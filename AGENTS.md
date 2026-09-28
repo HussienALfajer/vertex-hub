@@ -91,6 +91,7 @@ End every substantial task with these sections, in this order:
 2. **Changed** — what was built or modified.
 3. **Verified** — checks run and their results.
 4. **Found** — issues, risks, or follow-ups noticed.
+5. **Next step** — always last: the next task you recommend (from `docs/ROADMAP.md` or what this task uncovered), why it comes next, and what it needs from the owner before it can start.
 
 ## Language
 
