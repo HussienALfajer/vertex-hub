@@ -17,6 +17,8 @@ This project is independent. Do not read or reuse other folders on this machine 
 | `docs/specs/<feature>.md` | Detailed spec per feature, written before implementation. |
 | `docs/open-questions.md` | Unresolved decisions. Never guess an answer to one: ask. |
 | `docs/workflow.md` | How work is run with AI coding agents (feature cycle, effort, sessions). |
+| `brand/identity.md` | Visual identity: colors, typography, shape, motif, logo usage, patterns to avoid. Read before any UI work. |
+| `brand/` | The only home of logo files and brand assets. |
 
 Read these on demand. For a feature, read its spec, the ADRs it touches, and its section of `v1-scope.md`.
 
@@ -46,6 +48,7 @@ Not scaffolded yet. When the workspace exists, list the exact commands here: ins
 - **Module boundaries:** an api module reaches another module only through that module's exported service, never its tables directly.
 - **Design system only:** the UI uses `packages/ui` components and tokens; no ad-hoc colors, fonts, or spacing.
 - **No secrets in the repo** (it is public). Use git-ignored `.env` files and keep `.env.example` with fake values.
+- **No licensed fonts in the repo.** Madani Arabic files stay in git-ignored `brand/fonts/private/`; builds must work with the fallback font.
 - **Archive, don't delete:** business records are archived, not hard-deleted.
 
 ## How to work

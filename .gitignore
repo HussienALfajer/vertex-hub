@@ -14,6 +14,9 @@ build/
 *.pem
 *.key
 
+# Licensed fonts (commercial; must never be published)
+brand/fonts/private/
+
 # Tests
 coverage/
 playwright-report/

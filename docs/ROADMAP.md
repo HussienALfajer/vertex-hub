@@ -9,7 +9,8 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done. Feature IDs
 - [ ] `apps/api` skeleton: NestJS, nestjs-zod, OpenAPI, pino, health endpoint
 - [ ] `apps/worker` skeleton: pg-boss wiring
 - [ ] `apps/web` skeleton: Vite, TanStack Router/Query, i18next, RTL shell
-- [ ] Design system: tokens from the Vertex brand, base components in `packages/ui` (needs brand assets)
+- [x] Brand assets and visual identity (`brand/`, ADR 0011)
+- [ ] Design system: tokens from `brand/identity.md`, base components in `packages/ui` (Madani font files pending Q11; fallback until then)
 - [ ] Authentication (Better Auth) and permission guards
 - [ ] CI: typecheck, lint, test, build, gitleaks
 - [ ] Claude Code setup: `.claude/settings.json` (permissions, hooks), path-scoped rules, core skills and subagents
