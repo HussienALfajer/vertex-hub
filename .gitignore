@@ -1,0 +1,41 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+.turbo/
+*.tsbuildinfo
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Tests
+coverage/
+playwright-report/
+test-results/
+blob-report/
+
+# Local uploads and storage
+storage/
+uploads/
+
+# Logs
+*.log
+logs/
+
+# Local agent files
+CLAUDE.local.md
+.claude/settings.local.json
+TASKS.md
+
+# OS and editors
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+.idea/
