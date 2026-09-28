@@ -110,7 +110,8 @@ fi
 
 log "pruning old releases"
 active=$(readlink -f "$CURRENT")
+# grep exits 1 when nothing is left to prune; that is success, not a failed deploy.
 find "$RELEASES" -mindepth 1 -maxdepth 1 -type d | sort | head -n -"$KEEP_RELEASES" |
-  grep -v -x "$active" | xargs -r rm -rf
+  { grep -v -x "$active" || true; } | xargs -r rm -rf
 
 log "deployed ${sha:0:7}"
