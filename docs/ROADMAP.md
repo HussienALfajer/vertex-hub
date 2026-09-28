@@ -10,8 +10,8 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done. Feature IDs
 - [x] `apps/worker` skeleton: pg-boss wiring, sample heartbeat job
 - [x] `apps/web` skeleton: Vite, TanStack Router/Query, i18next, RTL shell, Playwright smoke test
 - [x] Brand assets and visual identity (`brand/`, ADR 0011)
-- [ ] Design system: tokens from `brand/identity.md`, base components in `packages/ui` (Madani font files pending Q11; fallback until then)
-- [ ] Authentication (Better Auth) and permission guards
+- [x] Design system: tokens from `brand/identity.md`, base components in `packages/ui`, app shell (Madani font files pending Q11; Noto Kufi Arabic fallback until then)
+- [x] Authentication (Better Auth), login page, permission map and guards (map provisional until the F01 spec, Q13)
 - [x] CI: typecheck, lint, test, build, e2e smoke, gitleaks
 - [~] Claude Code setup: `.claude/settings.json` (permissions, Biome hook) done; path-scoped rules, core skills and subagents pending
 - [ ] Deployment skeleton on the VPS (needs domain decision)

@@ -6,7 +6,8 @@ import { ENV, type Env } from './config/env.js';
 
 loadRootEnv();
 
-const app = await NestFactory.create(AppModule, { bufferLogs: true });
+// Better Auth parses its own request bodies; its Nest module re-adds parsers for other routes.
+const app = await NestFactory.create(AppModule, { bufferLogs: true, bodyParser: false });
 configureApp(app);
 app.enableShutdownHooks();
 

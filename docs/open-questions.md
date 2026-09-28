@@ -13,6 +13,7 @@ Decisions that belong to the owner. Agents must not guess answers to these. When
 | Q10 | License for the public repository (none means all rights reserved) | Anytime | — |
 | Q11 | Madani Arabic: is a license owned that covers web embedding and server-side PDF embedding? Which weights are available (need at least 400, 500, 700)? Provide the font files (WOFF2 preferred) privately | Design system (fallback works until then); required before launch | Buy/confirm a web license covering the number of users and PDF embedding |
 | Q12 | Original vector logo files (AI/EPS/SVG) from the designer, and confirmation of the wordmark typeface (appears to be Montserrat) | Before print materials; nice to have for UI | — |
+| Q13 | Permission map details: who manages users and roles (General Manager only, or also Internal Operations)? Who performs the medical review (a role, or membership of the Medical Consultation department)? Do account managers work leads? Do department managers manage templates? Which reports does Finance see? | F01 spec | Until answered, these grants stay with the General Manager only (`packages/contracts/src/permissions.ts`) |
 
 ## Resolved
 

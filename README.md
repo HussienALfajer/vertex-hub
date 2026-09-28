@@ -16,8 +16,12 @@ Requirements: Node 24, pnpm (via Corepack), PostgreSQL 17 running locally.
 pnpm install
 pnpm db:setup-local   # creates .env, the vertex_hub role and databases (asks for the postgres password)
 pnpm db:migrate
+pnpm build            # needed once for the next command
+pnpm --filter @vertex-hub/api user:create --email you@example.com --name "Your Name" --role general_manager
 pnpm dev              # api http://127.0.0.1:3000/api/docs · web http://127.0.0.1:5173
 ```
+
+`user:create` prints a generated password once; sign in with it at http://127.0.0.1:5173/login. Self sign-up is disabled.
 
 All commands are listed in [AGENTS.md](AGENTS.md#commands).
 

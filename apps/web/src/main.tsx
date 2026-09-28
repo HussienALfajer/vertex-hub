@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createRouter, RouterProvider } from '@tanstack/react-router';
+import { DirectionProvider, Toaster } from '@vertex-hub/ui';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import i18n from './i18n';
@@ -27,8 +28,12 @@ if (!root) throw new Error('Missing #root element');
 
 createRoot(root).render(
   <StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} />
-    </QueryClientProvider>
+    <DirectionProvider direction="rtl">
+      <QueryClientProvider client={queryClient}>
+        <Toaster closeLabel={i18n.t('common.close')}>
+          <RouterProvider router={router} />
+        </Toaster>
+      </QueryClientProvider>
+    </DirectionProvider>
   </StrictMode>,
 );

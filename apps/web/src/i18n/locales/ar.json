@@ -1,10 +1,60 @@
 {
   "app": {
-    "name": "Vertex Hub"
+    "name": "Vertex Hub",
+    "brand": "Vertex Media",
+    "tagline": "منصة العمليات الداخلية"
+  },
+  "common": {
+    "close": "أغلق",
+    "cancel": "إلغاء",
+    "loading": "جارٍ التحميل…",
+    "errorTitle": "حدث خطأ غير متوقع",
+    "errorBody": "أعد تحميل الصفحة. إن تكرر الخطأ فأبلغ فريق العمليات.",
+    "reload": "أعد التحميل",
+    "notFoundTitle": "الصفحة غير موجودة",
+    "backHome": "عد إلى الرئيسية"
+  },
+  "nav": {
+    "label": "التنقل الرئيسي",
+    "open": "افتح القائمة",
+    "home": "الرئيسية",
+    "designSystem": "نظام التصميم"
+  },
+  "theme": {
+    "toDark": "فعّل الوضع الداكن",
+    "toLight": "فعّل الوضع الفاتح"
+  },
+  "user": {
+    "menu": "قائمة الحساب",
+    "signOut": "سجّل الخروج"
+  },
+  "roles": {
+    "general_manager": "المدير العام",
+    "department_manager": "مدير قسم",
+    "employee": "موظف",
+    "account_manager": "مدير حساب",
+    "finance": "المالية"
+  },
+  "login": {
+    "title": "تسجيل الدخول",
+    "subtitle": "ادخل بحسابك في Vertex Hub.",
+    "email": "البريد الإلكتروني",
+    "password": "كلمة المرور",
+    "submit": "ادخل",
+    "submitting": "جارٍ الدخول…",
+    "errors": {
+      "email": "اكتب بريدًا إلكترونيًا صحيحًا.",
+      "password": "اكتب كلمة المرور.",
+      "invalid": "البريد الإلكتروني أو كلمة المرور غير صحيحة.",
+      "tooMany": "محاولات كثيرة. انتظر قليلًا ثم حاول مجددًا.",
+      "generic": "تعذّر تسجيل الدخول الآن. حاول مجددًا."
+    }
   },
   "home": {
-    "title": "مرحبًا بك في منصة العمليات",
-    "subtitle": "المنصة قيد الإنشاء."
+    "title": "الرئيسية",
+    "greeting": "مرحبًا، {{name}}",
+    "rolesTitle": "أدوارك",
+    "rolesEmpty": "لم تُسند إليك أدوار بعد."
   },
   "status": {
     "label": "حالة النظام",
@@ -13,5 +63,64 @@
     "error": "متوقف",
     "unreachable": "تعذّر الاتصال بالخادم",
     "checkedAt": "آخر فحص: {{time}}"
+  },
+  "workflow": {
+    "new": "جديدة",
+    "in_progress": "قيد التنفيذ",
+    "internal_review": "مراجعة داخلية",
+    "awaiting_client": "بانتظار العميل",
+    "revisions": "تعديلات",
+    "approved": "معتمدة",
+    "delivered": "مسلّمة"
+  },
+  "designSystem": {
+    "title": "نظام التصميم",
+    "subtitle": "المكونات الأساسية بهوية Vertex، للمراجعة.",
+    "colors": "الألوان",
+    "buttons": "الأزرار",
+    "primary": "احفظ",
+    "secondary": "معاينة",
+    "outline": "صدّر",
+    "ghost": "تجاهل",
+    "destructive": "أرشف",
+    "fields": "الحقول",
+    "clientName": "اسم العميل",
+    "clientNamePlaceholder": "مثال: مطعم الياسمين",
+    "clientNameHint": "الاسم التجاري كما يظهر في العقود.",
+    "department": "القسم",
+    "departmentPlaceholder": "اختر القسم",
+    "departments": {
+      "design": "التصميم",
+      "content": "المحتوى",
+      "video": "التصوير والمونتاج"
+    },
+    "statuses": "حالات العمل",
+    "table": "جدول",
+    "task": "المهمة",
+    "client": "العميل",
+    "due": "الاستحقاق",
+    "amount": "المبلغ",
+    "status": "الحالة",
+    "sampleTasks": {
+      "logo": "هوية بصرية كاملة",
+      "reel": "ريل ترويجي",
+      "calendar": "خطة محتوى الشهر"
+    },
+    "sampleClients": {
+      "jasmine": "مطعم الياسمين",
+      "clinic": "عيادة الشفاء",
+      "store": "متجر البيت"
+    },
+    "overlays": "الحوار والقوائم والإشعارات",
+    "openDialog": "افتح الحوار",
+    "dialogTitle": "أرشفة المشروع",
+    "dialogBody": "ينتقل المشروع إلى الأرشيف ويبقى سجله محفوظًا. يمكنك استعادته لاحقًا.",
+    "openMenu": "إجراءات",
+    "menuEdit": "عدّل",
+    "menuDuplicate": "انسخ",
+    "menuArchive": "أرشف",
+    "showToast": "أظهر إشعارًا",
+    "toastTitle": "حُفظت التغييرات",
+    "toastBody": "تحدّث ملف العميل."
   }
 }
