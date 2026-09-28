@@ -26,10 +26,10 @@ vertex-hub/
 
 | Layer | Choice | ADR |
 |---|---|---|
-| Language / runtime | TypeScript strict, Node 24 | 0001 |
+| Language / runtime | TypeScript strict (~6.0), ESM, Node 24 | 0001, 0012 |
 | Monorepo | pnpm workspaces, Turborepo | 0001 |
-| API framework | NestJS, Express adapter | 0002 |
-| Validation / API docs | Zod in `packages/contracts`, nestjs-zod, OpenAPI via @nestjs/swagger | 0002 |
+| API framework | NestJS 12, Express adapter | 0002, 0012 |
+| Validation / API docs | Zod in `packages/contracts`, NestJS native Standard Schema pipe and serializer, OpenAPI via @nestjs/swagger | 0012 |
 | Database | PostgreSQL 17 | 0005 |
 | Data access | Drizzle ORM, drizzle-kit migrations | 0005 |
 | Authentication | Better Auth (sessions in PostgreSQL, optional 2FA) | 0002 |
@@ -86,6 +86,6 @@ Deployment follows the server's existing conventions (ADR 0009): a dedicated sys
 
 ## Environments
 
-- **Local (Windows):** PostgreSQL 17 installed locally (see open questions), `pnpm dev` runs api, worker and web.
+- **Local (Windows):** PostgreSQL 17 installed natively; `pnpm db:setup-local` creates the role and the `vertex_hub` and `vertex_hub_test` databases. `pnpm dev` runs api (:3000), worker and web (:5173, proxies `/api`).
 - **CI:** GitHub Actions with a PostgreSQL service container.
 - **Production:** the owner's VPS. No staging in V1.

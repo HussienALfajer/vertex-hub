@@ -1,0 +1,12 @@
+packages:
+  - apps/*
+  - packages/*
+
+# Supply-chain guard: only install versions published at least 24 hours ago.
+minimumReleaseAge: 1440
+
+# Dependencies allowed to run install scripts. Everything else is blocked.
+allowBuilds:
+  '@scarf/scarf': false # install telemetry from swagger-ui-dist
+  '@swc/core': false # the native binary arrives as an optional dependency
+  esbuild: true

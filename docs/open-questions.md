@@ -5,10 +5,8 @@ Decisions that belong to the owner. Agents must not guess answers to these. When
 | ID | Question | Needed before | Recommendation |
 |---|---|---|---|
 | Q1 | Domain for the system (e.g. a `hub.` subdomain of the company domain)? | First deployment | — |
-| Q3 | Digits in the UI: Latin (123) or Arabic-Indic (١٢٣)? | Design system | Latin, clearer for financial figures |
 | Q4 | Off-server backup destination (none exists on the server today) | Launch | Required before launch: the system holds invoices and client data |
 | Q5 | Email provider for notifications (SMTP) | F14 email | — |
-| Q6 | Local PostgreSQL for development: native Windows install or Docker Desktop? | Phase 0 scaffold | Native PostgreSQL 17, matching production |
 | Q7 | Add swap on the server (none today) as a safety margin for Chromium PDF rendering? | Launch | 2–4 GB |
 | Q8 | ISO currency code used for the redenominated Syrian pound | F13 | Confirm current official code |
 | Q9 | Work week and first day of the week in calendars (weekend days) | F08, F11 | — |
@@ -29,3 +27,5 @@ Decisions that belong to the owner. Agents must not guess answers to these. When
 | Backend framework | NestJS (ADR 0002) | 2026-09-28 |
 | Repository visibility | Public on GitHub | 2026-09-28 |
 | Brand assets and fonts (was Q2) | Logo provided (`brand/logo/`); identity derived in `brand/identity.md`; Arabic font Madani Arabic, Latin Montserrat (ADR 0011) | 2026-09-28 |
+| Digits in the UI (was Q3) | Latin digits (123), formatted with the `ar-u-nu-latn` locale | 2026-09-28 |
+| Local PostgreSQL for development (was Q6) | PostgreSQL 17 installed natively on Windows, matching production | 2026-09-28 |

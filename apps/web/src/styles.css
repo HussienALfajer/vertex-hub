@@ -1,0 +1,33 @@
+/*
+ * Structural placeholder until the design system (packages/ui) lands: no brand colors or fonts here.
+ * Logical properties only (inline = start/end), so the layout follows dir="rtl".
+ */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, sans-serif;
+  line-height: 1.6;
+}
+
+.shell-header {
+  padding-block: 1rem;
+  padding-inline: 1.5rem;
+  border-block-end: 1px solid color-mix(in srgb, currentColor 15%, transparent);
+}
+
+.shell-brand {
+  font-weight: 700;
+}
+
+.shell-main {
+  max-inline-size: 60rem;
+  margin-inline: auto;
+  padding-block: 2rem;
+  padding-inline: 1.5rem;
+  text-align: start;
+}

@@ -4,16 +4,16 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done. Feature IDs
 
 ## Phase 0 — Foundation
 - [x] Product scope, decisions and working method documented
-- [ ] Monorepo scaffold (pnpm, Turborepo, TypeScript, Biome, shared config)
-- [ ] `packages/db` with Drizzle and first migration; local PostgreSQL
-- [ ] `apps/api` skeleton: NestJS, nestjs-zod, OpenAPI, pino, health endpoint
-- [ ] `apps/worker` skeleton: pg-boss wiring
-- [ ] `apps/web` skeleton: Vite, TanStack Router/Query, i18next, RTL shell
+- [x] Monorepo scaffold (pnpm, Turborepo, TypeScript, Biome, shared config)
+- [x] `packages/db` with Drizzle and first migration; local PostgreSQL (`pnpm db:setup-local`)
+- [x] `apps/api` skeleton: NestJS 12, native Standard Schema validation (ADR 0012), OpenAPI, pino, `/api/health`
+- [x] `apps/worker` skeleton: pg-boss wiring, sample heartbeat job
+- [x] `apps/web` skeleton: Vite, TanStack Router/Query, i18next, RTL shell, Playwright smoke test
 - [x] Brand assets and visual identity (`brand/`, ADR 0011)
 - [ ] Design system: tokens from `brand/identity.md`, base components in `packages/ui` (Madani font files pending Q11; fallback until then)
 - [ ] Authentication (Better Auth) and permission guards
-- [ ] CI: typecheck, lint, test, build, gitleaks
-- [ ] Claude Code setup: `.claude/settings.json` (permissions, hooks), path-scoped rules, core skills and subagents
+- [x] CI: typecheck, lint, test, build, e2e smoke, gitleaks
+- [~] Claude Code setup: `.claude/settings.json` (permissions, Biome hook) done; path-scoped rules, core skills and subagents pending
 - [ ] Deployment skeleton on the VPS (needs domain decision)
 
 ## Phase 1 — Core

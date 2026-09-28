@@ -1,6 +1,6 @@
 # 0002 — NestJS backend with Zod contracts and Better Auth
 
-Status: Accepted · Date: 2026-09-28
+Status: Accepted, validation bullet superseded by [0012](0012-nestjs-12-native-standard-schema.md) · Date: 2026-09-28
 
 ## Context
 The backend has ~19 domain modules, role-based permissions, audit logging and background jobs. Hono was proposed for its small footprint; the owner chose NestJS for its enforced structure (modules, dependency injection, guards, interceptors), which suits a system expected to grow for years.

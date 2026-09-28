@@ -8,6 +8,19 @@ Arabic-first (RTL) web application.
 
 Early development — Phase 0 (foundation). See [docs/ROADMAP.md](docs/ROADMAP.md).
 
+## Getting started
+
+Requirements: Node 24, pnpm (via Corepack), PostgreSQL 17 running locally.
+
+```bash
+pnpm install
+pnpm db:setup-local   # creates .env, the vertex_hub role and databases (asks for the postgres password)
+pnpm db:migrate
+pnpm dev              # api http://127.0.0.1:3000/api/docs · web http://127.0.0.1:5173
+```
+
+All commands are listed in [AGENTS.md](AGENTS.md#commands).
+
 ## Documentation
 
 - [V1 scope](docs/product/v1-scope.md)
