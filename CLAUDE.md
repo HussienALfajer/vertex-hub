@@ -17,6 +17,7 @@
 ## Skills
 
 - `/spec <feature>`: interview the owner, then write `docs/specs/<feature>.md`.
+- `/feature-slice <feature>`: implement an approved spec layer by layer (contracts → db → api → web → E2E) with a check gate per layer, the reviewer and the owner's acceptance steps; stops before `/ship`.
 - `/db-migration`: change the schema, generate and review the migration, test it.
 - `/ship`: final checks, commit, PR with auto-merge, final report.
 
@@ -28,7 +29,7 @@
 
 ## Feature workflow
 
-`/spec` → plan (plan mode) → implement → `reviewer` → owner verifies → `/ship` → update `docs/ROADMAP.md`. Details in `docs/workflow.md`.
+`/spec` (own session, `high`) → `/feature-slice` (one session per PR: plan, implement, `reviewer`, owner acceptance) → `/ship` (updates `docs/ROADMAP.md`). Production deploys happen once per phase, in their own session. Sessions, effort and first messages: `docs/workflow.md`.
 
 ## Compaction
 

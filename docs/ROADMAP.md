@@ -1,6 +1,6 @@
 # Roadmap
 
-Status legend: `[ ]` not started · `[~]` in progress · `[x]` done. Feature IDs refer to `docs/product/v1-scope.md`.
+Status legend: `[ ]` not started · `[~]` in progress · `[x]` done. Feature IDs refer to `docs/product/v1-scope.md`. Production is deployed once at the end of each phase (`docs/workflow.md`).
 
 ## Phase 0 — Foundation
 - [x] Product scope, decisions and working method documented
@@ -19,7 +19,7 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done. Feature IDs
 
 ## Phase 1 — Core
 - [x] F01 Users, departments, roles and permissions (spec: `docs/specs/F01-users-roles.md`): access core, users and departments API, web screens; owner acceptance passed
-- [ ] `feature-slice` skill (contracts → db → api → web → tests), extracted from F01 as the reference module
+- [x] `feature-slice` skill (contracts → db → api → web → tests), extracted from F01: layer gates, new-module wiring checklist, F01 patterns to copy
 - [ ] F02 Clients
 - [ ] F05 Projects and retainers
 - [ ] F06 Task engine and workflow
@@ -27,6 +27,7 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done. Feature IDs
 - [ ] F14 Notifications (in-app)
 - [ ] Automations A03, A07, A08
 - [ ] Pilot with 2–3 real clients
+- [ ] Production deploy of Phase 1
 
 ## Phase 2 — Production and client
 - [ ] F08 Content calendar
@@ -34,6 +35,7 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done. Feature IDs
 - [ ] F10 Files and versions
 - [ ] F11 Unified calendar and shoots
 - [ ] Automations A02 (task part), A04, A05, A06, A09, A13
+- [ ] Production deploy of Phase 2
 
 ## Phase 3 — Money and sales
 - [ ] F04 Service catalog and quotes
@@ -41,10 +43,12 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done. Feature IDs
 - [ ] F12 Ad campaigns and ad budget
 - [ ] F03 Leads
 - [ ] Automations A01, A02 (invoice part), A10, A11, A12
+- [ ] Production deploy of Phase 3
 
 ## Phase 4 — Visibility
 - [ ] F15 Dashboards and reports (incl. monthly client report)
 - [ ] F14 Email and daily digest
+- [ ] Production deploy of Phase 4
 
 ## Launch checklist
 - [ ] Off-server backups configured and a restore tested

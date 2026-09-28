@@ -101,7 +101,7 @@ End every substantial task with these sections, in this order:
 2. **Changed** — what was built or modified.
 3. **Verified** — checks run and their results.
 4. **Found** — issues, risks, or follow-ups noticed.
-5. **Next step** — always last: the next task you recommend (from `docs/ROADMAP.md` or what this task uncovered), why it comes next, and what it needs from the owner before it can start.
+5. **Next step** — always last: the next task you recommend (from `docs/ROADMAP.md` or what this task uncovered), why it comes next, and what it needs from the owner before it can start. Then, in this order: whether it needs a new session (and `/clear` first), the model and effort to set before the first message (from the session table in `docs/workflow.md`), and the exact first message to send, in its own code block.
 
 ## Language
 

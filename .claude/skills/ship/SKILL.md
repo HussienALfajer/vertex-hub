@@ -15,5 +15,6 @@ Ship the current branch. Stop and report at the first step that fails.
 6. **Pull request:** `git push -u origin <branch>`, then `gh pr create --base main` with a body of `## Summary` (what and why, in bullets) and `## Test plan` (the checks run, as ticked boxes), ending with the session's attribution line. Then `gh pr merge <number> --auto --merge`, never squash or rebase.
 7. **Report** in the format from `AGENTS.md`, in Arabic. Put the PR link under Changed, and end "Needs from you" with the cleanup line:
    `cd D:\vertex-hub; git switch main; git pull --ff-only; git branch -d <branch>`
+   End with "Next step" as `AGENTS.md` requires: whether the next session needs `/clear`, its model and effort (`docs/workflow.md`), and its exact first message in a code block.
 
 $ARGUMENTS

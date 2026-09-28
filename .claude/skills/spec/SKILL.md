@@ -26,4 +26,4 @@ Write the spec for **$ARGUMENTS**.
 - Mark the feature `[~]` in `docs/ROADMAP.md`.
 
 ## 4. Hand over
-Summarize the spec for the owner in Arabic, in a few lines: what V1 of the feature does, the main rules, what stays open. Ask for approval before planning.
+Summarize the spec for the owner in Arabic, in a few lines: what V1 of the feature does, the main rules, what stays open. Revise it until the owner approves, then set `Status: Approved`. The spec ships on its own through `/ship` (branch `docs/<id>-spec`), and the next session starts `/feature-slice <id>`.
