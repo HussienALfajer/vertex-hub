@@ -8,15 +8,19 @@
     "build": "nest build",
     "start": "node dist/main.js",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "user:create": "node dist/cli/create-user.js"
   },
   "dependencies": {
     "@nestjs/common": "^12.1.0",
     "@nestjs/core": "^12.1.0",
     "@nestjs/platform-express": "^12.1.0",
     "@nestjs/swagger": "^12.0.2",
+    "@thallesp/nestjs-better-auth": "^2.8.0",
     "@vertex-hub/contracts": "workspace:*",
     "@vertex-hub/db": "workspace:*",
+    "better-auth": "^1.7.6",
+    "drizzle-orm": "^0.45.3",
     "nestjs-pino": "^5.2.1",
     "pino": "^10.3.1",
     "pino-http": "^11.0.0",

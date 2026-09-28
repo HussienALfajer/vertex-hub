@@ -1,23 +1,10 @@
 import type { INestApplication } from '@nestjs/common';
 import type { OpenAPIObject } from '@nestjs/swagger';
-import { Test, type TestingModuleBuilder } from '@nestjs/testing';
 import { healthResponseSchema } from '@vertex-hub/contracts';
 import { createDatabase } from '@vertex-hub/db';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { AppModule } from '../src/app.module.js';
-import { configureApp } from '../src/app.setup.js';
 import { DATABASE } from '../src/database/database.module.js';
-
-async function startApp(
-  override?: (builder: TestingModuleBuilder) => void,
-): Promise<{ app: INestApplication; url: string }> {
-  const builder = Test.createTestingModule({ imports: [AppModule] });
-  override?.(builder);
-  const app = (await builder.compile()).createNestApplication({ bufferLogs: true });
-  configureApp(app);
-  await app.listen(0, '127.0.0.1');
-  return { app, url: await app.getUrl() };
-}
+import { startApp } from './start-app.js';
 
 describe('api against the test database', () => {
   let app: INestApplication;
@@ -62,8 +49,10 @@ describe('api with an unreachable database', () => {
   let url: string;
 
   beforeAll(async () => {
-    ({ app, url } = await startApp((builder) => {
-      builder.overrideProvider(DATABASE).useValue(unreachable.db);
+    ({ app, url } = await startApp({
+      override: (builder) => {
+        builder.overrideProvider(DATABASE).useValue(unreachable.db);
+      },
     }));
   });
   afterAll(async () => {

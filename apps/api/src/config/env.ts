@@ -1,12 +1,32 @@
+import { createHash } from 'node:crypto';
 import { z } from 'zod';
 
-export const envSchema = z.object({
-  NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
-  LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
-  API_HOST: z.string().min(1).default('127.0.0.1'),
-  API_PORT: z.coerce.number().int().min(1).max(65535).default(3000),
-  DATABASE_URL: z.url({ protocol: /^postgres(ql)?$/ }),
-});
+export const envSchema = z
+  .object({
+    NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
+    LOG_LEVEL: z
+      .enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'])
+      .default('info'),
+    API_HOST: z.string().min(1).default('127.0.0.1'),
+    API_PORT: z.coerce.number().int().min(1).max(65535).default(3000),
+    DATABASE_URL: z.url({ protocol: /^postgres(ql)?$/ }),
+    /** Public origin of the web app; the API is served under it at /api (nginx or the Vite proxy). */
+    APP_URL: z.url({ protocol: /^https?$/ }).default('http://127.0.0.1:5173'),
+    /** Signs session cookies. Required in production; derived locally when unset. */
+    BETTER_AUTH_SECRET: z.string().min(32).optional(),
+  })
+  .refine((env) => env.NODE_ENV !== 'production' || env.BETTER_AUTH_SECRET, {
+    message: 'BETTER_AUTH_SECRET is required in production',
+    path: ['BETTER_AUTH_SECRET'],
+  })
+  .transform(({ BETTER_AUTH_SECRET, ...env }) => ({
+    ...env,
+    // Outside production, fall back to a stable per-machine value: DATABASE_URL carries the random
+    // password that `pnpm db:setup-local` generated, and it never leaves the machine.
+    BETTER_AUTH_SECRET:
+      BETTER_AUTH_SECRET ??
+      createHash('sha256').update(`vertex-hub-dev-auth:${env.DATABASE_URL}`).digest('hex'),
+  }));
 
 export type Env = z.infer<typeof envSchema>;
 
