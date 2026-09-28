@@ -80,12 +80,13 @@ API docs (non-production): `http://127.0.0.1:3000/api/docs`. Health: `GET /api/h
 
 - Conventional Commits (`feat:`, `fix:`, `docs:`, `chore:`, `refactor:`, `test:`).
 - One branch per feature (`feat/<feature>`), merged to `main` through a PR after CI passes.
+- Right after opening a PR, enable auto-merge with a merge commit: `gh pr merge <number> --auto --merge`. `main` requires the three CI checks, so the PR merges only when CI is green, and GitHub then deletes the remote branch. Never squash or rebase-merge: the owner's cleanup uses `git branch -d`, which refuses branches merged that way.
 
 ## Reporting
 
 End every substantial task with these sections, in this order:
 
-1. **Needs from you** — decisions or approvals blocking progress, or "nothing".
+1. **Needs from you** — decisions or approvals blocking progress, or "nothing". Whenever the task opened or merged a PR, always end this section with the local cleanup line for that PR's branch, in a code block, to run after the merge: `git switch main; git pull --ff-only; git branch -d <branch>`
 2. **Changed** — what was built or modified.
 3. **Verified** — checks run and their results.
 4. **Found** — issues, risks, or follow-ups noticed.
