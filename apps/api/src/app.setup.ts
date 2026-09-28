@@ -1,7 +1,7 @@
 import type { INestApplication } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { Logger } from 'nestjs-pino';
-import { ENV, type Env } from './config/env.js';
+import { ENV, type Env } from './core/config/env.js';
 
 export const API_PREFIX = 'api';
 

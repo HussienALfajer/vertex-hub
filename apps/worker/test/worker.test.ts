@@ -3,7 +3,7 @@ import { Test } from '@nestjs/testing';
 import { type Database, workerHeartbeats } from '@vertex-hub/db';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { DATABASE } from '../src/database/database.module.js';
+import { DATABASE } from '../src/core/database/database.module.js';
 import { HEARTBEAT_CRON, HEARTBEAT_QUEUE, HeartbeatJob } from '../src/jobs/heartbeat.job.js';
 import { PgBossService } from '../src/jobs/pg-boss.service.js';
 import { WorkerModule } from '../src/worker.module.js';

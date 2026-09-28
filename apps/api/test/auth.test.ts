@@ -4,8 +4,8 @@ import { createDatabase, users } from '@vertex-hub/db';
 import { testDatabaseUrl } from '@vertex-hub/db/testing';
 import { inArray } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createUser } from '../src/auth/create-user.js';
-import { RequirePermissions } from '../src/auth/require-permissions.decorator.js';
+import { createUser } from '../src/modules/auth/create-user.js';
+import { RequirePermissions } from '../src/modules/auth/require-permissions.decorator.js';
 import { startApp } from './start-app.js';
 
 /** Test-only routes exercising the permission guard. */

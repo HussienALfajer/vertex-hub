@@ -1,7 +1,7 @@
 import { Inject, Injectable, Logger, type OnApplicationBootstrap } from '@nestjs/common';
 import { type Database, workerHeartbeats } from '@vertex-hub/db';
-import { ENV, type Env } from '../config/env.js';
-import { DATABASE } from '../database/database.module.js';
+import { ENV, type Env } from '../core/config/env.js';
+import { DATABASE } from '../core/database/database.module.js';
 import { PgBossService } from './pg-boss.service.js';
 
 export const HEARTBEAT_QUEUE = 'system.heartbeat';

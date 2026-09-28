@@ -2,7 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import type { Role } from '@vertex-hub/contracts';
 import { type Database, userRoles } from '@vertex-hub/db';
 import { asc, eq } from 'drizzle-orm';
-import { DATABASE } from '../database/database.module.js';
+import { DATABASE } from '../../core/database/database.module.js';
 
 @Injectable()
 export class RolesService {

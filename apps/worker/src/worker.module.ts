@@ -1,8 +1,8 @@
 import { Module } from '@nestjs/common';
 import { LoggerModule } from 'nestjs-pino';
-import { ConfigModule } from './config/config.module.js';
-import { ENV, type Env } from './config/env.js';
-import { DatabaseModule } from './database/database.module.js';
+import { ConfigModule } from './core/config/config.module.js';
+import { ENV, type Env } from './core/config/env.js';
+import { DatabaseModule } from './core/database/database.module.js';
 import { HeartbeatJob } from './jobs/heartbeat.job.js';
 import { PgBossService } from './jobs/pg-boss.service.js';
 

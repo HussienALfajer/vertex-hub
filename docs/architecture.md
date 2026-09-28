@@ -9,8 +9,8 @@ One repository (pnpm workspaces + Turborepo) with separately deployable apps and
 ```
 vertex-hub/
 ├── apps/
-│   ├── api/          NestJS HTTP API (Express adapter), one module per domain
-│   ├── worker/       NestJS standalone context: pg-boss jobs, PDF, email
+│   ├── api/          NestJS HTTP API (Express adapter): src/core (infrastructure), src/modules (one per domain)
+│   ├── worker/       NestJS standalone context: src/core, src/jobs (pg-boss jobs, PDF, email)
 │   └── web/          React 19 + Vite SPA
 ├── packages/
 │   ├── contracts/    Zod schemas, shared types, permission map
@@ -58,7 +58,7 @@ vertex-hub/
 
 `auth` · `users` · `clients` · `leads` · `catalog` · `quotes` · `projects` · `retainers` · `tasks` · `templates` · `content` · `approvals` · `files` · `shoots` · `campaigns` · `billing` · `notifications` · `reports` · `audit`
 
-Rules:
+Rules (module anatomy, naming and the tests that enforce them: ADR 0013):
 - A module owns its tables. Other modules call its exported service; they never query its tables.
 - Controllers stay thin: validate (Zod DTO), authorize (guard), delegate to a service.
 - Anything slow or scheduled (PDF, email, reminders, monthly cycles) is enqueued with pg-boss and handled by `apps/worker`, which reuses the same modules.

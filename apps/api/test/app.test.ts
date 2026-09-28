@@ -3,7 +3,7 @@ import type { OpenAPIObject } from '@nestjs/swagger';
 import { healthResponseSchema } from '@vertex-hub/contracts';
 import { createDatabase } from '@vertex-hub/db';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { DATABASE } from '../src/database/database.module.js';
+import { DATABASE } from '../src/core/database/database.module.js';
 import { startApp } from './start-app.js';
 
 describe('api against the test database', () => {

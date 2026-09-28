@@ -5,11 +5,11 @@ import {
 } from '@nestjs/common';
 import { APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core';
 import { LoggerModule } from 'nestjs-pino';
-import { AuthModule } from './auth/auth.module.js';
-import { ConfigModule } from './config/config.module.js';
-import { ENV, type Env } from './config/env.js';
-import { DatabaseModule } from './database/database.module.js';
-import { HealthModule } from './health/health.module.js';
+import { ConfigModule } from './core/config/config.module.js';
+import { ENV, type Env } from './core/config/env.js';
+import { DatabaseModule } from './core/database/database.module.js';
+import { AuthModule } from './modules/auth/index.js';
+import { HealthModule } from './modules/health/index.js';
 
 @Module({
   imports: [

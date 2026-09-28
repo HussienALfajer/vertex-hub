@@ -9,7 +9,7 @@ import { parseArgs } from 'node:util';
 import { roleSchema } from '@vertex-hub/contracts';
 import { createDatabase, loadRootEnv } from '@vertex-hub/db';
 import { z } from 'zod';
-import { createUser } from '../auth/create-user.js';
+import { createUser } from '../modules/auth/index.js';
 
 const argsSchema = z.object({
   email: z.email(),
