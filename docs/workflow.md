@@ -96,6 +96,36 @@ Avoid `max` unless a gain is measured. Agent teams (~7× tokens), fast mode (2×
 - Codex reads `AGENTS.md` directly and can continue work when Claude limits are reached.
 - Everything needed to resume lives in `docs/`, `TASKS.md` and git history.
 
+## Cloud sessions
+
+Sessions can run on the owner's machine (**Local**) or in a Claude Code cloud environment (**Cloud**, Ubuntu 24.04). Skills, subagents, hooks, `CLAUDE.md` files and settings come with the repository, and the two scripts below give a cloud session the same toolchain and databases as the owner's machine, so the spec, backend and web sessions can all run in the cloud.
+
+| Script | Runs | Does |
+|---|---|---|
+| `scripts/cloud-setup.sh` | Once per environment, as its setup script; the result is cached (rebuilt when the script or network list changes, or after about seven days) | Installs Node 24, pulls the `postgres:17` image, installs Chromium for Playwright |
+| `scripts/cloud-session.sh` | On every cloud session start and resume (SessionStart hook in `.claude/settings.json`); exits at once outside the cloud | Starts PostgreSQL 17, `pnpm install`, creates `.env` and the dev and test databases (`db:setup-local`), `db:migrate`, checks Chromium |
+
+The dev database in a cloud session is disposable, so the hook migrates it without asking. No secret is needed: `.env` gets a random password on each VM.
+
+### One-time setup (the owner, at claude.ai/code)
+1. Create a cloud environment named `vertex-hub`.
+2. **Network access:** Custom, with the default (Trusted) domains included, plus `cdn.playwright.dev` and `playwright.download.prss.microsoft.com`.
+3. **Setup script:** paste the whole of `scripts/cloud-setup.sh`. Paste it again whenever that file changes.
+4. **Environment variables:** none.
+5. The Claude GitHub App is installed on the repository (needed to clone and push).
+
+### What stays local
+- **Production deploys** (`ssh vertex`): the server's SSH key never goes into a cloud environment, where every process in the session could read it.
+- **The owner's acceptance test in the browser:** the app in a cloud VM is not reachable from the owner's browser. Pull the branch into the local checkout (`git fetch; git switch <branch>`), run `pnpm db:migrate` and `pnpm dev`, then return to the cloud session to report findings.
+- Madani font files (not in the repository; builds use the fallback font, as in CI).
+
+### Differences in use
+- `/clear` does not exist: start a new session from the sidebar instead.
+- Set the model and effort with arguments before the first message: `/model opus`, `/effort high`.
+- The owner's personal `~/.claude/` files are not loaded; everything the project needs is in the repository.
+- The cleanup line after a merge is for the local checkout; run it there before the next local session.
+- If the hook reports a problem ("Cloud session problems"), fix the environment before running checks: a check that fails for environment reasons says nothing about the code.
+
 ## References
 
 - Getting the most out of Opus 5.5 — https://claude.dev/blog/getting-the-most-out-of-opus-5-5/
