@@ -12,7 +12,7 @@ Decisions that belong to the owner. Agents must not guess answers to these. When
 | Q10 | License for the public repository (none means all rights reserved) | Anytime | — |
 | Q11 | Madani Arabic: is a license owned that covers web embedding and server-side PDF embedding? Which weights are available (need at least 400, 500, 700)? Provide the font files (WOFF2 preferred) privately | Design system (fallback works until then); required before launch | Buy/confirm a web license covering the number of users and PDF embedding |
 | Q12 | Original vector logo files (AI/EPS/SVG) from the designer, and confirmation of the wordmark typeface (appears to be Montserrat) | Before print materials; nice to have for UI | — |
-| Q13 | Permission map details: who manages users and roles (General Manager only, or also Internal Operations)? Who performs the medical review (a role, or membership of the Medical Consultation department)? Do account managers work leads? Do department managers manage templates? Which reports does Finance see? | F01 spec | Until answered, these grants stay with the General Manager only (`packages/contracts/src/permissions.ts`) |
+| Q14 | Should the Internal Operations manager see and reassign tasks across all departments (workload distribution)? | F06 spec | Yes: `tasks.read` and `tasks.manage` with scope `all`, plus `reports.read` `all` |
 
 ## Resolved
 
@@ -29,4 +29,5 @@ Decisions that belong to the owner. Agents must not guess answers to these. When
 | Domain for the system (was Q1) | `hub.vertexmedia.pro`, a subdomain of the company domain (docs/deployment.md) | 2026-09-28 |
 | Brand assets and fonts (was Q2) | Logo provided (`brand/logo/`); identity derived in `brand/identity.md`; Arabic font Madani Arabic, Latin Montserrat (ADR 0011) | 2026-09-28 |
 | Digits in the UI (was Q3) | Latin digits (123), formatted with the `ar-u-nu-latn` locale | 2026-09-28 |
+| Permission map details (was Q13) | Users, roles and the audit log: General Manager + Internal Operations manager. Medical review: members of Medical Consultation. Leads: General Communication and Marketing (all), account managers (their own). Templates: managed by General Manager + Internal Operations manager, read by department managers. Finance: financial reports only (`docs/specs/F01-users-roles.md`, ADR 0014) | 2026-09-28 |
 | Local PostgreSQL for development (was Q6) | PostgreSQL 17 installed natively on Windows, matching production | 2026-09-28 |
