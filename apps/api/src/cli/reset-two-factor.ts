@@ -33,7 +33,7 @@ try {
     process.exitCode = 1;
   } else {
     // No actor: the audit log records CLI changes as made by the system.
-    await resetTwoFactor(db, userId, null);
+    await db.transaction((tx) => resetTwoFactor(tx, userId, null));
     process.stdout.write(`Two-factor sign-in turned off for ${email}.\n`);
   }
 } finally {

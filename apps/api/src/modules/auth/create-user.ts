@@ -1,4 +1,8 @@
-import type { AssignableRole, DepartmentCode } from '@vertex-hub/contracts';
+import {
+  type AssignableRole,
+  type DepartmentCode,
+  MIN_PASSWORD_LENGTH,
+} from '@vertex-hub/contracts';
 import {
   accounts,
   type Database,
@@ -11,7 +15,6 @@ import {
 import { hashPassword } from 'better-auth/crypto';
 import { eq } from 'drizzle-orm';
 import { type AuditActor, recordAudit } from '../audit/index.js';
-import { MIN_PASSWORD_LENGTH } from './auth.config.js';
 
 export interface NewUser {
   name: string;

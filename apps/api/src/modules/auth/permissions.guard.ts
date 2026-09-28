@@ -8,16 +8,18 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { AuthService, type UserSession } from '@thallesp/nestjs-better-auth';
-import { type ErrorCode, hasPermission, type Permission } from '@vertex-hub/contracts';
+import { hasPermission, type Permission } from '@vertex-hub/contracts';
 import { fromNodeHeaders } from 'better-auth/node';
 import {
   ALLOW_PENDING_TWO_FACTOR,
   REQUIRE_SESSION,
   REQUIRED_PERMISSIONS,
 } from '../../core/access/index.js';
+import { CodedException } from '../../core/errors/index.js';
 import { AccessService } from './access.service.js';
+import type { RequestWithUser } from './current-user.decorator.js';
 
-interface AuthenticatedRequest {
+interface AuthenticatedRequest extends RequestWithUser {
   headers: IncomingHttpHeaders;
   session?: UserSession | null;
 }
@@ -62,17 +64,13 @@ export class PermissionsGuard implements CanActivate {
       targets,
     );
     if (resolved.twoFactor.required && !resolved.twoFactor.enabled && !pendingAllowed) {
-      const code: ErrorCode = 'TWO_FACTOR_REQUIRED';
-      throw new ForbiddenException({
-        statusCode: 403,
-        code,
-        message: 'Set up two-factor sign-in first',
-      });
+      throw new CodedException(403, 'TWO_FACTOR_REQUIRED', 'Set up two-factor sign-in first');
     }
 
     if (required && !required.every((permission) => hasPermission(resolved.access, permission))) {
       throw new ForbiddenException();
     }
+    request.currentUser = { id: session.user.id, name: session.user.name, ...resolved };
     return true;
   }
 }

@@ -1,5 +1,5 @@
 import type { INestApplication } from '@nestjs/common';
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { DocumentBuilder, type OpenAPIObject, SwaggerModule } from '@nestjs/swagger';
 import { Logger } from 'nestjs-pino';
 import { ENV, type Env } from './core/config/env.js';
 
@@ -14,8 +14,12 @@ export function configureApp(app: INestApplication): void {
   app.getHttpAdapter().getInstance().disable('x-powered-by');
 
   if (env.NODE_ENV !== 'production') {
-    const config = new DocumentBuilder().setTitle('Vertex Hub API').setVersion('0.0.0').build();
-    const document = SwaggerModule.createDocument(app, config);
-    SwaggerModule.setup(`${API_PREFIX}/docs`, app, document);
+    SwaggerModule.setup(`${API_PREFIX}/docs`, app, createOpenApiDocument(app));
   }
+}
+
+/** The OpenAPI document, generated from the contracts on each route (ADR 0012). */
+export function createOpenApiDocument(app: INestApplication): OpenAPIObject {
+  const config = new DocumentBuilder().setTitle('Vertex Hub API').setVersion('0.0.0').build();
+  return SwaggerModule.createDocument(app, config);
 }

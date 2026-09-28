@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "user:create": "node dist/cli/create-user.js",
-    "user:reset-two-factor": "node dist/cli/reset-two-factor.js"
+    "user:reset-two-factor": "node dist/cli/reset-two-factor.js",
+    "openapi:export": "node dist/cli/openapi.js"
   },
   "dependencies": {
     "@nestjs/common": "^12.1.0",
