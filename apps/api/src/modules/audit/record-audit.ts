@@ -35,3 +35,21 @@ export async function recordAudit(
     after: entry.after ?? null,
   });
 }
+
+/**
+ * The fields that differ between two versions of a record, as `before` and `after` for an audit
+ * entry; `null` when nothing changed.
+ */
+export function changedFields<T extends Record<string, unknown>>(
+  before: T,
+  after: Partial<T>,
+): { before: Partial<T>; after: Partial<T> } | null {
+  const changed = (Object.keys(after) as (keyof T)[]).filter(
+    (key) => after[key] !== undefined && JSON.stringify(before[key]) !== JSON.stringify(after[key]),
+  );
+  if (changed.length === 0) return null;
+  return {
+    before: Object.fromEntries(changed.map((key) => [key, before[key]])) as Partial<T>,
+    after: Object.fromEntries(changed.map((key) => [key, after[key]])) as Partial<T>,
+  };
+}

@@ -347,7 +347,7 @@ describe('authentication and permissions', () => {
     it('resets 2FA, so a required user must set it up again', async () => {
       const user = await client.signInWithTwoFactor(db, { roles: ['general_manager'] });
       seeded.push(user.id);
-      await resetTwoFactor(db, user.id, null);
+      await db.transaction((tx) => resetTwoFactor(tx, user.id, null));
       const cookie = await client.signIn(user.email);
       const me = meResponseSchema.parse(await (await client.get('/api/me', cookie)).json());
       expect(me.twoFactor).toEqual({ enabled: false, required: true });

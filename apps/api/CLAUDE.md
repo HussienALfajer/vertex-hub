@@ -13,6 +13,9 @@ NestJS 12 HTTP API (modular monolith). Conventions and their reasons: ADR 0013. 
 - Controller: parameters validated with `{ schema }` from `@vertex-hub/contracts`, response shaped with `@SerializeOptions({ schema })`, documented with `@Api*Response({ standardSchema })`, then one call to the service.
 - Service: all logic and queries (Drizzle through `@Inject(DATABASE)`). No repository layer.
 - Register the module in `src/app.module.ts` through its `index.ts`.
+- After changing a route or a contract it uses, run `pnpm build` and `pnpm --filter @vertex-hub/api openapi:export`, and commit `apps/web/src/lib/api/openapi.json` (CI fails when it is stale).
+- Coded errors: `throw new CodedException(status, 'CODE', message, details?)` from `src/core/errors/`; the code is listed in `ERROR_CODES` in contracts.
+- The signed-in user and their access: `@CurrentUser()` from the `auth` module (set by the guard).
 
 ## Access and audit
 - Access decorators come from `src/core/access/`: `@RequirePermissions`, `@RequireSession`, `@AllowPendingTwoFactor` (only `GET /api/me`). `@AllowAnonymous` and `@Session` come from `@thallesp/nestjs-better-auth`.

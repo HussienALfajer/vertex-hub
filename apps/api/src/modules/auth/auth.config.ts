@@ -1,4 +1,4 @@
-import type { ErrorCode } from '@vertex-hub/contracts';
+import { type ErrorCode, MIN_PASSWORD_LENGTH } from '@vertex-hub/contracts';
 import {
   accounts,
   type Database,
@@ -18,9 +18,6 @@ import { recordAudit } from '../audit/index.js';
 import { resolveAccess } from './resolve-access.js';
 
 export const AUTH_BASE_PATH = '/api/auth';
-
-/** Minimum length for new passwords (NIST SP 800-63B favours length over composition rules). */
-export const MIN_PASSWORD_LENGTH = 12;
 
 /**
  * Better Auth endpoints Vertex Hub does not use. Profile, email and password-reset changes go

@@ -166,11 +166,11 @@ All request and response schemas live in `packages/contracts` (`users.ts`, `depa
 | `GET /api/users` | `users.read` | `userListQuerySchema` (search on name/email, `departmentId`, `role`, `skill`, `status`; `status` other than `active` needs `users.manage`) | `userPageSchema` | — |
 | `GET /api/users/skills` | `users.read` | — | skills in use, sorted | — |
 | `GET /api/users/:id` | `users.read` | — | `userDetailSchema` (roles, status, 2FA state and email of archived users only with `users.manage`) | 404 |
-| `POST /api/users` | `users.manage` | `createUserSchema` (name, email, primaryDepartmentId, secondaryDepartmentIds, title, phone, skills, roles ⊆ assignable roles) | `{ user, link: { url, expiresAt } }` | `EMAIL_TAKEN`, `GENERAL_MANAGER_ONLY` |
-| `PATCH /api/users/:id` | `users.manage` | `updateUserSchema` (same fields, all optional) | `userDetailSchema` | `EMAIL_TAKEN`, `USER_ARCHIVED`, `GENERAL_MANAGER_ONLY`, `LAST_GENERAL_MANAGER`, `MANAGER_MEMBERSHIP_REQUIRED` |
+| `POST /api/users` | `users.manage` | `createUserSchema` (name, email, primaryDepartmentId, secondaryDepartmentIds, title, phone, skills, roles ⊆ assignable roles) | `{ user, link: { url, expiresAt } }` | `EMAIL_TAKEN`, `GENERAL_MANAGER_ONLY`, `UNKNOWN_DEPARTMENT` |
+| `PATCH /api/users/:id` | `users.manage` | `updateUserSchema` (same fields, all optional) | `userDetailSchema` | `EMAIL_TAKEN`, `USER_ARCHIVED`, `GENERAL_MANAGER_ONLY`, `LAST_GENERAL_MANAGER`, `MANAGER_MEMBERSHIP_REQUIRED`, `PRIMARY_DEPARTMENT_REQUIRED` (edge case 6), `UNKNOWN_DEPARTMENT` |
 | `POST /api/users/:id/link` | `users.manage` | — | `{ url, expiresAt, kind: 'activation' \| 'reset' }` | `USER_ARCHIVED`, `GENERAL_MANAGER_ONLY` |
 | `POST /api/users/:id/archive` | `users.manage` | — | `userDetailSchema` | `USER_HAS_RESPONSIBILITIES`, `CANNOT_ARCHIVE_SELF`, `LAST_GENERAL_MANAGER`, `GENERAL_MANAGER_ONLY` |
-| `POST /api/users/:id/restore` | `users.manage` | — | `{ user, link }` | `GENERAL_MANAGER_ONLY` |
+| `POST /api/users/:id/restore` | `users.manage` | — | `{ user, link }` | `GENERAL_MANAGER_ONLY`, `USER_NOT_ARCHIVED` |
 | `POST /api/users/:id/two-factor/reset` | `users.manage` | — | `userDetailSchema` | `USER_ARCHIVED`, `GENERAL_MANAGER_ONLY` |
 | `GET /api/departments` | `users.read` | — | departments with manager and member count | — |
 | `GET /api/departments/:id` | `users.read` | — | department with members | 404 |
@@ -180,6 +180,8 @@ All request and response schemas live in `packages/contracts` (`users.ts`, `depa
 | Better Auth: change password, two-factor enable / verify / disable, sign-in | session or anonymous as Better Auth defines | — | — | `TWO_FACTOR_REQUIRED` on disable when required |
 
 `users.read` without `users.manage` returns directory fields only: name, email, departments, title, phone, skills, whether the user manages a department.
+
+In the implementation `userDetailSchema` is `userResponseSchema` (the same shape as list items); changing the primary department without listing secondary ones drops the old primary membership.
 
 The `user:create` CLI stays for bootstrapping the first General Manager: it gains a required `--department <code>`, accepts assignable roles only, and writes an audit entry with a null actor.
 
@@ -192,7 +194,7 @@ All screens: Arabic RTL, strings through i18next (`users.*`, `departments.*`, `a
 3. **User profile** `/team/$userId` — everyone: directory fields and the departments they manage. With `users.manage`: edit form, status, roles, 2FA state, and actions "Copy activation/reset link", "Reset 2FA", "Archive" (confirmation; on `USER_HAS_RESPONSIBILITIES` lists what must be moved first, with links), "Restore".
 4. **Departments** `/departments` — the ten departments: name, manager, member count. **Department** `/departments/$departmentId` — members (primary first), manager. With `users.manage`: rename, change manager (picker lists active members only).
 5. **My account** `/account` — own profile (read-only fields), edit phone and skills, change password, enable 2FA or disable it (hidden when required), regenerate backup codes.
-6. **Activate / reset password** `/activate?token=…` (public) — new password twice, then redirect to sign-in. Invalid or expired token: explanation and "ask your manager for a new link".
+6. **Activate / reset password** `/activate#token=…` (public; the token is in the fragment so it never reaches server logs) — new password twice, then redirect to sign-in. Invalid or expired token: explanation and "ask your manager for a new link".
 7. **Set up 2FA** `/setup-two-factor` — QR code and manual key, code confirmation, backup codes shown once with copy. Required users are redirected here until done.
 8. **Sign-in** `/login` — adds the 2FA code step (code or backup code).
 9. **Audit log** `/audit` (`audit.read`) — newest first: time (Asia/Damascus), actor, action (translated), entity (linked where a page exists). Filters: entity type, actor, action, date range. Row expands to show the before/after of changed fields.

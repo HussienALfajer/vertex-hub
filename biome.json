@@ -8,6 +8,13 @@
     "useIgnoreFile": true
   },
   "files": {
-    "includes": ["**", "!**/routeTree.gen.ts", "!**/migrations/meta", "!brand", "!docs"]
+    "includes": [
+      "**",
+      "!**/routeTree.gen.ts",
+      "!**/lib/api/openapi.json",
+      "!**/migrations/meta",
+      "!brand",
+      "!docs"
+    ]
   }
 }

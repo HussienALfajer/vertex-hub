@@ -6,8 +6,14 @@ import { ENV, type Env } from '../../core/config/env.js';
 import { DATABASE } from '../../core/database/database.module.js';
 import { AccessService } from './access.service.js';
 import { createAuth } from './auth.config.js';
+import { DepartmentsController } from './departments.controller.js';
+import { DepartmentsService } from './departments.service.js';
 import { MeController } from './me.controller.js';
+import { PasswordLinksController } from './password-links.controller.js';
 import { PermissionsGuard } from './permissions.guard.js';
+import { UserLinksService } from './user-links.service.js';
+import { UsersController } from './users.controller.js';
+import { UsersService } from './users.service.js';
 
 /**
  * Identity and access: Better Auth (mounted at /api/auth, with two-factor sign-in), users, roles
@@ -25,7 +31,13 @@ import { PermissionsGuard } from './permissions.guard.js';
       }),
     }),
   ],
-  controllers: [MeController],
-  providers: [AccessService, { provide: APP_GUARD, useClass: PermissionsGuard }],
+  controllers: [MeController, UsersController, DepartmentsController, PasswordLinksController],
+  providers: [
+    AccessService,
+    UsersService,
+    UserLinksService,
+    DepartmentsService,
+    { provide: APP_GUARD, useClass: PermissionsGuard },
+  ],
 })
 export class AuthModule {}
