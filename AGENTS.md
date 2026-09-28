@@ -86,7 +86,7 @@ API docs (non-production): `http://127.0.0.1:3000/api/docs`. Health: `GET /api/h
 
 End every substantial task with these sections, in this order:
 
-1. **Needs from you** — decisions or approvals blocking progress, or "nothing". Whenever the task opened or merged a PR, always end this section with the local cleanup line for that PR's branch, in a code block, to run after the merge: `git switch main; git pull --ff-only; git branch -d <branch>`
+1. **Needs from you** — decisions or approvals blocking progress, or "nothing". Whenever the task opened or merged a PR, always end this section with the local cleanup line for that PR's branch, in a code block, to run after the merge. Start it with `cd` to the owner's checkout so it works from any terminal: `cd D:\vertex-hub; git switch main; git pull --ff-only; git branch -d <branch>`
 2. **Changed** — what was built or modified.
 3. **Verified** — checks run and their results.
 4. **Found** — issues, risks, or follow-ups noticed.
