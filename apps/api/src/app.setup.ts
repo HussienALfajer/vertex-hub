@@ -10,6 +10,8 @@ export function configureApp(app: INestApplication): void {
   const env = app.get<Env>(ENV);
   app.useLogger(app.get(Logger));
   app.setGlobalPrefix(API_PREFIX);
+  // Don't advertise the framework in every response.
+  app.getHttpAdapter().getInstance().disable('x-powered-by');
 
   if (env.NODE_ENV !== 'production') {
     const config = new DocumentBuilder().setTitle('Vertex Hub API').setVersion('0.0.0').build();

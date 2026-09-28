@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# Entry point for deploys (root): ssh vertex "vertexhub-deploy [<ref>|rollback]"
+# Fetches the repository as `vertexhub` and runs the latest deploy/deploy.sh from origin/main
+# as that user, so changes to the deploy script apply on the same deploy.
+set -euo pipefail
+
+SITE_DIR=/srv/hub.vertexmedia.pro
+[ "$(id -u)" -eq 0 ] || { echo "run as root" >&2; exit 1; }
+
+runuser -u vertexhub -- git -C "$SITE_DIR/repo.git" fetch --quiet --prune origin \
+  '+refs/heads/*:refs/remotes/origin/*'
+script=$(mktemp)
+trap 'rm -f "$script"' EXIT
+runuser -u vertexhub -- git -C "$SITE_DIR/repo.git" show origin/main:deploy/deploy.sh >"$script"
+chmod 755 "$script"
+
+cd "$SITE_DIR"
+runuser -u vertexhub -- env -i HOME=/home/vertexhub USER=vertexhub LOGNAME=vertexhub \
+  PATH=/usr/local/bin:/usr/bin:/bin PM2_HOME=/home/vertexhub/.pm2 LANG=C.UTF-8 \
+  bash "$script" "$@"

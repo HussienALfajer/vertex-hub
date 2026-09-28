@@ -14,7 +14,7 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done. Feature IDs
 - [x] Authentication (Better Auth), login page, permission map and guards (map provisional until the F01 spec, Q13)
 - [x] CI: typecheck, lint, test, build, e2e smoke, gitleaks
 - [~] Claude Code setup: `.claude/settings.json` (permissions, Biome hook) done; path-scoped rules, core skills and subagents pending
-- [ ] Deployment skeleton on the VPS (needs domain decision)
+- [x] Deployment on the VPS: https://hub.vertexmedia.pro, atomic releases, health checks, daily local backups (`docs/deployment.md`)
 
 ## Phase 1 — Core
 - [ ] F01 Users, departments, roles and permissions
@@ -46,6 +46,6 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done. Feature IDs
 
 ## Launch checklist
 - [ ] Off-server backups configured and a restore tested
-- [ ] Domain and TLS
+- [x] Domain and TLS
 - [ ] Production secrets set on the server only
 - [ ] All users onboarded; data from the pilot clients verified

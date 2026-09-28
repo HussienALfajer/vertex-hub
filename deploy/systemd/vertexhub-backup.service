@@ -1,0 +1,8 @@
+[Unit]
+Description=Local backup of hub.vertexmedia.pro
+After=postgresql.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/vertexhub-backup
+UMask=0077

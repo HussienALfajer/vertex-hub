@@ -1,0 +1,7 @@
+[Unit]
+Description=Health check for hub.vertexmedia.pro
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/vertexhub-healthcheck

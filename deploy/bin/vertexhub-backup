@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# Daily local backup of hub.vertexmedia.pro (vertexhub-backup.timer), kept 14 days in
+# /var/backups/hub.vertexmedia.pro (700, root). Off-server copies need a destination (open
+# question Q4) and are required before launch.
+#
+# Restore: pg_restore --clean --if-exists --no-owner --role=vertex_hub -d vertex_hub database.dump
+set -euo pipefail
+umask 077
+
+SITE=hub.vertexmedia.pro
+DB=vertex_hub
+DEST=/var/backups/$SITE
+KEEP_DAYS=14
+
+target="$DEST/$(date -u +%Y%m%dT%H%M%SZ)"
+mkdir -p "$target"
+
+# pg_dump runs as postgres, which cannot write here: it writes to stdout and root redirects.
+runuser -u postgres -- pg_dump --format=custom "$DB" >"$target/database.dump"
+pg_restore --list "$target/database.dump" >"$target/database-contents.txt"
+cp "/srv/$SITE/shared/.env" "$target/environment"
+cp "/etc/nginx/sites-available/$SITE" "$target/nginx.conf"
+readlink -f "/srv/$SITE/current" >"$target/release.txt" 2>/dev/null || true
+cat "/srv/$SITE/current/REVISION" >>"$target/release.txt" 2>/dev/null || true
+
+find "$DEST" -mindepth 1 -maxdepth 1 -type d -mtime +"$KEEP_DAYS" -exec rm -rf {} +
+logger -t vertexhub-backup "backup completed: $target ($(du -sh "$target" | cut -f1))"
