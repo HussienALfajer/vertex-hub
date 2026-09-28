@@ -139,6 +139,14 @@ fi
 activate "$src/deploy/nginx/$DOMAIN"
 echo "site enabled with TLS"
 
+step "fail2ban"
+# The nginx jails expand their log globs when they start: reload them to watch the new logs.
+for jail in nginx-4xx-flood nginx-limit-req; do
+  if fail2ban-client status "$jail" >/dev/null 2>&1; then
+    fail2ban-client reload "$jail" >/dev/null && echo "$jail reloaded"
+  fi
+done
+
 step "PM2 service"
 systemctl enable --now pm2-vertexhub.service
 systemctl is-active pm2-vertexhub.service
