@@ -1,0 +1,11 @@
+[Unit]
+Description=Health check for hub.vertexmedia.pro every 2 minutes
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=2min
+AccuracySec=15s
+Unit=vertexhub-health.service
+
+[Install]
+WantedBy=timers.target

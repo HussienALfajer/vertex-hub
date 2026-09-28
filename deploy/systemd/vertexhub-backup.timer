@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily backup of hub.vertexmedia.pro
+
+[Timer]
+OnCalendar=*-*-* 03:35:00
+Persistent=true
+Unit=vertexhub-backup.service
+
+[Install]
+WantedBy=timers.target

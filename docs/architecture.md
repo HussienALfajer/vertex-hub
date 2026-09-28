@@ -96,4 +96,4 @@ Deployment follows the server's existing conventions (ADR 0009): a dedicated sys
 
 - **Local (Windows):** PostgreSQL 17 installed natively; `pnpm db:setup-local` creates the role and the `vertex_hub` and `vertex_hub_test` databases. `pnpm dev` runs api (:3000), worker and web (:5173, proxies `/api`).
 - **CI:** GitHub Actions with a PostgreSQL service container.
-- **Production:** the owner's VPS. No staging in V1.
+- **Production:** https://hub.vertexmedia.pro on the owner's VPS, atomic releases with automatic rollback (runbook: `docs/deployment.md`). No staging in V1.

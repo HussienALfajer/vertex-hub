@@ -4,7 +4,6 @@ Decisions that belong to the owner. Agents must not guess answers to these. When
 
 | ID | Question | Needed before | Recommendation |
 |---|---|---|---|
-| Q1 | Domain for the system (e.g. a `hub.` subdomain of the company domain)? | First deployment | — |
 | Q4 | Off-server backup destination (none exists on the server today) | Launch | Required before launch: the system holds invoices and client data |
 | Q5 | Email provider for notifications (SMTP) | F14 email | — |
 | Q7 | Add swap on the server (none today) as a safety margin for Chromium PDF rendering? | Launch | 2–4 GB |
@@ -27,6 +26,7 @@ Decisions that belong to the owner. Agents must not guess answers to these. When
 | Hosting | The owner's existing VPS (ADR 0009) | 2026-09-28 |
 | Backend framework | NestJS (ADR 0002) | 2026-09-28 |
 | Repository visibility | Public on GitHub | 2026-09-28 |
+| Domain for the system (was Q1) | `hub.vertexmedia.pro`, a subdomain of the company domain (docs/deployment.md) | 2026-09-28 |
 | Brand assets and fonts (was Q2) | Logo provided (`brand/logo/`); identity derived in `brand/identity.md`; Arabic font Madani Arabic, Latin Montserrat (ADR 0011) | 2026-09-28 |
 | Digits in the UI (was Q3) | Latin digits (123), formatted with the `ar-u-nu-latn` locale | 2026-09-28 |
 | Local PostgreSQL for development (was Q6) | PostgreSQL 17 installed natively on Windows, matching production | 2026-09-28 |

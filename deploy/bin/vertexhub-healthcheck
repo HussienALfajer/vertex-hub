@@ -1,0 +1,72 @@
+#!/bin/bash
+# Periodic health check for hub.vertexmedia.pro (vertexhub-health.timer, every 2 minutes).
+# Heals, not only logs, with a cooldown so it never loops on restarts. Read with:
+#   journalctl -t vertexhub-health -n 50
+set -u
+
+DOMAIN=hub.vertexmedia.pro
+APP_USER=vertexhub
+UNIT=pm2-vertexhub.service
+PORT=3050
+APPS="vertexhub-api vertexhub-worker"
+STATE_DIR=/var/lib/vertexhub-health
+COOLDOWN=600
+mkdir -p "$STATE_DIR"
+
+log() { logger -t vertexhub-health "$*"; }
+
+cooled_down() {
+  local f="$STATE_DIR/$1.last" now last
+  now=$(date +%s); last=$(cat "$f" 2>/dev/null || echo 0)
+  if [ $((now - last)) -ge "$COOLDOWN" ]; then echo "$now" >"$f"; return 0; fi
+  return 1
+}
+
+pm2_as_app() { sudo -u "$APP_USER" -H env PM2_HOME="/home/$APP_USER/.pm2" pm2 "$@"; }
+
+restart_app() {
+  cooled_down "$1" || return 0
+  pm2_as_app restart "$1" >/dev/null 2>&1 && log "$1 restarted"
+}
+
+# 1. The PM2 unit: if it is down, nothing else is worth checking.
+if ! systemctl is-active --quiet "$UNIT"; then
+  log "$UNIT is not active"
+  cooled_down unit && systemctl start "$UNIT" && log "$UNIT started"
+  exit 0
+fi
+
+# 2. The API answers on loopback, database included (/api/health checks it).
+code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 "http://127.0.0.1:$PORT/api/health")
+if [ "$code" != 200 ]; then
+  log "API answers $code on port $PORT"
+  [ "$code" = 503 ] && log "the API is up but reports a dependency down (database?)" || restart_app vertexhub-api
+fi
+
+# 3. PM2 state and restart counts of each process.
+jlist=$(pm2_as_app jlist 2>/dev/null || echo '[]')
+for app in $APPS; do
+  read -r state restarts < <(printf '%s' "$jlist" | python3 -c "
+import json, sys
+apps = {p['name']: p['pm2_env'] for p in json.load(sys.stdin)}
+env = apps.get('$app')
+print(env['status'], env['restart_time']) if env else print('missing', 0)
+" 2>/dev/null || echo "unknown 0")
+  [ "$state" = online ] || { log "$app is $state"; restart_app "$app"; }
+  [ "${restarts:-0}" -gt 20 ] && log "warning: $app restarted $restarts times; check pm2 logs $app --err"
+done
+
+# 4. Public path and certificate.
+if [ -f "/etc/letsencrypt/live/$DOMAIN/fullchain.pem" ]; then
+  code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 20 "https://$DOMAIN/api/health")
+  [ "$code" = 200 ] || log "public https://$DOMAIN/api/health answers $code"
+  end=$(openssl x509 -enddate -noout -in "/etc/letsencrypt/live/$DOMAIN/fullchain.pem" | cut -d= -f2)
+  days=$(( ($(date -d "$end" +%s) - $(date +%s)) / 86400 ))
+  [ "$days" -lt 15 ] && log "warning: certificate for $DOMAIN expires in $days days"
+fi
+
+# 5. Disk.
+use=$(df --output=pcent / | tail -1 | tr -dc '0-9')
+[ "$use" -ge 85 ] && log "warning: disk is ${use}% full"
+
+exit 0

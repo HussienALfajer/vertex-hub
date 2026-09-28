@@ -98,4 +98,4 @@ Talk to the owner in Arabic. Write everything stored in the repo in English: cod
 
 ## Production server
 
-Deploys go to the owner's existing Ubuntu VPS: PM2 + nginx, one isolated system user per site, apps listen on `127.0.0.1` only, nginx is the only public gateway. Never run commands on the server without explicit approval in the current conversation.
+Deploys go to the owner's existing Ubuntu VPS: PM2 + nginx, one isolated system user per site, apps listen on `127.0.0.1` only, nginx is the only public gateway. Never run commands on the server without explicit approval in the current conversation. Deploys, rollbacks and server layout: `docs/deployment.md`.
