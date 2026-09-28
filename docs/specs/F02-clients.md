@@ -1,6 +1,6 @@
 # F02 — Clients (unified client profile)
 
-Status: Draft · Date: 2026-09-28 · Scope: `docs/product/v1-scope.md` §F02 · ADRs: 0007, 0013, 0014
+Status: Approved · Date: 2026-09-28 · Scope: `docs/product/v1-scope.md` §F02 · ADRs: 0007, 0013, 0014
 
 ## Summary
 Client information is spread across WhatsApp threads and people's memories: who the account manager is, who at the client may approve work, which colors and words the brand uses, who holds the page admin rights, and what was agreed on the last call. F02 gives every client one profile that the whole team can read: basics with the primary account manager and status, contacts with final-approval authority, the brand kit, platform accounts, a healthcare flag that later switches on the medical review, and a hand-written communication log. Projects, retainers, tasks and invoices attach to this profile in their own features.
