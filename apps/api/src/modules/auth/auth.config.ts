@@ -1,7 +1,7 @@
 import { accounts, type Database, newId, sessions, users, verifications } from '@vertex-hub/db';
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
-import type { Env } from '../config/env.js';
+import type { Env } from '../../core/config/env.js';
 
 export const AUTH_BASE_PATH = '/api/auth';
 

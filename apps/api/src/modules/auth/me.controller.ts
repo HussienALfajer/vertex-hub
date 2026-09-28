@@ -2,9 +2,11 @@ import { Controller, Get, SerializeOptions } from '@nestjs/common';
 import { ApiOkResponse, ApiTags, ApiUnauthorizedResponse } from '@nestjs/swagger';
 import { Session, type UserSession } from '@thallesp/nestjs-better-auth';
 import { grantedPermissions, type MeResponse, meResponseSchema } from '@vertex-hub/contracts';
+import { RequireSession } from './require-session.decorator.js';
 import { RolesService } from './roles.service.js';
 
 @ApiTags('auth')
+@RequireSession()
 @Controller('me')
 export class MeController {
   constructor(private readonly roles: RolesService) {}

@@ -6,7 +6,7 @@ import {
   type OnModuleInit,
 } from '@nestjs/common';
 import { PgBoss } from 'pg-boss';
-import { ENV, type Env } from '../config/env.js';
+import { ENV, type Env } from '../core/config/env.js';
 
 /** Owns the pg-boss instance: started before jobs register, stopped gracefully on shutdown. */
 @Injectable()

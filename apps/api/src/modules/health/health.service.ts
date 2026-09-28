@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import type { HealthResponse } from '@vertex-hub/contracts';
 import { type Database, pingDatabase } from '@vertex-hub/db';
-import { DATABASE } from '../database/database.module.js';
+import { DATABASE } from '../../core/database/database.module.js';
 
 @Injectable()
 export class HealthService {

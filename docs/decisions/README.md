@@ -16,6 +16,7 @@ Short records of decisions that shape the system. Each has a status: **Accepted*
 | [0010](0010-ai-assisted-development.md) | Claude Code (Opus 5.5) as the primary developer; AGENTS.md shared with Codex | Accepted |
 | [0011](0011-brand-identity-and-fonts.md) | Brand identity from the logo; Madani Arabic + Montserrat | Accepted |
 | [0012](0012-nestjs-12-native-standard-schema.md) | NestJS 12 with native Standard Schema validation instead of nestjs-zod | Accepted |
+| [0013](0013-engineering-conventions.md) | Engineering conventions: layout, module anatomy, data, errors, tests | Accepted |
 
 Template:
 

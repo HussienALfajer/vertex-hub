@@ -2,7 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { loadRootEnv } from '@vertex-hub/db';
 import { AppModule } from './app.module.js';
 import { configureApp } from './app.setup.js';
-import { ENV, type Env } from './config/env.js';
+import { ENV, type Env } from './core/config/env.js';
 
 loadRootEnv();
 

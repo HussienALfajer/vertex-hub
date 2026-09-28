@@ -9,34 +9,26 @@ import {
   timestamp,
   uuid,
 } from 'drizzle-orm/pg-core';
-import { newId } from '../id.js';
+import { id, timestamps } from './columns.js';
 
 /*
  * Tables used by Better Auth (ADR 0002). Property names are the field names Better Auth expects;
  * column names are snake_case. Better Auth generates ids through `newId`, so they are UUIDv7.
  */
 
-const timestamps = {
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true })
-    .notNull()
-    .defaultNow()
-    .$onUpdate(() => new Date()),
-};
-
 export const users = pgTable('users', {
-  id: uuid('id').primaryKey().$defaultFn(newId),
+  id: id(),
   name: text('name').notNull(),
   email: text('email').notNull().unique(),
   emailVerified: boolean('email_verified').notNull().default(false),
   image: text('image'),
-  ...timestamps,
+  ...timestamps(),
 });
 
 export const sessions = pgTable(
   'sessions',
   {
-    id: uuid('id').primaryKey().$defaultFn(newId),
+    id: id(),
     userId: uuid('user_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
@@ -44,7 +36,7 @@ export const sessions = pgTable(
     expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
     ipAddress: text('ip_address'),
     userAgent: text('user_agent'),
-    ...timestamps,
+    ...timestamps(),
   },
   (table) => [index('sessions_user_id_idx').on(table.userId)],
 );
@@ -53,7 +45,7 @@ export const sessions = pgTable(
 export const accounts = pgTable(
   'accounts',
   {
-    id: uuid('id').primaryKey().$defaultFn(newId),
+    id: id(),
     userId: uuid('user_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
@@ -66,7 +58,7 @@ export const accounts = pgTable(
     refreshTokenExpiresAt: timestamp('refresh_token_expires_at', { withTimezone: true }),
     scope: text('scope'),
     password: text('password'),
-    ...timestamps,
+    ...timestamps(),
   },
   (table) => [index('accounts_user_id_idx').on(table.userId)],
 );
@@ -75,11 +67,11 @@ export const accounts = pgTable(
 export const verifications = pgTable(
   'verifications',
   {
-    id: uuid('id').primaryKey().$defaultFn(newId),
+    id: id(),
     identifier: text('identifier').notNull(),
     value: text('value').notNull(),
     expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
-    ...timestamps,
+    ...timestamps(),
   },
   (table) => [index('verifications_identifier_idx').on(table.identifier)],
 );
