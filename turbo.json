@@ -2,7 +2,7 @@
   "$schema": "https://turborepo.com/schema.json",
   "ui": "stream",
   "globalDependencies": [".node-version"],
-  "globalPassThroughEnv": ["DATABASE_URL", "TEST_DATABASE_URL", "CI"],
+  "globalPassThroughEnv": ["DATABASE_URL", "TEST_DATABASE_URL", "CI", "PLAYWRIGHT_BROWSERS_PATH"],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
