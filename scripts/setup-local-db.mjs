@@ -36,11 +36,11 @@ const databases = [app, test].map((url) => decodeURIComponent(url.pathname.slice
 
 const literal = (value) => `'${value.replaceAll("'", "''")}'`;
 const sql = [
-  `SELECT format('CREATE ROLE %I LOGIN', ${literal(role)}) WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = ${literal(role)})gexec`,
-  `SELECT format('ALTER ROLE %I WITH LOGIN PASSWORD %L', ${literal(role)}, ${literal(password)})gexec`,
+  `SELECT format('CREATE ROLE %I LOGIN', ${literal(role)}) WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = ${literal(role)})\\gexec`,
+  `SELECT format('ALTER ROLE %I WITH LOGIN PASSWORD %L', ${literal(role)}, ${literal(password)})\\gexec`,
   ...databases.map(
     (name) =>
-      `SELECT format('CREATE DATABASE %I OWNER %I', ${literal(name)}, ${literal(role)}) WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = ${literal(name)})gexec`,
+      `SELECT format('CREATE DATABASE %I OWNER %I', ${literal(name)}, ${literal(role)}) WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = ${literal(name)})\\gexec`,
   ),
 ].join('\n');
 
@@ -66,6 +66,14 @@ try {
   if (result.status !== 0) fail('psql failed; nothing else was changed.');
 } finally {
   rmSync(sqlFile, { force: true });
+}
+
+// Prove the result: connect as the application role to each database (no prompt; the URL has the password).
+for (const url of [app, test]) {
+  const check = spawnSync('psql', [url.href, '-tAc', 'select 1'], { encoding: 'utf8' });
+  if (check.status !== 0 || check.stdout.trim() !== '1') {
+    fail(`Could not connect as "${role}" to ${url.pathname.slice(1)}:\n${check.stderr}`);
+  }
 }
 console.warn(
   `Role "${role}" and databases ${databases.join(', ')} are ready. Next: pnpm db:migrate`,
