@@ -17,13 +17,37 @@ export const AUDIT_ACTIONS = [
   'user.two_factor_reset',
   'user.profile_updated',
   'department.updated',
+  'client.created',
+  'client.updated',
+  'client.status_changed',
+  'client.account_manager_changed',
+  'client.healthcare_changed',
+  'client.archived',
+  'client.restored',
+  'client.brand_kit_updated',
+  'client_contact.created',
+  'client_contact.updated',
+  'client_contact.archived',
+  'client_platform_account.created',
+  'client_platform_account.updated',
+  'client_platform_account.archived',
+  'client_note.created',
+  'client_note.updated',
+  'client_note.archived',
 ] as const;
 
 export const auditActionSchema = z.enum(AUDIT_ACTIONS).meta({ id: 'AuditAction' });
 
 export type AuditAction = z.infer<typeof auditActionSchema>;
 
-export const AUDIT_ENTITY_TYPES = ['user', 'department'] as const;
+export const AUDIT_ENTITY_TYPES = [
+  'user',
+  'department',
+  'client',
+  'client_contact',
+  'client_platform_account',
+  'client_note',
+] as const;
 
 export const auditEntityTypeSchema = z.enum(AUDIT_ENTITY_TYPES).meta({ id: 'AuditEntityType' });
 

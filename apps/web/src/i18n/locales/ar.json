@@ -190,6 +190,14 @@
     "MANAGER_MEMBERSHIP_REQUIRED": "لا يمكن إخراج المستخدم من قسم يديره. غيّر مدير القسم أولًا.",
     "DEPARTMENT_NAME_TAKEN": "يوجد قسم آخر بهذا الاسم.",
     "LINK_INVALID": "الرابط غير صالح أو انتهت صلاحيته.",
+    "CLIENT_NAME_TAKEN": "يوجد عميل آخر بهذا الاسم التجاري.",
+    "INVALID_ACCOUNT_MANAGER": "اختر مستخدمًا غير مؤرشف يحمل دور مدير الحساب.",
+    "CLIENT_ARCHIVED": "هذا العميل مؤرشف ولا يمكن تعديله.",
+    "CLIENT_NOT_ARCHIVED": "هذا العميل غير مؤرشف.",
+    "LIMIT_REACHED": "وصلت إلى الحد الأقصى المسموح.",
+    "UNKNOWN_CONTACT": "جهة الاتصال غير موجودة لدى هذا العميل.",
+    "NOT_NOTE_AUTHOR": "يعدّل الملاحظة كاتبها فقط.",
+    "NOTE_ARCHIVED": "هذه الملاحظة مسحوبة ولا يمكن تعديلها.",
     "auth": {
       "INVALID_EMAIL_OR_PASSWORD": "البريد الإلكتروني أو كلمة المرور غير صحيحة.",
       "INVALID_PASSWORD": "كلمة المرور غير صحيحة.",
@@ -339,7 +347,8 @@
       "title": "لا يمكن الأرشفة الآن",
       "body": "انقل هذه المسؤوليات إلى عضو آخر، ثم أعد المحاولة:",
       "manages_department": "يدير قسم {{name}}",
-      "open": "افتح القسم"
+      "open": "افتح القسم",
+      "account_manager_of_client": "مدير حساب العميل {{name}}"
     },
     "managerBadge": "مدير القسم"
   },
@@ -497,7 +506,11 @@
     "noDetails": "لا تفاصيل إضافية لهذا الإجراء.",
     "entityTypes": {
       "user": "مستخدم",
-      "department": "قسم"
+      "department": "قسم",
+      "client": "عميل",
+      "client_contact": "جهة اتصال",
+      "client_platform_account": "حساب منصة",
+      "client_note": "ملاحظة تواصل"
     },
     "actions": {
       "user": {
@@ -517,6 +530,31 @@
       },
       "department": {
         "updated": "عدّل قسمًا"
+      },
+      "client": {
+        "created": "أنشأ عميلًا",
+        "updated": "عدّل بيانات عميل",
+        "status_changed": "غيّر حالة عميل",
+        "account_manager_changed": "غيّر مدير الحساب",
+        "healthcare_changed": "غيّر علامة الرعاية الصحية",
+        "archived": "أرشف عميلًا",
+        "restored": "استعاد عميلًا",
+        "brand_kit_updated": "عدّل الهوية البصرية"
+      },
+      "client_contact": {
+        "created": "أضاف جهة اتصال",
+        "updated": "عدّل جهة اتصال",
+        "archived": "أزال جهة اتصال"
+      },
+      "client_platform_account": {
+        "created": "أضاف حساب منصة",
+        "updated": "عدّل حساب منصة",
+        "archived": "أزال حساب منصة"
+      },
+      "client_note": {
+        "created": "أضاف ملاحظة تواصل",
+        "updated": "عدّل ملاحظة تواصل",
+        "archived": "سحب ملاحظة تواصل"
       }
     },
     "fields": {

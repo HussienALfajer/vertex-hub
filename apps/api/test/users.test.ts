@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { INestApplication } from '@nestjs/common';
 import {
+  clientDetailResponseSchema,
   type ErrorResponse,
   meResponseSchema,
   userLinkSchema,
@@ -23,6 +24,7 @@ import {
   api,
   departmentId,
   PASSWORD,
+  removeClients,
   removeUsers,
   type SeedUser,
   seedUser,
@@ -36,6 +38,7 @@ describe('users', () => {
   const connection = createDatabase(testDatabaseUrl());
   const db = connection.db;
   const seeded: string[] = [];
+  const seededClients: string[] = [];
   /** Names carry the run id, so searches see only this run's users. */
   const run = randomUUID().slice(0, 8);
   let app: INestApplication;
@@ -100,6 +103,7 @@ describe('users', () => {
 
   afterAll(async () => {
     await app?.close();
+    await removeClients(db, seededClients);
     await removeUsers(db, seeded);
     await connection.close();
   });
@@ -636,6 +640,72 @@ describe('users', () => {
       expect(
         (await client.post(`/api/users/${user.id}/two-factor/reset`, employee.cookie)).status,
       ).toBe(403);
+    });
+  });
+  describe('account manager responsibilities (F02 rule 8)', () => {
+    const createClient = async (accountManagerId: string, status = 'active') => {
+      const response = await client.post('/api/clients', gm.cookie, {
+        tradeName: `عميل ${run} ${randomUUID().slice(0, 6)}`,
+        accountManagerId,
+        status,
+      });
+      expect(response.status).toBe(201);
+      const created = clientDetailResponseSchema.parse(await response.json());
+      seededClients.push(created.id);
+      return created;
+    };
+
+    it('refuses to archive the manager of an active or paused client, listing it', async () => {
+      const user = await seed({ roles: ['account_manager'] });
+      const active = await createClient(user.id);
+      const paused = await createClient(user.id, 'paused');
+      await createClient(user.id, 'ended');
+      const body = await expectError(
+        await client.post(`/api/users/${user.id}/archive`, operations.cookie),
+        409,
+        'USER_HAS_RESPONSIBILITIES',
+      );
+      expect(body.details).toEqual(
+        [active, paused]
+          .sort((a, b) => a.tradeName.localeCompare(b.tradeName))
+          .map((c) => ({ type: 'account_manager_of_client', id: c.id, name: c.tradeName })),
+      );
+      const other = await seed({ roles: ['account_manager'] });
+      for (const { id } of [active, paused]) {
+        expect(
+          (await patch(`/api/clients/${id}`, gm.cookie, { accountManagerId: other.id })).status,
+        ).toBe(200);
+      }
+      // Ended clients do not block.
+      expect((await client.post(`/api/users/${user.id}/archive`, operations.cookie)).status).toBe(
+        200,
+      );
+    });
+
+    it('refuses to remove the Account Manager role while it is needed', async () => {
+      const user = await seed({ roles: ['account_manager', 'finance'] });
+      const managed = await createClient(user.id);
+      const body = await expectError(
+        await patch(`/api/users/${user.id}`, gm.cookie, { roles: ['finance'] }),
+        409,
+        'USER_HAS_RESPONSIBILITIES',
+      );
+      expect(body.details).toEqual([
+        { type: 'account_manager_of_client', id: managed.id, name: managed.tradeName },
+      ]);
+      const [roles] = await db
+        .select({ role: userRoles.role })
+        .from(userRoles)
+        .where(and(eq(userRoles.userId, user.id), eq(userRoles.role, 'account_manager')));
+      expect(roles).toBeDefined();
+      // Other role changes go through.
+      expect(
+        (await patch(`/api/users/${user.id}`, gm.cookie, { roles: ['account_manager'] })).status,
+      ).toBe(200);
+      expect(
+        (await patch(`/api/clients/${managed.id}`, gm.cookie, { status: 'ended' })).status,
+      ).toBe(200);
+      expect((await patch(`/api/users/${user.id}`, gm.cookie, { roles: [] })).status).toBe(200);
     });
   });
 });

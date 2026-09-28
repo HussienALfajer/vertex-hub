@@ -19,6 +19,14 @@ export const ERROR_CODES = [
   'MANAGER_MEMBERSHIP_REQUIRED',
   'DEPARTMENT_NAME_TAKEN',
   'LINK_INVALID',
+  'CLIENT_NAME_TAKEN',
+  'INVALID_ACCOUNT_MANAGER',
+  'CLIENT_ARCHIVED',
+  'CLIENT_NOT_ARCHIVED',
+  'LIMIT_REACHED',
+  'UNKNOWN_CONTACT',
+  'NOT_NOTE_AUTHOR',
+  'NOTE_ARCHIVED',
 ] as const;
 
 export const errorCodeSchema = z.enum(ERROR_CODES).meta({ id: 'ErrorCode' });
@@ -41,10 +49,13 @@ export const errorResponseSchema = z
 
 export type ErrorResponse = z.infer<typeof errorResponseSchema>;
 
-/** Something a user is responsible for, which blocks archiving them (F01 rule 9). */
+/**
+ * Something a user is responsible for, which blocks archiving them (F01 rule 9) or removing
+ * their Account Manager role (F02 rule 8).
+ */
 export const responsibilitySchema = z
   .object({
-    type: z.enum(['manages_department']),
+    type: z.enum(['manages_department', 'account_manager_of_client']),
     id: z.uuid(),
     name: z.string(),
   })

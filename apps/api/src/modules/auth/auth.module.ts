@@ -11,6 +11,8 @@ import { DepartmentsService } from './departments.service.js';
 import { MeController } from './me.controller.js';
 import { PasswordLinksController } from './password-links.controller.js';
 import { PermissionsGuard } from './permissions.guard.js';
+import { ResponsibilityRegistry } from './responsibility-registry.js';
+import { UserDirectory } from './user-directory.js';
 import { UserLinksService } from './user-links.service.js';
 import { UsersController } from './users.controller.js';
 import { UsersService } from './users.service.js';
@@ -37,7 +39,10 @@ import { UsersService } from './users.service.js';
     UsersService,
     UserLinksService,
     DepartmentsService,
+    ResponsibilityRegistry,
+    UserDirectory,
     { provide: APP_GUARD, useClass: PermissionsGuard },
   ],
+  exports: [ResponsibilityRegistry, UserDirectory],
 })
 export class AuthModule {}

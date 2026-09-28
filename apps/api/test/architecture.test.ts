@@ -139,6 +139,7 @@ describe('module boundaries', () => {
   const TABLE_OWNERS: Record<string, string | null> = {
     audit: 'audit',
     auth: 'auth',
+    clients: 'clients',
     system: null,
   };
 

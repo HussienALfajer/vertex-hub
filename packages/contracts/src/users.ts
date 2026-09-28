@@ -3,6 +3,7 @@ import { newPasswordSchema } from './auth.js';
 import { userDepartmentSchema } from './departments.js';
 import { pageQuerySchema, pageSchema } from './lists.js';
 import { assignableRoleSchema, roleSchema } from './roles.js';
+import { optionalText, uniqueTexts } from './text.js';
 
 /** Derived, never stored: archived, else invited until a password is set, else active. */
 export const USER_STATUSES = ['invited', 'active', 'archived'] as const;
@@ -10,15 +11,6 @@ export const USER_STATUSES = ['invited', 'active', 'archived'] as const;
 export const userStatusSchema = z.enum(USER_STATUSES).meta({ id: 'UserStatus' });
 
 export type UserStatus = z.infer<typeof userStatusSchema>;
-
-/** Optional text: blank input is stored as null. */
-const optionalText = (max: number) =>
-  z
-    .string()
-    .trim()
-    .max(max)
-    .nullable()
-    .transform((value) => value || null);
 
 /**
  * A phone number stored as `+` and 8–15 digits. Spaces, dashes, dots and parentheses are
@@ -36,18 +28,7 @@ export const phoneSchema = z
 export const skillSchema = z.string().trim().min(1).max(40);
 
 /** Skills, stored once per user regardless of case (the first spelling wins). */
-export const skillsSchema = z
-  .array(skillSchema)
-  .transform((skills) => {
-    const seen = new Set<string>();
-    return skills.filter((skill) => {
-      const key = skill.toLocaleLowerCase('ar');
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-  })
-  .pipe(z.array(z.string()).max(20));
+export const skillsSchema = uniqueTexts(skillSchema, 20);
 
 const rolesSchema = z.array(assignableRoleSchema).transform((roles) => [...new Set(roles)]);
 

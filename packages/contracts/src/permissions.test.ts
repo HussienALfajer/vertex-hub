@@ -68,7 +68,7 @@ describe('permission map', () => {
 
   it('combines the scopes of several roles', () => {
     // A designer who is also an account manager (ADR 0007).
-    expect(permissionScopes(access(['employee', 'account_manager']), 'clients.read')).toEqual([
+    expect(permissionScopes(access(['employee', 'account_manager']), 'tasks.read')).toEqual([
       'own_clients',
       'assigned',
     ]);
@@ -85,6 +85,32 @@ describe('permission map', () => {
       scopes: ['department', 'assigned'],
     });
     expect(grantedPermissions(access([], []))).toEqual([]);
+  });
+});
+
+describe('clients (F02)', () => {
+  it('lets every user read every client and write in the communication log', () => {
+    expect(permissionScopes(access(['employee']), 'clients.read')).toEqual(['all']);
+    expect(permissionScopes(access(['employee']), 'clients.log')).toEqual(['all']);
+    for (const role of ['department_manager', 'account_manager', 'finance'] as const) {
+      expect(PERMISSION_MAP[role]['clients.read'], role).toBeUndefined();
+    }
+  });
+
+  it('lets account managers manage their own clients only', () => {
+    expect(permissionScopes(access(['employee', 'account_manager']), 'clients.manage')).toEqual([
+      'own_clients',
+    ]);
+  });
+
+  it('lets the Operations manager manage every client', () => {
+    const manager = access(
+      ['employee', 'department_manager'],
+      [{ code: 'internal_operations', isManager: true }],
+    );
+    expect(permissionScopes(manager, 'clients.manage')).toEqual(['all']);
+    const member = access(['employee'], [{ code: 'internal_operations', isManager: false }]);
+    expect(hasPermission(member, 'clients.manage')).toBe(false);
   });
 });
 

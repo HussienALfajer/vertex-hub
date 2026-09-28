@@ -17,3 +17,15 @@ export function pageSchema<Item extends z.ZodType>(item: Item) {
     pageSize: z.number().int().min(1),
   });
 }
+
+export const sortOrderSchema = z.enum(['asc', 'desc']).meta({ id: 'SortOrder' });
+
+/** A `true`/`false` query parameter. */
+export const queryBooleanSchema = z.enum(['true', 'false']).transform((value) => value === 'true');
+
+/** A query parameter that may repeat (`?status=a&status=b`); one value is a list of one. */
+export function queryListSchema<Item extends z.ZodType>(item: Item) {
+  return z
+    .union([item, z.array(item)])
+    .transform((value) => (Array.isArray(value) ? value : [value]) as z.output<Item>[]);
+}

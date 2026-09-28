@@ -3,6 +3,10 @@ import type { AssignableRole, DepartmentCode } from '@vertex-hub/contracts';
 import {
   accounts,
   auditEntries,
+  clientContacts,
+  clientNotes,
+  clientPlatformAccounts,
+  clients,
   type Database,
   departmentMembers,
   departments,
@@ -102,6 +106,30 @@ export async function removeUsers(db: Database, ids: string[]): Promise<void> {
     .where(or(inArray(auditEntries.actorId, ids), inArray(auditEntries.entityId, ids)));
   await db.update(departments).set({ managerId: null }).where(inArray(departments.managerId, ids));
   await db.delete(users).where(inArray(users.id, ids));
+}
+
+/** Removes seeded clients, their contacts, accounts, notes and audit entries (test cleanup only). */
+export async function removeClients(db: Database, ids: string[]): Promise<void> {
+  if (ids.length === 0) return;
+  const children = [
+    ...(await db
+      .select({ id: clientContacts.id })
+      .from(clientContacts)
+      .where(inArray(clientContacts.clientId, ids))),
+    ...(await db
+      .select({ id: clientPlatformAccounts.id })
+      .from(clientPlatformAccounts)
+      .where(inArray(clientPlatformAccounts.clientId, ids))),
+    ...(await db
+      .select({ id: clientNotes.id })
+      .from(clientNotes)
+      .where(inArray(clientNotes.clientId, ids))),
+  ].map((row) => row.id);
+  await db.delete(auditEntries).where(inArray(auditEntries.entityId, [...ids, ...children]));
+  await db.delete(clientNotes).where(inArray(clientNotes.clientId, ids));
+  await db.delete(clientContacts).where(inArray(clientContacts.clientId, ids));
+  await db.delete(clientPlatformAccounts).where(inArray(clientPlatformAccounts.clientId, ids));
+  await db.delete(clients).where(inArray(clients.id, ids));
 }
 
 function base32Decode(input: string): Buffer {
