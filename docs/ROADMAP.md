@@ -18,7 +18,7 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done. Feature IDs
 - [x] Deployment on the VPS: https://hub.vertexmedia.pro, atomic releases, health checks, daily local backups (`docs/deployment.md`)
 
 ## Phase 1 — Core
-- [~] F01 Users, departments, roles and permissions (spec: `docs/specs/F01-users-roles.md`): PR 1/3 access core and PR 2/3 users and departments API shipped; web screens next
+- [x] F01 Users, departments, roles and permissions (spec: `docs/specs/F01-users-roles.md`): access core, users and departments API, web screens; owner acceptance passed
 - [ ] `feature-slice` skill (contracts → db → api → web → tests), extracted from F01 as the reference module
 - [ ] F02 Clients
 - [ ] F05 Projects and retainers

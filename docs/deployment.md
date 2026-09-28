@@ -69,11 +69,13 @@ ssh vertex "sudo -u vertexhub pg_restore --clean --if-exists --no-owner -d \"\$(
 
 ## Accounts
 
-Self sign-up is disabled. Until user management (F01) exists, create accounts on the server. The generated password is printed once, to whoever runs the command:
+Self sign-up is disabled. User managers create accounts in the app and hand over an activation link (F01). Only the first General Manager is created on the server; the generated password is printed once, to whoever runs the command, and 2FA setup is asked at the first sign-in:
 
 ```bash
-ssh -t vertex "cd /srv/hub.vertexmedia.pro/current && sudo -u vertexhub node apps/api/dist/cli/create-user.js --email <email> --name '<name>' --role general_manager"
+ssh -t vertex "cd /srv/hub.vertexmedia.pro/current && sudo -u vertexhub node apps/api/dist/cli/create-user.js --email <email> --name '<name>' --department general_management --role general_manager"
 ```
+
+A user who lost their authenticator and backup codes gets 2FA reset the same way, with `node apps/api/dist/cli/reset-two-factor.js --email <email>`.
 
 ## Operate
 

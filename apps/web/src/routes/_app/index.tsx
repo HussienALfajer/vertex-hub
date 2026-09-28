@@ -2,8 +2,8 @@ import { useQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
 import { Badge, Card, CardHeader, CardTitle, PageHeader } from '@vertex-hub/ui';
 import { useTranslation } from 'react-i18next';
-import { healthQuery } from '../../lib/api';
 import { formatDateTime } from '../../lib/format';
+import { healthQuery } from '../../lib/health';
 
 export const Route = createFileRoute('/_app/')({
   component: HomePage,

@@ -12,6 +12,7 @@
       "**",
       "!**/routeTree.gen.ts",
       "!**/lib/api/openapi.json",
+      "!**/lib/api/schema.gen.ts",
       "!**/migrations/meta",
       "!brand",
       "!docs"

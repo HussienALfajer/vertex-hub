@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatDateTime, formatNumber } from './format';
+import { businessDayEnd, businessDayStart, formatDateTime, formatNumber } from './format';
 
 const ARABIC_INDIC_DIGITS = /[٠-٩۰-۹]/;
 
@@ -16,5 +16,10 @@ describe('formatting', () => {
     expect(formatted).not.toMatch(ARABIC_INDIC_DIGITS);
     expect(formatted).toContain('29');
     expect(formatted).toContain('12:30');
+  });
+
+  it('turns a business day into its UTC bounds', () => {
+    expect(businessDayStart('2026-09-28')).toBe('2026-09-27T21:00:00.000Z');
+    expect(businessDayEnd('2026-09-28')).toBe('2026-09-28T20:59:59.999Z');
   });
 });

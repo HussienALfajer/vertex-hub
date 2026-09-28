@@ -1,10 +1,20 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { WORKFLOW_STATUSES, type WorkflowStatus } from '@vertex-hub/contracts';
 import {
+  AlertDialog,
+  AlertDialogClose,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+  Avatar,
   Button,
   Card,
   CardHeader,
   CardTitle,
+  Checkbox,
   Dialog,
   DialogClose,
   DialogContent,
@@ -18,16 +28,21 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  EmptyState,
   Field,
   FieldDescription,
   FieldLabel,
   Input,
+  MultiCombobox,
+  OtpField,
   PageHeader,
+  Pagination,
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
+  Skeleton,
   StatusBadge,
   Table,
   TableBody,
@@ -37,8 +52,15 @@ import {
   TableRow,
   toast,
 } from '@vertex-hub/ui';
-import { ArchiveIcon, CopyIcon, EllipsisIcon, PencilIcon } from 'lucide-react';
-import type { ReactNode } from 'react';
+import {
+  ArchiveIcon,
+  CopyIcon,
+  EllipsisIcon,
+  ListTodoIcon,
+  PencilIcon,
+  PlusIcon,
+} from 'lucide-react';
+import { type ReactNode, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { formatNumber } from '../../lib/format';
 
@@ -203,6 +225,8 @@ function DesignSystemPage() {
         </Table>
       </Section>
 
+      <PeopleSection />
+
       <Section title={t('designSystem.overlays')}>
         <div className="flex flex-wrap items-center gap-3">
           <Dialog>
@@ -224,6 +248,26 @@ function DesignSystemPage() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
+
+          <AlertDialog>
+            <AlertDialogTrigger render={<Button variant="outline" />}>
+              {t('designSystem.openAlert')}
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>{t('designSystem.dialogTitle')}</AlertDialogTitle>
+                <AlertDialogDescription>{t('designSystem.dialogBody')}</AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogClose render={<Button variant="outline" />}>
+                  {t('common.cancel')}
+                </AlertDialogClose>
+                <AlertDialogClose render={<Button variant="destructive" />}>
+                  {t('designSystem.destructive')}
+                </AlertDialogClose>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
 
           <DropdownMenu>
             <DropdownMenuTrigger render={<Button variant="outline" />}>
@@ -262,5 +306,97 @@ function DesignSystemPage() {
         </div>
       </Section>
     </>
+  );
+}
+
+const sampleSkills = ['figma', 'motion', 'copy', 'premiere', 'product'] as const;
+
+/** Avatars, checkbox, multi-select with chips, one-time code, empty state, loading and paging. */
+function PeopleSection() {
+  const { t } = useTranslation();
+  const ids = { skills: useId(), agree: useId(), otp: useId() };
+  const skillItems = sampleSkills.map((key) => t(`designSystem.sampleSkills.${key}`));
+  const [skills, setSkills] = useState<string[]>(() => skillItems.slice(0, 2));
+  const [agree, setAgree] = useState(true);
+  const [code, setCode] = useState('482');
+  const [page, setPage] = useState(2);
+  return (
+    <Section title={t('designSystem.people')}>
+      <div className="grid gap-8 lg:grid-cols-2">
+        <div className="flex flex-col gap-6">
+          <div className="flex items-center gap-3">
+            <Avatar name={t('designSystem.sampleName')} size="xl" />
+            <Avatar name={t('designSystem.sampleName')} size="lg" />
+            <Avatar name={t('designSystem.sampleName2')} size="md" tone="accent" />
+            <Avatar name={t('designSystem.sampleName2')} size="sm" tone="muted" />
+          </div>
+          <Field>
+            <FieldLabel htmlFor={ids.skills}>{t('designSystem.skillsLabel')}</FieldLabel>
+            <MultiCombobox<string>
+              id={ids.skills}
+              items={skillItems}
+              value={skills}
+              onValueChange={setSkills}
+              itemToLabel={(skill) => skill}
+              itemToKey={(skill) => skill}
+              emptyLabel={t('users.form.noMatches')}
+              removeLabel={(label) => t('users.form.remove', { label })}
+              create={{
+                label: (skill) => t('users.form.addSkill', { skill }),
+                toItem: (skill) => skill,
+              }}
+            />
+          </Field>
+          <label htmlFor={ids.agree} className="flex items-center gap-3 text-sm">
+            <Checkbox id={ids.agree} checked={agree} onCheckedChange={setAgree} />
+            {t('designSystem.agree')}
+          </label>
+          <div className="flex flex-col gap-2">
+            <label htmlFor={ids.otp} className="text-sm font-medium">
+              {t('designSystem.otp')}
+            </label>
+            <OtpField
+              id={ids.otp}
+              value={code}
+              onValueChange={setCode}
+              slotLabel={(position) => t('twoFactorSetup.digit', { position })}
+              className="justify-start"
+            />
+          </div>
+        </div>
+        <div className="flex flex-col gap-6">
+          <EmptyState
+            icon={<ListTodoIcon />}
+            title={t('designSystem.emptyTitle')}
+            description={t('designSystem.emptyBody')}
+            action={
+              <Button size="sm">
+                <PlusIcon />
+                {t('designSystem.emptyAction')}
+              </Button>
+            }
+          />
+          <div className="flex items-center gap-3">
+            <Skeleton className="size-9 rounded-full" />
+            <div className="flex flex-1 flex-col gap-2">
+              <Skeleton className="h-4 w-2/3" />
+              <Skeleton className="h-3 w-1/3" />
+            </div>
+          </div>
+          <Pagination
+            page={page}
+            pageCount={3}
+            onPageChange={setPage}
+            summary={t('common.pageSummary', {
+              from: formatNumber((page - 1) * 25 + 1),
+              to: formatNumber(Math.min(page * 25, 57)),
+              total: formatNumber(57),
+            })}
+            previousLabel={t('common.previous')}
+            nextLabel={t('common.next')}
+          />
+        </div>
+      </div>
+    </Section>
   );
 }

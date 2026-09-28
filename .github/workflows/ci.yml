@@ -51,10 +51,11 @@ jobs:
           pnpm db:generate
           git diff --exit-code -- packages/db/migrations
           test -z "$(git status --porcelain -- packages/db/migrations)"
-      - name: The web app's OpenAPI document matches the API
+      - name: The web app's OpenAPI document and client types match the API
         run: |
           pnpm --filter @vertex-hub/api openapi:export
-          git diff --exit-code -- apps/web/src/lib/api/openapi.json
+          pnpm --filter @vertex-hub/web api:generate
+          git diff --exit-code -- apps/web/src/lib/api
 
   e2e:
     name: Playwright smoke

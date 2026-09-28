@@ -15,3 +15,19 @@ export function formatDateTime(value: Date | string): string {
     timeZone: BUSINESS_TIME_ZONE,
   }).format(new Date(value));
 }
+
+/**
+ * Syria keeps UTC+3 all year (no daylight saving since 2022), so a calendar day in the business
+ * timezone starts and ends at these instants.
+ */
+const BUSINESS_UTC_OFFSET = '+03:00';
+
+/** The first instant of a business day given as `YYYY-MM-DD`, as an ISO timestamp. */
+export function businessDayStart(day: string): string {
+  return new Date(`${day}T00:00:00${BUSINESS_UTC_OFFSET}`).toISOString();
+}
+
+/** The last instant of a business day given as `YYYY-MM-DD`, as an ISO timestamp. */
+export function businessDayEnd(day: string): string {
+  return new Date(`${day}T23:59:59.999${BUSINESS_UTC_OFFSET}`).toISOString();
+}
