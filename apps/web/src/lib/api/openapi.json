@@ -624,6 +624,805 @@
         ]
       }
     },
+    "/api/clients": {
+      "get": {
+        "operationId": "ClientsController_list",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 1,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 50,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/ClientStatus"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ClientStatus"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "name": "accountManagerId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          {
+            "name": "sector",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 60
+            }
+          },
+          {
+            "name": "healthcare",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ]
+            }
+          },
+          {
+            "name": "archived",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ]
+            }
+          },
+          {
+            "name": "sort",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "tradeName",
+              "type": "string",
+              "enum": [
+                "tradeName",
+                "createdAt"
+              ]
+            }
+          },
+          {
+            "name": "order",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "asc",
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/SortOrder"
+                }
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Clients",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClientPage"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "clients"
+        ]
+      },
+      "post": {
+        "operationId": "ClientsController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateClient"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The new client (scope all only)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClientDetail"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "clients"
+        ]
+      }
+    },
+    "/api/clients/sectors": {
+      "get": {
+        "operationId": "ClientsController_sectors",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Sectors in use",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SectorList"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "clients"
+        ]
+      }
+    },
+    "/api/clients/{id}": {
+      "get": {
+        "operationId": "ClientsController_detail",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A client profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClientDetail"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "clients"
+        ]
+      },
+      "patch": {
+        "operationId": "ClientsController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateClient"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The updated client; account manager and healthcare need scope all",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClientDetail"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "clients"
+        ]
+      }
+    },
+    "/api/clients/{id}/archive": {
+      "post": {
+        "operationId": "ClientsController_archive",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The archived client (scope all only)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClientDetail"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "clients"
+        ]
+      }
+    },
+    "/api/clients/{id}/restore": {
+      "post": {
+        "operationId": "ClientsController_restore",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The restored client (scope all only)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClientDetail"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "clients"
+        ]
+      }
+    },
+    "/api/clients/{id}/brand-kit": {
+      "put": {
+        "operationId": "ClientsController_replaceBrandKit",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateBrandKit"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The new brand kit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BrandKit"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "clients"
+        ]
+      }
+    },
+    "/api/clients/{id}/contacts": {
+      "post": {
+        "operationId": "ClientContactsController_create",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateContact"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The new contact",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Contact"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "clients"
+        ]
+      }
+    },
+    "/api/clients/{id}/contacts/{contactId}": {
+      "patch": {
+        "operationId": "ClientContactsController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "contactId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateContact"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The updated contact",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Contact"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "clients"
+        ]
+      }
+    },
+    "/api/clients/{id}/contacts/{contactId}/archive": {
+      "post": {
+        "operationId": "ClientContactsController_archive",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "contactId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "The contact is removed from the client"
+          }
+        },
+        "tags": [
+          "clients"
+        ]
+      }
+    },
+    "/api/clients/{id}/platform-accounts": {
+      "post": {
+        "operationId": "ClientPlatformAccountsController_create",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePlatformAccount"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The new platform account",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformAccount"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "clients"
+        ]
+      }
+    },
+    "/api/clients/{id}/platform-accounts/{accountId}": {
+      "patch": {
+        "operationId": "ClientPlatformAccountsController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "accountId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePlatformAccount"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The updated platform account",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformAccount"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "clients"
+        ]
+      }
+    },
+    "/api/clients/{id}/platform-accounts/{accountId}/archive": {
+      "post": {
+        "operationId": "ClientPlatformAccountsController_archive",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "accountId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "The platform account is removed from the client"
+          }
+        },
+        "tags": [
+          "clients"
+        ]
+      }
+    },
+    "/api/clients/{id}/notes": {
+      "get": {
+        "operationId": "ClientNotesController_list",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 1,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 50,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          {
+            "name": "channel",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/NoteChannel"
+                }
+              ]
+            }
+          },
+          {
+            "name": "contactId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          {
+            "name": "authorId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The communication log",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotePage"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "clients"
+        ]
+      },
+      "post": {
+        "operationId": "ClientNotesController_create",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateNote"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The new note",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Note"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "clients"
+        ]
+      }
+    },
+    "/api/clients/{id}/notes/{noteId}": {
+      "patch": {
+        "operationId": "ClientNotesController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "noteId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateNote"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The updated note (author only)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Note"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "clients"
+        ]
+      }
+    },
+    "/api/clients/{id}/notes/{noteId}/archive": {
+      "post": {
+        "operationId": "ClientNotesController_archive",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "noteId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "The note is withdrawn from the log"
+          }
+        },
+        "tags": [
+          "clients"
+        ]
+      }
+    },
     "/api/health": {
       "get": {
         "operationId": "HealthController_check",
@@ -670,7 +1469,11 @@
         "type": "string",
         "enum": [
           "user",
-          "department"
+          "department",
+          "client",
+          "client_contact",
+          "client_platform_account",
+          "client_note"
         ]
       },
       "AuditAction": {
@@ -689,7 +1492,24 @@
           "user.two_factor_disabled",
           "user.two_factor_reset",
           "user.profile_updated",
-          "department.updated"
+          "department.updated",
+          "client.created",
+          "client.updated",
+          "client.status_changed",
+          "client.account_manager_changed",
+          "client.healthcare_changed",
+          "client.archived",
+          "client.restored",
+          "client.brand_kit_updated",
+          "client_contact.created",
+          "client_contact.updated",
+          "client_contact.archived",
+          "client_platform_account.created",
+          "client_platform_account.updated",
+          "client_platform_account.archived",
+          "client_note.created",
+          "client_note.updated",
+          "client_note.archived"
         ]
       },
       "AuditPage": {
@@ -943,6 +1763,7 @@
           "users.manage",
           "clients.read",
           "clients.manage",
+          "clients.log",
           "leads.read",
           "leads.manage",
           "catalog.read",
@@ -1486,6 +2307,922 @@
         ],
         "additionalProperties": false,
         "description": "An error; `code` tells errors apart"
+      },
+      "ClientStatus": {
+        "type": "string",
+        "enum": [
+          "active",
+          "paused",
+          "ended"
+        ]
+      },
+      "SortOrder": {
+        "type": "string",
+        "enum": [
+          "asc",
+          "desc"
+        ]
+      },
+      "ClientPage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Client"
+            }
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "page",
+          "pageSize"
+        ],
+        "additionalProperties": false
+      },
+      "Client": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "tradeName": {
+            "type": "string"
+          },
+          "sector": {
+            "nullable": true,
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ClientStatus"
+          },
+          "isHealthcare": {
+            "type": "boolean"
+          },
+          "accountManager": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "name": {
+                "type": "string"
+              },
+              "archived": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "archived"
+            ],
+            "additionalProperties": false
+          },
+          "hasApprovalContact": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "tradeName",
+          "sector",
+          "status",
+          "isHealthcare",
+          "accountManager",
+          "hasApprovalContact"
+        ],
+        "additionalProperties": false
+      },
+      "SectorList": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "additionalProperties": false,
+        "description": "Sectors of clients that are not archived, one spelling per sector, sorted"
+      },
+      "ClientDetail": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "tradeName": {
+            "type": "string"
+          },
+          "sector": {
+            "nullable": true,
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ClientStatus"
+          },
+          "isHealthcare": {
+            "type": "boolean"
+          },
+          "accountManager": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "name": {
+                "type": "string"
+              },
+              "archived": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "archived"
+            ],
+            "additionalProperties": false
+          },
+          "hasApprovalContact": {
+            "type": "boolean"
+          },
+          "brandKit": {
+            "$ref": "#/components/schemas/BrandKit"
+          },
+          "contacts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Contact"
+            }
+          },
+          "platformAccounts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlatformAccount"
+            }
+          },
+          "archivedAt": {
+            "nullable": true,
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "canManage": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "tradeName",
+          "sector",
+          "status",
+          "isHealthcare",
+          "accountManager",
+          "hasApprovalContact",
+          "brandKit",
+          "contacts",
+          "platformAccounts",
+          "archivedAt",
+          "canManage"
+        ],
+        "additionalProperties": false
+      },
+      "BrandKit": {
+        "type": "object",
+        "properties": {
+          "colors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "nullable": true,
+                  "type": "string"
+                },
+                "hex": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name",
+                "hex"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "fonts": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "toneOfVoice": {
+            "nullable": true,
+            "type": "string"
+          },
+          "forbiddenWords": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "logo",
+                    "font",
+                    "guidelines",
+                    "other"
+                  ]
+                },
+                "label": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "label",
+                "url"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "references": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "liked",
+                    "disliked"
+                  ]
+                },
+                "url": {
+                  "type": "string"
+                },
+                "note": {
+                  "nullable": true,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "url",
+                "note"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "colors",
+          "fonts",
+          "toneOfVoice",
+          "forbiddenWords",
+          "files",
+          "references"
+        ],
+        "additionalProperties": false
+      },
+      "Contact": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "clientId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "name": {
+            "type": "string"
+          },
+          "jobTitle": {
+            "nullable": true,
+            "type": "string"
+          },
+          "phone": {
+            "nullable": true,
+            "type": "string"
+          },
+          "email": {
+            "nullable": true,
+            "type": "string"
+          },
+          "hasFinalApproval": {
+            "type": "boolean"
+          },
+          "notes": {
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "clientId",
+          "name",
+          "jobTitle",
+          "phone",
+          "email",
+          "hasFinalApproval",
+          "notes"
+        ],
+        "additionalProperties": false
+      },
+      "PlatformAccount": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "clientId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "platform": {
+            "$ref": "#/components/schemas/ClientPlatform"
+          },
+          "label": {
+            "nullable": true,
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "agencyAccess": {
+            "$ref": "#/components/schemas/PlatformAccess"
+          },
+          "adminNote": {
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "clientId",
+          "platform",
+          "label",
+          "url",
+          "agencyAccess",
+          "adminNote"
+        ],
+        "additionalProperties": false
+      },
+      "ClientPlatform": {
+        "type": "string",
+        "enum": [
+          "instagram",
+          "facebook",
+          "tiktok",
+          "x",
+          "linkedin",
+          "youtube",
+          "snapchat",
+          "google_business",
+          "website",
+          "other"
+        ]
+      },
+      "PlatformAccess": {
+        "type": "string",
+        "enum": [
+          "granted",
+          "pending",
+          "none"
+        ]
+      },
+      "CreateClient": {
+        "type": "object",
+        "properties": {
+          "tradeName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "sector": {
+            "nullable": true,
+            "type": "string",
+            "maxLength": 60
+          },
+          "accountManagerId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "status": {
+            "default": "active",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ClientStatus"
+              }
+            ]
+          },
+          "isHealthcare": {
+            "default": false,
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "tradeName",
+          "accountManagerId"
+        ]
+      },
+      "UpdateClient": {
+        "type": "object",
+        "properties": {
+          "tradeName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "sector": {
+            "nullable": true,
+            "type": "string",
+            "maxLength": 60
+          },
+          "accountManagerId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ClientStatus"
+              }
+            ]
+          },
+          "isHealthcare": {
+            "type": "boolean"
+          }
+        }
+      },
+      "UpdateBrandKit": {
+        "type": "object",
+        "properties": {
+          "colors": {
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "nullable": true,
+                  "type": "string",
+                  "maxLength": 40
+                },
+                "hex": {
+                  "type": "string",
+                  "pattern": "^#[0-9a-fA-F]{6}$"
+                }
+              },
+              "required": [
+                "hex"
+              ]
+            }
+          },
+          "fonts": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 60
+            }
+          },
+          "toneOfVoice": {
+            "nullable": true,
+            "type": "string",
+            "maxLength": 2000
+          },
+          "forbiddenWords": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 60
+            }
+          },
+          "files": {
+            "default": [],
+            "maxItems": 30,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "logo",
+                    "font",
+                    "guidelines",
+                    "other"
+                  ]
+                },
+                "label": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 80
+                },
+                "url": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "label",
+                "url"
+              ]
+            }
+          },
+          "references": {
+            "maxItems": 50,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "liked",
+                    "disliked"
+                  ]
+                },
+                "url": {
+                  "type": "string"
+                },
+                "note": {
+                  "nullable": true,
+                  "type": "string",
+                  "maxLength": 300
+                }
+              },
+              "required": [
+                "kind",
+                "url"
+              ]
+            }
+          }
+        }
+      },
+      "CreateContact": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "jobTitle": {
+            "nullable": true,
+            "type": "string",
+            "maxLength": 80
+          },
+          "phone": {
+            "nullable": true,
+            "type": "string"
+          },
+          "email": {
+            "nullable": true,
+            "type": "string"
+          },
+          "hasFinalApproval": {
+            "type": "boolean"
+          },
+          "notes": {
+            "nullable": true,
+            "type": "string",
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "UpdateContact": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "jobTitle": {
+            "nullable": true,
+            "type": "string",
+            "maxLength": 80
+          },
+          "phone": {
+            "nullable": true,
+            "type": "string"
+          },
+          "email": {
+            "nullable": true,
+            "type": "string"
+          },
+          "hasFinalApproval": {
+            "type": "boolean"
+          },
+          "notes": {
+            "nullable": true,
+            "type": "string",
+            "maxLength": 500
+          }
+        }
+      },
+      "CreatePlatformAccount": {
+        "type": "object",
+        "properties": {
+          "platform": {
+            "$ref": "#/components/schemas/ClientPlatform"
+          },
+          "label": {
+            "nullable": true,
+            "type": "string",
+            "maxLength": 60
+          },
+          "url": {
+            "type": "string"
+          },
+          "agencyAccess": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PlatformAccess"
+              }
+            ]
+          },
+          "adminNote": {
+            "nullable": true,
+            "type": "string",
+            "maxLength": 300
+          }
+        },
+        "required": [
+          "platform",
+          "url"
+        ]
+      },
+      "UpdatePlatformAccount": {
+        "type": "object",
+        "properties": {
+          "platform": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ClientPlatform"
+              }
+            ]
+          },
+          "label": {
+            "nullable": true,
+            "type": "string",
+            "maxLength": 60
+          },
+          "url": {
+            "type": "string"
+          },
+          "agencyAccess": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PlatformAccess"
+              }
+            ]
+          },
+          "adminNote": {
+            "nullable": true,
+            "type": "string",
+            "maxLength": 300
+          }
+        }
+      },
+      "NoteChannel": {
+        "type": "string",
+        "enum": [
+          "call",
+          "meeting",
+          "whatsapp",
+          "email",
+          "other"
+        ]
+      },
+      "NotePage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Note"
+            }
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "page",
+          "pageSize"
+        ],
+        "additionalProperties": false,
+        "description": "Notes that are not archived, newest occurredAt first"
+      },
+      "Note": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "clientId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "channel": {
+            "$ref": "#/components/schemas/NoteChannel"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "author": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ],
+            "additionalProperties": false
+          },
+          "contact": {
+            "nullable": true,
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "name": {
+                "type": "string"
+              },
+              "archived": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "archived"
+            ],
+            "additionalProperties": false
+          },
+          "canEdit": {
+            "type": "boolean"
+          },
+          "canArchive": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "clientId",
+          "occurredAt",
+          "channel",
+          "summary",
+          "author",
+          "contact",
+          "canEdit",
+          "canArchive"
+        ],
+        "additionalProperties": false
+      },
+      "CreateNote": {
+        "type": "object",
+        "properties": {
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          },
+          "channel": {
+            "$ref": "#/components/schemas/NoteChannel"
+          },
+          "contactId": {
+            "nullable": true,
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "summary": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          }
+        },
+        "required": [
+          "channel",
+          "summary"
+        ]
+      },
+      "UpdateNote": {
+        "type": "object",
+        "properties": {
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          },
+          "channel": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/NoteChannel"
+              }
+            ]
+          },
+          "contactId": {
+            "nullable": true,
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "summary": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          }
+        }
       },
       "HealthResponse": {
         "type": "object",

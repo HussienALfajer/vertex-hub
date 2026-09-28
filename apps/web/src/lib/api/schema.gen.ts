@@ -212,6 +212,246 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/clients": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ClientsController_list"];
+        put?: never;
+        post: operations["ClientsController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/clients/sectors": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ClientsController_sectors"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/clients/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ClientsController_detail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["ClientsController_update"];
+        trace?: never;
+    };
+    "/api/clients/{id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ClientsController_archive"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/clients/{id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ClientsController_restore"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/clients/{id}/brand-kit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["ClientsController_replaceBrandKit"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/clients/{id}/contacts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ClientContactsController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/clients/{id}/contacts/{contactId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["ClientContactsController_update"];
+        trace?: never;
+    };
+    "/api/clients/{id}/contacts/{contactId}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ClientContactsController_archive"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/clients/{id}/platform-accounts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ClientPlatformAccountsController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/clients/{id}/platform-accounts/{accountId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["ClientPlatformAccountsController_update"];
+        trace?: never;
+    };
+    "/api/clients/{id}/platform-accounts/{accountId}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ClientPlatformAccountsController_archive"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/clients/{id}/notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ClientNotesController_list"];
+        put?: never;
+        post: operations["ClientNotesController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/clients/{id}/notes/{noteId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["ClientNotesController_update"];
+        trace?: never;
+    };
+    "/api/clients/{id}/notes/{noteId}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ClientNotesController_archive"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -233,9 +473,9 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         /** @enum {string} */
-        AuditEntityType: "user" | "department";
+        AuditEntityType: "user" | "department" | "client" | "client_contact" | "client_platform_account" | "client_note";
         /** @enum {string} */
-        AuditAction: "user.created" | "user.updated" | "user.roles_changed" | "user.departments_changed" | "user.archived" | "user.restored" | "user.link_issued" | "user.password_set" | "user.password_changed" | "user.two_factor_enabled" | "user.two_factor_disabled" | "user.two_factor_reset" | "user.profile_updated" | "department.updated";
+        AuditAction: "user.created" | "user.updated" | "user.roles_changed" | "user.departments_changed" | "user.archived" | "user.restored" | "user.link_issued" | "user.password_set" | "user.password_changed" | "user.two_factor_enabled" | "user.two_factor_disabled" | "user.two_factor_reset" | "user.profile_updated" | "department.updated" | "client.created" | "client.updated" | "client.status_changed" | "client.account_manager_changed" | "client.healthcare_changed" | "client.archived" | "client.restored" | "client.brand_kit_updated" | "client_contact.created" | "client_contact.updated" | "client_contact.archived" | "client_platform_account.created" | "client_platform_account.updated" | "client_platform_account.archived" | "client_note.created" | "client_note.updated" | "client_note.archived";
         /** @description Audit entries, newest first */
         AuditPage: {
             items: components["schemas"]["AuditEntry"][];
@@ -298,7 +538,7 @@ export interface components {
             scopes: components["schemas"]["PermissionScope"][];
         };
         /** @enum {string} */
-        Permission: "users.read" | "users.manage" | "clients.read" | "clients.manage" | "leads.read" | "leads.manage" | "catalog.read" | "catalog.manage" | "quotes.read" | "quotes.manage" | "quotes.approve_discount" | "projects.read" | "projects.manage" | "tasks.read" | "tasks.work" | "tasks.manage" | "templates.read" | "templates.manage" | "content.read" | "content.manage" | "approvals.review" | "approvals.review_medical" | "shoots.read" | "shoots.manage" | "campaigns.read" | "campaigns.manage" | "invoices.read" | "invoices.manage" | "payments.manage" | "reports.read" | "reports.finance" | "audit.read";
+        Permission: "users.read" | "users.manage" | "clients.read" | "clients.manage" | "clients.log" | "leads.read" | "leads.manage" | "catalog.read" | "catalog.manage" | "quotes.read" | "quotes.manage" | "quotes.approve_discount" | "projects.read" | "projects.manage" | "tasks.read" | "tasks.work" | "tasks.manage" | "templates.read" | "templates.manage" | "content.read" | "content.manage" | "approvals.review" | "approvals.review_medical" | "shoots.read" | "shoots.manage" | "campaigns.read" | "campaigns.manage" | "invoices.read" | "invoices.manage" | "payments.manage" | "reports.read" | "reports.finance" | "audit.read";
         /** @enum {string} */
         PermissionScope: "all" | "department" | "own_clients" | "assigned";
         UpdateOwnProfile: {
@@ -422,6 +662,222 @@ export interface components {
             code?: string;
             message: string;
             details?: unknown;
+        };
+        /** @enum {string} */
+        ClientStatus: "active" | "paused" | "ended";
+        /** @enum {string} */
+        SortOrder: "asc" | "desc";
+        ClientPage: {
+            items: components["schemas"]["Client"][];
+            total: number;
+            page: number;
+            pageSize: number;
+        };
+        Client: {
+            /** Format: uuid */
+            id: string;
+            tradeName: string;
+            sector: string | null;
+            status: components["schemas"]["ClientStatus"];
+            isHealthcare: boolean;
+            accountManager: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                archived: boolean;
+            };
+            hasApprovalContact: boolean;
+        };
+        /** @description Sectors of clients that are not archived, one spelling per sector, sorted */
+        SectorList: {
+            items: string[];
+        };
+        ClientDetail: {
+            /** Format: uuid */
+            id: string;
+            tradeName: string;
+            sector: string | null;
+            status: components["schemas"]["ClientStatus"];
+            isHealthcare: boolean;
+            accountManager: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                archived: boolean;
+            };
+            hasApprovalContact: boolean;
+            brandKit: components["schemas"]["BrandKit"];
+            contacts: components["schemas"]["Contact"][];
+            platformAccounts: components["schemas"]["PlatformAccount"][];
+            /** Format: date-time */
+            archivedAt: string | null;
+            canManage: boolean;
+        };
+        BrandKit: {
+            colors: {
+                name: string | null;
+                hex: string;
+            }[];
+            fonts: string[];
+            toneOfVoice: string | null;
+            forbiddenWords: string[];
+            files: {
+                /** @enum {string} */
+                kind: "logo" | "font" | "guidelines" | "other";
+                label: string;
+                url: string;
+            }[];
+            references: {
+                /** @enum {string} */
+                kind: "liked" | "disliked";
+                url: string;
+                note: string | null;
+            }[];
+        };
+        Contact: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            clientId: string;
+            name: string;
+            jobTitle: string | null;
+            phone: string | null;
+            email: string | null;
+            hasFinalApproval: boolean;
+            notes: string | null;
+        };
+        PlatformAccount: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            clientId: string;
+            platform: components["schemas"]["ClientPlatform"];
+            label: string | null;
+            url: string;
+            agencyAccess: components["schemas"]["PlatformAccess"];
+            adminNote: string | null;
+        };
+        /** @enum {string} */
+        ClientPlatform: "instagram" | "facebook" | "tiktok" | "x" | "linkedin" | "youtube" | "snapchat" | "google_business" | "website" | "other";
+        /** @enum {string} */
+        PlatformAccess: "granted" | "pending" | "none";
+        CreateClient: {
+            tradeName: string;
+            sector?: string | null;
+            /** Format: uuid */
+            accountManagerId: string;
+            /** @default active */
+            status: components["schemas"]["ClientStatus"];
+            /** @default false */
+            isHealthcare: boolean;
+        };
+        UpdateClient: {
+            tradeName?: string;
+            sector?: string | null;
+            /** Format: uuid */
+            accountManagerId?: string;
+            status?: components["schemas"]["ClientStatus"];
+            isHealthcare?: boolean;
+        };
+        UpdateBrandKit: {
+            colors?: {
+                name?: string | null;
+                hex: string;
+            }[];
+            fonts?: string[];
+            toneOfVoice?: string | null;
+            forbiddenWords?: string[];
+            /** @default [] */
+            files: {
+                /** @enum {string} */
+                kind: "logo" | "font" | "guidelines" | "other";
+                label: string;
+                url: string;
+            }[];
+            references?: {
+                /** @enum {string} */
+                kind: "liked" | "disliked";
+                url: string;
+                note?: string | null;
+            }[];
+        };
+        CreateContact: {
+            name: string;
+            jobTitle?: string | null;
+            phone?: string | null;
+            email?: string | null;
+            hasFinalApproval?: boolean;
+            notes?: string | null;
+        };
+        UpdateContact: {
+            name?: string;
+            jobTitle?: string | null;
+            phone?: string | null;
+            email?: string | null;
+            hasFinalApproval?: boolean;
+            notes?: string | null;
+        };
+        CreatePlatformAccount: {
+            platform: components["schemas"]["ClientPlatform"];
+            label?: string | null;
+            url: string;
+            agencyAccess?: components["schemas"]["PlatformAccess"];
+            adminNote?: string | null;
+        };
+        UpdatePlatformAccount: {
+            platform?: components["schemas"]["ClientPlatform"];
+            label?: string | null;
+            url?: string;
+            agencyAccess?: components["schemas"]["PlatformAccess"];
+            adminNote?: string | null;
+        };
+        /** @enum {string} */
+        NoteChannel: "call" | "meeting" | "whatsapp" | "email" | "other";
+        /** @description Notes that are not archived, newest occurredAt first */
+        NotePage: {
+            items: components["schemas"]["Note"][];
+            total: number;
+            page: number;
+            pageSize: number;
+        };
+        Note: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            clientId: string;
+            /** Format: date-time */
+            occurredAt: string;
+            channel: components["schemas"]["NoteChannel"];
+            summary: string;
+            author: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            };
+            contact: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                archived: boolean;
+            } | null;
+            canEdit: boolean;
+            canArchive: boolean;
+        };
+        CreateNote: {
+            /** Format: date-time */
+            occurredAt?: string;
+            channel: components["schemas"]["NoteChannel"];
+            /** Format: uuid */
+            contactId?: string | null;
+            summary: string;
+        };
+        UpdateNote: {
+            /** Format: date-time */
+            occurredAt?: string;
+            channel?: components["schemas"]["NoteChannel"];
+            /** Format: uuid */
+            contactId?: string | null;
+            summary?: string;
         };
         /** @description Liveness of the API and its dependencies */
         HealthResponse: {
@@ -827,6 +1283,449 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
+            };
+        };
+    };
+    ClientsController_list: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+                search?: string;
+                status?: components["schemas"]["ClientStatus"] | components["schemas"]["ClientStatus"][];
+                accountManagerId?: string;
+                sector?: string;
+                healthcare?: "true" | "false";
+                archived?: "true" | "false";
+                sort?: "tradeName" | "createdAt";
+                order?: components["schemas"]["SortOrder"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Clients */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClientPage"];
+                };
+            };
+        };
+    };
+    ClientsController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateClient"];
+            };
+        };
+        responses: {
+            /** @description The new client (scope all only) */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClientDetail"];
+                };
+            };
+        };
+    };
+    ClientsController_sectors: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Sectors in use */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SectorList"];
+                };
+            };
+        };
+    };
+    ClientsController_detail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A client profile */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClientDetail"];
+                };
+            };
+        };
+    };
+    ClientsController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateClient"];
+            };
+        };
+        responses: {
+            /** @description The updated client; account manager and healthcare need scope all */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClientDetail"];
+                };
+            };
+        };
+    };
+    ClientsController_archive: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The archived client (scope all only) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClientDetail"];
+                };
+            };
+        };
+    };
+    ClientsController_restore: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The restored client (scope all only) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClientDetail"];
+                };
+            };
+        };
+    };
+    ClientsController_replaceBrandKit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateBrandKit"];
+            };
+        };
+        responses: {
+            /** @description The new brand kit */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BrandKit"];
+                };
+            };
+        };
+    };
+    ClientContactsController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateContact"];
+            };
+        };
+        responses: {
+            /** @description The new contact */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Contact"];
+                };
+            };
+        };
+    };
+    ClientContactsController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                contactId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateContact"];
+            };
+        };
+        responses: {
+            /** @description The updated contact */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Contact"];
+                };
+            };
+        };
+    };
+    ClientContactsController_archive: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                contactId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The contact is removed from the client */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ClientPlatformAccountsController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreatePlatformAccount"];
+            };
+        };
+        responses: {
+            /** @description The new platform account */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformAccount"];
+                };
+            };
+        };
+    };
+    ClientPlatformAccountsController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                accountId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdatePlatformAccount"];
+            };
+        };
+        responses: {
+            /** @description The updated platform account */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformAccount"];
+                };
+            };
+        };
+    };
+    ClientPlatformAccountsController_archive: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                accountId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The platform account is removed from the client */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ClientNotesController_list: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+                channel?: components["schemas"]["NoteChannel"];
+                contactId?: string;
+                authorId?: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The communication log */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotePage"];
+                };
+            };
+        };
+    };
+    ClientNotesController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateNote"];
+            };
+        };
+        responses: {
+            /** @description The new note */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Note"];
+                };
+            };
+        };
+    };
+    ClientNotesController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                noteId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateNote"];
+            };
+        };
+        responses: {
+            /** @description The updated note (author only) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Note"];
+                };
+            };
+        };
+    };
+    ClientNotesController_archive: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                noteId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The note is withdrawn from the log */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

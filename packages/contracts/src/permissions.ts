@@ -11,6 +11,7 @@ export const PERMISSIONS = [
   'users.manage',
   'clients.read',
   'clients.manage',
+  'clients.log',
   'leads.read',
   'leads.manage',
   'catalog.read',
@@ -67,7 +68,6 @@ const everything: Grants = Object.fromEntries(PERMISSIONS.map((p) => [p, 'all'])
 export const PERMISSION_MAP: Readonly<Record<Role, Grants>> = {
   general_manager: everything,
   department_manager: {
-    'clients.read': 'department',
     'catalog.read': 'all',
     'projects.read': 'department',
     'projects.manage': 'department',
@@ -84,7 +84,8 @@ export const PERMISSION_MAP: Readonly<Record<Role, Grants>> = {
   },
   employee: {
     'users.read': 'all',
-    'clients.read': 'assigned',
+    'clients.read': 'all',
+    'clients.log': 'all',
     'projects.read': 'assigned',
     'tasks.read': 'assigned',
     'tasks.work': 'assigned',
@@ -92,7 +93,6 @@ export const PERMISSION_MAP: Readonly<Record<Role, Grants>> = {
     'shoots.read': 'all',
   },
   account_manager: {
-    'clients.read': 'own_clients',
     'clients.manage': 'own_clients',
     'leads.read': 'assigned',
     'leads.manage': 'assigned',
@@ -112,7 +112,6 @@ export const PERMISSION_MAP: Readonly<Record<Role, Grants>> = {
     'reports.read': 'own_clients',
   },
   finance: {
-    'clients.read': 'all',
     'catalog.read': 'all',
     'quotes.read': 'all',
     'projects.read': 'all',
@@ -133,6 +132,7 @@ export const DEPARTMENT_CAPABILITIES: Readonly<
   internal_operations: {
     manager: {
       'users.manage': 'all',
+      'clients.manage': 'all',
       'audit.read': 'all',
       'templates.read': 'all',
       'templates.manage': 'all',

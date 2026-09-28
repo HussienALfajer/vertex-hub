@@ -10,6 +10,7 @@ import { ENV, type Env } from './core/config/env.js';
 import { DatabaseModule } from './core/database/database.module.js';
 import { AuditModule } from './modules/audit/index.js';
 import { AuthModule } from './modules/auth/index.js';
+import { ClientsModule } from './modules/clients/index.js';
 import { HealthModule } from './modules/health/index.js';
 
 @Module({
@@ -28,6 +29,7 @@ import { HealthModule } from './modules/health/index.js';
     DatabaseModule,
     AuditModule,
     AuthModule,
+    ClientsModule,
     HealthModule,
   ],
   providers: [

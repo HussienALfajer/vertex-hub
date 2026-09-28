@@ -483,15 +483,17 @@ function ArchiveDialog({
                     <Building2Icon className="size-4 text-muted-foreground" />
                     {t(`users.responsibilities.${item.type}`, { name: item.name })}
                   </span>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    render={
-                      <Link to="/departments/$departmentId" params={{ departmentId: item.id }} />
-                    }
-                  >
-                    {t('users.responsibilities.open')}
-                  </Button>
+                  {item.type === 'manages_department' && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      render={
+                        <Link to="/departments/$departmentId" params={{ departmentId: item.id }} />
+                      }
+                    >
+                      {t('users.responsibilities.open')}
+                    </Button>
+                  )}
                 </li>
               ))}
             </ul>

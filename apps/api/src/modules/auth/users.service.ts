@@ -44,6 +44,7 @@ import { CodedException } from '../../core/errors/index.js';
 import { type AuditActor, changedFields, recordAudit } from '../audit/index.js';
 import type { CurrentUserInfo } from './current-user.decorator.js';
 import { resetTwoFactor } from './reset-two-factor.js';
+import { ResponsibilityRegistry } from './responsibility-registry.js';
 import { UserLinksService } from './user-links.service.js';
 import { hasPassword, lockAccessChanges, statusOf } from './user-status.js';
 
@@ -80,6 +81,7 @@ export class UsersService {
   constructor(
     @Inject(DATABASE) private readonly db: Database,
     private readonly links: UserLinksService,
+    private readonly responsibilities: ResponsibilityRegistry,
   ) {}
 
   async list(actor: CurrentUserInfo, query: UserListQuery): Promise<UserPage> {
@@ -251,15 +253,7 @@ export class UsersService {
       if (user.roles.includes('general_manager') && user.status === 'active') {
         await this.assertAnotherActiveGeneralManager(tx, id);
       }
-      const responsibilities = await this.responsibilitiesOf(tx, id);
-      if (responsibilities.length > 0) {
-        throw new CodedException(
-          409,
-          'USER_HAS_RESPONSIBILITIES',
-          'Move the user’s responsibilities to someone else first',
-          responsibilities,
-        );
-      }
+      this.assertNoResponsibilities(await this.responsibilitiesOf(tx, id));
       await tx.update(users).set({ archivedAt: new Date() }).where(eq(users.id, id));
       await tx.delete(sessions).where(eq(sessions.userId, id));
       await this.links.revoke(tx, id);
@@ -453,6 +447,9 @@ export class UsersService {
     if (removed.includes('general_manager') && current.status === 'active') {
       await this.assertAnotherActiveGeneralManager(tx, current.id);
     }
+    for (const role of removed) {
+      this.assertNoResponsibilities(await this.responsibilities.find(tx, current.id, role));
+    }
     if (removed.length > 0) {
       await tx
         .delete(userRoles)
@@ -586,14 +583,31 @@ export class UsersService {
     return link;
   }
 
-  /** What blocks archiving a user (F01 rule 9); later features add their own checks. */
+  /**
+   * What blocks archiving a user (F01 rule 9): the departments they manage, plus what other
+   * modules registered (F02 rule 8).
+   */
   private async responsibilitiesOf(tx: Transaction, userId: string): Promise<Responsibility[]> {
     const managed = await tx
       .select({ id: departments.id, name: departments.name })
       .from(departments)
       .where(eq(departments.managerId, userId))
       .orderBy(asc(departments.name));
-    return managed.map((d) => ({ type: 'manages_department', ...d }));
+    return [
+      ...managed.map((d) => ({ type: 'manages_department' as const, ...d })),
+      ...(await this.responsibilities.find(tx, userId)),
+    ];
+  }
+
+  private assertNoResponsibilities(responsibilities: Responsibility[]): void {
+    if (responsibilities.length > 0) {
+      throw new CodedException(
+        409,
+        'USER_HAS_RESPONSIBILITIES',
+        'Move the user’s responsibilities to someone else first',
+        responsibilities,
+      );
+    }
   }
 
   private async assertAnotherActiveGeneralManager(tx: Transaction, userId: string): Promise<void> {

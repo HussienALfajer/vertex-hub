@@ -421,6 +421,9 @@ function EntityLink({ entry, name }: { entry: AuditEntry; name: string | undefin
       </Link>
     );
   }
+  if (entry.entityType !== 'department') {
+    return <span className="font-medium">{label}</span>;
+  }
   return (
     <Link
       to="/departments/$departmentId"
