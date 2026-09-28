@@ -10,12 +10,26 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as AppRouteImport } from './routes/_app'
+import { Route as ActivateRouteImport } from './routes/activate'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as SetupTwoFactorRouteImport } from './routes/setup-two-factor'
 import { Route as AppIndexRouteImport } from './routes/_app/index'
+import { Route as AppAccountRouteImport } from './routes/_app/account'
+import { Route as AppAuditRouteImport } from './routes/_app/audit'
 import { Route as AppDesignSystemRouteImport } from './routes/_app/design-system'
+import { Route as AppDepartmentsIndexRouteImport } from './routes/_app/departments/index'
+import { Route as AppDepartmentsDepartmentIdRouteImport } from './routes/_app/departments/$departmentId'
+import { Route as AppTeamIndexRouteImport } from './routes/_app/team/index'
+import { Route as AppTeamUserIdRouteImport } from './routes/_app/team/$userId'
+import { Route as AppTeamNewRouteImport } from './routes/_app/team/new'
 
 const AppRoute = AppRouteImport.update({
   id: '/_app',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ActivateRoute = ActivateRouteImport.update({
+  id: '/activate',
+  path: '/activate',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -23,9 +37,24 @@ const LoginRoute = LoginRouteImport.update({
   path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SetupTwoFactorRoute = SetupTwoFactorRouteImport.update({
+  id: '/setup-two-factor',
+  path: '/setup-two-factor',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AppIndexRoute = AppIndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppAccountRoute = AppAccountRouteImport.update({
+  id: '/account',
+  path: '/account',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppAuditRoute = AppAuditRouteImport.update({
+  id: '/audit',
+  path: '/audit',
   getParentRoute: () => AppRoute,
 } as any)
 const AppDesignSystemRoute = AppDesignSystemRouteImport.update({
@@ -33,35 +62,128 @@ const AppDesignSystemRoute = AppDesignSystemRouteImport.update({
   path: '/design-system',
   getParentRoute: () => AppRoute,
 } as any)
+const AppDepartmentsIndexRoute = AppDepartmentsIndexRouteImport.update({
+  id: '/departments/',
+  path: '/departments/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppDepartmentsDepartmentIdRoute =
+  AppDepartmentsDepartmentIdRouteImport.update({
+    id: '/departments/$departmentId',
+    path: '/departments/$departmentId',
+    getParentRoute: () => AppRoute,
+  } as any)
+const AppTeamIndexRoute = AppTeamIndexRouteImport.update({
+  id: '/team/',
+  path: '/team/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppTeamUserIdRoute = AppTeamUserIdRouteImport.update({
+  id: '/team/$userId',
+  path: '/team/$userId',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppTeamNewRoute = AppTeamNewRouteImport.update({
+  id: '/team/new',
+  path: '/team/new',
+  getParentRoute: () => AppRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
+  '/activate': typeof ActivateRoute
   '/login': typeof LoginRoute
+  '/setup-two-factor': typeof SetupTwoFactorRoute
+  '/account': typeof AppAccountRoute
+  '/audit': typeof AppAuditRoute
   '/design-system': typeof AppDesignSystemRoute
+  '/departments/$departmentId': typeof AppDepartmentsDepartmentIdRoute
+  '/team/$userId': typeof AppTeamUserIdRoute
+  '/team/new': typeof AppTeamNewRoute
+  '/departments/': typeof AppDepartmentsIndexRoute
+  '/team/': typeof AppTeamIndexRoute
 }
 export interface FileRoutesByTo {
+  '/activate': typeof ActivateRoute
   '/login': typeof LoginRoute
+  '/setup-two-factor': typeof SetupTwoFactorRoute
+  '/account': typeof AppAccountRoute
+  '/audit': typeof AppAuditRoute
   '/design-system': typeof AppDesignSystemRoute
   '/': typeof AppIndexRoute
+  '/departments/$departmentId': typeof AppDepartmentsDepartmentIdRoute
+  '/team/$userId': typeof AppTeamUserIdRoute
+  '/team/new': typeof AppTeamNewRoute
+  '/departments': typeof AppDepartmentsIndexRoute
+  '/team': typeof AppTeamIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_app': typeof AppRouteWithChildren
+  '/activate': typeof ActivateRoute
   '/login': typeof LoginRoute
+  '/setup-two-factor': typeof SetupTwoFactorRoute
+  '/_app/account': typeof AppAccountRoute
+  '/_app/audit': typeof AppAuditRoute
   '/_app/design-system': typeof AppDesignSystemRoute
   '/_app/': typeof AppIndexRoute
+  '/_app/departments/$departmentId': typeof AppDepartmentsDepartmentIdRoute
+  '/_app/team/$userId': typeof AppTeamUserIdRoute
+  '/_app/team/new': typeof AppTeamNewRoute
+  '/_app/departments/': typeof AppDepartmentsIndexRoute
+  '/_app/team/': typeof AppTeamIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/login' | '/design-system'
+  fullPaths:
+    | '/'
+    | '/activate'
+    | '/login'
+    | '/setup-two-factor'
+    | '/account'
+    | '/audit'
+    | '/design-system'
+    | '/departments/$departmentId'
+    | '/team/$userId'
+    | '/team/new'
+    | '/departments/'
+    | '/team/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/login' | '/design-system' | '/'
-  id: '__root__' | '/_app' | '/login' | '/_app/design-system' | '/_app/'
+  to:
+    | '/activate'
+    | '/login'
+    | '/setup-two-factor'
+    | '/account'
+    | '/audit'
+    | '/design-system'
+    | '/'
+    | '/departments/$departmentId'
+    | '/team/$userId'
+    | '/team/new'
+    | '/departments'
+    | '/team'
+  id:
+    | '__root__'
+    | '/_app'
+    | '/activate'
+    | '/login'
+    | '/setup-two-factor'
+    | '/_app/account'
+    | '/_app/audit'
+    | '/_app/design-system'
+    | '/_app/'
+    | '/_app/departments/$departmentId'
+    | '/_app/team/$userId'
+    | '/_app/team/new'
+    | '/_app/departments/'
+    | '/_app/team/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   AppRoute: typeof AppRouteWithChildren
+  ActivateRoute: typeof ActivateRoute
   LoginRoute: typeof LoginRoute
+  SetupTwoFactorRoute: typeof SetupTwoFactorRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -73,11 +195,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/activate': {
+      id: '/activate'
+      path: '/activate'
+      fullPath: '/activate'
+      preLoaderRoute: typeof ActivateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/login': {
       id: '/login'
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/setup-two-factor': {
+      id: '/setup-two-factor'
+      path: '/setup-two-factor'
+      fullPath: '/setup-two-factor'
+      preLoaderRoute: typeof SetupTwoFactorRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_app/': {
@@ -87,6 +223,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppIndexRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/account': {
+      id: '/_app/account'
+      path: '/account'
+      fullPath: '/account'
+      preLoaderRoute: typeof AppAccountRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/audit': {
+      id: '/_app/audit'
+      path: '/audit'
+      fullPath: '/audit'
+      preLoaderRoute: typeof AppAuditRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/design-system': {
       id: '/_app/design-system'
       path: '/design-system'
@@ -94,24 +244,75 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppDesignSystemRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/departments/': {
+      id: '/_app/departments/'
+      path: '/departments'
+      fullPath: '/departments/'
+      preLoaderRoute: typeof AppDepartmentsIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/departments/$departmentId': {
+      id: '/_app/departments/$departmentId'
+      path: '/departments/$departmentId'
+      fullPath: '/departments/$departmentId'
+      preLoaderRoute: typeof AppDepartmentsDepartmentIdRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/team/': {
+      id: '/_app/team/'
+      path: '/team'
+      fullPath: '/team/'
+      preLoaderRoute: typeof AppTeamIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/team/$userId': {
+      id: '/_app/team/$userId'
+      path: '/team/$userId'
+      fullPath: '/team/$userId'
+      preLoaderRoute: typeof AppTeamUserIdRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/team/new': {
+      id: '/_app/team/new'
+      path: '/team/new'
+      fullPath: '/team/new'
+      preLoaderRoute: typeof AppTeamNewRouteImport
+      parentRoute: typeof AppRoute
+    }
   }
 }
 
 interface AppRouteChildren {
+  AppAccountRoute: typeof AppAccountRoute
+  AppAuditRoute: typeof AppAuditRoute
   AppDesignSystemRoute: typeof AppDesignSystemRoute
   AppIndexRoute: typeof AppIndexRoute
+  AppDepartmentsDepartmentIdRoute: typeof AppDepartmentsDepartmentIdRoute
+  AppTeamUserIdRoute: typeof AppTeamUserIdRoute
+  AppTeamNewRoute: typeof AppTeamNewRoute
+  AppDepartmentsIndexRoute: typeof AppDepartmentsIndexRoute
+  AppTeamIndexRoute: typeof AppTeamIndexRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
+  AppAccountRoute: AppAccountRoute,
+  AppAuditRoute: AppAuditRoute,
   AppDesignSystemRoute: AppDesignSystemRoute,
   AppIndexRoute: AppIndexRoute,
+  AppDepartmentsDepartmentIdRoute: AppDepartmentsDepartmentIdRoute,
+  AppTeamUserIdRoute: AppTeamUserIdRoute,
+  AppTeamNewRoute: AppTeamNewRoute,
+  AppDepartmentsIndexRoute: AppDepartmentsIndexRoute,
+  AppTeamIndexRoute: AppTeamIndexRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   AppRoute: AppRouteWithChildren,
+  ActivateRoute: ActivateRoute,
   LoginRoute: LoginRoute,
+  SetupTwoFactorRoute: SetupTwoFactorRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

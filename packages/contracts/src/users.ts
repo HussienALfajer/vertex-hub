@@ -80,6 +80,9 @@ export const createUserSchema = userFieldsSchema
 
 export type CreateUser = z.infer<typeof createUserSchema>;
 
+/** What a create or edit form holds before validation. */
+export type CreateUserInput = z.input<typeof createUserSchema>;
+
 export const updateUserSchema = userFieldsSchema
   .partial()
   .refine(secondaryIsNotPrimary, secondaryIsNotPrimaryIssue)
@@ -94,6 +97,8 @@ export const updateOwnProfileSchema = userFieldsSchema
   .meta({ id: 'UpdateOwnProfile' });
 
 export type UpdateOwnProfile = z.infer<typeof updateOwnProfileSchema>;
+
+export type UpdateOwnProfileInput = z.input<typeof updateOwnProfileSchema>;
 
 /**
  * A user as the team directory shows them. `status`, `roles` and `twoFactorEnabled` are present

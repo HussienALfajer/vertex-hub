@@ -1,36 +1,57 @@
-import { queryOptions } from '@tanstack/react-query';
-import { type MeResponse, meResponseSchema, type Permission } from '@vertex-hub/contracts';
+import { queryOptions, useQuery } from '@tanstack/react-query';
+import { useRouteContext } from '@tanstack/react-router';
+import type { MeResponse, Permission } from '@vertex-hub/contracts';
 import { createAuthClient } from 'better-auth/client';
+import { twoFactorClient } from 'better-auth/client/plugins';
+import { api } from './api/client';
 
 /** Better Auth is served by the API under the same origin (the Vite proxy locally, nginx in production). */
 export const authClient = createAuthClient({
   baseURL: window.location.origin,
   basePath: '/api/auth',
+  // The sign-in screen handles the two-factor step itself.
+  plugins: [twoFactorClient()],
 });
 
 /** The signed-in user, or null without a session. */
 async function fetchMe(): Promise<MeResponse | null> {
-  const response = await fetch('/api/me');
+  const { data, response } = await api.GET('/api/me');
   if (response.status === 401) return null;
-  if (!response.ok) throw new Error(`Loading the session failed with HTTP ${response.status}`);
-  return meResponseSchema.parse(await response.json());
+  if (!data) throw new Error(`Loading the session failed with HTTP ${response.status}`);
+  return data;
 }
 
 export const meQuery = queryOptions({
   queryKey: ['me'],
   queryFn: fetchMe,
-  staleTime: 5 * 60_000,
+  staleTime: 60_000,
+  // Roles and departments can change while the tab is open (F01 edge case 2).
+  refetchOnWindowFocus: 'always',
   retry: false,
 });
+
+/**
+ * The signed-in user inside the app shell, kept fresh by the query (the route context holds the
+ * value from when the page loaded).
+ */
+export function useMe(): MeResponse {
+  const { me } = useRouteContext({ from: '/_app' });
+  const { data } = useQuery(meQuery);
+  return data ?? me;
+}
 
 /** Whether the user holds a permission with any scope. Hides UI only; the API enforces it. */
 export function can(me: MeResponse, permission: Permission): boolean {
   return me.permissions.some((granted) => granted.permission === permission);
 }
 
+/** Two-factor sign-in is required and not set up yet: the user must go to the setup page. */
+export function needsTwoFactorSetup(me: MeResponse): boolean {
+  return me.twoFactor.required && !me.twoFactor.enabled;
+}
+
 /** Accepts only same-origin paths as a post-login destination, to prevent open redirects. */
 export function safeRedirect(target: unknown): string {
-  return typeof target === 'string' && target.startsWith('/') && !target.startsWith('//')
-    ? target
-    : '/';
+  // "//host" and "/\host" are protocol-relative URLs to another site.
+  return typeof target === 'string' && /^\/(?![/\\])/.test(target) ? target : '/';
 }

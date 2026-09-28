@@ -1,13 +1,41 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MutationCache, QueryCache, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createRouter, RouterProvider } from '@tanstack/react-router';
 import { DirectionProvider, Toaster } from '@vertex-hub/ui';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import i18n from './i18n';
+import { ApiError } from './lib/api/client';
 import { routeTree } from './routeTree.gen';
 import './styles.css';
 
-const queryClient = new QueryClient();
+/**
+ * Reacts to access changes found by any request (F01 edge cases 2-4): a user who must set up 2FA
+ * goes to the setup page; any other 403 means permissions changed, so the session is reloaded;
+ * a 401 means the session ended.
+ */
+function onApiError(error: Error) {
+  if (!(error instanceof ApiError)) return;
+  if (error.status === 403 && error.code === 'TWO_FACTOR_REQUIRED') {
+    void router.navigate({ to: '/setup-two-factor' });
+  } else if (error.status === 403) {
+    void queryClient.invalidateQueries({ queryKey: ['me'] });
+  } else if (error.status === 401) {
+    queryClient.setQueryData(['me'], null);
+    void router.navigate({ to: '/login' });
+  }
+}
+
+const queryClient = new QueryClient({
+  queryCache: new QueryCache({ onError: onApiError }),
+  mutationCache: new MutationCache({ onError: onApiError }),
+  defaultOptions: {
+    queries: {
+      // Do not retry what the server refused on purpose.
+      retry: (failureCount, error) =>
+        !(error instanceof ApiError && error.status < 500) && failureCount < 2,
+    },
+  },
+});
 
 const router = createRouter({
   routeTree,

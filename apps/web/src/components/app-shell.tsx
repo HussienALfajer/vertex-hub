@@ -2,6 +2,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Link, type LinkProps, useRouter } from '@tanstack/react-router';
 import type { MeResponse, Permission } from '@vertex-hub/contracts';
 import {
+  Avatar,
   Button,
   cn,
   DropdownMenu,
@@ -17,34 +18,44 @@ import {
   VertexMark,
 } from '@vertex-hub/ui';
 import {
+  Building2Icon,
   ChevronDownIcon,
+  CircleUserIcon,
   HouseIcon,
   LogOutIcon,
   type LucideIcon,
   MenuIcon,
   MoonIcon,
+  ScrollTextIcon,
   SunIcon,
   SwatchBookIcon,
+  UsersIcon,
 } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { authClient, can } from '../lib/auth';
+import { authClient, can, useMe } from '../lib/auth';
 import { useTheme } from '../lib/theme';
 
 interface NavItem {
   to: LinkProps['to'];
-  label: 'nav.home' | 'nav.designSystem';
+  label: 'nav.home' | 'nav.team' | 'nav.departments' | 'nav.audit' | 'nav.designSystem';
   icon: LucideIcon;
   /** Hides the item from users without it. Cosmetic: the API enforces access. */
   permission?: Permission;
+  /** Active only on this exact path; otherwise also on its sub-pages (a profile under Team). */
+  exact?: boolean;
 }
 
 const navItems: NavItem[] = [
-  { to: '/', label: 'nav.home', icon: HouseIcon },
-  { to: '/design-system', label: 'nav.designSystem', icon: SwatchBookIcon },
+  { to: '/', label: 'nav.home', icon: HouseIcon, exact: true },
+  { to: '/team', label: 'nav.team', icon: UsersIcon },
+  { to: '/departments', label: 'nav.departments', icon: Building2Icon },
+  { to: '/audit', label: 'nav.audit', icon: ScrollTextIcon, permission: 'audit.read' },
+  { to: '/design-system', label: 'nav.designSystem', icon: SwatchBookIcon, exact: true },
 ];
 
-export function AppShell({ me, children }: { me: MeResponse; children: ReactNode }) {
+export function AppShell({ children }: { children: ReactNode }) {
+  const me = useMe();
   return (
     <div className="flex min-h-dvh bg-background">
       <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 md:flex">
@@ -71,12 +82,12 @@ function Sidebar({ me, onNavigate }: { me: MeResponse; onNavigate?: () => void }
         <span className="text-lg font-bold">{t('app.name')}</span>
       </div>
       <nav aria-label={t('nav.label')} className="flex flex-col gap-1 p-3">
-        {items.map(({ to, label, icon: Icon }) => (
+        {items.map(({ to, label, icon: Icon, exact }) => (
           <Link
             key={to}
             to={to}
             onClick={onNavigate}
-            activeOptions={{ exact: true }}
+            activeOptions={{ exact: exact ?? false }}
             className={cn(
               'relative flex h-10 items-center gap-3 rounded-md px-3 text-base text-sidebar-muted-foreground transition-colors duration-150 ease-out',
               'hover:bg-sidebar-hover hover:text-sidebar-foreground',
@@ -129,15 +140,6 @@ function ThemeToggle() {
   );
 }
 
-function initials(name: string): string {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((word) => word[0])
-    .join('');
-}
-
 function UserMenu({ me }: { me: MeResponse }) {
   const { t } = useTranslation();
   const router = useRouter();
@@ -154,12 +156,7 @@ function UserMenu({ me }: { me: MeResponse }) {
       <DropdownMenuTrigger
         render={<Button variant="ghost" className="h-10 gap-2 px-2" aria-label={t('user.menu')} />}
       >
-        <span
-          aria-hidden="true"
-          className="flex size-8 items-center justify-center rounded-full bg-primary text-sm font-medium text-primary-foreground"
-        >
-          {initials(me.user.name)}
-        </span>
+        <Avatar name={me.user.name} size="sm" className="size-8" />
         <span className="hidden max-w-40 truncate text-sm font-medium sm:inline">
           {me.user.name}
         </span>
@@ -178,6 +175,10 @@ function UserMenu({ me }: { me: MeResponse }) {
           )}
         </DropdownMenuHeader>
         <DropdownMenuSeparator />
+        <DropdownMenuItem render={<Link to="/account" />}>
+          <CircleUserIcon />
+          {t('user.account')}
+        </DropdownMenuItem>
         <DropdownMenuItem onClick={signOut}>
           <LogOutIcon className="rtl:-scale-x-100" />
           {t('user.signOut')}

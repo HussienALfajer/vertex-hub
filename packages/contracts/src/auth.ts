@@ -9,6 +9,28 @@ export const MIN_PASSWORD_LENGTH = 12;
 /** A new password; Better Auth caps passwords at 128 characters. */
 export const newPasswordSchema = z.string().min(MIN_PASSWORD_LENGTH).max(128);
 
+/** Setting a password through an activation or reset link: typed twice. */
+export const setPasswordFormSchema = z
+  .object({ password: newPasswordSchema, confirm: z.string() })
+  .refine((form) => form.password === form.confirm, { path: ['confirm'] });
+
+export type SetPasswordForm = z.infer<typeof setPasswordFormSchema>;
+
+/** Changing one's own password (Better Auth change-password). */
+export const changePasswordFormSchema = z
+  .object({
+    currentPassword: z.string().min(1),
+    newPassword: newPasswordSchema,
+    confirm: z.string(),
+  })
+  .refine((form) => form.newPassword === form.confirm, { path: ['confirm'] });
+
+export type ChangePasswordForm = z.infer<typeof changePasswordFormSchema>;
+
+/** A one-time code from an authenticator app, or a backup code. */
+export const totpCodeSchema = z.string().regex(/^\d{6}$/);
+export const backupCodeSchema = z.string().trim().min(1).max(64);
+
 /** Sign-in form. Password rules are enforced where passwords are set, not at sign-in. */
 export const signInSchema = z.object({
   email: z.email(),

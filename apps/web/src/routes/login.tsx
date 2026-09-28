@@ -1,20 +1,16 @@
 import { standardSchemaResolver } from '@hookform/resolvers/standard-schema';
 import { useQueryClient } from '@tanstack/react-query';
 import { createFileRoute, redirect, useRouter } from '@tanstack/react-router';
-import { type SignIn, signInSchema } from '@vertex-hub/contracts';
-import {
-  AscentLines,
-  Button,
-  Field,
-  FieldError,
-  FieldLabel,
-  Input,
-  VertexLogo,
-} from '@vertex-hub/ui';
-import { useState } from 'react';
+import { backupCodeSchema, type SignIn, signInSchema, totpCodeSchema } from '@vertex-hub/contracts';
+import { Button, Field, FieldError, FieldLabel, Input, OtpField } from '@vertex-hub/ui';
+import { ArrowRightIcon, KeyRoundIcon, SmartphoneIcon } from 'lucide-react';
+import { useId, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
-import { authClient, meQuery, safeRedirect } from '../lib/auth';
+import { AuthHeading, AuthLayout } from '../components/auth-layout';
+import { FormAlert } from '../components/form-alert';
+import { authClient, meQuery, needsTwoFactorSetup, safeRedirect } from '../lib/auth';
+import { errorMessage } from '../lib/errors';
 
 export const Route = createFileRoute('/login')({
   validateSearch: (search: Record<string, unknown>): { redirect?: string } =>
@@ -26,35 +22,76 @@ export const Route = createFileRoute('/login')({
   component: LoginPage,
 });
 
-function LoginPage() {
-  const { t } = useTranslation();
-  return (
-    <div className="grid min-h-dvh bg-background md:grid-cols-2">
-      <main className="flex items-center justify-center px-6 py-12">
-        <div className="flex w-full max-w-sm flex-col gap-8">
-          <VertexLogo label={t('app.brand')} className="w-28 text-primary md:hidden" />
-          <div className="flex flex-col gap-2">
-            <h1 className="text-3xl font-bold">{t('login.title')}</h1>
-            <p className="text-muted-foreground">{t('login.subtitle')}</p>
-          </div>
-          <SignInForm />
-        </div>
-      </main>
-      {/* Brand panel: the full logo in sand on Vertex Green (approved colorway, §7). */}
-      <aside className="relative hidden flex-col items-center justify-center gap-8 overflow-hidden bg-green-800 p-12 md:flex dark:bg-green-900">
-        <AscentLines className="absolute inset-y-0 end-0 h-full w-1/4 text-gold-400 opacity-20" />
-        <VertexLogo label={t('app.brand')} className="relative w-56 text-gold-400" />
-        <p className="relative text-center text-lg text-neutral-300">{t('app.tagline')}</p>
-      </aside>
-    </div>
-  );
-}
+type Step = 'password' | 'totp' | 'backup';
 
-function SignInForm() {
+function LoginPage() {
   const { t } = useTranslation();
   const router = useRouter();
   const queryClient = useQueryClient();
   const search = Route.useSearch();
+  const [step, setStep] = useState<Step>('password');
+
+  /** Loads the new session, then goes where the user was heading (or sets up 2FA first). */
+  async function enter() {
+    // Replace the cached "no session" answer before the guarded route reads it.
+    const me = await queryClient.fetchQuery({ ...meQuery, staleTime: 0 });
+    if (me && needsTwoFactorSetup(me)) {
+      await router.navigate({ to: '/setup-two-factor', replace: true });
+      return;
+    }
+    await router.navigate({ href: safeRedirect(search.redirect), replace: true });
+  }
+
+  return (
+    <AuthLayout>
+      {step === 'password' && (
+        <>
+          <AuthHeading title={t('login.title')} subtitle={t('login.subtitle')} />
+          <SignInForm onSignedIn={enter} onTwoFactor={() => setStep('totp')} />
+        </>
+      )}
+      {step === 'totp' && (
+        <>
+          <AuthHeading
+            title={t('login.twoFactor.title')}
+            subtitle={t('login.twoFactor.subtitle')}
+          />
+          <TotpForm onVerified={enter} />
+          <StepLinks
+            onSwitch={() => setStep('backup')}
+            switchLabel={t('login.twoFactor.useBackup')}
+            switchIcon={<KeyRoundIcon />}
+            onBack={() => setStep('password')}
+          />
+        </>
+      )}
+      {step === 'backup' && (
+        <>
+          <AuthHeading
+            title={t('login.twoFactor.backupTitle')}
+            subtitle={t('login.twoFactor.backupSubtitle')}
+          />
+          <BackupCodeForm onVerified={enter} />
+          <StepLinks
+            onSwitch={() => setStep('totp')}
+            switchLabel={t('login.twoFactor.useApp')}
+            switchIcon={<SmartphoneIcon />}
+            onBack={() => setStep('password')}
+          />
+        </>
+      )}
+    </AuthLayout>
+  );
+}
+
+function SignInForm({
+  onSignedIn,
+  onTwoFactor,
+}: {
+  onSignedIn: () => Promise<void>;
+  onTwoFactor: () => void;
+}) {
+  const { t } = useTranslation();
   const [failure, setFailure] = useState<string | null>(null);
   const {
     register,
@@ -67,16 +104,16 @@ function SignInForm() {
 
   const onSubmit = handleSubmit(async (values) => {
     setFailure(null);
-    const { error } = await authClient.signIn.email(values);
+    const { data, error } = await authClient.signIn.email(values);
     if (error) {
       if (error.status === 401) setFailure(t('login.errors.invalid'));
       else if (error.status === 429) setFailure(t('login.errors.tooMany'));
       else setFailure(t('login.errors.generic'));
       return;
     }
-    // Replace the cached "no session" answer before the guarded route reads it.
-    await queryClient.fetchQuery({ ...meQuery, staleTime: 0 });
-    await router.navigate({ href: safeRedirect(search.redirect), replace: true });
+    // Users with 2FA get a second step before the session exists (F01 rule 16).
+    if (data && 'twoFactorRedirect' in data && data.twoFactorRedirect) return onTwoFactor();
+    await onSignedIn();
   });
 
   return (
@@ -104,17 +141,133 @@ function SignInForm() {
         />
         <FieldError match={!!errors.password}>{t('login.errors.password')}</FieldError>
       </Field>
-      {failure && (
-        <p
-          role="alert"
-          className="rounded-md bg-status-danger px-3 py-2 text-sm text-status-danger-foreground"
-        >
-          {failure}
-        </p>
-      )}
+      {failure && <FormAlert>{failure}</FormAlert>}
       <Button type="submit" size="lg" className="w-full" disabled={isSubmitting}>
         {isSubmitting ? t('login.submitting') : t('login.submit')}
       </Button>
     </form>
+  );
+}
+
+function TotpForm({ onVerified }: { onVerified: () => Promise<void> }) {
+  const { t } = useTranslation();
+  const id = useId();
+  const [code, setCode] = useState('');
+  const [failure, setFailure] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
+
+  async function verify(value: string) {
+    if (!totpCodeSchema.safeParse(value).success || pending) return;
+    setFailure(null);
+    setPending(true);
+    const { error } = await authClient.twoFactor.verifyTotp({ code: value });
+    if (error) {
+      setPending(false);
+      setCode('');
+      return setFailure(errorMessage(t, error));
+    }
+    await onVerified();
+  }
+
+  return (
+    <form
+      className="flex flex-col gap-5"
+      onSubmit={(event) => {
+        event.preventDefault();
+        void verify(code);
+      }}
+    >
+      <div className="flex flex-col gap-2">
+        <label htmlFor={id} className="text-sm font-medium">
+          {t('login.twoFactor.code')}
+        </label>
+        <OtpField
+          id={id}
+          autoFocus
+          value={code}
+          onValueChange={setCode}
+          onValueComplete={(value) => void verify(value)}
+          slotLabel={(position) => t('twoFactorSetup.digit', { position })}
+          disabled={pending}
+          aria-invalid={failure ? true : undefined}
+        />
+      </div>
+      {failure && <FormAlert>{failure}</FormAlert>}
+      <Button
+        type="submit"
+        size="lg"
+        className="w-full"
+        disabled={pending || !totpCodeSchema.safeParse(code).success}
+      >
+        {pending ? t('login.twoFactor.submitting') : t('login.twoFactor.submit')}
+      </Button>
+    </form>
+  );
+}
+
+function BackupCodeForm({ onVerified }: { onVerified: () => Promise<void> }) {
+  const { t } = useTranslation();
+  const [code, setCode] = useState('');
+  const [failure, setFailure] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
+
+  async function submit(event: React.FormEvent) {
+    event.preventDefault();
+    const parsed = backupCodeSchema.safeParse(code);
+    if (!parsed.success) return setFailure(t('login.twoFactor.backupError'));
+    setFailure(null);
+    setPending(true);
+    const { error } = await authClient.twoFactor.verifyBackupCode({ code: parsed.data });
+    if (error) {
+      setPending(false);
+      return setFailure(errorMessage(t, error));
+    }
+    await onVerified();
+  }
+
+  return (
+    <form className="flex flex-col gap-5" onSubmit={submit} noValidate>
+      <Field invalid={!!failure}>
+        <FieldLabel>{t('login.twoFactor.backupCode')}</FieldLabel>
+        <Input
+          dir="ltr"
+          className="text-center text-lg tabular-nums"
+          autoComplete="one-time-code"
+          autoFocus
+          value={code}
+          onChange={(event) => setCode(event.target.value)}
+        />
+      </Field>
+      {failure && <FormAlert>{failure}</FormAlert>}
+      <Button type="submit" size="lg" className="w-full" disabled={pending}>
+        {pending ? t('login.twoFactor.submitting') : t('login.twoFactor.submit')}
+      </Button>
+    </form>
+  );
+}
+
+function StepLinks({
+  onSwitch,
+  switchLabel,
+  switchIcon,
+  onBack,
+}: {
+  onSwitch: () => void;
+  switchLabel: string;
+  switchIcon: React.ReactNode;
+  onBack: () => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-4">
+      <Button variant="ghost" size="sm" onClick={onSwitch}>
+        {switchIcon}
+        {switchLabel}
+      </Button>
+      <Button variant="ghost" size="sm" onClick={onBack}>
+        <ArrowRightIcon className="ltr:-scale-x-100" />
+        {t('login.twoFactor.back')}
+      </Button>
+    </div>
   );
 }
