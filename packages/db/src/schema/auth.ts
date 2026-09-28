@@ -1,19 +1,23 @@
-import { ROLES } from '@vertex-hub/contracts';
+import { DEPARTMENT_CODES, ROLES } from '@vertex-hub/contracts';
+import { sql } from 'drizzle-orm';
 import {
   boolean,
   index,
+  integer,
   pgEnum,
   pgTable,
   primaryKey,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
-import { id, timestamps } from './columns.js';
+import { archivedAt, id, timestamps } from './columns.js';
 
 /*
- * Tables used by Better Auth (ADR 0002). Property names are the field names Better Auth expects;
- * column names are snake_case. Better Auth generates ids through `newId`, so they are UUIDv7.
+ * Identity and access, owned by the api `auth` module: the Better Auth tables (ADR 0002) plus
+ * roles and departments (ADR 0014). Property names of Better Auth tables are the field names it
+ * expects; column names are snake_case. Better Auth generates ids through `newId` (UUIDv7).
  */
 
 export const users = pgTable('users', {
@@ -22,7 +26,14 @@ export const users = pgTable('users', {
   email: text('email').notNull().unique(),
   emailVerified: boolean('email_verified').notNull().default(false),
   image: text('image'),
+  /** Set by the Better Auth two-factor plugin once TOTP is verified. */
+  twoFactorEnabled: boolean('two_factor_enabled').notNull().default(false),
+  title: text('title'),
+  /** `+` and 8–15 digits. */
+  phone: text('phone'),
+  skills: text('skills').array().notNull().default(sql`'{}'::text[]`),
   ...timestamps(),
+  archivedAt: archivedAt(),
 });
 
 export const sessions = pgTable(
@@ -63,7 +74,7 @@ export const accounts = pgTable(
   (table) => [index('accounts_user_id_idx').on(table.userId)],
 );
 
-/** Short-lived tokens (password reset, email verification). */
+/** Short-lived tokens: activation and password reset links (`user-link:<sha256>`). */
 export const verifications = pgTable(
   'verifications',
   {
@@ -89,4 +100,60 @@ export const userRoles = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [primaryKey({ columns: [table.userId, table.role] })],
+);
+
+/** TOTP secret and backup codes, both encrypted by the Better Auth two-factor plugin. */
+export const twoFactors = pgTable(
+  'two_factors',
+  {
+    id: id(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    secret: text('secret').notNull(),
+    backupCodes: text('backup_codes').notNull(),
+    verified: boolean('verified').notNull().default(true),
+    failedVerificationCount: integer('failed_verification_count').notNull().default(0),
+    lockedUntil: timestamp('locked_until', { withTimezone: true }),
+    ...timestamps(),
+  },
+  (table) => [index('two_factors_user_id_idx').on(table.userId)],
+);
+
+export const departmentCodeEnum = pgEnum('department_code', DEPARTMENT_CODES);
+
+/** The ten fixed departments (ADR 0014), seeded by migration; never archived in V1. */
+export const departments = pgTable(
+  'departments',
+  {
+    id: id(),
+    code: departmentCodeEnum('code').notNull().unique(),
+    name: text('name').notNull().unique(),
+    managerId: uuid('manager_id').references(() => users.id),
+    ...timestamps(),
+    archivedAt: archivedAt(),
+  },
+  (table) => [index('departments_manager_id_idx').on(table.managerId)],
+);
+
+/** Who belongs to which department; each active user has exactly one primary department. */
+export const departmentMembers = pgTable(
+  'department_members',
+  {
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    departmentId: uuid('department_id')
+      .notNull()
+      .references(() => departments.id),
+    isPrimary: boolean('is_primary').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.userId, table.departmentId] }),
+    index('department_members_department_id_idx').on(table.departmentId),
+    uniqueIndex('department_members_one_primary_idx')
+      .on(table.userId)
+      .where(sql`${table.isPrimary}`),
+  ],
 );

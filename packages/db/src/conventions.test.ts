@@ -17,11 +17,13 @@ const tables = (Object.values(schema) as unknown[])
  * timestamps). Every entry needs a reason.
  */
 const NOT_BUSINESS_RECORDS: Record<string, string> = {
-  users: 'Better Auth table; its business fields are decided by the F01 spec',
   sessions: 'Better Auth table',
   accounts: 'Better Auth table',
   verifications: 'Better Auth table',
+  two_factors: 'Better Auth table',
   user_roles: 'Link table; a role is granted or revoked, never archived',
+  department_members: 'Link table; a membership is added or removed, never archived',
+  audit_entries: 'Append-only log; rows are never updated or archived',
   worker_heartbeats: 'System data written by the worker',
 };
 

@@ -15,3 +15,6 @@ export function createDatabase(connectionString: string): DatabaseConnection {
   const db = drizzle({ client: pool, schema, casing: 'snake_case' });
   return { db, pool, close: () => pool.end() };
 }
+
+/** The handle inside `db.transaction(async (tx) => ...)`. */
+export type Transaction = Parameters<Parameters<Database['transaction']>[0]>[0];

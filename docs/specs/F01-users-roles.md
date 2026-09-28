@@ -104,7 +104,7 @@ Derived status: `invited` (no password set yet), `active`, `archived`.
 Holds assigned roles only: `general_manager`, `account_manager`, `finance`. The migration deletes existing `employee` and `department_manager` rows (both are derived now). The `role` enum keeps all five values, since effective roles use them.
 
 ### Two-factor data
-The tables and columns Better Auth's two-factor plugin requires (TOTP secret and hashed backup codes, a `two_factor_enabled` flag on `users`). Secrets are never returned by the API or written to the audit log.
+The tables and columns Better Auth's two-factor plugin requires: `two_factors` (encrypted TOTP secret and backup codes, `verified`, failed-attempt counter and lock) and a `two_factor_enabled` flag on `users`. Secrets are never returned by the API or written to the audit log.
 
 ### `audit_entries` (append-only; listed as an exception in `packages/db/src/conventions.test.ts`)
 | Field | Type | Rules |
@@ -112,6 +112,7 @@ The tables and columns Better Auth's two-factor plugin requires (TOTP secret and
 | `id` | uuid | `id()` (UUIDv7, so time-ordered) |
 | `occurred_at` | timestamptz | required, default now |
 | `actor_id` | uuid → `users.id` | nullable (null: system or CLI), indexed |
+| `actor_name` | text | nullable; the actor's name at the time of the change (the `audit` module cannot read `users`) |
 | `action` | text | required, `<entity>.<verb>`, e.g. `user.archived` |
 | `entity_type` | text | required, e.g. `user`, `department` |
 | `entity_id` | uuid | required |
@@ -120,7 +121,7 @@ The tables and columns Better Auth's two-factor plugin requires (TOTP secret and
 
 Indexes: (`entity_type`, `entity_id`), `actor_id`, `occurred_at`. Rows are never updated or deleted, and kept indefinitely. Owned by the `audit` module, which exports the writer every module uses inside its own transaction (ADR 0013).
 
-Module ownership of the new tables (`users` vs `auth` module) is settled in the plan; it must not create a circular dependency between modules.
+Module ownership: the `auth` module owns `users`, `departments`, `department_members`, `user_roles` and the Better Auth tables; the `audit` module owns `audit_entries` and depends on no other module (`docs/architecture.md`).
 
 ## States and rules
 
@@ -152,7 +153,7 @@ invited | active ──(archive)──→ archived ──(restore)──→ invi
 19. A user edits only their own phone and skills (plus password and 2FA). Name, email, departments, title and roles are edited by user managers.
 20. Email changes by a user manager keep the user's sessions and password.
 21. Department names are unique; codes never change.
-22. Every change in this feature writes an audit entry in the same transaction (see below). Password hashes, tokens, links and 2FA secrets are never written to the audit log.
+22. Every change in this feature writes an audit entry in the same transaction (see below). Changes made inside Better Auth (password change, 2FA enable and disable) are audited from its hooks right after they commit. Password hashes, tokens, links and 2FA secrets are never written to the audit log.
 
 ## API
 
@@ -175,7 +176,7 @@ All request and response schemas live in `packages/contracts` (`users.ts`, `depa
 | `GET /api/departments/:id` | `users.read` | — | department with members | 404 |
 | `PATCH /api/departments/:id` | `users.manage` | `updateDepartmentSchema` (name, managerId nullable) | department | `DEPARTMENT_NAME_TAKEN`, `MANAGER_NOT_MEMBER` |
 | `GET /api/audit` | `audit.read` | `auditListQuerySchema` (`entityType`, `entityId`, `actorId`, `action`, `from`, `to`) | `auditPageSchema` (newest first, actor name included) | — |
-| Better Auth: `POST /api/auth/reset-password` | anonymous | token + new password | — | invalid or expired token |
+| `POST /api/password-links/redeem` | anonymous | `redeemLinkSchema` (token, new password) | 204 | `LINK_INVALID` (unknown, used, expired or superseded token; archived user) |
 | Better Auth: change password, two-factor enable / verify / disable, sign-in | session or anonymous as Better Auth defines | — | — | `TWO_FACTOR_REQUIRED` on disable when required |
 
 `users.read` without `users.manage` returns directory fields only: name, email, departments, title, phone, skills, whether the user manages a department.
