@@ -12,11 +12,29 @@ How Vertex Hub is built with Claude Code (Opus 5.5). Based on Anthropic's guidan
 
 ## The feature cycle
 
-1. **Spec** (new session, `/spec <feature>`, effort `high`): the agent interviews the owner about the feature from `v1-scope.md` and writes `docs/specs/<feature>.md` from `docs/specs/_template.md`: roles, data, states, API, screens, edge cases, and an end-to-end acceptance check.
-2. **Plan** (new session, plan mode): the agent reads the spec and the relevant ADRs and proposes a plan; the owner reviews it. Skip for changes describable in one sentence.
-3. **Implement** (same session, effort `medium`): one complete request with a clear finish line; the agent keeps `TASKS.md` updated.
+A feature runs through separate sessions. Each session ends with a merged PR (or a finished deploy) and `/clear`, so the next one starts from files and git, not from a long conversation. Set the model and effort before the first message of each session.
+
+| # | Session | Model and effort | First message | The owner | Ends with |
+|---|---|---|---|---|---|
+| 1 | Spec | Opus 5.5, `high` | `/spec <id>` | Answers the interview; approves the spec | `/ship` of the spec as a `docs/<id>-spec` PR |
+| 2 | Backend PR | Opus 5.5, `high` when it adds or changes core tables, else `medium` | `/feature-slice <id>` | Approves the PR split and `TASKS.md`; may try the endpoints at `/api/docs` | `/ship` of PR 1 (contracts, db, api) |
+| 3 | Web PR | Opus 5.5, `medium` | `/feature-slice <id>` | Runs the acceptance steps in the browser, in each role the spec names | `/ship` of PR 2 (web, E2E); `docs/ROADMAP.md` marks the feature done |
+| 4 | Phase deploy (once per phase) | Opus 5.5, `low` | `Deploy phase <n> to production` | Approves the deploy; checks the live site | Deploy done, the phase's deploy item ticked in `docs/ROADMAP.md` |
+
+- A small feature (about one table and one screen) does sessions 2 and 3 in one session and one PR.
+- `/feature-slice` reads `TASKS.md` and continues from the first open PR, so a session can stop between PRs and a new one picks up.
+- After each merge the owner runs the cleanup line from the report, then `/clear`.
+- **Deploys happen at the end of a phase, not after each feature.** Merging to `main` does not deploy; the phase-deploy session runs `vertexhub-deploy` on the server after the owner approves it (`docs/deployment.md`). A hotfix for a bug in production is the exception, deployed when the owner asks.
+- Inside session 2 or 3, use `/compact` between layers if the context grows, never in the middle of one.
+- The "Next step" of every report names the next session: whether it needs `/clear`, its model and effort from this table, and its exact first message (`AGENTS.md`, Reporting).
+
+Steps inside a session:
+
+1. **Spec** (`/spec`): the agent interviews the owner about the feature from `v1-scope.md` and writes `docs/specs/<feature>.md` from `docs/specs/_template.md`: roles, data, states, API, screens, edge cases, and an end-to-end acceptance check.
+2. **Plan** (`/feature-slice`, first step): the agent splits the feature into PRs and writes `TASKS.md`; the owner approves before any code.
+3. **Implement** (`/feature-slice`): one layer at a time, contracts → db → api → OpenAPI → web → E2E, each followed by a check gate through the `checker` subagent. The new-module wiring checklist and the F01 files to copy from are in `.claude/skills/feature-slice/wiring.md`.
 4. **Review:** the `reviewer` subagent (fresh context) checks the branch against the spec and the rules and reports blocking issues only.
-5. **Close:** the owner tries it in the browser, `/ship` runs the checks, opens the PR with auto-merge and updates `docs/ROADMAP.md`, then `/clear`.
+5. **Accept and close:** the owner tries it in the browser, `/ship` runs the checks, opens the PR with auto-merge and updates `docs/ROADMAP.md`.
 
 ## How the instructions are layered
 
@@ -27,7 +45,7 @@ Each rule lives in one place and loads only when it is needed, so every turn car
 | Project rules | `AGENTS.md` (shared with Codex), `CLAUDE.md` (Claude-specific, imports `AGENTS.md`) | Every session |
 | Folder rules | `<app or package>/CLAUDE.md`; the root `AGENTS.md` points other agents to them | When the agent reads a file in that folder |
 | Decisions and specs | `docs/decisions/`, `docs/specs/`, `docs/product/v1-scope.md` | On demand, the parts the task needs |
-| Workflows | `.claude/skills/`: `spec`, `db-migration`, `ship` | When invoked (`db-migration` also when a schema change is detected) |
+| Workflows | `.claude/skills/`: `spec`, `feature-slice`, `db-migration`, `ship` | When invoked (`db-migration` also when a schema change is detected) |
 | Subagents | `.claude/agents/`: `checker` (Haiku, runs checks and returns failures only), `reviewer` (Opus, fresh-context review) | In their own context; only their summary returns |
 | Enforcement | Biome hook on every edit (`.claude/hooks/`), architecture and conventions tests, CI | Always, without costing context |
 | Guard rails | `.claude/settings.json`: model and effort, permissions, reads of generated files denied | Always |
@@ -52,7 +70,8 @@ Don't write "think hard" or "step by step": Opus 5.5 decides how much to think; 
 |---|---|---|
 | Data model and architecture (the core schema) | Opus 5.5 | `high`, `xhigh` for the core data model |
 | Spec interviews | Opus 5.5 | `high` |
-| Implementing a clearly specified feature | Opus 5.5 | `medium` |
+| Implementing a clearly specified feature | Opus 5.5 | `medium` (`high` for a PR that adds core tables) |
+| Production deploy at the end of a phase | Opus 5.5 | `low` |
 | Mechanical edits (renames, translation keys, applying a pattern) | Opus 5.5 | `low` |
 | Searching code, reading logs and test output | Subagent on Haiku or Sonnet | — |
 | A problem that failed twice at `xhigh` | Fable 5.1, for that problem only | — |

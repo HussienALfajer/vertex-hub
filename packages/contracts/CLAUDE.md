@@ -3,7 +3,7 @@
 The single source of shapes shared by the API and the web app: Zod schemas, their types, the role list and the permission map (ADR 0007, ADR 0012).
 
 ## Rules
-- One file per module (`src/<module>.ts`), re-exported from `src/index.ts`. Pattern to copy: `src/auth.ts`.
+- One file per module (`src/<module>.ts`), re-exported from `src/index.ts`. Pattern to copy: `src/users.ts` (entity, create and update inputs, list query and page) and `src/departments.ts`.
 - Naming: `<thing>Schema` and `type Thing = z.infer<typeof thingSchema>`. Inputs: `create<Thing>Schema`, `update<Thing>Schema`. Responses: `<thing>ResponseSchema`.
 - Every schema the API exposes has `.meta({ id: '<Thing>' })`, so OpenAPI names it.
 - Pure code only: no I/O, no Node or framework imports. Zod is the only dependency.

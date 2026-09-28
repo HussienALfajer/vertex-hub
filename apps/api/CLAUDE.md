@@ -9,7 +9,7 @@ NestJS 12 HTTP API (modular monolith). Conventions and their reasons: ADR 0013. 
 
 ## A module
 - Files: `<module>.module.ts`, `<module>.controller.ts`, `<module>.service.ts`, `index.ts` (public surface). Kebab-case, one exported class per file.
-- Pattern to copy: `src/modules/health/` (controller, service, module, index) and `src/modules/auth/me.controller.ts` (contract schema, OpenAPI, session).
+- Pattern to copy: `src/modules/audit/` (module skeleton and `index.ts`), `src/modules/auth/departments.controller.ts` and `departments.service.ts` (contract schemas, OpenAPI, current user, transaction with audit, coded errors), and `users.controller.ts`/`users.service.ts` for paged lists and actions. A new feature follows `/feature-slice`.
 - Controller: parameters validated with `{ schema }` from `@vertex-hub/contracts`, response shaped with `@SerializeOptions({ schema })`, documented with `@Api*Response({ standardSchema })`, then one call to the service.
 - Service: all logic and queries (Drizzle through `@Inject(DATABASE)`). No repository layer.
 - Register the module in `src/app.module.ts` through its `index.ts`.
