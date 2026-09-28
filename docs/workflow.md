@@ -12,11 +12,29 @@ How Vertex Hub is built with Claude Code (Opus 5.5). Based on Anthropic's guidan
 
 ## The feature cycle
 
-1. **Spec** (new session, effort `high`): the agent interviews the owner about the feature from `v1-scope.md` and writes `docs/specs/<feature>.md`: screens, fields, states, rules, out of scope, and an end-to-end verification step.
+1. **Spec** (new session, `/spec <feature>`, effort `high`): the agent interviews the owner about the feature from `v1-scope.md` and writes `docs/specs/<feature>.md` from `docs/specs/_template.md`: roles, data, states, API, screens, edge cases, and an end-to-end acceptance check.
 2. **Plan** (new session, plan mode): the agent reads the spec and the relevant ADRs and proposes a plan; the owner reviews it. Skip for changes describable in one sentence.
 3. **Implement** (same session, effort `medium`): one complete request with a clear finish line; the agent keeps `TASKS.md` updated.
-4. **Review:** a fresh-context subagent (or `/code-review`) checks the diff against the spec and reports blocking issues only.
-5. **Close:** the owner tries it in the browser, the PR is merged after CI passes, `docs/ROADMAP.md` is updated, then `/clear`.
+4. **Review:** the `reviewer` subagent (fresh context) checks the branch against the spec and the rules and reports blocking issues only.
+5. **Close:** the owner tries it in the browser, `/ship` runs the checks, opens the PR with auto-merge and updates `docs/ROADMAP.md`, then `/clear`.
+
+## How the instructions are layered
+
+Each rule lives in one place and loads only when it is needed, so every turn carries the least context.
+
+| Layer | Files | Loaded |
+|---|---|---|
+| Project rules | `AGENTS.md` (shared with Codex), `CLAUDE.md` (Claude-specific, imports `AGENTS.md`) | Every session |
+| Folder rules | `<app or package>/CLAUDE.md`; the root `AGENTS.md` points other agents to them | When the agent reads a file in that folder |
+| Decisions and specs | `docs/decisions/`, `docs/specs/`, `docs/product/v1-scope.md` | On demand, the parts the task needs |
+| Workflows | `.claude/skills/`: `spec`, `db-migration`, `ship` | When invoked (`db-migration` also when a schema change is detected) |
+| Subagents | `.claude/agents/`: `checker` (Haiku, runs checks and returns failures only), `reviewer` (Opus, fresh-context review) | In their own context; only their summary returns |
+| Enforcement | Biome hook on every edit (`.claude/hooks/`), architecture and conventions tests, CI | Always, without costing context |
+| Guard rails | `.claude/settings.json`: model and effort, permissions, reads of generated files denied | Always |
+
+A rule that a machine can check belongs in a test or lint rule, not in prose (ADR 0013). A rule that only applies to one folder belongs in that folder's `CLAUDE.md`, not the root.
+
+Folder rules are plain `CLAUDE.md` files rather than `AGENTS.md` files imported with `@AGENTS.md`: Claude Code reads a subfolder's `AGENTS.md` only when the owner's personal settings ask for it, and an `@` import inside a subfolder file was not expanded in practice. Codex reaches the same files through the pointer in the root `AGENTS.md`.
 
 ## Anatomy of a good request
 
@@ -49,8 +67,9 @@ Avoid `max` unless a gain is measured. Agent teams (~7× tokens), fast mode (2×
 4. `/compact <what to keep>` at natural breaks; `/rewind` to abandon a failed path.
 5. After two failed corrections on the same issue, `/clear` and start again with a better request.
 6. Side questions: `/btw`, so they don't enter the context.
-7. Disconnect connectors (MCP servers) the project does not need.
-8. Check `/usage` after each feature: cache share should be high; output should be small relative to the change.
+7. Disconnect connectors (MCP servers) and plugins the project does not need: each adds tool and skill descriptions to every turn. The project turns off the `ui-ux-pro-max` plugin (the visual identity is fixed in `brand/identity.md`); switch off unrelated connectors (Canva, Remotion, Hostinger) for this project in the app, and turn Hostinger DNS on only for DNS work.
+8. Let the `checker` subagent run long checks, so their output never enters the main context.
+9. Check `/usage` after each feature: cache share should be high; output should be small relative to the change.
 
 ## Accounts and tools
 
