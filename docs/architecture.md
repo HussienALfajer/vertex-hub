@@ -63,6 +63,14 @@ Rules:
 - Controllers stay thin: validate (Zod DTO), authorize (guard), delegate to a service.
 - Anything slow or scheduled (PDF, email, reminders, monthly cycles) is enqueued with pg-boss and handled by `apps/worker`, which reuses the same modules.
 
+## Authentication and authorization
+
+- Better Auth is mounted by the `auth` module at `/api/auth` (email and password, sessions in the `sessions` table, self sign-up disabled). Until F01 ships, accounts are created with `pnpm --filter @vertex-hub/api user:create`.
+- Every API route requires a session unless marked `@AllowAnonymous()` (Better Auth's global guard). `@RequirePermissions(...)` adds a role check against `PERMISSION_MAP` in `packages/contracts`; roles live in `user_roles` (several per user, ADR 0007).
+- A permission is granted with a scope (`all`, `department`, `own_clients`, `assigned`). Guards check the permission; services turn the scopes from `permissionScopes()` into query filters.
+- `GET /api/me` returns the user, roles and permissions; the web app uses it for route guards and to hide what the user cannot do (cosmetic only).
+- The SPA and API share one origin (nginx in production, the Vite proxy locally), so no CORS is enabled.
+
 ## Data conventions
 
 - Primary keys: UUIDv7 generated in the application.

@@ -24,4 +24,5 @@ The SVGs were traced from `logo/source/vertex-logo-green-on-white.jpg` and match
 ## Fonts
 
 - Madani Arabic is a commercial font: its files are **never committed** (this repository is public). Keep them in `brand/fonts/private/` (git-ignored) locally and provision them on the server outside the repository.
-- Montserrat and Noto Kufi Arabic (SIL OFL) are installed as packages when the design system is scaffolded.
+- Expected file names (WOFF2): `MadaniArabic-Regular.woff2` (400), `MadaniArabic-Medium.woff2` (500), `MadaniArabic-Bold.woff2` (700). The web app serves them at `/fonts/madani/` in dev and preview; production serves that path from outside the repository. Without them, Arabic falls back to Noto Kufi Arabic.
+- Montserrat and Noto Kufi Arabic (SIL OFL) come from `@fontsource` packages in `packages/ui`.

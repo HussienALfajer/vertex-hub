@@ -50,6 +50,7 @@ Run from the repository root (Node 24, pnpm via Corepack). Turborepo builds depe
 | Generate a migration after a schema change | `pnpm db:generate` |
 | Apply migrations to the dev database | `pnpm db:migrate` |
 | Build | `pnpm build` |
+| Create a user (prints a generated password once; needs `pnpm build`) | `pnpm --filter @vertex-hub/api user:create --email <email> --name <name> --role <role>` |
 | One package only | `pnpm --filter @vertex-hub/<name> <script>` |
 
 API docs (non-production): `http://127.0.0.1:3000/api/docs`. Health: `GET /api/health`.
