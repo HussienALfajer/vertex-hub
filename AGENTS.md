@@ -26,7 +26,7 @@ Read these on demand. For a feature, read its spec, the ADRs it touches, and its
 
 pnpm workspaces + Turborepo · TypeScript (strict) · Node 24 · PostgreSQL 17
 
-- `apps/api` — NestJS (Express adapter), Drizzle ORM, Zod contracts via nestjs-zod, OpenAPI, Better Auth, pg-boss producer
+- `apps/api` — NestJS (Express adapter), Drizzle ORM, Zod contracts via native Standard Schema validation (ADR 0012), OpenAPI, Better Auth, pg-boss producer
 - `apps/worker` — NestJS standalone context: scheduled jobs (pg-boss), PDF rendering (Playwright/Chromium), email
 - `apps/web` — React 19 + Vite SPA, TanStack Router / Query / Table, React Hook Form, i18next
 - `packages/ui` — Vertex design system: shadcn/ui on Base UI + Tailwind CSS v4 tokens (RTL)
@@ -36,7 +36,23 @@ pnpm workspaces + Turborepo · TypeScript (strict) · Node 24 · PostgreSQL 17
 
 ## Commands
 
-Not scaffolded yet. When the workspace exists, list the exact commands here: install, dev, typecheck, lint, test (unit / e2e), db generate / migrate, build.
+Run from the repository root (Node 24, pnpm via Corepack). Turborepo builds dependent packages first.
+
+| Task | Command |
+|---|---|
+| Install | `pnpm install` |
+| First-time local DB (creates `.env`, role, dev + test databases; asks for the postgres password) | `pnpm db:setup-local` |
+| Dev (api :3000, worker, web :5173) | `pnpm dev` |
+| Typecheck | `pnpm typecheck` |
+| Lint + format check / fix | `pnpm lint` / `pnpm lint:fix` |
+| Unit + integration tests (need `TEST_DATABASE_URL`; migrations run automatically) | `pnpm test` |
+| E2E smoke (Playwright, builds web first) | `pnpm test:e2e` |
+| Generate a migration after a schema change | `pnpm db:generate` |
+| Apply migrations to the dev database | `pnpm db:migrate` |
+| Build | `pnpm build` |
+| One package only | `pnpm --filter @vertex-hub/<name> <script>` |
+
+API docs (non-production): `http://127.0.0.1:3000/api/docs`. Health: `GET /api/health`.
 
 ## Non-negotiable conventions
 

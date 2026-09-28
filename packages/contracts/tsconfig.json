@@ -1,0 +1,7 @@
+{
+  "extends": "@vertex-hub/config/tsconfig/node.json",
+  "compilerOptions": {
+    "noEmit": true
+  },
+  "include": ["src"]
+}
