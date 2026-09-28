@@ -13,6 +13,8 @@ export default defineConfig({
     }),
   ],
   test: {
+    // Files share one test database, and some rows are global (one manager per department).
+    fileParallelism: false,
     globalSetup: ['./test/global-setup.ts'],
     env: { NODE_ENV: 'test', LOG_LEVEL: 'silent', DATABASE_URL: testDatabaseUrl() },
   },

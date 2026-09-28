@@ -1,5 +1,5 @@
 import type { Page, TestInfo } from '@playwright/test';
-import type { HealthResponse, MeResponse } from '@vertex-hub/contracts';
+import { grantedPermissions, type HealthResponse, type MeResponse } from '@vertex-hub/contracts';
 
 /*
  * The E2E suite covers the SPA alone: API responses are mocked here with the shared contract
@@ -19,8 +19,21 @@ export const manager: MeResponse = {
     email: 'sara@vertex.example',
     image: null,
   },
-  roles: ['general_manager', 'account_manager'],
-  permissions: ['users.read', 'users.manage', 'clients.read', 'clients.manage'],
+  roles: ['general_manager', 'employee', 'account_manager'],
+  departments: [
+    {
+      id: '01a0e97d-0023-7c42-857b-de0c777a52fb',
+      code: 'general_management',
+      name: 'الإدارة العامة',
+      isPrimary: true,
+      isManager: false,
+    },
+  ],
+  permissions: grantedPermissions({
+    roles: ['general_manager', 'employee', 'account_manager'],
+    departments: [{ code: 'general_management', isManager: false }],
+  }),
+  twoFactor: { enabled: true, required: true },
 };
 
 /** Mocks the API. `signedIn` decides whether /api/me finds a session; sign-in flips it on. */

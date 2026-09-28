@@ -56,19 +56,21 @@ vertex-hub/
 
 ## API modules
 
-`auth` · `users` · `clients` · `leads` · `catalog` · `quotes` · `projects` · `retainers` · `tasks` · `templates` · `content` · `approvals` · `files` · `shoots` · `campaigns` · `billing` · `notifications` · `reports` · `audit`
+`auth` · `clients` · `leads` · `catalog` · `quotes` · `projects` · `retainers` · `tasks` · `templates` · `content` · `approvals` · `files` · `shoots` · `campaigns` · `billing` · `notifications` · `reports` · `audit`
 
 Rules (module anatomy, naming and the tests that enforce them: ADR 0013):
 - A module owns its tables. Other modules call its exported service; they never query its tables.
 - Controllers stay thin: validate (Zod DTO), authorize (guard), delegate to a service.
+- `auth` owns identity and access: the Better Auth tables, `user_roles`, `departments` and `department_members`, with the team, department and `/api/me` endpoints. Better Auth needs the `users` table and the guard needs roles and departments, so splitting them into another module would create a dependency cycle (F01 plan).
+- `audit` sits below every other module: it owns `audit_entries` and exports `recordAudit`, which each module calls inside the transaction of its change. The access decorators live in `src/core/access/` so that `audit` does not depend on `auth`.
 - Anything slow or scheduled (PDF, email, reminders, monthly cycles) is enqueued with pg-boss and handled by `apps/worker`, which reuses the same modules.
 
 ## Authentication and authorization
 
-- Better Auth is mounted by the `auth` module at `/api/auth` (email and password, sessions in the `sessions` table, self sign-up disabled). Until F01 ships, accounts are created with `pnpm --filter @vertex-hub/api user:create`.
-- Every API route requires a session unless marked `@AllowAnonymous()` (Better Auth's global guard). `@RequirePermissions(...)` adds a role check against `PERMISSION_MAP` in `packages/contracts`; roles live in `user_roles` (several per user, ADR 0007).
+- Better Auth is mounted by the `auth` module at `/api/auth` (email and password, sessions in the `sessions` table, self sign-up disabled, TOTP two-factor plugin, sign-in rate limiting). User managers create accounts in the app (F01); `pnpm --filter @vertex-hub/api user:create` bootstraps the first General Manager.
+- Every API route requires a session unless marked `@AllowAnonymous()` (Better Auth's global guard). The `auth` module's global guard resolves the user's access on every request: effective roles (assigned roles in `user_roles` plus derived Employee and Department Manager) and department capabilities (ADR 0014). `@RequirePermissions(...)` checks the union of their grants from `packages/contracts`. Users who must use two-factor sign-in get `TWO_FACTOR_REQUIRED` until they enable it.
 - A permission is granted with a scope (`all`, `department`, `own_clients`, `assigned`). Guards check the permission; services turn the scopes from `permissionScopes()` into query filters.
-- `GET /api/me` returns the user, roles and permissions; the web app uses it for route guards and to hide what the user cannot do (cosmetic only).
+- `GET /api/me` returns the user, effective roles, departments, permissions with scopes and 2FA state; the web app uses it for route guards and to hide what the user cannot do (cosmetic only).
 - The SPA and API share one origin (nginx in production, the Vite proxy locally), so no CORS is enabled.
 
 ## Data conventions

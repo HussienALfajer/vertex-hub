@@ -28,7 +28,7 @@ import {
 } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { authClient } from '../lib/auth';
+import { authClient, can } from '../lib/auth';
 import { useTheme } from '../lib/theme';
 
 interface NavItem {
@@ -63,9 +63,7 @@ export function AppShell({ me, children }: { me: MeResponse; children: ReactNode
 /** Vertex Green navigation with the sand mark and a sand marker on the active item (§2, §7). */
 function Sidebar({ me, onNavigate }: { me: MeResponse; onNavigate?: () => void }) {
   const { t } = useTranslation();
-  const items = navItems.filter(
-    (item) => !item.permission || me.permissions.includes(item.permission),
-  );
+  const items = navItems.filter((item) => !item.permission || can(me, item.permission));
   return (
     <div className="flex h-full w-full flex-col border-e border-sidebar-border bg-sidebar text-sidebar-foreground [--ring:var(--sidebar-ring)]">
       <div className="flex h-16 items-center gap-3 border-b border-sidebar-border px-5">

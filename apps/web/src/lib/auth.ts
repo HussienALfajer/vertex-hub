@@ -1,5 +1,5 @@
 import { queryOptions } from '@tanstack/react-query';
-import { type MeResponse, meResponseSchema } from '@vertex-hub/contracts';
+import { type MeResponse, meResponseSchema, type Permission } from '@vertex-hub/contracts';
 import { createAuthClient } from 'better-auth/client';
 
 /** Better Auth is served by the API under the same origin (the Vite proxy locally, nginx in production). */
@@ -22,6 +22,11 @@ export const meQuery = queryOptions({
   staleTime: 5 * 60_000,
   retry: false,
 });
+
+/** Whether the user holds a permission with any scope. Hides UI only; the API enforces it. */
+export function can(me: MeResponse, permission: Permission): boolean {
+  return me.permissions.some((granted) => granted.permission === permission);
+}
 
 /** Accepts only same-origin paths as a post-login destination, to prevent open redirects. */
 export function safeRedirect(target: unknown): string {

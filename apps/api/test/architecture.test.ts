@@ -7,7 +7,7 @@ import { ModulesContainer } from '@nestjs/core';
 import { Test } from '@nestjs/testing';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AppModule } from '../src/app.module.js';
-import { REQUIRE_SESSION, REQUIRED_PERMISSIONS } from '../src/modules/auth/index.js';
+import { REQUIRE_SESSION, REQUIRED_PERMISSIONS } from '../src/core/access/index.js';
 
 /*
  * Guards for the conventions in ADR 0013 that the type checker cannot see. A failure here means
@@ -137,6 +137,7 @@ describe('module boundaries', () => {
    * does). A new schema file must be added here, which forces the ownership decision.
    */
   const TABLE_OWNERS: Record<string, string | null> = {
+    audit: 'audit',
     auth: 'auth',
     system: null,
   };

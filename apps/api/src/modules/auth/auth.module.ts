@@ -4,14 +4,15 @@ import { AuthModule as BetterAuthModule } from '@thallesp/nestjs-better-auth';
 import type { Database } from '@vertex-hub/db';
 import { ENV, type Env } from '../../core/config/env.js';
 import { DATABASE } from '../../core/database/database.module.js';
+import { AccessService } from './access.service.js';
 import { createAuth } from './auth.config.js';
 import { MeController } from './me.controller.js';
 import { PermissionsGuard } from './permissions.guard.js';
-import { RolesService } from './roles.service.js';
 
 /**
- * Authentication (Better Auth, mounted at /api/auth) and authorization. Every route requires a
- * session unless it is marked `@AllowAnonymous()`; `@RequirePermissions()` adds role checks.
+ * Identity and access: Better Auth (mounted at /api/auth, with two-factor sign-in), users, roles
+ * and departments (ADR 0014). Every route requires a session unless it is marked
+ * `@AllowAnonymous()`; the global guard applies `@RequirePermissions()` and the 2FA requirement.
  */
 @Module({
   imports: [
@@ -25,7 +26,6 @@ import { RolesService } from './roles.service.js';
     }),
   ],
   controllers: [MeController],
-  providers: [RolesService, { provide: APP_GUARD, useClass: PermissionsGuard }],
-  exports: [RolesService],
+  providers: [AccessService, { provide: APP_GUARD, useClass: PermissionsGuard }],
 })
 export class AuthModule {}

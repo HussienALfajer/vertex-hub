@@ -1,20 +1,22 @@
 /**
- * Creates a user with a generated password, printed once. Until user management (F01) exists,
- * this is how the first accounts are made.
+ * Creates an active user with a generated password, printed once. Used to bootstrap the first
+ * General Manager; everyone else is created from the team screens (F01).
  *
- *   pnpm --filter @vertex-hub/api user:create --email a@example.com --name "Name" --role general_manager
+ *   pnpm --filter @vertex-hub/api user:create --email a@example.com --name "Name" \
+ *     --department general_management --role general_manager
  */
 import { randomBytes } from 'node:crypto';
 import { parseArgs } from 'node:util';
-import { roleSchema } from '@vertex-hub/contracts';
+import { assignableRoleSchema, departmentCodeSchema } from '@vertex-hub/contracts';
 import { createDatabase, loadRootEnv } from '@vertex-hub/db';
 import { z } from 'zod';
 import { createUser } from '../modules/auth/index.js';
 
 const argsSchema = z.object({
   email: z.email(),
-  name: z.string().trim().min(1),
-  role: z.array(roleSchema).min(1),
+  name: z.string().trim().min(1).max(100),
+  department: departmentCodeSchema,
+  role: z.array(assignableRoleSchema).default([]),
 });
 
 loadRootEnv();
@@ -23,14 +25,16 @@ const { values } = parseArgs({
   options: {
     email: { type: 'string' },
     name: { type: 'string' },
+    department: { type: 'string' },
     role: { type: 'string', multiple: true },
   },
 });
 
 const parsed = argsSchema.safeParse(values);
 if (!parsed.success) {
-  console.error(`Usage: user:create --email <email> --name <name> --role <role> [--role <role>]
-Roles: ${roleSchema.options.join(', ')}
+  console.error(`Usage: user:create --email <email> --name <name> --department <code> [--role <role>]...
+Departments: ${departmentCodeSchema.options.join(', ')}
+Roles: ${assignableRoleSchema.options.join(', ')}
 
 ${z.prettifyError(parsed.error)}`);
   process.exit(1);
@@ -45,14 +49,21 @@ if (!databaseUrl) {
 const password = randomBytes(18).toString('base64url');
 const { db, close } = createDatabase(databaseUrl);
 try {
-  await createUser(db, {
-    email: parsed.data.email,
-    name: parsed.data.name,
-    roles: parsed.data.role,
-    password,
-  });
+  // No actor: the audit log records CLI changes as made by the system.
+  await createUser(
+    db,
+    {
+      email: parsed.data.email,
+      name: parsed.data.name,
+      department: parsed.data.department,
+      roles: parsed.data.role,
+      password,
+    },
+    null,
+  );
+  const roles = parsed.data.role.length > 0 ? parsed.data.role.join(', ') : 'no assigned roles';
   process.stdout.write(
-    `Created ${parsed.data.email} (${parsed.data.role.join(', ')}).\nPassword (shown once): ${password}\n`,
+    `Created ${parsed.data.email} (${parsed.data.department}; ${roles}).\nPassword (shown once): ${password}\n`,
   );
 } finally {
   await close();
