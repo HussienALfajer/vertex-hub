@@ -24,6 +24,7 @@ import {
   CircleUserIcon,
   FolderKanbanIcon,
   HouseIcon,
+  LayoutTemplateIcon,
   ListTodoIcon,
   LogOutIcon,
   type LucideIcon,
@@ -49,6 +50,7 @@ interface NavItem {
     | 'nav.tasks'
     | 'nav.projects'
     | 'nav.retainers'
+    | 'nav.templates'
     | 'nav.team'
     | 'nav.departments'
     | 'nav.audit'
@@ -56,6 +58,8 @@ interface NavItem {
   icon: LucideIcon;
   /** Hides the item from users without it. Cosmetic: the API enforces access. */
   permission?: Permission;
+  /** Lists the item only for these users; others still reach the page. */
+  show?: (me: MeResponse) => boolean;
   /** Active only on this exact path; otherwise also on its sub-pages (a profile under Team). */
   exact?: boolean;
   /** Pages of the section, listed under it. */
@@ -86,6 +90,8 @@ const navItems: NavItem[] = [
   { to: '/clients', label: 'nav.clients', icon: BriefcaseBusinessIcon, permission: 'clients.read' },
   { to: '/projects', label: 'nav.projects', icon: FolderKanbanIcon, permission: 'projects.read' },
   { to: '/retainers', label: 'nav.retainers', icon: RepeatIcon, permission: 'projects.read' },
+  // Everyone reads templates; the people who apply or maintain them see the link (F07 screen 1).
+  { to: '/templates', label: 'nav.templates', icon: LayoutTemplateIcon, show: managesTeams },
   { to: '/team', label: 'nav.team', icon: UsersIcon },
   { to: '/departments', label: 'nav.departments', icon: Building2Icon },
   { to: '/audit', label: 'nav.audit', icon: ScrollTextIcon, permission: 'audit.read' },
@@ -126,7 +132,9 @@ const navSection = cn(
 /** Vertex Green navigation with the sand mark and a sand marker on the active item (§2, §7). */
 function Sidebar({ me, onNavigate }: { me: MeResponse; onNavigate?: () => void }) {
   const { t } = useTranslation();
-  const items = navItems.filter((item) => !item.permission || can(me, item.permission));
+  const items = navItems.filter(
+    (item) => (!item.permission || can(me, item.permission)) && (!item.show || item.show(me)),
+  );
   return (
     <div className="flex h-full w-full flex-col border-e border-sidebar-border bg-sidebar text-sidebar-foreground [--ring:var(--sidebar-ring)]">
       <div className="flex h-16 items-center gap-3 border-b border-sidebar-border px-5">

@@ -447,6 +447,56 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await expect(page.getByRole('link', { name: 'بوستات أسبوع الافتتاح' })).toBeVisible();
       await screenshot(page, testInfo, `client-tasks-${colorScheme}`);
     });
+
+    test('templates list', async ({ page }, testInfo) => {
+      await page.setViewportSize({ width: 1280, height: 900 });
+      await mockApi(page, { signedIn: true });
+      await page.goto('/templates');
+      await expect(page.getByRole('link', { name: 'موقع إلكتروني' })).toBeVisible();
+      await screenshot(page, testInfo, `templates-${colorScheme}`);
+    });
+
+    test('project template page', async ({ page }, testInfo) => {
+      await page.setViewportSize({ width: 1280, height: 2400 });
+      await mockApi(page, { signedIn: true });
+      await page.goto(`/templates/${seedIds.websiteTemplate}`);
+      await expect(page.getByRole('heading', { name: 'تصميم الواجهات' })).toBeVisible();
+      await screenshot(page, testInfo, `template-project-${colorScheme}`);
+
+      await page
+        .getByRole('button', { name: ar.templates.editStep.replace('{{title}}', 'تصميم الواجهات') })
+        .click();
+      await expect(page.getByRole('dialog')).toBeVisible();
+      await screenshot(page, testInfo, `template-step-${colorScheme}`);
+    });
+
+    test('new template', async ({ page }, testInfo) => {
+      await page.setViewportSize({ width: 1280, height: 1300 });
+      await mockApi(page, { signedIn: true });
+      await page.goto('/templates/new');
+      await page.getByLabel(ar.templates.form.name).fill('شعار سريع');
+      await page.getByRole('button', { name: ar.templates.addStage }).click();
+      await page.getByLabel(ar.templates.stageName.replace('{{position}}', '1')).fill('التصميم');
+      await page
+        .getByRole('button', { name: ar.templates.addStepTo.replace('{{stage}}', 'التصميم') })
+        .click();
+      const dialog = page.getByRole('dialog');
+      await dialog.getByLabel(ar.templates.step.title).fill('مسودات الشعار');
+      await dialog.getByRole('combobox', { name: ar.templates.step.department }).click();
+      await page.getByRole('option', { name: 'التصميم' }).click();
+      await dialog.getByLabel(ar.templates.step.dueDay).fill('3');
+      await dialog.getByRole('button', { name: ar.templates.step.add }).click();
+      await expect(page.getByRole('heading', { name: 'مسودات الشعار' })).toBeVisible();
+      await screenshot(page, testInfo, `template-new-${colorScheme}`);
+    });
+
+    test('monthly template page', async ({ page }, testInfo) => {
+      await page.setViewportSize({ width: 1280, height: 1700 });
+      await mockApi(page, { signedIn: true });
+      await page.goto(`/templates/${seedIds.monthlyTemplate}`);
+      await expect(page.getByText(ar.templates.warningsTitle)).toBeVisible();
+      await screenshot(page, testInfo, `template-monthly-${colorScheme}`);
+    });
   });
 }
 

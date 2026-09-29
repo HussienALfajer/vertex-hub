@@ -17,10 +17,12 @@ import {
   type CreateProject,
   type CreateRetainer,
   type CreateTaskInput,
+  type CreateTemplate,
   type Currency,
   type Cycle,
   type CycleDetail,
   type CycleStatus,
+  createTemplateSchema,
   type DeliverableKind,
   type DepartmentCode,
   type DepartmentDetailResponse,
@@ -75,11 +77,17 @@ import {
   type TaskStatusChange,
   type TaskType,
   type TaskWorkload,
+  type TemplateDetail,
+  type TemplateDocument,
+  type TemplateKind,
+  type TemplateListItem,
+  type TemplateStep,
   taskMove,
   type UpdateCycleLine,
   type UpdateExtraWork,
   type UpdateTaskInput,
   type UserResponse,
+  updateTemplateSchema,
   weekOf,
 } from '@vertex-hub/contracts';
 
@@ -645,6 +653,13 @@ export async function mockApi(page: Page, options: MockOptions): Promise<MockedA
   const retainersApi = retainerRoutes({ users, clients, retainers, me: () => me });
   const tasks = tasksSeed();
   const tasksApi = taskRoutes({ users, clients, projects, retainers, tasks, me: () => me });
+  const templatesApi = templateRoutes({
+    users,
+    clients,
+    retainers,
+    templates: templatesSeed(),
+    me: () => me,
+  });
   const managers = new Map<string, string | null>(
     departmentsSeed.map((d) => [
       d.id,
@@ -865,6 +880,10 @@ export async function mockApi(page: Page, options: MockOptions): Promise<MockedA
     // Tasks (F06).
     const tasked = tasksApi(route, method, url, request);
     if (tasked) return tasked;
+
+    // Work templates (F07).
+    const templated = templatesApi(route, method, url, request);
+    if (templated) return templated;
 
     if (path === '/api/audit') {
       return json(route, { items: auditSeed, total: auditSeed.length, page: 1, pageSize: 30 });
@@ -3175,6 +3194,404 @@ function taskRoutes({ users, clients, projects, retainers, tasks, me }: TaskStat
   };
 }
 
+// Work templates (F07).
+
+interface TemplateRecord {
+  id: string;
+  name: string;
+  kind: TemplateKind;
+  description: string | null;
+  stages: TemplateDetail['stages'];
+  steps: TemplateStep[];
+  assignees: TemplateDocument['assignees'];
+  linkedRetainerIds: string[];
+  archived: boolean;
+  updatedAt: string;
+}
+
+type StepSeed = Partial<TemplateStep> & Pick<TemplateStep, 'title' | 'department'>;
+
+/** Steps numbered in order; `after` lists step numbers, as in the spec's seed tables. */
+function templateSteps(first: number, steps: (StepSeed & { after?: number[] })[]): TemplateStep[] {
+  return steps.map(({ after = [], ...step }, i) => ({
+    id: id(first + i),
+    stageId: null,
+    position: i + 1,
+    brief: null,
+    dueDay: null,
+    priority: 'normal',
+    needsClientApproval: true,
+    revisionLimit: 2,
+    checklist: [],
+    repeatKind: null,
+    repeatLabel: null,
+    spreadFromDay: null,
+    ...step,
+    dependsOn: after.map((n) => id(first + n - 1)),
+  }));
+}
+
+export function templatesSeed(): TemplateRecord[] {
+  const stage = (n: number, name: string, position: number) => ({ id: id(n), name, position });
+  const website = [
+    stage(2001, 'الاستكشاف', 1),
+    stage(2002, 'التصميم', 2),
+    stage(2003, 'التنفيذ', 3),
+    stage(2004, 'الاختبار', 4),
+    stage(2005, 'التسليم', 5),
+  ];
+  const [discovery, designStage, build, test, delivery] = website.map((s) => s.id);
+  return [
+    {
+      id: id(2000),
+      name: 'موقع إلكتروني',
+      kind: 'project',
+      description: 'من المتطلبات حتى الإطلاق وتسليم لوحة التحكم.',
+      stages: website,
+      steps: templateSteps(2010, [
+        {
+          title: 'المتطلبات وخريطة الموقع',
+          department: 'development',
+          dueDay: 3,
+          stageId: discovery,
+          checklist: ['اجتماع المتطلبات', 'خريطة الموقع'],
+        },
+        {
+          title: 'جرد المحتوى',
+          department: 'content_management',
+          dueDay: 5,
+          stageId: discovery,
+          needsClientApproval: false,
+          after: [1],
+        },
+        {
+          title: 'المخططات الأولية',
+          department: 'design',
+          dueDay: 8,
+          stageId: designStage,
+          after: [1],
+        },
+        {
+          title: 'تصميم الواجهات',
+          department: 'design',
+          dueDay: 14,
+          stageId: designStage,
+          priority: 'high',
+          after: [3],
+        },
+        {
+          title: 'بناء الواجهة الأمامية',
+          department: 'development',
+          dueDay: 24,
+          stageId: build,
+          needsClientApproval: false,
+          after: [4],
+        },
+        {
+          title: 'الخلفية ولوحة التحكم',
+          department: 'development',
+          dueDay: 24,
+          stageId: build,
+          needsClientApproval: false,
+          after: [1],
+        },
+        {
+          title: 'إدخال المحتوى',
+          department: 'content_management',
+          dueDay: 26,
+          stageId: build,
+          needsClientApproval: false,
+          after: [6, 2],
+        },
+        {
+          title: 'الاختبار والإصلاحات',
+          department: 'development',
+          dueDay: 29,
+          stageId: test,
+          after: [5, 7],
+        },
+        {
+          title: 'الإطلاق',
+          department: 'development',
+          dueDay: 31,
+          stageId: delivery,
+          needsClientApproval: false,
+          after: [8],
+        },
+        {
+          title: 'تدريب العميل والتسليم',
+          department: 'development',
+          dueDay: 32,
+          stageId: delivery,
+          needsClientApproval: false,
+          after: [9],
+        },
+      ]),
+      assignees: [{ department: 'design', userId: id(3) }],
+      linkedRetainerIds: [],
+      archived: false,
+      updatedAt: '2026-10-02T09:30:00.000Z',
+    },
+    {
+      id: id(2100),
+      name: 'دورة السوشيال ميديا الشهرية',
+      kind: 'retainer_cycle',
+      description: 'خطة الشهر، ثم مهمة لكل تصميم وريل، وتقرير آخر الشهر.',
+      stages: [],
+      steps: templateSteps(2110, [
+        { title: 'خطة المحتوى الشهرية والتعليقات', department: 'content_management', dueDay: 3 },
+        {
+          title: 'تصميم',
+          department: 'design',
+          repeatKind: 'design',
+          spreadFromDay: 4,
+          after: [1],
+        },
+        {
+          title: 'ريل',
+          department: 'photography',
+          repeatKind: 'reel',
+          spreadFromDay: 5,
+          after: [1],
+        },
+        {
+          title: 'التقرير الشهري',
+          department: 'marketing',
+          repeatKind: 'monthly_report',
+          spreadFromDay: 27,
+          needsClientApproval: false,
+        },
+      ]),
+      // Basel is archived: the default stays, with a warning (rule 4).
+      assignees: [
+        { department: 'design', userId: id(6) },
+        { department: 'photography', userId: id(4) },
+      ],
+      linkedRetainerIds: [id(901)],
+      archived: false,
+      updatedAt: '2026-10-03T11:00:00.000Z',
+    },
+    {
+      id: id(2200),
+      name: 'فيديو ترويجي',
+      kind: 'project',
+      description: null,
+      stages: [stage(2201, 'ما قبل الإنتاج', 1), stage(2202, 'الإنتاج', 2)],
+      steps: templateSteps(2210, [
+        {
+          title: 'الفكرة والسيناريو',
+          department: 'content_management',
+          dueDay: 2,
+          stageId: id(2201),
+        },
+        {
+          title: 'التصوير',
+          department: 'photography',
+          dueDay: 5,
+          stageId: id(2202),
+          needsClientApproval: false,
+          after: [1],
+        },
+      ]),
+      assignees: [],
+      linkedRetainerIds: [],
+      archived: false,
+      updatedAt: '2026-09-20T08:00:00.000Z',
+    },
+    {
+      id: id(2300),
+      name: 'حملة موسمية قديمة',
+      kind: 'project',
+      description: null,
+      stages: [],
+      steps: templateSteps(2310, [{ title: 'خطة الحملة', department: 'marketing', dueDay: 2 }]),
+      assignees: [],
+      linkedRetainerIds: [],
+      archived: true,
+      updatedAt: '2026-06-01T08:00:00.000Z',
+    },
+  ];
+}
+
+interface TemplateState {
+  users: UserResponse[];
+  clients: ClientRecord[];
+  retainers: RetainerRecord[];
+  templates: TemplateRecord[];
+  me: () => MeResponse;
+}
+
+/** The templates API over the in-memory records, with the F07 rules the screens rely on. */
+function templateRoutes({ users, clients, retainers, templates, me }: TemplateState) {
+  const manages = () => me().permissions.some((g) => g.permission === 'templates.manage');
+  let nextId = 2500;
+  let clock = Date.parse('2026-10-10T09:00:00.000Z');
+  const isMember = (userId: string, department: DepartmentCode) => {
+    const user = users.find((u) => u.id === userId);
+    return (
+      !!user && user.status !== 'archived' && user.departments.some((d) => d.code === department)
+    );
+  };
+
+  const detail = (t: TemplateRecord): TemplateDetail => {
+    const assignees = t.assignees.map(({ department, userId }) => {
+      const user = users.find((u) => u.id === userId);
+      return {
+        department,
+        user: { id: userId, name: user?.name ?? '', archived: user?.status === 'archived' },
+        valid: isMember(userId, department),
+      };
+    });
+    return {
+      id: t.id,
+      name: t.name,
+      kind: t.kind,
+      description: t.description,
+      stages: t.stages,
+      steps: t.steps,
+      assignees,
+      warnings: assignees
+        .filter((a) => !a.valid)
+        .map((a) => ({ type: 'invalid_assignee' as const, department: a.department })),
+      linkedRetainers: retainers
+        .filter((r) => t.linkedRetainerIds.includes(r.id) && !r.archived)
+        .map((r) => ({
+          id: r.id,
+          name: r.name,
+          client: {
+            id: r.clientId,
+            name: clients.find((c) => c.id === r.clientId)?.tradeName ?? '',
+          },
+        })),
+      createdAt: '2026-09-01T08:00:00.000Z',
+      updatedAt: t.updatedAt,
+      archivedAt: t.archived ? '2026-09-15T08:00:00.000Z' : null,
+      permissions: { canEdit: manages() && !t.archived, canArchive: manages() },
+    };
+  };
+
+  const listItem = (t: TemplateRecord): TemplateListItem => {
+    const full = detail(t);
+    return {
+      id: t.id,
+      name: t.name,
+      kind: t.kind,
+      description: t.description,
+      stepCount: t.steps.length,
+      departments: [...new Set(t.steps.map((s) => s.department))],
+      warningCount: full.warnings.length,
+      linkedRetainerCount: full.linkedRetainers.length,
+      updatedAt: t.updatedAt,
+      archivedAt: full.archivedAt,
+    };
+  };
+
+  const nameTaken = (name: string, except?: string) =>
+    templates.some(
+      (t) => !t.archived && t.id !== except && t.name.toLowerCase() === name.toLowerCase(),
+    );
+
+  /** Saves the document: a key equal to a stored id keeps it, any other key gets a new id. */
+  const save = (t: TemplateRecord, doc: TemplateDocument) => {
+    const known = new Set([...t.stages.map((s) => s.id), ...t.steps.map((s) => s.id)]);
+    const ids = new Map<string, string>();
+    const idOf = (key: string) => {
+      if (!ids.has(key)) ids.set(key, known.has(key) ? key : id(nextId++));
+      return ids.get(key) as string;
+    };
+    t.name = doc.name;
+    t.description = doc.description;
+    t.stages = doc.stages.map((s, i) => ({ id: idOf(s.key), name: s.name, position: i + 1 }));
+    t.steps = doc.steps.map(({ key, stageKey, dependsOn, ...step }, i) => ({
+      ...step,
+      id: idOf(key),
+      stageId: stageKey ? idOf(stageKey) : null,
+      position: i + 1,
+      dependsOn: dependsOn.map(idOf),
+    }));
+    t.assignees = doc.assignees;
+    clock += 60_000;
+    t.updatedAt = new Date(clock).toISOString();
+  };
+
+  /** Rule 4: a new or changed default must be a non-archived member of its department. */
+  const invalidAssignee = (t: TemplateRecord | null, doc: TemplateDocument) =>
+    doc.assignees.find(
+      (a) =>
+        !t?.assignees.some((b) => b.department === a.department && b.userId === a.userId) &&
+        !isMember(a.userId, a.department),
+    );
+
+  return (route: Route, method: string, url: URL, request: Request): Promise<void> | undefined => {
+    const path = url.pathname;
+    if (path === '/api/templates' && method === 'GET') {
+      const archived = url.searchParams.get('archived') === 'true';
+      if (archived && !manages()) return fail(route, 403, 'FORBIDDEN');
+      const kind = url.searchParams.get('kind');
+      const search = url.searchParams.get('search')?.toLowerCase();
+      const items = templates
+        .filter(
+          (t) =>
+            t.archived === archived &&
+            (!kind || t.kind === kind) &&
+            (!search || t.name.toLowerCase().includes(search)),
+        )
+        .sort((a, b) => a.name.localeCompare(b.name, 'ar'))
+        .map(listItem);
+      return json(route, { items, total: items.length, page: 1, pageSize: 25 });
+    }
+    if (path === '/api/templates' && method === 'POST') {
+      if (!manages()) return fail(route, 403, 'FORBIDDEN');
+      const input: CreateTemplate = createTemplateSchema.parse(request.postDataJSON());
+      if (nameTaken(input.name)) return fail(route, 409, 'TEMPLATE_NAME_TAKEN');
+      const wrong = invalidAssignee(null, input);
+      if (wrong) return fail(route, 400, 'INVALID_ASSIGNEE', { department: wrong.department });
+      const created: TemplateRecord = {
+        id: id(nextId++),
+        name: input.name,
+        kind: input.kind,
+        description: null,
+        stages: [],
+        steps: [],
+        assignees: [],
+        linkedRetainerIds: [],
+        archived: false,
+        updatedAt: '',
+      };
+      save(created, input);
+      templates.push(created);
+      return json(route, detail(created), 201);
+    }
+    const match = path.match(/^\/api\/templates\/([^/]+)(?:\/(archive|restore))?$/);
+    if (!match) return undefined;
+    const template = templates.find((t) => t.id === match[1]);
+    if (!template || (template.archived && !manages())) return fail(route, 404, 'NOT_FOUND');
+    const action = match[2];
+    if (!action && method === 'GET') return json(route, detail(template));
+    if (!manages()) return fail(route, 403, 'FORBIDDEN');
+    if (!action && method === 'PUT') {
+      if (template.archived) return fail(route, 409, 'TEMPLATE_ARCHIVED');
+      const input = updateTemplateSchema.parse(request.postDataJSON());
+      if (nameTaken(input.name, template.id)) return fail(route, 409, 'TEMPLATE_NAME_TAKEN');
+      const wrong = invalidAssignee(template, input);
+      if (wrong) return fail(route, 400, 'INVALID_ASSIGNEE', { department: wrong.department });
+      save(template, input);
+      return json(route, detail(template));
+    }
+    if (action === 'archive' && method === 'POST') {
+      if (template.archived) return fail(route, 409, 'TEMPLATE_ARCHIVED');
+      template.archived = true;
+      return json(route, detail(template));
+    }
+    if (action === 'restore' && method === 'POST') {
+      if (!template.archived) return fail(route, 409, 'TEMPLATE_NOT_ARCHIVED');
+      if (nameTaken(template.name, template.id)) return fail(route, 409, 'TEMPLATE_NAME_TAKEN');
+      template.archived = false;
+      return json(route, detail(template));
+    }
+    return undefined;
+  };
+}
 /** Ids of the seeded team, for navigating straight to a profile or department. */
 export const seedIds = {
   sara: id(1),
@@ -3195,6 +3612,8 @@ export const seedIds = {
   dishShoot: id(1002),
   openingPosts: id(1003),
   clinicLogo: id(1006),
+  websiteTemplate: id(2000),
+  monthlyTemplate: id(2100),
 };
 
 /** Viewport screenshot kept in the test output and attached to the HTML report. */
