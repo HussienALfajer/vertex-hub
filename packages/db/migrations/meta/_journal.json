@@ -43,6 +43,13 @@
       "when": 1790645348811,
       "tag": "0005_curvy_meltdown",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1790648222495,
+      "tag": "0006_nosy_penance",
+      "breakpoints": true
     }
   ]
 }

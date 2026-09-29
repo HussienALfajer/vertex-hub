@@ -5,6 +5,7 @@ import { ENV, type Env } from './core/config/env.js';
 import { DatabaseModule } from './core/database/database.module.js';
 import { HeartbeatJob } from './jobs/heartbeat.job.js';
 import { PgBossService } from './jobs/pg-boss.service.js';
+import { RetainerCyclesJob } from './jobs/retainer-cycles.job.js';
 
 @Module({
   imports: [
@@ -20,6 +21,6 @@ import { PgBossService } from './jobs/pg-boss.service.js';
     }),
     DatabaseModule,
   ],
-  providers: [PgBossService, HeartbeatJob],
+  providers: [PgBossService, HeartbeatJob, RetainerCyclesJob],
 })
 export class WorkerModule {}

@@ -1,5 +1,6 @@
 import type { INestApplicationContext } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
+import { RETAINER_CYCLES_JOB } from '@vertex-hub/contracts';
 import { type Database, workerHeartbeats } from '@vertex-hub/db';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -32,6 +33,16 @@ describe('worker against the test database', () => {
   it('registers the heartbeat schedule in pg-boss', async () => {
     const schedules = await app.get(PgBossService).boss.getSchedules(HEARTBEAT_QUEUE);
     expect(schedules).toEqual([expect.objectContaining({ cron: HEARTBEAT_CRON })]);
+  });
+
+  it('schedules the daily retainer cycle run in Damascus time, once however often it boots', async () => {
+    const { queue, cron, tz } = RETAINER_CYCLES_JOB;
+    const boss = app.get(PgBossService).boss;
+    // The API works this queue; scheduling it again (a restart) keeps one schedule.
+    await boss.schedule(queue, cron, null, { tz });
+    expect(await boss.getSchedules(queue)).toEqual([
+      expect.objectContaining({ cron, timezone: tz }),
+    ]);
   });
 
   it('heartbeat is idempotent: repeated runs keep one row with the latest time', async () => {

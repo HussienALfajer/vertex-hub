@@ -463,6 +463,23 @@ const KNOWN_FIELDS = [
   'installmentMinor',
   'projectId',
   'openTasks',
+  'renewalDate',
+  'monthlyFeeMinor',
+  'deliverables',
+  'month',
+  'periodStart',
+  'periodEnd',
+  'lines',
+  'lineId',
+  'committed',
+  'delivered',
+  'delta',
+  'retainerId',
+  'requestedOn',
+  'requestedByContactId',
+  'estimateMinor',
+  'billingStatus',
+  'billingNote',
 ] as const;
 
 function fieldLabel(t: TFunction, field: string): string {

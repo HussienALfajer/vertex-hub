@@ -23,7 +23,13 @@ import {
   permissionScopes,
   type UpdateProject,
 } from '@vertex-hub/contracts';
-import { type Database, projectMilestones, projects, type Transaction } from '@vertex-hub/db';
+import {
+  type Database,
+  extraWorkItems,
+  projectMilestones,
+  projects,
+  type Transaction,
+} from '@vertex-hub/db';
 import {
   and,
   arrayContains,
@@ -57,6 +63,7 @@ import { ClientDirectory, type ClientSummary } from '../clients/index.js';
 import {
   actorOf,
   assertCanEditMoney,
+  assertClientTakesWork,
   assertNotArchived,
   canWork,
   coversClient,
@@ -569,7 +576,10 @@ export class ProjectsService implements OnModuleInit {
     }
   }
 
-  /** M2: the currency changes only while no amount is set; amounts are never converted. */
+  /**
+   * M2: the currency changes only while no installment or extra work estimate is set; amounts are
+   * never converted.
+   */
   private async assertCurrencyFree(tx: Transaction, projectId: string) {
     const [priced] = await tx
       .select({ id: projectMilestones.id })
@@ -582,23 +592,26 @@ export class ProjectsService implements OnModuleInit {
         ),
       )
       .limit(1);
-    if (priced) {
+    const [estimated] = priced
+      ? []
+      : await tx
+          .select({ id: extraWorkItems.id })
+          .from(extraWorkItems)
+          .where(
+            and(
+              eq(extraWorkItems.projectId, projectId),
+              isNull(extraWorkItems.archivedAt),
+              isNotNull(extraWorkItems.estimateMinor),
+            ),
+          )
+          .limit(1);
+    if (priced || estimated) {
       throw new CodedException(
         409,
         'CURRENCY_LOCKED',
         'The currency cannot change once amounts are set',
       );
     }
-  }
-}
-
-/** Rule 1: work is added only for a non-archived client that is active or paused. */
-function assertClientTakesWork(client: ClientSummary): void {
-  if (client.archived) {
-    throw new CodedException(409, 'CLIENT_ARCHIVED', 'The client is archived');
-  }
-  if (client.status === 'ended') {
-    throw new CodedException(409, 'CLIENT_ENDED', 'Work is not added for an ended client');
   }
 }
 

@@ -13,6 +13,7 @@
   "dependencies": {
     "@nestjs/common": "^12.1.0",
     "@nestjs/core": "^12.1.0",
+    "@vertex-hub/contracts": "workspace:*",
     "@vertex-hub/db": "workspace:*",
     "drizzle-orm": "^0.45.3",
     "nestjs-pino": "^5.2.1",

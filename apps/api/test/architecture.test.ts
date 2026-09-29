@@ -141,6 +141,7 @@ describe('module boundaries', () => {
     auth: 'auth',
     clients: 'clients',
     projects: 'projects',
+    retainers: 'projects',
     system: null,
   };
 

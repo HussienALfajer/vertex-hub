@@ -32,7 +32,7 @@ NestJS 12 HTTP API (modular monolith). Conventions and their reasons: ADR 0013. 
 - Every state change on a business record writes an audit entry in the same `db.transaction`.
 - Archive (`archivedAt`), never delete business records.
 - Errors: `HttpException` subclasses; add `code` when the UI must tell the error apart (ADR 0013).
-- Slow or scheduled work (PDF, email, reminders) is enqueued with pg-boss for `apps/worker`.
+- Slow or scheduled work (PDF, email, reminders) is enqueued with pg-boss for `apps/worker`. A scheduled job whose rule lives in a module service is scheduled by the worker and worked here: register the handler with `JobQueue.work(queue, handler)` from `src/core/jobs/` in `onModuleInit` (pattern: `modules/projects/retainer-cycles.service.ts`). Tests run with `JOBS_ENABLED=false` and call the handler's service method directly.
 - ESM: relative imports end in `.js`. Logs through the Nest logger (pino), never `console.log`.
 
 ## Tests

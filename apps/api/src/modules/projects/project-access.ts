@@ -48,6 +48,16 @@ export function assertCanEditMoney(actor: CurrentUserInfo, client: ClientSummary
   if (!seesMoney(actor, client) || !coversClient(actor, client)) throw new ForbiddenException();
 }
 
+/** Rule 1: work is added only for a non-archived client that is active or paused. */
+export function assertClientTakesWork(client: ClientSummary): void {
+  if (client.archived) {
+    throw new CodedException(409, 'CLIENT_ARCHIVED', 'The client is archived');
+  }
+  if (client.status === 'ended') {
+    throw new CodedException(409, 'CLIENT_ENDED', 'Work is not added for an ended client');
+  }
+}
+
 /** A project with the fields that decide access, and its client. */
 export interface ProjectAccess {
   id: string;
