@@ -76,13 +76,17 @@ export const retainerCycleQuery = (id: string, cycleId: string) =>
 /**
  * A mutation on retainer data. Every one refreshes the whole `retainers` cache, also on failure:
  * a 403 after the client changed account manager (edge case 9) reloads the page without edit
- * actions.
+ * actions. Committed quantities and status also drive the monthly template's line counts (F07).
  */
 function useRetainersMutation<Input, Output>(mutationFn: (input: Input) => Promise<Output>) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn,
-    onSettled: () => queryClient.invalidateQueries({ queryKey: retainersKeys.all }),
+    onSettled: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: retainersKeys.all }),
+        queryClient.invalidateQueries({ queryKey: ['templates', 'retainer'] }),
+      ]),
   });
 }
 

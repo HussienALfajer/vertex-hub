@@ -1,4 +1,11 @@
-import type { CreateTemplateInput, TemplateDetail, TemplateKind } from '@vertex-hub/contracts';
+import {
+  type CalendarDate,
+  type CreateMilestoneInput,
+  type CreateTemplateInput,
+  nthWorkDay,
+  type TemplateDetail,
+  type TemplateKind,
+} from '@vertex-hub/contracts';
 
 /*
  * The template being edited, as one document (spec F07, screen 2): the order of `steps` is their
@@ -145,4 +152,24 @@ export function templateFormValues(template: TemplateDetail): TemplateFormValues
     })),
     assignees: template.assignees.map(({ department, user }) => ({ department, userId: user.id })),
   };
+}
+
+/**
+ * The new project form's milestones for a project template (spec screen 4): each stage used by a
+ * step, in stage order, due on the latest due date of its steps counted from `start` (rule 7).
+ */
+export function stageMilestones(
+  template: Pick<TemplateDetail, 'stages' | 'steps'>,
+  start: CalendarDate,
+): CreateMilestoneInput[] {
+  return [...template.stages]
+    .sort((a, b) => a.position - b.position)
+    .flatMap((stage) => {
+      const dates = template.steps
+        .filter((step) => step.stageId === stage.id)
+        .map((step) => nthWorkDay(start, step.dueDay ?? 1))
+        .sort();
+      const due = dates.at(-1);
+      return due ? [{ name: stage.name, dueDate: due, installmentMinor: null }] : [];
+    });
 }

@@ -8,10 +8,11 @@ import {
   type Currency,
   createProjectSchema,
   daysInclusive,
+  type TemplateDetail,
 } from '@vertex-hub/contracts';
 import { AscentLines, AscentMeter, Avatar, Button, PageHeader, toast } from '@vertex-hub/ui';
 import { ArrowRightIcon, CalendarRangeIcon } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { FormAlert } from '../../components/form-alert';
@@ -19,6 +20,8 @@ import { FormSection } from '../../components/form-section';
 import { useMe } from '../../lib/auth';
 import { formatCalendarDate, formatNumber } from '../../lib/format';
 import { formatMoney } from '../../lib/money';
+import { stageMilestones } from '../templates/template-document';
+import { ProjectTemplateField } from '../templates/template-pickers';
 import { MilestonesEditor, suggestedMilestones } from './milestones-editor';
 import { hasMoneyAccess } from './project-access';
 import { DepartmentChips, PersonName, ProjectStatusBadge } from './project-badges';
@@ -60,6 +63,7 @@ export function NewProjectPage({ search }: { search: NewProjectSearch }) {
   const create = useCreateProject();
   const clients = useProjectClients();
   const [failure, setFailure] = useState<string | null>(null);
+  const [template, setTemplate] = useState<TemplateDetail | null>(null);
   const form = useForm<CreateProjectInput, unknown, CreateProject>({
     resolver: standardSchemaResolver(createProjectSchema),
     defaultValues: {
@@ -75,8 +79,19 @@ export function NewProjectPage({ search }: { search: NewProjectSearch }) {
       milestones: suggestedMilestones(t),
     },
   });
-  const [clientId, currency] = useWatch({ control: form.control, name: ['clientId', 'currency'] });
+  const [clientId, currency, startDate] = useWatch({
+    control: form.control,
+    name: ['clientId', 'currency', 'startDate'],
+  });
   const client = clients.data?.items.find((item) => item.id === clientId);
+  // F07 screen 4: the template's stages become the milestones, due in work days from the start
+  // (rule 7), and follow the start date; runs start today at the earliest (rule 6).
+  useEffect(() => {
+    if (!template || !startDate) return;
+    const today = businessDate();
+    const start = startDate > today ? startDate : today;
+    form.setValue('milestones', stageMilestones(template, start), { shouldDirty: true });
+  }, [template, startDate, form]);
   // Money fields follow the chosen client's account manager (M1).
   const money = client && hasMoneyAccess(me, client.accountManager.id) ? (currency ?? 'USD') : null;
   const back = search.clientId
@@ -101,7 +116,12 @@ export function NewProjectPage({ search }: { search: NewProjectSearch }) {
     try {
       const project = await create.mutateAsync(input);
       toast.add({ title: t('projects.new.created'), type: 'success' });
-      await navigate({ to: '/projects/$projectId', params: { projectId: project.id } });
+      // F07 screen 4: the generate dialog opens with the chosen template.
+      await navigate({
+        to: '/projects/$projectId',
+        params: { projectId: project.id },
+        search: template ? { tab: 'tasks', generate: template.id } : {},
+      });
     } catch (error) {
       setFailure(projectFormFailure(form, t, error));
     }
@@ -142,6 +162,7 @@ export function NewProjectPage({ search }: { search: NewProjectSearch }) {
             title={t('projects.form.plan')}
             hint={money ? t('projects.form.planHintMoney') : t('projects.form.planHint')}
           >
+            <ProjectTemplateField value={template?.id ?? null} onChange={setTemplate} />
             {money && <CurrencyField form={form} />}
             <MilestonesEditor form={form} money={money} />
           </FormSection>

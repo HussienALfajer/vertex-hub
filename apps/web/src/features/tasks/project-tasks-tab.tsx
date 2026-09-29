@@ -8,13 +8,15 @@ import {
   type Task,
 } from '@vertex-hub/contracts';
 import { Button, EmptyState, Skeleton } from '@vertex-hub/ui';
-import { ArrowLeftIcon, ListTodoIcon, MilestoneIcon, PlusIcon } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { ArrowLeftIcon, LayersIcon, ListTodoIcon, MilestoneIcon, PlusIcon } from 'lucide-react';
+import { type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LoadError } from '../../components/load-error';
 import { TabHeader } from '../../components/tab-header';
 import { formatNumber } from '../../lib/format';
 import { clientQuery } from '../clients/clients.queries';
+import { GenerateTasksDialog } from '../templates/generate-dialog';
+import { ProjectRunLines } from '../templates/template-runs';
 import type { TaskListSearch } from './task-list-page';
 import { TaskRows } from './task-rows';
 import { taskListQuery } from './tasks.queries';
@@ -25,10 +27,21 @@ const TAB_SIZE = 100;
 /**
  * The Tasks tab of the project page (spec screen 7): the project's tasks grouped by milestone,
  * in milestone order, then those without one. "New task" comes preset with the project (and the
- * milestone, from its group) while the project is running.
+ * milestone, from its group) while the project is running; managers of a running project can
+ * generate tasks from a template (F07 screen 5), with a line per run above the tasks.
  */
-export function ProjectTasksTab({ project }: { project: ProjectDetail }) {
+export function ProjectTasksTab({
+  project,
+  generateTemplateId,
+  onGenerateClosed,
+}: {
+  project: ProjectDetail;
+  /** Opens the generate dialog with this template (after creating the project from one). */
+  generateTemplateId?: string;
+  onGenerateClosed: () => void;
+}) {
   const { t } = useTranslation();
+  const [generating, setGenerating] = useState(false);
   const tasks = useQuery(
     taskListQuery({ projectId: project.id, status: [...TASK_STATUSES], pageSize: TAB_SIZE }),
   );
@@ -43,11 +56,30 @@ export function ProjectTasksTab({ project }: { project: ProjectDetail }) {
     projectId: project.id,
     milestoneId,
   });
+  // F07 rule 15: templates apply to running projects of clients that have not ended.
+  const canGenerate = running && project.permissions.canManage;
   const newTask = running && (
     <Button size="sm" render={<Link to="/tasks/new" search={preset()} />}>
       <PlusIcon />
       {t('tasks.actions.new')}
     </Button>
+  );
+  const generate = canGenerate && (
+    <Button size="sm" variant="outline" onClick={() => setGenerating(true)}>
+      <LayersIcon />
+      {t('templates.generate.fromTemplate')}
+    </Button>
+  );
+  const dialog = (
+    <GenerateTasksDialog
+      target={{ type: 'project', project }}
+      initialTemplateId={generateTemplateId}
+      open={generating || (!!generateTemplateId && canGenerate)}
+      onClose={() => {
+        setGenerating(false);
+        onGenerateClosed();
+      }}
+    />
   );
 
   if (tasks.isPending) {
@@ -101,14 +133,30 @@ export function ProjectTasksTab({ project }: { project: ProjectDetail }) {
       <TabHeader
         title={t('tasks.projectTab.title')}
         description={t('tasks.projectTab.hint')}
-        action={items.length > 0 && newTask}
+        action={
+          items.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {generate}
+              {newTask}
+            </div>
+          )
+        }
       />
+      <ProjectRunLines projectId={project.id} />
+      {dialog}
       {items.length === 0 ? (
         <EmptyState
           icon={<ListTodoIcon />}
           title={t('tasks.projectTab.emptyTitle')}
           description={running ? t('tasks.projectTab.emptyHint') : undefined}
-          action={newTask}
+          action={
+            running && (
+              <div className="flex flex-wrap justify-center gap-2">
+                {newTask}
+                {generate}
+              </div>
+            )
+          }
         />
       ) : (
         <div className="flex flex-col gap-4">

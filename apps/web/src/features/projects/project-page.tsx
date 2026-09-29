@@ -60,10 +60,20 @@ type ProjectTab = (typeof PROJECT_TABS)[number];
 export interface ProjectPageSearch {
   /** Unset means the first tab. */
   tab?: ProjectTab;
+  /** A template to open the generate dialog with (after creating the project from one). */
+  generate?: string;
 }
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export function parseProjectPageSearch(search: Record<string, unknown>): ProjectPageSearch {
-  return { tab: PROJECT_TABS.find((tab) => tab !== 'milestones' && tab === search.tab) };
+  return {
+    tab: PROJECT_TABS.find((tab) => tab !== 'milestones' && tab === search.tab),
+    generate:
+      typeof search.generate === 'string' && UUID.test(search.generate)
+        ? search.generate
+        : undefined,
+  };
 }
 
 export function ProjectPage({
@@ -96,13 +106,25 @@ export function ProjectPage({
           onRetry={() => project.refetch()}
         />
       ) : (
-        <ProjectView project={project.data} tab={search.tab ?? 'milestones'} />
+        <ProjectView
+          project={project.data}
+          tab={search.tab ?? 'milestones'}
+          generate={search.generate}
+        />
       )}
     </>
   );
 }
 
-function ProjectView({ project, tab }: { project: ProjectDetail; tab: ProjectTab }) {
+function ProjectView({
+  project,
+  tab,
+  generate,
+}: {
+  project: ProjectDetail;
+  tab: ProjectTab;
+  generate: string | undefined;
+}) {
   const { t } = useTranslation();
   const navigate = useNavigate({ from: '/projects/$projectId' });
   const archived = project.archivedAt !== null;
@@ -148,7 +170,16 @@ function ProjectView({ project, tab }: { project: ProjectDetail; tab: ProjectTab
           <MilestonesTab project={project} editable={editable} />
         </TabsContent>
         <TabsContent value="tasks">
-          <ProjectTasksTab project={project} />
+          <ProjectTasksTab
+            project={project}
+            generateTemplateId={generate}
+            onGenerateClosed={() =>
+              navigate({
+                search: (previous) => ({ ...previous, generate: undefined }),
+                replace: true,
+              })
+            }
+          />
         </TabsContent>
         <TabsContent value="extra-work">
           <ExtraWorkTab

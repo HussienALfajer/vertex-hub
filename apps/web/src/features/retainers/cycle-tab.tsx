@@ -16,6 +16,7 @@ import {
   daysInclusive,
   RETAINER_LIMITS,
   type RetainerDetail,
+  type RetainerTemplate,
   type UpdateCycleLine,
   updateCycleLineSchema,
 } from '@vertex-hub/contracts';
@@ -77,6 +78,8 @@ import { ApiError } from '../../lib/api/client';
 import { errorMessage, fieldError, SCREEN_ERROR } from '../../lib/errors';
 import { formatCalendarDate, formatDateTime, formatMonth, formatNumber } from '../../lib/format';
 import { clientQuery } from '../clients/clients.queries';
+import { LineTemplateTasks, RetainerTemplatePanel } from '../templates/retainer-template-panel';
+import { retainerTemplateQuery } from '../templates/templates.queries';
 import { BehindBadge, DeliverableIcon, lineName, OverDeliveredBadge } from './retainer-badges';
 import {
   retainerCycleQuery,
@@ -91,7 +94,14 @@ import {
  */
 export function ThisMonthTab({ retainer }: { retainer: RetainerDetail }) {
   const current = retainer.currentCycle;
-  if (!current) return <NoOpenCycle retainer={retainer} />;
+  if (!current) {
+    return (
+      <>
+        <RetainerTemplatePanel retainer={retainer} />
+        <NoOpenCycle retainer={retainer} />
+      </>
+    );
+  }
   return <OpenCycle retainer={retainer} cycleId={current.id} />;
 }
 
@@ -99,8 +109,16 @@ function OpenCycle({ retainer, cycleId }: { retainer: RetainerDetail; cycleId: s
   const { t } = useTranslation();
   const cycle = useQuery(retainerCycleQuery(retainer.id, cycleId));
   const client = useQuery(clientQuery(retainer.client.id));
+  // F07: the lines' task counts against the linked monthly template (rule 18).
+  const template = useQuery(retainerTemplateQuery(retainer.id)).data;
   const [adding, setAdding] = useState(false);
   const editable = retainer.permissions.canManage;
+  const templateLines =
+    template?.template && template.cycle?.id === cycleId ? template.lines : undefined;
+  const canGenerateMissing =
+    !!template?.permissions.canGenerate &&
+    retainer.archivedAt === null &&
+    retainer.status !== 'ended';
 
   if (cycle.isPending) {
     return (
@@ -131,6 +149,7 @@ function OpenCycle({ retainer, cycleId }: { retainer: RetainerDetail; cycleId: s
         }
       />
       <CycleSummary cycle={cycle.data} />
+      <RetainerTemplatePanel retainer={retainer} />
       {cycle.data.lines.length === 0 ? (
         <EmptyState
           icon={<ListPlusIcon />}
@@ -146,6 +165,8 @@ function OpenCycle({ retainer, cycleId }: { retainer: RetainerDetail; cycleId: s
               clientId={retainer.client.id}
               cycle={cycle.data}
               line={line}
+              templateLine={templateLines?.find((item) => item.id === line.id)}
+              canGenerateMissing={canGenerateMissing}
               editable={editable}
               // Rule 7: no tasks for an archived retainer's cycle or a client that has ended.
               taskable={retainer.archivedAt === null && client.data?.status !== 'ended'}
@@ -218,6 +239,8 @@ function CycleLineRow({
   clientId,
   cycle,
   line,
+  templateLine,
+  canGenerateMissing,
   editable,
   taskable,
 }: {
@@ -225,6 +248,9 @@ function CycleLineRow({
   clientId: string;
   cycle: CycleDetail;
   line: CycleDetail['lines'][number];
+  /** The line against the linked monthly template, when one is linked. */
+  templateLine: RetainerTemplate['lines'][number] | undefined;
+  canGenerateMissing: boolean;
   editable: boolean;
   taskable: boolean;
 }) {
@@ -318,6 +344,14 @@ function CycleLineRow({
           </div>
         )}
       </div>
+      {templateLine && (
+        <LineTemplateTasks
+          retainerId={retainerId}
+          cycleId={cycle.id}
+          line={templateLine}
+          canGenerate={canGenerateMissing}
+        />
+      )}
       {line.committed > 0 ? (
         <Meter
           value={Math.min(line.delivered, line.committed)}

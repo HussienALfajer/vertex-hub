@@ -497,6 +497,67 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await expect(page.getByText(ar.templates.warningsTitle)).toBeVisible();
       await screenshot(page, testInfo, `template-monthly-${colorScheme}`);
     });
+
+    test('new project with a template', async ({ page }, testInfo) => {
+      await page.setViewportSize({ width: 1280, height: 1900 });
+      await page.clock.setFixedTime(new Date(`${PROJECTS_TODAY}T09:00:00+03:00`));
+      await mockApi(page, { signedIn: true });
+      await page.goto(`/projects/new?clientId=${seedIds.jasmine}`);
+      await page.getByLabel(ar.projects.form.name).fill('موقع الحجوزات');
+      await page.getByRole('combobox', { name: ar.templates.picker.project }).click();
+      await page.getByRole('option', { name: 'موقع إلكتروني' }).click();
+      await expect(
+        page.getByLabel(ar.projects.form.milestoneDue.replace('{{position}}', '1')),
+      ).toHaveValue('2026-10-14');
+      await screenshot(page, testInfo, `project-new-template-${colorScheme}`);
+    });
+
+    test('generate dialog for a project', async ({ page }, testInfo) => {
+      await page.setViewportSize({ width: 1280, height: 1000 });
+      await page.clock.setFixedTime(new Date(`${PROJECTS_TODAY}T09:00:00+03:00`));
+      await mockApi(page, { signedIn: true });
+      await page.goto(
+        `/projects/${seedIds.identityProject}?tab=tasks&generate=${seedIds.websiteTemplate}`,
+      );
+      const preview = page
+        .getByRole('dialog', { name: /هوية/ })
+        .getByRole('region', { name: ar.templates.generate.preview });
+      await expect(preview.getByText('تصميم الواجهات', { exact: true })).toBeVisible();
+      await screenshot(page, testInfo, `template-generate-project-${colorScheme}`);
+    });
+
+    test('retainer month generated from its template', async ({ page }, testInfo) => {
+      await page.setViewportSize({ width: 1280, height: 1600 });
+      await page.clock.setFixedTime(new Date(`${PROJECTS_TODAY}T09:00:00+03:00`));
+      await mockApi(page, { signedIn: true });
+      await page.goto(`/retainers/${seedIds.socialRetainer}`);
+      const panel = page.getByRole('region', { name: ar.templates.retainer.title });
+      await panel.getByRole('button', { name: ar.templates.retainer.generate }).click();
+      const dialog = page.getByRole('dialog', { name: ar.templates.generate.cycleTitle });
+      await expect(dialog.getByText('تصميم 12')).toBeVisible();
+      await screenshot(page, testInfo, `template-generate-cycle-${colorScheme}`);
+
+      await dialog.getByRole('button', { name: /18/ }).click();
+      await expect(dialog).toBeHidden();
+      // Four more designs (two made by hand already): the line offers two missing tasks.
+      const designs = page.getByRole('listitem').filter({ hasText: ar.retainers.kinds.design });
+      await designs
+        .getByRole('button', {
+          name: ar.retainers.cycle.lineActions.replace('{{name}}', ar.retainers.kinds.design),
+        })
+        .click();
+      await page.getByRole('menuitem', { name: ar.retainers.cycle.changeCommitted }).click();
+      const committed = page.getByRole('dialog', {
+        name: ar.retainers.cycle.committedTitle.replace('{{name}}', ar.retainers.kinds.design),
+      });
+      await committed.getByLabel(ar.retainers.cycle.committed).fill('16');
+      await committed.getByLabel(ar.retainers.cycle.reason).fill('حملة إضافية');
+      await committed.getByRole('button', { name: ar.common.save }).click();
+      await expect(
+        designs.getByRole('button', { name: ar.templates.lines.generateMissing_two }),
+      ).toBeVisible();
+      await screenshot(page, testInfo, `retainer-month-template-${colorScheme}`);
+    });
   });
 }
 

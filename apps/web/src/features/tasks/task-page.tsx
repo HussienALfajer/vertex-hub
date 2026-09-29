@@ -20,6 +20,7 @@ import { can, useMe } from '../../lib/auth';
 import { formatCalendarDate, formatDateTime, formatNumber } from '../../lib/format';
 import { PersonName, useDepartmentNames } from '../projects/project-badges';
 import { lineName } from '../retainers/retainer-badges';
+import { TaskTemplateOrigin } from '../templates/template-runs';
 import { TaskActions } from './task-actions';
 import {
   BlockedBadge,
@@ -298,6 +299,7 @@ function DetailsSection({ task }: { task: TaskDetail }) {
         )
       }
     >
+      <TaskTemplateOrigin taskId={task.id} />
       <dl className="flex flex-col gap-3 text-sm">
         {task.client && (
           <>
