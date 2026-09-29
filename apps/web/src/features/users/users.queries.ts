@@ -35,13 +35,17 @@ export const skillsQuery = queryOptions({
   staleTime: 5 * 60_000,
 });
 
-/** Changes to users also change departments (members, managers) and possibly the viewer's access. */
+/**
+ * Changes to users also change departments (members, managers), clients (an account manager's
+ * name or status) and possibly the viewer's access.
+ */
 function useInvalidateTeam() {
   const queryClient = useQueryClient();
   return () =>
     Promise.all([
       queryClient.invalidateQueries({ queryKey: usersKeys.all }),
       queryClient.invalidateQueries({ queryKey: ['departments'] }),
+      queryClient.invalidateQueries({ queryKey: ['clients'] }),
       queryClient.invalidateQueries({ queryKey: ['me'] }),
     ]);
 }

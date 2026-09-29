@@ -6,6 +6,7 @@ import {
   type AuditAction,
   type AuditEntityType,
   type AuditEntry,
+  CLIENT_STATUSES,
 } from '@vertex-hub/contracts';
 import {
   Avatar,
@@ -24,11 +25,14 @@ import {
   SelectValue,
   Skeleton,
 } from '@vertex-hub/ui';
+import type { TFunction } from 'i18next';
 import { ChevronDownIcon, CpuIcon, FilterXIcon, HistoryIcon } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LoadError } from '../../components/load-error';
+import { canAll, useMe } from '../../lib/auth';
 import { businessDayEnd, businessDayStart, formatDateTime, formatNumber } from '../../lib/format';
+import { clientListQuery } from '../clients/clients.queries';
 import { departmentListQuery } from '../departments/departments.queries';
 import { userListQuery } from '../users/users.queries';
 import { auditListQuery } from './audit.queries';
@@ -137,14 +141,24 @@ interface EntityNames {
   users: { id: string; name: string }[];
   user: (id: string) => string | undefined;
   department: (id: string) => string | undefined;
+  client: (id: string) => string | undefined;
 }
 
-/** Names for the entities and actors in the log: every user (any status) and department. */
+/**
+ * Names for the entities and actors in the log: every user (any status), department and client
+ * (archived clients only for those who may see them).
+ */
 function useEntityNames(): EntityNames {
+  const me = useMe();
   const active = useQuery(userListQuery({ status: 'active', pageSize: 100 })).data;
   const invited = useQuery(userListQuery({ status: 'invited', pageSize: 100 })).data;
   const archived = useQuery(userListQuery({ status: 'archived', pageSize: 100 })).data;
   const departments = useQuery(departmentListQuery).data;
+  const clients = useQuery(clientListQuery({ status: [...CLIENT_STATUSES], pageSize: 100 })).data;
+  const archivedClients = useQuery({
+    ...clientListQuery({ status: [...CLIENT_STATUSES], archived: 'true', pageSize: 100 }),
+    enabled: canAll(me, 'clients.manage'),
+  }).data;
   return useMemo(() => {
     const users = [active, invited, archived]
       .flatMap((page) => page?.items ?? [])
@@ -154,12 +168,18 @@ function useEntityNames(): EntityNames {
     const departmentNames = new Map(
       (departments?.items ?? []).map((department) => [department.id, department.name]),
     );
+    const clientNames = new Map(
+      [clients, archivedClients]
+        .flatMap((page) => page?.items ?? [])
+        .map((client) => [client.id, client.tradeName]),
+    );
     return {
       users,
       user: (id) => userNames.get(id),
       department: (id) => departmentNames.get(id),
+      client: (id) => clientNames.get(id),
     };
-  }, [active, invited, archived, departments]);
+  }, [active, invited, archived, departments, clients, archivedClients]);
 }
 
 function Filters({
@@ -289,7 +309,7 @@ function FilterSelect({
   );
 }
 
-function actionLabel(t: ReturnType<typeof useTranslation>['t'], action: AuditAction): string {
+function actionLabel(t: TFunction, action: AuditAction): string {
   const [entity, verb] = action.split('.') as [AuditEntityType, string];
   return t(`audit.actions.${entity}.${verb}` as 'audit.actions.user.created');
 }
@@ -305,11 +325,10 @@ const actionTone = (action: AuditAction) => {
 function AuditRow({ entry, names }: { entry: AuditEntry; names: EntityNames }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
+  // `clientId` on a contact, platform account or note entry is where its link points, not a change.
   const fields = [
     ...new Set([...Object.keys(entry.before ?? {}), ...Object.keys(entry.after ?? {})]),
-  ];
-  const entityName =
-    entry.entityType === 'user' ? names.user(entry.entityId) : names.department(entry.entityId);
+  ].filter((field) => field !== 'clientId');
   const detailsId = `audit-${entry.id}`;
 
   return (
@@ -338,7 +357,7 @@ function AuditRow({ entry, names }: { entry: AuditEntry; names: EntityNames }) {
           <span className="text-muted-foreground">
             {t(`audit.entityTypes.${entry.entityType}`)}
           </span>
-          <EntityLink entry={entry} name={entityName} />
+          <EntityLink entry={entry} names={names} />
         </span>
         {fields.length > 0 ? (
           <Button
@@ -372,10 +391,18 @@ function AuditRow({ entry, names }: { entry: AuditEntry; names: EntityNames }) {
                 <tr key={field} className="align-top">
                   <td className="py-1.5 pe-4 font-medium">{fieldLabel(t, field)}</td>
                   <td className="py-1.5 pe-4 text-muted-foreground">
-                    <AuditValue field={field} value={entry.before?.[field]} />
+                    <AuditValue
+                      entityType={entry.entityType}
+                      field={field}
+                      value={entry.before?.[field]}
+                    />
                   </td>
                   <td className="py-1.5">
-                    <AuditValue field={field} value={entry.after?.[field]} />
+                    <AuditValue
+                      entityType={entry.entityType}
+                      field={field}
+                      value={entry.after?.[field]}
+                    />
                   </td>
                 </tr>
               ))}
@@ -400,37 +427,86 @@ const KNOWN_FIELDS = [
   'status',
   'twoFactorEnabled',
   'kind',
+  'tradeName',
+  'sector',
+  'accountManager',
+  'isHealthcare',
+  'archived',
+  'colors',
+  'fonts',
+  'toneOfVoice',
+  'forbiddenWords',
+  'files',
+  'references',
+  'jobTitle',
+  'hasFinalApproval',
+  'notes',
+  'platform',
+  'label',
+  'url',
+  'agencyAccess',
+  'adminNote',
+  'occurredAt',
+  'channel',
+  'contactId',
+  'summary',
 ] as const;
 
-function fieldLabel(t: ReturnType<typeof useTranslation>['t'], field: string): string {
+function fieldLabel(t: TFunction, field: string): string {
   const known = KNOWN_FIELDS.find((name) => name === field);
   return known ? t(`audit.fields.${known}`) : field;
 }
 
-function EntityLink({ entry, name }: { entry: AuditEntry; name: string | undefined }) {
+/** The client a client, contact, platform account or note entry belongs to. */
+function clientIdOf(entry: AuditEntry): string | undefined {
+  if (entry.entityType === 'client') return entry.entityId;
+  const clientId = entry.after?.clientId ?? entry.before?.clientId;
+  return typeof clientId === 'string' ? clientId : undefined;
+}
+
+const CLIENT_TAB: Partial<Record<AuditEntityType, 'platforms' | 'communication'>> = {
+  client_platform_account: 'platforms',
+  client_note: 'communication',
+};
+
+const linkClass = 'font-medium hover:underline';
+
+function EntityLink({ entry, names }: { entry: AuditEntry; names: EntityNames }) {
   const { t } = useTranslation();
-  const label = name ?? t('common.none');
+  const none = t('common.none');
   if (entry.entityType === 'user') {
     return (
-      <Link
-        to="/team/$userId"
-        params={{ userId: entry.entityId }}
-        className="font-medium hover:underline"
-      >
-        {label}
+      <Link to="/team/$userId" params={{ userId: entry.entityId }} className={linkClass}>
+        {names.user(entry.entityId) ?? none}
       </Link>
     );
   }
-  if (entry.entityType !== 'department') {
-    return <span className="font-medium">{label}</span>;
+  if (entry.entityType === 'department') {
+    return (
+      <Link
+        to="/departments/$departmentId"
+        params={{ departmentId: entry.entityId }}
+        className={linkClass}
+      >
+        {names.department(entry.entityId) ?? none}
+      </Link>
+    );
   }
+  const clientId = clientIdOf(entry);
+  if (!clientId) return <span className="font-medium">{none}</span>;
+  // A contact is named by the entry itself; the rest by their client.
+  const contactName = entry.after?.name ?? entry.before?.name;
+  const clientName = names.client(clientId) ?? t('audit.openClient');
   return (
     <Link
-      to="/departments/$departmentId"
-      params={{ departmentId: entry.entityId }}
-      className="font-medium hover:underline"
+      to="/clients/$clientId"
+      params={{ clientId }}
+      search={{ tab: CLIENT_TAB[entry.entityType] }}
+      className={linkClass}
     >
-      {label}
+      {entry.entityType === 'client_contact' && typeof contactName === 'string'
+        ? t('audit.contactOfClient', { contact: contactName, client: clientName })
+        : clientName}
     </Link>
   );
 }

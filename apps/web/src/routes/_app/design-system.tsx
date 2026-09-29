@@ -1,5 +1,11 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { WORKFLOW_STATUSES, type WorkflowStatus } from '@vertex-hub/contracts';
+import {
+  CLIENT_PLATFORMS,
+  CLIENT_STATUSES,
+  type ClientStatus,
+  WORKFLOW_STATUSES,
+  type WorkflowStatus,
+} from '@vertex-hub/contracts';
 import {
   AlertDialog,
   AlertDialogClose,
@@ -9,12 +15,17 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
+  Autocomplete,
   Avatar,
   Button,
+  Callout,
   Card,
   CardHeader,
   CardTitle,
   Checkbox,
+  ColorInput,
+  ColorStrip,
+  ColorSwatch,
   Dialog,
   DialogClose,
   DialogContent,
@@ -37,6 +48,7 @@ import {
   OtpField,
   PageHeader,
   Pagination,
+  PlatformMark,
   Select,
   SelectContent,
   SelectItem,
@@ -44,12 +56,20 @@ import {
   SelectValue,
   Skeleton,
   StatusBadge,
+  Switch,
   Table,
   TableBody,
   TableCell,
   TableHead,
   TableHeader,
   TableRow,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+  Textarea,
+  ToggleGroup,
+  ToggleGroupItem,
   toast,
 } from '@vertex-hub/ui';
 import {
@@ -57,8 +77,12 @@ import {
   CopyIcon,
   EllipsisIcon,
   ListTodoIcon,
+  MessagesSquareIcon,
   PencilIcon,
   PlusIcon,
+  ShieldAlertIcon,
+  UserPlusIcon,
+  UsersRoundIcon,
 } from 'lucide-react';
 import { type ReactNode, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -226,6 +250,8 @@ function DesignSystemPage() {
       </Section>
 
       <PeopleSection />
+
+      <ClientKitSection />
 
       <Section title={t('designSystem.overlays')}>
         <div className="flex flex-wrap items-center gap-3">
@@ -395,6 +421,132 @@ function PeopleSection() {
             previousLabel={t('common.previous')}
             nextLabel={t('common.next')}
           />
+        </div>
+      </div>
+    </Section>
+  );
+}
+
+const sampleSectors = ['restaurants', 'clinics', 'stores'] as const;
+
+/** Brand palette as data: token colors stand in for a client's own hex codes. */
+const samplePalette = [
+  'var(--color-green-800)',
+  'var(--color-gold-400)',
+  'var(--color-neutral-100)',
+  'var(--color-info-600)',
+];
+
+/** Tabs, notices, form controls, content colors and platform marks (F02 client profile). */
+function ClientKitSection() {
+  const { t } = useTranslation();
+  const ids = { healthcare: useId(), sector: useId(), notes: useId(), status: useId() };
+  const [healthcare, setHealthcare] = useState(true);
+  const [sector, setSector] = useState('');
+  const [status, setStatus] = useState<ClientStatus>('active');
+  const [color, setColor] = useState('');
+  return (
+    <Section title={t('designSystem.brand')}>
+      <div className="grid gap-8 lg:grid-cols-2">
+        <div className="flex flex-col gap-6">
+          <Tabs defaultValue="overview">
+            <TabsList aria-label={t('designSystem.tabs')}>
+              <TabsTrigger value="overview">{t('designSystem.tabOverview')}</TabsTrigger>
+              <TabsTrigger value="contacts">
+                <UsersRoundIcon />
+                {t('designSystem.tabContacts')}
+              </TabsTrigger>
+              <TabsTrigger value="activity">
+                <MessagesSquareIcon />
+                {t('designSystem.tabActivity')}
+              </TabsTrigger>
+            </TabsList>
+            <TabsContent value="overview">
+              <p className="text-muted-foreground">{t('designSystem.tabBody')}</p>
+            </TabsContent>
+            <TabsContent value="contacts">
+              <p className="text-muted-foreground">{t('designSystem.tabBody')}</p>
+            </TabsContent>
+            <TabsContent value="activity">
+              <p className="text-muted-foreground">{t('designSystem.tabBody')}</p>
+            </TabsContent>
+          </Tabs>
+          <Callout
+            tone="warning"
+            icon={<ShieldAlertIcon />}
+            title={t('designSystem.calloutTitle')}
+            description={t('designSystem.calloutBody')}
+            action={
+              <Button variant="outline" size="sm">
+                <UserPlusIcon />
+                {t('designSystem.calloutAction')}
+              </Button>
+            }
+          />
+          <Callout icon={<ArchiveIcon />} title={t('designSystem.dialogTitle')} />
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center gap-3">
+              <Avatar name={t('designSystem.clientJasmine')} shape="square" size="lg" />
+              <Avatar name={t('designSystem.clientStore')} shape="square" tone="muted" />
+              {CLIENT_PLATFORMS.map((platform) => (
+                <PlatformMark
+                  key={platform}
+                  platform={platform}
+                  size="sm"
+                  label={t(`clients.platforms.names.${platform}`)}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+        <div className="flex flex-col gap-6">
+          <label htmlFor={ids.healthcare} className="flex items-center justify-between gap-3">
+            <span className="text-sm font-medium">{t('designSystem.switchLabel')}</span>
+            <Switch id={ids.healthcare} checked={healthcare} onCheckedChange={setHealthcare} />
+          </label>
+          <Field>
+            <FieldLabel id={ids.status} render={<span />}>
+              {t('designSystem.segmented')}
+            </FieldLabel>
+            <ToggleGroup
+              aria-labelledby={ids.status}
+              value={[status]}
+              onValueChange={(next: ClientStatus[]) => next[0] && setStatus(next[0])}
+            >
+              {CLIENT_STATUSES.map((value) => (
+                <ToggleGroupItem key={value} value={value}>
+                  {t(`clients.statuses.${value}`)}
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
+          </Field>
+          <Field>
+            <FieldLabel htmlFor={ids.sector}>{t('designSystem.sector')}</FieldLabel>
+            <Autocomplete
+              id={ids.sector}
+              value={sector}
+              onValueChange={setSector}
+              suggestions={sampleSectors.map((key) => t(`designSystem.sampleSectors.${key}`))}
+            />
+          </Field>
+          <Field>
+            <FieldLabel htmlFor={ids.notes}>{t('designSystem.notes')}</FieldLabel>
+            <Textarea id={ids.notes} placeholder={t('designSystem.notesPlaceholder')} />
+          </Field>
+          <div className="flex flex-col gap-3">
+            <ColorStrip colors={samplePalette} className="rounded-sm" />
+            <div className="flex items-center gap-2">
+              {samplePalette.map((swatch) => (
+                <ColorSwatch key={swatch} color={swatch} className="size-8" />
+              ))}
+              <ColorInput
+                value={color}
+                onChange={setColor}
+                pickLabel={t('clients.brandKit.form.pickColor')}
+                className="ms-auto w-44"
+              />
+            </div>
+          </div>
         </div>
       </div>
     </Section>

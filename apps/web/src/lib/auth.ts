@@ -45,6 +45,16 @@ export function can(me: MeResponse, permission: Permission): boolean {
   return me.permissions.some((granted) => granted.permission === permission);
 }
 
+/**
+ * Whether the user holds a permission with scope `all`, as the actions that no narrower scope
+ * covers need (creating a client, archiving it). Hides UI only; the API enforces it.
+ */
+export function canAll(me: MeResponse, permission: Permission): boolean {
+  return me.permissions.some(
+    (granted) => granted.permission === permission && granted.scopes.includes('all'),
+  );
+}
+
 /** Two-factor sign-in is required and not set up yet: the user must go to the setup page. */
 export function needsTwoFactorSetup(me: MeResponse): boolean {
   return me.twoFactor.required && !me.twoFactor.enabled;

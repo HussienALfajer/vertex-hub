@@ -34,6 +34,7 @@ import {
   ArchiveIcon,
   ArchiveRestoreIcon,
   ArrowRightIcon,
+  BriefcaseBusinessIcon,
   Building2Icon,
   EllipsisIcon,
   KeyRoundIcon,
@@ -48,6 +49,7 @@ import {
 } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { ConfirmDialog } from '../../components/confirm-dialog';
 import { FormAlert } from '../../components/form-alert';
 import { LoadError } from '../../components/load-error';
 import { ApiError } from '../../lib/api/client';
@@ -480,20 +482,28 @@ function ArchiveDialog({
                   className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2"
                 >
                   <span className="flex items-center gap-2 text-sm">
-                    <Building2Icon className="size-4 text-muted-foreground" />
+                    {item.type === 'manages_department' ? (
+                      <Building2Icon className="size-4 text-muted-foreground" />
+                    ) : (
+                      <BriefcaseBusinessIcon className="size-4 text-muted-foreground" />
+                    )}
                     {t(`users.responsibilities.${item.type}`, { name: item.name })}
                   </span>
-                  {item.type === 'manages_department' && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      render={
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    render={
+                      item.type === 'manages_department' ? (
                         <Link to="/departments/$departmentId" params={{ departmentId: item.id }} />
-                      }
-                    >
-                      {t('users.responsibilities.open')}
-                    </Button>
-                  )}
+                      ) : (
+                        <Link to="/clients/$clientId" params={{ clientId: item.id }} />
+                      )
+                    }
+                  >
+                    {item.type === 'manages_department'
+                      ? t('users.responsibilities.open')
+                      : t('users.responsibilities.openClient')}
+                  </Button>
                 </li>
               ))}
             </ul>
@@ -578,68 +588,6 @@ function ResetTwoFactorDialog({
         toast.add({ title: t('users.confirm.resetDone'), type: 'success' });
       }}
     />
-  );
-}
-
-function ConfirmDialog({
-  open,
-  onClose,
-  title,
-  body,
-  action,
-  destructive,
-  pending,
-  onConfirm,
-}: {
-  open: boolean;
-  onClose: () => void;
-  title: string;
-  body: string;
-  action: string;
-  destructive?: boolean;
-  pending: boolean;
-  onConfirm: () => Promise<void>;
-}) {
-  const { t } = useTranslation();
-  const [failure, setFailure] = useState<string | null>(null);
-  return (
-    <AlertDialog
-      open={open}
-      onOpenChange={(next) => {
-        if (!next) {
-          setFailure(null);
-          onClose();
-        }
-      }}
-    >
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>{title}</AlertDialogTitle>
-          <AlertDialogDescription>{body}</AlertDialogDescription>
-        </AlertDialogHeader>
-        {failure && <FormAlert>{failure}</FormAlert>}
-        <AlertDialogFooter>
-          <AlertDialogClose render={<Button variant="outline" />}>
-            {t('common.cancel')}
-          </AlertDialogClose>
-          <Button
-            variant={destructive ? 'destructive' : 'primary'}
-            disabled={pending}
-            onClick={async () => {
-              setFailure(null);
-              try {
-                await onConfirm();
-                onClose();
-              } catch (error) {
-                setFailure(errorMessage(t, error));
-              }
-            }}
-          >
-            {action}
-          </Button>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
   );
 }
 

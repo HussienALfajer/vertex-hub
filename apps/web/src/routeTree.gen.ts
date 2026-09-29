@@ -17,6 +17,9 @@ import { Route as AppIndexRouteImport } from './routes/_app/index'
 import { Route as AppAccountRouteImport } from './routes/_app/account'
 import { Route as AppAuditRouteImport } from './routes/_app/audit'
 import { Route as AppDesignSystemRouteImport } from './routes/_app/design-system'
+import { Route as AppClientsIndexRouteImport } from './routes/_app/clients/index'
+import { Route as AppClientsClientIdRouteImport } from './routes/_app/clients/$clientId'
+import { Route as AppClientsNewRouteImport } from './routes/_app/clients/new'
 import { Route as AppDepartmentsIndexRouteImport } from './routes/_app/departments/index'
 import { Route as AppDepartmentsDepartmentIdRouteImport } from './routes/_app/departments/$departmentId'
 import { Route as AppTeamIndexRouteImport } from './routes/_app/team/index'
@@ -62,6 +65,21 @@ const AppDesignSystemRoute = AppDesignSystemRouteImport.update({
   path: '/design-system',
   getParentRoute: () => AppRoute,
 } as any)
+const AppClientsIndexRoute = AppClientsIndexRouteImport.update({
+  id: '/clients/',
+  path: '/clients/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppClientsClientIdRoute = AppClientsClientIdRouteImport.update({
+  id: '/clients/$clientId',
+  path: '/clients/$clientId',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppClientsNewRoute = AppClientsNewRouteImport.update({
+  id: '/clients/new',
+  path: '/clients/new',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppDepartmentsIndexRoute = AppDepartmentsIndexRouteImport.update({
   id: '/departments/',
   path: '/departments/',
@@ -97,9 +115,12 @@ export interface FileRoutesByFullPath {
   '/account': typeof AppAccountRoute
   '/audit': typeof AppAuditRoute
   '/design-system': typeof AppDesignSystemRoute
+  '/clients/$clientId': typeof AppClientsClientIdRoute
+  '/clients/new': typeof AppClientsNewRoute
   '/departments/$departmentId': typeof AppDepartmentsDepartmentIdRoute
   '/team/$userId': typeof AppTeamUserIdRoute
   '/team/new': typeof AppTeamNewRoute
+  '/clients/': typeof AppClientsIndexRoute
   '/departments/': typeof AppDepartmentsIndexRoute
   '/team/': typeof AppTeamIndexRoute
 }
@@ -111,9 +132,12 @@ export interface FileRoutesByTo {
   '/audit': typeof AppAuditRoute
   '/design-system': typeof AppDesignSystemRoute
   '/': typeof AppIndexRoute
+  '/clients/$clientId': typeof AppClientsClientIdRoute
+  '/clients/new': typeof AppClientsNewRoute
   '/departments/$departmentId': typeof AppDepartmentsDepartmentIdRoute
   '/team/$userId': typeof AppTeamUserIdRoute
   '/team/new': typeof AppTeamNewRoute
+  '/clients': typeof AppClientsIndexRoute
   '/departments': typeof AppDepartmentsIndexRoute
   '/team': typeof AppTeamIndexRoute
 }
@@ -127,9 +151,12 @@ export interface FileRoutesById {
   '/_app/audit': typeof AppAuditRoute
   '/_app/design-system': typeof AppDesignSystemRoute
   '/_app/': typeof AppIndexRoute
+  '/_app/clients/$clientId': typeof AppClientsClientIdRoute
+  '/_app/clients/new': typeof AppClientsNewRoute
   '/_app/departments/$departmentId': typeof AppDepartmentsDepartmentIdRoute
   '/_app/team/$userId': typeof AppTeamUserIdRoute
   '/_app/team/new': typeof AppTeamNewRoute
+  '/_app/clients/': typeof AppClientsIndexRoute
   '/_app/departments/': typeof AppDepartmentsIndexRoute
   '/_app/team/': typeof AppTeamIndexRoute
 }
@@ -143,9 +170,12 @@ export interface FileRouteTypes {
     | '/account'
     | '/audit'
     | '/design-system'
+    | '/clients/$clientId'
+    | '/clients/new'
     | '/departments/$departmentId'
     | '/team/$userId'
     | '/team/new'
+    | '/clients/'
     | '/departments/'
     | '/team/'
   fileRoutesByTo: FileRoutesByTo
@@ -157,9 +187,12 @@ export interface FileRouteTypes {
     | '/audit'
     | '/design-system'
     | '/'
+    | '/clients/$clientId'
+    | '/clients/new'
     | '/departments/$departmentId'
     | '/team/$userId'
     | '/team/new'
+    | '/clients'
     | '/departments'
     | '/team'
   id:
@@ -172,9 +205,12 @@ export interface FileRouteTypes {
     | '/_app/audit'
     | '/_app/design-system'
     | '/_app/'
+    | '/_app/clients/$clientId'
+    | '/_app/clients/new'
     | '/_app/departments/$departmentId'
     | '/_app/team/$userId'
     | '/_app/team/new'
+    | '/_app/clients/'
     | '/_app/departments/'
     | '/_app/team/'
   fileRoutesById: FileRoutesById
@@ -244,6 +280,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppDesignSystemRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/clients/': {
+      id: '/_app/clients/'
+      path: '/clients'
+      fullPath: '/clients/'
+      preLoaderRoute: typeof AppClientsIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/clients/$clientId': {
+      id: '/_app/clients/$clientId'
+      path: '/clients/$clientId'
+      fullPath: '/clients/$clientId'
+      preLoaderRoute: typeof AppClientsClientIdRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/clients/new': {
+      id: '/_app/clients/new'
+      path: '/clients/new'
+      fullPath: '/clients/new'
+      preLoaderRoute: typeof AppClientsNewRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/departments/': {
       id: '/_app/departments/'
       path: '/departments'
@@ -287,9 +344,12 @@ interface AppRouteChildren {
   AppAuditRoute: typeof AppAuditRoute
   AppDesignSystemRoute: typeof AppDesignSystemRoute
   AppIndexRoute: typeof AppIndexRoute
+  AppClientsClientIdRoute: typeof AppClientsClientIdRoute
+  AppClientsNewRoute: typeof AppClientsNewRoute
   AppDepartmentsDepartmentIdRoute: typeof AppDepartmentsDepartmentIdRoute
   AppTeamUserIdRoute: typeof AppTeamUserIdRoute
   AppTeamNewRoute: typeof AppTeamNewRoute
+  AppClientsIndexRoute: typeof AppClientsIndexRoute
   AppDepartmentsIndexRoute: typeof AppDepartmentsIndexRoute
   AppTeamIndexRoute: typeof AppTeamIndexRoute
 }
@@ -299,9 +359,12 @@ const AppRouteChildren: AppRouteChildren = {
   AppAuditRoute: AppAuditRoute,
   AppDesignSystemRoute: AppDesignSystemRoute,
   AppIndexRoute: AppIndexRoute,
+  AppClientsClientIdRoute: AppClientsClientIdRoute,
+  AppClientsNewRoute: AppClientsNewRoute,
   AppDepartmentsDepartmentIdRoute: AppDepartmentsDepartmentIdRoute,
   AppTeamUserIdRoute: AppTeamUserIdRoute,
   AppTeamNewRoute: AppTeamNewRoute,
+  AppClientsIndexRoute: AppClientsIndexRoute,
   AppDepartmentsIndexRoute: AppDepartmentsIndexRoute,
   AppTeamIndexRoute: AppTeamIndexRoute,
 }

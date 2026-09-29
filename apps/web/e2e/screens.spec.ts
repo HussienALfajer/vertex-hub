@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 import ar from '../src/i18n/locales/ar.json' with { type: 'json' };
 import {
+  accountManagerMe,
   financeWithoutTwoFactor,
   mockApi,
   screenshot,
@@ -35,7 +36,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
 
     test('design system components', async ({ page }, testInfo) => {
       // Tall enough for the whole gallery: the shell's sidebar and top bar are sticky.
-      await page.setViewportSize({ width: 1280, height: 2000 });
+      await page.setViewportSize({ width: 1280, height: 2700 });
       await mockApi(page, { signedIn: true });
       await page.goto('/design-system');
       await expect(page.getByRole('heading', { level: 1 })).toHaveText(ar.designSystem.title);
@@ -131,6 +132,77 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await page.getByRole('button', { name: ar.login.submit }).click();
       await expect(page.getByRole('heading', { level: 1 })).toHaveText(ar.login.twoFactor.title);
       await screenshot(page, testInfo, `login-code-${colorScheme}`);
+    });
+
+    test('client list', async ({ page }, testInfo) => {
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await mockApi(page, { signedIn: true });
+      await page.goto('/clients');
+      await expect(page.getByRole('link', { name: /مطعم الياسمين/ })).toBeVisible();
+      await screenshot(page, testInfo, `clients-${colorScheme}`);
+    });
+
+    test('new client', async ({ page }, testInfo) => {
+      await page.setViewportSize({ width: 1280, height: 1100 });
+      await mockApi(page, { signedIn: true });
+      await page.goto('/clients/new');
+      await page.getByLabel(ar.clients.form.tradeName).fill('مخبز السنابل');
+      await page.getByLabel(ar.clients.form.sector).fill('مخابز');
+      await page.getByRole('combobox', { name: ar.clients.form.accountManager }).click();
+      await page.getByRole('option', { name: 'ليان الأحمد' }).click();
+      await expect(page.getByRole('complementary', { name: ar.clients.new.preview })).toContainText(
+        'ليان الأحمد',
+      );
+      await screenshot(page, testInfo, `new-client-${colorScheme}`);
+    });
+
+    test('client profile tabs', async ({ page }, testInfo) => {
+      await page.setViewportSize({ width: 1280, height: 1000 });
+      await mockApi(page, { signedIn: true });
+      await page.goto(`/clients/${seedIds.jasmine}`);
+      await expect(page.getByRole('heading', { level: 1 })).toHaveText('مطعم الياسمين');
+      await screenshot(page, testInfo, `client-contacts-${colorScheme}`);
+
+      await page.setViewportSize({ width: 1280, height: 1300 });
+      await page.getByRole('tab', { name: ar.clients.profile.tabs.brandKit }).click();
+      await expect(page.getByText('#C9A45C')).toBeVisible();
+      await screenshot(page, testInfo, `client-brand-kit-${colorScheme}`);
+
+      await page.getByRole('button', { name: ar.clients.brandKit.edit }).click();
+      await expect(
+        page.getByRole('heading', { name: ar.clients.brandKit.form.title }),
+      ).toBeVisible();
+      await screenshot(page, testInfo, `client-brand-kit-form-${colorScheme}`);
+      await page.getByRole('button', { name: ar.common.cancel }).click();
+
+      await page.setViewportSize({ width: 1280, height: 1000 });
+      await page.getByRole('tab', { name: ar.clients.profile.tabs.platforms }).click();
+      await expect(page.getByText('فرع المزة')).toBeVisible();
+      await screenshot(page, testInfo, `client-platforms-${colorScheme}`);
+
+      await page.setViewportSize({ width: 1280, height: 1300 });
+      await page.getByRole('tab', { name: ar.clients.profile.tabs.communication }).click();
+      await expect(page.getByText(/خطة محتوى أكتوبر/)).toBeVisible();
+      await screenshot(page, testInfo, `client-communication-${colorScheme}`);
+    });
+
+    test('client profile (account manager view)', async ({ page }, testInfo) => {
+      await page.setViewportSize({ width: 1280, height: 900 });
+      await mockApi(page, { signedIn: true, me: accountManagerMe });
+      await page.goto('/clients');
+      await expect(page.getByRole('button', { name: ar.clients.filters.mine })).toBeVisible();
+      await expect(page.getByRole('link', { name: ar.clients.newClient })).toHaveCount(0);
+      await page.goto(`/clients/${seedIds.jasmine}`);
+      await expect(page.getByRole('heading', { level: 1 })).toHaveText('مطعم الياسمين');
+      await page.getByRole('button', { name: ar.clients.profile.edit }).click();
+      const dialog = page.getByRole('dialog');
+      await expect(dialog.getByLabel(ar.clients.form.tradeName)).toBeVisible();
+      // Rule 5: the account manager and the healthcare flag are for scope-all holders only.
+      await expect(
+        dialog.getByRole('combobox', { name: ar.clients.form.accountManager }),
+      ).toHaveCount(0);
+      await expect(dialog.getByRole('switch')).toHaveCount(0);
+      await screenshot(page, testInfo, `client-account-manager-${colorScheme}`);
     });
 
     test('audit log', async ({ page }, testInfo) => {
