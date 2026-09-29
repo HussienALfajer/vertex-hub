@@ -37,6 +37,9 @@ import { Route as AppTasksWorkloadRouteImport } from './routes/_app/tasks/worklo
 import { Route as AppTeamIndexRouteImport } from './routes/_app/team/index'
 import { Route as AppTeamUserIdRouteImport } from './routes/_app/team/$userId'
 import { Route as AppTeamNewRouteImport } from './routes/_app/team/new'
+import { Route as AppTemplatesIndexRouteImport } from './routes/_app/templates/index'
+import { Route as AppTemplatesTemplateIdRouteImport } from './routes/_app/templates/$templateId'
+import { Route as AppTemplatesNewRouteImport } from './routes/_app/templates/new'
 
 const AppRoute = AppRouteImport.update({
   id: '/_app',
@@ -178,6 +181,21 @@ const AppTeamNewRoute = AppTeamNewRouteImport.update({
   path: '/team/new',
   getParentRoute: () => AppRoute,
 } as any)
+const AppTemplatesIndexRoute = AppTemplatesIndexRouteImport.update({
+  id: '/templates/',
+  path: '/templates/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppTemplatesTemplateIdRoute = AppTemplatesTemplateIdRouteImport.update({
+  id: '/templates/$templateId',
+  path: '/templates/$templateId',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppTemplatesNewRoute = AppTemplatesNewRouteImport.update({
+  id: '/templates/new',
+  path: '/templates/new',
+  getParentRoute: () => AppRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
@@ -201,12 +219,15 @@ export interface FileRoutesByFullPath {
   '/tasks/workload': typeof AppTasksWorkloadRoute
   '/team/$userId': typeof AppTeamUserIdRoute
   '/team/new': typeof AppTeamNewRoute
+  '/templates/$templateId': typeof AppTemplatesTemplateIdRoute
+  '/templates/new': typeof AppTemplatesNewRoute
   '/clients/': typeof AppClientsIndexRoute
   '/departments/': typeof AppDepartmentsIndexRoute
   '/projects/': typeof AppProjectsIndexRoute
   '/retainers/': typeof AppRetainersIndexRoute
   '/tasks/': typeof AppTasksIndexRoute
   '/team/': typeof AppTeamIndexRoute
+  '/templates/': typeof AppTemplatesIndexRoute
 }
 export interface FileRoutesByTo {
   '/activate': typeof ActivateRoute
@@ -230,12 +251,15 @@ export interface FileRoutesByTo {
   '/tasks/workload': typeof AppTasksWorkloadRoute
   '/team/$userId': typeof AppTeamUserIdRoute
   '/team/new': typeof AppTeamNewRoute
+  '/templates/$templateId': typeof AppTemplatesTemplateIdRoute
+  '/templates/new': typeof AppTemplatesNewRoute
   '/clients': typeof AppClientsIndexRoute
   '/departments': typeof AppDepartmentsIndexRoute
   '/projects': typeof AppProjectsIndexRoute
   '/retainers': typeof AppRetainersIndexRoute
   '/tasks': typeof AppTasksIndexRoute
   '/team': typeof AppTeamIndexRoute
+  '/templates': typeof AppTemplatesIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -261,12 +285,15 @@ export interface FileRoutesById {
   '/_app/tasks/workload': typeof AppTasksWorkloadRoute
   '/_app/team/$userId': typeof AppTeamUserIdRoute
   '/_app/team/new': typeof AppTeamNewRoute
+  '/_app/templates/$templateId': typeof AppTemplatesTemplateIdRoute
+  '/_app/templates/new': typeof AppTemplatesNewRoute
   '/_app/clients/': typeof AppClientsIndexRoute
   '/_app/departments/': typeof AppDepartmentsIndexRoute
   '/_app/projects/': typeof AppProjectsIndexRoute
   '/_app/retainers/': typeof AppRetainersIndexRoute
   '/_app/tasks/': typeof AppTasksIndexRoute
   '/_app/team/': typeof AppTeamIndexRoute
+  '/_app/templates/': typeof AppTemplatesIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -292,12 +319,15 @@ export interface FileRouteTypes {
     | '/tasks/workload'
     | '/team/$userId'
     | '/team/new'
+    | '/templates/$templateId'
+    | '/templates/new'
     | '/clients/'
     | '/departments/'
     | '/projects/'
     | '/retainers/'
     | '/tasks/'
     | '/team/'
+    | '/templates/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/activate'
@@ -321,12 +351,15 @@ export interface FileRouteTypes {
     | '/tasks/workload'
     | '/team/$userId'
     | '/team/new'
+    | '/templates/$templateId'
+    | '/templates/new'
     | '/clients'
     | '/departments'
     | '/projects'
     | '/retainers'
     | '/tasks'
     | '/team'
+    | '/templates'
   id:
     | '__root__'
     | '/_app'
@@ -351,12 +384,15 @@ export interface FileRouteTypes {
     | '/_app/tasks/workload'
     | '/_app/team/$userId'
     | '/_app/team/new'
+    | '/_app/templates/$templateId'
+    | '/_app/templates/new'
     | '/_app/clients/'
     | '/_app/departments/'
     | '/_app/projects/'
     | '/_app/retainers/'
     | '/_app/tasks/'
     | '/_app/team/'
+    | '/_app/templates/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -564,6 +600,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppTeamNewRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/templates/': {
+      id: '/_app/templates/'
+      path: '/templates'
+      fullPath: '/templates/'
+      preLoaderRoute: typeof AppTemplatesIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/templates/$templateId': {
+      id: '/_app/templates/$templateId'
+      path: '/templates/$templateId'
+      fullPath: '/templates/$templateId'
+      preLoaderRoute: typeof AppTemplatesTemplateIdRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/templates/new': {
+      id: '/_app/templates/new'
+      path: '/templates/new'
+      fullPath: '/templates/new'
+      preLoaderRoute: typeof AppTemplatesNewRouteImport
+      parentRoute: typeof AppRoute
+    }
   }
 }
 
@@ -586,12 +643,15 @@ interface AppRouteChildren {
   AppTasksWorkloadRoute: typeof AppTasksWorkloadRoute
   AppTeamUserIdRoute: typeof AppTeamUserIdRoute
   AppTeamNewRoute: typeof AppTeamNewRoute
+  AppTemplatesTemplateIdRoute: typeof AppTemplatesTemplateIdRoute
+  AppTemplatesNewRoute: typeof AppTemplatesNewRoute
   AppClientsIndexRoute: typeof AppClientsIndexRoute
   AppDepartmentsIndexRoute: typeof AppDepartmentsIndexRoute
   AppProjectsIndexRoute: typeof AppProjectsIndexRoute
   AppRetainersIndexRoute: typeof AppRetainersIndexRoute
   AppTasksIndexRoute: typeof AppTasksIndexRoute
   AppTeamIndexRoute: typeof AppTeamIndexRoute
+  AppTemplatesIndexRoute: typeof AppTemplatesIndexRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
@@ -613,12 +673,15 @@ const AppRouteChildren: AppRouteChildren = {
   AppTasksWorkloadRoute: AppTasksWorkloadRoute,
   AppTeamUserIdRoute: AppTeamUserIdRoute,
   AppTeamNewRoute: AppTeamNewRoute,
+  AppTemplatesTemplateIdRoute: AppTemplatesTemplateIdRoute,
+  AppTemplatesNewRoute: AppTemplatesNewRoute,
   AppClientsIndexRoute: AppClientsIndexRoute,
   AppDepartmentsIndexRoute: AppDepartmentsIndexRoute,
   AppProjectsIndexRoute: AppProjectsIndexRoute,
   AppRetainersIndexRoute: AppRetainersIndexRoute,
   AppTasksIndexRoute: AppTasksIndexRoute,
   AppTeamIndexRoute: AppTeamIndexRoute,
+  AppTemplatesIndexRoute: AppTemplatesIndexRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
