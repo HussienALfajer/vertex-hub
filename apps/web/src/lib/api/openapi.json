@@ -5480,6 +5480,9 @@
           },
           "canEditMoney": {
             "type": "boolean"
+          },
+          "canBill": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -5489,7 +5492,8 @@
           "canReopen",
           "canArchive",
           "canSeeMoney",
-          "canEditMoney"
+          "canEditMoney",
+          "canBill"
         ],
         "additionalProperties": false,
         "description": "What the caller may do, for the UI"
@@ -6219,6 +6223,9 @@
           },
           "canEditMoney": {
             "type": "boolean"
+          },
+          "canBill": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -6226,7 +6233,8 @@
           "canReactivate",
           "canArchive",
           "canSeeMoney",
-          "canEditMoney"
+          "canEditMoney",
+          "canBill"
         ],
         "additionalProperties": false,
         "description": "What the caller may do, for the UI"

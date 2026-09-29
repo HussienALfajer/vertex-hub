@@ -230,6 +230,7 @@ describe('projects', () => {
         canArchive: false,
         canSeeMoney: false,
         canEditMoney: false,
+        canBill: false,
       });
       const byFinance = await detail(project.id, finance.cookie);
       expect(byFinance.money).toEqual({ currency: 'USD', totalMinor: 1000 });
@@ -241,6 +242,7 @@ describe('projects', () => {
         canCancel: true,
         canReopen: false,
         canEditMoney: true,
+        canBill: true,
       });
       const byOtherAm = await detail(project.id, cast.otherAm.cookie);
       expect(byOtherAm.money).toBeUndefined();

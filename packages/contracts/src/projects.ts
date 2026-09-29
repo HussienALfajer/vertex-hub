@@ -226,6 +226,8 @@ export const projectPermissionsSchema = z
     canArchive: z.boolean(),
     canSeeMoney: z.boolean(),
     canEditMoney: z.boolean(),
+    /** M3: billing follows the work, so it stays open on completed and cancelled projects. */
+    canBill: z.boolean(),
   })
   .meta({ id: 'ProjectPermissions', description: 'What the caller may do, for the UI' });
 

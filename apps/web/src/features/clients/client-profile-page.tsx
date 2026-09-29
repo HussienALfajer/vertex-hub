@@ -44,6 +44,7 @@ import {
   CheckIcon,
   ChevronDownIcon,
   EllipsisIcon,
+  FolderKanbanIcon,
   MessagesSquareIcon,
   PaletteIcon,
   PencilIcon,
@@ -63,6 +64,7 @@ import { ApiError } from '../../lib/api/client';
 import { canAll, useMe } from '../../lib/auth';
 import { errorMessage } from '../../lib/errors';
 import { formatNumber } from '../../lib/format';
+import { ClientProjectsTab, EndedClientWorkCallout } from '../projects/client-projects-tab';
 import { BrandKitTab } from './brand-kit-tab';
 import { ClientStatusBadge, HealthcareBadge } from './client-badges';
 import {
@@ -82,7 +84,7 @@ import { CommunicationTab } from './communication-tab';
 import { ContactsTab } from './contacts-tab';
 import { PlatformsTab } from './platforms-tab';
 
-const CLIENT_TABS = ['contacts', 'brand-kit', 'platforms', 'communication'] as const;
+const CLIENT_TABS = ['contacts', 'projects', 'brand-kit', 'platforms', 'communication'] as const;
 
 type ClientTab = (typeof CLIENT_TABS)[number];
 
@@ -179,12 +181,18 @@ function Profile({ client, tab }: { client: ClientDetailResponse; tab: ClientTab
         )
       )}
 
+      <EndedClientWorkCallout client={client} />
+
       <Tabs value={tab} onValueChange={(value: ClientTab) => openTab(value)}>
         <TabsList aria-label={t('clients.title')}>
           <TabsTrigger value="contacts">
             <UsersRoundIcon />
             {t('clients.profile.tabs.contacts')}
             <Counter value={client.contacts.length} />
+          </TabsTrigger>
+          <TabsTrigger value="projects">
+            <FolderKanbanIcon />
+            {t('clients.profile.tabs.projects')}
           </TabsTrigger>
           <TabsTrigger value="brand-kit">
             <PaletteIcon />
@@ -207,6 +215,9 @@ function Profile({ client, tab }: { client: ClientDetailResponse; tab: ClientTab
             adding={addingContact}
             onAddingChange={setAddingContact}
           />
+        </TabsContent>
+        <TabsContent value="projects">
+          <ClientProjectsTab client={client} />
         </TabsContent>
         <TabsContent value="brand-kit">
           <BrandKitTab client={client} editable={editable} />

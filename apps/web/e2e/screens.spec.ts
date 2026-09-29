@@ -2,8 +2,10 @@ import { expect, test } from '@playwright/test';
 import ar from '../src/i18n/locales/ar.json' with { type: 'json' };
 import {
   accountManagerMe,
+  employeeMe,
   financeWithoutTwoFactor,
   mockApi,
+  PROJECTS_TODAY,
   screenshot,
   seedIds,
   VALID_LINK_TOKEN,
@@ -36,7 +38,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
 
     test('design system components', async ({ page }, testInfo) => {
       // Tall enough for the whole gallery: the shell's sidebar and top bar are sticky.
-      await page.setViewportSize({ width: 1280, height: 2700 });
+      await page.setViewportSize({ width: 1280, height: 2900 });
       await mockApi(page, { signedIn: true });
       await page.goto('/design-system');
       await expect(page.getByRole('heading', { level: 1 })).toHaveText(ar.designSystem.title);
@@ -203,6 +205,71 @@ for (const colorScheme of ['light', 'dark'] as const) {
       ).toHaveCount(0);
       await expect(dialog.getByRole('switch')).toHaveCount(0);
       await screenshot(page, testInfo, `client-account-manager-${colorScheme}`);
+    });
+
+    test('project list', async ({ page }, testInfo) => {
+      await page.setViewportSize({ width: 1440, height: 1000 });
+      await page.clock.setFixedTime(new Date(`${PROJECTS_TODAY}T09:00:00+03:00`));
+      await mockApi(page, { signedIn: true });
+      await page.goto('/projects');
+      await expect(page.getByRole('link', { name: /الهوية البصرية الجديدة/ })).toBeVisible();
+      await screenshot(page, testInfo, `projects-${colorScheme}`);
+    });
+
+    test('new project', async ({ page }, testInfo) => {
+      await page.setViewportSize({ width: 1280, height: 1900 });
+      await page.clock.setFixedTime(new Date(`${PROJECTS_TODAY}T09:00:00+03:00`));
+      await mockApi(page, { signedIn: true });
+      await page.goto(`/projects/new?clientId=${seedIds.jasmine}`);
+      await page.getByLabel(ar.projects.form.name).fill('موقع الحجوزات');
+      await page.getByRole('combobox', { name: ar.projects.form.projectManager }).click();
+      await page.getByRole('option', { name: /كريم الزين/ }).click();
+      await page.getByLabel(ar.projects.form.dueDate).fill('2026-12-20');
+      await page
+        .getByLabel(ar.projects.form.milestoneInstallment.replace('{{position}}', '1'))
+        .fill('1500');
+      await expect(
+        page.getByRole('complementary', { name: ar.projects.new.preview }),
+      ).toContainText('كريم الزين');
+      await screenshot(page, testInfo, `new-project-${colorScheme}`);
+    });
+
+    test('project page tabs', async ({ page }, testInfo) => {
+      await page.setViewportSize({ width: 1280, height: 1400 });
+      await page.clock.setFixedTime(new Date(`${PROJECTS_TODAY}T09:00:00+03:00`));
+      await mockApi(page, { signedIn: true });
+      await page.goto(`/projects/${seedIds.identityProject}`);
+      await expect(page.getByRole('heading', { level: 1 })).toHaveText('الهوية البصرية الجديدة');
+      await expect(page.getByText(ar.projects.milestones.current).first()).toBeVisible();
+      await screenshot(page, testInfo, `project-milestones-${colorScheme}`);
+
+      await page.setViewportSize({ width: 1280, height: 1100 });
+      await page.getByRole('tab', { name: ar.projects.page.tabs.extraWork }).click();
+      await expect(page.getByText('تصميم إضافي لإعلان العيد')).toBeVisible();
+      await screenshot(page, testInfo, `project-extra-work-${colorScheme}`);
+
+      await page.goto(`/projects/${seedIds.summerMenu}`);
+      await expect(page.getByText(ar.projects.page.completedTitle)).toBeVisible();
+      await screenshot(page, testInfo, `project-completed-${colorScheme}`);
+    });
+
+    test('project page (employee view)', async ({ page }, testInfo) => {
+      await page.setViewportSize({ width: 1280, height: 1000 });
+      await page.clock.setFixedTime(new Date(`${PROJECTS_TODAY}T09:00:00+03:00`));
+      await mockApi(page, { signedIn: true, me: employeeMe });
+      await page.goto(`/projects/${seedIds.clinicSite}`);
+      await expect(page.getByRole('heading', { level: 1 })).toHaveText('موقع العيادة');
+      await expect(page.getByRole('button', { name: ar.common.edit })).toHaveCount(0);
+      await screenshot(page, testInfo, `project-employee-${colorScheme}`);
+    });
+
+    test('client profile projects tab', async ({ page }, testInfo) => {
+      await page.setViewportSize({ width: 1280, height: 1100 });
+      await page.clock.setFixedTime(new Date(`${PROJECTS_TODAY}T09:00:00+03:00`));
+      await mockApi(page, { signedIn: true });
+      await page.goto(`/clients/${seedIds.jasmine}?tab=projects`);
+      await expect(page.getByRole('link', { name: /حملة الافتتاح/ })).toBeVisible();
+      await screenshot(page, testInfo, `client-projects-${colorScheme}`);
     });
 
     test('audit log', async ({ page }, testInfo) => {

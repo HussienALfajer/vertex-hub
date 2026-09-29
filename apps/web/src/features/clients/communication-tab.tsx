@@ -58,6 +58,7 @@ import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '../../components/confirm-dialog';
 import { FormAlert } from '../../components/form-alert';
 import { LoadError } from '../../components/load-error';
+import { TabHeader } from '../../components/tab-header';
 import { errorMessage } from '../../lib/errors';
 import {
   businessDay,
@@ -73,7 +74,6 @@ import {
   useCreateNote,
   useUpdateNote,
 } from './clients.queries';
-import { TabHeader } from './tab-header';
 
 const channelIcon: Record<NoteChannel, LucideIcon> = {
   call: PhoneIcon,

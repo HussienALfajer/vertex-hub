@@ -42,9 +42,9 @@ import { type ReactNode, useId, useState } from 'react';
 import { Controller, useFieldArray, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { FormAlert } from '../../components/form-alert';
+import { TabHeader } from '../../components/tab-header';
 import { errorMessage } from '../../lib/errors';
 import { useReplaceBrandKit } from './clients.queries';
-import { TabHeader } from './tab-header';
 
 /** List limits of `updateBrandKitSchema`: the "Add" buttons stop there, so a list never exceeds them. */
 const LIMITS = { colors: 20, files: 30, references: 50 } as const;

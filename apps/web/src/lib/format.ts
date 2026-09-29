@@ -33,6 +33,19 @@ export function formatTime(value: Date | string): string {
   }).format(new Date(value));
 }
 
+/**
+ * A calendar day stored without a time (`YYYY-MM-DD`, already a business-timezone day), e.g.
+ * "5 أكتوبر 2026". Read as UTC so no timezone shift can move it to another day.
+ */
+export function formatCalendarDate(day: string): string {
+  return new Intl.DateTimeFormat(APP_LOCALE, {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC',
+  }).format(new Date(`${day}T00:00:00Z`));
+}
+
 /** The calendar day of an instant in the business timezone, as `YYYY-MM-DD` (for grouping). */
 export function businessDay(value: Date | string): string {
   return toBusinessDateTimeInput(value).slice(0, 10);

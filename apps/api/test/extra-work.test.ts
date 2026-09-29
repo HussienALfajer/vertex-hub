@@ -233,6 +233,12 @@ describe('extra work', () => {
         409,
         'PROJECT_CLOSED',
       );
+      const closed = await client.get(`/api/projects/${project.id}`, cast.gm.cookie);
+      expect((await closed.json()).permissions).toMatchObject({
+        canManage: false,
+        canEditMoney: false,
+        canBill: true,
+      });
       expect(
         (
           await bill('projects', project.id, item.id, cast.gm.cookie, {

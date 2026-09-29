@@ -48,9 +48,9 @@ import { Controller, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '../../components/confirm-dialog';
 import { FormAlert } from '../../components/form-alert';
+import { TabHeader } from '../../components/tab-header';
 import { errorMessage } from '../../lib/errors';
 import { useArchiveContact, useCreateContact, useUpdateContact } from './clients.queries';
-import { TabHeader } from './tab-header';
 
 /** `null` while closed, `'new'` to add, or the contact being edited. */
 type Editing = Contact | 'new' | null;

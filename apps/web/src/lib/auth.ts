@@ -1,6 +1,6 @@
 import { queryOptions, useQuery } from '@tanstack/react-query';
 import { useRouteContext } from '@tanstack/react-router';
-import type { MeResponse, Permission } from '@vertex-hub/contracts';
+import type { MeResponse, Permission, PermissionScope } from '@vertex-hub/contracts';
 import { createAuthClient } from 'better-auth/client';
 import { twoFactorClient } from 'better-auth/client/plugins';
 import { api } from './api/client';
@@ -53,6 +53,11 @@ export function canAll(me: MeResponse, permission: Permission): boolean {
   return me.permissions.some(
     (granted) => granted.permission === permission && granted.scopes.includes('all'),
   );
+}
+
+/** Every scope under which the user holds a permission; empty without it. Hides UI only. */
+export function scopesOf(me: MeResponse, permission: Permission): PermissionScope[] {
+  return me.permissions.find((granted) => granted.permission === permission)?.scopes ?? [];
 }
 
 /** Two-factor sign-in is required and not set up yet: the user must go to the setup page. */
