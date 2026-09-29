@@ -1479,6 +1479,7 @@ export interface components {
             canArchive: boolean;
             canSeeMoney: boolean;
             canEditMoney: boolean;
+            canBill: boolean;
         };
         CreateProject: {
             name: string;
@@ -1666,6 +1667,7 @@ export interface components {
             canArchive: boolean;
             canSeeMoney: boolean;
             canEditMoney: boolean;
+            canBill: boolean;
         };
         CreateRetainer: {
             name: string;

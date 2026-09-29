@@ -15,6 +15,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
+  AscentMeter,
   Autocomplete,
   Avatar,
   Button,
@@ -44,6 +45,7 @@ import {
   FieldDescription,
   FieldLabel,
   Input,
+  Meter,
   MultiCombobox,
   OtpField,
   PageHeader,
@@ -199,6 +201,36 @@ function DesignSystemPage() {
               </SelectContent>
             </Select>
           </Field>
+        </div>
+      </Section>
+
+      <Section title={t('designSystem.meters')}>
+        <div className="grid gap-6 md:grid-cols-3">
+          {[
+            { value: 2, max: 5 },
+            { value: 4, max: 5 },
+            { value: 5, max: 5 },
+          ].map(({ value, max }) => (
+            <div key={value} className="flex flex-col gap-2">
+              <AscentMeter
+                value={value}
+                max={max}
+                tone="success"
+                aria-label={t('designSystem.meterSteps', { value, max })}
+              />
+              <span className="text-sm text-muted-foreground">
+                {t('designSystem.meterSteps', { value, max })}
+              </span>
+            </div>
+          ))}
+          {(['brand', 'warning', 'danger'] as const).map((tone, index) => (
+            <Meter
+              key={tone}
+              value={40 + index * 25}
+              tone={tone}
+              aria-label={t('designSystem.meterTime')}
+            />
+          ))}
         </div>
       </Section>
 

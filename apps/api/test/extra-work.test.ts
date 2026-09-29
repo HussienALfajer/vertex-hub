@@ -1,6 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import type { INestApplication } from '@nestjs/common';
-import { addDays, businessDate, extraWorkPageSchema, extraWorkSchema } from '@vertex-hub/contracts';
+import {
+  addDays,
+  businessDate,
+  extraWorkPageSchema,
+  extraWorkSchema,
+  projectDetailSchema,
+} from '@vertex-hub/contracts';
 import { auditEntries, createDatabase } from '@vertex-hub/db';
 import { testDatabaseUrl } from '@vertex-hub/db/testing';
 import { eq } from 'drizzle-orm';
@@ -233,6 +239,12 @@ describe('extra work', () => {
         409,
         'PROJECT_CLOSED',
       );
+      const closed = await client.get(`/api/projects/${project.id}`, cast.gm.cookie);
+      expect(projectDetailSchema.parse(await closed.json()).permissions).toMatchObject({
+        canManage: false,
+        canEditMoney: false,
+        canBill: true,
+      });
       expect(
         (
           await bill('projects', project.id, item.id, cast.gm.cookie, {

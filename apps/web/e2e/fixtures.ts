@@ -6,14 +6,30 @@ import {
   type ClientResponse,
   type ClientStatus,
   type Contact,
+  type CreateExtraWork,
+  type CreateMilestone,
+  type CreateProject,
+  type Currency,
+  type DepartmentCode,
   type DepartmentDetailResponse,
   type DepartmentResponse,
+  type ExtraWork,
+  type ExtraWorkBilling,
+  type ExtraWorkBillingChange,
   grantedPermissions,
   type HealthResponse,
+  isProjectClosed,
   type MeResponse,
+  type Milestone,
+  type MilestoneStatus,
   type Note,
   type NoteChannel,
   type PlatformAccount,
+  type Project,
+  type ProjectDetail,
+  type ProjectStatus,
+  type ProjectStatusChange,
+  type UpdateExtraWork,
   type UserResponse,
 } from '@vertex-hub/contracts';
 
@@ -256,6 +272,28 @@ export const auditSeed: AuditEntry[] = [
     entityId: id(611),
     before: null,
     after: { clientId: id(601), name: 'هالة الشامي', hasFinalApproval: true },
+  },
+  {
+    id: id(507),
+    occurredAt: '2026-09-26T10:00:00.000Z',
+    actorId: id(1),
+    actorName: 'سارة الخطيب',
+    action: 'project.status_changed',
+    entityType: 'project',
+    entityId: id(801),
+    before: { status: 'planned' },
+    after: { status: 'active' },
+  },
+  {
+    id: id(508),
+    occurredAt: '2026-09-26T09:30:00.000Z',
+    actorId: id(1),
+    actorName: 'سارة الخطيب',
+    action: 'project_milestone.updated',
+    entityType: 'project_milestone',
+    entityId: id(813),
+    before: { projectId: id(801), name: 'التنفيذ', installmentMinor: 100_000 },
+    after: { projectId: id(801), name: 'التنفيذ', installmentMinor: 120_000 },
   },
 ];
 
@@ -519,6 +557,8 @@ export async function mockApi(page: Page, options: MockOptions): Promise<void> {
   const users = teamSeed();
   const clients = clientsSeed();
   const clientsApi = clientRoutes({ users, clients, me: () => me });
+  const projects = projectsSeed();
+  const projectsApi = projectRoutes({ users, clients, projects, me: () => me });
   const managers = new Map<string, string | null>(
     departmentsSeed.map((d) => [
       d.id,
@@ -663,7 +703,11 @@ export async function mockApi(page: Page, options: MockOptions): Promise<void> {
         const accounts = clients.filter(
           (c) => !c.archived && c.status !== 'ended' && c.accountManagerId === user.id,
         );
-        if (managed.length > 0 || accounts.length > 0) {
+        // F05 rule 4: open projects they are project manager of.
+        const running = projects.filter(
+          (p) => !p.archived && OPEN_STATUSES.includes(p.status) && p.projectManagerId === user.id,
+        );
+        if (managed.length > 0 || accounts.length > 0 || running.length > 0) {
           return fail(route, 409, 'USER_HAS_RESPONSIBILITIES', [
             ...managed.map((d) => ({ type: 'manages_department', id: d.id, name: d.name })),
             ...accounts.map((c) => ({
@@ -671,6 +715,7 @@ export async function mockApi(page: Page, options: MockOptions): Promise<void> {
               id: c.id,
               name: c.tradeName,
             })),
+            ...running.map((p) => ({ type: 'project_manager_of_project', id: p.id, name: p.name })),
           ]);
         }
         user.status = 'archived';
@@ -714,6 +759,10 @@ export async function mockApi(page: Page, options: MockOptions): Promise<void> {
     // Clients (F02).
     const handled = clientsApi(route, method, url, request);
     if (handled) return handled;
+
+    // Projects (F05).
+    const answered = projectsApi(route, method, url, request);
+    if (answered) return answered;
 
     if (path === '/api/audit') {
       return json(route, { items: auditSeed, total: auditSeed.length, page: 1, pageSize: 30 });
@@ -926,14 +975,525 @@ function clientRoutes({ users, clients, me }: ClientState) {
   };
 }
 
+/** The day the project screens are shot on, so schedules and overdue badges stay stable. */
+export const PROJECTS_TODAY = '2026-10-10';
+
+interface MilestoneRecord {
+  id: string;
+  name: string;
+  dueDate: string | null;
+  status: MilestoneStatus;
+  doneAt: string | null;
+  doneById: string | null;
+  installmentMinor: number | null;
+  archived: boolean;
+}
+
+interface ExtraWorkRecord {
+  id: string;
+  title: string;
+  description: string | null;
+  requestedOn: string;
+  contactId: string | null;
+  estimateMinor: number | null;
+  billingStatus: ExtraWorkBilling;
+  billingNote: string | null;
+  loggedById: string;
+  createdAt: string;
+  archived: boolean;
+}
+
+interface ProjectRecord {
+  id: string;
+  clientId: string;
+  name: string;
+  description: string | null;
+  projectManagerId: string;
+  departments: DepartmentCode[];
+  status: ProjectStatus;
+  startDate: string;
+  dueDate: string;
+  currency: Currency;
+  completedAt: string | null;
+  cancelledAt: string | null;
+  cancelReason: string | null;
+  archived: boolean;
+  milestones: MilestoneRecord[];
+  extraWork: ExtraWorkRecord[];
+}
+
+const milestone = (
+  n: number,
+  name: string,
+  dueDate: string | null,
+  installmentMinor: number | null,
+  done?: { at: string; by: string },
+): MilestoneRecord => ({
+  id: id(n),
+  name,
+  dueDate,
+  status: done ? 'done' : 'pending',
+  doneAt: done?.at ?? null,
+  doneById: done?.by ?? null,
+  installmentMinor,
+  archived: false,
+});
+
+export function projectsSeed(): ProjectRecord[] {
+  const base = {
+    description: null,
+    currency: 'USD' as const,
+    completedAt: null,
+    cancelledAt: null,
+    cancelReason: null,
+    archived: false,
+    extraWork: [],
+  };
+  return [
+    {
+      ...base,
+      id: id(801),
+      clientId: id(601),
+      name: 'الهوية البصرية الجديدة',
+      description: 'شعار جديد ودليل هوية وتطبيقات المطبوعات والقوائم لفروع المطعم الثلاثة.',
+      projectManagerId: id(4),
+      departments: ['design', 'content_management', 'photography'],
+      status: 'active',
+      startDate: '2026-09-01',
+      dueDate: '2026-11-15',
+      milestones: [
+        milestone(811, 'الاستكشاف', '2026-09-10', 60_000, {
+          at: '2026-09-09T12:00:00.000Z',
+          by: id(4),
+        }),
+        milestone(812, 'التصميم', '2026-10-05', 150_000, {
+          at: '2026-10-04T15:30:00.000Z',
+          by: id(3),
+        }),
+        milestone(813, 'التنفيذ', '2026-10-25', 120_000),
+        milestone(814, 'الاختبار', '2026-11-05', null),
+        milestone(815, 'التسليم', '2026-11-20', 70_000),
+      ],
+      extraWork: [
+        {
+          id: id(821),
+          title: 'تصميم إضافي لإعلان العيد',
+          description: 'ثلاثة مقاسات لإعلان العيد خارج نطاق الاتفاق.',
+          requestedOn: '2026-09-28',
+          contactId: id(611),
+          estimateMinor: 25_000,
+          billingStatus: 'unbilled',
+          billingNote: null,
+          loggedById: id(4),
+          createdAt: '2026-09-28T09:00:00.000Z',
+          archived: false,
+        },
+        {
+          id: id(822),
+          title: 'جلسة تصوير للقائمة الجديدة',
+          description: null,
+          requestedOn: '2026-09-15',
+          contactId: null,
+          estimateMinor: 40_000,
+          billingStatus: 'billed',
+          billingNote: 'فاتورة 2026-041',
+          loggedById: id(3),
+          createdAt: '2026-09-15T11:00:00.000Z',
+          archived: false,
+        },
+      ],
+    },
+    {
+      ...base,
+      id: id(802),
+      clientId: id(601),
+      name: 'حملة الافتتاح',
+      projectManagerId: id(1),
+      departments: ['marketing', 'design'],
+      status: 'planned',
+      startDate: '2026-10-20',
+      dueDate: '2026-11-30',
+      milestones: [],
+    },
+    {
+      ...base,
+      id: id(803),
+      clientId: id(602),
+      name: 'موقع العيادة',
+      // Invited users may manage projects (rule 2).
+      projectManagerId: id(5),
+      departments: ['development', 'design', 'content_management'],
+      status: 'active',
+      startDate: '2026-08-01',
+      dueDate: '2026-10-01',
+      currency: 'SYP',
+      milestones: [
+        milestone(831, 'التصميم', '2026-08-20', 50_000_000, {
+          at: '2026-08-19T10:00:00.000Z',
+          by: id(1),
+        }),
+        milestone(832, 'البرمجة', '2026-09-20', 90_000_000),
+      ],
+    },
+    {
+      ...base,
+      id: id(804),
+      clientId: id(602),
+      name: 'تصوير المنتجات الطبية',
+      projectManagerId: id(4),
+      departments: ['photography'],
+      status: 'on_hold',
+      startDate: '2026-09-15',
+      dueDate: '2026-12-01',
+      milestones: [milestone(841, 'جلسة التصوير', '2026-10-15', null)],
+    },
+    {
+      ...base,
+      id: id(805),
+      clientId: id(601),
+      name: 'قائمة الطعام الصيفية',
+      projectManagerId: id(3),
+      departments: ['design'],
+      status: 'completed',
+      startDate: '2026-05-01',
+      dueDate: '2026-06-15',
+      completedAt: '2026-06-12T10:00:00.000Z',
+      milestones: [
+        milestone(851, 'التصميم', '2026-06-01', 80_000, {
+          at: '2026-06-01T10:00:00.000Z',
+          by: id(3),
+        }),
+      ],
+      extraWork: [
+        {
+          id: id(852),
+          title: 'نسخة مطبوعة من القائمة',
+          description: null,
+          requestedOn: '2026-06-05',
+          contactId: null,
+          estimateMinor: 15_000,
+          billingStatus: 'unbilled',
+          billingNote: null,
+          loggedById: id(3),
+          createdAt: '2026-06-05T09:00:00.000Z',
+          archived: false,
+        },
+      ],
+    },
+  ];
+}
+
+interface ProjectState {
+  users: UserResponse[];
+  clients: ClientRecord[];
+  projects: ProjectRecord[];
+  me: () => MeResponse;
+}
+
+const OPEN_STATUSES: ProjectStatus[] = ['planned', 'active', 'on_hold'];
+
+/** The projects API (F05) over the in-memory records, with its access and money rules. */
+function projectRoutes({ users, clients, projects, me }: ProjectState) {
+  const holds = (permission: string, scope: string) =>
+    me().permissions.some((g) => g.permission === permission && g.scopes.includes(scope as never));
+  const user = (userId: string) => users.find((u) => u.id === userId);
+  const clientOf = (p: ProjectRecord) => clients.find((c) => c.id === p.clientId);
+  const clientScope = (p: ProjectRecord) =>
+    holds('projects.manage', 'all') ||
+    (holds('projects.manage', 'own_clients') && clientOf(p)?.accountManagerId === me().user.id);
+  const isManager = (p: ProjectRecord) =>
+    holds('projects.manage', 'assigned') && p.projectManagerId === me().user.id;
+  const seesMoney = (p: ProjectRecord) =>
+    holds('invoices.read', 'all') ||
+    (holds('invoices.read', 'own_clients') && clientOf(p)?.accountManagerId === me().user.id);
+  // Mirrors `projectPermissions` in the API: closed projects are read-only except billing (M3).
+  const permissions = (p: ProjectRecord): ProjectDetail['permissions'] => {
+    const closed = isProjectClosed(p.status);
+    const canManage = !p.archived && !closed && (clientScope(p) || isManager(p));
+    return {
+      canManage,
+      canChangeManager: canManage && clientScope(p),
+      canCancel: canManage && clientScope(p),
+      canReopen: !p.archived && closed && holds('projects.manage', 'all'),
+      canArchive: holds('projects.manage', 'all'),
+      canSeeMoney: seesMoney(p),
+      canEditMoney: canManage && clientScope(p) && seesMoney(p),
+      canBill: !p.archived && clientScope(p) && seesMoney(p),
+    };
+  };
+  const live = (p: ProjectRecord) => p.milestones.filter((m) => !m.archived);
+  const noTasks = { total: 0, delivered: 0, open: 0 };
+
+  const milestoneOf = (p: ProjectRecord, m: MilestoneRecord): Milestone => ({
+    id: m.id,
+    projectId: p.id,
+    name: m.name,
+    position: live(p).indexOf(m) + 1,
+    dueDate: m.dueDate,
+    status: m.status,
+    overdue: m.status === 'pending' && !!m.dueDate && m.dueDate < PROJECTS_TODAY,
+    doneAt: m.doneAt,
+    doneBy: m.doneById ? { id: m.doneById, name: user(m.doneById)?.name ?? '' } : null,
+    tasks: noTasks,
+    ...(seesMoney(p) && { money: { installmentMinor: m.installmentMinor } }),
+  });
+  const summary = (p: ProjectRecord): Project => {
+    const manager = user(p.projectManagerId);
+    const milestones = live(p);
+    return {
+      id: p.id,
+      name: p.name,
+      client: { id: p.clientId, name: clientOf(p)?.tradeName ?? '' },
+      projectManager: {
+        id: p.projectManagerId,
+        name: manager?.name ?? '',
+        archived: manager?.status === 'archived',
+      },
+      departments: p.departments,
+      status: p.status,
+      startDate: p.startDate,
+      dueDate: p.dueDate,
+      overdue: OPEN_STATUSES.includes(p.status) && p.dueDate < PROJECTS_TODAY,
+      milestoneProgress: {
+        done: milestones.filter((m) => m.status === 'done').length,
+        total: milestones.length,
+      },
+      progress: null,
+    };
+  };
+  const detail = (p: ProjectRecord): ProjectDetail => ({
+    ...summary(p),
+    description: p.description,
+    milestones: live(p).map((m) => milestoneOf(p, m)),
+    tasks: noTasks,
+    completedAt: p.completedAt,
+    cancelledAt: p.cancelledAt,
+    cancelReason: p.cancelReason,
+    archivedAt: p.archived ? '2026-10-01T10:00:00.000Z' : null,
+    ...(seesMoney(p) && {
+      money: {
+        currency: p.currency,
+        totalMinor: live(p).reduce((sum, m) => sum + (m.installmentMinor ?? 0), 0),
+      },
+    }),
+    permissions: permissions(p),
+  });
+  const extraWorkOf = (p: ProjectRecord, item: ExtraWorkRecord): ExtraWork => {
+    const who = clientOf(p)?.contacts.find((x) => x.id === item.contactId);
+    return {
+      id: item.id,
+      projectId: p.id,
+      retainerId: null,
+      title: item.title,
+      description: item.description,
+      requestedOn: item.requestedOn,
+      contact: who ? { id: who.id, name: who.name, archived: who.archived } : null,
+      loggedBy: { id: item.loggedById, name: user(item.loggedById)?.name ?? '' },
+      billingStatus: item.billingStatus,
+      billingNote: item.billingNote,
+      createdAt: item.createdAt,
+      ...(seesMoney(p) && { money: { estimateMinor: item.estimateMinor, currency: p.currency } }),
+    };
+  };
+  let next = 870;
+
+  // Answers a projects request, or returns undefined to let the other mocks try.
+  return (route: Route, method: string, url: URL, request: Request): Promise<void> | undefined => {
+    const path = url.pathname;
+    const body = <T>() => request.postDataJSON() as T;
+
+    if (path === '/api/projects' && method === 'GET') {
+      const q = url.searchParams;
+      const statuses = q.getAll('status');
+      const wanted = statuses.length > 0 ? statuses : OPEN_STATUSES;
+      const archived = q.get('archived') === 'true';
+      const search = q.get('search');
+      const department = q.get('department') as DepartmentCode | null;
+      const items = projects
+        .filter(
+          (p) =>
+            p.archived === archived &&
+            !clientOf(p)?.archived &&
+            wanted.includes(p.status) &&
+            (!search || p.name.includes(search) || !!clientOf(p)?.tradeName.includes(search)) &&
+            (!q.get('clientId') || p.clientId === q.get('clientId')) &&
+            (!q.get('projectManagerId') || p.projectManagerId === q.get('projectManagerId')) &&
+            (!department || p.departments.includes(department)) &&
+            (q.get('overdue') !== 'true' || summary(p).overdue),
+        )
+        .sort((a, b) => a.dueDate.localeCompare(b.dueDate))
+        .map(summary);
+      const pageSize = Number(q.get('pageSize') ?? 50);
+      return json(route, {
+        items: items.slice(0, pageSize),
+        total: items.length,
+        page: 1,
+        pageSize,
+      });
+    }
+    if (path === '/api/projects' && method === 'POST') {
+      const input = body<CreateProject>();
+      const created: ProjectRecord = {
+        id: id(next++),
+        clientId: input.clientId,
+        name: input.name,
+        description: input.description ?? null,
+        projectManagerId: input.projectManagerId,
+        departments: input.departments,
+        status: input.status ?? 'planned',
+        startDate: input.startDate,
+        dueDate: input.dueDate,
+        currency: input.currency ?? 'USD',
+        completedAt: null,
+        cancelledAt: null,
+        cancelReason: null,
+        archived: false,
+        milestones: (input.milestones ?? []).map((m) =>
+          milestone(next++, m.name, m.dueDate ?? null, m.installmentMinor ?? null),
+        ),
+        extraWork: [],
+      };
+      if (!clientScope(created)) return fail(route, 403, 'FORBIDDEN');
+      projects.push(created);
+      return json(route, detail(created), 201);
+    }
+
+    const match = path.match(
+      /^\/api\/projects\/([^/]+)(?:\/([^/]+))?(?:\/([^/]+))?(?:\/([^/]+))?$/,
+    );
+    if (!match) return undefined;
+    const [, projectId, part, childId, childAction] = match;
+    const project = projects.find((p) => p.id === projectId);
+    if (!project || (project.archived && !holds('projects.manage', 'all'))) {
+      return fail(route, 404, 'NOT_FOUND');
+    }
+    const allowed = permissions(project);
+
+    if (!part) {
+      if (method === 'GET') return json(route, detail(project));
+      if (!allowed.canManage) return fail(route, 403, 'FORBIDDEN');
+      Object.assign(project, body<Partial<ProjectRecord>>());
+      return json(route, detail(project));
+    }
+    if (part === 'status') {
+      const change = body<ProjectStatusChange>();
+      if (change.status === 'completed') {
+        const pending = live(project).filter((m) => m.status === 'pending');
+        if (pending.length > 0) {
+          const open = pending.map((m) => ({ id: m.id, name: m.name }));
+          return fail(route, 409, 'MILESTONES_OPEN', open);
+        }
+        project.completedAt = new Date().toISOString();
+      }
+      if (change.status === 'cancelled') {
+        project.cancelledAt = new Date().toISOString();
+        project.cancelReason = change.reason ?? null;
+      }
+      if (change.projectManagerId) project.projectManagerId = change.projectManagerId;
+      project.status = change.status;
+      return json(route, detail(project));
+    }
+    if (part === 'archive' || part === 'restore') {
+      project.archived = part === 'archive';
+      return json(route, detail(project));
+    }
+    if (part === 'milestones') {
+      if (!allowed.canManage) return fail(route, 403, 'FORBIDDEN');
+      if (childId === 'order') {
+        const { ids } = body<{ ids: string[] }>();
+        project.milestones.sort((a, b) => ids.indexOf(a.id) - ids.indexOf(b.id));
+        return json(route, { items: detail(project).milestones });
+      }
+      if (!childId) {
+        const input = body<CreateMilestone>();
+        const created = milestone(
+          next++,
+          input.name,
+          input.dueDate ?? null,
+          input.installmentMinor ?? null,
+        );
+        project.milestones.push(created);
+        return json(route, milestoneOf(project, created), 201);
+      }
+      const item = project.milestones.find((m) => m.id === childId);
+      if (!item) return fail(route, 404, 'NOT_FOUND');
+      if (childAction === 'archive') {
+        item.archived = true;
+        return route.fulfill({ status: 204 });
+      }
+      if (childAction === 'complete') {
+        Object.assign(item, {
+          status: 'done',
+          doneAt: new Date().toISOString(),
+          doneById: me().user.id,
+        });
+      } else if (childAction === 'reopen') {
+        Object.assign(item, { status: 'pending', doneAt: null, doneById: null });
+      } else {
+        Object.assign(item, body<Partial<MilestoneRecord>>());
+      }
+      return json(route, milestoneOf(project, item));
+    }
+    if (part === 'extra-work') {
+      if (!childId && method === 'GET') {
+        const items = project.extraWork
+          .filter((item) => !item.archived)
+          .sort((a, b) => b.requestedOn.localeCompare(a.requestedOn))
+          .map((item) => extraWorkOf(project, item));
+        return json(route, { items, total: items.length, page: 1, pageSize: 20 });
+      }
+      if (childAction === 'billing' ? !allowed.canBill : !allowed.canManage) {
+        return fail(route, 403, 'FORBIDDEN');
+      }
+      if (!childId) {
+        const input = body<CreateExtraWork>();
+        const created: ExtraWorkRecord = {
+          id: id(next++),
+          title: input.title,
+          description: input.description ?? null,
+          requestedOn: input.requestedOn ?? PROJECTS_TODAY,
+          contactId: input.requestedByContactId ?? null,
+          estimateMinor: input.estimateMinor ?? null,
+          billingStatus: 'unbilled',
+          billingNote: null,
+          loggedById: me().user.id,
+          createdAt: new Date().toISOString(),
+          archived: false,
+        };
+        project.extraWork.push(created);
+        return json(route, extraWorkOf(project, created), 201);
+      }
+      const item = project.extraWork.find((x) => x.id === childId);
+      if (!item) return fail(route, 404, 'NOT_FOUND');
+      if (childAction === 'archive') {
+        item.archived = true;
+        return route.fulfill({ status: 204 });
+      }
+      if (childAction === 'billing') {
+        Object.assign(item, body<ExtraWorkBillingChange>());
+        return json(route, extraWorkOf(project, item));
+      }
+      const { requestedByContactId, ...changes } = body<UpdateExtraWork>();
+      Object.assign(item, changes);
+      if (requestedByContactId !== undefined) item.contactId = requestedByContactId;
+      return json(route, extraWorkOf(project, item));
+    }
+    return undefined;
+  };
+}
 /** Ids of the seeded team, for navigating straight to a profile or department. */
 export const seedIds = {
   sara: id(1),
   omar: id(2),
   layan: id(3),
   design: design.id,
+  karim: id(4),
   jasmine: id(601),
   shifa: id(602),
+  identityProject: id(801),
+  launchProject: id(802),
+  clinicSite: id(803),
+  summerMenu: id(805),
 };
 
 /** Viewport screenshot kept in the test output and attached to the HTML report. */

@@ -170,5 +170,6 @@ export function projectPermissions(
     canArchive: holdsAll(actor, 'projects.manage'),
     canSeeMoney,
     canEditMoney: canManage && clientScope && canSeeMoney,
+    canBill: !readOnly && clientScope && canSeeMoney,
   };
 }

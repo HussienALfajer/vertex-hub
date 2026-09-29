@@ -56,6 +56,7 @@ import { Controller, useForm, useWatch } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '../../components/confirm-dialog';
 import { FormAlert } from '../../components/form-alert';
+import { TabHeader } from '../../components/tab-header';
 import { errorMessage } from '../../lib/errors';
 import { formatLink, formatNumber } from '../../lib/format';
 import { PlatformAccessBadge } from './client-badges';
@@ -64,7 +65,6 @@ import {
   useCreatePlatformAccount,
   useUpdatePlatformAccount,
 } from './clients.queries';
-import { TabHeader } from './tab-header';
 
 /** `null` while closed, `'new'` to add, or the account being edited. */
 type Editing = PlatformAccount | 'new' | null;

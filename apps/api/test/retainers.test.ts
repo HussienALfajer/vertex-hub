@@ -106,7 +106,13 @@ describe('retainers', () => {
         endedOn: null,
         renewal: null,
         money: { currency: 'USD', monthlyFeeMinor: 150000 },
-        permissions: { canManage: true, canArchive: true, canSeeMoney: true, canEditMoney: true },
+        permissions: {
+          canManage: true,
+          canArchive: true,
+          canSeeMoney: true,
+          canEditMoney: true,
+          canBill: true,
+        },
       });
       expect(created.deliverables.map((line) => [line.kind, line.monthlyQuantity])).toEqual([
         ['design', 12],
@@ -226,7 +232,11 @@ describe('retainers', () => {
       expect(asEmployee.permissions).toMatchObject({ canManage: false, canSeeMoney: false });
       const asFinance = await detail(created.id, finance.cookie);
       expect(asFinance.money).toEqual({ currency: 'USD', monthlyFeeMinor: 90000 });
-      expect(asFinance.permissions).toMatchObject({ canManage: false, canEditMoney: false });
+      expect(asFinance.permissions).toMatchObject({
+        canManage: false,
+        canEditMoney: false,
+        canBill: false,
+      });
       expect((await detail(created.id, cast.otherAm.cookie)).money).toBeUndefined();
       expect((await client.get(`/api/retainers/${randomUUID()}`, cast.gm.cookie)).status).toBe(404);
     });

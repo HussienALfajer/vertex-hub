@@ -381,6 +381,8 @@ export const retainerPermissionsSchema = z
     canArchive: z.boolean(),
     canSeeMoney: z.boolean(),
     canEditMoney: z.boolean(),
+    /** M3: billing follows the work, so it stays open on ended retainers. */
+    canBill: z.boolean(),
   })
   .meta({ id: 'RetainerPermissions', description: 'What the caller may do, for the UI' });
 

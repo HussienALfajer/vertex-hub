@@ -25,10 +25,10 @@ import {
 } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { TabHeader } from '../../components/tab-header';
 import { useCopy } from '../../lib/clipboard';
 import { formatLink, formatLinkHost } from '../../lib/format';
 import { BrandKitForm } from './brand-kit-form';
-import { TabHeader } from './tab-header';
 
 const isEmpty = (kit: BrandKit) =>
   kit.colors.length === 0 &&

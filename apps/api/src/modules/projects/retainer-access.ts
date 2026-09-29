@@ -113,5 +113,6 @@ export function retainerPermissions(
     canArchive: holdsAll(actor, 'projects.manage'),
     canSeeMoney,
     canEditMoney: canManage && canSeeMoney,
+    canBill: !readOnly && coversClient(actor, retainer.client) && canSeeMoney,
   };
 }

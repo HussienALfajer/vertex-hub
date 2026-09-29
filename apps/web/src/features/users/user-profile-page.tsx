@@ -37,6 +37,7 @@ import {
   BriefcaseBusinessIcon,
   Building2Icon,
   EllipsisIcon,
+  FolderKanbanIcon,
   KeyRoundIcon,
   LinkIcon,
   MailIcon,
@@ -484,8 +485,10 @@ function ArchiveDialog({
                   <span className="flex items-center gap-2 text-sm">
                     {item.type === 'manages_department' ? (
                       <Building2Icon className="size-4 text-muted-foreground" />
-                    ) : (
+                    ) : item.type === 'account_manager_of_client' ? (
                       <BriefcaseBusinessIcon className="size-4 text-muted-foreground" />
+                    ) : (
+                      <FolderKanbanIcon className="size-4 text-muted-foreground" />
                     )}
                     {t(`users.responsibilities.${item.type}`, { name: item.name })}
                   </span>
@@ -507,7 +510,15 @@ function ArchiveDialog({
                     >
                       {t('users.responsibilities.openClient')}
                     </Button>
-                  ) : null}
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      render={<Link to="/projects/$projectId" params={{ projectId: item.id }} />}
+                    >
+                      {t('users.responsibilities.openProject')}
+                    </Button>
+                  )}
                 </li>
               ))}
             </ul>
