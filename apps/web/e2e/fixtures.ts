@@ -6,19 +6,29 @@ import {
   type ClientResponse,
   type ClientStatus,
   type Contact,
+  type CreateCycleAdjustment,
+  type CreateCycleLine,
   type CreateExtraWork,
   type CreateMilestone,
   type CreateProject,
+  type CreateRetainer,
   type Currency,
+  type Cycle,
+  type CycleDetail,
+  type CycleStatus,
+  type DeliverableKind,
   type DepartmentCode,
   type DepartmentDetailResponse,
   type DepartmentResponse,
   type ExtraWork,
   type ExtraWorkBilling,
   type ExtraWorkBillingChange,
+  firstOfMonth,
   grantedPermissions,
   type HealthResponse,
+  isLineBehind,
   isProjectClosed,
+  lastOfMonth,
   type MeResponse,
   type Milestone,
   type MilestoneStatus,
@@ -29,6 +39,14 @@ import {
   type ProjectDetail,
   type ProjectStatus,
   type ProjectStatusChange,
+  type Retainer,
+  type RetainerDeliverables,
+  type RetainerDetail,
+  type RetainerStatus,
+  type RetainerStatusChange,
+  deliveryRate as rateOf,
+  renewalState,
+  type UpdateCycleLine,
   type UpdateExtraWork,
   type UserResponse,
 } from '@vertex-hub/contracts';
@@ -295,6 +313,33 @@ export const auditSeed: AuditEntry[] = [
     before: { projectId: id(801), name: 'التنفيذ', installmentMinor: 100_000 },
     after: { projectId: id(801), name: 'التنفيذ', installmentMinor: 120_000 },
   },
+  {
+    id: id(509),
+    occurredAt: '2026-09-25T11:00:00.000Z',
+    actorId: id(3),
+    actorName: 'ليان الأحمد',
+    action: 'retainer.status_changed',
+    entityType: 'retainer',
+    entityId: id(901),
+    before: { status: 'paused' },
+    after: { status: 'active' },
+  },
+  {
+    id: id(510),
+    occurredAt: '2026-09-25T10:30:00.000Z',
+    actorId: id(3),
+    actorName: 'ليان الأحمد',
+    action: 'retainer.deliverables_updated',
+    entityType: 'retainer',
+    entityId: id(901),
+    before: { deliverables: [{ kind: 'design', label: null, monthlyQuantity: 10 }] },
+    after: {
+      deliverables: [
+        { kind: 'design', label: null, monthlyQuantity: 12 },
+        { kind: 'reel', label: null, monthlyQuantity: 4 },
+      ],
+    },
+  },
 ];
 
 interface ClientRecord {
@@ -559,6 +604,8 @@ export async function mockApi(page: Page, options: MockOptions): Promise<void> {
   const clientsApi = clientRoutes({ users, clients, me: () => me });
   const projects = projectsSeed();
   const projectsApi = projectRoutes({ users, clients, projects, me: () => me });
+  const retainers = retainersSeed();
+  const retainersApi = retainerRoutes({ users, clients, retainers, me: () => me });
   const managers = new Map<string, string | null>(
     departmentsSeed.map((d) => [
       d.id,
@@ -763,6 +810,8 @@ export async function mockApi(page: Page, options: MockOptions): Promise<void> {
     // Projects (F05).
     const answered = projectsApi(route, method, url, request);
     if (answered) return answered;
+    const retained = retainersApi(route, method, url, request);
+    if (retained) return retained;
 
     if (path === '/api/audit') {
       return json(route, { items: auditSeed, total: auditSeed.length, page: 1, pageSize: 30 });
@@ -1481,6 +1530,615 @@ function projectRoutes({ users, clients, projects, me }: ProjectState) {
     return undefined;
   };
 }
+interface AdjustmentRecord {
+  id: string;
+  delta: number;
+  reason: string;
+  authorId: string;
+  createdAt: string;
+}
+
+interface CycleLineRecord {
+  id: string;
+  deliverableId: string | null;
+  kind: DeliverableKind;
+  label: string | null;
+  committed: number;
+  /** Frozen when the cycle closes (R8). */
+  deliveredAtClose: number | null;
+  /** Tasks delivered after the cycle closed (F06; seeded here). */
+  afterClose: number;
+  adjustments: AdjustmentRecord[];
+}
+
+interface CycleRecord {
+  id: string;
+  month: string;
+  periodStart: string;
+  periodEnd: string;
+  status: CycleStatus;
+  closedAt: string | null;
+  lines: CycleLineRecord[];
+}
+
+interface DeliverableRecord {
+  id: string;
+  kind: DeliverableKind;
+  label: string | null;
+  monthlyQuantity: number;
+  archived: boolean;
+}
+
+interface RetainerRecord {
+  id: string;
+  clientId: string;
+  name: string;
+  departments: DepartmentCode[];
+  status: RetainerStatus;
+  startDate: string;
+  renewalDate: string | null;
+  endedOn: string | null;
+  currency: Currency;
+  monthlyFeeMinor: number | null;
+  archived: boolean;
+  deliverables: DeliverableRecord[];
+  cycles: CycleRecord[];
+  extraWork: ExtraWorkRecord[];
+}
+
+const deliverable = (
+  n: number,
+  kind: DeliverableKind,
+  monthlyQuantity: number,
+  label: string | null = null,
+): DeliverableRecord => ({ id: id(n), kind, label, monthlyQuantity, archived: false });
+
+/** A cycle line with a delivered count: frozen when `closed`, otherwise one adjustment. */
+const cycleLine = (
+  n: number,
+  source: DeliverableRecord | { kind: DeliverableKind; label: string },
+  committed: number,
+  delivered: number,
+  closed: boolean,
+  afterClose = 0,
+): CycleLineRecord => ({
+  id: id(n),
+  deliverableId: 'id' in source ? source.id : null,
+  kind: source.kind,
+  label: source.label,
+  committed,
+  deliveredAtClose: closed ? delivered : null,
+  afterClose,
+  adjustments: [],
+});
+
+export function retainersSeed(): RetainerRecord[] {
+  const design = deliverable(911, 'design', 12);
+  const reel = deliverable(912, 'reel', 4);
+  const story = deliverable(913, 'story', 8);
+  const report = deliverable(914, 'monthly_report', 1);
+  const ads = deliverable(915, 'ad_campaign', 2);
+  const adsReport = deliverable(916, 'monthly_report', 1);
+  const shoot = deliverable(917, 'photo_shoot', 1);
+  const october: CycleRecord = {
+    id: id(921),
+    month: '2026-10-01',
+    periodStart: '2026-10-01',
+    periodEnd: '2026-10-31',
+    status: 'open',
+    closedAt: null,
+    lines: [
+      cycleLine(931, design, 12, 0, false),
+      cycleLine(932, reel, 4, 0, false),
+      cycleLine(933, story, 8, 0, false),
+      cycleLine(934, report, 1, 0, false),
+    ],
+  };
+  const [octoberDesign, , octoberStory] = october.lines;
+  octoberDesign?.adjustments.push({
+    id: id(961),
+    delta: 3,
+    reason: 'تصاميم حملة الخريف سُلّمت خارج المهام',
+    authorId: id(3),
+    createdAt: '2026-10-06T08:15:00.000Z',
+  });
+  octoberStory?.adjustments.push({
+    id: id(962),
+    delta: 4,
+    reason: 'ستوريات الأسبوع الأول',
+    authorId: id(3),
+    createdAt: '2026-10-07T12:40:00.000Z',
+  });
+  const closedOn = (day: string) => `${day}T21:05:00.000Z`;
+  return [
+    {
+      id: id(901),
+      clientId: id(601),
+      name: 'إدارة السوشيال ميديا',
+      departments: ['marketing', 'design', 'content_management'],
+      status: 'active',
+      startDate: '2026-03-01',
+      renewalDate: '2026-11-01',
+      endedOn: null,
+      currency: 'USD',
+      monthlyFeeMinor: 150_000,
+      archived: false,
+      deliverables: [design, reel, story, report],
+      cycles: [
+        october,
+        {
+          id: id(922),
+          month: '2026-09-01',
+          periodStart: '2026-09-01',
+          periodEnd: '2026-09-30',
+          status: 'closed',
+          closedAt: closedOn('2026-09-30'),
+          lines: [
+            cycleLine(941, design, 12, 12, true),
+            cycleLine(942, reel, 4, 4, true),
+            cycleLine(943, story, 8, 7, true),
+            cycleLine(944, report, 1, 1, true),
+          ],
+        },
+        {
+          id: id(923),
+          month: '2026-08-01',
+          periodStart: '2026-08-01',
+          periodEnd: '2026-08-31',
+          status: 'closed',
+          closedAt: closedOn('2026-08-31'),
+          lines: [
+            cycleLine(945, design, 12, 10, true, 1),
+            cycleLine(946, reel, 4, 4, true),
+            cycleLine(947, story, 8, 8, true),
+            cycleLine(948, report, 1, 1, true),
+            cycleLine(949, { kind: 'other', label: 'تغطية افتتاح الفرع' }, 1, 1, true),
+          ],
+        },
+      ],
+      extraWork: [
+        {
+          id: id(981),
+          title: 'ريل إضافي لافتتاح الفرع الثاني',
+          description: null,
+          requestedOn: '2026-10-04',
+          contactId: id(611),
+          estimateMinor: 20_000,
+          billingStatus: 'unbilled',
+          billingNote: null,
+          loggedById: id(3),
+          createdAt: '2026-10-04T10:00:00.000Z',
+          archived: false,
+        },
+      ],
+    },
+    {
+      id: id(902),
+      clientId: id(602),
+      name: 'الإعلانات الممولة',
+      departments: ['marketing'],
+      status: 'paused',
+      startDate: '2026-05-01',
+      renewalDate: '2027-05-01',
+      endedOn: null,
+      currency: 'SYP',
+      monthlyFeeMinor: null,
+      archived: false,
+      deliverables: [ads, adsReport],
+      cycles: [
+        {
+          id: id(924),
+          month: '2026-09-01',
+          periodStart: '2026-09-01',
+          periodEnd: '2026-09-30',
+          status: 'closed',
+          closedAt: closedOn('2026-09-30'),
+          lines: [cycleLine(951, ads, 2, 1, true), cycleLine(952, adsReport, 1, 1, true)],
+        },
+      ],
+      extraWork: [],
+    },
+    {
+      id: id(903),
+      clientId: id(601),
+      name: 'تصوير المنيو الموسمي',
+      departments: ['photography'],
+      status: 'ended',
+      startDate: '2026-06-01',
+      renewalDate: null,
+      endedOn: '2026-09-30',
+      currency: 'USD',
+      monthlyFeeMinor: 40_000,
+      archived: false,
+      deliverables: [shoot],
+      cycles: [
+        {
+          id: id(925),
+          month: '2026-09-01',
+          periodStart: '2026-09-01',
+          periodEnd: '2026-09-30',
+          status: 'closed',
+          closedAt: closedOn('2026-09-30'),
+          lines: [cycleLine(953, shoot, 1, 1, true)],
+        },
+      ],
+      extraWork: [],
+    },
+  ];
+}
+
+interface RetainerState {
+  users: UserResponse[];
+  clients: ClientRecord[];
+  retainers: RetainerRecord[];
+  me: () => MeResponse;
+}
+
+/** The retainers API (F05) over the in-memory records, with its access, cycle and money rules. */
+function retainerRoutes({ users, clients, retainers, me }: RetainerState) {
+  const today = PROJECTS_TODAY;
+  const holds = (permission: string, scope: string) =>
+    me().permissions.some((g) => g.permission === permission && g.scopes.includes(scope as never));
+  const user = (userId: string) => users.find((u) => u.id === userId);
+  const clientOf = (r: RetainerRecord) => clients.find((c) => c.id === r.clientId);
+  const clientScope = (r: RetainerRecord) =>
+    holds('projects.manage', 'all') ||
+    (holds('projects.manage', 'own_clients') && clientOf(r)?.accountManagerId === me().user.id);
+  const seesMoney = (r: RetainerRecord) =>
+    holds('invoices.read', 'all') ||
+    (holds('invoices.read', 'own_clients') && clientOf(r)?.accountManagerId === me().user.id);
+  // Mirrors `retainerPermissions` in the API: ended retainers are read-only except billing (M3).
+  const permissions = (r: RetainerRecord): RetainerDetail['permissions'] => {
+    const readOnly = r.archived || !!clientOf(r)?.archived;
+    const canManage = !readOnly && r.status !== 'ended' && clientScope(r);
+    return {
+      canManage,
+      canReactivate: !readOnly && r.status === 'ended' && holds('projects.manage', 'all'),
+      canArchive: holds('projects.manage', 'all'),
+      canSeeMoney: seesMoney(r),
+      canEditMoney: canManage && seesMoney(r),
+      canBill: !readOnly && clientScope(r) && seesMoney(r),
+    };
+  };
+  const noTasks = { total: 0, delivered: 0, open: 0 };
+  const deliveredOf = (line: CycleLineRecord) =>
+    line.deliveredAtClose ?? line.adjustments.reduce((sum, a) => sum + a.delta, 0);
+
+  const lineOf = (r: RetainerRecord, c: CycleRecord, line: CycleLineRecord) => {
+    const delivered = deliveredOf(line);
+    return {
+      id: line.id,
+      cycleId: c.id,
+      deliverableId: line.deliverableId,
+      kind: line.kind,
+      label: line.label,
+      position: c.lines.indexOf(line) + 1,
+      committed: line.committed,
+      delivered,
+      deliveredAfterClose: c.status === 'closed' ? line.afterClose : 0,
+      behind:
+        c.status === 'open' &&
+        r.status === 'active' &&
+        isLineBehind({ committed: line.committed, delivered }, c, today),
+      tasks: noTasks,
+    };
+  };
+  const cycleOf = (r: RetainerRecord, c: CycleRecord): Cycle => {
+    const lines = c.lines.map((line) => lineOf(r, c, line));
+    return {
+      id: c.id,
+      retainerId: r.id,
+      month: c.month,
+      periodStart: c.periodStart,
+      periodEnd: c.periodEnd,
+      status: c.status,
+      closedAt: c.closedAt,
+      deliveryRate: rateOf(lines),
+      behind: lines.some((line) => line.behind),
+      lines,
+    };
+  };
+  const cycleDetailOf = (r: RetainerRecord, c: CycleRecord): CycleDetail => ({
+    ...cycleOf(r, c),
+    lines: c.lines.map((line) => ({
+      ...lineOf(r, c, line),
+      adjustments: [...line.adjustments].reverse().map((a) => ({
+        id: a.id,
+        delta: a.delta,
+        reason: a.reason,
+        author: { id: a.authorId, name: user(a.authorId)?.name ?? '' },
+        createdAt: a.createdAt,
+      })),
+    })),
+  });
+  const newest = (r: RetainerRecord) =>
+    [...r.cycles].sort((a, b) => b.month.localeCompare(a.month));
+  const current = (r: RetainerRecord) => newest(r).find((c) => c.status === 'open');
+  const live = (r: RetainerRecord) => r.deliverables.filter((d) => !d.archived);
+
+  const summary = (r: RetainerRecord): Retainer => {
+    const client = clientOf(r);
+    const open = current(r);
+    return {
+      id: r.id,
+      name: r.name,
+      client: { id: r.clientId, name: client?.tradeName ?? '' },
+      accountManager: {
+        id: client?.accountManagerId ?? '',
+        name: user(client?.accountManagerId ?? '')?.name ?? '',
+      },
+      departments: r.departments,
+      status: r.status,
+      renewalDate: r.renewalDate,
+      renewal: renewalState(r.renewalDate, r.status, today),
+      currentCycle: open ? cycleOf(r, open) : null,
+    };
+  };
+  const detail = (r: RetainerRecord): RetainerDetail => ({
+    ...summary(r),
+    startDate: r.startDate,
+    endedOn: r.endedOn,
+    deliverables: live(r).map((d, index) => ({
+      id: d.id,
+      kind: d.kind,
+      label: d.label,
+      monthlyQuantity: d.monthlyQuantity,
+      position: index + 1,
+    })),
+    archivedAt: r.archived ? '2026-10-01T10:00:00.000Z' : null,
+    ...(seesMoney(r) && {
+      money: { currency: r.currency, monthlyFeeMinor: r.monthlyFeeMinor },
+    }),
+    permissions: permissions(r),
+  });
+  const extraWorkOf = (r: RetainerRecord, item: ExtraWorkRecord): ExtraWork => {
+    const who = clientOf(r)?.contacts.find((x) => x.id === item.contactId);
+    return {
+      id: item.id,
+      projectId: null,
+      retainerId: r.id,
+      title: item.title,
+      description: item.description,
+      requestedOn: item.requestedOn,
+      contact: who ? { id: who.id, name: who.name, archived: who.archived } : null,
+      loggedBy: { id: item.loggedById, name: user(item.loggedById)?.name ?? '' },
+      billingStatus: item.billingStatus,
+      billingNote: item.billingNote,
+      createdAt: item.createdAt,
+      ...(seesMoney(r) && { money: { estimateMinor: item.estimateMinor, currency: r.currency } }),
+    };
+  };
+  let next = 1900;
+
+  /** R3: this month's cycle, opened at once with the full quantities, if none exists. */
+  const openCurrent = (r: RetainerRecord, from: string) => {
+    const month = firstOfMonth(today);
+    if (r.cycles.some((c) => c.month === month)) return;
+    r.cycles.push({
+      id: id(next++),
+      month,
+      periodStart: from > month ? from : month,
+      periodEnd: lastOfMonth(today),
+      status: 'open',
+      closedAt: null,
+      lines: live(r).map((d) => cycleLine(next++, d, d.monthlyQuantity, 0, false)),
+    });
+  };
+
+  // Answers a retainers request, or returns undefined to let the other mocks try.
+  return (route: Route, method: string, url: URL, request: Request): Promise<void> | undefined => {
+    const path = url.pathname;
+    const body = <T>() => request.postDataJSON() as T;
+
+    if (path === '/api/retainers' && method === 'GET') {
+      const q = url.searchParams;
+      const statuses = q.getAll('status');
+      const wanted: string[] = statuses.length > 0 ? statuses : ['active', 'paused'];
+      const archived = q.get('archived') === 'true';
+      const search = q.get('search');
+      const department = q.get('department') as DepartmentCode | null;
+      const items = retainers
+        .filter((r) => {
+          const shown = summary(r);
+          return (
+            r.archived === archived &&
+            !clientOf(r)?.archived &&
+            wanted.includes(r.status) &&
+            (!search || r.name.includes(search) || !!clientOf(r)?.tradeName.includes(search)) &&
+            (!q.get('clientId') || r.clientId === q.get('clientId')) &&
+            (!q.get('accountManagerId') ||
+              clientOf(r)?.accountManagerId === q.get('accountManagerId')) &&
+            (!department || r.departments.includes(department)) &&
+            (q.get('behind') !== 'true' || !!shown.currentCycle?.behind) &&
+            (q.get('renewalDue') !== 'true' || shown.renewal !== null)
+          );
+        })
+        .map(summary)
+        .sort((a, b) => a.client.name.localeCompare(b.client.name, 'ar'));
+      const pageSize = Number(q.get('pageSize') ?? 50);
+      return json(route, {
+        items: items.slice(0, pageSize),
+        total: items.length,
+        page: 1,
+        pageSize,
+      });
+    }
+    if (path === '/api/retainers' && method === 'POST') {
+      const input = body<CreateRetainer>();
+      const created: RetainerRecord = {
+        id: id(next++),
+        clientId: input.clientId,
+        name: input.name,
+        departments: input.departments,
+        status: 'active',
+        startDate: input.startDate,
+        renewalDate: input.renewalDate ?? null,
+        endedOn: null,
+        currency: input.currency ?? 'USD',
+        monthlyFeeMinor: input.monthlyFeeMinor ?? null,
+        archived: false,
+        deliverables: (input.deliverables ?? []).map((d) =>
+          deliverable(next++, d.kind, d.monthlyQuantity, d.label ?? null),
+        ),
+        cycles: [],
+        extraWork: [],
+      };
+      if (!clientScope(created)) return fail(route, 403, 'FORBIDDEN');
+      if (created.startDate <= today) openCurrent(created, created.startDate);
+      retainers.push(created);
+      return json(route, detail(created), 201);
+    }
+
+    const match = path.match(
+      /^\/api\/retainers\/([^/]+)(?:\/([^/]+))?(?:\/([^/]+))?(?:\/([^/]+))?(?:\/([^/]+))?(?:\/([^/]+))?$/,
+    );
+    if (!match) return undefined;
+    const [, retainerId, part, childId, childPart, lineId, lineAction] = match;
+    const retainer = retainers.find((r) => r.id === retainerId);
+    if (!retainer || (retainer.archived && !holds('projects.manage', 'all'))) {
+      return fail(route, 404, 'NOT_FOUND');
+    }
+    const allowed = permissions(retainer);
+
+    if (!part) {
+      if (method === 'GET') return json(route, detail(retainer));
+      if (!allowed.canManage) return fail(route, 403, 'FORBIDDEN');
+      Object.assign(retainer, body<Partial<RetainerRecord>>());
+      return json(route, detail(retainer));
+    }
+    if (part === 'deliverables') {
+      if (!allowed.canManage) return fail(route, 403, 'FORBIDDEN');
+      const { lines } = body<RetainerDeliverables>();
+      const kept = new Set(lines.flatMap((line) => (line.id ? [line.id] : [])));
+      for (const d of retainer.deliverables) if (!kept.has(d.id)) d.archived = true;
+      const ordered = lines.map((line) => {
+        const existing = retainer.deliverables.find((d) => d.id === line.id);
+        if (!existing)
+          return deliverable(next++, line.kind, line.monthlyQuantity, line.label ?? null);
+        return Object.assign(existing, {
+          kind: line.kind,
+          label: line.label ?? null,
+          monthlyQuantity: line.monthlyQuantity,
+        });
+      });
+      retainer.deliverables = [...ordered, ...retainer.deliverables.filter((d) => d.archived)];
+      return json(route, { items: detail(retainer).deliverables });
+    }
+    if (part === 'status') {
+      const { status } = body<RetainerStatusChange>();
+      if (status === 'active' ? !allowed.canManage && !allowed.canReactivate : !allowed.canManage) {
+        return fail(route, 403, 'FORBIDDEN');
+      }
+      if (status === 'ended') {
+        for (const c of retainer.cycles.filter((c) => c.status === 'open')) {
+          for (const line of c.lines) line.deliveredAtClose = deliveredOf(line);
+          Object.assign(c, {
+            status: 'closed',
+            closedAt: new Date().toISOString(),
+            periodEnd: c.periodEnd > today ? today : c.periodEnd,
+          });
+        }
+        retainer.endedOn = today;
+      }
+      if (status === 'active') {
+        retainer.endedOn = null;
+        openCurrent(retainer, today);
+      }
+      retainer.status = status;
+      return json(route, detail(retainer));
+    }
+    if (part === 'archive' || part === 'restore') {
+      retainer.archived = part === 'archive';
+      return json(route, detail(retainer));
+    }
+    if (part === 'cycles') {
+      if (!childId) {
+        const items = newest(retainer).map((c) => cycleOf(retainer, c));
+        return json(route, { items, total: items.length, page: 1, pageSize: 12 });
+      }
+      const cycle = retainer.cycles.find((c) => c.id === childId);
+      if (!cycle) return fail(route, 404, 'NOT_FOUND');
+      if (!childPart) return json(route, cycleDetailOf(retainer, cycle));
+      if (!allowed.canManage) return fail(route, 403, 'FORBIDDEN');
+      if (cycle.status === 'closed') return fail(route, 409, 'CYCLE_CLOSED');
+      if (!lineId) {
+        const input = body<CreateCycleLine>();
+        const line = cycleLine(
+          next++,
+          { kind: input.kind, label: input.label ?? '' },
+          input.committedQuantity,
+          0,
+          false,
+        );
+        line.label = input.label ?? null;
+        cycle.lines.push(line);
+        return json(route, lineOf(retainer, cycle, line), 201);
+      }
+      const line = cycle.lines.find((l) => l.id === lineId);
+      if (!line) return fail(route, 404, 'NOT_FOUND');
+      if (lineAction === 'adjustments') {
+        const input = body<CreateCycleAdjustment>();
+        if (deliveredOf(line) + input.delta < 0) return fail(route, 409, 'NEGATIVE_DELIVERED');
+        line.adjustments.push({
+          id: id(next++),
+          delta: input.delta,
+          reason: input.reason,
+          authorId: me().user.id,
+          createdAt: new Date().toISOString(),
+        });
+        return json(route, lineOf(retainer, cycle, line), 201);
+      }
+      line.committed = body<UpdateCycleLine>().committedQuantity;
+      return json(route, lineOf(retainer, cycle, line));
+    }
+    if (part === 'extra-work') {
+      if (!childId && method === 'GET') {
+        const items = retainer.extraWork
+          .filter((item) => !item.archived)
+          .sort((a, b) => b.requestedOn.localeCompare(a.requestedOn))
+          .map((item) => extraWorkOf(retainer, item));
+        return json(route, { items, total: items.length, page: 1, pageSize: 20 });
+      }
+      if (childPart === 'billing' ? !allowed.canBill : !allowed.canManage) {
+        return fail(route, 403, 'FORBIDDEN');
+      }
+      if (!childId) {
+        const input = body<CreateExtraWork>();
+        const created: ExtraWorkRecord = {
+          id: id(next++),
+          title: input.title,
+          description: input.description ?? null,
+          requestedOn: input.requestedOn ?? today,
+          contactId: input.requestedByContactId ?? null,
+          estimateMinor: input.estimateMinor ?? null,
+          billingStatus: 'unbilled',
+          billingNote: null,
+          loggedById: me().user.id,
+          createdAt: new Date().toISOString(),
+          archived: false,
+        };
+        retainer.extraWork.push(created);
+        return json(route, extraWorkOf(retainer, created), 201);
+      }
+      const item = retainer.extraWork.find((x) => x.id === childId);
+      if (!item) return fail(route, 404, 'NOT_FOUND');
+      if (childPart === 'archive') {
+        item.archived = true;
+        return route.fulfill({ status: 204 });
+      }
+      if (childPart === 'billing') {
+        Object.assign(item, body<ExtraWorkBillingChange>());
+        return json(route, extraWorkOf(retainer, item));
+      }
+      const { requestedByContactId, ...changes } = body<UpdateExtraWork>();
+      Object.assign(item, changes);
+      if (requestedByContactId !== undefined) item.contactId = requestedByContactId;
+      return json(route, extraWorkOf(retainer, item));
+    }
+    return undefined;
+  };
+}
+
 /** Ids of the seeded team, for navigating straight to a profile or department. */
 export const seedIds = {
   sara: id(1),
@@ -1494,6 +2152,9 @@ export const seedIds = {
   launchProject: id(802),
   clinicSite: id(803),
   summerMenu: id(805),
+  socialRetainer: id(901),
+  adsRetainer: id(902),
+  endedRetainer: id(903),
 };
 
 /** Viewport screenshot kept in the test output and attached to the HTML report. */

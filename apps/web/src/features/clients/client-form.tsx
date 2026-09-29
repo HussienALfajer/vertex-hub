@@ -29,7 +29,7 @@ import { useId } from 'react';
 import { Controller, type UseFormReturn } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { ApiError } from '../../lib/api/client';
-import { errorMessage } from '../../lib/errors';
+import { errorMessage, fieldError, SCREEN_ERROR } from '../../lib/errors';
 import { accountManagersQuery, invitedAccountManagersQuery, sectorsQuery } from './clients.queries';
 
 export type ClientFormMethods = UseFormReturn<CreateClientInput, unknown, CreateClient>;
@@ -52,11 +52,11 @@ export function clientFormFailure(
   error: unknown,
 ): string | null {
   if (error instanceof ApiError && error.code === 'CLIENT_NAME_TAKEN') {
-    form.setError('tradeName', { message: errorMessage(t, error) });
+    form.setError('tradeName', { type: SCREEN_ERROR, message: errorMessage(t, error) });
     return null;
   }
   if (error instanceof ApiError && error.code === 'INVALID_ACCOUNT_MANAGER') {
-    form.setError('accountManagerId', { message: errorMessage(t, error) });
+    form.setError('accountManagerId', { type: SCREEN_ERROR, message: errorMessage(t, error) });
     return null;
   }
   return errorMessage(t, error);
@@ -74,7 +74,7 @@ export function TradeNameField({ form }: { form: ClientFormMethods }) {
         {...form.register('tradeName')}
       />
       <FieldError match={!!error}>
-        {error?.message || t('clients.form.errors.tradeName')}
+        {fieldError(error, t('clients.form.errors.tradeName'))}
       </FieldError>
     </Field>
   );
@@ -180,7 +180,7 @@ export function AccountManagerField({
           : t('clients.form.accountManagerHint')}
       </FieldDescription>
       <FieldError match={!!error}>
-        {error?.message || t('clients.form.errors.accountManager')}
+        {fieldError(error, t('clients.form.errors.accountManager'))}
       </FieldError>
     </Field>
   );

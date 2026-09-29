@@ -38,6 +38,7 @@
     "home": "الرئيسية",
     "clients": "العملاء",
     "projects": "المشاريع",
+    "retainers": "العقود الشهرية",
     "team": "الفريق",
     "departments": "الأقسام",
     "audit": "سجل التدقيق",
@@ -731,7 +732,9 @@
     "openClient": "افتح ملف العميل",
     "contactOfClient": "{{contact}} لدى {{client}}",
     "openProject": "افتح المشروع",
-    "milestoneOfProject": "{{milestone}} · {{project}}"
+    "milestoneOfProject": "{{milestone}} · {{project}}",
+    "openRetainer": "افتح العقد الشهري",
+    "cycleOfRetainer": "دورة {{month}} من {{retainer}}"
   },
   "clients": {
     "title": "العملاء",
@@ -833,7 +836,8 @@
         "brandKit": "الهوية البصرية",
         "platforms": "المنصات",
         "communication": "التواصل",
-        "projects": "المشاريع"
+        "projects": "المشاريع",
+        "retainers": "العقود الشهرية"
       },
       "confirm": {
         "archiveTitle": "أرشفة {{name}}؟",
@@ -1371,7 +1375,7 @@
       "requestedBy": "طلبه {{name}}",
       "loggedBy": "سجّله {{name}}",
       "estimate": "التقدير",
-      "estimateHint": "بعملة المشروع، ويُستخدم عند الفوترة.",
+      "estimateHint": "بعملة المشروع أو العقد الشهري، ويُستخدم عند الفوترة.",
       "actions": "إجراءات «{{title}}»",
       "changeBilling": "غيّر حالة الفوترة",
       "archive": "احذف البند",
@@ -1398,7 +1402,8 @@
       "errors": {
         "title": "اكتب عنوانًا من 1 إلى 160 حرفًا.",
         "description": "التفاصيل أطول من 2000 حرف.",
-        "futureDate": "تاريخ الطلب لا يكون في المستقبل."
+        "futureDate": "تاريخ الطلب لا يكون في المستقبل.",
+        "billingNote": "اكتب الملاحظة (حتى 300 حرف)."
       }
     },
     "clientTab": {
@@ -1413,6 +1418,276 @@
       "endedWithWorkBody_few": "لديه {{n}} مشاريع مفتوحة. أكملها أو ألغها إن توقف العمل.",
       "endedWithWorkBody_many": "لديه {{n}} مشروعًا مفتوحًا. أكملها أو ألغها إن توقف العمل.",
       "endedWithWorkBody_other": "لديه {{n}} مشروع مفتوح. أكملها أو ألغها إن توقف العمل."
+    }
+  },
+  "retainers": {
+    "title": "العقود الشهرية",
+    "subtitle": "الخدمات الشهرية المستمرة: ما وعدنا به كل شهر وما سلّمناه.",
+    "newRetainer": "عقد شهري جديد",
+    "search": "ابحث باسم العقد أو العميل",
+    "loadError": "تعذّر تحميل العقود الشهرية.",
+    "behind": "متأخر عن الوتيرة",
+    "overDelivered": "تسليم زائد",
+    "noLines": "لا بنود",
+    "noOpenCycle": "لا دورة مفتوحة",
+    "startsOn": "يبدأ {{date}}",
+    "startRenewal": "من {{start}} · التجديد {{renewal}}",
+    "emptyTitle": "لا عقود مطابقة",
+    "noRetainersTitle": "لا عقود شهرية بعد",
+    "noRetainersHint": "أنشئ عقدًا شهريًا لعميل، وحدّد ما يُسلَّم كل شهر.",
+    "archivedEmptyTitle": "لا عقود مؤرشفة",
+    "statuses": {
+      "active": "نشط",
+      "paused": "متوقف مؤقتًا",
+      "ended": "منتهٍ"
+    },
+    "cycleStatuses": {
+      "open": "مفتوحة",
+      "closed": "مغلقة"
+    },
+    "kinds": {
+      "design": "تصاميم",
+      "reel": "ريلز",
+      "story": "ستوري",
+      "post": "منشورات",
+      "video": "فيديو",
+      "photo_shoot": "جلسات تصوير",
+      "ad_campaign": "حملات إعلانية",
+      "monthly_report": "تقرير شهري",
+      "other": "أخرى"
+    },
+    "renewal": {
+      "due": "التجديد قريب",
+      "overdue": "التجديد متأخر"
+    },
+    "pulse": {
+      "active": "عقود نشطة",
+      "paused": "متوقفة مؤقتًا",
+      "behind": "متأخرة هذا الشهر",
+      "renewalDue": "تجديدها قريب"
+    },
+    "filters": {
+      "accountManager": "مدير الحساب",
+      "allAccountManagers": "كل مديري الحسابات",
+      "behind": "المتأخرة",
+      "renewalDue": "التجديد قريب",
+      "mine": "عملائي"
+    },
+    "columns": {
+      "retainer": "العقد",
+      "accountManager": "مدير الحساب",
+      "thisMonth": "هذا الشهر",
+      "deliveryRate": "نسبة التسليم"
+    },
+    "new": {
+      "title": "عقد شهري جديد",
+      "subtitle": "حدّد العميل والمدة، ثم ما يُسلَّم كل شهر.",
+      "back": "العقود الشهرية",
+      "preview": "ملخص العقد",
+      "perMonth": "كل شهر",
+      "created": "أُنشئ العقد الشهري"
+    },
+    "form": {
+      "identity": "العقد",
+      "identityHint": "لمن العقد وأي الأقسام تعمل عليه.",
+      "name": "اسم العقد",
+      "namePlaceholder": "مثل: إدارة السوشيال ميديا",
+      "term": "المدة",
+      "termHint": "متى يبدأ العقد ومتى يُراجع للتجديد.",
+      "startDate": "تاريخ البدء",
+      "startHint": "تبدأ الدورة الشهرية الأولى في هذا اليوم.",
+      "startLocked": "لا يتغير تاريخ البدء بعد فتح أول دورة.",
+      "renewalDate": "تاريخ التجديد",
+      "renewalHint": "تذكير فقط: لا يغيّر حالة العقد.",
+      "currencyHint": "عملة الرسوم الشهرية والعمل الإضافي في العقد.",
+      "monthlyFee": "الرسوم الشهرية",
+      "monthlyFeeHint": "تُستخدم عند إصدار فاتورة كل شهر.",
+      "linesHint": "ما يُسلَّم كل شهر. تبدأ كل دورة بهذه الكميات كاملة.",
+      "cycleNow": "تُفتح دورة هذا الشهر فور الإنشاء",
+      "cycleNowBody": "بالكميات الشهرية كاملة، دون احتساب جزء الشهر. يمكن تعديل كميات الدورة بعدها مع ذكر السبب.",
+      "cycleLater": "تُفتح أول دورة يوم البدء",
+      "cycleLaterBody": "تُفتح تلقائيًا في {{date}} بالكميات الشهرية كاملة.",
+      "create": "أنشئ العقد",
+      "errors": {
+        "renewalAfterStart": "تاريخ التجديد بعد تاريخ البدء."
+      }
+    },
+    "lines": {
+      "title": "البنود الشهرية",
+      "kind": "النوع",
+      "name": "الاسم",
+      "label": "اسم البند {{position}}",
+      "labelPlaceholder": "اسم اختياري بدل «{{kind}}»",
+      "labelRequired": "اسم البند (مطلوب)",
+      "quantity": "كمية البند {{position}} شهريًا",
+      "remove": "احذف بند {{name}}",
+      "addHint": "أضف بندًا:",
+      "total": "إجمالي القطع شهريًا",
+      "limit": "الحد الأقصى {{max}} بندًا لكل عقد.",
+      "emptyTitle": "لا بنود بعد",
+      "emptyHint": "اختر نوعًا من الأسفل لإضافة أول بند.",
+      "editTitle": "تعديل البنود الشهرية",
+      "editHint": "تسري التغييرات من الدورة القادمة. عدّل دورة هذا الشهر من تبويب «هذا الشهر».",
+      "saved": "حُفظت البنود",
+      "errors": {
+        "label": "اكتب اسمًا للبند (حتى 60 حرفًا).",
+        "quantity": "من 1 إلى 999.",
+        "duplicate": "بند مكرر: غيّر الاسم أو احذفه."
+      }
+    },
+    "actions": {
+      "editLines": "البنود",
+      "pause": "أوقف مؤقتًا",
+      "resume": "استأنف",
+      "end": "أنهِ العقد",
+      "reactivate": "أعد تفعيل العقد",
+      "archive": "أرشف العقد",
+      "restore": "استعد العقد",
+      "done": {
+        "active": "استُؤنف العقد",
+        "paused": "أُوقف العقد مؤقتًا",
+        "ended": "انتهى العقد",
+        "reactivated": "أُعيد تفعيل العقد"
+      }
+    },
+    "end": {
+      "title": "إنهاء «{{name}}»",
+      "body": "تُغلق دورة هذا الشهر اليوم وتُجمَّد أرقامها، ويصبح العقد للقراءة فقط. تبقى فوترة العمل الإضافي متاحة."
+    },
+    "reactivate": {
+      "title": "إعادة تفعيل «{{name}}»",
+      "body": "يعود العقد نشطًا، وتُفتح دورة هذا الشهر إن لم تكن موجودة."
+    },
+    "archive": {
+      "title": "أرشفة «{{name}}»",
+      "body": "الأرشفة للعقود المُدخلة خطأً: يختفي من القوائم ويصبح للقراءة فقط.",
+      "done": "أُرشف العقد"
+    },
+    "restore": {
+      "title": "استعادة «{{name}}»",
+      "body": "يعود العقد إلى القوائم بحالته السابقة.",
+      "done": "استُعيد العقد"
+    },
+    "edit": {
+      "title": "تعديل العقد"
+    },
+    "page": {
+      "back": "العقود الشهرية",
+      "notFound": "العقد غير موجود أو لا تملك صلاحية عرضه.",
+      "loadError": "تعذّر تحميل العقد.",
+      "thisMonth": "هذا الشهر",
+      "term": "المدة والتجديد",
+      "noRenewal": "بلا تاريخ تجديد",
+      "renewalIn_zero": "التجديد اليوم",
+      "renewalIn_one": "التجديد غدًا",
+      "renewalIn_two": "التجديد بعد يومين",
+      "renewalIn_few": "التجديد بعد {{days}} أيام",
+      "renewalIn_many": "التجديد بعد {{days}} يومًا",
+      "renewalIn_other": "التجديد بعد {{days}} يوم",
+      "renewalPast_zero": "التجديد اليوم",
+      "renewalPast_one": "فات التجديد بيوم",
+      "renewalPast_two": "فات التجديد بيومين",
+      "renewalPast_few": "فات التجديد بـ{{days}} أيام",
+      "renewalPast_many": "فات التجديد بـ{{days}} يومًا",
+      "renewalPast_other": "فات التجديد بـ{{days}} يوم",
+      "endedOn": "انتهى {{date}}",
+      "perMonth": "شهريًا",
+      "feeMissing": "الرسوم غير محددة",
+      "feeMissingHint": "حدّدها ليُفوتر العقد كل شهر.",
+      "endedTitle": "انتهى العقد {{date}}",
+      "endedBody": "العقد للقراءة فقط حتى يُعاد تفعيله، والفوترة تبقى متاحة.",
+      "archivedTitle": "هذا العقد مؤرشف",
+      "tabs": {
+        "thisMonth": "هذا الشهر",
+        "history": "السجل"
+      }
+    },
+    "cycle": {
+      "title": "دورة {{month}}",
+      "hint": "المسلَّم من كل بند مقابل المتفق عليه لهذا الشهر.",
+      "lines": "بنود الدورة",
+      "loadError": "تعذّر تحميل الدورة.",
+      "period": "الوقت المتبقي",
+      "timeElapsed": "الوقت المنقضي من الدورة",
+      "lastDay": "آخر يوم في الدورة",
+      "daysLeft_zero": "",
+      "daysLeft_one": "باقٍ يوم واحد",
+      "daysLeft_two": "باقٍ يومان",
+      "daysLeft_few": "باقٍ {{days}} أيام",
+      "daysLeft_many": "باقٍ {{days}} يومًا",
+      "daysLeft_other": "باقٍ {{days}} يوم",
+      "rateHint": "التسليم الزائد في بند لا يعوّض نقص بند آخر.",
+      "emptyTitle": "لا بنود في هذه الدورة",
+      "emptyHint": "أضف بندًا لهذا الشهر، أو عدّل بنود العقد للدورات القادمة.",
+      "thisMonthOnly": "لهذا الشهر فقط",
+      "notCommitted": "لا كمية متفق عليها هذا الشهر.",
+      "counter": "{{name}}: {{delivered}} من {{committed}}",
+      "adjust": "عدّل المسلَّم",
+      "lineActions": "إجراءات «{{name}}»",
+      "changeCommitted": "غيّر الكمية المتفق عليها",
+      "adjustments_zero": "",
+      "adjustments_one": "تعديل واحد",
+      "adjustments_two": "تعديلان",
+      "adjustments_few": "{{n}} تعديلات",
+      "adjustments_many": "{{n}} تعديلًا",
+      "adjustments_other": "{{n}} تعديل",
+      "adjustedBy": "{{name}} · {{when}}",
+      "committed": "الكمية المتفق عليها",
+      "committedTitle": "كمية «{{name}}» لهذا الشهر",
+      "committedHint": "يسري على هذه الدورة فقط. بنود العقد للدورات القادمة لا تتغير.",
+      "committedSaved": "حُفظت الكمية",
+      "adjustTitle": "تعديل المسلَّم من «{{name}}»",
+      "adjustHint": "يُضاف إلى ما سُلّم عبر المهام. لا يُحذف تعديل: صحّحه بتعديل جديد.",
+      "direction": "التعديل",
+      "add": "إضافة",
+      "subtract": "طرح",
+      "amount": "العدد",
+      "deliveredAfter": "يصبح المسلَّم",
+      "adjusted": "عُدّل عدد المسلَّم",
+      "addLine": "أضف بندًا لهذا الشهر",
+      "addLineTitle": "بند جديد لدورة {{month}}",
+      "addLineHint": "يُضاف إلى هذه الدورة فقط، ولا يغيّر بنود العقد.",
+      "lineAdded": "أُضيف البند",
+      "reason": "السبب",
+      "reasonPlaceholder": "مثل: اتفقنا مع العميل على ريل إضافي هذا الشهر",
+      "reasonHint": "يظهر في سجل الدورة وسجل التدقيق.",
+      "errors": {
+        "committed": "من 0 إلى 999.",
+        "amount": "من 1 إلى 999.",
+        "reason": "اكتب السبب (حتى 300 حرف)."
+      },
+      "none": {
+        "endedTitle": "لا دورات جديدة",
+        "endedBody": "انتهى العقد، فلا تُفتح له دورات. الدورات السابقة في تبويب «السجل».",
+        "pausedTitle": "العقد متوقف مؤقتًا",
+        "pausedBody": "لا تُفتح دورة أثناء التوقف. الاستئناف يفتح دورة هذا الشهر فورًا.",
+        "notStartedTitle": "يبدأ العقد {{date}}",
+        "notStartedBody": "تُفتح أول دورة تلقائيًا يوم البدء بالكميات الشهرية كاملة.",
+        "waitingTitle": "لا دورة مفتوحة الآن",
+        "waitingBody": "تُفتح دورة هذا الشهر مع التشغيل اليومي التالي (00:05)."
+      }
+    },
+    "history": {
+      "title": "الدورات السابقة",
+      "hint": "نسبة تسليم كل شهر كما جُمّدت عند إغلاق دورته.",
+      "emptyTitle": "لا دورات مغلقة بعد",
+      "emptyHint": "تُغلق كل دورة تلقائيًا في آخر الشهر.",
+      "open": "افتح دورة {{month}}",
+      "afterClose": "+{{n}} بعد الإغلاق",
+      "lineAfterClose": "سُلّم {{n}} بعد إغلاق الدورة، ولا يغيّر نسبتها.",
+      "closedOn": "أُغلقت {{when}}"
+    },
+    "clientTab": {
+      "title": "العقود الشهرية",
+      "hint": "عقود هذا العميل وما سُلّم منها هذا الشهر.",
+      "emptyTitle": "لا عقود شهرية لهذا العميل",
+      "emptyHint": "أنشئ عقدًا شهريًا وحدّد بنوده.",
+      "endedWithRetainers_zero": "",
+      "endedWithRetainers_one": "ولديه عقد شهري لم ينتهِ. أنهِه إن توقف العمل.",
+      "endedWithRetainers_two": "ولديه عقدان شهريان لم ينتهيا. أنهِهما إن توقف العمل.",
+      "endedWithRetainers_few": "ولديه {{n}} عقود شهرية لم تنتهِ. أنهِها إن توقف العمل.",
+      "endedWithRetainers_many": "ولديه {{n}} عقدًا شهريًا لم تنتهِ. أنهِها إن توقف العمل.",
+      "endedWithRetainers_other": "ولديه {{n}} عقد شهري لم ينتهِ. أنهِها إن توقف العمل."
     }
   }
 }

@@ -12,8 +12,6 @@ import {
   type ExtraWorkBilling,
   type ExtraWorkBillingChange,
   extraWorkBillingChangeSchema,
-  isProjectClosed,
-  type ProjectDetail,
   type UpdateExtraWork,
 } from '@vertex-hub/contracts';
 import {
@@ -68,17 +66,31 @@ import { LoadError } from '../../components/load-error';
 import { MoneyInput } from '../../components/money-input';
 import { TabHeader } from '../../components/tab-header';
 import { ApiError } from '../../lib/api/client';
-import { errorMessage } from '../../lib/errors';
+import { errorMessage, fieldError, SCREEN_ERROR } from '../../lib/errors';
 import { formatCalendarDate, formatNumber } from '../../lib/format';
 import { formatMoney } from '../../lib/money';
 import { clientQuery } from '../clients/clients.queries';
 import {
-  projectExtraWorkQuery,
+  type ExtraWorkParent,
+  extraWorkQuery,
   useArchiveExtraWork,
   useChangeExtraWorkBilling,
   useCreateExtraWork,
   useUpdateExtraWork,
-} from './projects.queries';
+} from './extra-work.queries';
+
+/** A project or retainer as its Extra work tab needs it; the page works out what the caller may do. */
+export interface ExtraWorkOwner extends ExtraWorkParent {
+  clientId: string;
+  /** Logging and editing: an open project, an active or paused retainer (M3). */
+  canLog: boolean;
+  /** Billing stays open once the work is done, with money access (M3). */
+  canBill: boolean;
+  /** The currency to show amounts in; null without money access (M1). */
+  currency: Currency | null;
+  /** The currency of the estimate input; null when the caller may not set money fields. */
+  editCurrency: Currency | null;
+}
 
 const billingTone = { unbilled: 'warning', billed: 'success', waived: 'neutral' } as const;
 
@@ -93,17 +105,14 @@ export function BillingBadge({ status }: { status: ExtraWorkBilling }) {
 }
 
 /**
- * Out-of-scope work the client asked for, logged for separate billing (M3). Logging and editing
- * need an open project; billing stays open after it closes, with money access.
+ * Out-of-scope work the client asked for, logged for separate billing (M3), on a project or a
+ * retainer. Logging and editing need open work; billing stays open after it ends.
  */
-export function ExtraWorkTab({ project }: { project: ProjectDetail }) {
+export function ExtraWorkTab({ owner }: { owner: ExtraWorkOwner }) {
   const { t } = useTranslation();
-  const items = useInfiniteQuery(projectExtraWorkQuery(project.id));
+  const items = useInfiniteQuery(extraWorkQuery(owner));
   const [logging, setLogging] = useState(false);
-  const archived = project.archivedAt !== null;
-  const canLog = project.permissions.canManage && !archived && !isProjectClosed(project.status);
-  const canBill = project.permissions.canBill;
-  const currency = project.money?.currency ?? null;
+  const { canLog, canBill, currency } = owner;
 
   const all = items.data?.pages.flatMap((page) => page.items) ?? [];
 
@@ -149,7 +158,7 @@ export function ExtraWorkTab({ project }: { project: ProjectDetail }) {
             {all.map((item) => (
               <ExtraWorkItem
                 key={item.id}
-                project={project}
+                owner={owner}
                 item={item}
                 canEdit={canLog}
                 canBill={canBill}
@@ -169,7 +178,7 @@ export function ExtraWorkTab({ project }: { project: ProjectDetail }) {
           )}
         </>
       )}
-      <ExtraWorkDialog project={project} open={logging} onClose={() => setLogging(false)} />
+      <ExtraWorkDialog owner={owner} open={logging} onClose={() => setLogging(false)} />
     </>
   );
 }
@@ -205,18 +214,18 @@ function Ledger({ items, currency }: { items: ExtraWork[]; currency: Currency })
 }
 
 function ExtraWorkItem({
-  project,
+  owner,
   item,
   canEdit,
   canBill,
 }: {
-  project: ProjectDetail;
+  owner: ExtraWorkOwner;
   item: ExtraWork;
   canEdit: boolean;
   canBill: boolean;
 }) {
   const { t } = useTranslation();
-  const archive = useArchiveExtraWork(project.id);
+  const archive = useArchiveExtraWork(owner);
   const [dialog, setDialog] = useState<'edit' | 'billing' | 'archive' | null>(null);
   const estimate = item.money?.estimateMinor ?? null;
 
@@ -308,13 +317,13 @@ function ExtraWorkItem({
       </div>
 
       <ExtraWorkDialog
-        project={project}
+        owner={owner}
         item={item}
         open={dialog === 'edit'}
         onClose={() => setDialog(null)}
       />
       <BillingDialog
-        project={project}
+        owner={owner}
         item={item}
         open={dialog === 'billing'}
         onClose={() => setDialog(null)}
@@ -340,12 +349,12 @@ const NO_CONTACT = 'none';
 
 /** Logs extra work, or edits it. The estimate is shown and sent only with money access (M1). */
 function ExtraWorkDialog({
-  project,
+  owner,
   item,
   open,
   onClose,
 }: {
-  project: ProjectDetail;
+  owner: ExtraWorkOwner;
   item?: ExtraWork;
   open: boolean;
   onClose: () => void;
@@ -358,10 +367,10 @@ function ExtraWorkDialog({
     contact: useId(),
     estimate: useId(),
   };
-  const create = useCreateExtraWork(project.id);
-  const update = useUpdateExtraWork(project.id);
-  const client = useQuery({ ...clientQuery(project.client.id), enabled: open });
-  const money = project.permissions.canEditMoney ? (project.money?.currency ?? null) : null;
+  const create = useCreateExtraWork(owner);
+  const update = useUpdateExtraWork(owner);
+  const client = useQuery({ ...clientQuery(owner.clientId), enabled: open });
+  const money = owner.editCurrency;
   const today = businessDate();
   const [failure, setFailure] = useState<string | null>(null);
   const form = useForm<CreateExtraWorkInput, unknown, CreateExtraWork>({
@@ -395,7 +404,10 @@ function ExtraWorkDialog({
   const submit = form.handleSubmit(async (values) => {
     setFailure(null);
     if (values.requestedOn && values.requestedOn > today) {
-      form.setError('requestedOn', { message: t('projects.extraWork.errors.futureDate') });
+      form.setError('requestedOn', {
+        type: SCREEN_ERROR,
+        message: t('projects.extraWork.errors.futureDate'),
+      });
       return;
     }
     const dirty = form.formState.dirtyFields;
@@ -420,9 +432,15 @@ function ExtraWorkDialog({
       close();
     } catch (error) {
       if (error instanceof ApiError && error.code === 'INVALID_DATES') {
-        form.setError('requestedOn', { message: t('projects.extraWork.errors.futureDate') });
+        form.setError('requestedOn', {
+          type: SCREEN_ERROR,
+          message: t('projects.extraWork.errors.futureDate'),
+        });
       } else if (error instanceof ApiError && error.code === 'UNKNOWN_CONTACT') {
-        form.setError('requestedByContactId', { message: errorMessage(t, error) });
+        form.setError('requestedByContactId', {
+          type: SCREEN_ERROR,
+          message: errorMessage(t, error),
+        });
       } else {
         setFailure(errorMessage(t, error));
       }
@@ -468,7 +486,7 @@ function ExtraWorkDialog({
               </FieldLabel>
               <Input id={ids.date} type="date" max={today} {...form.register('requestedOn')} />
               <FieldError match={!!errors.requestedOn}>
-                {errors.requestedOn?.message || t('projects.form.errors.date')}
+                {fieldError(errors.requestedOn, t('projects.form.errors.date'))}
               </FieldError>
             </Field>
             <Field invalid={!!errors.requestedByContactId}>
@@ -500,7 +518,7 @@ function ExtraWorkDialog({
                 )}
               />
               <FieldError match={!!errors.requestedByContactId}>
-                {errors.requestedByContactId?.message}
+                {fieldError(errors.requestedByContactId, t('errors.UNKNOWN_CONTACT'))}
               </FieldError>
             </Field>
           </div>
@@ -545,19 +563,19 @@ function ExtraWorkDialog({
 
 /** Marks an item billed (with the invoice reference), waived (with why) or back to unbilled (M3). */
 function BillingDialog({
-  project,
+  owner,
   item,
   open,
   onClose,
 }: {
-  project: ProjectDetail;
+  owner: ExtraWorkOwner;
   item: ExtraWork;
   open: boolean;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
   const ids = { status: useId(), note: useId() };
-  const change = useChangeExtraWorkBilling(project.id);
+  const change = useChangeExtraWorkBilling(owner);
   const [failure, setFailure] = useState<string | null>(null);
   const form = useForm<ExtraWorkBillingChange>({
     resolver: standardSchemaResolver(extraWorkBillingChangeSchema),
@@ -575,7 +593,10 @@ function BillingDialog({
   const submit = form.handleSubmit(async (values) => {
     setFailure(null);
     if (billingNeedsNote(values.billingStatus) && !values.billingNote) {
-      form.setError('billingNote', { message: t('errors.BILLING_NOTE_REQUIRED') });
+      form.setError('billingNote', {
+        type: SCREEN_ERROR,
+        message: t('errors.BILLING_NOTE_REQUIRED'),
+      });
       return;
     }
     try {
@@ -584,7 +605,10 @@ function BillingDialog({
       close();
     } catch (error) {
       if (error instanceof ApiError && error.code === 'BILLING_NOTE_REQUIRED') {
-        form.setError('billingNote', { message: errorMessage(t, error) });
+        form.setError('billingNote', {
+          type: SCREEN_ERROR,
+          message: errorMessage(t, error),
+        });
       } else {
         setFailure(errorMessage(t, error));
       }
@@ -631,7 +655,9 @@ function BillingDialog({
             </FieldLabel>
             <Textarea id={ids.note} rows={2} {...form.register('billingNote')} />
             <FieldDescription>{t(`projects.extraWork.noteHint.${status}`)}</FieldDescription>
-            <FieldError match={!!noteError}>{noteError?.message}</FieldError>
+            <FieldError match={!!noteError}>
+              {fieldError(noteError, t('projects.extraWork.errors.billingNote'))}
+            </FieldError>
           </Field>
           {failure && <FormAlert>{failure}</FormAlert>}
           <DialogFooter>

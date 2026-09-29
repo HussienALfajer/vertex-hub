@@ -272,6 +272,83 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await screenshot(page, testInfo, `client-projects-${colorScheme}`);
     });
 
+    test('retainer list', async ({ page }, testInfo) => {
+      await page.setViewportSize({ width: 1440, height: 1000 });
+      await page.clock.setFixedTime(new Date(`${PROJECTS_TODAY}T09:00:00+03:00`));
+      await mockApi(page, { signedIn: true });
+      await page.goto('/retainers');
+      await expect(page.getByRole('link', { name: /إدارة السوشيال ميديا/ })).toBeVisible();
+      await screenshot(page, testInfo, `retainers-${colorScheme}`);
+    });
+
+    test('new retainer', async ({ page }, testInfo) => {
+      await page.setViewportSize({ width: 1280, height: 1900 });
+      await page.clock.setFixedTime(new Date(`${PROJECTS_TODAY}T09:00:00+03:00`));
+      await mockApi(page, { signedIn: true });
+      await page.goto(`/retainers/new?clientId=${seedIds.jasmine}`);
+      await page.getByLabel(ar.retainers.form.name).fill('المحتوى الشهري');
+      await page.getByLabel(ar.retainers.form.monthlyFee).fill('1500');
+      for (const kind of [ar.retainers.kinds.design, ar.retainers.kinds.reel]) {
+        await page.getByRole('button', { name: kind, exact: true }).click();
+      }
+      await page.getByLabel(ar.retainers.lines.quantity.replace('{{position}}', '1')).fill('12');
+      await expect(
+        page.getByRole('complementary', { name: ar.retainers.new.preview }),
+      ).toContainText('1,500.00');
+      await screenshot(page, testInfo, `new-retainer-${colorScheme}`);
+    });
+
+    test('retainer page tabs', async ({ page }, testInfo) => {
+      await page.setViewportSize({ width: 1280, height: 1500 });
+      await page.clock.setFixedTime(new Date(`${PROJECTS_TODAY}T09:00:00+03:00`));
+      await mockApi(page, { signedIn: true });
+      await page.goto(`/retainers/${seedIds.socialRetainer}`);
+      await expect(page.getByRole('heading', { level: 1 })).toHaveText('إدارة السوشيال ميديا');
+      const designs = page
+        .getByRole('list', { name: ar.retainers.cycle.lines })
+        .getByRole('listitem')
+        .filter({ hasText: ar.retainers.kinds.design });
+      await designs.getByRole('button', { name: ar.retainers.cycle.adjustments_one }).click();
+      await screenshot(page, testInfo, `retainer-this-month-${colorScheme}`);
+
+      await page.setViewportSize({ width: 1280, height: 1000 });
+      await page.getByRole('tab', { name: ar.retainers.page.tabs.history }).click();
+      await expect(page.getByText(ar.retainers.history.title).first()).toBeVisible();
+      await screenshot(page, testInfo, `retainer-history-${colorScheme}`);
+
+      await page.getByRole('button', { name: /أغسطس/ }).click();
+      await expect(page.getByRole('dialog').getByText('تغطية افتتاح الفرع')).toBeVisible();
+      await screenshot(page, testInfo, `retainer-cycle-${colorScheme}`);
+      await page.keyboard.press('Escape');
+
+      await page.getByRole('tab', { name: ar.projects.page.tabs.extraWork }).click();
+      await expect(page.getByText('ريل إضافي لافتتاح الفرع الثاني')).toBeVisible();
+      await screenshot(page, testInfo, `retainer-extra-work-${colorScheme}`);
+
+      await page.goto(`/retainers/${seedIds.adsRetainer}`);
+      await expect(page.getByText(ar.retainers.cycle.none.pausedTitle)).toBeVisible();
+      await screenshot(page, testInfo, `retainer-paused-${colorScheme}`);
+    });
+
+    test('retainer page (employee view)', async ({ page }, testInfo) => {
+      await page.setViewportSize({ width: 1280, height: 1300 });
+      await page.clock.setFixedTime(new Date(`${PROJECTS_TODAY}T09:00:00+03:00`));
+      await mockApi(page, { signedIn: true, me: employeeMe });
+      await page.goto(`/retainers/${seedIds.socialRetainer}`);
+      await expect(page.getByRole('heading', { level: 1 })).toHaveText('إدارة السوشيال ميديا');
+      await expect(page.getByRole('button', { name: ar.common.edit })).toHaveCount(0);
+      await screenshot(page, testInfo, `retainer-employee-${colorScheme}`);
+    });
+
+    test('client profile retainers tab', async ({ page }, testInfo) => {
+      await page.setViewportSize({ width: 1280, height: 1100 });
+      await page.clock.setFixedTime(new Date(`${PROJECTS_TODAY}T09:00:00+03:00`));
+      await mockApi(page, { signedIn: true });
+      await page.goto(`/clients/${seedIds.jasmine}?tab=retainers`);
+      await expect(page.getByRole('link', { name: /إدارة السوشيال ميديا/ })).toBeVisible();
+      await screenshot(page, testInfo, `client-retainers-${colorScheme}`);
+    });
+
     test('audit log', async ({ page }, testInfo) => {
       await page.setViewportSize({ width: 1440, height: 900 });
       await mockApi(page, { signedIn: true });

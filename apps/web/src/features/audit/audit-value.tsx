@@ -2,6 +2,8 @@ import {
   type AuditEntityType,
   CLIENT_PLATFORMS,
   CLIENT_STATUSES,
+  CYCLE_STATUSES,
+  DELIVERABLE_KINDS,
   DEPARTMENT_CODES,
   type DepartmentCode,
   EXTRA_WORK_BILLING,
@@ -9,15 +11,17 @@ import {
   NOTE_CHANNELS,
   PLATFORM_ACCESS_STATES,
   PROJECT_STATUSES,
+  RETAINER_STATUSES,
   ROLES,
   USER_STATUSES,
 } from '@vertex-hub/contracts';
 import { Badge, ColorSwatch } from '@vertex-hub/ui';
 import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
-import { formatDateTime } from '../../lib/format';
+import { formatDateTime, formatMonth, formatNumber } from '../../lib/format';
 import { formatAmount } from '../../lib/money';
 import { useDepartmentNames } from '../projects/project-badges';
+import { lineName } from '../retainers/retainer-badges';
 
 type Item = Record<string, unknown>;
 
@@ -47,6 +51,10 @@ function enumLabel(
     if (project) return t(`projects.statuses.${project}`);
     const milestone = entityType === 'project_milestone' ? find(MILESTONE_STATUSES) : undefined;
     if (milestone) return t(`projects.milestones.statuses.${milestone}`);
+    const retainer = entityType === 'retainer' ? find(RETAINER_STATUSES) : undefined;
+    if (retainer) return t(`retainers.statuses.${retainer}`);
+    const cycle = entityType === 'retainer_cycle' ? find(CYCLE_STATUSES) : undefined;
+    if (cycle) return t(`retainers.cycleStatuses.${cycle}`);
     const user = find(USER_STATUSES);
     if (user) return t(`users.statuses.${user}`);
   }
@@ -69,6 +77,10 @@ function enumLabel(
   if (field === 'channel') {
     const channel = find(NOTE_CHANNELS);
     if (channel) return t(`clients.notes.channels.${channel}`);
+  }
+  if (field === 'kind' && entityType === 'retainer_cycle') {
+    const kind = find(DELIVERABLE_KINDS);
+    if (kind) return t(`retainers.kinds.${kind}`);
   }
   if (field === 'kind' && (value === 'activation' || value === 'reset')) {
     return t(`audit.kinds.${value}`);
@@ -121,6 +133,9 @@ export function AuditValue({
       </span>
     );
   }
+  if (field === 'month' && typeof value === 'string') {
+    return <span>{formatMonth(value)}</span>;
+  }
   if (field === 'occurredAt' && typeof value === 'string') {
     return <span className="tabular-nums">{formatDateTime(value)}</span>;
   }
@@ -151,6 +166,17 @@ function ListItem({
   if (!isItem(item)) {
     return <Badge tone="outline">{enumLabel(t, entityType, field, item) ?? String(item)}</Badge>;
   }
+  const line = deliverableLine(item);
+  if (line) {
+    return (
+      <Badge tone="outline">
+        {lineName(t, line)}
+        <span className="tabular-nums" dir="ltr">
+          {line.count}
+        </span>
+      </Badge>
+    );
+  }
   const hex = text(item, 'hex');
   if (hex) {
     return (
@@ -166,6 +192,25 @@ function ListItem({
       {text(item, 'name') ?? text(item, 'label') ?? text(item, 'url')}
     </Badge>
   );
+}
+
+/**
+ * A retainer's or cycle's line in an entry (`deliverables`, `lines`): its kind and label, with
+ * its monthly quantity, its committed quantity, or delivered of committed at close.
+ */
+function deliverableLine(item: Item) {
+  const kind = DELIVERABLE_KINDS.find((known) => known === item.kind);
+  if (!kind) return undefined;
+  const number = (key: string) => (typeof item[key] === 'number' ? (item[key] as number) : null);
+  const committed = number('committed') ?? number('monthlyQuantity');
+  const delivered = number('delivered');
+  const count =
+    committed === null
+      ? ''
+      : delivered === null
+        ? formatNumber(committed)
+        : `${formatNumber(delivered)}/${formatNumber(committed)}`;
+  return { kind, label: text(item, 'label') ?? null, count };
 }
 
 /** A department code, shown by the department's current name (names are editable, F01). */

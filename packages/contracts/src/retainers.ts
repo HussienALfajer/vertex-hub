@@ -300,6 +300,8 @@ export const createCycleLineSchema = z
 
 export type CreateCycleLine = z.infer<typeof createCycleLineSchema>;
 
+export type CreateCycleLineInput = z.input<typeof createCycleLineSchema>;
+
 /** R7: a correction of the delivered count; never edited, corrected by another one. */
 export const createCycleAdjustmentSchema = z
   .object({

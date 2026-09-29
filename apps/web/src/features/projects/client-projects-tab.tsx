@@ -6,13 +6,13 @@ import {
   PROJECT_STATUSES,
   type Project,
 } from '@vertex-hub/contracts';
-import { Button, Callout, EmptyState, Skeleton } from '@vertex-hub/ui';
-import { CalendarIcon, FolderKanbanIcon, PlusIcon, TriangleAlertIcon } from 'lucide-react';
+import { Button, EmptyState, Skeleton } from '@vertex-hub/ui';
+import { CalendarIcon, FolderKanbanIcon, PlusIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { LoadError } from '../../components/load-error';
 import { TabHeader } from '../../components/tab-header';
 import { useMe } from '../../lib/auth';
-import { formatCalendarDate, formatNumber } from '../../lib/format';
+import { formatCalendarDate } from '../../lib/format';
 import { canCreateProjectFor } from './project-access';
 import { MilestoneProgress, OverdueBadge, PersonName, ProjectStatusBadge } from './project-badges';
 import { projectListQuery } from './projects.queries';
@@ -105,27 +105,5 @@ function ProjectCard({ project }: { project: Project }) {
         </div>
       </Link>
     </li>
-  );
-}
-
-/** G3: an ended client whose work still runs; the client's status never changes its projects. */
-export function EndedClientWorkCallout({ client }: { client: ClientDetailResponse }) {
-  const { t } = useTranslation();
-  const ended = client.status === 'ended' && client.archivedAt === null;
-  const projects = useQuery({ ...clientProjectsQuery(client.id), enabled: ended });
-  const running = (projects.data?.items ?? []).filter(
-    (project) => !isProjectClosed(project.status),
-  ).length;
-  if (!ended || running === 0) return null;
-  return (
-    <Callout
-      tone="warning"
-      icon={<TriangleAlertIcon />}
-      title={t('projects.clientTab.endedWithWork')}
-      description={t('projects.clientTab.endedWithWorkBody', {
-        count: running,
-        n: formatNumber(running),
-      })}
-    />
   );
 }

@@ -1,4 +1,5 @@
 import type { TFunction } from 'i18next';
+import type { FieldError } from 'react-hook-form';
 import { ApiError } from './api/client';
 
 /** Better Auth error codes the screens explain (sign-in, password and 2FA forms). */
@@ -34,4 +35,15 @@ export function errorMessage(t: TFunction, error: unknown): string {
     return t(`errors.auth.${auth.code as AuthCode}`);
   }
   return t('errors.generic');
+}
+
+/** The `type` of a field error a screen sets itself, with a translated message. */
+export const SCREEN_ERROR = 'screen';
+
+/**
+ * The text of a field error: the translated message a screen set (`SCREEN_ERROR`), otherwise the
+ * field's own hint. Errors from the schema resolver carry Zod's English text and never show.
+ */
+export function fieldError(error: FieldError | undefined, fallback: string): string {
+  return error?.type === SCREEN_ERROR && error.message ? error.message : fallback;
 }

@@ -21,7 +21,7 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done. Feature IDs
 - [x] F01 Users, departments, roles and permissions (spec: `docs/specs/F01-users-roles.md`): access core, users and departments API, web screens; owner acceptance passed
 - [x] `feature-slice` skill (contracts → db → api → web → tests), extracted from F01: layer gates, new-module wiring checklist, F01 patterns to copy
 - [x] F02 Clients (spec: `docs/specs/F02-clients.md`): contracts, schema and API (PR 1); client list, new client and profile with contacts, brand kit, platforms and communication log, audit links (PR 2); owner acceptance passed
-- [~] F05 Projects and retainers (spec: `docs/specs/F05-projects-retainers.md`): contracts, schema and API for projects and milestones (PR 1); retainers, monthly cycles and extra work API, daily cycle job (PR 2); project list, new project, project page with milestones and extra work, client Projects tab, audit labels (PR 3)
+- [x] F05 Projects and retainers (spec: `docs/specs/F05-projects-retainers.md`): contracts, schema and API for projects and milestones (PR 1); retainers, monthly cycles and extra work API, daily cycle job (PR 2); project list, new project, project page with milestones and extra work, client Projects tab, audit labels (PR 3); retainer list, new retainer, retainer page with this month, history and extra work, client Retainers tab, audit labels (PR 4); owner acceptance passed
 - [ ] F06 Task engine and workflow
 - [ ] F07 Work templates
 - [ ] F14 Notifications (in-app)

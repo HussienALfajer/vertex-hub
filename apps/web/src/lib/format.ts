@@ -46,6 +46,15 @@ export function formatCalendarDate(day: string): string {
   }).format(new Date(`${day}T00:00:00Z`));
 }
 
+/** A calendar month from any of its days (`YYYY-MM-DD`), e.g. "أكتوبر 2026". */
+export function formatMonth(day: string): string {
+  return new Intl.DateTimeFormat(APP_LOCALE, {
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC',
+  }).format(new Date(`${day}T00:00:00Z`));
+}
+
 /** The calendar day of an instant in the business timezone, as `YYYY-MM-DD` (for grouping). */
 export function businessDay(value: Date | string): string {
   return toBusinessDateTimeInput(value).slice(0, 10);

@@ -138,3 +138,12 @@ test('the audit log links client changes to the profile', async ({ page }) => {
   await page.getByRole('link', { name: 'مطعم الياسمين' }).first().click();
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('مطعم الياسمين');
 });
+
+test('form errors from the contract schema show in Arabic, never in English', async ({ page }) => {
+  await mockApi(page, { signedIn: true });
+  await page.goto('/clients/new');
+  // An empty trade name fails the contract schema before any request.
+  await page.getByRole('button', { name: ar.clients.form.create }).click();
+  await expect(page.getByText(ar.clients.form.errors.tradeName)).toBeVisible();
+  await expect(page.getByText(/Too small|expected string|Invalid input/)).toHaveCount(0);
+});
