@@ -79,7 +79,8 @@ export const taskWorkloadQuery = (filters: TaskWorkloadFilters) =>
 /**
  * A mutation on task data. Every one refreshes the whole `tasks` cache, also on failure: a 403
  * after the task changed hands (edge case 15) reloads the page without the lost actions. Task
- * counts show on projects and retainers (F05), so those refresh too.
+ * counts show on projects and retainers (F05) and against a monthly template's lines (F07), so
+ * those refresh too.
  */
 function useTasksMutation<Input, Output>(mutationFn: (input: Input) => Promise<Output>) {
   const queryClient = useQueryClient();
@@ -90,6 +91,7 @@ function useTasksMutation<Input, Output>(mutationFn: (input: Input) => Promise<O
         queryClient.invalidateQueries({ queryKey: tasksKeys.all }),
         queryClient.invalidateQueries({ queryKey: ['projects'] }),
         queryClient.invalidateQueries({ queryKey: ['retainers'] }),
+        queryClient.invalidateQueries({ queryKey: ['templates', 'retainer'] }),
       ]),
   });
 }

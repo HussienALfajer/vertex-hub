@@ -53,18 +53,22 @@ import {
   type ProjectDetail,
   type ProjectStatus,
   type ProjectStatusChange,
+  planTemplateRun,
   type RequestScope,
   type Retainer,
   type RetainerDeliverables,
   type RetainerDetail,
   type RetainerStatus,
   type RetainerStatusChange,
+  type RetainerTemplate,
   type RevisionDecision,
   type RevisionDecisionInput,
   type RevisionSource,
   deliveryRate as rateOf,
   renewalState,
+  repeatedStepFor,
   revisionSourceOf,
+  setRetainerTemplateSchema,
   TASK_PRIORITIES,
   type Task,
   type TaskBoard,
@@ -81,8 +85,12 @@ import {
   type TemplateDocument,
   type TemplateKind,
   type TemplateListItem,
+  type TemplateRun,
+  type TemplateRunInput,
+  type TemplateRunTrigger,
   type TemplateStep,
   taskMove,
+  templateRunInputSchema,
   type UpdateCycleLine,
   type UpdateExtraWork,
   type UpdateTaskInput,
@@ -653,11 +661,15 @@ export async function mockApi(page: Page, options: MockOptions): Promise<MockedA
   const retainersApi = retainerRoutes({ users, clients, retainers, me: () => me });
   const tasks = tasksSeed();
   const tasksApi = taskRoutes({ users, clients, projects, retainers, tasks, me: () => me });
-  const templatesApi = templateRoutes({
+  const templates = templatesSeed();
+  const templatesApi = templateRoutes({ users, clients, retainers, templates, me: () => me });
+  const templateRunsApi = templateRunRoutes({
     users,
     clients,
+    projects,
     retainers,
-    templates: templatesSeed(),
+    tasks,
+    templates,
     me: () => me,
   });
   const managers = new Map<string, string | null>(
@@ -870,6 +882,10 @@ export async function mockApi(page: Page, options: MockOptions): Promise<MockedA
     // Clients (F02).
     const handled = clientsApi(route, method, url, request);
     if (handled) return handled;
+
+    // Template runs (F07), ahead of the retainer routes that answer the rest of `/api/retainers`.
+    const generated = templateRunsApi(route, method, url, request);
+    if (generated) return generated;
 
     // Projects (F05).
     const answered = projectsApi(route, method, url, request);
@@ -3588,6 +3604,372 @@ function templateRoutes({ users, clients, retainers, templates, me }: TemplateSt
       if (nameTaken(template.name, template.id)) return fail(route, 409, 'TEMPLATE_NAME_TAKEN');
       template.archived = false;
       return json(route, detail(template));
+    }
+    return undefined;
+  };
+}
+interface RunRecord {
+  id: string;
+  templateId: string;
+  trigger: TemplateRunTrigger;
+  projectId: string | null;
+  retainerId: string | null;
+  cycleId: string | null;
+  cycleLineId: string | null;
+  startDate: string;
+  taskIds: string[];
+  milestonesCreated: number;
+  createdById: string | null;
+  createdAt: string;
+}
+
+interface TemplateRunState {
+  users: UserResponse[];
+  clients: ClientRecord[];
+  projects: ProjectRecord[];
+  retainers: RetainerRecord[];
+  tasks: TaskRecord[];
+  templates: TemplateRecord[];
+  me: () => MeResponse;
+}
+
+type RunError = { error: readonly [number, string] };
+
+/** Template runs (F07 rules 6–19) over the in-memory records, planned with `planTemplateRun`. */
+function templateRunRoutes({
+  users,
+  clients,
+  projects,
+  retainers,
+  tasks,
+  templates,
+  me,
+}: TemplateRunState) {
+  const runs: RunRecord[] = [];
+  let nextId = 2700;
+  let clock = Date.parse('2026-10-10T09:30:00.000Z');
+  const today = PROJECTS_TODAY;
+  const later = (a: string, b: string) => (a > b ? a : b);
+  const holds = (permission: string, scope: string) =>
+    me().permissions.some((g) => g.permission === permission && g.scopes.includes(scope as never));
+  const user = (userId: string) => users.find((u) => u.id === userId);
+  const person = (userId: string) => ({ id: userId, name: user(userId)?.name ?? '' });
+  const clientScope = (clientId: string) =>
+    holds('projects.manage', 'all') ||
+    (holds('projects.manage', 'own_clients') &&
+      clients.find((c) => c.id === clientId)?.accountManagerId === me().user.id);
+  const managesProject = (p: ProjectRecord) =>
+    clientScope(p.clientId) ||
+    (holds('projects.manage', 'assigned') && p.projectManagerId === me().user.id);
+  const isMember = (userId: string, department: DepartmentCode) => {
+    const u = user(userId);
+    return !!u && u.status !== 'archived' && u.departments.some((d) => d.code === department);
+  };
+  const linkedTo = (retainerId: string) =>
+    templates.find((t) => t.linkedRetainerIds.includes(retainerId));
+  const cycleOf = (cycleId: string) => {
+    for (const retainer of retainers) {
+      const cycle = retainer.cycles.find((c) => c.id === cycleId);
+      if (cycle) return { retainer, cycle };
+    }
+    return undefined;
+  };
+  const lineTasks = (lineId: string) =>
+    tasks.filter((t) => t.cycleLineId === lineId && !t.archived && t.status !== 'cancelled').length;
+  const fullRun = (cycleId: string) =>
+    runs.find((r) => r.cycleId === cycleId && r.trigger !== 'missing_tasks');
+  const assigneesOf = (template: TemplateRecord, chosen: TemplateRunInput['assignees']) => {
+    const byDepartment = new Map<DepartmentCode, string | null>(
+      template.assignees.map((a) => [a.department, a.userId]),
+    );
+    for (const a of chosen) byDepartment.set(a.department, a.userId);
+    return [...byDepartment].map(([department, userId]) => ({
+      department,
+      user: userId ? person(userId) : null,
+    }));
+  };
+
+  const present = (run: RunRecord): TemplateRun => {
+    const template = templates.find((t) => t.id === run.templateId);
+    const project = projects.find((p) => p.id === run.projectId);
+    const found = run.cycleId ? cycleOf(run.cycleId) : undefined;
+    const line = found?.cycle.lines.find((l) => l.id === run.cycleLineId);
+    return {
+      id: run.id,
+      template: { id: run.templateId, name: template?.name ?? '', archived: !!template?.archived },
+      trigger: run.trigger,
+      project: project ? { id: project.id, name: project.name } : null,
+      cycle: found
+        ? {
+            id: found.cycle.id,
+            month: found.cycle.month,
+            retainer: { id: found.retainer.id, name: found.retainer.name },
+          }
+        : null,
+      cycleLine: line ? { id: line.id, kind: line.kind, label: line.label } : null,
+      startDate: run.startDate,
+      taskCount: run.taskIds.length,
+      milestonesCreated: run.milestonesCreated,
+      createdBy: run.createdById ? person(run.createdById) : null,
+      createdAt: run.createdAt,
+    };
+  };
+
+  interface Planned {
+    plan: ReturnType<typeof planTemplateRun>;
+    project?: ProjectRecord;
+    retainer?: RetainerRecord;
+    cycle?: CycleRecord;
+  }
+
+  /** Checks the target as the API does (rules 15, 17), then plans with `planTemplateRun`. */
+  const plan = (template: TemplateRecord, input: TemplateRunInput): Planned | RunError => {
+    if (template.archived) return { error: [409, 'TEMPLATE_ARCHIVED'] };
+    const assignees = assigneesOf(template, input.assignees);
+    if (input.projectId) {
+      const project = projects.find((p) => p.id === input.projectId);
+      if (!project) return { error: [404, 'NOT_FOUND'] };
+      if (!managesProject(project)) return { error: [403, 'FORBIDDEN'] };
+      if (template.kind !== 'project') return { error: [400, 'TEMPLATE_KIND_MISMATCH'] };
+      const startDate = input.startDate ?? later(project.startDate, today);
+      if (startDate < today) return { error: [400, 'INVALID_DATES'] };
+      const milestones = project.milestones
+        .filter((m) => !m.archived)
+        .map((m, i) => ({ id: m.id, name: m.name, position: i + 1, status: m.status }));
+      const earlierRuns = runs.filter(
+        (r) => r.projectId === project.id && r.templateId === template.id,
+      ).length;
+      const target = {
+        type: 'project' as const,
+        startDate,
+        dueDate: project.dueDate,
+        milestones,
+        earlierRuns,
+      };
+      return { project, plan: planTemplateRun({ template, target, assignees, isMember }) };
+    }
+    const found = input.retainerCycleId ? cycleOf(input.retainerCycleId) : undefined;
+    if (!found) return { error: [404, 'NOT_FOUND'] };
+    const { retainer, cycle } = found;
+    if (!clientScope(retainer.clientId)) return { error: [403, 'FORBIDDEN'] };
+    const linked = linkedTo(retainer.id);
+    if (!linked) return { error: [400, 'NO_TEMPLATE'] };
+    if (linked.id !== template.id) return { error: [400, 'TEMPLATE_NOT_LINKED'] };
+    if (cycle.status !== 'open') return { error: [409, 'CYCLE_CLOSED'] };
+    if (fullRun(cycle.id)) return { error: [409, 'ALREADY_GENERATED'] };
+    const target = {
+      type: 'cycle' as const,
+      startDate: later(cycle.periodStart, today),
+      periodEnd: cycle.periodEnd,
+      lines: cycle.lines,
+    };
+    return { retainer, cycle, plan: planTemplateRun({ template, target, assignees, isMember }) };
+  };
+
+  /** Creates the plan's milestones and tasks (dependencies by key) and records the run. */
+  const apply = (
+    template: TemplateRecord,
+    { plan: planned, project, retainer, cycle }: Planned,
+    trigger: TemplateRunTrigger,
+    cycleLineId: string | null = null,
+  ): TemplateRun => {
+    const created = new Map<string, string>();
+    for (const m of planned.milestonesToCreate) {
+      const milestoneId = id(nextId++);
+      project?.milestones.push({
+        id: milestoneId,
+        name: m.name,
+        dueDate: m.dueDate,
+        status: 'pending',
+        doneAt: null,
+        doneById: null,
+        installmentMinor: null,
+        archived: false,
+      });
+      created.set(m.name, milestoneId);
+    }
+    const keys = new Map(planned.tasks.map((task) => [task.key, id(nextId++)]));
+    clock += 60_000;
+    const createdAt = new Date(clock).toISOString();
+    for (const task of planned.tasks) {
+      tasks.push(
+        taskRecord(0, {
+          id: keys.get(task.key) as string,
+          title: task.title,
+          brief: task.brief,
+          department: task.department,
+          assigneeId: task.assignee?.id ?? null,
+          priority: task.priority,
+          dueDate: task.dueDate,
+          clientId: project?.clientId ?? retainer?.clientId ?? null,
+          projectId: project?.id ?? null,
+          milestoneId: task.milestone
+            ? (task.milestone.existingId ?? created.get(task.milestone.name) ?? null)
+            : null,
+          retainerId: retainer?.id ?? null,
+          cycleId: cycle?.id ?? null,
+          cycleLineId: task.cycleLineId,
+          needsClientApproval: task.needsClientApproval,
+          revisionLimit: task.revisionLimit,
+          createdById: me().user.id,
+          createdAt,
+          dependsOn: task.dependsOn.map((key) => keys.get(key) as string),
+          checklist: task.checklist.map((text) => ({
+            id: id(nextId++),
+            text,
+            doneAt: null,
+            doneById: null,
+            archived: false,
+          })),
+        }),
+      );
+    }
+    const run: RunRecord = {
+      id: id(nextId++),
+      templateId: template.id,
+      trigger,
+      projectId: project?.id ?? null,
+      retainerId: retainer?.id ?? null,
+      cycleId: cycle?.id ?? null,
+      cycleLineId,
+      startDate: planned.startDate,
+      taskIds: [...keys.values()],
+      milestonesCreated: planned.milestonesToCreate.length,
+      createdById: me().user.id,
+      createdAt,
+    };
+    runs.unshift(run);
+    return present(run);
+  };
+
+  const retainerState = (r: RetainerRecord): RetainerTemplate => {
+    const template = linkedTo(r.id);
+    const cycle = r.cycles.find((c) => c.status === 'open');
+    const run = cycle ? fullRun(cycle.id) : undefined;
+    const active = !!template && !template.archived;
+    const canManage = !r.archived && clientScope(r.clientId);
+    return {
+      template: template
+        ? { id: template.id, name: template.name, archived: template.archived }
+        : null,
+      cycle: cycle
+        ? {
+            id: cycle.id,
+            month: cycle.month,
+            periodStart: cycle.periodStart,
+            periodEnd: cycle.periodEnd,
+          }
+        : null,
+      run: run ? present(run) : null,
+      lines: (cycle?.lines ?? []).map((line) => {
+        const count = lineTasks(line.id);
+        return {
+          id: line.id,
+          kind: line.kind,
+          label: line.label,
+          committed: line.committed,
+          tasks: count,
+          missing: Math.max(0, line.committed - count),
+          canGenerate: active && !!repeatedStepFor(template.steps, line),
+        };
+      }),
+      permissions: { canLink: canManage, canGenerate: canManage && active },
+    };
+  };
+
+  /** Rule 18: instances of the line's repeated step, numbered after its existing tasks. */
+  const generateMissing = (retainer: RetainerRecord, cycleId: string, lineId: string) => {
+    const cycle = retainer.cycles.find((c) => c.id === cycleId && c.status === 'open');
+    if (!cycle) return { error: [409, 'CYCLE_CLOSED'] } as RunError;
+    const line = cycle.lines.find((l) => l.id === lineId);
+    if (!line) return { error: [404, 'NOT_FOUND'] } as RunError;
+    const template = linkedTo(retainer.id);
+    if (!template) return { error: [400, 'NO_TEMPLATE'] } as RunError;
+    if (template.archived) return { error: [409, 'TEMPLATE_ARCHIVED'] } as RunError;
+    if (!repeatedStepFor(template.steps, line))
+      return { error: [400, 'NO_REPEATED_STEP'] } as RunError;
+    const existing = lineTasks(line.id);
+    const missing = line.committed - existing;
+    if (missing <= 0) return { error: [409, 'NOTHING_MISSING'] } as RunError;
+    const target = {
+      type: 'missing' as const,
+      startDate: today,
+      periodEnd: cycle.periodEnd,
+      line,
+      existing,
+      missing,
+    };
+    const assignees = assigneesOf(template, []);
+    const planned = planTemplateRun({ template, target, assignees, isMember });
+    return apply(template, { retainer, cycle, plan: planned }, 'missing_tasks', line.id);
+  };
+
+  return (route: Route, method: string, url: URL, request: Request): Promise<void> | undefined => {
+    const path = url.pathname;
+    const runMatch = path.match(/^\/api\/templates\/([^/]+)\/(preview|runs)$/);
+    if (runMatch && method === 'POST') {
+      const template = templates.find((t) => t.id === runMatch[1]);
+      if (!template) return fail(route, 404, 'NOT_FOUND');
+      const result = plan(template, templateRunInputSchema.parse(request.postDataJSON()));
+      if ('error' in result) return fail(route, result.error[0], result.error[1]);
+      if (runMatch[2] === 'runs') return json(route, apply(template, result, 'manual'), 201);
+      const { tasks: planned, ...rest } = result.plan;
+      return json(route, {
+        ...rest,
+        tasks: planned.map((task) => ({
+          key: task.key,
+          title: task.title,
+          department: task.department,
+          assignee: task.assignee,
+          assigneeReplaced: task.assigneeReplaced,
+          dueDate: task.dueDate,
+          milestone: task.milestone,
+          cycleLineId: task.cycleLineId,
+          dependsOn: task.dependsOn,
+        })),
+      });
+    }
+    if (path === '/api/template-runs' && method === 'GET') {
+      const projectId = url.searchParams.get('projectId');
+      const retainerId = url.searchParams.get('retainerId');
+      const taskId = url.searchParams.get('taskId');
+      const items = runs
+        .filter(
+          (r) =>
+            (!projectId || r.projectId === projectId) &&
+            (!retainerId || r.retainerId === retainerId) &&
+            (!taskId || r.taskIds.includes(taskId)),
+        )
+        .map(present);
+      return json(route, { items, total: items.length, page: 1, pageSize: 50 });
+    }
+    const match = path.match(
+      /^\/api\/retainers\/([^/]+)\/(?:template|cycles\/([^/]+)\/lines\/([^/]+)\/missing-tasks)$/,
+    );
+    if (!match) return undefined;
+    const [, retainerId, cycleId, lineId] = match;
+    const retainer = retainers.find((r) => r.id === retainerId);
+    if (!retainer) return fail(route, 404, 'NOT_FOUND');
+    if (!cycleId && method === 'GET') return json(route, retainerState(retainer));
+    if (!clientScope(retainer.clientId)) return fail(route, 403, 'FORBIDDEN');
+    if (retainer.archived) return fail(route, 409, 'RETAINER_ARCHIVED');
+    if (retainer.status === 'ended') return fail(route, 409, 'RETAINER_ENDED');
+    if (!cycleId && method === 'PUT') {
+      const { templateId } = setRetainerTemplateSchema.parse(request.postDataJSON());
+      const next = templates.find((t) => t.id === templateId);
+      if (templateId && !next) return fail(route, 404, 'NOT_FOUND');
+      if (next?.kind === 'project') return fail(route, 400, 'TEMPLATE_KIND_MISMATCH');
+      if (next?.archived) return fail(route, 409, 'TEMPLATE_ARCHIVED');
+      for (const t of templates) {
+        t.linkedRetainerIds = t.linkedRetainerIds.filter((r) => r !== retainer.id);
+      }
+      next?.linkedRetainerIds.push(retainer.id);
+      return json(route, retainerState(retainer));
+    }
+    if (cycleId && lineId && method === 'POST') {
+      const result = generateMissing(retainer, cycleId, lineId);
+      if ('error' in result) return fail(route, result.error[0], result.error[1]);
+      return json(route, result, 201);
     }
     return undefined;
   };

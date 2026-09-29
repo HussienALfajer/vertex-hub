@@ -1,3 +1,4 @@
+import type { TemplateStep } from '@vertex-hub/contracts';
 import { describe, expect, it } from 'vitest';
 import {
   dependencyOptions,
@@ -6,6 +7,7 @@ import {
   orderSteps,
   type StageValues,
   type StepValues,
+  stageMilestones,
   withoutStage,
   withoutStep,
   withStep,
@@ -126,5 +128,46 @@ describe('removing and moving', () => {
     const steps = [step('b', { dependsOn: ['a'] }), step('a')];
     expect(laterDependencies(steps, 0)).toEqual(['a']);
     expect(laterDependencies(steps, 1)).toEqual([]);
+  });
+});
+
+describe('stageMilestones', () => {
+  const detailStep = (id: string, stageId: string | null, dueDay: number): TemplateStep => ({
+    id,
+    stageId,
+    position: 1,
+    title: id,
+    brief: null,
+    department: 'design',
+    dueDay,
+    priority: 'normal',
+    needsClientApproval: true,
+    revisionLimit: 2,
+    checklist: [],
+    repeatKind: null,
+    repeatLabel: null,
+    spreadFromDay: null,
+    dependsOn: [],
+  });
+
+  it('keeps stages with steps, in stage order, due on their latest work day', () => {
+    const template = {
+      stages: [
+        { id: 'b', name: 'Design', position: 2 },
+        { id: 'a', name: 'Discovery', position: 1 },
+        { id: 'c', name: 'Empty', position: 3 },
+      ],
+      steps: [
+        detailStep('s1', 'a', 3),
+        detailStep('s2', 'a', 5),
+        detailStep('s3', 'b', 7),
+        detailStep('s4', null, 40),
+      ],
+    };
+    // 2026-10-03 is a Saturday: work day 5 is Wednesday 10-07, work day 7 skips Friday 10-09.
+    expect(stageMilestones(template, '2026-10-03')).toEqual([
+      { name: 'Discovery', dueDate: '2026-10-07', installmentMinor: null },
+      { name: 'Design', dueDate: '2026-10-10', installmentMinor: null },
+    ]);
   });
 });

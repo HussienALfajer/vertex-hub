@@ -20,6 +20,8 @@ import { formatMoney } from '../../lib/money';
 import { hasMoneyAccess } from '../projects/project-access';
 import { DepartmentChips } from '../projects/project-badges';
 import { useProjectClients } from '../projects/project-form';
+import { MonthlyTemplateField } from '../templates/template-pickers';
+import { useSetRetainerTemplate } from '../templates/templates.queries';
 import { DeliverableIcon, lineName, RetainerStatusBadge } from './retainer-badges';
 import {
   ClientField,
@@ -55,6 +57,8 @@ export function NewRetainerPage({ search }: { search: NewRetainerSearch }) {
   const me = useMe();
   const navigate = useNavigate();
   const create = useCreateRetainer();
+  const link = useSetRetainerTemplate();
+  const [templateId, setTemplateId] = useState<string | null>(null);
   // Retainers start for the same clients as projects (rule 1, the same permission).
   const clients = useProjectClients();
   const [failure, setFailure] = useState<string | null>(null);
@@ -97,6 +101,12 @@ export function NewRetainerPage({ search }: { search: NewRetainerSearch }) {
     try {
       const retainer = await create.mutateAsync(input);
       toast.add({ title: t('retainers.new.created'), type: 'success' });
+      // The link is a second call: when it fails the retainer stays, and its page can link again.
+      if (templateId) {
+        await link
+          .mutateAsync({ retainerId: retainer.id, templateId })
+          .catch(() => toast.add({ title: t('templates.retainer.linkFailed'), type: 'error' }));
+      }
       await navigate({ to: '/retainers/$retainerId', params: { retainerId: retainer.id } });
     } catch (error) {
       setFailure(retainerFormFailure(form, t, error));
@@ -133,6 +143,7 @@ export function NewRetainerPage({ search }: { search: NewRetainerSearch }) {
           </FormSection>
           <FormSection title={t('retainers.lines.title')} hint={t('retainers.form.linesHint')}>
             <DeliverablesEditor form={linesForm} />
+            <MonthlyTemplateField value={templateId} onChange={setTemplateId} />
           </FormSection>
           {failure && <FormAlert>{failure}</FormAlert>}
           <div className="flex flex-wrap items-center justify-end gap-3">
