@@ -562,6 +562,15 @@ const KNOWN_FIELDS = [
   'site',
   'body',
   'mentionedUserIds',
+  'stages',
+  'steps',
+  'stagesAdded',
+  'stagesChanged',
+  'stagesRemoved',
+  'stepsAdded',
+  'stepsChanged',
+  'stepsRemoved',
+  'user',
 ] as const;
 
 function fieldLabel(t: TFunction, field: string): string {

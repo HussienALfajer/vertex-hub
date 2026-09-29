@@ -82,6 +82,13 @@ export const AUDIT_ACTIONS = [
   'task_comment.created',
   'task_comment.updated',
   'task_comment.archived',
+  'template.created',
+  'template.updated',
+  'template.assignees_updated',
+  'template.archived',
+  'template.restored',
+  'template_run.created',
+  'retainer.template_changed',
 ] as const;
 
 export const auditActionSchema = z.enum(AUDIT_ACTIONS).meta({ id: 'AuditAction' });
@@ -104,6 +111,8 @@ export const AUDIT_ENTITY_TYPES = [
   'task_checklist_item',
   'task_link',
   'task_comment',
+  'template',
+  'template_run',
 ] as const;
 
 export const auditEntityTypeSchema = z.enum(AUDIT_ENTITY_TYPES).meta({ id: 'AuditEntityType' });

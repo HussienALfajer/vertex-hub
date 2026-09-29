@@ -64,6 +64,20 @@
       "when": 1790664015159,
       "tag": "0008_needy_swordsman",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1790696357976,
+      "tag": "0009_bored_siren",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1790696375633,
+      "tag": "0010_seed_work_templates",
+      "breakpoints": true
     }
   ]
 }

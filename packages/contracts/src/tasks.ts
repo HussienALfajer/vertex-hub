@@ -595,7 +595,8 @@ export const taskDetailSchema = taskSchema
     links: z.array(taskLinkSchema),
     /** Oldest first. */
     revisionHistory: z.array(taskRevisionSchema),
-    createdBy: personSchema,
+    /** Null for a task the system created (an automatic template run, F07). */
+    createdBy: personSchema.nullable(),
     createdAt: z.iso.datetime(),
     updatedAt: z.iso.datetime(),
     startedAt: z.iso.datetime().nullable(),

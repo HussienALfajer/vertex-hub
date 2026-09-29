@@ -14,6 +14,7 @@ export * from './projects.js';
 export * from './retainers.js';
 export * from './roles.js';
 export * from './tasks.js';
+export * from './templates.js';
 export * from './text.js';
 export * from './users.js';
 export * from './workflow.js';

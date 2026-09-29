@@ -280,7 +280,16 @@
     "NOT_COMMENT_AUTHOR": "يعدّل التعليق كاتبه فقط.",
     "TASK_ARCHIVED": "هذه المهمة مؤرشفة أو تتبع سجلاً مؤرشفاً، ولا يمكن تعديلها.",
     "TASK_NOT_ARCHIVED": "هذه المهمة غير مؤرشفة.",
-    "TASKS_OPEN": "لا يمكن إكمال المشروع وفيه مهام مفتوحة."
+    "TASKS_OPEN": "لا يمكن إكمال المشروع وفيه مهام مفتوحة.",
+    "TEMPLATE_NAME_TAKEN": "يوجد قالب آخر بهذا الاسم.",
+    "TEMPLATE_ARCHIVED": "هذا القالب مؤرشف.",
+    "TEMPLATE_NOT_ARCHIVED": "هذا القالب غير مؤرشف.",
+    "TEMPLATE_KIND_MISMATCH": "نوع القالب لا يناسب هذا العمل.",
+    "TEMPLATE_NOT_LINKED": "هذا القالب غير مربوط بالعقد الشهري.",
+    "NO_TEMPLATE": "لا يوجد قالب شهري مربوط بالعقد.",
+    "NO_REPEATED_STEP": "لا توجد في القالب خطوة متكررة لهذا البند.",
+    "NOTHING_MISSING": "لا مهام ناقصة لهذا البند.",
+    "ALREADY_GENERATED": "مهام هذا الشهر مولَّدة من قبل."
   },
   "users": {
     "title": "الفريق",
@@ -598,7 +607,9 @@
       "task": "مهمة",
       "task_checklist_item": "بند قائمة مهمة",
       "task_link": "رابط مهمة",
-      "task_comment": "تعليق على مهمة"
+      "task_comment": "تعليق على مهمة",
+      "template": "قالب عمل",
+      "template_run": "توليد من قالب"
     },
     "actions": {
       "user": {
@@ -668,7 +679,8 @@
         "deliverables_updated": "عدّل بنود العقد الشهري",
         "money_updated": "عدّل عملة العقد الشهري أو رسومه",
         "archived": "أرشف العقد الشهري",
-        "restored": "استعاد العقد الشهري"
+        "restored": "استعاد العقد الشهري",
+        "template_changed": "غيّر القالب الشهري"
       },
       "retainer_cycle": {
         "created": "أنشأ دورة شهرية",
@@ -695,6 +707,16 @@
         "revision_decided": "قرّر في تعديل فوق الحد",
         "request_scope_changed": "غيّر نطاق طلب العميل"
       },
+      "template": {
+        "created": "أنشأ قالبًا",
+        "updated": "عدّل قالبًا",
+        "assignees_updated": "غيّر المنفّذين الافتراضيين",
+        "archived": "أرشف قالبًا",
+        "restored": "استعاد قالبًا"
+      },
+      "template_run": {
+        "created": "ولّد مهام من قالب"
+      },
       "task_checklist_item": {
         "created": "أضاف بنداً إلى القائمة",
         "updated": "عدّل بنداً في القائمة",
@@ -713,6 +735,15 @@
     },
     "fields": {
       "name": "الاسم",
+      "stages": "المراحل",
+      "steps": "الخطوات",
+      "stagesAdded": "مراحل مضافة",
+      "stagesChanged": "مراحل معدّلة",
+      "stagesRemoved": "مراحل محذوفة",
+      "stepsAdded": "خطوات مضافة",
+      "stepsChanged": "خطوات معدّلة",
+      "stepsRemoved": "خطوات محذوفة",
+      "user": "المستخدم",
       "email": "البريد",
       "title": "المسمى",
       "phone": "الهاتف",
@@ -1147,6 +1178,7 @@
       "department": "القسم",
       "due": "الاستحقاق",
       "createdBy": "أنشأها",
+      "createdBySystem": "النظام تلقائيًا",
       "brief": "التفاصيل",
       "noBrief": "لا تفاصيل.",
       "details": "الإعدادات",
@@ -2250,6 +2282,12 @@
       "endedWithRetainers_few": "ولديه {{n}} عقود شهرية لم تنتهِ. أنهِها إن توقف العمل.",
       "endedWithRetainers_many": "ولديه {{n}} عقدًا شهريًا لم تنتهِ. أنهِها إن توقف العمل.",
       "endedWithRetainers_other": "ولديه {{n}} عقد شهري لم ينتهِ. أنهِها إن توقف العمل."
+    }
+  },
+  "templates": {
+    "kinds": {
+      "project": "مشروع",
+      "retainer_cycle": "شهري"
     }
   }
 }

@@ -55,6 +55,31 @@ export function weekOf(date: CalendarDate): { from: CalendarDate; to: CalendarDa
   return { from, to: addDays(from, 6) };
 }
 
+/** Not a weekend day of `WORK_WEEK` (no holidays in V1, ADR 0017). */
+export function isWorkDay(date: CalendarDate): boolean {
+  return !(WORK_WEEK.weekend as readonly number[]).includes(weekday(date));
+}
+
+/** Work day `n` counted from `start`: day 1 is the first work day on or after `start`. */
+export function nthWorkDay(start: CalendarDate, n: number): CalendarDate {
+  let date = start;
+  let count = isWorkDay(date) ? 1 : 0;
+  while (count < n) {
+    date = addDays(date, 1);
+    if (isWorkDay(date)) count += 1;
+  }
+  return date;
+}
+
+/** The work days in `[from, to]`, in order; empty when `to` is before `from`. */
+export function workDaysBetween(from: CalendarDate, to: CalendarDate): CalendarDate[] {
+  const days: CalendarDate[] = [];
+  for (let date = from; date <= to; date = addDays(date, 1)) {
+    if (isWorkDay(date)) days.push(date);
+  }
+  return days;
+}
+
 /** A time of day without seconds, as `HH:MM`, in Asia/Damascus. */
 export const timeOfDaySchema = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Expected HH:MM');
 

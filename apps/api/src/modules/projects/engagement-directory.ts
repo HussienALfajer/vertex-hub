@@ -6,6 +6,7 @@ import {
   isProjectClosed,
   type MilestoneStatus,
   type ProjectStatus,
+  type RetainerStatus,
 } from '@vertex-hub/contracts';
 import {
   type Database,
@@ -39,6 +40,14 @@ export interface MilestoneLink {
   projectId: string;
   name: string;
   status: MilestoneStatus;
+  archived: boolean;
+}
+
+export interface RetainerLink {
+  id: string;
+  name: string;
+  clientId: string;
+  status: RetainerStatus;
   archived: boolean;
 }
 
@@ -133,6 +142,22 @@ export class EngagementDirectory {
       })
       .from(projectMilestones)
       .where(inArray(projectMilestones.id, unique));
+    return byId(rows.map(({ archivedAt, ...row }) => ({ ...row, archived: !!archivedAt })));
+  }
+
+  async retainers(ids: string[], executor: Executor = this.db): Promise<Map<string, RetainerLink>> {
+    const unique = [...new Set(ids)];
+    if (unique.length === 0) return new Map();
+    const rows = await executor
+      .select({
+        id: retainers.id,
+        name: retainers.name,
+        clientId: retainers.clientId,
+        status: retainers.status,
+        archivedAt: retainers.archivedAt,
+      })
+      .from(retainers)
+      .where(inArray(retainers.id, unique));
     return byId(rows.map(({ archivedAt, ...row }) => ({ ...row, archived: !!archivedAt })));
   }
 

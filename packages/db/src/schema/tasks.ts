@@ -71,9 +71,8 @@ export const tasks = pgTable(
     requestScope: requestScopeEnum('request_scope'),
     /** Set while an out-of-scope client request has its extra work item (rule 11). */
     extraWorkItemId: uuid('extra_work_item_id').references(() => extraWorkItems.id),
-    createdById: uuid('created_by_id')
-      .notNull()
-      .references(() => users.id),
+    /** Null for tasks the system created (an automatic template run, F07). */
+    createdById: uuid('created_by_id').references(() => users.id),
     startedAt: timestamp('started_at', { withTimezone: true }),
     deliveredAt: timestamp('delivered_at', { withTimezone: true }),
     cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
@@ -130,9 +129,8 @@ export const taskDependencies = pgTable(
     dependsOnId: uuid('depends_on_id')
       .notNull()
       .references(() => tasks.id),
-    createdById: uuid('created_by_id')
-      .notNull()
-      .references(() => users.id),
+    /** Null for tasks the system created (an automatic template run, F07). */
+    createdById: uuid('created_by_id').references(() => users.id),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
