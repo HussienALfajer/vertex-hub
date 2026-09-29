@@ -29,7 +29,7 @@ import { Controller, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { FormAlert } from '../../components/form-alert';
 import { ApiError } from '../../lib/api/client';
-import { errorMessage } from '../../lib/errors';
+import { errorMessage, fieldError, SCREEN_ERROR } from '../../lib/errors';
 import { departmentListQuery } from '../departments/departments.queries';
 import { skillsQuery } from './users.queries';
 
@@ -100,7 +100,7 @@ export function UserForm({
       await onSubmit(values);
     } catch (error) {
       if (error instanceof ApiError && error.code === 'EMAIL_TAKEN') {
-        setError('email', { message: errorMessage(t, error) });
+        setError('email', { type: SCREEN_ERROR, message: errorMessage(t, error) });
       } else {
         setFailure(errorMessage(t, error));
       }
@@ -126,7 +126,7 @@ export function UserForm({
           />
           <FieldDescription>{t('users.form.emailHint')}</FieldDescription>
           <FieldError match={!!errors.email}>
-            {errors.email?.message || t('users.form.errors.email')}
+            {fieldError(errors.email, t('users.form.errors.email'))}
           </FieldError>
         </Field>
       </FormSection>
