@@ -638,6 +638,8 @@ export const taskListQuerySchema = pageQuerySchema.extend({
   dueFrom: calendarDateSchema.optional(),
   dueTo: calendarDateSchema.optional(),
   createdBy: z.literal('me').optional(),
+  /** `me`: tasks the caller may review (manage scope), for My tasks' "to review". */
+  reviewer: z.literal('me').optional(),
   /** `true` lists archived tasks only; needs `tasks.manage` with scope all. */
   archived: queryBooleanSchema.default(false),
   sort: z.enum(TASK_SORTS).default('dueDate'),
@@ -651,3 +653,190 @@ export type TaskListQueryInput = z.input<typeof taskListQuerySchema>;
 export const taskPageSchema = pageSchema(taskSchema).meta({ id: 'TaskPage' });
 
 export type TaskPage = z.infer<typeof taskPageSchema>;
+
+// Checklist and links
+
+export const createTaskChecklistItemSchema = z
+  .object({ text: checklistTextSchema })
+  .meta({ id: 'CreateTaskChecklistItem' });
+
+export type CreateTaskChecklistItem = z.infer<typeof createTaskChecklistItemSchema>;
+
+/** Rename, tick (`done: true`) or untick an item. */
+export const updateTaskChecklistItemSchema = z
+  .object({ text: checklistTextSchema.optional(), done: z.boolean().optional() })
+  .meta({ id: 'UpdateTaskChecklistItem' });
+
+export type UpdateTaskChecklistItem = z.infer<typeof updateTaskChecklistItemSchema>;
+
+/** Every non-archived item of the task once, in the new order (`INVALID_ORDER` otherwise). */
+export const taskChecklistOrderSchema = z
+  .object({ ids: z.array(z.uuid()) })
+  .meta({ id: 'TaskChecklistOrder' });
+
+export type TaskChecklistOrder = z.infer<typeof taskChecklistOrderSchema>;
+
+export const taskChecklistSchema = z
+  .object({ items: z.array(taskChecklistItemSchema) })
+  .meta({ id: 'TaskChecklist', description: 'Non-archived items, by position' });
+
+export type TaskChecklist = z.infer<typeof taskChecklistSchema>;
+
+// Comments
+
+/** A mention in a comment body: `@{userId}`, shown with the user's current name. */
+const MENTION_TOKEN =
+  /@\{([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})\}/g;
+
+export const MAX_COMMENT_MENTIONS = 20;
+
+/** The distinct users a comment body mentions, in order of first mention, lowercased. */
+export function mentionedUserIds(body: string): string[] {
+  return [
+    ...new Set(
+      [...body.matchAll(MENTION_TOKEN)].map((match) => (match[1] as string).toLowerCase()),
+    ),
+  ];
+}
+
+/** Rule 16: plain text with line breaks; the API checks that mentioned users are active. */
+export const taskCommentInputSchema = z
+  .object({
+    body: z
+      .string()
+      .trim()
+      .min(1)
+      .max(4000)
+      .refine((body) => mentionedUserIds(body).length <= MAX_COMMENT_MENTIONS, {
+        message: `At most ${MAX_COMMENT_MENTIONS} people are mentioned in one comment`,
+      }),
+  })
+  .meta({ id: 'TaskCommentInput' });
+
+export type TaskCommentInput = z.infer<typeof taskCommentInputSchema>;
+
+export const taskCommentSchema = z
+  .object({
+    id: z.uuid(),
+    author: archivablePersonSchema,
+    /** Null once removed: the UI shows "comment removed" in its place. */
+    body: z.string().nullable(),
+    /** The users the body mentions, with their current names (edge case 14). */
+    mentions: z.array(archivablePersonSchema),
+    editedAt: z.iso.datetime().nullable(),
+    removed: z.boolean(),
+    createdAt: z.iso.datetime(),
+    /** The caller wrote it and the task is not read-only. */
+    canEdit: z.boolean(),
+    /** The caller wrote it or holds `tasks.manage` with scope all, and the task is not read-only. */
+    canRemove: z.boolean(),
+  })
+  .meta({ id: 'TaskComment' });
+
+export type TaskComment = z.infer<typeof taskCommentSchema>;
+
+export const taskCommentPageSchema = pageSchema(taskCommentSchema).meta({ id: 'TaskCommentPage' });
+
+export type TaskCommentPage = z.infer<typeof taskCommentPageSchema>;
+
+// Views
+
+/** The statuses the board shows as columns; cancelled tasks are left out. */
+export const BOARD_STATUSES = TASK_STATUSES.filter(
+  (status): status is Exclude<TaskStatus, 'cancelled'> => status !== 'cancelled',
+);
+
+export const BOARD_LIMITS = {
+  /** Cards per column; the rest are in the list. */
+  cards: 200,
+  /** The delivered column holds tasks delivered in the last days. */
+  deliveredDays: 14,
+} as const;
+
+/** Departments of the board and the workload: the ones the caller manages, else their own. */
+const viewDepartmentsSchema = queryListSchema(departmentCodeSchema).optional();
+
+export const taskBoardQuerySchema = z.object({
+  department: viewDepartmentsSchema,
+  assigneeId: z.union([z.uuid(), z.literal('me')]).optional(),
+  clientId: z.uuid().optional(),
+});
+
+export type TaskBoardQuery = z.infer<typeof taskBoardQuerySchema>;
+
+export type TaskBoardQueryInput = z.input<typeof taskBoardQuerySchema>;
+
+export const taskBoardSchema = z
+  .object({
+    /** The departments shown: the filter, or its default. */
+    departments: z.array(departmentCodeSchema),
+    columns: z.array(
+      z.object({
+        status: taskStatusSchema,
+        /** At most `BOARD_LIMITS.cards`, by due date. */
+        items: z.array(taskSchema),
+        total: z.number().int().min(0),
+      }),
+    ),
+  })
+  .meta({ id: 'TaskBoard' });
+
+export type TaskBoard = z.infer<typeof taskBoardSchema>;
+
+export const taskWorkloadQuerySchema = z.object({
+  department: viewDepartmentsSchema,
+  /** Any day of the week to show (Saturday to Friday); this week when left out. */
+  week: calendarDateSchema.optional(),
+});
+
+export type TaskWorkloadQuery = z.infer<typeof taskWorkloadQuerySchema>;
+
+export type TaskWorkloadQueryInput = z.input<typeof taskWorkloadQuerySchema>;
+
+export const taskWorkloadSchema = z
+  .object({
+    week: z.object({ from: calendarDateSchema, to: calendarDateSchema }),
+    departments: z.array(departmentCodeSchema),
+    /**
+     * Each non-archived member of those departments, by name. Counts cover all of the person's
+     * open tasks, in any department.
+     */
+    people: z.array(
+      z.object({
+        user: personSchema,
+        /** The shown departments the person belongs to. */
+        departments: z.array(departmentCodeSchema),
+        overdue: z.number().int().min(0),
+        dueThisWeek: z.number().int().min(0),
+        open: z.number().int().min(0),
+      }),
+    ),
+    /** Open tasks nobody is assigned to, per shown department. */
+    unassigned: z.array(
+      z.object({ department: departmentCodeSchema, count: z.number().int().min(0) }),
+    ),
+  })
+  .meta({ id: 'TaskWorkload' });
+
+export type TaskWorkload = z.infer<typeof taskWorkloadSchema>;
+
+/** Counts for the sections of My tasks; each open task of the caller is in one due section. */
+export const myTaskSummarySchema = z
+  .object({
+    overdue: z.number().int().min(0),
+    today: z.number().int().min(0),
+    /** Due after today, up to the end of this week (Friday). */
+    thisWeek: z.number().int().min(0),
+    later: z.number().int().min(0),
+    /** Waiting on others: blocked, or awaiting the client. */
+    waiting: z.number().int().min(0),
+    /** In internal review, under the caller's manage scope. */
+    toReview: z.number().int().min(0),
+    /** Open tasks the caller created for someone else or for a department queue. */
+    requestedByMe: z.number().int().min(0),
+    /** Open unassigned tasks in the departments the caller manages; null for non-managers. */
+    unassignedInMyDepartments: z.number().int().min(0).nullable(),
+  })
+  .meta({ id: 'MyTaskSummary' });
+
+export type MyTaskSummary = z.infer<typeof myTaskSummarySchema>;

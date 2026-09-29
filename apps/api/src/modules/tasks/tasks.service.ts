@@ -10,7 +10,7 @@ import {
   businessDate,
   type CreateTask,
   isTaskOverdue,
-  OPEN_TASK_STATUSES,
+  permissionScopes,
   TASK_LIMITS,
   type Task,
   type TaskDetail,
@@ -73,6 +73,7 @@ import {
   dependenciesOf,
   dependentsOf,
 } from './task-dependencies.js';
+import { overdueSql, overLimitPendingSql } from './task-sql.js';
 
 type Executor = Database | Transaction;
 
@@ -93,26 +94,6 @@ const LINK_FIELDS = [
 ] as const;
 
 const escapeLike = (value: string) => value.replace(/[\\%_]/g, (char) => `\\${char}`);
-
-/** Syria keeps UTC+3 all year: the time of day in Asia/Damascus, as `HH:MM:SS`. */
-const businessTime = (now: Date) =>
-  new Date(now.getTime() + 3 * 60 * 60 * 1000).toISOString().slice(11, 19);
-
-/** SQL over a row of `tasks`: open and past its due date and time (rule 12). */
-function overdueSql(now: Date): SQL {
-  const today = businessDate(now);
-  return sql`(${tasks.status} in (${sql.join(
-    OPEN_TASK_STATUSES.map((status) => sql`${status}`),
-    sql`, `,
-  )}) and (${tasks.dueDate} < ${today}
-    or (${tasks.dueTime} is not null and ${tasks.dueDate} = ${today}
-      and ${tasks.dueTime} < ${businessTime(now)})))`;
-}
-
-/** SQL over a row of `tasks`: a client revision over the limit waits for a decision. */
-const overLimitPendingSql = sql<boolean>`exists (
-  select 1 from ${taskRevisions} as r
-  where r.task_id = "tasks"."id" and r.over_limit and r.decision is null)`;
 
 /** `HH:MM:SS` from the database to `HH:MM`. */
 const toTimeOfDay = (time: string | null) => time?.slice(0, 5) ?? null;
@@ -136,13 +117,7 @@ export class TasksService {
     const now = new Date();
     const filters: (SQL | undefined)[] = [
       holdsAll(actor, 'tasks.read') ? undefined : sql`false`,
-      query.archived
-        ? isNotNull(tasks.archivedAt)
-        : and(
-            isNull(tasks.archivedAt),
-            or(isNull(tasks.clientId), this.clients.isLive(tasks.clientId)),
-            this.engagements.isLive(tasks.projectId, tasks.retainerCycleId),
-          ),
+      query.archived ? isNotNull(tasks.archivedAt) : this.visibleSql(),
       inArray(tasks.status, query.status),
     ];
     if (query.search) filters.push(ilike(tasks.title, `%${escapeLike(query.search)}%`));
@@ -177,6 +152,7 @@ export class TasksService {
     if (query.dueFrom) filters.push(gte(tasks.dueDate, query.dueFrom));
     if (query.dueTo) filters.push(lte(tasks.dueDate, query.dueTo));
     if (query.createdBy === 'me') filters.push(eq(tasks.createdById, actor.id));
+    if (query.reviewer === 'me') filters.push(this.manageScopeSql(actor));
     const where = and(...filters);
 
     const sortColumn = {
@@ -660,6 +636,39 @@ export class TasksService {
       await this.auditArchive(tx, actor, 'task.restored', id, false);
     });
     return this.detail(actor, id);
+  }
+
+  /**
+   * SQL over a row of `tasks`: shown in views and counts, so neither archived nor read-only
+   * through an archived client, project or retainer (rule 17).
+   */
+  visibleSql(): SQL {
+    return and(
+      isNull(tasks.archivedAt),
+      or(isNull(tasks.clientId), this.clients.isLive(tasks.clientId)),
+      this.engagements.isLive(tasks.projectId, tasks.retainerCycleId),
+    ) as SQL;
+  }
+
+  /**
+   * SQL over a row of `tasks`: under the actor's manage scope (`tasks.manage` under any scope), so
+   * they may review it.
+   */
+  manageScopeSql(actor: CurrentUserInfo): SQL {
+    const scopes = permissionScopes(actor.access, 'tasks.manage');
+    if (scopes.includes('all')) return sql`true`;
+    const managed = actor.access.departments.filter((d) => d.isManager).map((d) => d.code);
+    const parts: SQL[] = [];
+    if (scopes.includes('department') && managed.length > 0) {
+      parts.push(inArray(tasks.department, managed));
+    }
+    if (scopes.includes('own_clients')) {
+      parts.push(this.clients.managedBy(tasks.clientId, actor.id));
+    }
+    if (scopes.includes('assigned')) {
+      parts.push(this.engagements.projectManagedBy(tasks.projectId, actor.id));
+    }
+    return parts.length > 0 ? (or(...parts) as SQL) : sql`false`;
   }
 
   /** List items for task rows, with their people, links and computed flags. */

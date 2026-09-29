@@ -210,6 +210,12 @@ export class EngagementDirectory {
         where ${retainers.archivedAt} is null))`;
   }
 
+  /** `projectColumn` holds a project whose project manager is `userId`. */
+  projectManagedBy(projectColumn: PgColumn, userId: string): SQL {
+    return sql`${qualified(projectColumn)} in (select ${projects.id} from ${projects}
+      where ${projects.projectManagerId} = ${userId})`;
+  }
+
   /** `cycleColumn` holds a cycle of the retainer. */
   cycleOf(cycleColumn: PgColumn, retainerId: string): SQL {
     return sql`${qualified(cycleColumn)} in (select ${retainerCycles.id} from ${retainerCycles}

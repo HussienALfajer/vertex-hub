@@ -230,3 +230,27 @@ export const taskRevisions = pgTable(
     ),
   ],
 );
+
+/** Comments on a task (rule 16); mentions are `@{userId}` tokens in the plain-text body. */
+export const taskComments = pgTable(
+  'task_comments',
+  {
+    id: id(),
+    taskId: uuid('task_id')
+      .notNull()
+      .references(() => tasks.id),
+    authorId: uuid('author_id')
+      .notNull()
+      .references(() => users.id),
+    body: text('body').notNull(),
+    /** Derived from the body on save. */
+    mentionedUserIds: uuid('mentioned_user_ids').array().notNull().default(sql`'{}'::uuid[]`),
+    editedAt: timestamp('edited_at', { withTimezone: true }),
+    ...timestamps(),
+    archivedAt: archivedAt(),
+  },
+  (table) => [
+    index('task_comments_task_id_idx').on(table.taskId, table.createdAt),
+    index('task_comments_author_id_idx').on(table.authorId),
+  ],
+);

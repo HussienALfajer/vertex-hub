@@ -795,7 +795,13 @@
       "overLimit": "فوق الحد",
       "overrideReason": "سبب البدء رغم الانتظار",
       "revisionId": "التعديل",
-      "decision": "القرار"
+      "decision": "القرار",
+      "taskId": "المهمة",
+      "text": "النص",
+      "done": "منجز",
+      "site": "الموقع",
+      "body": "النص",
+      "mentionedUserIds": "الإشارات"
     },
     "kinds": {
       "activation": "تفعيل",

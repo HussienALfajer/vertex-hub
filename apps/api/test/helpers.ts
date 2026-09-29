@@ -20,6 +20,7 @@ import {
   retainerDeliverables,
   retainers,
   taskChecklistItems,
+  taskComments,
   taskDependencies,
   taskLinks,
   taskRevisions,
@@ -123,6 +124,16 @@ export async function removeUsers(db: Database, ids: string[]): Promise<void> {
         .where(or(inArray(tasks.createdById, ids), inArray(tasks.assigneeId, ids)))
     ).map((row) => row.id),
   );
+  const comments = (
+    await db
+      .select({ id: taskComments.id })
+      .from(taskComments)
+      .where(inArray(taskComments.authorId, ids))
+  ).map((row) => row.id);
+  if (comments.length > 0) {
+    await db.delete(auditEntries).where(inArray(auditEntries.entityId, comments));
+    await db.delete(taskComments).where(inArray(taskComments.id, comments));
+  }
   await db
     .delete(auditEntries)
     .where(or(inArray(auditEntries.actorId, ids), inArray(auditEntries.entityId, ids)));
@@ -180,8 +191,8 @@ export async function removeClients(db: Database, ids: string[]): Promise<void> 
 }
 
 /**
- * Removes seeded tasks with their dependencies (both ways), checklists, links, revisions and
- * audit entries (test cleanup only).
+ * Removes seeded tasks with their dependencies (both ways), checklists, links, revisions,
+ * comments and audit entries (test cleanup only).
  */
 export async function removeTasks(db: Database, ids: string[]): Promise<void> {
   if (ids.length === 0) return;
@@ -194,6 +205,10 @@ export async function removeTasks(db: Database, ids: string[]): Promise<void> {
       .select({ id: taskLinks.id })
       .from(taskLinks)
       .where(inArray(taskLinks.taskId, ids))),
+    ...(await db
+      .select({ id: taskComments.id })
+      .from(taskComments)
+      .where(inArray(taskComments.taskId, ids))),
   ].map((row) => row.id);
   await db.delete(auditEntries).where(inArray(auditEntries.entityId, [...ids, ...children]));
   await db
@@ -201,6 +216,7 @@ export async function removeTasks(db: Database, ids: string[]): Promise<void> {
     .where(or(inArray(taskDependencies.taskId, ids), inArray(taskDependencies.dependsOnId, ids)));
   await db.delete(taskChecklistItems).where(inArray(taskChecklistItems.taskId, ids));
   await db.delete(taskLinks).where(inArray(taskLinks.taskId, ids));
+  await db.delete(taskComments).where(inArray(taskComments.taskId, ids));
   await db.delete(taskRevisions).where(inArray(taskRevisions.taskId, ids));
   await db.delete(tasks).where(inArray(tasks.id, ids));
 }

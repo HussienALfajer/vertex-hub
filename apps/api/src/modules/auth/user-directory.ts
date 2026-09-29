@@ -77,6 +77,36 @@ export class UserDirectory {
     return row ? { ...row, archived: false } : null;
   }
 
+  /**
+   * Non-archived members (primary or secondary) of any of the departments, by name, each with the
+   * ones of those departments they belong to; an invited user qualifies.
+   */
+  async activeMembers(
+    codes: DepartmentCode[],
+    executor: Database | Transaction = this.db,
+  ): Promise<(UserSummary & { departments: DepartmentCode[] })[]> {
+    if (codes.length === 0) return [];
+    const rows = await executor
+      .select({ id: users.id, name: users.name, code: departments.code })
+      .from(users)
+      .innerJoin(departmentMembers, eq(departmentMembers.userId, users.id))
+      .innerJoin(departments, eq(departments.id, departmentMembers.departmentId))
+      .where(and(inArray(departments.code, codes), isNull(users.archivedAt)))
+      .orderBy(users.name, users.id, departments.code);
+    const members = new Map<string, UserSummary & { departments: DepartmentCode[] }>();
+    for (const row of rows) {
+      const member = members.get(row.id) ?? {
+        id: row.id,
+        name: row.name,
+        archived: false,
+        departments: [],
+      };
+      member.departments.push(row.code);
+      members.set(row.id, member);
+    }
+    return [...members.values()];
+  }
+
   /** The department codes each of the given users belongs to. */
   async memberships(ids: string[], executor: Database | Transaction = this.db) {
     const unique = [...new Set(ids)];
