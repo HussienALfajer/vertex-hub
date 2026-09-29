@@ -40,6 +40,7 @@ import {
   FolderKanbanIcon,
   KeyRoundIcon,
   LinkIcon,
+  ListTodoIcon,
   MailIcon,
   PencilIcon,
   PhoneIcon,
@@ -487,6 +488,8 @@ function ArchiveDialog({
                       <Building2Icon className="size-4 text-muted-foreground" />
                     ) : item.type === 'account_manager_of_client' ? (
                       <BriefcaseBusinessIcon className="size-4 text-muted-foreground" />
+                    ) : item.type === 'assignee_of_open_tasks' ? (
+                      <ListTodoIcon className="size-4 text-muted-foreground" />
                     ) : (
                       <FolderKanbanIcon className="size-4 text-muted-foreground" />
                     )}
@@ -517,6 +520,14 @@ function ArchiveDialog({
                       render={<Link to="/projects/$projectId" params={{ projectId: item.id }} />}
                     >
                       {t('users.responsibilities.openProject')}
+                    </Button>
+                  ) : item.type === 'assignee_of_open_tasks' ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      render={<Link to="/tasks/$taskId" params={{ taskId: item.id }} />}
+                    >
+                      {t('users.responsibilities.openTask')}
                     </Button>
                   ) : null}
                 </li>

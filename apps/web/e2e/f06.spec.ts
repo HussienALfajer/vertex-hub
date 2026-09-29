@@ -1,0 +1,198 @@
+import { expect, type Page, test } from '@playwright/test';
+import ar from '../src/i18n/locales/ar.json' with { type: 'json' };
+import { accountManagerMe, employeeMe, mockApi, PROJECTS_TODAY, seedIds } from './fixtures';
+
+// F06 task flows against the mocked API (the real rules are covered by apps/api/test).
+
+/** Freezes the browser's clock on the seeded "today" so due dates and badges are stable. */
+async function onTasksToday(page: Page) {
+  await page.clock.setFixedTime(new Date(`${PROJECTS_TODAY}T09:00:00+03:00`));
+}
+
+/** Clicks a workflow move in the task header, then confirms its dialog when it opens one. */
+async function move(page: Page, name: string, note?: string) {
+  await page.getByRole('button', { name, exact: true }).first().click();
+  if (note !== undefined) {
+    const dialog = page.getByRole('dialog');
+    await dialog.getByRole('textbox').first().fill(note);
+    await dialog.getByRole('button', { name, exact: true }).click();
+  }
+}
+
+async function expectStatus(page: Page, status: keyof typeof ar.tasks.statuses) {
+  const hero = page.locator('section').first();
+  await expect(hero.getByText(ar.tasks.statuses[status], { exact: true })).toBeVisible();
+}
+
+test('request → assign → work → internal return → client changes over the limit → approve → deliver', async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  // Tall enough that the header's moves never sit under the toasts.
+  await page.setViewportSize({ width: 1280, height: 2000 });
+  await onTasksToday(page);
+  const api = await mockApi(page, { signedIn: true, me: employeeMe });
+
+  // A plain employee requests a banner from Design for a client's project.
+  await page.goto('/tasks');
+  await page.getByRole('link', { name: ar.tasks.actions.request }).first().click();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(ar.tasks.new.requestTitle);
+  await page.getByRole('combobox', { name: ar.tasks.form.department }).click();
+  await page.getByRole('option', { name: 'التصميم' }).click();
+  await page.getByLabel(ar.tasks.form.title).fill('بانر الافتتاح');
+  await page.getByLabel(ar.tasks.form.dueDate).fill('2026-10-13');
+  await page.getByRole('combobox', { name: ar.tasks.form.client }).click();
+  await page.getByRole('option', { name: /مطعم الياسمين/ }).click();
+  await page.getByRole('combobox', { name: ar.tasks.form.engagement }).click();
+  await page.getByRole('option', { name: 'الهوية البصرية الجديدة' }).click();
+  await page.getByLabel(ar.tasks.form.revisionLimit).fill('1');
+  await page.getByRole('button', { name: ar.tasks.form.sendRequest }).click();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('بانر الافتتاح');
+  await expect(page.getByText(ar.tasks.unassigned).first()).toBeVisible();
+  const bannerUrl = page.url();
+
+  // The Design manager finds it in the unassigned queue and assigns it.
+  api.signInAs(accountManagerMe);
+  await page.goto('/tasks');
+  const queue = page.getByRole('region', {
+    name: ar.tasks.my.sections.unassignedInMyDepartments,
+  });
+  await queue.getByRole('link', { name: 'بانر الافتتاح' }).click();
+  await page.getByRole('button', { name: ar.tasks.actions.more }).click();
+  await page.getByRole('menuitem', { name: ar.tasks.actions.reassign }).click();
+  const reassign = page.getByRole('dialog');
+  await reassign.getByRole('combobox', { name: ar.tasks.form.assignee }).click();
+  await page.getByRole('option', { name: 'ليان الأحمد' }).click();
+  await reassign.getByRole('button', { name: ar.common.save }).click();
+  await expect(page.getByText(ar.tasks.reassign.done)).toBeVisible();
+
+  // A second task for Content waits on the banner.
+  await page.goto('/tasks/new?mode=request');
+  await page.getByRole('combobox', { name: ar.tasks.form.department }).click();
+  await page.getByRole('option', { name: 'إدارة المحتوى' }).click();
+  await page.getByLabel(ar.tasks.form.title).fill('نشر البانر');
+  await page.getByLabel(ar.tasks.form.dueDate).fill('2026-10-15');
+  await page.getByRole('combobox', { name: ar.tasks.form.client }).click();
+  await page.getByRole('option', { name: /مطعم الياسمين/ }).click();
+  const dependencies = page.getByLabel(ar.tasks.form.dependencies);
+  await dependencies.fill('بانر');
+  await page.getByRole('option', { name: 'بانر الافتتاح' }).click();
+  await page.getByRole('button', { name: ar.tasks.form.sendRequest }).click();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('نشر البانر');
+  await expect(page.getByText(ar.tasks.blocked).first()).toBeVisible();
+  const publishUrl = page.url();
+
+  // The assignee starts, ticks a checklist item, adds a link and submits for review.
+  await page.goto(bannerUrl);
+  await move(page, ar.tasks.moves.start);
+  await expectStatus(page, 'in_progress');
+  await page.getByLabel(ar.tasks.checklist.add).fill('قص المقاسات');
+  await page.getByRole('button', { name: ar.tasks.form.addItem, exact: true }).click();
+  await page.getByRole('checkbox', { name: 'قص المقاسات' }).click();
+  await expect(page.getByRole('checkbox', { name: 'قص المقاسات' })).toBeChecked();
+  await page.getByRole('button', { name: ar.tasks.links.add }).click();
+  await page.getByRole('dialog').getByLabel(ar.tasks.links.url).fill('https://drive.google.com/x');
+  await page.getByRole('dialog').getByRole('button', { name: ar.tasks.links.add }).click();
+  await expect(page.getByText(ar.tasks.links.added)).toBeVisible();
+  await move(page, ar.tasks.moves.submit);
+  await expectStatus(page, 'internal_review');
+
+  // The manager returns it (an internal revision, never counted), then it goes to the client.
+  await move(page, ar.tasks.moves.return, 'كبّر الشعار');
+  await expectStatus(page, 'revisions');
+  await expect(page.getByText(ar.tasks.revisions.internal, { exact: true })).toBeVisible();
+  await move(page, ar.tasks.moves.resubmit);
+  await move(page, ar.tasks.moves.send_to_client);
+  await expectStatus(page, 'awaiting_client');
+
+  // The account manager records changes twice: the second is over the limit of 1.
+  await move(page, ar.tasks.moves.client_changes, 'غيّر الخلفية');
+  await move(page, ar.tasks.moves.resubmit);
+  await move(page, ar.tasks.moves.send_to_client);
+  await move(page, ar.tasks.moves.client_changes, 'أضف رقم الهاتف');
+  await expect(page.getByText(ar.tasks.overLimitPending).first()).toBeVisible();
+  await page.getByRole('button', { name: ar.tasks.revisions.decide }).click();
+  await page.getByRole('dialog').getByRole('button', { name: ar.tasks.revisions.decide }).click();
+  await expect(page.getByText(ar.tasks.revisions.decided.extra_work)).toBeVisible();
+  await expect(page.getByText(ar.tasks.overLimitPending)).toHaveCount(0);
+
+  // The client approves: the waiting task is no longer blocked. Then the banner is delivered.
+  await move(page, ar.tasks.moves.resubmit);
+  await move(page, ar.tasks.moves.send_to_client);
+  await page.getByRole('button', { name: ar.tasks.moves.client_approved, exact: true }).click();
+  await page
+    .getByRole('dialog')
+    .getByRole('button', { name: ar.tasks.moves.client_approved, exact: true })
+    .click();
+  await expectStatus(page, 'approved');
+  await page.goto(publishUrl);
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('نشر البانر');
+  await expect(page.getByText(ar.tasks.blocked)).toHaveCount(0);
+  await page.goto(bannerUrl);
+  await move(page, ar.tasks.moves.deliver);
+  await expectStatus(page, 'delivered');
+
+  // The over-limit decision logged extra work on the project.
+  await page.goto(`/projects/${seedIds.identityProject}?tab=extra-work`);
+  await expect(page.getByText('التعديل 2: بانر الافتتاح')).toBeVisible();
+});
+
+test('an employee sees every task but acts only on their own', async ({ page }) => {
+  await onTasksToday(page);
+  await mockApi(page, { signedIn: true, me: employeeMe });
+
+  // Someone else's task: readable, without actions.
+  await page.goto(`/tasks/${seedIds.openingPosts}`);
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('بوستات أسبوع الافتتاح');
+  await expect(page.getByText(ar.tasks.overLimitPending).first()).toBeVisible();
+  await expect(page.getByRole('button', { name: ar.tasks.actions.more })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: ar.tasks.revisions.decide })).toHaveCount(0);
+
+  // Their own task waits on unfinished work, so it cannot start without an override.
+  await page.goto(`/tasks/${seedIds.dishShoot}`);
+  await expect(page.getByText(ar.tasks.blocked).first()).toBeVisible();
+  await expect(page.getByRole('button', { name: ar.tasks.moves.start })).toHaveCount(0);
+
+  // Assigning: a plain employee may pick only themselves, in their own department.
+  await page.goto('/tasks/new');
+  await page.getByRole('combobox', { name: ar.tasks.form.assignee }).click();
+  await expect(page.getByRole('option')).toHaveCount(1);
+  await expect(page.getByRole('option')).toContainText('كريم الزين');
+});
+
+test('the task list keeps its filters in the URL and sorts by column', async ({ page }) => {
+  await onTasksToday(page);
+  await mockApi(page, { signedIn: true, me: accountManagerMe });
+  await page.goto('/tasks/list');
+  await expect(page.getByRole('link', { name: 'تصاميم منيو الخريف' })).toBeVisible();
+
+  await page.getByRole('button', { name: ar.tasks.filters.overdue }).click();
+  await expect(page).toHaveURL(/overdue=true/);
+  await expect(page.getByRole('row')).toHaveCount(2);
+  await expect(page.getByRole('link', { name: 'تصاميم منيو الخريف' })).toBeVisible();
+  await page.getByRole('button', { name: ar.tasks.filters.clear }).click();
+
+  await page.getByRole('button', { name: ar.tasks.columns.priority }).click();
+  await expect(page).toHaveURL(/sort=priority/);
+  await expect(page.getByRole('columnheader', { name: ar.tasks.columns.priority })).toHaveAttribute(
+    'aria-sort',
+    'descending',
+  );
+  await expect(page.getByRole('row').nth(1)).toContainText('فيديو تعريفي للعيادة');
+});
+
+test('archiving a user with open tasks lists them with a link to each', async ({ page }) => {
+  await onTasksToday(page);
+  await mockApi(page, { signedIn: true });
+  await page.goto(`/team/${seedIds.karim}`);
+  await page.getByRole('button', { name: ar.users.profile.actions }).click();
+  await page.getByRole('menuitem', { name: ar.users.profile.archive }).click();
+  await page
+    .getByRole('alertdialog')
+    .getByRole('button', { name: ar.users.confirm.archiveAction })
+    .click();
+  const dialog = page.getByRole('alertdialog');
+  await expect(dialog.getByText('منفّذ المهمة المفتوحة جلسة تصوير الأطباق')).toBeVisible();
+  await dialog.getByRole('link', { name: ar.users.responsibilities.openTask }).click();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('جلسة تصوير الأطباق');
+});

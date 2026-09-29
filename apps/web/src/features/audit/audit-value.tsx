@@ -11,8 +11,14 @@ import {
   NOTE_CHANNELS,
   PLATFORM_ACCESS_STATES,
   PROJECT_STATUSES,
+  REQUEST_SCOPES,
   RETAINER_STATUSES,
+  REVISION_DECISIONS,
+  REVISION_SOURCES,
   ROLES,
+  TASK_PRIORITIES,
+  TASK_STATUSES,
+  TASK_TYPES,
   USER_STATUSES,
 } from '@vertex-hub/contracts';
 import { Badge, ColorSwatch } from '@vertex-hub/ui';
@@ -55,8 +61,22 @@ function enumLabel(
     if (retainer) return t(`retainers.statuses.${retainer}`);
     const cycle = entityType === 'retainer_cycle' ? find(CYCLE_STATUSES) : undefined;
     if (cycle) return t(`retainers.cycleStatuses.${cycle}`);
+    const task = entityType === 'task' ? find(TASK_STATUSES) : undefined;
+    if (task) return t(`tasks.statuses.${task}`);
     const user = find(USER_STATUSES);
     if (user) return t(`users.statuses.${user}`);
+  }
+  if (entityType === 'task') {
+    const priority = field === 'priority' ? find(TASK_PRIORITIES) : undefined;
+    if (priority) return t(`tasks.priorities.${priority}`);
+    const type = field === 'type' ? find(TASK_TYPES) : undefined;
+    if (type) return t(`tasks.types.${type}`);
+    const scope = field === 'requestScope' ? find(REQUEST_SCOPES) : undefined;
+    if (scope) return t(`tasks.requestScopes.${scope}`);
+    const source = field === 'revisionSource' ? find(REVISION_SOURCES) : undefined;
+    if (source) return t(`tasks.revisionSources.${source}`);
+    const decision = field === 'decision' ? find(REVISION_DECISIONS) : undefined;
+    if (decision) return t(`tasks.revisions.decisions.${decision}`);
   }
   if (field === 'billingStatus') {
     const billing = find(EXTRA_WORK_BILLING);
@@ -123,6 +143,9 @@ export function AuditValue({
       return <span>{value ? t('account.twoFactor.on') : t('account.twoFactor.off')}</span>;
     }
     return <span>{value ? t('common.yes') : t('common.no')}</span>;
+  }
+  if (field === 'department' && DEPARTMENT_CODES.some((code) => code === value)) {
+    return <DepartmentItem code={value as DepartmentCode} />;
   }
   const label = enumLabel(t, entityType, field, value);
   if (label) return <span>{label}</span>;

@@ -65,6 +65,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  TableSortHead,
   Tabs,
   TabsContent,
   TabsList,
@@ -149,6 +150,10 @@ function DesignSystemPage() {
     value,
     label: t(`designSystem.departments.${value}`),
   }));
+  const [dueOrder, setDueOrder] = useState<'asc' | 'desc'>('asc');
+  const rows = [...sampleRows].sort((a, b) =>
+    dueOrder === 'asc' ? a.due.localeCompare(b.due) : b.due.localeCompare(a.due),
+  );
 
   return (
     <>
@@ -250,13 +255,18 @@ function DesignSystemPage() {
             <TableRow>
               <TableHead>{t('designSystem.task')}</TableHead>
               <TableHead>{t('designSystem.client')}</TableHead>
-              <TableHead>{t('designSystem.due')}</TableHead>
+              <TableSortHead
+                direction={dueOrder}
+                onSort={() => setDueOrder(dueOrder === 'asc' ? 'desc' : 'asc')}
+              >
+                {t('designSystem.due')}
+              </TableSortHead>
               <TableHead className="text-end">{t('designSystem.amount')}</TableHead>
               <TableHead>{t('designSystem.status')}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {sampleRows.map((row) => (
+            {rows.map((row) => (
               <TableRow key={row.task}>
                 <TableCell className="font-medium">
                   {t(`designSystem.sampleTasks.${row.task}`)}

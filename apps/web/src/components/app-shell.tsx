@@ -24,6 +24,7 @@ import {
   CircleUserIcon,
   FolderKanbanIcon,
   HouseIcon,
+  ListTodoIcon,
   LogOutIcon,
   type LucideIcon,
   MenuIcon,
@@ -44,6 +45,7 @@ interface NavItem {
   label:
     | 'nav.home'
     | 'nav.clients'
+    | 'nav.tasks'
     | 'nav.projects'
     | 'nav.retainers'
     | 'nav.team'
@@ -55,10 +57,27 @@ interface NavItem {
   permission?: Permission;
   /** Active only on this exact path; otherwise also on its sub-pages (a profile under Team). */
   exact?: boolean;
+  /** Pages of the section, listed under it. */
+  children?: NavChild[];
+}
+
+interface NavChild {
+  to: LinkProps['to'];
+  label: 'nav.myTasks' | 'nav.taskList';
 }
 
 const navItems: NavItem[] = [
   { to: '/', label: 'nav.home', icon: HouseIcon, exact: true },
+  {
+    to: '/tasks',
+    label: 'nav.tasks',
+    icon: ListTodoIcon,
+    permission: 'tasks.read',
+    children: [
+      { to: '/tasks', label: 'nav.myTasks' },
+      { to: '/tasks/list', label: 'nav.taskList' },
+    ],
+  },
   { to: '/clients', label: 'nav.clients', icon: BriefcaseBusinessIcon, permission: 'clients.read' },
   { to: '/projects', label: 'nav.projects', icon: FolderKanbanIcon, permission: 'projects.read' },
   { to: '/retainers', label: 'nav.retainers', icon: RepeatIcon, permission: 'projects.read' },
@@ -85,6 +104,20 @@ export function AppShell({ children }: { children: ReactNode }) {
   );
 }
 
+const navLink = cn(
+  'relative flex items-center rounded-md text-sidebar-muted-foreground transition-colors duration-150 ease-out',
+  'hover:bg-sidebar-hover hover:text-sidebar-foreground',
+  'data-[status=active]:bg-sidebar-active data-[status=active]:font-medium data-[status=active]:text-sidebar-foreground',
+  'before:absolute before:inset-y-2 before:start-0 before:w-0.5 before:bg-sidebar-marker before:opacity-0 data-[status=active]:before:opacity-100',
+);
+
+/** A section with pages under it: the active page is marked, the section only brightens. */
+const navSection = cn(
+  'flex items-center rounded-md text-sidebar-muted-foreground transition-colors duration-150 ease-out',
+  'hover:bg-sidebar-hover hover:text-sidebar-foreground',
+  'data-[status=active]:font-medium data-[status=active]:text-sidebar-foreground',
+);
+
 /** Vertex Green navigation with the sand mark and a sand marker on the active item (§2, §7). */
 function Sidebar({ me, onNavigate }: { me: MeResponse; onNavigate?: () => void }) {
   const { t } = useTranslation();
@@ -96,22 +129,33 @@ function Sidebar({ me, onNavigate }: { me: MeResponse; onNavigate?: () => void }
         <span className="text-lg font-bold">{t('app.name')}</span>
       </div>
       <nav aria-label={t('nav.label')} className="flex flex-col gap-1 p-3">
-        {items.map(({ to, label, icon: Icon, exact }) => (
-          <Link
-            key={to}
-            to={to}
-            onClick={onNavigate}
-            activeOptions={{ exact: exact ?? false }}
-            className={cn(
-              'relative flex h-10 items-center gap-3 rounded-md px-3 text-base text-sidebar-muted-foreground transition-colors duration-150 ease-out',
-              'hover:bg-sidebar-hover hover:text-sidebar-foreground',
-              'data-[status=active]:bg-sidebar-active data-[status=active]:font-medium data-[status=active]:text-sidebar-foreground',
-              'before:absolute before:inset-y-2 before:start-0 before:w-0.5 before:bg-sidebar-marker before:opacity-0 data-[status=active]:before:opacity-100',
+        {items.map(({ to, label, icon: Icon, exact, children }) => (
+          <div key={to} className="flex flex-col gap-1">
+            <Link
+              to={to}
+              onClick={onNavigate}
+              activeOptions={{ exact: exact ?? false }}
+              className={cn(children ? navSection : navLink, 'h-10 gap-3 px-3 text-base')}
+            >
+              <Icon className="size-5" />
+              {t(label)}
+            </Link>
+            {children && (
+              <div className="flex flex-col gap-0.5">
+                {children.map((child) => (
+                  <Link
+                    key={child.label}
+                    to={child.to}
+                    onClick={onNavigate}
+                    activeOptions={{ exact: true, includeSearch: false }}
+                    className={cn(navLink, 'h-8 ps-11 pe-3 text-sm')}
+                  >
+                    {t(child.label)}
+                  </Link>
+                ))}
+              </div>
             )}
-          >
-            <Icon className="size-5" />
-            {t(label)}
-          </Link>
+          </div>
         ))}
       </nav>
     </div>

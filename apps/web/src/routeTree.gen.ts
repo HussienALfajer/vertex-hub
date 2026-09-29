@@ -28,6 +28,10 @@ import { Route as AppProjectsNewRouteImport } from './routes/_app/projects/new'
 import { Route as AppRetainersIndexRouteImport } from './routes/_app/retainers/index'
 import { Route as AppRetainersRetainerIdRouteImport } from './routes/_app/retainers/$retainerId'
 import { Route as AppRetainersNewRouteImport } from './routes/_app/retainers/new'
+import { Route as AppTasksIndexRouteImport } from './routes/_app/tasks/index'
+import { Route as AppTasksTaskIdRouteImport } from './routes/_app/tasks/$taskId'
+import { Route as AppTasksListRouteImport } from './routes/_app/tasks/list'
+import { Route as AppTasksNewRouteImport } from './routes/_app/tasks/new'
 import { Route as AppTeamIndexRouteImport } from './routes/_app/team/index'
 import { Route as AppTeamUserIdRouteImport } from './routes/_app/team/$userId'
 import { Route as AppTeamNewRouteImport } from './routes/_app/team/new'
@@ -127,6 +131,26 @@ const AppRetainersNewRoute = AppRetainersNewRouteImport.update({
   path: '/retainers/new',
   getParentRoute: () => AppRoute,
 } as any)
+const AppTasksIndexRoute = AppTasksIndexRouteImport.update({
+  id: '/tasks/',
+  path: '/tasks/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppTasksTaskIdRoute = AppTasksTaskIdRouteImport.update({
+  id: '/tasks/$taskId',
+  path: '/tasks/$taskId',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppTasksListRoute = AppTasksListRouteImport.update({
+  id: '/tasks/list',
+  path: '/tasks/list',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppTasksNewRoute = AppTasksNewRouteImport.update({
+  id: '/tasks/new',
+  path: '/tasks/new',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppTeamIndexRoute = AppTeamIndexRouteImport.update({
   id: '/team/',
   path: '/team/',
@@ -158,12 +182,16 @@ export interface FileRoutesByFullPath {
   '/projects/new': typeof AppProjectsNewRoute
   '/retainers/$retainerId': typeof AppRetainersRetainerIdRoute
   '/retainers/new': typeof AppRetainersNewRoute
+  '/tasks/$taskId': typeof AppTasksTaskIdRoute
+  '/tasks/list': typeof AppTasksListRoute
+  '/tasks/new': typeof AppTasksNewRoute
   '/team/$userId': typeof AppTeamUserIdRoute
   '/team/new': typeof AppTeamNewRoute
   '/clients/': typeof AppClientsIndexRoute
   '/departments/': typeof AppDepartmentsIndexRoute
   '/projects/': typeof AppProjectsIndexRoute
   '/retainers/': typeof AppRetainersIndexRoute
+  '/tasks/': typeof AppTasksIndexRoute
   '/team/': typeof AppTeamIndexRoute
 }
 export interface FileRoutesByTo {
@@ -181,12 +209,16 @@ export interface FileRoutesByTo {
   '/projects/new': typeof AppProjectsNewRoute
   '/retainers/$retainerId': typeof AppRetainersRetainerIdRoute
   '/retainers/new': typeof AppRetainersNewRoute
+  '/tasks/$taskId': typeof AppTasksTaskIdRoute
+  '/tasks/list': typeof AppTasksListRoute
+  '/tasks/new': typeof AppTasksNewRoute
   '/team/$userId': typeof AppTeamUserIdRoute
   '/team/new': typeof AppTeamNewRoute
   '/clients': typeof AppClientsIndexRoute
   '/departments': typeof AppDepartmentsIndexRoute
   '/projects': typeof AppProjectsIndexRoute
   '/retainers': typeof AppRetainersIndexRoute
+  '/tasks': typeof AppTasksIndexRoute
   '/team': typeof AppTeamIndexRoute
 }
 export interface FileRoutesById {
@@ -206,12 +238,16 @@ export interface FileRoutesById {
   '/_app/projects/new': typeof AppProjectsNewRoute
   '/_app/retainers/$retainerId': typeof AppRetainersRetainerIdRoute
   '/_app/retainers/new': typeof AppRetainersNewRoute
+  '/_app/tasks/$taskId': typeof AppTasksTaskIdRoute
+  '/_app/tasks/list': typeof AppTasksListRoute
+  '/_app/tasks/new': typeof AppTasksNewRoute
   '/_app/team/$userId': typeof AppTeamUserIdRoute
   '/_app/team/new': typeof AppTeamNewRoute
   '/_app/clients/': typeof AppClientsIndexRoute
   '/_app/departments/': typeof AppDepartmentsIndexRoute
   '/_app/projects/': typeof AppProjectsIndexRoute
   '/_app/retainers/': typeof AppRetainersIndexRoute
+  '/_app/tasks/': typeof AppTasksIndexRoute
   '/_app/team/': typeof AppTeamIndexRoute
 }
 export interface FileRouteTypes {
@@ -231,12 +267,16 @@ export interface FileRouteTypes {
     | '/projects/new'
     | '/retainers/$retainerId'
     | '/retainers/new'
+    | '/tasks/$taskId'
+    | '/tasks/list'
+    | '/tasks/new'
     | '/team/$userId'
     | '/team/new'
     | '/clients/'
     | '/departments/'
     | '/projects/'
     | '/retainers/'
+    | '/tasks/'
     | '/team/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -254,12 +294,16 @@ export interface FileRouteTypes {
     | '/projects/new'
     | '/retainers/$retainerId'
     | '/retainers/new'
+    | '/tasks/$taskId'
+    | '/tasks/list'
+    | '/tasks/new'
     | '/team/$userId'
     | '/team/new'
     | '/clients'
     | '/departments'
     | '/projects'
     | '/retainers'
+    | '/tasks'
     | '/team'
   id:
     | '__root__'
@@ -278,12 +322,16 @@ export interface FileRouteTypes {
     | '/_app/projects/new'
     | '/_app/retainers/$retainerId'
     | '/_app/retainers/new'
+    | '/_app/tasks/$taskId'
+    | '/_app/tasks/list'
+    | '/_app/tasks/new'
     | '/_app/team/$userId'
     | '/_app/team/new'
     | '/_app/clients/'
     | '/_app/departments/'
     | '/_app/projects/'
     | '/_app/retainers/'
+    | '/_app/tasks/'
     | '/_app/team/'
   fileRoutesById: FileRoutesById
 }
@@ -429,6 +477,34 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppRetainersNewRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/tasks/': {
+      id: '/_app/tasks/'
+      path: '/tasks'
+      fullPath: '/tasks/'
+      preLoaderRoute: typeof AppTasksIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/tasks/$taskId': {
+      id: '/_app/tasks/$taskId'
+      path: '/tasks/$taskId'
+      fullPath: '/tasks/$taskId'
+      preLoaderRoute: typeof AppTasksTaskIdRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/tasks/list': {
+      id: '/_app/tasks/list'
+      path: '/tasks/list'
+      fullPath: '/tasks/list'
+      preLoaderRoute: typeof AppTasksListRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/tasks/new': {
+      id: '/_app/tasks/new'
+      path: '/tasks/new'
+      fullPath: '/tasks/new'
+      preLoaderRoute: typeof AppTasksNewRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/team/': {
       id: '/_app/team/'
       path: '/team'
@@ -465,12 +541,16 @@ interface AppRouteChildren {
   AppProjectsNewRoute: typeof AppProjectsNewRoute
   AppRetainersRetainerIdRoute: typeof AppRetainersRetainerIdRoute
   AppRetainersNewRoute: typeof AppRetainersNewRoute
+  AppTasksTaskIdRoute: typeof AppTasksTaskIdRoute
+  AppTasksListRoute: typeof AppTasksListRoute
+  AppTasksNewRoute: typeof AppTasksNewRoute
   AppTeamUserIdRoute: typeof AppTeamUserIdRoute
   AppTeamNewRoute: typeof AppTeamNewRoute
   AppClientsIndexRoute: typeof AppClientsIndexRoute
   AppDepartmentsIndexRoute: typeof AppDepartmentsIndexRoute
   AppProjectsIndexRoute: typeof AppProjectsIndexRoute
   AppRetainersIndexRoute: typeof AppRetainersIndexRoute
+  AppTasksIndexRoute: typeof AppTasksIndexRoute
   AppTeamIndexRoute: typeof AppTeamIndexRoute
 }
 
@@ -486,12 +566,16 @@ const AppRouteChildren: AppRouteChildren = {
   AppProjectsNewRoute: AppProjectsNewRoute,
   AppRetainersRetainerIdRoute: AppRetainersRetainerIdRoute,
   AppRetainersNewRoute: AppRetainersNewRoute,
+  AppTasksTaskIdRoute: AppTasksTaskIdRoute,
+  AppTasksListRoute: AppTasksListRoute,
+  AppTasksNewRoute: AppTasksNewRoute,
   AppTeamUserIdRoute: AppTeamUserIdRoute,
   AppTeamNewRoute: AppTeamNewRoute,
   AppClientsIndexRoute: AppClientsIndexRoute,
   AppDepartmentsIndexRoute: AppDepartmentsIndexRoute,
   AppProjectsIndexRoute: AppProjectsIndexRoute,
   AppRetainersIndexRoute: AppRetainersIndexRoute,
+  AppTasksIndexRoute: AppTasksIndexRoute,
   AppTeamIndexRoute: AppTeamIndexRoute,
 }
 

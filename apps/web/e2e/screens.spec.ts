@@ -357,6 +357,60 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await expect(page.getByRole('cell', { name: ar.audit.fields.manager })).toBeVisible();
       await screenshot(page, testInfo, `audit-${colorScheme}`);
     });
+
+    test('my tasks', async ({ page }, testInfo) => {
+      await page.setViewportSize({ width: 1280, height: 1600 });
+      await page.clock.setFixedTime(new Date(`${PROJECTS_TODAY}T09:00:00+03:00`));
+      await mockApi(page, { signedIn: true, me: accountManagerMe });
+      await page.goto('/tasks');
+      await expect(
+        page.getByRole('region', { name: ar.tasks.my.sections.overdue }).getByRole('link'),
+      ).toHaveText('تصاميم منيو الخريف');
+      await expect(
+        page.getByRole('region', { name: ar.tasks.my.sections.requestedByMe }),
+      ).toBeVisible();
+      await screenshot(page, testInfo, `my-tasks-${colorScheme}`);
+    });
+
+    test('task list', async ({ page }, testInfo) => {
+      await page.setViewportSize({ width: 1440, height: 1100 });
+      await page.clock.setFixedTime(new Date(`${PROJECTS_TODAY}T09:00:00+03:00`));
+      await mockApi(page, { signedIn: true });
+      await page.goto('/tasks/list');
+      await expect(page.getByRole('link', { name: 'بوستات أسبوع الافتتاح' })).toBeVisible();
+      await screenshot(page, testInfo, `task-list-${colorScheme}`);
+    });
+
+    test('new task, both modes', async ({ page }, testInfo) => {
+      await page.setViewportSize({ width: 1280, height: 1900 });
+      await page.clock.setFixedTime(new Date(`${PROJECTS_TODAY}T09:00:00+03:00`));
+      await mockApi(page, { signedIn: true, me: accountManagerMe });
+      await page.goto(`/tasks/new?clientId=${seedIds.jasmine}`);
+      await page.getByRole('combobox', { name: ar.tasks.form.assignee }).click();
+      await page.getByRole('option', { name: 'ليان الأحمد' }).click();
+      await page.getByLabel(ar.tasks.form.title).fill('تصميم بانر حملة رمضان');
+      await page.getByLabel(ar.tasks.form.dueDate).fill('2026-10-14');
+      await page.getByRole('switch', { name: ar.tasks.form.clientRequest }).click();
+      await page.getByRole('button', { name: ar.tasks.requestScopes.out_of_scope }).click();
+      await expect(page.getByText(ar.tasks.form.outOfScopeTitle)).toBeVisible();
+      await screenshot(page, testInfo, `new-task-assign-${colorScheme}`);
+
+      await page.setViewportSize({ width: 1280, height: 1300 });
+      await page.goto('/tasks/new?mode=request');
+      await expect(page.getByRole('heading', { level: 1 })).toHaveText(ar.tasks.new.requestTitle);
+      await screenshot(page, testInfo, `new-task-request-${colorScheme}`);
+    });
+
+    test('task page', async ({ page }, testInfo) => {
+      await page.setViewportSize({ width: 1280, height: 2000 });
+      await page.clock.setFixedTime(new Date(`${PROJECTS_TODAY}T09:00:00+03:00`));
+      await mockApi(page, { signedIn: true, me: accountManagerMe });
+      await page.goto(`/tasks/${seedIds.openingPosts}`);
+      await expect(page.getByRole('heading', { level: 1 })).toHaveText('بوستات أسبوع الافتتاح');
+      await expect(page.getByText('سأراجع العقد وأرد اليوم.')).toBeVisible();
+      await expect(page.getByRole('button', { name: ar.tasks.revisions.decide })).toBeVisible();
+      await screenshot(page, testInfo, `task-page-${colorScheme}`);
+    });
   });
 }
 

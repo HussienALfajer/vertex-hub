@@ -33,6 +33,13 @@ export function formatTime(value: Date | string): string {
   }).format(new Date(value));
 }
 
+/** A time of day stored without a date (`HH:MM`, already business-timezone time), e.g. "4:00 م". */
+export function formatTimeOfDay(time: string): string {
+  return new Intl.DateTimeFormat(APP_LOCALE, { timeStyle: 'short', timeZone: 'UTC' }).format(
+    new Date(`1970-01-01T${time}:00Z`),
+  );
+}
+
 /**
  * A calendar day stored without a time (`YYYY-MM-DD`, already a business-timezone day), e.g.
  * "5 أكتوبر 2026". Read as UTC so no timezone shift can move it to another day.

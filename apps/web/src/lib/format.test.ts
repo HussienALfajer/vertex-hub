@@ -9,6 +9,7 @@ import {
   formatLinkHost,
   formatMonth,
   formatNumber,
+  formatTimeOfDay,
   fromBusinessDateTimeInput,
   toBusinessDateTimeInput,
 } from './format';
@@ -20,6 +21,12 @@ describe('formatting', () => {
     const formatted = formatNumber(1234567.5);
     expect(formatted).not.toMatch(ARABIC_INDIC_DIGITS);
     expect(formatted.replace(/\D/g, '')).toBe('12345675');
+  });
+
+  it('formats a stored time of day as it is, with Latin digits', () => {
+    const formatted = formatTimeOfDay('16:05');
+    expect(formatted).not.toMatch(ARABIC_INDIC_DIGITS);
+    expect(formatted).toContain('4:05');
   });
 
   it('formats date-times with Latin digits in the business timezone', () => {

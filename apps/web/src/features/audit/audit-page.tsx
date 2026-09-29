@@ -596,6 +596,16 @@ function retainerTabOf(entry: AuditEntry): 'history' | 'extra-work' | undefined 
   return undefined;
 }
 
+const TASK_PARTS: AuditEntityType[] = ['task_checklist_item', 'task_link', 'task_comment'];
+
+/** The task a task, checklist item, link or comment entry belongs to. */
+function taskIdOf(entry: AuditEntry): string | undefined {
+  if (entry.entityType === 'task') return entry.entityId;
+  if (!TASK_PARTS.includes(entry.entityType)) return;
+  const taskId = entry.after?.taskId ?? entry.before?.taskId;
+  return typeof taskId === 'string' ? taskId : undefined;
+}
+
 /** The project a project, milestone or extra work entry belongs to. */
 function projectIdOf(entry: AuditEntry): string | undefined {
   if (entry.entityType === 'project') return entry.entityId;
@@ -624,6 +634,16 @@ function EntityLink({ entry, names }: { entry: AuditEntry; names: EntityNames })
         className={linkClass}
       >
         {names.department(entry.entityId) ?? none}
+      </Link>
+    );
+  }
+  const taskId = taskIdOf(entry);
+  if (taskId) {
+    // Entries carry the fields that changed, so the title shows only when it is one of them.
+    const title = entry.entityType === 'task' ? (entry.after?.title ?? entry.before?.title) : null;
+    return (
+      <Link to="/tasks/$taskId" params={{ taskId }} className={linkClass}>
+        {typeof title === 'string' ? title : t('audit.openTask')}
       </Link>
     );
   }
