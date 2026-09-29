@@ -72,7 +72,7 @@ import { FormAlert } from '../../components/form-alert';
 import { LoadError } from '../../components/load-error';
 import { TabHeader } from '../../components/tab-header';
 import { ApiError } from '../../lib/api/client';
-import { errorMessage } from '../../lib/errors';
+import { errorMessage, fieldError, SCREEN_ERROR } from '../../lib/errors';
 import { formatCalendarDate, formatDateTime, formatMonth, formatNumber } from '../../lib/format';
 import { BehindBadge, DeliverableIcon, lineName, OverDeliveredBadge } from './retainer-badges';
 import {
@@ -494,7 +494,10 @@ function AdjustDialog({
   const submit = form.handleSubmit(async (values) => {
     setFailure(null);
     if (after < 0) {
-      form.setError('delta', { message: t('errors.NEGATIVE_DELIVERED') });
+      form.setError('delta', {
+        type: SCREEN_ERROR,
+        message: t('errors.NEGATIVE_DELIVERED'),
+      });
       return;
     }
     try {
@@ -507,7 +510,10 @@ function AdjustDialog({
       close();
     } catch (error) {
       if (error instanceof ApiError && error.code === 'NEGATIVE_DELIVERED') {
-        form.setError('delta', { message: errorMessage(t, error) });
+        form.setError('delta', {
+          type: SCREEN_ERROR,
+          message: errorMessage(t, error),
+        });
       } else {
         setFailure(errorMessage(t, error));
       }
@@ -563,7 +569,7 @@ function AdjustDialog({
           </p>
           {errors.delta && (
             <p role="alert" className="text-sm text-destructive-text">
-              {errors.delta.message || t('retainers.cycle.errors.amount')}
+              {fieldError(errors.delta, t('retainers.cycle.errors.amount'))}
             </p>
           )}
           <ReasonField
@@ -627,7 +633,10 @@ function AddLineDialog({
       close();
     } catch (error) {
       if (error instanceof ApiError && error.code === 'DUPLICATE_DELIVERABLE') {
-        form.setError('label', { message: errorMessage(t, error) });
+        form.setError('label', {
+          type: SCREEN_ERROR,
+          message: errorMessage(t, error),
+        });
       } else {
         setFailure(errorMessage(t, error));
       }
@@ -708,7 +717,7 @@ function AddLineDialog({
               })}
             />
             <FieldError match={!!errors.label}>
-              {errors.label?.message || t('retainers.lines.errors.label')}
+              {fieldError(errors.label, t('retainers.lines.errors.label'))}
             </FieldError>
           </Field>
           <ReasonField

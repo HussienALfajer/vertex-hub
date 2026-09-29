@@ -39,7 +39,7 @@ import { Controller, type UseFormReturn, useFieldArray, useWatch } from 'react-h
 import { useTranslation } from 'react-i18next';
 import { MoneyInput } from '../../components/money-input';
 import { ApiError } from '../../lib/api/client';
-import { errorMessage } from '../../lib/errors';
+import { errorMessage, fieldError, SCREEN_ERROR } from '../../lib/errors';
 import { formatNumber } from '../../lib/format';
 import { ClientStatusBadge } from '../clients/client-badges';
 import { departmentListQuery } from '../departments/departments.queries';
@@ -58,7 +58,10 @@ export function retainerFormFailure(
 ): string | null {
   const field = error instanceof ApiError ? FIELD_OF_CODE[error.code ?? ''] : undefined;
   if (field) {
-    form.setError(field, { message: errorMessage(t, error) });
+    form.setError(field, {
+      type: SCREEN_ERROR,
+      message: errorMessage(t, error),
+    });
     return null;
   }
   return errorMessage(t, error);
@@ -79,7 +82,10 @@ export function checkRenewal(
   renewal: string | null | undefined,
 ) {
   if (!renewal || renewal > start) return true;
-  form.setError('renewalDate', { message: t('retainers.form.errors.renewalAfterStart') });
+  form.setError('renewalDate', {
+    type: SCREEN_ERROR,
+    message: t('retainers.form.errors.renewalAfterStart'),
+  });
   return false;
 }
 
@@ -139,7 +145,7 @@ export function NameField({ form }: { form: RetainerFormMethods }) {
         placeholder={t('retainers.form.namePlaceholder')}
         {...form.register('name')}
       />
-      <FieldError match={!!error}>{error?.message || t('projects.form.errors.name')}</FieldError>
+      <FieldError match={!!error}>{fieldError(error, t('projects.form.errors.name'))}</FieldError>
     </Field>
   );
 }
@@ -199,7 +205,7 @@ export function DatesFields({
           {startLocked ? t('retainers.form.startLocked') : t('retainers.form.startHint')}
         </FieldDescription>
         <FieldError match={!!startError}>
-          {startError?.message || t('projects.form.errors.date')}
+          {fieldError(startError, t('projects.form.errors.date'))}
         </FieldError>
       </Field>
       <Field invalid={!!renewalError}>
@@ -213,7 +219,9 @@ export function DatesFields({
           {...form.register('renewalDate', { setValueAs: (value: string | null) => value || null })}
         />
         <FieldDescription>{t('retainers.form.renewalHint')}</FieldDescription>
-        <FieldError match={!!renewalError}>{renewalError?.message}</FieldError>
+        <FieldError match={!!renewalError}>
+          {fieldError(renewalError, t('projects.form.errors.date'))}
+        </FieldError>
       </Field>
     </div>
   );
@@ -263,7 +271,7 @@ export function MoneyFields({
         <FieldDescription>
           {currencyLocked ? t('projects.form.currencyLocked') : t('retainers.form.currencyHint')}
         </FieldDescription>
-        <FieldError match={!!error}>{error?.message}</FieldError>
+        <FieldError match={!!error}>{fieldError(error, t('errors.CURRENCY_LOCKED'))}</FieldError>
       </Field>
       <Field>
         <FieldLabel htmlFor={ids.fee}>
@@ -312,7 +320,10 @@ export function parseLines(
   for (const issue of result.error.issues) {
     const [, index, field] = issue.path;
     if (typeof index === 'number' && (field === 'label' || field === 'monthlyQuantity')) {
-      form.setError(`deliverables.${index}.${field}`, { message: '' });
+      form.setError(`deliverables.${index}.${field}`, {
+        type: SCREEN_ERROR,
+        message: '',
+      });
     }
   }
   return null;
@@ -328,6 +339,7 @@ export function checkDuplicateLines(
   lines.forEach((line, index) => {
     if (repeated.has(line)) {
       form.setError(`deliverables.${index}.label`, {
+        type: SCREEN_ERROR,
         message: t('retainers.lines.errors.duplicate'),
       });
     }
@@ -416,7 +428,7 @@ export function DeliverablesEditor({ form }: { form: DeliverablesFormMethods }) 
                     />
                     {errors?.label && (
                       <p className="text-sm text-destructive-text">
-                        {errors.label.message || t('retainers.lines.errors.label')}
+                        {fieldError(errors.label, t('retainers.lines.errors.label'))}
                       </p>
                     )}
                   </div>

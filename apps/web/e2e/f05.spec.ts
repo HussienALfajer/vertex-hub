@@ -336,3 +336,19 @@ test('the audit log names retainer changes and links them to the retainer', asyn
   await lines.getByRole('link', { name: 'إدارة السوشيال ميديا' }).click();
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('إدارة السوشيال ميديا');
 });
+
+test('form errors from the contract schema show in Arabic, never in English', async ({ page }) => {
+  await onProjectsToday(page);
+  await mockApi(page, { signedIn: true });
+  await page.goto(`/retainers/${seedIds.socialRetainer}`);
+  const designs = page
+    .getByRole('list', { name: ar.retainers.cycle.lines })
+    .getByRole('listitem')
+    .filter({ hasText: ar.retainers.kinds.design });
+  await designs.getByRole('button', { name: ar.retainers.cycle.adjust }).click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByLabel(ar.retainers.cycle.amount).fill('0');
+  await dialog.getByRole('button', { name: ar.common.save }).click();
+  await expect(dialog.getByText(ar.retainers.cycle.errors.amount)).toBeVisible();
+  await expect(dialog.getByText(/cannot be zero/)).toHaveCount(0);
+});

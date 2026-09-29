@@ -66,7 +66,7 @@ import { LoadError } from '../../components/load-error';
 import { MoneyInput } from '../../components/money-input';
 import { TabHeader } from '../../components/tab-header';
 import { ApiError } from '../../lib/api/client';
-import { errorMessage } from '../../lib/errors';
+import { errorMessage, fieldError, SCREEN_ERROR } from '../../lib/errors';
 import { formatCalendarDate, formatNumber } from '../../lib/format';
 import { formatMoney } from '../../lib/money';
 import { clientQuery } from '../clients/clients.queries';
@@ -404,7 +404,10 @@ function ExtraWorkDialog({
   const submit = form.handleSubmit(async (values) => {
     setFailure(null);
     if (values.requestedOn && values.requestedOn > today) {
-      form.setError('requestedOn', { message: t('projects.extraWork.errors.futureDate') });
+      form.setError('requestedOn', {
+        type: SCREEN_ERROR,
+        message: t('projects.extraWork.errors.futureDate'),
+      });
       return;
     }
     const dirty = form.formState.dirtyFields;
@@ -429,9 +432,15 @@ function ExtraWorkDialog({
       close();
     } catch (error) {
       if (error instanceof ApiError && error.code === 'INVALID_DATES') {
-        form.setError('requestedOn', { message: t('projects.extraWork.errors.futureDate') });
+        form.setError('requestedOn', {
+          type: SCREEN_ERROR,
+          message: t('projects.extraWork.errors.futureDate'),
+        });
       } else if (error instanceof ApiError && error.code === 'UNKNOWN_CONTACT') {
-        form.setError('requestedByContactId', { message: errorMessage(t, error) });
+        form.setError('requestedByContactId', {
+          type: SCREEN_ERROR,
+          message: errorMessage(t, error),
+        });
       } else {
         setFailure(errorMessage(t, error));
       }
@@ -477,7 +486,7 @@ function ExtraWorkDialog({
               </FieldLabel>
               <Input id={ids.date} type="date" max={today} {...form.register('requestedOn')} />
               <FieldError match={!!errors.requestedOn}>
-                {errors.requestedOn?.message || t('projects.form.errors.date')}
+                {fieldError(errors.requestedOn, t('projects.form.errors.date'))}
               </FieldError>
             </Field>
             <Field invalid={!!errors.requestedByContactId}>
@@ -509,7 +518,7 @@ function ExtraWorkDialog({
                 )}
               />
               <FieldError match={!!errors.requestedByContactId}>
-                {errors.requestedByContactId?.message}
+                {fieldError(errors.requestedByContactId, t('errors.UNKNOWN_CONTACT'))}
               </FieldError>
             </Field>
           </div>
@@ -584,7 +593,10 @@ function BillingDialog({
   const submit = form.handleSubmit(async (values) => {
     setFailure(null);
     if (billingNeedsNote(values.billingStatus) && !values.billingNote) {
-      form.setError('billingNote', { message: t('errors.BILLING_NOTE_REQUIRED') });
+      form.setError('billingNote', {
+        type: SCREEN_ERROR,
+        message: t('errors.BILLING_NOTE_REQUIRED'),
+      });
       return;
     }
     try {
@@ -593,7 +605,10 @@ function BillingDialog({
       close();
     } catch (error) {
       if (error instanceof ApiError && error.code === 'BILLING_NOTE_REQUIRED') {
-        form.setError('billingNote', { message: errorMessage(t, error) });
+        form.setError('billingNote', {
+          type: SCREEN_ERROR,
+          message: errorMessage(t, error),
+        });
       } else {
         setFailure(errorMessage(t, error));
       }
@@ -640,7 +655,9 @@ function BillingDialog({
             </FieldLabel>
             <Textarea id={ids.note} rows={2} {...form.register('billingNote')} />
             <FieldDescription>{t(`projects.extraWork.noteHint.${status}`)}</FieldDescription>
-            <FieldError match={!!noteError}>{noteError?.message}</FieldError>
+            <FieldError match={!!noteError}>
+              {fieldError(noteError, t('projects.extraWork.errors.billingNote'))}
+            </FieldError>
           </Field>
           {failure && <FormAlert>{failure}</FormAlert>}
           <DialogFooter>

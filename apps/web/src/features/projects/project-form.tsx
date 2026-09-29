@@ -31,7 +31,7 @@ import { Controller, type UseFormReturn, useWatch } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { ApiError } from '../../lib/api/client';
 import { can, useMe } from '../../lib/auth';
-import { errorMessage } from '../../lib/errors';
+import { errorMessage, fieldError, SCREEN_ERROR } from '../../lib/errors';
 import { formatNumber } from '../../lib/format';
 import { ClientStatusBadge } from '../clients/client-badges';
 import { clientListQuery } from '../clients/clients.queries';
@@ -52,7 +52,10 @@ export function projectFormFailure(
 ): string | null {
   const field = error instanceof ApiError ? FIELD_OF_CODE[error.code ?? ''] : undefined;
   if (field) {
-    form.setError(field, { message: errorMessage(t, error) });
+    form.setError(field, {
+      type: SCREEN_ERROR,
+      message: errorMessage(t, error),
+    });
     return null;
   }
   return errorMessage(t, error);
@@ -68,7 +71,10 @@ const FIELD_OF_CODE: Record<string, 'name' | 'projectManagerId' | 'dueDate' | 'c
 /** Rule 5 before the round trip: the due date is on or after the start date. */
 export function checkDates(form: ProjectFormMethods, t: TFunction, start: string, due: string) {
   if (due >= start) return true;
-  form.setError('dueDate', { message: t('errors.INVALID_DATES') });
+  form.setError('dueDate', {
+    type: SCREEN_ERROR,
+    message: t('errors.INVALID_DATES'),
+  });
   return false;
 }
 
@@ -142,7 +148,7 @@ export function NameField({ form }: { form: ProjectFormMethods }) {
         placeholder={t('projects.form.namePlaceholder')}
         {...form.register('name')}
       />
-      <FieldError match={!!error}>{error?.message || t('projects.form.errors.name')}</FieldError>
+      <FieldError match={!!error}>{fieldError(error, t('projects.form.errors.name'))}</FieldError>
     </Field>
   );
 }
@@ -246,7 +252,7 @@ export function ProjectManagerField({
       />
       <FieldDescription>{t('projects.form.projectManagerHint')}</FieldDescription>
       <FieldError match={!!error}>
-        {error?.message || t('projects.form.errors.projectManager')}
+        {fieldError(error, t('projects.form.errors.projectManager'))}
       </FieldError>
     </Field>
   );
@@ -305,7 +311,7 @@ export function DatesFields({ form }: { form: ProjectFormMethods }) {
           <FieldLabel>{t('projects.form.dueDate')}</FieldLabel>
           <Input type="date" min={start || undefined} {...form.register('dueDate')} />
           <FieldError match={!!dueError}>
-            {dueError?.message || t('projects.form.errors.date')}
+            {fieldError(dueError, t('projects.form.errors.date'))}
           </FieldError>
         </Field>
       </div>
@@ -383,7 +389,7 @@ export function CurrencyField({ form, locked }: { form: ProjectFormMethods; lock
       <FieldDescription>
         {locked ? t('projects.form.currencyLocked') : t('projects.form.currencyHint')}
       </FieldDescription>
-      <FieldError match={!!error}>{error?.message}</FieldError>
+      <FieldError match={!!error}>{fieldError(error, t('errors.CURRENCY_LOCKED'))}</FieldError>
     </Field>
   );
 }
