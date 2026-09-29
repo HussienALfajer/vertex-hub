@@ -219,6 +219,7 @@ export async function removeTasks(db: Database, ids: string[]): Promise<void> {
       .where(inArray(taskComments.taskId, ids))),
   ].map((row) => row.id);
   await db.delete(auditEntries).where(inArray(auditEntries.entityId, [...ids, ...children]));
+  await db.delete(templateRunTasks).where(inArray(templateRunTasks.taskId, ids));
   await db
     .delete(taskDependencies)
     .where(or(inArray(taskDependencies.taskId, ids), inArray(taskDependencies.dependsOnId, ids)));
@@ -229,9 +230,26 @@ export async function removeTasks(db: Database, ids: string[]): Promise<void> {
   await db.delete(tasks).where(inArray(tasks.id, ids));
 }
 
-/** Removes seeded projects, their milestones and audit entries (test cleanup only). */
+/** Removes template runs with their task links and audit entries (test cleanup only). */
+async function removeRuns(db: Database, runIds: string[]): Promise<void> {
+  if (runIds.length === 0) return;
+  await db.delete(auditEntries).where(inArray(auditEntries.entityId, runIds));
+  await db.delete(templateRunTasks).where(inArray(templateRunTasks.runId, runIds));
+  await db.delete(templateRuns).where(inArray(templateRuns.id, runIds));
+}
+
+/** Removes seeded projects, their milestones, template runs and audit entries (test cleanup only). */
 export async function removeProjects(db: Database, ids: string[]): Promise<void> {
   if (ids.length === 0) return;
+  await removeRuns(
+    db,
+    (
+      await db
+        .select({ id: templateRuns.id })
+        .from(templateRuns)
+        .where(inArray(templateRuns.projectId, ids))
+    ).map((row) => row.id),
+  );
   const milestones = (
     await db
       .select({ id: projectMilestones.id })
@@ -252,7 +270,10 @@ export async function removeProjects(db: Database, ids: string[]): Promise<void>
   await db.delete(projects).where(inArray(projects.id, ids));
 }
 
-/** Removes seeded retainers, their lines, cycles, extra work and audit entries (test cleanup only). */
+/**
+ * Removes seeded retainers, their lines, cycles, template link and runs, extra work and audit
+ * entries (test cleanup only).
+ */
 export async function removeRetainers(db: Database, ids: string[]): Promise<void> {
   if (ids.length === 0) return;
   const cycles = (
@@ -261,6 +282,18 @@ export async function removeRetainers(db: Database, ids: string[]): Promise<void
       .from(retainerCycles)
       .where(inArray(retainerCycles.retainerId, ids))
   ).map((row) => row.id);
+  if (cycles.length) {
+    await removeRuns(
+      db,
+      (
+        await db
+          .select({ id: templateRuns.id })
+          .from(templateRuns)
+          .where(inArray(templateRuns.retainerCycleId, cycles))
+      ).map((row) => row.id),
+    );
+  }
+  await db.delete(retainerTemplates).where(inArray(retainerTemplates.retainerId, ids));
   const lines = cycles.length
     ? (
         await db
@@ -308,11 +341,8 @@ export async function removeTemplates(db: Database, ids: string[]): Promise<void
       .from(workTemplateSteps)
       .where(inArray(workTemplateSteps.templateId, ids))
   ).map((row) => row.id);
-  await db.delete(auditEntries).where(inArray(auditEntries.entityId, [...ids, ...runs]));
-  if (runs.length) {
-    await db.delete(templateRunTasks).where(inArray(templateRunTasks.runId, runs));
-    await db.delete(templateRuns).where(inArray(templateRuns.id, runs));
-  }
+  await db.delete(auditEntries).where(inArray(auditEntries.entityId, ids));
+  await removeRuns(db, runs);
   await db.delete(retainerTemplates).where(inArray(retainerTemplates.templateId, ids));
   if (steps.length) {
     await db

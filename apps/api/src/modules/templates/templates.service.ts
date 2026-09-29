@@ -43,6 +43,17 @@ type Executor = Database | Transaction;
 
 type AssigneeRow = { templateId: string; department: DepartmentCode; userId: string };
 
+export interface TemplateForRun {
+  id: string;
+  name: string;
+  kind: TemplateKind;
+  archivedAt: Date | null;
+  stages: { id: string; name: string; position: number }[];
+  steps: TemplateStep[];
+  /** Default assignees, valid or not (rule 10 replaces invalid ones). */
+  assignees: AssigneeRow[];
+}
+
 type Person = { id: string; name: string };
 
 type AssigneeChange = { department: DepartmentCode; before: Person | null; after: Person | null };
@@ -305,6 +316,33 @@ export class TemplatesService {
       });
     });
     return this.detail(actor, id);
+  }
+
+  /** A template with what a run plans from (rules 6–14), or null. */
+  async forRun(executor: Executor, id: string): Promise<TemplateForRun | null> {
+    const [row] = await executor
+      .select({
+        id: workTemplates.id,
+        name: workTemplates.name,
+        kind: workTemplates.kind,
+        archivedAt: workTemplates.archivedAt,
+      })
+      .from(workTemplates)
+      .where(eq(workTemplates.id, id));
+    if (!row) return null;
+    // One after another: a transaction's client runs one query at a time.
+    const stages = await executor
+      .select({
+        id: workTemplateStages.id,
+        name: workTemplateStages.name,
+        position: workTemplateStages.position,
+      })
+      .from(workTemplateStages)
+      .where(eq(workTemplateStages.templateId, id))
+      .orderBy(asc(workTemplateStages.position));
+    const steps = await this.steps(executor, id);
+    const assignees = await this.assigneeRows([id], executor);
+    return { ...row, stages, steps, assignees };
   }
 
   /** Unique among non-archived templates, case-insensitively. */

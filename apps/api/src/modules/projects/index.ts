@@ -1,4 +1,5 @@
 // Public surface of the projects module. Code outside this folder imports from here only.
+export { type CycleOpened, CycleOpenedHooks } from './cycle-opened-hooks.js';
 export {
   type CycleLineLink,
   type CycleLink,

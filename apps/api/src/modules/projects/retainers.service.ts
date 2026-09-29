@@ -51,7 +51,12 @@ import {
 import { DATABASE } from '../../core/database/database.module.js';
 import { CodedException } from '../../core/errors/index.js';
 import { changedFields, recordAudit } from '../audit/index.js';
-import { type CurrentUserInfo, UserDirectory, type UserSummary } from '../auth/index.js';
+import {
+  type CurrentUserInfo,
+  lockAccessChanges,
+  UserDirectory,
+  type UserSummary,
+} from '../auth/index.js';
 import { ClientDirectory, type ClientSummary } from '../clients/index.js';
 import {
   actorOf,
@@ -235,6 +240,8 @@ export class RetainersService {
 
   async create(actor: CurrentUserInfo, input: CreateRetainer): Promise<RetainerDetail> {
     const id = await this.db.transaction(async (tx) => {
+      // A cycle opening at once may assign its tasks (F07 rule 16): users must stay active.
+      if (input.startDate <= businessDate()) await lockAccessChanges(tx);
       const client = await this.clients.summary(input.clientId, tx, { forUpdate: true });
       if (!client) throw new NotFoundException();
       if (!coversClient(actor, client)) throw new ForbiddenException();
@@ -289,6 +296,9 @@ export class RetainersService {
 
   async update(actor: CurrentUserInfo, id: string, input: UpdateRetainer): Promise<RetainerDetail> {
     await this.db.transaction(async (tx) => {
+      // A new start date may open a cycle that assigns its tasks (F07 rule 16); taken before the
+      // retainer lock, as every other holder of both.
+      if (input.startDate) await lockAccessChanges(tx);
       const retainer = await workableRetainer(tx, this.clients, actor, id);
       const [current] = await tx
         .select({
@@ -447,6 +457,8 @@ export class RetainersService {
     change: RetainerStatusChange,
   ): Promise<RetainerDetail> {
     await this.db.transaction(async (tx) => {
+      // Resuming may open a cycle that assigns its tasks (F07 rule 16).
+      if (change.status === 'active') await lockAccessChanges(tx);
       const retainer = await readableRetainer(tx, this.clients, actor, id, { forUpdate: true });
       if (!coversClient(actor, retainer.client)) throw new ForbiddenException();
       assertRetainerNotArchived(retainer);

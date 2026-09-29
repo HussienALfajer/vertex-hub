@@ -34,8 +34,9 @@ import { DATABASE } from '../../core/database/database.module.js';
 import { CodedException } from '../../core/errors/index.js';
 import { JobQueue } from '../../core/jobs/index.js';
 import { type AuditActor, recordAudit } from '../audit/index.js';
-import { type CurrentUserInfo, UserDirectory } from '../auth/index.js';
+import { type CurrentUserInfo, lockAccessChanges, UserDirectory } from '../auth/index.js';
 import { ClientDirectory } from '../clients/index.js';
+import { CycleOpenedHooks } from './cycle-opened-hooks.js';
 import { actorOf } from './project-access.js';
 import { readableRetainer, workableRetainer } from './retainer-access.js';
 import { NO_TASKS, WorkProgress } from './work-progress.js';
@@ -100,6 +101,7 @@ export class RetainerCyclesService implements OnModuleInit {
     private readonly clients: ClientDirectory,
     private readonly progress: WorkProgress,
     private readonly jobs: JobQueue,
+    private readonly openedHooks: CycleOpenedHooks,
   ) {}
 
   onModuleInit(): void {
@@ -123,6 +125,8 @@ export class RetainerCyclesService implements OnModuleInit {
     let opened = 0;
     for (const { id } of candidates) {
       await this.db.transaction(async (tx) => {
+        // An opening cycle may assign its tasks (F07 rule 16); taken before the retainer lock.
+        await lockAccessChanges(tx);
         const [retainer] = await tx
           .select({
             status: retainers.status,
@@ -161,7 +165,8 @@ export class RetainerCyclesService implements OnModuleInit {
   /**
    * R3, R4: opens the retainer's cycle for the month of `today` unless one exists, copying the
    * retainer's lines with their full quantities. The period starts on the 1st or on `from`,
-   * whichever is later. Returns the new cycle's id, or null when the month already has one.
+   * whichever is later, then runs the `CycleOpenedHooks` in the same transaction (F07 rule 16).
+   * Returns the new cycle's id, or null when the month already has one.
    */
   async open(
     tx: Transaction,
@@ -218,6 +223,7 @@ export class RetainerCyclesService implements OnModuleInit {
         retainerId,
       },
     });
+    await this.openedHooks.run(tx, { cycleId: created.id, retainerId, today, actor });
     return created.id;
   }
 

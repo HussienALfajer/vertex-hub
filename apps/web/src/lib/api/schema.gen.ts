@@ -1300,6 +1300,86 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/templates/{id}/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["TemplateRunsController_preview"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/templates/{id}/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["TemplateRunsController_apply"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/template-runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["TemplateRunsController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/retainers/{id}/template": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["RetainerTemplatesController_get"];
+        put: operations["RetainerTemplatesController_set"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/retainers/{id}/cycles/{cycleId}/lines/{lineId}/missing-tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["RetainerTemplatesController_generateMissing"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -2857,6 +2937,157 @@ export interface components {
                 /** Format: uuid */
                 userId: string;
             }[];
+        };
+        TemplateRunInput: {
+            /** Format: uuid */
+            projectId?: string;
+            /** Format: uuid */
+            retainerCycleId?: string;
+            /** Format: date */
+            startDate?: string;
+            /** @default [] */
+            assignees: {
+                department: components["schemas"]["DepartmentCode"];
+                /** Format: uuid */
+                userId: string | null;
+            }[];
+        };
+        TemplateRunPlan: {
+            /** Format: date */
+            startDate: string;
+            tasks: components["schemas"]["TemplatePlannedTask"][];
+            milestonesToCreate: {
+                name: string;
+                /** Format: date */
+                dueDate: string;
+            }[];
+            warnings: components["schemas"]["TemplateRunWarning"][];
+            taskCount: number;
+        };
+        TemplatePlannedTask: {
+            key: string;
+            title: string;
+            department: components["schemas"]["DepartmentCode"];
+            assignee: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            assigneeReplaced: boolean;
+            /** Format: date */
+            dueDate: string;
+            milestone: {
+                /** Format: uuid */
+                existingId: string | null;
+                name: string;
+            } | null;
+            /** Format: uuid */
+            cycleLineId: string | null;
+            dependsOn: string[];
+        };
+        TemplateRunWarning: {
+            /** @enum {string} */
+            type: "due_after_project" | "applied_before" | "assignee_replaced" | "over_cap";
+            department: components["schemas"]["DepartmentCode"] | null;
+            count: number;
+        };
+        TemplateRun: {
+            /** Format: uuid */
+            id: string;
+            template: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                archived: boolean;
+            };
+            trigger: components["schemas"]["TemplateRunTrigger"];
+            project: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            cycle: {
+                /** Format: uuid */
+                id: string;
+                /** Format: date */
+                month: string;
+                retainer: {
+                    /** Format: uuid */
+                    id: string;
+                    name: string;
+                };
+            } | null;
+            cycleLine: {
+                /** Format: uuid */
+                id: string;
+                kind: components["schemas"]["DeliverableKind"];
+                label: string | null;
+            } | null;
+            /** Format: date */
+            startDate: string;
+            taskCount: number;
+            milestonesCreated: number;
+            createdBy: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            /** Format: date-time */
+            createdAt: string;
+            tasks?: components["schemas"]["TemplateRunTask"][];
+        };
+        /** @enum {string} */
+        TemplateRunTrigger: "manual" | "cycle_opened" | "missing_tasks";
+        TemplateRunTask: {
+            /** Format: uuid */
+            id: string;
+            title: string;
+            status: components["schemas"]["TaskStatus"];
+        };
+        /** @description Template runs, newest first */
+        TemplateRunPage: {
+            items: components["schemas"]["TemplateRun"][];
+            total: number;
+            page: number;
+            pageSize: number;
+        };
+        RetainerTemplate: {
+            template: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                archived: boolean;
+            } | null;
+            cycle: {
+                /** Format: uuid */
+                id: string;
+                /** Format: date */
+                month: string;
+                /** Format: date */
+                periodStart: string;
+                /** Format: date */
+                periodEnd: string;
+            } | null;
+            run: components["schemas"]["TemplateRun"] | null;
+            lines: components["schemas"]["RetainerTemplateLine"][];
+            permissions: {
+                canLink: boolean;
+                canGenerate: boolean;
+            };
+        };
+        RetainerTemplateLine: {
+            /** Format: uuid */
+            id: string;
+            kind: components["schemas"]["DeliverableKind"];
+            label: string | null;
+            committed: number;
+            tasks: number;
+            missing: number;
+            canGenerate: boolean;
+        };
+        SetRetainerTemplate: {
+            /** Format: uuid */
+            templateId: string | null;
         };
         /** @description Liveness of the API and its dependencies */
         HealthResponse: {
@@ -5312,6 +5543,157 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TemplateDetail"];
+                };
+            };
+        };
+    };
+    TemplateRunsController_preview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TemplateRunInput"];
+            };
+        };
+        responses: {
+            /** @description The tasks and milestones a run would create; nothing is written */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TemplateRunPlan"];
+                };
+            };
+        };
+    };
+    TemplateRunsController_apply: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TemplateRunInput"];
+            };
+        };
+        responses: {
+            /** @description The run; the project's or cycle's tasks are created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TemplateRun"];
+                };
+            };
+        };
+    };
+    TemplateRunsController_list: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+                projectId?: string;
+                retainerId?: string;
+                taskId?: string;
+                include?: "tasks";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Runs of a project, a retainer or the run that created a task, newest first */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TemplateRunPage"];
+                };
+            };
+        };
+    };
+    RetainerTemplatesController_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The linked monthly template, the current cycle's run and its lines' tasks */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RetainerTemplate"];
+                };
+            };
+        };
+    };
+    RetainerTemplatesController_set: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetRetainerTemplate"];
+            };
+        };
+        responses: {
+            /** @description Links or unlinks the monthly template; it applies from the next cycle */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RetainerTemplate"];
+                };
+            };
+        };
+    };
+    RetainerTemplatesController_generateMissing: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                cycleId: string;
+                lineId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tasks for the units of the line that have none, from the template's repeated step */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TemplateRun"];
                 };
             };
         };
