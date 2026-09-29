@@ -16,12 +16,20 @@ import type { paths } from '../../lib/api/schema.gen';
 /** The list endpoint's query string as the API reads it: flags are `'true'` or `'false'`. */
 export type TaskListFilters = NonNullable<paths['/api/tasks']['get']['parameters']['query']>;
 
+export type TaskBoardFilters = NonNullable<paths['/api/tasks/board']['get']['parameters']['query']>;
+
+export type TaskWorkloadFilters = NonNullable<
+  paths['/api/tasks/workload']['get']['parameters']['query']
+>;
+
 export const tasksKeys = {
   all: ['tasks'] as const,
   list: (filters: TaskListFilters) => ['tasks', 'list', filters] as const,
   detail: (id: string) => ['tasks', 'detail', id] as const,
   comments: (id: string) => ['tasks', 'comments', id] as const,
   summary: ['tasks', 'summary'] as const,
+  board: (filters: TaskBoardFilters) => ['tasks', 'board', filters] as const,
+  workload: (filters: TaskWorkloadFilters) => ['tasks', 'workload', filters] as const,
 };
 
 export const taskListQuery = (filters: TaskListFilters) =>
@@ -54,6 +62,20 @@ export const myTaskSummaryQuery = queryOptions({
   queryFn: () => call(api.GET('/api/me/tasks/summary')),
 });
 
+export const taskBoardQuery = (filters: TaskBoardFilters) =>
+  queryOptions({
+    queryKey: tasksKeys.board(filters),
+    queryFn: () => call(api.GET('/api/tasks/board', { params: { query: filters } })),
+    placeholderData: keepPreviousData,
+  });
+
+export const taskWorkloadQuery = (filters: TaskWorkloadFilters) =>
+  queryOptions({
+    queryKey: tasksKeys.workload(filters),
+    queryFn: () => call(api.GET('/api/tasks/workload', { params: { query: filters } })),
+    placeholderData: keepPreviousData,
+  });
+
 /**
  * A mutation on task data. Every one refreshes the whole `tasks` cache, also on failure: a 403
  * after the task changed hands (edge case 15) reloads the page without the lost actions. Task
@@ -84,6 +106,12 @@ export const useUpdateTask = (id: string) =>
 
 export const useChangeTaskStatus = (id: string) =>
   useTasksMutation((input: TaskStatusChange) =>
+    call(api.POST('/api/tasks/{id}/status', { ...path(id), body: input })),
+  );
+
+/** A status change on any task: the board moves many cards through one mutation. */
+export const useMoveTask = () =>
+  useTasksMutation(({ id, ...input }: TaskStatusChange & { id: string }) =>
     call(api.POST('/api/tasks/{id}/status', { ...path(id), body: input })),
   );
 

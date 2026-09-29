@@ -45,6 +45,7 @@ import {
   ChevronDownIcon,
   EllipsisIcon,
   FolderKanbanIcon,
+  ListTodoIcon,
   MessagesSquareIcon,
   PaletteIcon,
   PencilIcon,
@@ -67,6 +68,7 @@ import { errorMessage } from '../../lib/errors';
 import { formatNumber } from '../../lib/format';
 import { ClientProjectsTab } from '../projects/client-projects-tab';
 import { ClientRetainersTab, EndedClientWorkCallout } from '../retainers/client-retainers-tab';
+import { ClientTasksTab } from '../tasks/client-tasks-tab';
 import { BrandKitTab } from './brand-kit-tab';
 import { ClientStatusBadge, HealthcareBadge } from './client-badges';
 import {
@@ -90,6 +92,7 @@ const CLIENT_TABS = [
   'contacts',
   'projects',
   'retainers',
+  'tasks',
   'brand-kit',
   'platforms',
   'communication',
@@ -207,6 +210,10 @@ function Profile({ client, tab }: { client: ClientDetailResponse; tab: ClientTab
             <RepeatIcon />
             {t('clients.profile.tabs.retainers')}
           </TabsTrigger>
+          <TabsTrigger value="tasks">
+            <ListTodoIcon />
+            {t('clients.profile.tabs.tasks')}
+          </TabsTrigger>
           <TabsTrigger value="brand-kit">
             <PaletteIcon />
             {t('clients.profile.tabs.brandKit')}
@@ -234,6 +241,9 @@ function Profile({ client, tab }: { client: ClientDetailResponse; tab: ClientTab
         </TabsContent>
         <TabsContent value="retainers">
           <ClientRetainersTab client={client} />
+        </TabsContent>
+        <TabsContent value="tasks">
+          <ClientTasksTab client={client} />
         </TabsContent>
         <TabsContent value="brand-kit">
           <BrandKitTab client={client} editable={editable} />

@@ -85,7 +85,7 @@ import {
 } from './task-form';
 import { useArchiveTask, useChangeTaskStatus, useUpdateTask } from './tasks.queries';
 
-const MOVE_ICONS: Record<TaskMove, LucideIcon> = {
+export const MOVE_ICONS: Record<TaskMove, LucideIcon> = {
   start: PlayIcon,
   submit: SendIcon,
   return: UndoIcon,
@@ -108,16 +108,24 @@ const BACKWARD: TaskMove[] = ['return', 'client_changes', 'reopen_client', 'reop
 /** Moves that record who answered for the client. */
 const CLIENT_MOVES: TaskMove[] = ['client_approved', 'client_changes', 'reopen_client'];
 
-interface Target {
+export interface Target {
   to: TaskStatus;
   move: TaskMove;
 }
 
 /** A move asks for input first: a note, who answered, or a reason to start a blocked task. */
-function needsDialog(task: TaskDetail, { move }: Target): boolean {
+export function needsDialog(task: TaskDetail, { move }: Target): boolean {
   return (
     taskMoveNeedsNote(move) || CLIENT_MOVES.includes(move) || (move === 'start' && task.blocked)
   );
+}
+
+/** The workflow moves the caller may make now, from the server's `allowedTransitions`. */
+export function targetsOf(task: TaskDetail): Target[] {
+  return task.allowedTransitions.flatMap((to) => {
+    const move = taskMove(task.status, to);
+    return move ? [{ to, move }] : [];
+  });
 }
 
 /**
@@ -131,10 +139,7 @@ export function TaskActions({ task }: { task: TaskDetail }) {
   const [dialog, setDialog] = useState<Target | 'edit' | 'reassign' | 'archive' | null>(null);
   if (task.readOnly) return null;
 
-  const targets: Target[] = task.allowedTransitions.flatMap((to) => {
-    const move = taskMove(task.status, to);
-    return move ? [{ to, move }] : [];
-  });
+  const targets = targetsOf(task);
   const moves = targets.filter((target) => target.move !== 'cancel');
   const cancel = targets.find((target) => target.move === 'cancel');
   const { canEdit, canAssign, canArchive } = task.permissions;
@@ -221,7 +226,7 @@ export function TaskActions({ task }: { task: TaskDetail }) {
  * The input a move needs: what must change (returns and client changes, recorded as revisions),
  * a reason (cancel, reopen), who answered for the client, or why a blocked task starts anyway.
  */
-function MoveDialog({
+export function MoveDialog({
   task,
   target,
   onClose,

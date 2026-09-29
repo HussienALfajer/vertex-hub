@@ -1,7 +1,10 @@
 import type { Page, Route, TestInfo } from '@playwright/test';
 import {
   type AuditEntry,
+  addDays,
   allowedTaskTransitions,
+  BOARD_LIMITS,
+  BOARD_STATUSES,
   type BrandKit,
   type ClientDetailResponse,
   type ClientResponse,
@@ -62,6 +65,7 @@ import {
   revisionSourceOf,
   TASK_PRIORITIES,
   type Task,
+  type TaskBoard,
   type TaskComment,
   type TaskDependenciesInput,
   type TaskDetail,
@@ -70,6 +74,7 @@ import {
   type TaskStatus,
   type TaskStatusChange,
   type TaskType,
+  type TaskWorkload,
   taskMove,
   type UpdateCycleLine,
   type UpdateExtraWork,
@@ -2776,6 +2781,8 @@ function taskRoutes({ users, clients, projects, retainers, tasks, me }: TaskStat
       (flag('internal') !== 'true' || task.clientId === null) &&
       (!q.get('projectId') || task.projectId === q.get('projectId')) &&
       (!q.get('retainerId') || task.retainerId === q.get('retainerId')) &&
+      (!q.get('milestoneId') || task.milestoneId === q.get('milestoneId')) &&
+      (!q.get('cycleLineId') || task.cycleLineId === q.get('cycleLineId')) &&
       (!q.get('type') || task.type === q.get('type')) &&
       (priorities.length === 0 || priorities.includes(task.priority)) &&
       (!flag('overdue') || overdue(task) === (flag('overdue') === 'true')) &&
@@ -2896,6 +2903,80 @@ function taskRoutes({ users, clients, projects, retainers, tasks, me }: TaskStat
       }));
       tasks.push(created);
       return json(route, detail(created), 201);
+    }
+
+    // The board's and workload's departments: the filter, else managed, else own (spec F06).
+    const viewDepartments = (q: URLSearchParams): DepartmentCode[] => {
+      const chosen = q.getAll('department') as DepartmentCode[];
+      if (chosen.length > 0) return chosen;
+      if (managed().length > 0) return managed();
+      return me().departments.map((d) => d.code);
+    };
+    if (path === '/api/tasks/board') {
+      const q = url.searchParams;
+      const departments = viewDepartments(q);
+      const meId = me().user.id;
+      const assigneeId = q.get('assigneeId') === 'me' ? meId : q.get('assigneeId');
+      const since = addDays(PROJECTS_TODAY, -BOARD_LIMITS.deliveredDays);
+      const shown = tasks.filter(
+        (t) =>
+          !t.archived &&
+          departments.includes(t.department) &&
+          (!assigneeId || t.assigneeId === assigneeId) &&
+          (!q.get('clientId') || t.clientId === q.get('clientId')),
+      );
+      const board: TaskBoard = {
+        departments,
+        columns: BOARD_STATUSES.map((status) => {
+          const items = shown
+            .filter(
+              (t) =>
+                t.status === status &&
+                (status !== 'delivered' || (t.deliveredAt ?? '').slice(0, 10) >= since),
+            )
+            .sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+          return {
+            status,
+            items: items.slice(0, BOARD_LIMITS.cards).map(summary),
+            total: items.length,
+          };
+        }),
+      };
+      return json(route, board);
+    }
+    if (path === '/api/tasks/workload') {
+      const q = url.searchParams;
+      const departments = viewDepartments(q);
+      const week = weekOf(q.get('week') ?? PROJECTS_TODAY);
+      const open = tasks.filter((t) => !t.archived && OPEN_TASK.includes(t.status));
+      const workload: TaskWorkload = {
+        week,
+        departments,
+        people: users
+          .filter(
+            (u) =>
+              u.status !== 'archived' && u.departments.some((d) => departments.includes(d.code)),
+          )
+          .sort((a, b) => a.name.localeCompare(b.name, 'ar'))
+          .map((u) => {
+            const theirs = open.filter((t) => t.assigneeId === u.id);
+            return {
+              user: { id: u.id, name: u.name },
+              departments: u.departments
+                .map((d) => d.code)
+                .filter((code) => departments.includes(code)),
+              overdue: theirs.filter(overdue).length,
+              dueThisWeek: theirs.filter((t) => t.dueDate >= week.from && t.dueDate <= week.to)
+                .length,
+              open: theirs.length,
+            };
+          }),
+        unassigned: departments.map((department) => ({
+          department,
+          count: open.filter((t) => t.assigneeId === null && t.department === department).length,
+        })),
+      };
+      return json(route, workload);
     }
 
     const match = path.match(/^\/api\/tasks\/([^/]+)(?:\/([^/]+))?(?:\/([^/]+))?(?:\/([^/]+))?$/);
@@ -3113,6 +3194,7 @@ export const seedIds = {
   autumnMenu: id(1001),
   dishShoot: id(1002),
   openingPosts: id(1003),
+  clinicLogo: id(1006),
 };
 
 /** Viewport screenshot kept in the test output and attached to the HTML report. */

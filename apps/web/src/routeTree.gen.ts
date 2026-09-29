@@ -30,8 +30,10 @@ import { Route as AppRetainersRetainerIdRouteImport } from './routes/_app/retain
 import { Route as AppRetainersNewRouteImport } from './routes/_app/retainers/new'
 import { Route as AppTasksIndexRouteImport } from './routes/_app/tasks/index'
 import { Route as AppTasksTaskIdRouteImport } from './routes/_app/tasks/$taskId'
+import { Route as AppTasksBoardRouteImport } from './routes/_app/tasks/board'
 import { Route as AppTasksListRouteImport } from './routes/_app/tasks/list'
 import { Route as AppTasksNewRouteImport } from './routes/_app/tasks/new'
+import { Route as AppTasksWorkloadRouteImport } from './routes/_app/tasks/workload'
 import { Route as AppTeamIndexRouteImport } from './routes/_app/team/index'
 import { Route as AppTeamUserIdRouteImport } from './routes/_app/team/$userId'
 import { Route as AppTeamNewRouteImport } from './routes/_app/team/new'
@@ -141,6 +143,11 @@ const AppTasksTaskIdRoute = AppTasksTaskIdRouteImport.update({
   path: '/tasks/$taskId',
   getParentRoute: () => AppRoute,
 } as any)
+const AppTasksBoardRoute = AppTasksBoardRouteImport.update({
+  id: '/tasks/board',
+  path: '/tasks/board',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppTasksListRoute = AppTasksListRouteImport.update({
   id: '/tasks/list',
   path: '/tasks/list',
@@ -149,6 +156,11 @@ const AppTasksListRoute = AppTasksListRouteImport.update({
 const AppTasksNewRoute = AppTasksNewRouteImport.update({
   id: '/tasks/new',
   path: '/tasks/new',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppTasksWorkloadRoute = AppTasksWorkloadRouteImport.update({
+  id: '/tasks/workload',
+  path: '/tasks/workload',
   getParentRoute: () => AppRoute,
 } as any)
 const AppTeamIndexRoute = AppTeamIndexRouteImport.update({
@@ -183,8 +195,10 @@ export interface FileRoutesByFullPath {
   '/retainers/$retainerId': typeof AppRetainersRetainerIdRoute
   '/retainers/new': typeof AppRetainersNewRoute
   '/tasks/$taskId': typeof AppTasksTaskIdRoute
+  '/tasks/board': typeof AppTasksBoardRoute
   '/tasks/list': typeof AppTasksListRoute
   '/tasks/new': typeof AppTasksNewRoute
+  '/tasks/workload': typeof AppTasksWorkloadRoute
   '/team/$userId': typeof AppTeamUserIdRoute
   '/team/new': typeof AppTeamNewRoute
   '/clients/': typeof AppClientsIndexRoute
@@ -210,8 +224,10 @@ export interface FileRoutesByTo {
   '/retainers/$retainerId': typeof AppRetainersRetainerIdRoute
   '/retainers/new': typeof AppRetainersNewRoute
   '/tasks/$taskId': typeof AppTasksTaskIdRoute
+  '/tasks/board': typeof AppTasksBoardRoute
   '/tasks/list': typeof AppTasksListRoute
   '/tasks/new': typeof AppTasksNewRoute
+  '/tasks/workload': typeof AppTasksWorkloadRoute
   '/team/$userId': typeof AppTeamUserIdRoute
   '/team/new': typeof AppTeamNewRoute
   '/clients': typeof AppClientsIndexRoute
@@ -239,8 +255,10 @@ export interface FileRoutesById {
   '/_app/retainers/$retainerId': typeof AppRetainersRetainerIdRoute
   '/_app/retainers/new': typeof AppRetainersNewRoute
   '/_app/tasks/$taskId': typeof AppTasksTaskIdRoute
+  '/_app/tasks/board': typeof AppTasksBoardRoute
   '/_app/tasks/list': typeof AppTasksListRoute
   '/_app/tasks/new': typeof AppTasksNewRoute
+  '/_app/tasks/workload': typeof AppTasksWorkloadRoute
   '/_app/team/$userId': typeof AppTeamUserIdRoute
   '/_app/team/new': typeof AppTeamNewRoute
   '/_app/clients/': typeof AppClientsIndexRoute
@@ -268,8 +286,10 @@ export interface FileRouteTypes {
     | '/retainers/$retainerId'
     | '/retainers/new'
     | '/tasks/$taskId'
+    | '/tasks/board'
     | '/tasks/list'
     | '/tasks/new'
+    | '/tasks/workload'
     | '/team/$userId'
     | '/team/new'
     | '/clients/'
@@ -295,8 +315,10 @@ export interface FileRouteTypes {
     | '/retainers/$retainerId'
     | '/retainers/new'
     | '/tasks/$taskId'
+    | '/tasks/board'
     | '/tasks/list'
     | '/tasks/new'
+    | '/tasks/workload'
     | '/team/$userId'
     | '/team/new'
     | '/clients'
@@ -323,8 +345,10 @@ export interface FileRouteTypes {
     | '/_app/retainers/$retainerId'
     | '/_app/retainers/new'
     | '/_app/tasks/$taskId'
+    | '/_app/tasks/board'
     | '/_app/tasks/list'
     | '/_app/tasks/new'
+    | '/_app/tasks/workload'
     | '/_app/team/$userId'
     | '/_app/team/new'
     | '/_app/clients/'
@@ -491,6 +515,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppTasksTaskIdRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/tasks/board': {
+      id: '/_app/tasks/board'
+      path: '/tasks/board'
+      fullPath: '/tasks/board'
+      preLoaderRoute: typeof AppTasksBoardRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/tasks/list': {
       id: '/_app/tasks/list'
       path: '/tasks/list'
@@ -503,6 +534,13 @@ declare module '@tanstack/react-router' {
       path: '/tasks/new'
       fullPath: '/tasks/new'
       preLoaderRoute: typeof AppTasksNewRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/tasks/workload': {
+      id: '/_app/tasks/workload'
+      path: '/tasks/workload'
+      fullPath: '/tasks/workload'
+      preLoaderRoute: typeof AppTasksWorkloadRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/team/': {
@@ -542,8 +580,10 @@ interface AppRouteChildren {
   AppRetainersRetainerIdRoute: typeof AppRetainersRetainerIdRoute
   AppRetainersNewRoute: typeof AppRetainersNewRoute
   AppTasksTaskIdRoute: typeof AppTasksTaskIdRoute
+  AppTasksBoardRoute: typeof AppTasksBoardRoute
   AppTasksListRoute: typeof AppTasksListRoute
   AppTasksNewRoute: typeof AppTasksNewRoute
+  AppTasksWorkloadRoute: typeof AppTasksWorkloadRoute
   AppTeamUserIdRoute: typeof AppTeamUserIdRoute
   AppTeamNewRoute: typeof AppTeamNewRoute
   AppClientsIndexRoute: typeof AppClientsIndexRoute
@@ -567,8 +607,10 @@ const AppRouteChildren: AppRouteChildren = {
   AppRetainersRetainerIdRoute: AppRetainersRetainerIdRoute,
   AppRetainersNewRoute: AppRetainersNewRoute,
   AppTasksTaskIdRoute: AppTasksTaskIdRoute,
+  AppTasksBoardRoute: AppTasksBoardRoute,
   AppTasksListRoute: AppTasksListRoute,
   AppTasksNewRoute: AppTasksNewRoute,
+  AppTasksWorkloadRoute: AppTasksWorkloadRoute,
   AppTeamUserIdRoute: AppTeamUserIdRoute,
   AppTeamNewRoute: AppTeamNewRoute,
   AppClientsIndexRoute: AppClientsIndexRoute,

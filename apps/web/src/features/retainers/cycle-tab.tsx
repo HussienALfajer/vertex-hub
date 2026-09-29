@@ -1,6 +1,8 @@
 import { standardSchemaResolver } from '@hookform/resolvers/standard-schema';
 import { useQuery } from '@tanstack/react-query';
+import { Link } from '@tanstack/react-router';
 import {
+  BOARD_STATUSES,
   businessDate,
   type CreateCycleAdjustment,
   type CreateCycleLine,
@@ -74,6 +76,7 @@ import { TabHeader } from '../../components/tab-header';
 import { ApiError } from '../../lib/api/client';
 import { errorMessage, fieldError, SCREEN_ERROR } from '../../lib/errors';
 import { formatCalendarDate, formatDateTime, formatMonth, formatNumber } from '../../lib/format';
+import { clientQuery } from '../clients/clients.queries';
 import { BehindBadge, DeliverableIcon, lineName, OverDeliveredBadge } from './retainer-badges';
 import {
   retainerCycleQuery,
@@ -95,6 +98,7 @@ export function ThisMonthTab({ retainer }: { retainer: RetainerDetail }) {
 function OpenCycle({ retainer, cycleId }: { retainer: RetainerDetail; cycleId: string }) {
   const { t } = useTranslation();
   const cycle = useQuery(retainerCycleQuery(retainer.id, cycleId));
+  const client = useQuery(clientQuery(retainer.client.id));
   const [adding, setAdding] = useState(false);
   const editable = retainer.permissions.canManage;
 
@@ -139,9 +143,12 @@ function OpenCycle({ retainer, cycleId }: { retainer: RetainerDetail; cycleId: s
             <CycleLineRow
               key={line.id}
               retainerId={retainer.id}
+              clientId={retainer.client.id}
               cycle={cycle.data}
               line={line}
               editable={editable}
+              // Rule 7: no tasks for an archived retainer's cycle or a client that has ended.
+              taskable={retainer.archivedAt === null && client.data?.status !== 'ended'}
             />
           ))}
         </ul>
@@ -208,14 +215,18 @@ function CycleSummary({ cycle }: { cycle: CycleDetail }) {
 /** One line's counter: delivered of committed, with its corrections (R7, R9). */
 function CycleLineRow({
   retainerId,
+  clientId,
   cycle,
   line,
   editable,
+  taskable,
 }: {
   retainerId: string;
+  clientId: string;
   cycle: CycleDetail;
   line: CycleDetail['lines'][number];
   editable: boolean;
+  taskable: boolean;
 }) {
   const { t } = useTranslation();
   const [dialog, setDialog] = useState<'committed' | 'adjust' | null>(null);
@@ -242,12 +253,21 @@ function CycleLineRow({
             {over && <OverDeliveredBadge />}
           </div>
           {line.tasks.total > 0 && (
-            <p className="text-xs text-muted-foreground">
+            <Link
+              to="/tasks/list"
+              search={{
+                clientId,
+                retainerId,
+                cycleLineId: line.id,
+                status: [...BOARD_STATUSES],
+              }}
+              className="w-fit text-xs text-muted-foreground hover:text-foreground hover:underline"
+            >
               {t('projects.milestones.tasks', {
                 delivered: formatNumber(line.tasks.delivered),
                 total: formatNumber(line.tasks.total),
               })}
-            </p>
+            </Link>
           )}
         </div>
         <p className="text-2xl font-bold tabular-nums" dir="ltr">
@@ -256,6 +276,21 @@ function CycleLineRow({
             /{formatNumber(line.committed)}
           </span>
         </p>
+        {taskable && (
+          <Button
+            variant="ghost"
+            size="sm"
+            render={
+              <Link
+                to="/tasks/new"
+                search={{ clientId, retainerCycleId: cycle.id, cycleLineId: line.id }}
+              />
+            }
+          >
+            <PlusIcon />
+            {t('retainers.cycle.newTask')}
+          </Button>
+        )}
         {editable && (
           <div className="flex items-center gap-1">
             <Button variant="outline" size="sm" onClick={() => setDialog('adjust')}>

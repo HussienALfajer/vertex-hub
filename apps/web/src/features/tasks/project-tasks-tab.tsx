@@ -1,0 +1,206 @@
+import { useQuery } from '@tanstack/react-query';
+import { Link } from '@tanstack/react-router';
+import {
+  BOARD_STATUSES,
+  isProjectClosed,
+  type ProjectDetail,
+  TASK_STATUSES,
+  type Task,
+} from '@vertex-hub/contracts';
+import { Button, EmptyState, Skeleton } from '@vertex-hub/ui';
+import { ArrowLeftIcon, ListTodoIcon, MilestoneIcon, PlusIcon } from 'lucide-react';
+import type { ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
+import { LoadError } from '../../components/load-error';
+import { TabHeader } from '../../components/tab-header';
+import { formatNumber } from '../../lib/format';
+import { clientQuery } from '../clients/clients.queries';
+import type { TaskListSearch } from './task-list-page';
+import { TaskRows } from './task-rows';
+import { taskListQuery } from './tasks.queries';
+
+/** A project holds far fewer tasks than this; more are one click away in the list. */
+const TAB_SIZE = 100;
+
+/**
+ * The Tasks tab of the project page (spec screen 7): the project's tasks grouped by milestone,
+ * in milestone order, then those without one. "New task" comes preset with the project (and the
+ * milestone, from its group) while the project is running.
+ */
+export function ProjectTasksTab({ project }: { project: ProjectDetail }) {
+  const { t } = useTranslation();
+  const tasks = useQuery(
+    taskListQuery({ projectId: project.id, status: [...TASK_STATUSES], pageSize: TAB_SIZE }),
+  );
+  const client = useQuery(clientQuery(project.client.id));
+  // Rule 7: new tasks link only to a running project of a client that has not ended.
+  const running =
+    project.archivedAt === null &&
+    !isProjectClosed(project.status) &&
+    client.data?.status !== 'ended';
+  const preset = (milestoneId?: string) => ({
+    clientId: project.client.id,
+    projectId: project.id,
+    milestoneId,
+  });
+  const newTask = running && (
+    <Button size="sm" render={<Link to="/tasks/new" search={preset()} />}>
+      <PlusIcon />
+      {t('tasks.actions.new')}
+    </Button>
+  );
+
+  if (tasks.isPending) {
+    return (
+      <div className="flex flex-col gap-3">
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-32" />
+        <Skeleton className="h-32" />
+      </div>
+    );
+  }
+  if (tasks.isError) {
+    return <LoadError message={t('tasks.list.loadError')} onRetry={() => tasks.refetch()} />;
+  }
+  const items = tasks.data.items;
+  // Tasks keep a milestone removed from the project since: they get a group of their own.
+  const removed = new Map(
+    items.flatMap((task) =>
+      task.milestone && !project.milestones.some(({ id }) => id === task.milestone?.id)
+        ? [[task.milestone.id, task.milestone.name] as const]
+        : [],
+    ),
+  );
+  const groups = [
+    ...project.milestones.map((milestone) => ({
+      key: milestone.id,
+      milestoneId: milestone.id as string | undefined,
+      name: milestone.name,
+      // Rule 7: tasks link only to a pending milestone.
+      open: milestone.status === 'pending',
+      tasks: items.filter((task) => task.milestone?.id === milestone.id),
+    })),
+    ...[...removed].map(([id, name]) => ({
+      key: id,
+      milestoneId: id as string | undefined,
+      name,
+      open: false,
+      tasks: items.filter((task) => task.milestone?.id === id),
+    })),
+    {
+      key: 'none',
+      milestoneId: undefined,
+      name: t('tasks.projectTab.noMilestone'),
+      open: false,
+      tasks: items.filter((task) => !task.milestone),
+    },
+  ].filter((group) => group.tasks.length > 0);
+
+  return (
+    <>
+      <TabHeader
+        title={t('tasks.projectTab.title')}
+        description={t('tasks.projectTab.hint')}
+        action={items.length > 0 && newTask}
+      />
+      {items.length === 0 ? (
+        <EmptyState
+          icon={<ListTodoIcon />}
+          title={t('tasks.projectTab.emptyTitle')}
+          description={running ? t('tasks.projectTab.emptyHint') : undefined}
+          action={newTask}
+        />
+      ) : (
+        <div className="flex flex-col gap-4">
+          {groups.map((group) => (
+            <TaskGroup
+              key={group.key}
+              name={group.name}
+              tasks={group.tasks}
+              // The list has no "without a milestone" filter.
+              listSearch={
+                group.milestoneId
+                  ? {
+                      clientId: project.client.id,
+                      projectId: project.id,
+                      milestoneId: group.milestoneId,
+                      status: [...BOARD_STATUSES],
+                    }
+                  : undefined
+              }
+              newTask={
+                running &&
+                group.open && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    render={<Link to="/tasks/new" search={preset(group.milestoneId)} />}
+                  >
+                    <PlusIcon />
+                    {t('tasks.projectTab.newForMilestone')}
+                  </Button>
+                )
+              }
+            />
+          ))}
+          {tasks.data.total > items.length && (
+            <Button
+              variant="outline"
+              className="self-start"
+              render={
+                <Link
+                  to="/tasks/list"
+                  search={{ clientId: project.client.id, projectId: project.id }}
+                />
+              }
+            >
+              {t('tasks.projectTab.seeAll', { n: formatNumber(tasks.data.total) })}
+              <ArrowLeftIcon className="ltr:-scale-x-100" />
+            </Button>
+          )}
+        </div>
+      )}
+    </>
+  );
+}
+
+function TaskGroup({
+  name,
+  tasks,
+  listSearch,
+  newTask,
+}: {
+  name: string;
+  tasks: Task[];
+  listSearch: TaskListSearch | undefined;
+  newTask: ReactNode;
+}) {
+  const { t } = useTranslation();
+  const delivered = tasks.filter((task) => task.status === 'delivered').length;
+  const counted = tasks.filter((task) => task.status !== 'cancelled').length;
+  const counts = t('projects.milestones.tasks', {
+    delivered: formatNumber(delivered),
+    total: formatNumber(counted),
+  });
+  return (
+    <section className="overflow-hidden rounded-lg border border-border bg-surface">
+      <div className="flex flex-wrap items-center gap-3 border-b border-border px-4 py-3">
+        <MilestoneIcon aria-hidden="true" className="size-5 text-muted-foreground" />
+        <h3 className="font-bold">{name}</h3>
+        {listSearch ? (
+          <Link
+            to="/tasks/list"
+            search={listSearch}
+            className="text-sm text-muted-foreground hover:text-foreground hover:underline"
+          >
+            {counts}
+          </Link>
+        ) : (
+          <span className="text-sm text-muted-foreground">{counts}</span>
+        )}
+        <span className="ms-auto">{newTask}</span>
+      </div>
+      <TaskRows tasks={tasks} showAssignee />
+    </section>
+  );
+}

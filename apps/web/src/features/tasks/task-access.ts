@@ -46,3 +46,14 @@ export function logsClientRequests(me: MeResponse): boolean {
   const scopes = scopesOf(me, 'tasks.manage');
   return scopes.includes('all') || scopes.includes('own_clients');
 }
+
+/**
+ * Whether the user manages other people's work: department managers, account managers, the
+ * General Manager and the Operations manager. The board is in their navigation (spec screen 3).
+ */
+export function managesTeams(me: MeResponse): boolean {
+  const scopes = scopesOf(me, 'tasks.manage');
+  return scopes.some(
+    (scope) => scope === 'all' || scope === 'department' || scope === 'own_clients',
+  );
+}

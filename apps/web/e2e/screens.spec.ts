@@ -411,6 +411,42 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await expect(page.getByRole('button', { name: ar.tasks.revisions.decide })).toBeVisible();
       await screenshot(page, testInfo, `task-page-${colorScheme}`);
     });
+
+    test('task board', async ({ page }, testInfo) => {
+      await page.setViewportSize({ width: 1600, height: 1000 });
+      await page.clock.setFixedTime(new Date(`${PROJECTS_TODAY}T09:00:00+03:00`));
+      await mockApi(page, { signedIn: true, me: accountManagerMe });
+      await page.goto('/tasks/board');
+      await expect(page.getByRole('link', { name: 'بوستات أسبوع الافتتاح' })).toBeVisible();
+      await screenshot(page, testInfo, `task-board-${colorScheme}`);
+    });
+
+    test('workload', async ({ page }, testInfo) => {
+      await page.setViewportSize({ width: 1280, height: 900 });
+      await page.clock.setFixedTime(new Date(`${PROJECTS_TODAY}T09:00:00+03:00`));
+      await mockApi(page, { signedIn: true, me: accountManagerMe });
+      await page.goto('/tasks/workload');
+      await expect(page.getByRole('row', { name: /ليان الأحمد/ })).toBeVisible();
+      await screenshot(page, testInfo, `workload-${colorScheme}`);
+    });
+
+    test('project tasks tab', async ({ page }, testInfo) => {
+      await page.setViewportSize({ width: 1280, height: 1300 });
+      await page.clock.setFixedTime(new Date(`${PROJECTS_TODAY}T09:00:00+03:00`));
+      await mockApi(page, { signedIn: true, me: accountManagerMe });
+      await page.goto(`/projects/${seedIds.identityProject}?tab=tasks`);
+      await expect(page.getByRole('link', { name: 'تصاميم منيو الخريف' })).toBeVisible();
+      await screenshot(page, testInfo, `project-tasks-${colorScheme}`);
+    });
+
+    test('client open tasks tab', async ({ page }, testInfo) => {
+      await page.setViewportSize({ width: 1280, height: 1100 });
+      await page.clock.setFixedTime(new Date(`${PROJECTS_TODAY}T09:00:00+03:00`));
+      await mockApi(page, { signedIn: true, me: accountManagerMe });
+      await page.goto(`/clients/${seedIds.jasmine}?tab=tasks`);
+      await expect(page.getByRole('link', { name: 'بوستات أسبوع الافتتاح' })).toBeVisible();
+      await screenshot(page, testInfo, `client-tasks-${colorScheme}`);
+    });
   });
 }
 
