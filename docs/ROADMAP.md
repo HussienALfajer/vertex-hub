@@ -23,7 +23,7 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done. Feature IDs
 - [x] F02 Clients (spec: `docs/specs/F02-clients.md`): contracts, schema and API (PR 1); client list, new client and profile with contacts, brand kit, platforms and communication log, audit links (PR 2); owner acceptance passed
 - [x] F05 Projects and retainers (spec: `docs/specs/F05-projects-retainers.md`): contracts, schema and API for projects and milestones (PR 1); retainers, monthly cycles and extra work API, daily cycle job (PR 2); project list, new project, project page with milestones and extra work, client Projects tab, audit labels (PR 3); retainer list, new retainer, retainer page with this month, history and extra work, client Retainers tab, audit labels (PR 4); owner acceptance passed
 - [x] F06 Task engine and workflow (spec: `docs/specs/F06-tasks.md`, ADR 0016): contracts, schema and API for tasks, workflow, dependencies and revisions, with the F05 and F01 hooks (PR 1); checklist, links, comments with @mentions, board, workload and My tasks counts API (PR 2); My tasks, task list, new task and task page screens with status actions, revisions and comments (PR 3); board, workload, project Tasks tab, retainer line task links and client Open tasks tab (PR 4); owner acceptance passed
-- [ ] F07 Work templates
+- [~] F07 Work templates (spec: `docs/specs/F07-work-templates.md`, ADR 0017; includes the task part of A02)
 - [ ] F14 Notifications (in-app)
 - [ ] Automations A03, A07, A08
 - [ ] Pilot with 2–3 real clients
@@ -34,7 +34,7 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done. Feature IDs
 - [ ] F09 Internal review and client approval (incl. medical review)
 - [ ] F10 Files and versions
 - [ ] F11 Unified calendar and shoots
-- [ ] Automations A02 (task part), A04, A05, A06, A09, A13
+- [ ] Automations A04, A05, A06, A09, A13 (A02 task part moved to F07)
 - [ ] Production deploy of Phase 2
 
 ## Phase 3 — Money and sales
