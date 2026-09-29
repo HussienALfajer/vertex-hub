@@ -218,7 +218,7 @@ export class TasksService {
     if (!item || !row) throw new NotFoundException();
     const [people, contacts, extraWork] = await Promise.all([
       this.users.summaries([
-        task.createdById,
+        ...(task.createdById ? [task.createdById] : []),
         ...checklist.flatMap((i) => (i.doneById ? [i.doneById] : [])),
         ...links.map((l) => l.addedById),
         ...revisions.flatMap((r) => [r.authorId, ...(r.decidedById ? [r.decidedById] : [])]),
@@ -290,7 +290,7 @@ export class TasksService {
           createdAt: r.createdAt.toISOString(),
         };
       }),
-      createdBy: person(task.createdById),
+      createdBy: task.createdById ? person(task.createdById) : null,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
       startedAt: task.startedAt?.toISOString() ?? null,

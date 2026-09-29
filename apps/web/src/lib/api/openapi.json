@@ -4311,6 +4311,267 @@
         ]
       }
     },
+    "/api/templates": {
+      "get": {
+        "operationId": "TemplatesController_list",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 1,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 50,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            }
+          },
+          {
+            "name": "kind",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/TemplateKind"
+                }
+              ]
+            }
+          },
+          {
+            "name": "archived",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ]
+            }
+          },
+          {
+            "name": "sort",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "name",
+              "type": "string",
+              "enum": [
+                "name",
+                "updatedAt"
+              ]
+            }
+          },
+          {
+            "name": "order",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "asc",
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/SortOrder"
+                }
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Work templates; archived ones with `templates.manage` only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TemplatePage"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "templates"
+        ]
+      },
+      "post": {
+        "operationId": "TemplatesController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTemplate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The new template",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TemplateDetail"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "templates"
+        ]
+      }
+    },
+    "/api/templates/{id}": {
+      "get": {
+        "operationId": "TemplatesController_detail",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A template with its stages, steps and default assignees",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TemplateDetail"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "templates"
+        ]
+      },
+      "put": {
+        "operationId": "TemplatesController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateTemplate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The template after replacing its document; a `key` equal to an id keeps that row",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TemplateDetail"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "templates"
+        ]
+      }
+    },
+    "/api/templates/{id}/archive": {
+      "post": {
+        "operationId": "TemplatesController_archive",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The archived template",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TemplateDetail"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "templates"
+        ]
+      }
+    },
+    "/api/templates/{id}/restore": {
+      "post": {
+        "operationId": "TemplatesController_restore",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The restored template",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TemplateDetail"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "templates"
+        ]
+      }
+    },
     "/api/health": {
       "get": {
         "operationId": "HealthController_check",
@@ -4370,7 +4631,9 @@
           "task",
           "task_checklist_item",
           "task_link",
-          "task_comment"
+          "task_comment",
+          "template",
+          "template_run"
         ]
       },
       "AuditAction": {
@@ -4454,7 +4717,14 @@
           "task_link.archived",
           "task_comment.created",
           "task_comment.updated",
-          "task_comment.archived"
+          "task_comment.archived",
+          "template.created",
+          "template.updated",
+          "template.assignees_updated",
+          "template.archived",
+          "template.restored",
+          "template_run.created",
+          "retainer.template_changed"
         ]
       },
       "AuditPage": {
@@ -9023,6 +9293,7 @@
             }
           },
           "createdBy": {
+            "nullable": true,
             "type": "object",
             "properties": {
               "id": {
@@ -10019,6 +10290,766 @@
         },
         "required": [
           "body"
+        ]
+      },
+      "TemplateKind": {
+        "type": "string",
+        "enum": [
+          "project",
+          "retainer_cycle"
+        ]
+      },
+      "TemplatePage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TemplateListItem"
+            }
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "page",
+          "pageSize"
+        ],
+        "additionalProperties": false,
+        "description": "Work templates"
+      },
+      "TemplateListItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/TemplateKind"
+          },
+          "description": {
+            "nullable": true,
+            "type": "string"
+          },
+          "stepCount": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "departments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DepartmentCode"
+            }
+          },
+          "warningCount": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "linkedRetainerCount": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "archivedAt": {
+            "nullable": true,
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "kind",
+          "description",
+          "stepCount",
+          "departments",
+          "warningCount",
+          "linkedRetainerCount",
+          "updatedAt",
+          "archivedAt"
+        ],
+        "additionalProperties": false
+      },
+      "TemplateDetail": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/TemplateKind"
+          },
+          "description": {
+            "nullable": true,
+            "type": "string"
+          },
+          "stages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TemplateStage"
+            }
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TemplateStep"
+            }
+          },
+          "assignees": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TemplateAssignee"
+            }
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "invalid_assignee"
+                  ]
+                },
+                "department": {
+                  "$ref": "#/components/schemas/DepartmentCode"
+                }
+              },
+              "required": [
+                "type",
+                "department"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "linkedRetainers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "client": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "name": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "client"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "archivedAt": {
+            "nullable": true,
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "permissions": {
+            "$ref": "#/components/schemas/TemplatePermissions"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "kind",
+          "description",
+          "stages",
+          "steps",
+          "assignees",
+          "warnings",
+          "linkedRetainers",
+          "createdAt",
+          "updatedAt",
+          "archivedAt",
+          "permissions"
+        ],
+        "additionalProperties": false
+      },
+      "TemplateStage": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "name": {
+            "type": "string"
+          },
+          "position": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "position"
+        ],
+        "additionalProperties": false
+      },
+      "TemplateStep": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "stageId": {
+            "nullable": true,
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "position": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "title": {
+            "type": "string"
+          },
+          "brief": {
+            "nullable": true,
+            "type": "string"
+          },
+          "department": {
+            "$ref": "#/components/schemas/DepartmentCode"
+          },
+          "dueDay": {
+            "nullable": true,
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "priority": {
+            "$ref": "#/components/schemas/TaskPriority"
+          },
+          "needsClientApproval": {
+            "type": "boolean"
+          },
+          "revisionLimit": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "checklist": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "repeatKind": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DeliverableKind"
+              }
+            ]
+          },
+          "repeatLabel": {
+            "nullable": true,
+            "type": "string"
+          },
+          "spreadFromDay": {
+            "nullable": true,
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "dependsOn": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "stageId",
+          "position",
+          "title",
+          "brief",
+          "department",
+          "dueDay",
+          "priority",
+          "needsClientApproval",
+          "revisionLimit",
+          "checklist",
+          "repeatKind",
+          "repeatLabel",
+          "spreadFromDay",
+          "dependsOn"
+        ],
+        "additionalProperties": false
+      },
+      "TemplateAssignee": {
+        "type": "object",
+        "properties": {
+          "department": {
+            "$ref": "#/components/schemas/DepartmentCode"
+          },
+          "user": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "name": {
+                "type": "string"
+              },
+              "archived": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "archived"
+            ],
+            "additionalProperties": false
+          },
+          "valid": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "department",
+          "user",
+          "valid"
+        ],
+        "additionalProperties": false
+      },
+      "TemplatePermissions": {
+        "type": "object",
+        "properties": {
+          "canEdit": {
+            "type": "boolean"
+          },
+          "canArchive": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "canEdit",
+          "canArchive"
+        ],
+        "additionalProperties": false
+      },
+      "CreateTemplate": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "description": {
+            "nullable": true,
+            "type": "string",
+            "maxLength": 1000
+          },
+          "stages": {
+            "default": [],
+            "maxItems": 30,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 80
+                }
+              },
+              "required": [
+                "key",
+                "name"
+              ]
+            }
+          },
+          "steps": {
+            "minItems": 1,
+            "maxItems": 60,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64
+                },
+                "stageKey": {
+                  "default": null,
+                  "nullable": true,
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64
+                },
+                "title": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160
+                },
+                "brief": {
+                  "nullable": true,
+                  "type": "string",
+                  "maxLength": 5000
+                },
+                "department": {
+                  "$ref": "#/components/schemas/DepartmentCode"
+                },
+                "dueDay": {
+                  "default": null,
+                  "nullable": true,
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 260
+                },
+                "priority": {
+                  "default": "normal",
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/TaskPriority"
+                    }
+                  ]
+                },
+                "needsClientApproval": {
+                  "default": true,
+                  "type": "boolean"
+                },
+                "revisionLimit": {
+                  "default": 2,
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 20
+                },
+                "checklist": {
+                  "default": [],
+                  "maxItems": 20,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  }
+                },
+                "repeatKind": {
+                  "default": null,
+                  "nullable": true,
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/DeliverableKind"
+                    }
+                  ]
+                },
+                "repeatLabel": {
+                  "nullable": true,
+                  "type": "string",
+                  "maxLength": 60
+                },
+                "spreadFromDay": {
+                  "default": null,
+                  "nullable": true,
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 27
+                },
+                "dependsOn": {
+                  "maxItems": 10,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  }
+                }
+              },
+              "required": [
+                "key",
+                "title",
+                "department"
+              ]
+            }
+          },
+          "assignees": {
+            "default": [],
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "department": {
+                  "$ref": "#/components/schemas/DepartmentCode"
+                },
+                "userId": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                }
+              },
+              "required": [
+                "department",
+                "userId"
+              ]
+            }
+          },
+          "kind": {
+            "$ref": "#/components/schemas/TemplateKind"
+          }
+        },
+        "required": [
+          "name",
+          "steps",
+          "kind"
+        ]
+      },
+      "UpdateTemplate": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "description": {
+            "nullable": true,
+            "type": "string",
+            "maxLength": 1000
+          },
+          "stages": {
+            "default": [],
+            "maxItems": 30,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 80
+                }
+              },
+              "required": [
+                "key",
+                "name"
+              ]
+            }
+          },
+          "steps": {
+            "minItems": 1,
+            "maxItems": 60,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64
+                },
+                "stageKey": {
+                  "default": null,
+                  "nullable": true,
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64
+                },
+                "title": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160
+                },
+                "brief": {
+                  "nullable": true,
+                  "type": "string",
+                  "maxLength": 5000
+                },
+                "department": {
+                  "$ref": "#/components/schemas/DepartmentCode"
+                },
+                "dueDay": {
+                  "default": null,
+                  "nullable": true,
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 260
+                },
+                "priority": {
+                  "default": "normal",
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/TaskPriority"
+                    }
+                  ]
+                },
+                "needsClientApproval": {
+                  "default": true,
+                  "type": "boolean"
+                },
+                "revisionLimit": {
+                  "default": 2,
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 20
+                },
+                "checklist": {
+                  "default": [],
+                  "maxItems": 20,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  }
+                },
+                "repeatKind": {
+                  "default": null,
+                  "nullable": true,
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/DeliverableKind"
+                    }
+                  ]
+                },
+                "repeatLabel": {
+                  "nullable": true,
+                  "type": "string",
+                  "maxLength": 60
+                },
+                "spreadFromDay": {
+                  "default": null,
+                  "nullable": true,
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 27
+                },
+                "dependsOn": {
+                  "maxItems": 10,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  }
+                }
+              },
+              "required": [
+                "key",
+                "title",
+                "department"
+              ]
+            }
+          },
+          "assignees": {
+            "default": [],
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "department": {
+                  "$ref": "#/components/schemas/DepartmentCode"
+                },
+                "userId": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                }
+              },
+              "required": [
+                "department",
+                "userId"
+              ]
+            }
+          }
+        },
+        "required": [
+          "name",
+          "steps"
         ]
       },
       "HealthResponse": {

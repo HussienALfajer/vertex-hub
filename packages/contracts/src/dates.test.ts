@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { businessInstant, timeOfDaySchema, WORK_WEEK, weekday, weekOf } from './dates.js';
+import {
+  businessInstant,
+  isWorkDay,
+  nthWorkDay,
+  timeOfDaySchema,
+  WORK_WEEK,
+  weekday,
+  weekOf,
+  workDaysBetween,
+} from './dates.js';
 
 describe('work week (ADR 0016)', () => {
   it('starts on Saturday and rests on Friday', () => {
@@ -18,6 +27,37 @@ describe('work week (ADR 0016)', () => {
 
   it('crosses months and years', () => {
     expect(weekOf('2027-01-01')).toEqual({ from: '2026-12-26', to: '2027-01-01' });
+  });
+});
+
+describe('work days (ADR 0017)', () => {
+  it('skips Fridays only', () => {
+    expect(isWorkDay('2026-10-08')).toBe(true); // Thursday
+    expect(isWorkDay('2026-10-09')).toBe(false); // Friday
+    expect(isWorkDay('2026-10-10')).toBe(true); // Saturday
+  });
+
+  it('counts day 1 as the first work day on or after the start', () => {
+    expect(nthWorkDay('2026-10-08', 1)).toBe('2026-10-08');
+    expect(nthWorkDay('2026-10-09', 1)).toBe('2026-10-10');
+    expect(nthWorkDay('2026-10-08', 2)).toBe('2026-10-10');
+    expect(nthWorkDay('2026-10-03', 7)).toBe('2026-10-10');
+  });
+
+  it('crosses month and year ends', () => {
+    expect(nthWorkDay('2026-10-29', 3)).toBe('2026-11-01'); // Thu, Sat, Sun
+    expect(nthWorkDay('2026-12-31', 2)).toBe('2027-01-02'); // Thu, (Fri), Sat
+  });
+
+  it('lists the work days of a range', () => {
+    expect(workDaysBetween('2026-10-07', '2026-10-11')).toEqual([
+      '2026-10-07',
+      '2026-10-08',
+      '2026-10-10',
+      '2026-10-11',
+    ]);
+    expect(workDaysBetween('2026-10-09', '2026-10-09')).toEqual([]);
+    expect(workDaysBetween('2026-10-11', '2026-10-10')).toEqual([]);
   });
 });
 

@@ -6,6 +6,7 @@ export {
   type ExtraWorkLink,
   type MilestoneLink,
   type ProjectLink,
+  type RetainerLink,
 } from './engagement-directory.js';
 export { ProjectsModule } from './projects.module.js';
 export { WorkProgress, type WorkProgressSource } from './work-progress.js';

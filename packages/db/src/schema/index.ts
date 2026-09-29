@@ -5,3 +5,4 @@ export * from './projects.js';
 export * from './retainers.js';
 export * from './system.js';
 export * from './tasks.js';
+export * from './templates.js';

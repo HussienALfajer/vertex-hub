@@ -65,6 +65,15 @@ export const ERROR_CODES = [
   'TASK_ARCHIVED',
   'TASK_NOT_ARCHIVED',
   'TASKS_OPEN',
+  'TEMPLATE_NAME_TAKEN',
+  'TEMPLATE_ARCHIVED',
+  'TEMPLATE_NOT_ARCHIVED',
+  'TEMPLATE_KIND_MISMATCH',
+  'TEMPLATE_NOT_LINKED',
+  'NO_TEMPLATE',
+  'NO_REPEATED_STEP',
+  'NOTHING_MISSING',
+  'ALREADY_GENERATED',
 ] as const;
 
 export const errorCodeSchema = z.enum(ERROR_CODES).meta({ id: 'ErrorCode' });

@@ -19,6 +19,7 @@ import {
   TASK_PRIORITIES,
   TASK_STATUSES,
   TASK_TYPES,
+  TEMPLATE_KINDS,
   USER_STATUSES,
 } from '@vertex-hub/contracts';
 import { Badge, ColorSwatch } from '@vertex-hub/ui';
@@ -101,6 +102,10 @@ function enumLabel(
   if (field === 'kind' && entityType === 'retainer_cycle') {
     const kind = find(DELIVERABLE_KINDS);
     if (kind) return t(`retainers.kinds.${kind}`);
+  }
+  if (field === 'kind' && entityType === 'template') {
+    const kind = find(TEMPLATE_KINDS);
+    if (kind) return t(`templates.kinds.${kind}`);
   }
   if (field === 'kind' && (value === 'activation' || value === 'reset')) {
     return t(`audit.kinds.${value}`);

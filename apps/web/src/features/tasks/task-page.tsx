@@ -177,7 +177,7 @@ function TaskHero({ task }: { task: TaskDetail }) {
         </Fact>
         <Fact label={t('tasks.page.createdBy')}>
           <span>
-            {task.createdBy.name}
+            {task.createdBy?.name ?? t('tasks.page.createdBySystem')}
             <span className="block text-xs text-muted-foreground">
               {formatDateTime(task.createdAt)}
             </span>

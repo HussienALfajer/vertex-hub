@@ -19,14 +19,22 @@ import {
   retainerCycles,
   retainerDeliverables,
   retainers,
+  retainerTemplates,
   taskChecklistItems,
   taskComments,
   taskDependencies,
   taskLinks,
   taskRevisions,
   tasks,
+  templateRuns,
+  templateRunTasks,
   userRoles,
   users,
+  workTemplateAssignees,
+  workTemplateStages,
+  workTemplateStepDependencies,
+  workTemplateSteps,
+  workTemplates,
 } from '@vertex-hub/db';
 import { hashPassword } from 'better-auth/crypto';
 import { eq, inArray, or } from 'drizzle-orm';
@@ -280,6 +288,41 @@ export async function removeRetainers(db: Database, ids: string[]): Promise<void
   await db.delete(extraWorkItems).where(inArray(extraWorkItems.retainerId, ids));
   await db.delete(retainerDeliverables).where(inArray(retainerDeliverables.retainerId, ids));
   await db.delete(retainers).where(inArray(retainers.id, ids));
+}
+
+/**
+ * Removes seeded templates with their stages, steps, default assignees, retainer links, runs and
+ * audit entries; the generated tasks go with their clients (test cleanup only).
+ */
+export async function removeTemplates(db: Database, ids: string[]): Promise<void> {
+  if (ids.length === 0) return;
+  const runs = (
+    await db
+      .select({ id: templateRuns.id })
+      .from(templateRuns)
+      .where(inArray(templateRuns.templateId, ids))
+  ).map((row) => row.id);
+  const steps = (
+    await db
+      .select({ id: workTemplateSteps.id })
+      .from(workTemplateSteps)
+      .where(inArray(workTemplateSteps.templateId, ids))
+  ).map((row) => row.id);
+  await db.delete(auditEntries).where(inArray(auditEntries.entityId, [...ids, ...runs]));
+  if (runs.length) {
+    await db.delete(templateRunTasks).where(inArray(templateRunTasks.runId, runs));
+    await db.delete(templateRuns).where(inArray(templateRuns.id, runs));
+  }
+  await db.delete(retainerTemplates).where(inArray(retainerTemplates.templateId, ids));
+  if (steps.length) {
+    await db
+      .delete(workTemplateStepDependencies)
+      .where(inArray(workTemplateStepDependencies.stepId, steps));
+  }
+  await db.delete(workTemplateSteps).where(inArray(workTemplateSteps.templateId, ids));
+  await db.delete(workTemplateStages).where(inArray(workTemplateStages.templateId, ids));
+  await db.delete(workTemplateAssignees).where(inArray(workTemplateAssignees.templateId, ids));
+  await db.delete(workTemplates).where(inArray(workTemplates.id, ids));
 }
 
 function base32Decode(input: string): Buffer {

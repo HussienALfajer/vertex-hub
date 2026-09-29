@@ -85,7 +85,7 @@ export interface TaskRow {
   requestedOn: string | null;
   requestScope: RequestScope | null;
   extraWorkItemId: string | null;
-  createdById: string;
+  createdById: string | null;
   startedAt: Date | null;
   archivedAt: Date | null;
 }

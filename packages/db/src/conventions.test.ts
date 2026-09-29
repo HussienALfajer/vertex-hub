@@ -30,11 +30,19 @@ const NOT_BUSINESS_RECORDS: Record<string, string> = {
   retainer_cycle_adjustments: 'Append-only; corrected by a new adjustment (F05 R7)',
   task_dependencies: 'Link table; a dependency is added or removed, never archived (F06)',
   task_revisions: 'Append-only; never archived, an over-limit decision is set once (F06 rule 10)',
+  work_template_stages: 'Part of its template document; replaced when the template is saved (F07)',
+  work_template_steps: 'Part of its template document; replaced when the template is saved (F07)',
+  work_template_step_dependencies: 'Link table inside a template document (F07)',
+  work_template_assignees: 'Link table; a default assignee is set or cleared (F07)',
+  retainer_templates: 'Link table; linking and unlinking are audited on the retainer (F07)',
+  template_runs: 'Append-only; runs are never edited or archived (F07)',
+  template_run_tasks: 'Append-only link between a run and the tasks it created (F07)',
 };
 
 /** Tables keyed by a natural value instead of a UUIDv7 `id`. Every entry needs a reason. */
 const NATURAL_KEYS: Record<string, string> = {
   worker_heartbeats: 'One row per worker name, upserted',
+  retainer_templates: 'One row per retainer, keyed by the retainer (F07)',
 };
 
 describe('database conventions', () => {

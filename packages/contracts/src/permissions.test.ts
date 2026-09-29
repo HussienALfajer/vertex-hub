@@ -59,7 +59,7 @@ describe('permission map', () => {
     for (const permission of ['users.manage', 'audit.read', 'templates.manage'] as const) {
       expect(hasPermission(access(others), permission)).toBe(false);
     }
-    expect(hasPermission(access(['department_manager']), 'templates.read')).toBe(true);
+    expect(hasPermission(access(['employee']), 'templates.read')).toBe(true);
   });
 
   it('lets account managers work the leads they own', () => {
@@ -193,6 +193,17 @@ describe('tasks (F06)', () => {
     const member = access(['employee'], [{ code: 'internal_operations', isManager: false }]);
     expect(permissionScopes(member, 'tasks.manage')).toEqual(['assigned']);
     expect(hasPermission(member, 'reports.read')).toBe(false);
+  });
+});
+
+describe('templates (F07)', () => {
+  it('lets every user read templates and keeps managing them to GM and Operations', () => {
+    expect(permissionScopes(access(['employee']), 'templates.read')).toEqual(['all']);
+    for (const role of ['department_manager', 'account_manager', 'finance'] as const) {
+      expect(PERMISSION_MAP[role]['templates.read'], role).toBeUndefined();
+      expect(PERMISSION_MAP[role]['templates.manage'], role).toBeUndefined();
+    }
+    expect(hasPermission(access(['employee', 'account_manager']), 'templates.manage')).toBe(false);
   });
 });
 
