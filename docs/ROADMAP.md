@@ -20,7 +20,7 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done. Feature IDs
 ## Phase 1 — Core
 - [x] F01 Users, departments, roles and permissions (spec: `docs/specs/F01-users-roles.md`): access core, users and departments API, web screens; owner acceptance passed
 - [x] `feature-slice` skill (contracts → db → api → web → tests), extracted from F01: layer gates, new-module wiring checklist, F01 patterns to copy
-- [~] F02 Clients (spec: `docs/specs/F02-clients.md`): contracts, schema and API done (PR 1); web screens and E2E next (PR 2)
+- [x] F02 Clients (spec: `docs/specs/F02-clients.md`): contracts, schema and API (PR 1); client list, new client and profile with contacts, brand kit, platforms and communication log, audit links (PR 2); owner acceptance passed
 - [ ] F05 Projects and retainers
 - [ ] F06 Task engine and workflow
 - [ ] F07 Work templates

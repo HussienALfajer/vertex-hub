@@ -17,7 +17,7 @@ pnpm install
 pnpm db:setup-local   # creates .env, the vertex_hub role and databases (asks for the postgres password)
 pnpm db:migrate
 pnpm build            # needed once for the next command
-pnpm --filter @vertex-hub/api user:create --email you@example.com --name "Your Name" --role general_manager
+pnpm --filter @vertex-hub/api user:create --email you@example.com --name "Your Name" --department general_management --role general_manager
 pnpm dev              # api http://127.0.0.1:3000/api/docs · web http://127.0.0.1:5173
 ```
 

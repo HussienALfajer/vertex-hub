@@ -52,7 +52,7 @@ Run from the repository root (Node 24, pnpm via Corepack). Turborepo builds depe
 | Apply migrations to the dev database | `pnpm db:migrate` |
 | Build | `pnpm build` |
 | Refresh the web app's OpenAPI document and client types after an API change (CI checks both; needs `pnpm build`) | `pnpm --filter @vertex-hub/api openapi:export` then `pnpm --filter @vertex-hub/web api:generate` |
-| Create a user (prints a generated password once; needs `pnpm build`) | `pnpm --filter @vertex-hub/api user:create --email <email> --name <name> --role <role>` |
+| Create a user (prints a generated password once; needs `pnpm build`) | `pnpm --filter @vertex-hub/api user:create --email <email> --name <name> --department <code> [--role <role>]` |
 | One package only | `pnpm --filter @vertex-hub/<name> <script>` |
 
 API docs (non-production): `http://127.0.0.1:3000/api/docs`. Health: `GET /api/health`.
