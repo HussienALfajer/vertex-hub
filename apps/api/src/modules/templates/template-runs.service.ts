@@ -9,6 +9,7 @@ import {
   businessDate,
   type CalendarDate,
   type DepartmentCode,
+  type NotificationData,
   type PlanTarget,
   planTemplateRun,
   type RetainerTemplate,
@@ -36,6 +37,8 @@ import { DATABASE } from '../../core/database/database.module.js';
 import { CodedException } from '../../core/errors/index.js';
 import { type AuditActor, recordAudit } from '../audit/index.js';
 import { type CurrentUserInfo, lockAccessChanges, UserDirectory } from '../auth/index.js';
+import { ClientDirectory } from '../clients/index.js';
+import { type Notice, NotificationCenter } from '../notifications/index.js';
 import {
   type CycleLink,
   type CycleOpened,
@@ -79,6 +82,8 @@ export class TemplateRunsService implements OnModuleInit {
     private readonly generator: TaskGenerator,
     private readonly openedHooks: CycleOpenedHooks,
     private readonly templates: TemplatesService,
+    private readonly clients: ClientDirectory,
+    private readonly notifications: NotificationCenter,
   ) {}
 
   onModuleInit(): void {
@@ -371,7 +376,59 @@ export class TemplateRunsService implements OnModuleInit {
         ...(cycle && { retainerId: cycle.retainerId }),
       },
     });
+    await this.notifyRun(tx, runId, template, target, plan, actor);
     return runId;
+  }
+
+  /**
+   * F14 rule 6: one `tasks_generated` per assignee with their count, and one per department with
+   * unassigned tasks to its managers; the run's tasks send no `task_assigned` or `task_requested`.
+   */
+  private async notifyRun(
+    tx: Transaction,
+    runId: string,
+    template: TemplateForRun,
+    target: RunTarget,
+    plan: TemplateRunPlan,
+    actor: AuditActor | null,
+  ): Promise<void> {
+    if (plan.tasks.length === 0) return;
+    const clientId = target.type === 'project' ? target.project.clientId : target.cycle.clientId;
+    const client = await this.clients.summary(clientId, tx);
+    const context = {
+      template: template.name,
+      client: client?.name ?? null,
+      project: target.type === 'project' ? target.project.name : null,
+      retainer: target.type === 'cycle' ? target.cycle.retainerName : null,
+    };
+    // Per assignee (their first department names the notice) and per department's queue.
+    const assigned = new Map<string, { department: DepartmentCode; count: number }>();
+    const queued = new Map<DepartmentCode, number>();
+    for (const { assignee, department } of plan.tasks) {
+      if (assignee) {
+        const group = assigned.get(assignee.id) ?? { department, count: 0 };
+        assigned.set(assignee.id, { ...group, count: group.count + 1 });
+      } else {
+        queued.set(department, (queued.get(department) ?? 0) + 1);
+      }
+    }
+    const managers = await this.users.departmentManagers([...queued.keys()], tx);
+    const notice = (recipients: string[], data: NotificationData<'tasks_generated'>): Notice => ({
+      type: 'tasks_generated',
+      recipients,
+      actorId: actor?.id ?? null,
+      subjectId: runId,
+      data,
+    });
+    const notices: Notice[] = [
+      ...[...assigned].map(([userId, { department, count }]) =>
+        notice([userId], { ...context, count, department, unassigned: false }),
+      ),
+      ...[...queued].map(([department, count]) =>
+        notice(managers.get(department) ?? [], { ...context, count, department, unassigned: true }),
+      ),
+    ];
+    await this.notifications.notify(tx, notices);
   }
 
   /** The monthly template linked to the retainer, or null. */

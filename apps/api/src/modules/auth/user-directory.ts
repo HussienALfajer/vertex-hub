@@ -107,6 +107,24 @@ export class UserDirectory {
     return [...members.values()];
   }
 
+  /** The managers of each of the departments, by code; a department without one is left out. */
+  async departmentManagers(
+    codes: DepartmentCode[],
+    executor: Database | Transaction = this.db,
+  ): Promise<Map<DepartmentCode, string[]>> {
+    const unique = [...new Set(codes)];
+    const result = new Map<DepartmentCode, string[]>();
+    if (unique.length === 0) return result;
+    const rows = await executor
+      .select({ code: departments.code, managerId: departments.managerId })
+      .from(departments)
+      .where(inArray(departments.code, unique));
+    for (const row of rows) {
+      if (row.managerId) result.set(row.code, [row.managerId]);
+    }
+    return result;
+  }
+
   /** The department codes each of the given users belongs to. */
   async memberships(ids: string[], executor: Database | Transaction = this.db) {
     const unique = [...new Set(ids)];

@@ -1,5 +1,6 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import {
+  commentExcerpt,
   mentionedUserIds,
   type PageQuery,
   type TaskComment,
@@ -22,6 +23,7 @@ import {
   readableTask,
   type TaskAccess,
 } from './task-access.js';
+import { TaskNotices } from './task-notices.js';
 
 type CommentRow = typeof taskComments.$inferSelect;
 
@@ -36,6 +38,7 @@ export class TaskCommentsService {
     private readonly users: UserDirectory,
     private readonly clients: ClientDirectory,
     private readonly engagements: EngagementDirectory,
+    private readonly notices: TaskNotices,
   ) {}
 
   /** Oldest first; removed comments stay in place without their body. */
@@ -82,6 +85,12 @@ export class TaskCommentsService {
         entityId: created.id,
         after: { taskId, body: input.body, mentionedUserIds: mentions },
       });
+      // A mentioned assignee gets the mention only, unless they muted it (F14 rule 2).
+      const excerpt = await this.excerpt(tx, input.body);
+      await this.notices.send(tx, [
+        this.notices.notice(task, 'task_mentioned', mentions, actor.id, { excerpt }),
+        this.notices.notice(task, 'task_commented', [task.assigneeId], actor.id, { excerpt }),
+      ]);
       return { task, created };
     });
     return this.one(actor, row.task, row.created);
@@ -121,6 +130,14 @@ export class TaskCommentsService {
         before: { body: comment.body, mentionedUserIds: comment.mentionedUserIds },
         after: { taskId, body: input.body, mentionedUserIds: mentions },
       });
+      // Edge case 12: only mentions the edit adds notify.
+      const added = mentions.filter((id) => !comment.mentionedUserIds.includes(id));
+      if (added.length > 0) {
+        const excerpt = await this.excerpt(tx, input.body);
+        await this.notices.send(tx, [
+          this.notices.notice(task, 'task_mentioned', added, actor.id, { excerpt }),
+        ]);
+      }
       return { task, comment: updated };
     });
     return this.one(actor, row.task, row.comment);
@@ -191,6 +208,12 @@ export class TaskCommentsService {
         ids.filter((id) => !people.get(id) || people.get(id)?.archived),
       );
     }
+  }
+
+  /** The comment as a notification shows it, mentions by their current names. */
+  private async excerpt(tx: Transaction, body: string): Promise<string> {
+    const people = await this.users.summaries(mentionedUserIds(body), tx);
+    return commentExcerpt(body, (id) => people.get(id)?.name ?? '');
   }
 
   private async one(actor: CurrentUserInfo, task: TaskAccess, row: CommentRow) {

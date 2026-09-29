@@ -7,6 +7,7 @@ import { DATABASE } from '../../core/database/database.module.js';
 import { type AuditActor, recordAudit } from '../audit/index.js';
 import { ResponsibilityRegistry } from '../auth/index.js';
 import { EngagementDirectory, WorkProgress } from '../projects/index.js';
+import { blocksDependents, TaskNotices } from './task-notices.js';
 
 /**
  * What tasks feed into other modules (spec F06, "Links F06 fills in F05" and "Changes to F01"):
@@ -19,6 +20,7 @@ export class TaskHooksService implements OnModuleInit {
     private readonly progress: WorkProgress,
     private readonly responsibilities: ResponsibilityRegistry,
     private readonly engagements: EngagementDirectory,
+    private readonly notices: TaskNotices,
   ) {}
 
   onModuleInit(): void {
@@ -133,6 +135,18 @@ export class TaskHooksService implements OnModuleInit {
           ...(withdrawn && { extraWorkItemId: null }),
         },
       });
+      const cancelled = await this.notices.load(tx, task.id);
+      await this.notices.send(tx, this.notices.cancelled(cancelled, actor.id));
     }
+    // Rule 7: the tasks waiting on the cancelled ones, once each.
+    const blocking = open.filter((task) => blocksDependents({ ...task, archivedAt: null }));
+    await this.notices.send(
+      tx,
+      await this.notices.openedDependents(
+        tx,
+        blocking.map((task) => task.id),
+        actor.id,
+      ),
+    );
   }
 }

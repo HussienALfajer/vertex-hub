@@ -12,7 +12,7 @@ import {
   notifications,
   type Transaction,
 } from '@vertex-hub/db';
-import { lt } from 'drizzle-orm';
+import { and, eq, inArray, lt } from 'drizzle-orm';
 import { DATABASE } from '../../core/database/database.module.js';
 import { JobQueue } from '../../core/jobs/index.js';
 import { type Notice, NotificationCenter } from './notification-center.js';
@@ -90,6 +90,36 @@ export class DailyReminders implements OnModuleInit {
     if (inserted.length === 0) return false;
     await this.center.notify(tx, notice);
     return true;
+  }
+
+  /**
+   * When each reminder was sent, by subject id; subjects without a reminder of that kind for the
+   * given occurrence are left out (rule 11 escalates a day after the overdue reminder).
+   */
+  async sentOn(
+    kind: NotificationReminderKind,
+    subjects: readonly { subjectId: string; occurrence: CalendarDate }[],
+  ): Promise<Map<string, CalendarDate>> {
+    if (subjects.length === 0) return new Map();
+    const occurrences = new Map(subjects.map((subject) => [subject.subjectId, subject.occurrence]));
+    const rows = await this.db
+      .select({
+        subjectId: notificationReminders.subjectId,
+        occurrence: notificationReminders.occurrence,
+        sentOn: notificationReminders.sentOn,
+      })
+      .from(notificationReminders)
+      .where(
+        and(
+          eq(notificationReminders.kind, kind),
+          inArray(notificationReminders.subjectId, [...occurrences.keys()]),
+        ),
+      );
+    return new Map(
+      rows
+        .filter((row) => occurrences.get(row.subjectId) === row.occurrence)
+        .map((row) => [row.subjectId, row.sentOn]),
+    );
   }
 
   private async purge(now: Date): Promise<number> {

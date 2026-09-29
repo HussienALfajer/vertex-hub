@@ -16,6 +16,7 @@ import {
   queryListSchema,
   sortOrderSchema,
 } from './lists.js';
+import { NOTIFICATION_EXCERPT_MAX } from './notifications.js';
 import { deliverableKindSchema } from './retainers.js';
 import { httpUrlSchema, optionalText } from './text.js';
 import { WORKFLOW_STATUSES } from './workflow.js';
@@ -698,6 +699,20 @@ export function mentionedUserIds(body: string): string[] {
       [...body.matchAll(MENTION_TOKEN)].map((match) => (match[1] as string).toLowerCase()),
     ),
   ];
+}
+
+/**
+ * A comment as a notification shows it (F14): mentions as `@name`, whitespace collapsed, cut to
+ * `NOTIFICATION_EXCERPT_MAX` characters with an ellipsis.
+ */
+export function commentExcerpt(body: string, nameOf: (userId: string) => string): string {
+  const text = body
+    .replace(MENTION_TOKEN, (_, id: string) => `@${nameOf(id.toLowerCase())}`)
+    .replace(/\s+/g, ' ')
+    .trim();
+  return text.length > NOTIFICATION_EXCERPT_MAX
+    ? `${text.slice(0, NOTIFICATION_EXCERPT_MAX - 1)}…`
+    : text;
 }
 
 /** Rule 16: plain text with line breaks; the API checks that mentioned users are active. */

@@ -49,6 +49,7 @@ import {
   UserDirectory,
   type UserSummary,
 } from '../auth/index.js';
+import { NotificationCenter } from '../notifications/index.js';
 import {
   actorOf,
   covers,
@@ -104,6 +105,7 @@ export class ClientsService implements OnModuleInit {
     @Inject(DATABASE) private readonly db: Database,
     private readonly users: UserDirectory,
     private readonly responsibilities: ResponsibilityRegistry,
+    private readonly notifications: NotificationCenter,
   ) {}
 
   /** A user cannot be archived or lose the Account Manager role while they manage a live client. */
@@ -254,6 +256,7 @@ export class ClientsService implements OnModuleInit {
           isHealthcare: input.isHealthcare,
         },
       });
+      await this.notifyManager(tx, actor, created.id, manager.id, input.tradeName);
       return created.id;
     });
     return this.detail(actor, id);
@@ -348,6 +351,10 @@ export class ClientsService implements OnModuleInit {
       await audit('client.status_changed', statusChange);
       await audit('client.account_manager_changed', managerChange);
       await audit('client.healthcare_changed', healthcare);
+      if (managerChange && manager) {
+        const tradeName = input.tradeName ?? current.tradeName;
+        await this.notifyManager(tx, actor, id, manager.id, tradeName);
+      }
     });
     return this.detail(actor, id);
   }
@@ -441,6 +448,23 @@ export class ClientsService implements OnModuleInit {
   }
 
   /** Rule 6: unique case-insensitively among non-archived clients. */
+  /** F14: the new primary account manager learns about the client. */
+  private notifyManager(
+    tx: Transaction,
+    actor: CurrentUserInfo,
+    clientId: string,
+    managerId: string,
+    tradeName: string,
+  ) {
+    return this.notifications.notify(tx, {
+      type: 'client_account_manager_assigned',
+      recipients: [managerId],
+      actorId: actor.id,
+      subjectId: clientId,
+      data: { client: tradeName },
+    });
+  }
+
   private async assertNameFree(executor: Executor, tradeName: string, exceptId?: string) {
     const [taken] = await executor
       .select({ id: clients.id })
