@@ -489,21 +489,25 @@ function ArchiveDialog({
                     )}
                     {t(`users.responsibilities.${item.type}`, { name: item.name })}
                   </span>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    render={
-                      item.type === 'manages_department' ? (
+                  {item.type === 'manages_department' ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      render={
                         <Link to="/departments/$departmentId" params={{ departmentId: item.id }} />
-                      ) : (
-                        <Link to="/clients/$clientId" params={{ clientId: item.id }} />
-                      )
-                    }
-                  >
-                    {item.type === 'manages_department'
-                      ? t('users.responsibilities.open')
-                      : t('users.responsibilities.openClient')}
-                  </Button>
+                      }
+                    >
+                      {t('users.responsibilities.open')}
+                    </Button>
+                  ) : item.type === 'account_manager_of_client' ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      render={<Link to="/clients/$clientId" params={{ clientId: item.id }} />}
+                    >
+                      {t('users.responsibilities.openClient')}
+                    </Button>
+                  ) : null}
                 </li>
               ))}
             </ul>

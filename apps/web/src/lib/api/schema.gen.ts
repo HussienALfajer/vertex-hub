@@ -452,6 +452,182 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/projects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ProjectsController_list"];
+        put?: never;
+        post: operations["ProjectsController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ProjectsController_detail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["ProjectsController_update"];
+        trace?: never;
+    };
+    "/api/projects/{id}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ProjectsController_changeStatus"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ProjectsController_archive"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ProjectsController_restore"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{id}/milestones": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ProjectMilestonesController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{id}/milestones/order": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["ProjectMilestonesController_reorder"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{id}/milestones/{milestoneId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["ProjectMilestonesController_update"];
+        trace?: never;
+    };
+    "/api/projects/{id}/milestones/{milestoneId}/complete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ProjectMilestonesController_complete"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{id}/milestones/{milestoneId}/reopen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ProjectMilestonesController_reopen"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{id}/milestones/{milestoneId}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ProjectMilestonesController_archive"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -473,9 +649,9 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         /** @enum {string} */
-        AuditEntityType: "user" | "department" | "client" | "client_contact" | "client_platform_account" | "client_note";
+        AuditEntityType: "user" | "department" | "client" | "client_contact" | "client_platform_account" | "client_note" | "project" | "project_milestone";
         /** @enum {string} */
-        AuditAction: "user.created" | "user.updated" | "user.roles_changed" | "user.departments_changed" | "user.archived" | "user.restored" | "user.link_issued" | "user.password_set" | "user.password_changed" | "user.two_factor_enabled" | "user.two_factor_disabled" | "user.two_factor_reset" | "user.profile_updated" | "department.updated" | "client.created" | "client.updated" | "client.status_changed" | "client.account_manager_changed" | "client.healthcare_changed" | "client.archived" | "client.restored" | "client.brand_kit_updated" | "client_contact.created" | "client_contact.updated" | "client_contact.archived" | "client_platform_account.created" | "client_platform_account.updated" | "client_platform_account.archived" | "client_note.created" | "client_note.updated" | "client_note.archived";
+        AuditAction: "user.created" | "user.updated" | "user.roles_changed" | "user.departments_changed" | "user.archived" | "user.restored" | "user.link_issued" | "user.password_set" | "user.password_changed" | "user.two_factor_enabled" | "user.two_factor_disabled" | "user.two_factor_reset" | "user.profile_updated" | "department.updated" | "client.created" | "client.updated" | "client.status_changed" | "client.account_manager_changed" | "client.healthcare_changed" | "client.archived" | "client.restored" | "client.brand_kit_updated" | "client_contact.created" | "client_contact.updated" | "client_contact.archived" | "client_platform_account.created" | "client_platform_account.updated" | "client_platform_account.archived" | "client_note.created" | "client_note.updated" | "client_note.archived" | "project.created" | "project.updated" | "project.project_manager_changed" | "project.status_changed" | "project.money_updated" | "project.archived" | "project.restored" | "project_milestone.created" | "project_milestone.updated" | "project_milestone.reordered" | "project_milestone.completed" | "project_milestone.reopened" | "project_milestone.archived";
         /** @description Audit entries, newest first */
         AuditPage: {
             items: components["schemas"]["AuditEntry"][];
@@ -878,6 +1054,196 @@ export interface components {
             /** Format: uuid */
             contactId?: string | null;
             summary?: string;
+        };
+        /** @enum {string} */
+        ProjectStatus: "planned" | "active" | "on_hold" | "completed" | "cancelled";
+        ProjectPage: {
+            items: components["schemas"]["Project"][];
+            total: number;
+            page: number;
+            pageSize: number;
+        };
+        Project: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            client: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            };
+            projectManager: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                archived: boolean;
+            };
+            departments: components["schemas"]["DepartmentCode"][];
+            status: components["schemas"]["ProjectStatus"];
+            /** Format: date */
+            startDate: string;
+            /** Format: date */
+            dueDate: string;
+            overdue: boolean;
+            milestoneProgress: {
+                done: number;
+                total: number;
+            };
+            progress: number | null;
+        };
+        ProjectDetail: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            client: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            };
+            projectManager: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                archived: boolean;
+            };
+            departments: components["schemas"]["DepartmentCode"][];
+            status: components["schemas"]["ProjectStatus"];
+            /** Format: date */
+            startDate: string;
+            /** Format: date */
+            dueDate: string;
+            overdue: boolean;
+            milestoneProgress: {
+                done: number;
+                total: number;
+            };
+            progress: number | null;
+            description: string | null;
+            milestones: components["schemas"]["Milestone"][];
+            tasks: components["schemas"]["TaskCounts"];
+            /** Format: date-time */
+            completedAt: string | null;
+            /** Format: date-time */
+            cancelledAt: string | null;
+            cancelReason: string | null;
+            /** Format: date-time */
+            archivedAt: string | null;
+            money?: {
+                currency: components["schemas"]["Currency"];
+                totalMinor: number;
+            };
+            permissions: components["schemas"]["ProjectPermissions"];
+        };
+        Milestone: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            projectId: string;
+            name: string;
+            position: number;
+            /** Format: date */
+            dueDate: string | null;
+            status: components["schemas"]["MilestoneStatus"];
+            overdue: boolean;
+            /** Format: date-time */
+            doneAt: string | null;
+            doneBy: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            tasks: components["schemas"]["TaskCounts"];
+            money?: {
+                installmentMinor: number | null;
+            };
+        };
+        /** @enum {string} */
+        MilestoneStatus: "pending" | "done";
+        TaskCounts: {
+            total: number;
+            delivered: number;
+            open: number;
+        };
+        /** @enum {string} */
+        Currency: "USD" | "SYP";
+        /** @description What the caller may do, for the UI */
+        ProjectPermissions: {
+            canManage: boolean;
+            canChangeManager: boolean;
+            canCancel: boolean;
+            canReopen: boolean;
+            canArchive: boolean;
+            canSeeMoney: boolean;
+            canEditMoney: boolean;
+        };
+        CreateProject: {
+            name: string;
+            description?: string | null;
+            /** Format: uuid */
+            projectManagerId: string;
+            departments: components["schemas"]["DepartmentCode"][];
+            /** Format: date */
+            startDate: string;
+            /** Format: date */
+            dueDate: string;
+            currency?: components["schemas"]["Currency"];
+            /** Format: uuid */
+            clientId: string;
+            /**
+             * @default planned
+             * @enum {string}
+             */
+            status: "planned" | "active";
+            /** @default [] */
+            milestones: components["schemas"]["CreateMilestone"][];
+        };
+        CreateMilestone: {
+            name: string;
+            /** Format: date */
+            dueDate?: string | null;
+            installmentMinor?: number | null;
+        };
+        UpdateProject: {
+            name?: string;
+            description?: string | null;
+            /** Format: uuid */
+            projectManagerId?: string;
+            departments?: components["schemas"]["DepartmentCode"][];
+            /** Format: date */
+            startDate?: string;
+            /** Format: date */
+            dueDate?: string;
+            currency?: components["schemas"]["Currency"];
+        };
+        ProjectStatusChange: {
+            /** @enum {string} */
+            status: "active" | "on_hold" | "completed" | "cancelled";
+            reason?: string | null;
+            /** Format: uuid */
+            projectManagerId?: string;
+        };
+        /** @description Every non-archived milestone of the project once */
+        MilestoneOrder: {
+            ids: string[];
+        };
+        /** @description Non-archived milestones, by position */
+        MilestoneList: {
+            items: components["schemas"]["Milestone"][];
+        };
+        UpdateMilestone: {
+            name?: string;
+            /** Format: date */
+            dueDate?: string | null;
+            installmentMinor?: number | null;
+        };
+        /**
+         * @default {
+         *       "confirmOpenTasks": false
+         *     }
+         */
+        CompleteMilestone: {
+            /** @default false */
+            confirmOpenTasks: boolean;
         };
         /** @description Liveness of the API and its dependencies */
         HealthResponse: {
@@ -1721,6 +2087,330 @@ export interface operations {
         requestBody?: never;
         responses: {
             /** @description The note is withdrawn from the log */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ProjectsController_list: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+                search?: string;
+                status?: components["schemas"]["ProjectStatus"] | components["schemas"]["ProjectStatus"][];
+                clientId?: string;
+                projectManagerId?: string;
+                department?: components["schemas"]["DepartmentCode"];
+                overdue?: "true" | "false";
+                archived?: "true" | "false";
+                sort?: "dueDate" | "name" | "createdAt";
+                order?: components["schemas"]["SortOrder"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Projects */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectPage"];
+                };
+            };
+        };
+    };
+    ProjectsController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateProject"];
+            };
+        };
+        responses: {
+            /** @description The new project (client scope; currency and installments need money access) */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectDetail"];
+                };
+            };
+        };
+    };
+    ProjectsController_detail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A project with its milestones; money only with money access */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectDetail"];
+                };
+            };
+        };
+    };
+    ProjectsController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateProject"];
+            };
+        };
+        responses: {
+            /** @description The updated project; the project manager needs client scope, the currency money access */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectDetail"];
+                };
+            };
+        };
+    };
+    ProjectsController_changeStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProjectStatusChange"];
+            };
+        };
+        responses: {
+            /** @description The project after the change; cancel needs client scope, reopen scope all */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectDetail"];
+                };
+            };
+        };
+    };
+    ProjectsController_archive: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The archived project (scope all only) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectDetail"];
+                };
+            };
+        };
+    };
+    ProjectsController_restore: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The restored project (scope all only) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectDetail"];
+                };
+            };
+        };
+    };
+    ProjectMilestonesController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateMilestone"];
+            };
+        };
+        responses: {
+            /** @description The new milestone, last in the order; the installment needs money access */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Milestone"];
+                };
+            };
+        };
+    };
+    ProjectMilestonesController_reorder: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MilestoneOrder"];
+            };
+        };
+        responses: {
+            /** @description The milestones in their new order */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MilestoneList"];
+                };
+            };
+        };
+    };
+    ProjectMilestonesController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                milestoneId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateMilestone"];
+            };
+        };
+        responses: {
+            /** @description The updated milestone; the installment needs money access */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Milestone"];
+                };
+            };
+        };
+    };
+    ProjectMilestonesController_complete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                milestoneId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CompleteMilestone"];
+            };
+        };
+        responses: {
+            /** @description The completed milestone; open tasks need `confirmOpenTasks` */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Milestone"];
+                };
+            };
+        };
+    };
+    ProjectMilestonesController_reopen: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                milestoneId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The reopened milestone */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Milestone"];
+                };
+            };
+        };
+    };
+    ProjectMilestonesController_archive: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                milestoneId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The pending milestone is removed from the project */
             204: {
                 headers: {
                     [name: string]: unknown;

@@ -4,6 +4,7 @@ import {
   clientDetailResponseSchema,
   type ErrorResponse,
   meResponseSchema,
+  projectDetailSchema,
   userLinkSchema,
   userPageSchema,
   userResponseSchema,
@@ -706,6 +707,52 @@ describe('users', () => {
         (await patch(`/api/clients/${managed.id}`, gm.cookie, { status: 'ended' })).status,
       ).toBe(200);
       expect((await patch(`/api/users/${user.id}`, gm.cookie, { roles: [] })).status).toBe(200);
+    });
+  });
+
+  describe('project manager responsibilities (F05 rule 4)', () => {
+    it('refuses to archive the manager of an open project, listing it', async () => {
+      const manager = await seed();
+      const other = await seed();
+      const response = await client.post('/api/clients', gm.cookie, {
+        tradeName: `عميل ${run} ${randomUUID().slice(0, 6)}`,
+        accountManagerId: (await seed({ roles: ['account_manager'] })).id,
+      });
+      const { id: clientId } = clientDetailResponseSchema.parse(await response.json());
+      seededClients.push(clientId);
+      const createProject = async (name: string) => {
+        const created = await client.post('/api/projects', gm.cookie, {
+          clientId,
+          name: `${name} ${run}`,
+          projectManagerId: manager.id,
+          departments: ['design'],
+          startDate: '2026-10-01',
+          dueDate: '2099-12-31',
+        });
+        expect(created.status).toBe(201);
+        return projectDetailSchema.parse(await created.json());
+      };
+      const open = await createProject('Open');
+      const cancelled = await createProject('Cancelled');
+      await client.post(`/api/projects/${cancelled.id}/status`, gm.cookie, {
+        status: 'cancelled',
+        reason: 'Stopped',
+      });
+      const body = await expectError(
+        await client.post(`/api/users/${manager.id}/archive`, operations.cookie),
+        409,
+        'USER_HAS_RESPONSIBILITIES',
+      );
+      expect(body.details).toEqual([
+        { type: 'project_manager_of_project', id: open.id, name: open.name },
+      ]);
+      expect(
+        (await patch(`/api/projects/${open.id}`, gm.cookie, { projectManagerId: other.id })).status,
+      ).toBe(200);
+      // Completed and cancelled projects do not block.
+      expect(
+        (await client.post(`/api/users/${manager.id}/archive`, operations.cookie)).status,
+      ).toBe(200);
     });
   });
 });

@@ -114,6 +114,47 @@ describe('clients (F02)', () => {
   });
 });
 
+describe('projects and retainers (F05)', () => {
+  const operationsManager = access(
+    ['employee', 'department_manager'],
+    [{ code: 'internal_operations', isManager: true }],
+  );
+
+  it('lets every user read every project and retainer', () => {
+    expect(permissionScopes(access(['employee']), 'projects.read')).toEqual(['all']);
+    for (const role of ['department_manager', 'account_manager', 'finance'] as const) {
+      expect(PERMISSION_MAP[role]['projects.read'], role).toBeUndefined();
+    }
+  });
+
+  it('lets an employee manage only the projects they are project manager of', () => {
+    expect(permissionScopes(access(['employee']), 'projects.manage')).toEqual(['assigned']);
+  });
+
+  it('lets account managers manage the work of their own clients', () => {
+    expect(permissionScopes(access(['employee', 'account_manager']), 'projects.manage')).toEqual([
+      'own_clients',
+      'assigned',
+    ]);
+  });
+
+  it('leaves department managers read-only', () => {
+    expect(PERMISSION_MAP.department_manager['projects.manage']).toBeUndefined();
+    const designManager = access(
+      ['employee', 'department_manager'],
+      [{ code: 'design', isManager: true }],
+    );
+    expect(permissionScopes(designManager, 'projects.manage')).toEqual(['assigned']);
+  });
+
+  it('lets the Operations manager manage all work and read invoices', () => {
+    expect(permissionScopes(operationsManager, 'projects.manage')).toEqual(['all', 'assigned']);
+    expect(permissionScopes(operationsManager, 'invoices.read')).toEqual(['all']);
+    const member = access(['employee'], [{ code: 'internal_operations', isManager: false }]);
+    expect(hasPermission(member, 'invoices.read')).toBe(false);
+  });
+});
+
 describe('department capabilities', () => {
   it('only names known departments', () => {
     expect(Object.keys(DEPARTMENT_CAPABILITIES).sort()).toEqual([

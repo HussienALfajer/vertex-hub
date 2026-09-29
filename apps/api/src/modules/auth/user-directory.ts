@@ -27,6 +27,18 @@ export class UserDirectory {
     );
   }
 
+  /** A non-archived user; an invited user qualifies. */
+  async activeUser(
+    userId: string,
+    executor: Database | Transaction = this.db,
+  ): Promise<UserSummary | null> {
+    const [row] = await executor
+      .select({ id: users.id, name: users.name })
+      .from(users)
+      .where(and(eq(users.id, userId), isNull(users.archivedAt)));
+    return row ? { ...row, archived: false } : null;
+  }
+
   /** A non-archived user who holds the Account Manager role; an invited user qualifies. */
   async accountManager(
     userId: string,

@@ -450,6 +450,19 @@ const KNOWN_FIELDS = [
   'channel',
   'contactId',
   'summary',
+  'description',
+  'departments',
+  'startDate',
+  'dueDate',
+  'currency',
+  'projectManager',
+  'client',
+  'milestones',
+  'reason',
+  'position',
+  'installmentMinor',
+  'projectId',
+  'openTasks',
 ] as const;
 
 function fieldLabel(t: TFunction, field: string): string {

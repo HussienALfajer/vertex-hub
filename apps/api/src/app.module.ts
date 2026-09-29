@@ -12,6 +12,7 @@ import { AuditModule } from './modules/audit/index.js';
 import { AuthModule } from './modules/auth/index.js';
 import { ClientsModule } from './modules/clients/index.js';
 import { HealthModule } from './modules/health/index.js';
+import { ProjectsModule } from './modules/projects/index.js';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { HealthModule } from './modules/health/index.js';
     AuditModule,
     AuthModule,
     ClientsModule,
+    ProjectsModule,
     HealthModule,
   ],
   providers: [
