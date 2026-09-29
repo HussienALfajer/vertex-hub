@@ -78,6 +78,13 @@
       "when": 1790696375633,
       "tag": "0010_seed_work_templates",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1790708939157,
+      "tag": "0011_melted_zaladane",
+      "breakpoints": true
     }
   ]
 }

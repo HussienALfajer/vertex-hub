@@ -37,12 +37,16 @@ const NOT_BUSINESS_RECORDS: Record<string, string> = {
   retainer_templates: 'Link table; linking and unlinking are audited on the retainer (F07)',
   template_runs: 'Append-only; runs are never edited or archived (F07)',
   template_run_tasks: 'Append-only link between a run and the tasks it created (F07)',
+  notifications: 'Personal, not a business record: purged after reading, never archived (F14)',
+  notification_settings: 'Personal mute settings, one row per user (F14)',
+  notification_reminders: 'Idempotency keys of the daily job, insert-only (F14 rule 8)',
 };
 
 /** Tables keyed by a natural value instead of a UUIDv7 `id`. Every entry needs a reason. */
 const NATURAL_KEYS: Record<string, string> = {
   worker_heartbeats: 'One row per worker name, upserted',
   retainer_templates: 'One row per retainer, keyed by the retainer (F07)',
+  notification_settings: 'One row per user, keyed by the user (F14)',
 };
 
 describe('database conventions', () => {

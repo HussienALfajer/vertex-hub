@@ -1,0 +1,113 @@
+import { describe, expect, it } from 'vitest';
+import {
+  firstMatchPerRecipient,
+  isMutableNotificationType,
+  NOTIFICATION_CATALOG,
+  NOTIFICATION_TYPES,
+  notificationSchema,
+  notificationTypesOf,
+} from './notifications.js';
+
+describe('notification catalog', () => {
+  it('lets users mute only the types that do not require action', () => {
+    const mutable = NOTIFICATION_TYPES.filter(isMutableNotificationType);
+    expect(mutable.sort()).toEqual(
+      [
+        'request_finished',
+        'retainer_renewal_due',
+        'task_approved',
+        'task_changed',
+        'task_commented',
+        'task_due_soon',
+        'task_mentioned',
+        'task_opened',
+      ].sort(),
+    );
+  });
+
+  it('puts every type in one category', () => {
+    const all = [
+      ...notificationTypesOf('tasks'),
+      ...notificationTypesOf('reminders'),
+      ...notificationTypesOf('clients_projects'),
+    ];
+    expect(all.sort()).toEqual([...NOTIFICATION_TYPES].sort());
+    expect(NOTIFICATION_CATALOG.tasks_generated.subject).toBe('template_run');
+  });
+});
+
+describe('first match per recipient (rule 2)', () => {
+  it('keeps the earliest type of the order for each recipient of a subject', () => {
+    const kept = firstMatchPerRecipient([
+      { recipientId: 'a', subjectId: 't', type: 'task_commented' as const },
+      { recipientId: 'a', subjectId: 't', type: 'task_mentioned' as const },
+      { recipientId: 'b', subjectId: 't', type: 'task_commented' as const },
+      { recipientId: 'a', subjectId: 't', type: 'task_changed' as const },
+      { recipientId: 'c', subjectId: 't', type: 'task_approved' as const },
+      { recipientId: 'c', subjectId: 't', type: 'task_assigned' as const },
+    ]);
+    expect(kept).toEqual([
+      { recipientId: 'a', subjectId: 't', type: 'task_mentioned' },
+      { recipientId: 'b', subjectId: 't', type: 'task_commented' },
+      { recipientId: 'c', subjectId: 't', type: 'task_assigned' },
+    ]);
+  });
+
+  it('keeps notices about different subjects (two tasks opened for one assignee)', () => {
+    const items = [
+      { recipientId: 'a', subjectId: 't1', type: 'task_opened' as const },
+      { recipientId: 'a', subjectId: 't2', type: 'task_opened' as const },
+    ];
+    expect(firstMatchPerRecipient(items)).toEqual(items);
+  });
+
+  it('keeps several notices of the kept type (assignee and manager of one run)', () => {
+    const items = [
+      { recipientId: 'a', subjectId: 'run', type: 'tasks_generated' as const },
+      { recipientId: 'a', subjectId: 'run', type: 'tasks_generated' as const },
+    ];
+    expect(firstMatchPerRecipient(items)).toEqual(items);
+  });
+
+  it('follows the spec order for the first eight types', () => {
+    expect(NOTIFICATION_TYPES.slice(0, 8)).toEqual([
+      'task_assigned',
+      'task_mentioned',
+      'task_returned',
+      'task_review_requested',
+      'task_awaiting_client',
+      'task_over_limit',
+      'task_changed',
+      'task_commented',
+    ]);
+  });
+});
+
+describe('notification schema', () => {
+  const base = {
+    id: '0199a000-0000-7000-8000-000000000001',
+    actor: null,
+    subject: { type: 'task', id: '0199a000-0000-7000-8000-000000000002' },
+    count: 1,
+    read: false,
+    createdAt: '2026-10-01T06:00:00.000Z',
+    updatedAt: '2026-10-01T06:00:00.000Z',
+  };
+  const task = { title: 'Design', department: 'design', client: null, project: null };
+
+  it('validates the snapshot by type', () => {
+    expect(
+      notificationSchema.safeParse({ ...base, type: 'task_assigned', data: { task } }).success,
+    ).toBe(true);
+    expect(
+      notificationSchema.safeParse({ ...base, type: 'task_commented', data: { task } }).success,
+    ).toBe(false);
+    expect(
+      notificationSchema.safeParse({
+        ...base,
+        type: 'task_commented',
+        data: { task, excerpt: 'x'.repeat(141) },
+      }).success,
+    ).toBe(false);
+  });
+});

@@ -13,6 +13,7 @@ import { AuditModule } from './modules/audit/index.js';
 import { AuthModule } from './modules/auth/index.js';
 import { ClientsModule } from './modules/clients/index.js';
 import { HealthModule } from './modules/health/index.js';
+import { NotificationsModule } from './modules/notifications/index.js';
 import { ProjectsModule } from './modules/projects/index.js';
 import { TasksModule } from './modules/tasks/index.js';
 import { TemplatesModule } from './modules/templates/index.js';
@@ -34,6 +35,7 @@ import { TemplatesModule } from './modules/templates/index.js';
     JobsModule,
     AuditModule,
     AuthModule,
+    NotificationsModule,
     ClientsModule,
     ProjectsModule,
     TasksModule,

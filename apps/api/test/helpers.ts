@@ -12,6 +12,8 @@ import {
   departments,
   extraWorkItems,
   newId,
+  notificationSettings,
+  notifications,
   projectMilestones,
   projects,
   retainerCycleAdjustments,
@@ -145,6 +147,10 @@ export async function removeUsers(db: Database, ids: string[]): Promise<void> {
   await db
     .delete(auditEntries)
     .where(or(inArray(auditEntries.actorId, ids), inArray(auditEntries.entityId, ids)));
+  await db
+    .delete(notifications)
+    .where(or(inArray(notifications.recipientId, ids), inArray(notifications.actorId, ids)));
+  await db.delete(notificationSettings).where(inArray(notificationSettings.userId, ids));
   await db.update(departments).set({ managerId: null }).where(inArray(departments.managerId, ids));
   await db.delete(users).where(inArray(users.id, ids));
 }
