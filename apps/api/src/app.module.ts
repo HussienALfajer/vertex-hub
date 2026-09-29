@@ -14,6 +14,7 @@ import { AuthModule } from './modules/auth/index.js';
 import { ClientsModule } from './modules/clients/index.js';
 import { HealthModule } from './modules/health/index.js';
 import { ProjectsModule } from './modules/projects/index.js';
+import { TasksModule } from './modules/tasks/index.js';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { ProjectsModule } from './modules/projects/index.js';
     AuthModule,
     ClientsModule,
     ProjectsModule,
+    TasksModule,
     HealthModule,
   ],
   providers: [

@@ -1,5 +1,13 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { type Database, type Transaction, userRoles, users } from '@vertex-hub/db';
+import type { DepartmentCode } from '@vertex-hub/contracts';
+import {
+  type Database,
+  departmentMembers,
+  departments,
+  type Transaction,
+  userRoles,
+  users,
+} from '@vertex-hub/db';
 import { and, eq, inArray, isNull } from 'drizzle-orm';
 import { DATABASE } from '../../core/database/database.module.js';
 
@@ -52,5 +60,38 @@ export class UserDirectory {
         and(eq(users.id, userId), eq(userRoles.role, 'account_manager'), isNull(users.archivedAt)),
       );
     return row ? { ...row, archived: false } : null;
+  }
+
+  /** A non-archived member (primary or secondary) of the department; an invited user qualifies. */
+  async activeMember(
+    userId: string,
+    department: DepartmentCode,
+    executor: Database | Transaction = this.db,
+  ): Promise<UserSummary | null> {
+    const [row] = await executor
+      .select({ id: users.id, name: users.name })
+      .from(users)
+      .innerJoin(departmentMembers, eq(departmentMembers.userId, users.id))
+      .innerJoin(departments, eq(departments.id, departmentMembers.departmentId))
+      .where(and(eq(users.id, userId), eq(departments.code, department), isNull(users.archivedAt)));
+    return row ? { ...row, archived: false } : null;
+  }
+
+  /** The department codes each of the given users belongs to. */
+  async memberships(ids: string[], executor: Database | Transaction = this.db) {
+    const unique = [...new Set(ids)];
+    const result = new Map<string, Set<DepartmentCode>>();
+    if (unique.length === 0) return result;
+    const rows = await executor
+      .select({ userId: departmentMembers.userId, code: departments.code })
+      .from(departmentMembers)
+      .innerJoin(departments, eq(departments.id, departmentMembers.departmentId))
+      .where(inArray(departmentMembers.userId, unique));
+    for (const row of rows) {
+      const codes = result.get(row.userId) ?? new Set<DepartmentCode>();
+      codes.add(row.code);
+      result.set(row.userId, codes);
+    }
+    return result;
   }
 }

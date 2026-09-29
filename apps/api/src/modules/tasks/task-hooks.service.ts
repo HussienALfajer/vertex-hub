@@ -1,0 +1,138 @@
+import { Inject, Injectable, type OnModuleInit } from '@nestjs/common';
+import { OPEN_TASK_STATUSES, type TaskCounts } from '@vertex-hub/contracts';
+import { type Database, type Transaction, tasks } from '@vertex-hub/db';
+import { and, asc, count, eq, inArray, isNull, ne, sql } from 'drizzle-orm';
+import type { PgColumn } from 'drizzle-orm/pg-core';
+import { DATABASE } from '../../core/database/database.module.js';
+import { type AuditActor, recordAudit } from '../audit/index.js';
+import { ResponsibilityRegistry } from '../auth/index.js';
+import { EngagementDirectory, WorkProgress } from '../projects/index.js';
+
+/**
+ * What tasks feed into other modules (spec F06, "Links F06 fills in F05" and "Changes to F01"):
+ * task counts and the project close hooks for `projects`, and open assigned tasks for `auth`.
+ */
+@Injectable()
+export class TaskHooksService implements OnModuleInit {
+  constructor(
+    @Inject(DATABASE) private readonly db: Database,
+    private readonly progress: WorkProgress,
+    private readonly responsibilities: ResponsibilityRegistry,
+    private readonly engagements: EngagementDirectory,
+  ) {}
+
+  onModuleInit(): void {
+    this.progress.register({
+      projects: (ids) => this.counts(tasks.projectId, ids),
+      milestones: (ids) => this.counts(tasks.milestoneId, ids),
+      cycleLines: (ids) => this.counts(tasks.cycleLineId, ids),
+      openTasks: (tx, projectId) => this.openTasks(tx, projectId),
+      cancelOpenTasks: (tx, projectId, reason, actor) =>
+        this.cancelOpenTasks(tx, projectId, reason, actor),
+    });
+    // F01 change: a user with open assigned tasks cannot be archived.
+    this.responsibilities.register({
+      find: async (tx, userId) => {
+        const assigned = await tx
+          .select({ id: tasks.id, name: tasks.title })
+          .from(tasks)
+          .where(
+            and(
+              eq(tasks.assigneeId, userId),
+              inArray(tasks.status, [...OPEN_TASK_STATUSES]),
+              isNull(tasks.archivedAt),
+            ),
+          )
+          .orderBy(asc(tasks.dueDate), asc(tasks.title));
+        return assigned.map((task) => ({ type: 'assignee_of_open_tasks' as const, ...task }));
+      },
+    });
+  }
+
+  /** `total`: non-archived, non-cancelled tasks; `delivered`: those delivered. */
+  private async counts(column: PgColumn, ids: string[]): Promise<Map<string, TaskCounts>> {
+    const rows = await this.db
+      .select({
+        id: sql<string>`${column}`,
+        total: count(),
+        delivered: sql<number>`count(*) filter (where ${tasks.status} = 'delivered')`.mapWith(
+          Number,
+        ),
+      })
+      .from(tasks)
+      .where(and(inArray(column, ids), isNull(tasks.archivedAt), ne(tasks.status, 'cancelled')))
+      .groupBy(column);
+    return new Map(
+      rows.map((row) => [
+        row.id,
+        { total: row.total, delivered: row.delivered, open: row.total - row.delivered },
+      ]),
+    );
+  }
+
+  private openTaskFilter(projectId: string) {
+    return and(
+      eq(tasks.projectId, projectId),
+      inArray(tasks.status, [...OPEN_TASK_STATUSES]),
+      isNull(tasks.archivedAt),
+    );
+  }
+
+  private async openTasks(tx: Transaction, projectId: string) {
+    return tx
+      .select({ id: tasks.id, name: tasks.title })
+      .from(tasks)
+      .where(this.openTaskFilter(projectId))
+      .orderBy(asc(tasks.dueDate), asc(tasks.title));
+  }
+
+  /** Cancelling a project cancels its open tasks with its reason, each audited. */
+  private async cancelOpenTasks(
+    tx: Transaction,
+    projectId: string,
+    reason: string,
+    actor: AuditActor,
+  ): Promise<void> {
+    const open = await tx
+      .select({ id: tasks.id, status: tasks.status, extraWorkItemId: tasks.extraWorkItemId })
+      .from(tasks)
+      .where(this.openTaskFilter(projectId))
+      .for('update');
+    if (open.length === 0) return;
+    await tx
+      .update(tasks)
+      .set({ status: 'cancelled', cancelledAt: new Date(), cancelReason: reason })
+      .where(
+        inArray(
+          tasks.id,
+          open.map((task) => task.id),
+        ),
+      );
+    // Edge case 10: cancelled out-of-scope requests withdraw their unbilled extra work.
+    const items = await this.engagements.extraWork(
+      open.flatMap((task) => (task.extraWorkItemId ? [task.extraWorkItemId] : [])),
+      tx,
+    );
+    for (const task of open) {
+      const item = task.extraWorkItemId ? items.get(task.extraWorkItemId) : undefined;
+      const withdrawn = !!item && !item.archived && item.billingStatus === 'unbilled';
+      if (withdrawn) {
+        await this.engagements.archiveExtraWork(tx, item.id, actor);
+        await tx.update(tasks).set({ extraWorkItemId: null }).where(eq(tasks.id, task.id));
+      }
+      await recordAudit(tx, {
+        actor,
+        action: 'task.status_changed',
+        entityType: 'task',
+        entityId: task.id,
+        before: { status: task.status, ...(withdrawn && { extraWorkItemId: item.id }) },
+        after: {
+          status: 'cancelled',
+          note: reason,
+          projectId,
+          ...(withdrawn && { extraWorkItemId: null }),
+        },
+      });
+    }
+  }
+}

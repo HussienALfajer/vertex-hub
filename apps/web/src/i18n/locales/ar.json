@@ -260,7 +260,22 @@
     "DUPLICATE_DELIVERABLE": "هذا البند مكرر: غيّر النوع أو الاسم.",
     "CYCLE_CLOSED": "هذه الدورة الشهرية مغلقة ولا يمكن تعديلها.",
     "NEGATIVE_DELIVERED": "لا يمكن أن يصبح عدد المسلَّم أقل من صفر.",
-    "BILLING_NOTE_REQUIRED": "اكتب ملاحظة: رقم الفاتورة أو سبب الإعفاء."
+    "BILLING_NOTE_REQUIRED": "اكتب ملاحظة: رقم الفاتورة أو سبب الإعفاء.",
+    "ASSIGNEE_REQUIRED": "أسند المهمة إلى أحد أولاً.",
+    "INVALID_ASSIGNEE": "اختر منفّذاً من أعضاء القسم غير المؤرشفين، ضمن ما يحق لك إسناده.",
+    "TASK_BLOCKED": "هذه المهمة بانتظار مهام لم تُنجز بعد.",
+    "INVALID_DEPENDENCY": "المهمة المطلوبة يجب أن تكون غير مؤرشفة ولنفس العميل.",
+    "DEPENDENCY_CYCLE": "هذا الارتباط يجعل المهام تنتظر بعضها في حلقة.",
+    "INVALID_LINK": "الربط غير متطابق: المشروع أو العقد أو البند لا يتبع هذا العميل.",
+    "NO_ENGAGEMENT": "اربط المهمة بمشروع أو عقد شهري أولاً لتسجيل عمل إضافي.",
+    "EXTRA_WORK_BILLED": "فُوتر العمل الإضافي أو أُعفي منه، فلا يمكن إعادة الطلب ضمن النطاق.",
+    "NOT_OVER_LIMIT": "هذا التعديل ضمن الحد المتفق عليه ولا يحتاج قراراً.",
+    "ALREADY_DECIDED": "اتُّخذ القرار في هذا التعديل من قبل.",
+    "INVALID_MENTION": "لا يمكن الإشارة إلى مستخدم مؤرشف.",
+    "NOT_COMMENT_AUTHOR": "يعدّل التعليق كاتبه فقط.",
+    "TASK_ARCHIVED": "هذه المهمة مؤرشفة أو تتبع سجلاً مؤرشفاً، ولا يمكن تعديلها.",
+    "TASK_NOT_ARCHIVED": "هذه المهمة غير مؤرشفة.",
+    "TASKS_OPEN": "لا يمكن إكمال المشروع وفيه مهام مفتوحة."
   },
   "users": {
     "title": "الفريق",
@@ -405,7 +420,8 @@
       "account_manager_of_client": "مدير حساب العميل {{name}}",
       "openClient": "افتح ملف العميل",
       "project_manager_of_project": "مدير المشروع {{name}}",
-      "openProject": "افتح المشروع"
+      "openProject": "افتح المشروع",
+      "assignee_of_open_tasks": "منفّذ المهمة المفتوحة {{name}}"
     },
     "managerBadge": "مدير القسم"
   },
@@ -572,7 +588,11 @@
       "project_milestone": "مرحلة مشروع",
       "retainer": "عقد شهري",
       "retainer_cycle": "دورة شهرية",
-      "extra_work": "عمل إضافي"
+      "extra_work": "عمل إضافي",
+      "task": "مهمة",
+      "task_checklist_item": "بند قائمة مهمة",
+      "task_link": "رابط مهمة",
+      "task_comment": "تعليق على مهمة"
     },
     "actions": {
       "user": {
@@ -656,6 +676,33 @@
         "updated": "عدّل عملًا إضافيًا",
         "billing_changed": "غيّر حالة فوترة عمل إضافي",
         "archived": "حذف عملًا إضافيًا"
+      },
+      "task": {
+        "created": "أنشأ مهمة",
+        "updated": "عدّل مهمة",
+        "assigned": "غيّر منفّذ المهمة",
+        "department_changed": "نقل المهمة إلى قسم آخر",
+        "status_changed": "غيّر حالة المهمة",
+        "dependencies_updated": "عدّل ما تنتظره المهمة",
+        "archived": "أرشف مهمة",
+        "restored": "استعاد مهمة",
+        "revision_decided": "قرّر في تعديل فوق الحد",
+        "request_scope_changed": "غيّر نطاق طلب العميل"
+      },
+      "task_checklist_item": {
+        "created": "أضاف بنداً إلى القائمة",
+        "updated": "عدّل بنداً في القائمة",
+        "reordered": "أعاد ترتيب القائمة",
+        "archived": "حذف بنداً من القائمة"
+      },
+      "task_link": {
+        "created": "أضاف رابطاً",
+        "archived": "حذف رابطاً"
+      },
+      "task_comment": {
+        "created": "أضاف تعليقاً",
+        "updated": "عدّل تعليقاً",
+        "archived": "حذف تعليقاً"
       }
     },
     "fields": {
@@ -723,7 +770,32 @@
       "requestedByContactId": "طالب العمل",
       "estimateMinor": "التقدير",
       "billingStatus": "حالة الفوترة",
-      "billingNote": "ملاحظة الفوترة"
+      "billingNote": "ملاحظة الفوترة",
+      "brief": "الوصف المختصر",
+      "type": "النوع",
+      "department": "القسم",
+      "assigneeId": "المنفّذ",
+      "assignee": "المنفّذ",
+      "priority": "الأولوية",
+      "dueTime": "وقت التسليم",
+      "clientId": "العميل",
+      "milestoneId": "المرحلة",
+      "retainerCycleId": "الدورة الشهرية",
+      "cycleLineId": "بند الدورة",
+      "needsClientApproval": "يحتاج اعتماد العميل",
+      "revisionLimit": "حد التعديلات",
+      "requestScope": "نطاق الطلب",
+      "extraWorkItemId": "العمل الإضافي",
+      "dependsOn": "ينتظر",
+      "checklist": "قائمة المهام",
+      "links": "الروابط",
+      "note": "الملاحظة",
+      "revisionSource": "مصدر التعديل",
+      "revisionNumber": "رقم التعديل",
+      "overLimit": "فوق الحد",
+      "overrideReason": "سبب البدء رغم الانتظار",
+      "revisionId": "التعديل",
+      "decision": "القرار"
     },
     "kinds": {
       "activation": "تفعيل",

@@ -37,3 +37,30 @@ export function lastOfMonth(date: CalendarDate): CalendarDate {
   const [year, month] = date.split('-').map(Number) as [number, number];
   return new Date(Date.UTC(year, month, 0)).toISOString().slice(0, 10);
 }
+
+/**
+ * The agency's work week (ADR 0016): Saturday to Thursday, Friday off; a week starts on
+ * Saturday. Days are numbered like `Date.getUTCDay()` (0 = Sunday).
+ */
+export const WORK_WEEK = { startsOn: 6, weekend: [5] } as const;
+
+/** The day of the week of `date`, 0 = Sunday. */
+export function weekday(date: CalendarDate): number {
+  return new Date(dayNumber(date) * DAY_MS).getUTCDay();
+}
+
+/** The first day (a Saturday) and the last day (a Friday) of the week holding `date`. */
+export function weekOf(date: CalendarDate): { from: CalendarDate; to: CalendarDate } {
+  const from = addDays(date, -((weekday(date) - WORK_WEEK.startsOn + 7) % 7));
+  return { from, to: addDays(from, 6) };
+}
+
+/** A time of day without seconds, as `HH:MM`, in Asia/Damascus. */
+export const timeOfDaySchema = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Expected HH:MM');
+
+export type TimeOfDay = z.infer<typeof timeOfDaySchema>;
+
+/** The instant a calendar day and time of day in Asia/Damascus stand for. */
+export function businessInstant(date: CalendarDate, time: TimeOfDay): Date {
+  return new Date(Date.parse(`${date}T${time}:00Z`) - BUSINESS_UTC_OFFSET_MS);
+}

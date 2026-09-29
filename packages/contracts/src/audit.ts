@@ -63,6 +63,25 @@ export const AUDIT_ACTIONS = [
   'extra_work.updated',
   'extra_work.billing_changed',
   'extra_work.archived',
+  'task.created',
+  'task.updated',
+  'task.assigned',
+  'task.department_changed',
+  'task.status_changed',
+  'task.dependencies_updated',
+  'task.archived',
+  'task.restored',
+  'task.revision_decided',
+  'task.request_scope_changed',
+  'task_checklist_item.created',
+  'task_checklist_item.updated',
+  'task_checklist_item.reordered',
+  'task_checklist_item.archived',
+  'task_link.created',
+  'task_link.archived',
+  'task_comment.created',
+  'task_comment.updated',
+  'task_comment.archived',
 ] as const;
 
 export const auditActionSchema = z.enum(AUDIT_ACTIONS).meta({ id: 'AuditAction' });
@@ -81,6 +100,10 @@ export const AUDIT_ENTITY_TYPES = [
   'retainer',
   'retainer_cycle',
   'extra_work',
+  'task',
+  'task_checklist_item',
+  'task_link',
+  'task_comment',
 ] as const;
 
 export const auditEntityTypeSchema = z.enum(AUDIT_ENTITY_TYPES).meta({ id: 'AuditEntityType' });

@@ -68,7 +68,7 @@ describe('permission map', () => {
 
   it('combines the scopes of several roles', () => {
     // A designer who is also an account manager (ADR 0007).
-    expect(permissionScopes(access(['employee', 'account_manager']), 'tasks.read')).toEqual([
+    expect(permissionScopes(access(['employee', 'account_manager']), 'tasks.manage')).toEqual([
       'own_clients',
       'assigned',
     ]);
@@ -81,7 +81,7 @@ describe('permission map', () => {
     expect(new Set(names).size).toBe(names.length);
     expect(names).toEqual(PERMISSIONS.filter((p) => names.includes(p)));
     expect(granted).toContainEqual({
-      permission: 'tasks.read',
+      permission: 'tasks.work',
       scopes: ['department', 'assigned'],
     });
     expect(grantedPermissions(access([], []))).toEqual([]);
@@ -152,6 +152,47 @@ describe('projects and retainers (F05)', () => {
     expect(permissionScopes(operationsManager, 'invoices.read')).toEqual(['all']);
     const member = access(['employee'], [{ code: 'internal_operations', isManager: false }]);
     expect(hasPermission(member, 'invoices.read')).toBe(false);
+  });
+});
+
+describe('tasks (F06)', () => {
+  const operationsManager = access(
+    ['employee', 'department_manager'],
+    [{ code: 'internal_operations', isManager: true }],
+  );
+  const designManager = access(
+    ['employee', 'department_manager'],
+    [{ code: 'design', isManager: true }],
+  );
+
+  it('lets every user read every task and request work from any department', () => {
+    expect(permissionScopes(access(['employee']), 'tasks.read')).toEqual(['all']);
+    expect(permissionScopes(access(['employee']), 'tasks.request')).toEqual(['all']);
+    for (const role of ['department_manager', 'account_manager', 'finance'] as const) {
+      expect(PERMISSION_MAP[role]['tasks.read'], role).toBeUndefined();
+    }
+  });
+
+  it('lets an employee work their tasks and manage the tasks of their projects', () => {
+    expect(permissionScopes(access(['employee']), 'tasks.work')).toEqual(['assigned']);
+    expect(permissionScopes(access(['employee']), 'tasks.manage')).toEqual(['assigned']);
+  });
+
+  it('lets department managers work and manage the tasks of their departments', () => {
+    expect(permissionScopes(designManager, 'tasks.work')).toEqual(['department', 'assigned']);
+    expect(permissionScopes(designManager, 'tasks.manage')).toEqual(['department', 'assigned']);
+  });
+
+  it('lets the Operations manager manage every task and read operational reports', () => {
+    expect(permissionScopes(operationsManager, 'tasks.manage')).toEqual([
+      'all',
+      'department',
+      'assigned',
+    ]);
+    expect(permissionScopes(operationsManager, 'reports.read')).toEqual(['all', 'department']);
+    const member = access(['employee'], [{ code: 'internal_operations', isManager: false }]);
+    expect(permissionScopes(member, 'tasks.manage')).toEqual(['assigned']);
+    expect(hasPermission(member, 'reports.read')).toBe(false);
   });
 });
 
