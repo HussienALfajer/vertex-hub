@@ -18,6 +18,7 @@ import {
   VertexMark,
 } from '@vertex-hub/ui';
 import {
+  BriefcaseBusinessIcon,
   Building2Icon,
   ChevronDownIcon,
   CircleUserIcon,
@@ -38,7 +39,13 @@ import { useTheme } from '../lib/theme';
 
 interface NavItem {
   to: LinkProps['to'];
-  label: 'nav.home' | 'nav.team' | 'nav.departments' | 'nav.audit' | 'nav.designSystem';
+  label:
+    | 'nav.home'
+    | 'nav.clients'
+    | 'nav.team'
+    | 'nav.departments'
+    | 'nav.audit'
+    | 'nav.designSystem';
   icon: LucideIcon;
   /** Hides the item from users without it. Cosmetic: the API enforces access. */
   permission?: Permission;
@@ -48,6 +55,7 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { to: '/', label: 'nav.home', icon: HouseIcon, exact: true },
+  { to: '/clients', label: 'nav.clients', icon: BriefcaseBusinessIcon, permission: 'clients.read' },
   { to: '/team', label: 'nav.team', icon: UsersIcon },
   { to: '/departments', label: 'nav.departments', icon: Building2Icon },
   { to: '/audit', label: 'nav.audit', icon: ScrollTextIcon, permission: 'audit.read' },

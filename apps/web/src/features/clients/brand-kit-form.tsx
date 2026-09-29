@@ -1,0 +1,518 @@
+import { standardSchemaResolver } from '@hookform/resolvers/standard-schema';
+import {
+  BRAND_FILE_KINDS,
+  type ClientDetailResponse,
+  REFERENCE_KINDS,
+  type UpdateBrandKit,
+  type UpdateBrandKitInput,
+  updateBrandKitSchema,
+} from '@vertex-hub/contracts';
+import {
+  Button,
+  ColorInput,
+  Field,
+  FieldError,
+  FieldLabel,
+  Input,
+  MultiCombobox,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  Textarea,
+  ToggleGroup,
+  ToggleGroupItem,
+  toast,
+} from '@vertex-hub/ui';
+import {
+  BanIcon,
+  FileTextIcon,
+  ImageIcon,
+  type LucideIcon,
+  MessageSquareQuoteIcon,
+  PaletteIcon,
+  PlusIcon,
+  ThumbsDownIcon,
+  ThumbsUpIcon,
+  Trash2Icon,
+  TypeIcon,
+} from 'lucide-react';
+import { type ReactNode, useId, useState } from 'react';
+import { Controller, useFieldArray, useForm } from 'react-hook-form';
+import { useTranslation } from 'react-i18next';
+import { FormAlert } from '../../components/form-alert';
+import { errorMessage } from '../../lib/errors';
+import { useReplaceBrandKit } from './clients.queries';
+import { TabHeader } from './tab-header';
+
+/** List limits of `updateBrandKitSchema`: the "Add" buttons stop there, so a list never exceeds them. */
+const LIMITS = { colors: 20, files: 30, references: 50 } as const;
+
+type KitForm = ReturnType<typeof useForm<UpdateBrandKitInput, unknown, UpdateBrandKit>>;
+
+/** The whole brand kit in one form: it is read and replaced as a whole. */
+export function BrandKitForm({
+  client,
+  onDone,
+}: {
+  client: ClientDetailResponse;
+  onDone: () => void;
+}) {
+  const { t } = useTranslation();
+  const replace = useReplaceBrandKit(client.id);
+  const [failure, setFailure] = useState<string | null>(null);
+  const kit = client.brandKit;
+  const form: KitForm = useForm<UpdateBrandKitInput, unknown, UpdateBrandKit>({
+    resolver: standardSchemaResolver(updateBrandKitSchema),
+    defaultValues: {
+      colors: kit.colors.map((color) => ({ name: color.name ?? '', hex: color.hex })),
+      fonts: kit.fonts,
+      toneOfVoice: kit.toneOfVoice ?? '',
+      forbiddenWords: kit.forbiddenWords,
+      files: kit.files,
+      references: kit.references.map((reference) => ({ ...reference, note: reference.note ?? '' })),
+    },
+  });
+  const { errors } = form.formState;
+
+  const submit = form.handleSubmit(async (values) => {
+    setFailure(null);
+    try {
+      await replace.mutateAsync(values);
+      toast.add({ title: t('clients.brandKit.form.saved'), type: 'success' });
+      onDone();
+    } catch (error) {
+      setFailure(errorMessage(t, error));
+    }
+  });
+
+  return (
+    <form className="flex flex-col gap-6" onSubmit={submit} noValidate>
+      <TabHeader
+        title={t('clients.brandKit.form.title')}
+        description={t('clients.brandKit.form.subtitle')}
+      />
+
+      <Section
+        icon={PaletteIcon}
+        title={t('clients.brandKit.colors')}
+        hint={t('clients.brandKit.form.colorsHint')}
+      >
+        <ColorsField form={form} />
+      </Section>
+
+      <Section
+        icon={TypeIcon}
+        title={t('clients.brandKit.fonts')}
+        hint={t('clients.brandKit.form.fontsHint')}
+      >
+        <TextListField
+          form={form}
+          name="fonts"
+          label={t('clients.brandKit.fonts')}
+          placeholder={t('clients.brandKit.form.fontsPlaceholder')}
+          error={t('clients.brandKit.form.errors.fonts')}
+        />
+      </Section>
+
+      <Section icon={MessageSquareQuoteIcon} title={t('clients.brandKit.toneOfVoice')}>
+        <Field invalid={!!errors.toneOfVoice}>
+          <FieldLabel className="sr-only">{t('clients.brandKit.toneOfVoice')}</FieldLabel>
+          <Textarea
+            className="min-h-32"
+            placeholder={t('clients.brandKit.form.tonePlaceholder')}
+            {...form.register('toneOfVoice')}
+          />
+          <FieldError match={!!errors.toneOfVoice}>
+            {t('clients.brandKit.form.errors.tone')}
+          </FieldError>
+        </Field>
+      </Section>
+
+      <Section
+        icon={BanIcon}
+        title={t('clients.brandKit.forbiddenWords')}
+        hint={t('clients.brandKit.form.wordsHint')}
+      >
+        <TextListField
+          form={form}
+          name="forbiddenWords"
+          label={t('clients.brandKit.forbiddenWords')}
+          placeholder={t('clients.brandKit.form.wordsPlaceholder')}
+          error={t('clients.brandKit.form.errors.forbiddenWords')}
+        />
+      </Section>
+
+      <Section
+        icon={FileTextIcon}
+        title={t('clients.brandKit.files')}
+        hint={t('clients.brandKit.form.filesHint')}
+      >
+        <FilesField form={form} />
+      </Section>
+
+      <Section
+        icon={ImageIcon}
+        title={t('clients.brandKit.references')}
+        hint={t('clients.brandKit.form.referencesHint')}
+      >
+        <ReferencesField form={form} />
+      </Section>
+
+      {failure && <FormAlert>{failure}</FormAlert>}
+      <div className="sticky bottom-0 z-10 -mx-4 flex flex-wrap items-center justify-end gap-3 border-t border-border bg-background px-4 py-4 md:-mx-8 md:px-8">
+        <Button variant="outline" type="button" onClick={onDone}>
+          {t('common.cancel')}
+        </Button>
+        <Button type="submit" disabled={form.formState.isSubmitting}>
+          {form.formState.isSubmitting ? t('common.saving') : t('clients.brandKit.form.save')}
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+function Section({
+  icon: Icon,
+  title,
+  hint,
+  children,
+}: {
+  icon: LucideIcon;
+  title: string;
+  hint?: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className="grid gap-4 rounded-lg border border-border bg-surface p-6 lg:grid-cols-[14rem_1fr] lg:gap-8">
+      <div className="flex flex-col gap-1">
+        <h3 className="flex items-center gap-2 text-lg font-bold">
+          <Icon aria-hidden="true" className="size-5 text-muted-foreground" />
+          {title}
+        </h3>
+        {hint && <p className="text-sm text-muted-foreground">{hint}</p>}
+      </div>
+      <div className="flex min-w-0 flex-col gap-3">{children}</div>
+    </section>
+  );
+}
+
+function AddButton({
+  onClick,
+  disabled,
+  children,
+}: {
+  onClick: () => void;
+  disabled: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <Button
+      type="button"
+      variant="secondary"
+      size="sm"
+      className="self-start"
+      onClick={onClick}
+      disabled={disabled}
+    >
+      <PlusIcon />
+      {children}
+    </Button>
+  );
+}
+
+function RemoveButton({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon"
+      aria-label={label}
+      title={label}
+      onClick={onClick}
+    >
+      <Trash2Icon />
+    </Button>
+  );
+}
+
+function ColorsField({ form }: { form: KitForm }) {
+  const { t } = useTranslation();
+  const { fields, append, remove } = useFieldArray({ control: form.control, name: 'colors' });
+  const errors = form.formState.errors.colors;
+  return (
+    <>
+      {fields.length > 0 && (
+        <ul className="flex flex-col gap-3">
+          {fields.map((item, index) => {
+            const itemErrors = errors?.[index];
+            return (
+              <li key={item.id} className="grid gap-3 sm:grid-cols-[12rem_1fr_auto] sm:items-start">
+                <Field invalid={!!itemErrors?.hex}>
+                  <FieldLabel className="sr-only">{t('clients.brandKit.form.hex')}</FieldLabel>
+                  <Controller
+                    control={form.control}
+                    name={`colors.${index}.hex`}
+                    render={({ field }) => (
+                      <ColorInput
+                        value={field.value ?? ''}
+                        onChange={field.onChange}
+                        onBlur={field.onBlur}
+                        pickLabel={t('clients.brandKit.form.pickColor')}
+                        invalid={!!itemErrors?.hex}
+                      />
+                    )}
+                  />
+                  <FieldError match={!!itemErrors?.hex}>
+                    {t('clients.brandKit.form.errors.hex')}
+                  </FieldError>
+                </Field>
+                <Field invalid={!!itemErrors?.name}>
+                  <FieldLabel className="sr-only">
+                    {t('clients.brandKit.form.colorName')}
+                  </FieldLabel>
+                  <Input
+                    placeholder={t('clients.brandKit.form.colorNamePlaceholder')}
+                    {...form.register(`colors.${index}.name`)}
+                  />
+                  <FieldError match={!!itemErrors?.name}>
+                    {t('clients.brandKit.form.errors.colorName')}
+                  </FieldError>
+                </Field>
+                <RemoveButton
+                  label={t('clients.brandKit.form.removeColor')}
+                  onClick={() => remove(index)}
+                />
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      <AddButton
+        onClick={() => append({ hex: '', name: '' })}
+        disabled={fields.length >= LIMITS.colors}
+      >
+        {t('clients.brandKit.form.addColor')}
+      </AddButton>
+    </>
+  );
+}
+
+/** Short texts as chips (fonts, forbidden words): typed and added with Enter. */
+function TextListField({
+  form,
+  name,
+  label,
+  placeholder,
+  error,
+}: {
+  form: KitForm;
+  name: 'fonts' | 'forbiddenWords';
+  label: string;
+  placeholder: string;
+  error: string;
+}) {
+  const { t } = useTranslation();
+  const id = useId();
+  const invalid = !!form.formState.errors[name];
+  return (
+    <Field invalid={invalid}>
+      <FieldLabel htmlFor={id} className="sr-only">
+        {label}
+      </FieldLabel>
+      <Controller
+        control={form.control}
+        name={name}
+        render={({ field }) => (
+          <MultiCombobox<string>
+            id={id}
+            items={[]}
+            value={field.value ?? []}
+            onValueChange={field.onChange}
+            itemToLabel={(text) => text}
+            itemToKey={(text) => text.toLocaleLowerCase('ar')}
+            placeholder={placeholder}
+            emptyLabel={t('common.noMatches')}
+            removeLabel={(text) => t('common.remove', { label: text })}
+            create={{
+              label: (text) => t('clients.brandKit.form.addText', { text }),
+              toItem: (text) => text,
+            }}
+            invalid={invalid}
+          />
+        )}
+      />
+      <FieldError match={invalid}>{error}</FieldError>
+    </Field>
+  );
+}
+
+function FilesField({ form }: { form: KitForm }) {
+  const { t } = useTranslation();
+  const { fields, append, remove } = useFieldArray({ control: form.control, name: 'files' });
+  const errors = form.formState.errors.files;
+  const kinds = BRAND_FILE_KINDS.map((kind) => ({
+    value: kind,
+    label: t(`clients.brandKit.fileKinds.${kind}`),
+  }));
+  return (
+    <>
+      {fields.length > 0 && (
+        <ul className="flex flex-col gap-3">
+          {fields.map((item, index) => {
+            const itemErrors = errors?.[index];
+            return (
+              <li
+                key={item.id}
+                className="grid gap-3 rounded-md border border-border p-3 sm:grid-cols-[10rem_1fr_auto] sm:items-start"
+              >
+                <Field>
+                  <FieldLabel>{t('clients.brandKit.form.fileKind')}</FieldLabel>
+                  <Controller
+                    control={form.control}
+                    name={`files.${index}.kind`}
+                    render={({ field }) => (
+                      <Select items={kinds} value={field.value} onValueChange={field.onChange}>
+                        <SelectTrigger className="min-w-0">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {kinds.map((kind) => (
+                            <SelectItem key={kind.value} value={kind.value}>
+                              {kind.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                </Field>
+                <div className="grid gap-3">
+                  <Field invalid={!!itemErrors?.label}>
+                    <FieldLabel>{t('clients.brandKit.form.fileLabel')}</FieldLabel>
+                    <Input
+                      placeholder={t('clients.brandKit.form.fileLabelPlaceholder')}
+                      {...form.register(`files.${index}.label`)}
+                    />
+                    <FieldError match={!!itemErrors?.label}>
+                      {t('clients.brandKit.form.errors.label')}
+                    </FieldError>
+                  </Field>
+                  <UrlField form={form} name={`files.${index}.url`} invalid={!!itemErrors?.url} />
+                </div>
+                <RemoveButton
+                  label={t('clients.brandKit.form.removeFile')}
+                  onClick={() => remove(index)}
+                />
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      <AddButton
+        onClick={() => append({ kind: 'logo', label: '', url: '' })}
+        disabled={fields.length >= LIMITS.files}
+      >
+        {t('clients.brandKit.form.addFile')}
+      </AddButton>
+    </>
+  );
+}
+
+function ReferencesField({ form }: { form: KitForm }) {
+  const { t } = useTranslation();
+  const { fields, append, remove } = useFieldArray({ control: form.control, name: 'references' });
+  const errors = form.formState.errors.references;
+  return (
+    <>
+      {fields.length > 0 && (
+        <ul className="flex flex-col gap-3">
+          {fields.map((item, index) => {
+            const itemErrors = errors?.[index];
+            return (
+              <li
+                key={item.id}
+                className="grid gap-3 rounded-md border border-border p-3 sm:grid-cols-[1fr_auto] sm:items-start"
+              >
+                <div className="grid gap-3">
+                  <Controller
+                    control={form.control}
+                    name={`references.${index}.kind`}
+                    render={({ field }) => (
+                      <ToggleGroup
+                        aria-label={t('clients.brandKit.form.referenceKind')}
+                        value={field.value ? [field.value] : []}
+                        onValueChange={(next: (typeof REFERENCE_KINDS)[number][]) => {
+                          if (next[0]) field.onChange(next[0]);
+                        }}
+                      >
+                        {REFERENCE_KINDS.map((kind) => (
+                          <ToggleGroupItem key={kind} value={kind}>
+                            {kind === 'liked' ? <ThumbsUpIcon /> : <ThumbsDownIcon />}
+                            {t(`clients.brandKit.${kind}`)}
+                          </ToggleGroupItem>
+                        ))}
+                      </ToggleGroup>
+                    )}
+                  />
+                  <UrlField
+                    form={form}
+                    name={`references.${index}.url`}
+                    invalid={!!itemErrors?.url}
+                  />
+                  <Field invalid={!!itemErrors?.note}>
+                    <FieldLabel>{t('clients.brandKit.form.referenceNote')}</FieldLabel>
+                    <Input
+                      placeholder={t('clients.brandKit.form.referenceNotePlaceholder')}
+                      {...form.register(`references.${index}.note`)}
+                    />
+                    <FieldError match={!!itemErrors?.note}>
+                      {t('clients.brandKit.form.errors.note')}
+                    </FieldError>
+                  </Field>
+                </div>
+                <RemoveButton
+                  label={t('clients.brandKit.form.removeReference')}
+                  onClick={() => remove(index)}
+                />
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      <AddButton
+        onClick={() => append({ kind: 'liked', url: '', note: '' })}
+        disabled={fields.length >= LIMITS.references}
+      >
+        {t('clients.brandKit.form.addReference')}
+      </AddButton>
+    </>
+  );
+}
+
+function UrlField({
+  form,
+  name,
+  invalid,
+}: {
+  form: KitForm;
+  name: `files.${number}.url` | `references.${number}.url`;
+  invalid: boolean;
+}) {
+  const { t } = useTranslation();
+  return (
+    <Field invalid={invalid}>
+      <FieldLabel>{t('clients.brandKit.form.url')}</FieldLabel>
+      <Input
+        type="url"
+        dir="ltr"
+        className="text-end"
+        placeholder={t('clients.brandKit.form.urlPlaceholder')}
+        autoComplete="off"
+        {...form.register(name)}
+      />
+      <FieldError match={invalid}>{t('clients.brandKit.form.errors.url')}</FieldError>
+    </Field>
+  );
+}

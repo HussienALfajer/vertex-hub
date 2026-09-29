@@ -92,8 +92,8 @@ test('sign-in asks for the code, and a wrong code is explained', async ({ page }
 
 test('archiving is blocked while the user manages a department, then allowed', async ({ page }) => {
   await mockApi(page, { signedIn: true });
-  await page.goto(`/team/${seedIds.layan}`);
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('ليان الأحمد');
+  await page.goto(`/team/${seedIds.omar}`);
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('عمر حداد');
 
   const archive = async () => {
     await page.getByRole('button', { name: ar.users.profile.actions }).click();
@@ -107,17 +107,17 @@ test('archiving is blocked while the user manages a department, then allowed', a
   await archive();
   const dialog = page.getByRole('alertdialog');
   await expect(dialog.getByText(ar.users.responsibilities.title)).toBeVisible();
-  await expect(dialog.getByText('يدير قسم التصميم')).toBeVisible();
+  await expect(dialog.getByText('يدير قسم العمليات الداخلية')).toBeVisible();
   await dialog.getByRole('link', { name: ar.users.responsibilities.open }).click();
 
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('التصميم');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('العمليات الداخلية');
   await page.getByRole('button', { name: ar.departments.detail.changeManager }).click();
   await page.getByRole('dialog').getByRole('combobox').click();
   await page.getByRole('option', { name: ar.departments.detail.noManagerOption }).click();
   await page.getByRole('dialog').getByRole('button', { name: ar.common.save }).click();
   await expect(page.getByText(ar.departments.detail.saved)).toBeVisible();
 
-  await page.goto(`/team/${seedIds.layan}`);
+  await page.goto(`/team/${seedIds.omar}`);
   await archive();
   await expect(page.getByText(ar.users.confirm.archived)).toBeVisible();
   await expect(page.getByText(ar.users.profile.archivedNotice)).toBeVisible();

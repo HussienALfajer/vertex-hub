@@ -3,7 +3,7 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '../lib/cn';
 
 const avatarVariants = cva(
-  'relative inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full font-medium leading-none select-none',
+  'relative inline-flex shrink-0 items-center justify-center overflow-hidden font-medium leading-none select-none',
   {
     variants: {
       size: {
@@ -12,13 +12,18 @@ const avatarVariants = cva(
         lg: 'size-14 text-lg',
         xl: 'size-20 text-2xl',
       },
+      /** People are round; organizations, such as clients, are square (§4). */
+      shape: {
+        circle: 'rounded-full',
+        square: 'rounded-lg font-bold',
+      },
       tone: {
         brand: 'bg-primary text-primary-foreground',
         muted: 'bg-muted text-muted-foreground',
         accent: 'bg-accent text-accent-foreground',
       },
     },
-    defaultVariants: { size: 'md', tone: 'brand' },
+    defaultVariants: { size: 'md', shape: 'circle', tone: 'brand' },
   },
 );
 
@@ -54,13 +59,16 @@ type AvatarProps = Omit<AvatarPrimitive.Root.Props, 'children'> &
     src?: string | null;
   };
 
-/** A person's picture, or their initials until pictures exist (F10). Decorative: show the name nearby. */
-function Avatar({ name, src, size, tone, className, ...props }: AvatarProps) {
+/**
+ * A person's or organization's picture, or their initials until pictures exist (F10). Decorative:
+ * show the name nearby.
+ */
+function Avatar({ name, src, size, shape, tone, className, ...props }: AvatarProps) {
   return (
     <AvatarPrimitive.Root
       data-slot="avatar"
       aria-hidden="true"
-      className={cn(avatarVariants({ size, tone }), className)}
+      className={cn(avatarVariants({ size, shape, tone }), className)}
       {...props}
     >
       {src && <AvatarPrimitive.Image src={src} alt="" className="size-full object-cover" />}

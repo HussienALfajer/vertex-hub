@@ -1,11 +1,19 @@
 import type { Page, Route, TestInfo } from '@playwright/test';
 import {
   type AuditEntry,
+  type BrandKit,
+  type ClientDetailResponse,
+  type ClientResponse,
+  type ClientStatus,
+  type Contact,
   type DepartmentDetailResponse,
   type DepartmentResponse,
   grantedPermissions,
   type HealthResponse,
   type MeResponse,
+  type Note,
+  type NoteChannel,
+  type PlatformAccount,
   type UserResponse,
 } from '@vertex-hub/contracts';
 
@@ -74,6 +82,36 @@ export const financeWithoutTwoFactor: MeResponse = {
   roles: ['employee', 'finance'],
   permissions: grantedPermissions({ roles: ['employee', 'finance'], departments: [] }),
   twoFactor: { enabled: false, required: true },
+};
+
+/** Layan: a department manager who is also an Account Manager (F02 own_clients scope). */
+export const accountManagerMe: MeResponse = {
+  user: { id: id(3), name: 'ليان الأحمد', email: 'layan@vertex.example', image: null },
+  roles: ['account_manager', 'department_manager', 'employee'],
+  departments: [
+    { ...design, isPrimary: true, isManager: true },
+    { ...marketing, isPrimary: false, isManager: false },
+  ],
+  permissions: grantedPermissions({
+    roles: ['account_manager', 'department_manager', 'employee'],
+    departments: [
+      { code: 'design', isManager: true },
+      { code: 'marketing', isManager: false },
+    ],
+  }),
+  twoFactor: { enabled: false, required: false },
+};
+
+/** Karim: an employee with no role beyond the default one. */
+export const employeeMe: MeResponse = {
+  user: { id: id(4), name: 'كريم الزين', email: 'karim@vertex.example', image: null },
+  roles: ['employee'],
+  departments: [{ ...photography, isPrimary: true, isManager: false }],
+  permissions: grantedPermissions({
+    roles: ['employee'],
+    departments: [{ code: 'photography', isManager: false }],
+  }),
+  twoFactor: { enabled: false, required: false },
 };
 
 function member(
@@ -197,7 +235,245 @@ export const auditSeed: AuditEntry[] = [
     before: { twoFactorEnabled: true },
     after: { twoFactorEnabled: false },
   },
+  {
+    id: id(505),
+    occurredAt: '2026-09-27T12:20:00.000Z',
+    actorId: id(1),
+    actorName: 'سارة الخطيب',
+    action: 'client.account_manager_changed',
+    entityType: 'client',
+    entityId: id(601),
+    before: { accountManager: { id: id(1), name: 'سارة الخطيب' } },
+    after: { accountManager: { id: id(3), name: 'ليان الأحمد' } },
+  },
+  {
+    id: id(506),
+    occurredAt: '2026-09-27T12:05:00.000Z',
+    actorId: id(3),
+    actorName: 'ليان الأحمد',
+    action: 'client_contact.created',
+    entityType: 'client_contact',
+    entityId: id(611),
+    before: null,
+    after: { clientId: id(601), name: 'هالة الشامي', hasFinalApproval: true },
+  },
 ];
+
+interface ClientRecord {
+  id: string;
+  tradeName: string;
+  sector: string | null;
+  status: ClientStatus;
+  isHealthcare: boolean;
+  accountManagerId: string;
+  brandKit: BrandKit;
+  archived: boolean;
+  contacts: (Contact & { archived: boolean })[];
+  platformAccounts: (PlatformAccount & { archived: boolean })[];
+  notes: {
+    id: string;
+    occurredAt: string;
+    channel: NoteChannel;
+    summary: string;
+    authorId: string;
+    contactId: string | null;
+    archived: boolean;
+  }[];
+}
+
+const emptyKit: BrandKit = {
+  colors: [],
+  fonts: [],
+  toneOfVoice: null,
+  forbiddenWords: [],
+  files: [],
+  references: [],
+};
+
+const contact = (
+  n: number,
+  clientId: string,
+  name: string,
+  extra: Partial<Contact> = {},
+): Contact & { archived: boolean } => ({
+  id: id(n),
+  clientId,
+  name,
+  jobTitle: null,
+  phone: null,
+  email: null,
+  hasFinalApproval: false,
+  notes: null,
+  archived: false,
+  ...extra,
+});
+
+export function clientsSeed(): ClientRecord[] {
+  const jasmine = id(601);
+  const shifa = id(602);
+  const nukhba = id(603);
+  return [
+    {
+      id: jasmine,
+      tradeName: 'مطعم الياسمين',
+      sector: 'مطاعم',
+      status: 'active',
+      isHealthcare: false,
+      accountManagerId: id(3),
+      archived: false,
+      brandKit: {
+        // Client data, not design tokens: a brand's own colors are stored as hex codes.
+        colors: [
+          { name: 'أخضر الياسمين', hex: '#1F5C4A' },
+          { name: 'ذهبي', hex: '#C9A45C' },
+          { name: 'كريمي', hex: '#F5EFE3' },
+          { name: null, hex: '#2B2B2B' },
+        ],
+        fonts: ['Tajawal', 'Playfair Display'],
+        toneOfVoice:
+          'دافئ وعائلي، يتحدث عن الطبخ البيتي والضيافة الشامية. جمل قصيرة، ودعوة واضحة للحجز.',
+        forbiddenWords: ['رخيص', 'وجبات سريعة', 'عرض خيالي'],
+        files: [
+          {
+            kind: 'logo',
+            label: 'الشعار بخلفية شفافة',
+            url: 'https://drive.example.com/jasmine/logo',
+          },
+          {
+            kind: 'guidelines',
+            label: 'دليل الهوية 2026',
+            url: 'https://drive.example.com/jasmine/guide',
+          },
+        ],
+        references: [
+          {
+            kind: 'liked',
+            url: 'https://www.instagram.com/p/warm-table',
+            note: 'الإضاءة الدافئة وزوايا الطاولة',
+          },
+          {
+            kind: 'disliked',
+            url: 'https://www.behance.net/gallery/neon-food',
+            note: 'ألوان النيون',
+          },
+        ],
+      },
+      contacts: [
+        contact(611, jasmine, 'هالة الشامي', {
+          jobTitle: 'المالكة',
+          phone: '+963944555666',
+          email: 'hala@jasmine.example',
+          hasFinalApproval: true,
+          notes: 'تفضّل التواصل مساءً عبر واتساب.',
+        }),
+        contact(612, jasmine, 'سامر العلي', {
+          jobTitle: 'مدير الصالة',
+          phone: '+963933222111',
+        }),
+      ],
+      platformAccounts: [
+        {
+          id: id(621),
+          clientId: jasmine,
+          platform: 'instagram',
+          label: null,
+          url: 'https://www.instagram.com/jasmine.restaurant',
+          agencyAccess: 'granted',
+          adminNote: 'هالة على رقمها الشخصي',
+          archived: false,
+        },
+        {
+          id: id(622),
+          clientId: jasmine,
+          platform: 'facebook',
+          label: null,
+          url: 'https://www.facebook.com/jasmine.restaurant',
+          agencyAccess: 'pending',
+          adminNote: null,
+          archived: false,
+        },
+        {
+          id: id(623),
+          clientId: jasmine,
+          platform: 'google_business',
+          label: 'فرع المزة',
+          url: 'https://maps.google.com/?cid=123',
+          agencyAccess: 'none',
+          adminNote: 'حساب غوغل لدى المحاسب',
+          archived: false,
+        },
+      ],
+      notes: [
+        {
+          id: id(631),
+          occurredAt: '2026-09-28T09:30:00.000Z',
+          channel: 'meeting',
+          summary: 'اتفقنا على خطة محتوى أكتوبر: ثلاثة منشورات أسبوعيًا وريلز للأطباق الموسمية.',
+          authorId: id(3),
+          contactId: id(611),
+          archived: false,
+        },
+        {
+          id: id(632),
+          occurredAt: '2026-09-28T07:10:00.000Z',
+          channel: 'whatsapp',
+          summary: 'أرسلت هالة صور القائمة الجديدة.',
+          authorId: id(4),
+          contactId: id(611),
+          archived: false,
+        },
+        {
+          id: id(633),
+          occurredAt: '2026-09-25T12:00:00.000Z',
+          channel: 'call',
+          summary: 'طلب سامر تعديل موعد جلسة التصوير إلى الأحد.',
+          authorId: id(1),
+          contactId: id(612),
+          archived: false,
+        },
+      ],
+    },
+    {
+      id: shifa,
+      tradeName: 'عيادة الشفاء',
+      sector: 'عيادات',
+      status: 'paused',
+      isHealthcare: true,
+      accountManagerId: id(1),
+      archived: false,
+      brandKit: emptyKit,
+      contacts: [contact(613, shifa, 'د. رامي حسن', { jobTitle: 'المدير الطبي' })],
+      platformAccounts: [],
+      notes: [],
+    },
+    {
+      id: nukhba,
+      tradeName: 'متجر النخبة',
+      sector: 'متاجر',
+      status: 'ended',
+      isHealthcare: false,
+      accountManagerId: id(3),
+      archived: false,
+      brandKit: emptyKit,
+      contacts: [],
+      platformAccounts: [],
+      notes: [],
+    },
+    {
+      id: id(604),
+      tradeName: 'عميل تجريبي',
+      sector: null,
+      status: 'active',
+      isHealthcare: false,
+      accountManagerId: id(1),
+      archived: true,
+      brandKit: emptyKit,
+      contacts: [],
+      platformAccounts: [],
+      notes: [],
+    },
+  ];
+}
 
 /** What the mocked enable step returns; any 6-digit code but 000000 is accepted. */
 export const TOTP_URI =
@@ -241,6 +517,8 @@ export async function mockApi(page: Page, options: MockOptions): Promise<void> {
   let signedIn = options.signedIn;
   let me = options.me ?? manager;
   const users = teamSeed();
+  const clients = clientsSeed();
+  const clientsApi = clientRoutes({ users, clients, me: () => me });
   const managers = new Map<string, string | null>(
     departmentsSeed.map((d) => [
       d.id,
@@ -333,9 +611,16 @@ export async function mockApi(page: Page, options: MockOptions): Promise<void> {
       const status = url.searchParams.get('status') ?? 'active';
       const search = url.searchParams.get('search')?.toLowerCase();
       const departmentId = url.searchParams.get('departmentId');
+      const role = url.searchParams.get('role');
+      // Like the API: status and assigned-role filters are for user managers only.
+      const userManager = me.permissions.some((g) => g.permission === 'users.manage');
+      if ((status !== 'active' || (role && role !== 'department_manager')) && !userManager) {
+        return fail(route, 403, 'FORBIDDEN');
+      }
       const items = users.filter(
         (u) =>
           u.status === status &&
+          (!role || u.roles?.includes(role as NonNullable<UserResponse['roles']>[number])) &&
           (!search || u.name.toLowerCase().includes(search) || u.email?.includes(search)) &&
           (!departmentId || u.departments.some((d) => d.id === departmentId)),
       );
@@ -374,13 +659,19 @@ export async function mockApi(page: Page, options: MockOptions): Promise<void> {
       }
       if (action === 'archive') {
         const managed = departmentsSeed.filter((d) => managers.get(d.id) === user.id);
-        if (managed.length > 0) {
-          return fail(
-            route,
-            409,
-            'USER_HAS_RESPONSIBILITIES',
-            managed.map((d) => ({ type: 'manages_department', id: d.id, name: d.name })),
-          );
+        // F02 rule 8: active or paused clients they are account manager of.
+        const accounts = clients.filter(
+          (c) => !c.archived && c.status !== 'ended' && c.accountManagerId === user.id,
+        );
+        if (managed.length > 0 || accounts.length > 0) {
+          return fail(route, 409, 'USER_HAS_RESPONSIBILITIES', [
+            ...managed.map((d) => ({ type: 'manages_department', id: d.id, name: d.name })),
+            ...accounts.map((c) => ({
+              type: 'account_manager_of_client',
+              id: c.id,
+              name: c.tradeName,
+            })),
+          ]);
         }
         user.status = 'archived';
         return json(route, user);
@@ -420,11 +711,219 @@ export async function mockApi(page: Page, options: MockOptions): Promise<void> {
       return json(route, departmentDetail(department));
     }
 
+    // Clients (F02).
+    const handled = clientsApi(route, method, url, request);
+    if (handled) return handled;
+
     if (path === '/api/audit') {
       return json(route, { items: auditSeed, total: auditSeed.length, page: 1, pageSize: 30 });
     }
     return fail(route, 404, 'NOT_FOUND');
   });
+}
+
+interface ClientState {
+  users: UserResponse[];
+  clients: ClientRecord[];
+  me: () => MeResponse;
+}
+
+type Request = ReturnType<Route['request']>;
+
+/** The clients API over the in-memory records, with the F02 access rules the screens rely on. */
+function clientRoutes({ users, clients, me }: ClientState) {
+  const holds = (permission: string, scope: string) =>
+    me().permissions.some((g) => g.permission === permission && g.scopes.includes(scope as never));
+  const nameOf = (userId: string) => users.find((u) => u.id === userId)?.name ?? '';
+  const canManage = (c: ClientRecord) =>
+    !c.archived &&
+    (holds('clients.manage', 'all') ||
+      (holds('clients.manage', 'own_clients') && c.accountManagerId === me().user.id));
+
+  const summary = (c: ClientRecord): ClientResponse => {
+    const manager = users.find((u) => u.id === c.accountManagerId);
+    return {
+      id: c.id,
+      tradeName: c.tradeName,
+      sector: c.sector,
+      status: c.status,
+      isHealthcare: c.isHealthcare,
+      accountManager: {
+        id: c.accountManagerId,
+        name: manager?.name ?? '',
+        archived: manager?.status === 'archived',
+      },
+      hasApprovalContact: c.contacts.some((x) => !x.archived && x.hasFinalApproval),
+    };
+  };
+  const strip = <T extends { archived: boolean }>({ archived: _, ...rest }: T) => rest;
+  const detail = (c: ClientRecord): ClientDetailResponse => ({
+    ...summary(c),
+    brandKit: c.brandKit,
+    contacts: c.contacts.filter((x) => !x.archived).map(strip),
+    platformAccounts: c.platformAccounts.filter((x) => !x.archived).map(strip),
+    archivedAt: c.archived ? '2026-09-20T10:00:00.000Z' : null,
+    canManage: canManage(c),
+  });
+  const note = (c: ClientRecord, n: ClientRecord['notes'][number]): Note => {
+    const who = c.contacts.find((x) => x.id === n.contactId);
+    const own = n.authorId === me().user.id;
+    return {
+      id: n.id,
+      clientId: c.id,
+      occurredAt: n.occurredAt,
+      channel: n.channel,
+      summary: n.summary,
+      author: { id: n.authorId, name: nameOf(n.authorId) },
+      contact: who ? { id: who.id, name: who.name, archived: who.archived } : null,
+      canEdit: own && !c.archived,
+      canArchive: (own || holds('clients.manage', 'all')) && !c.archived,
+    };
+  };
+  let next = 700;
+
+  // Answers a clients request, or returns undefined to let the other mocks try.
+  return (route: Route, method: string, url: URL, request: Request): Promise<void> | undefined => {
+    const path = url.pathname;
+    const body = () => request.postDataJSON() as Record<string, unknown>;
+
+    if (path === '/api/clients' && method === 'GET') {
+      const q = url.searchParams;
+      const statuses = q.getAll('status');
+      const archived = q.get('archived') === 'true';
+      const search = q.get('search');
+      const items = clients
+        .filter(
+          (c) =>
+            c.archived === archived &&
+            (statuses.length === 0 || statuses.includes(c.status)) &&
+            (!search || c.tradeName.includes(search)) &&
+            (!q.get('accountManagerId') || c.accountManagerId === q.get('accountManagerId')) &&
+            (!q.get('sector') || c.sector === q.get('sector')) &&
+            (!q.get('healthcare') || String(c.isHealthcare) === q.get('healthcare')),
+        )
+        .sort((a, b) => a.tradeName.localeCompare(b.tradeName, 'ar'))
+        .map(summary);
+      return json(route, { items, total: items.length, page: 1, pageSize: 25 });
+    }
+    if (path === '/api/clients/sectors') {
+      const sectors = clients.filter((c) => !c.archived && c.sector).map((c) => c.sector);
+      return json(route, { items: [...new Set(sectors)].sort() });
+    }
+    if (path === '/api/clients' && method === 'POST') {
+      const input = body() as {
+        tradeName: string;
+        sector?: string | null;
+        accountManagerId: string;
+        status?: ClientStatus;
+        isHealthcare?: boolean;
+      };
+      const created: ClientRecord = {
+        id: id(next++),
+        tradeName: input.tradeName,
+        sector: input.sector ?? null,
+        status: input.status ?? 'active',
+        isHealthcare: input.isHealthcare ?? false,
+        accountManagerId: input.accountManagerId,
+        brandKit: emptyKit,
+        archived: false,
+        contacts: [],
+        platformAccounts: [],
+        notes: [],
+      };
+      clients.push(created);
+      return json(route, detail(created), 201);
+    }
+
+    const match = path.match(/^\/api\/clients\/([^/]+)(?:\/([^/]+))?(?:\/([^/]+))?(?:\/([^/]+))?$/);
+    if (!match) return undefined;
+    const [, clientId, part, childId, childAction] = match;
+    const client = clients.find((c) => c.id === clientId);
+    if (!client || (client.archived && !holds('clients.manage', 'all'))) {
+      return fail(route, 404, 'NOT_FOUND');
+    }
+
+    if (!part) {
+      if (method === 'GET') return json(route, detail(client));
+      if (!canManage(client)) return fail(route, 403, 'FORBIDDEN');
+      Object.assign(client, body());
+      return json(route, detail(client));
+    }
+    if (part === 'archive' || part === 'restore') {
+      client.archived = part === 'archive';
+      return json(route, detail(client));
+    }
+    if (part === 'brand-kit') {
+      client.brandKit = body() as BrandKit;
+      return json(route, client.brandKit);
+    }
+    if (part === 'contacts' || part === 'platform-accounts') {
+      const list = (part === 'contacts' ? client.contacts : client.platformAccounts) as {
+        id: string;
+        archived: boolean;
+      }[];
+      if (!canManage(client)) return fail(route, 403, 'FORBIDDEN');
+      if (!childId) {
+        const created = { id: id(next++), clientId: client.id, archived: false, ...body() };
+        list.push(created);
+        return json(route, strip(created), 201);
+      }
+      const item = list.find((x) => x.id === childId);
+      if (!item) return fail(route, 404, 'NOT_FOUND');
+      if (childAction === 'archive') {
+        item.archived = true;
+        return route.fulfill({ status: 204 });
+      }
+      Object.assign(item, body());
+      return json(route, strip(item));
+    }
+    if (part === 'notes') {
+      if (!childId && method === 'GET') {
+        const channel = url.searchParams.get('channel');
+        const contactId = url.searchParams.get('contactId');
+        const items = client.notes
+          .filter(
+            (n) =>
+              !n.archived &&
+              (!channel || n.channel === channel) &&
+              (!contactId || n.contactId === contactId),
+          )
+          .sort((a, b) => b.occurredAt.localeCompare(a.occurredAt))
+          .map((n) => note(client, n));
+        return json(route, { items, total: items.length, page: 1, pageSize: 20 });
+      }
+      if (!childId) {
+        const input = body() as {
+          summary: string;
+          channel: NoteChannel;
+          contactId?: string | null;
+          occurredAt?: string;
+        };
+        const created = {
+          id: id(next++),
+          summary: input.summary,
+          channel: input.channel,
+          contactId: input.contactId ?? null,
+          occurredAt: input.occurredAt ?? new Date().toISOString(),
+          authorId: me().user.id,
+          archived: false,
+        };
+        client.notes.push(created);
+        return json(route, note(client, created), 201);
+      }
+      const item = client.notes.find((n) => n.id === childId);
+      if (!item) return fail(route, 404, 'NOT_FOUND');
+      if (childAction === 'archive') {
+        if (!note(client, item).canArchive) return fail(route, 403, 'NOT_NOTE_AUTHOR');
+        item.archived = true;
+        return route.fulfill({ status: 204 });
+      }
+      if (!note(client, item).canEdit) return fail(route, 403, 'NOT_NOTE_AUTHOR');
+      Object.assign(item, body());
+      return json(route, note(client, item));
+    }
+    return undefined;
+  };
 }
 
 /** Ids of the seeded team, for navigating straight to a profile or department. */
@@ -433,6 +932,8 @@ export const seedIds = {
   omar: id(2),
   layan: id(3),
   design: design.id,
+  jasmine: id(601),
+  shifa: id(602),
 };
 
 /** Viewport screenshot kept in the test output and attached to the HTML report. */
