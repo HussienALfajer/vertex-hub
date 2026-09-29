@@ -15,6 +15,7 @@ export * from './components/dropdown-menu';
 export * from './components/empty-state';
 export * from './components/field';
 export * from './components/input';
+export * from './components/meter';
 export * from './components/multi-combobox';
 export * from './components/otp-field';
 export * from './components/page-header';

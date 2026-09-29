@@ -3,6 +3,7 @@ import {
   businessDay,
   businessDayEnd,
   businessDayStart,
+  formatCalendarDate,
   formatDateTime,
   formatLink,
   formatLinkHost,
@@ -44,5 +45,11 @@ describe('formatting', () => {
     expect(formatLinkHost('not a url')).toBe('not a url');
     expect(formatLink('https://www.instagram.com/vertex/')).toBe('instagram.com/vertex');
     expect(formatLink('https://vertex.example')).toBe('vertex.example');
+  });
+
+  it('formats a calendar day as that same day, with Latin digits', () => {
+    const formatted = formatCalendarDate('2026-10-01');
+    expect(formatted).not.toMatch(ARABIC_INDIC_DIGITS);
+    expect(formatted).toMatch(/^1 .+ 2026$/);
   });
 });

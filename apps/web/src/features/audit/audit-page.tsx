@@ -7,6 +7,7 @@ import {
   type AuditEntityType,
   type AuditEntry,
   CLIENT_STATUSES,
+  PROJECT_STATUSES,
 } from '@vertex-hub/contracts';
 import {
   Avatar,
@@ -34,6 +35,7 @@ import { canAll, useMe } from '../../lib/auth';
 import { businessDayEnd, businessDayStart, formatDateTime, formatNumber } from '../../lib/format';
 import { clientListQuery } from '../clients/clients.queries';
 import { departmentListQuery } from '../departments/departments.queries';
+import { projectListQuery } from '../projects/projects.queries';
 import { userListQuery } from '../users/users.queries';
 import { auditListQuery } from './audit.queries';
 import { AuditValue } from './audit-value';
@@ -142,6 +144,7 @@ interface EntityNames {
   user: (id: string) => string | undefined;
   department: (id: string) => string | undefined;
   client: (id: string) => string | undefined;
+  project: (id: string) => string | undefined;
 }
 
 /**
@@ -159,6 +162,13 @@ function useEntityNames(): EntityNames {
     ...clientListQuery({ status: [...CLIENT_STATUSES], archived: 'true', pageSize: 100 }),
     enabled: canAll(me, 'clients.manage'),
   }).data;
+  const projects = useQuery(
+    projectListQuery({ status: [...PROJECT_STATUSES], pageSize: 100 }),
+  ).data;
+  const archivedProjects = useQuery({
+    ...projectListQuery({ status: [...PROJECT_STATUSES], archived: 'true', pageSize: 100 }),
+    enabled: canAll(me, 'projects.manage'),
+  }).data;
   return useMemo(() => {
     const users = [active, invited, archived]
       .flatMap((page) => page?.items ?? [])
@@ -173,13 +183,28 @@ function useEntityNames(): EntityNames {
         .flatMap((page) => page?.items ?? [])
         .map((client) => [client.id, client.tradeName]),
     );
+    const projectNames = new Map(
+      [projects, archivedProjects]
+        .flatMap((page) => page?.items ?? [])
+        .map((project) => [project.id, project.name]),
+    );
     return {
       users,
       user: (id) => userNames.get(id),
       department: (id) => departmentNames.get(id),
       client: (id) => clientNames.get(id),
+      project: (id) => projectNames.get(id),
     };
-  }, [active, invited, archived, departments, clients, archivedClients]);
+  }, [
+    active,
+    invited,
+    archived,
+    departments,
+    clients,
+    archivedClients,
+    projects,
+    archivedProjects,
+  ]);
 }
 
 function Filters({
@@ -325,10 +350,10 @@ const actionTone = (action: AuditAction) => {
 function AuditRow({ entry, names }: { entry: AuditEntry; names: EntityNames }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
-  // `clientId` on a contact, platform account or note entry is where its link points, not a change.
+  // `clientId` and `projectId` on a child record's entry are where its link points, not a change.
   const fields = [
     ...new Set([...Object.keys(entry.before ?? {}), ...Object.keys(entry.after ?? {})]),
-  ].filter((field) => field !== 'clientId');
+  ].filter((field) => field !== 'clientId' && field !== 'projectId');
   const detailsId = `audit-${entry.id}`;
 
   return (
@@ -499,6 +524,14 @@ const CLIENT_TAB: Partial<Record<AuditEntityType, 'platforms' | 'communication'>
   client_note: 'communication',
 };
 
+/** The project a project, milestone or extra work entry belongs to. */
+function projectIdOf(entry: AuditEntry): string | undefined {
+  if (entry.entityType === 'project') return entry.entityId;
+  if (entry.entityType !== 'project_milestone' && entry.entityType !== 'extra_work') return;
+  const projectId = entry.after?.projectId ?? entry.before?.projectId;
+  return typeof projectId === 'string' ? projectId : undefined;
+}
+
 const linkClass = 'font-medium hover:underline';
 
 function EntityLink({ entry, names }: { entry: AuditEntry; names: EntityNames }) {
@@ -519,6 +552,23 @@ function EntityLink({ entry, names }: { entry: AuditEntry; names: EntityNames })
         className={linkClass}
       >
         {names.department(entry.entityId) ?? none}
+      </Link>
+    );
+  }
+  const projectId = projectIdOf(entry);
+  if (projectId) {
+    const projectName = names.project(projectId) ?? t('audit.openProject');
+    const milestoneName = entry.after?.name ?? entry.before?.name;
+    return (
+      <Link
+        to="/projects/$projectId"
+        params={{ projectId }}
+        search={{ tab: entry.entityType === 'extra_work' ? 'extra-work' : undefined }}
+        className={linkClass}
+      >
+        {entry.entityType === 'project_milestone' && typeof milestoneName === 'string'
+          ? t('audit.milestoneOfProject', { milestone: milestoneName, project: projectName })
+          : projectName}
       </Link>
     );
   }
