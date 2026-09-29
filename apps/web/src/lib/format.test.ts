@@ -9,6 +9,7 @@ import {
   formatLinkHost,
   formatMonth,
   formatNumber,
+  formatRelativeTime,
   formatTimeOfDay,
   fromBusinessDateTimeInput,
   toBusinessDateTimeInput,
@@ -67,5 +68,17 @@ describe('formatting', () => {
     expect(formatted).toBe(formatMonth('2026-10-31'));
     expect(formatted).not.toBe(formatMonth('2026-09-30'));
     expect(formatted).toMatch(/2026$/);
+  });
+
+  it('says how long ago an instant was, then the date after a week', () => {
+    const now = new Date('2026-10-10T12:00:00Z');
+    const ago = (seconds: number) =>
+      formatRelativeTime(new Date(now.getTime() - seconds * 1000), now);
+    expect(ago(20)).toBe(formatRelativeTime(now, now));
+    expect(ago(5 * 60)).toMatch(/5/);
+    expect(ago(3 * 60 * 60)).toMatch(/3/);
+    expect(ago(3 * 60 * 60)).not.toBe(ago(3 * 60));
+    expect(ago(8 * 24 * 60 * 60)).toBe(formatDateTime('2026-10-02T12:00:00Z'));
+    expect(ago(5 * 60)).not.toMatch(ARABIC_INDIC_DIGITS);
   });
 });

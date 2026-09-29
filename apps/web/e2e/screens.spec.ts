@@ -4,7 +4,9 @@ import {
   accountManagerMe,
   employeeMe,
   financeWithoutTwoFactor,
+  manager,
   mockApi,
+  notificationFor,
   PROJECTS_TODAY,
   screenshot,
   seedIds,
@@ -36,6 +38,54 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await screenshot(page, testInfo, `shell-${colorScheme}`);
     });
 
+    test('notifications', async ({ page }, testInfo) => {
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await mockApi(page, {
+        signedIn: true,
+        streamed: [
+          notificationFor(manager, 5950, {
+            type: 'task_mentioned',
+            actor: { id: seedIds.layan, name: 'ليان الأحمد' },
+            subject: { type: 'task', id: seedIds.autumnMenu },
+            data: {
+              task: {
+                title: 'تصاميم منيو الخريف',
+                department: 'design',
+                client: 'مطعم الياسمين',
+                project: 'الهوية البصرية الجديدة',
+              },
+              excerpt: 'هل نعتمد الصفحة الأولى؟',
+            },
+          }),
+        ],
+      });
+      await page.goto('/');
+      await expect(page.locator('[data-slot="toast"]')).toBeVisible();
+      await screenshot(page, testInfo, `notification-toast-${colorScheme}`);
+
+      await page.getByRole('button', { name: /^الإشعارات، / }).click();
+      await expect(page.getByRole('dialog', { name: ar.notifications.title })).toBeVisible();
+      await screenshot(page, testInfo, `notification-bell-${colorScheme}`);
+      await page.keyboard.press('Escape');
+
+      await page.goto('/notifications');
+      await expect(page.getByRole('heading', { level: 1 })).toHaveText(ar.notifications.title);
+      await expect(page.getByRole('main').getByRole('listitem').first()).toBeVisible();
+      await screenshot(page, testInfo, `notifications-${colorScheme}`);
+
+      await page.goto('/notifications/settings');
+      await expect(page.getByRole('switch').first()).toBeVisible();
+      await screenshot(page, testInfo, `notification-settings-${colorScheme}`);
+    });
+
+    test('empty notifications bell', async ({ page }, testInfo) => {
+      await mockApi(page, { signedIn: true, notifications: [] });
+      await page.goto('/');
+      await page.getByRole('button', { name: ar.notifications.bell, exact: true }).click();
+      await expect(page.getByText(ar.notifications.emptyTitle)).toBeVisible();
+      await screenshot(page, testInfo, `notification-bell-empty-${colorScheme}`);
+    });
+
     test('design system components', async ({ page }, testInfo) => {
       // Tall enough for the whole gallery: the shell's sidebar and top bar are sticky.
       await page.setViewportSize({ width: 1280, height: 2900 });
@@ -47,6 +97,11 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await page.getByRole('button', { name: ar.designSystem.openMenu }).click();
       await expect(page.getByRole('menuitem', { name: ar.designSystem.menuEdit })).toBeVisible();
       await screenshot(page, testInfo, `dropdown-${colorScheme}`);
+      await page.keyboard.press('Escape');
+
+      await page.getByRole('button', { name: ar.designSystem.openPopover }).click();
+      await expect(page.getByRole('dialog', { name: ar.designSystem.popoverTitle })).toBeVisible();
+      await screenshot(page, testInfo, `popover-${colorScheme}`);
       await page.keyboard.press('Escape');
 
       await page.getByRole('button', { name: ar.designSystem.openDialog }).click();

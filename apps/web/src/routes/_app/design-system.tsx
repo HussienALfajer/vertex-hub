@@ -51,6 +51,10 @@ import {
   PageHeader,
   Pagination,
   PlatformMark,
+  Popover,
+  PopoverContent,
+  PopoverTitle,
+  PopoverTrigger,
   Select,
   SelectContent,
   SelectItem,
@@ -371,6 +375,33 @@ function DesignSystemPage() {
           >
             {t('designSystem.showToast')}
           </Button>
+
+          <Button
+            variant="secondary"
+            onClick={() => {
+              const id = toast.add({
+                title: t('designSystem.toastTitle'),
+                description: t('designSystem.toastBody'),
+                type: 'info',
+                actionProps: {
+                  children: t('designSystem.toastAction'),
+                  onClick: () => toast.close(id),
+                },
+              });
+            }}
+          >
+            {t('designSystem.showActionToast')}
+          </Button>
+
+          <Popover>
+            <PopoverTrigger render={<Button variant="outline" />}>
+              {t('designSystem.openPopover')}
+            </PopoverTrigger>
+            <PopoverContent className="gap-2 p-4">
+              <PopoverTitle>{t('designSystem.popoverTitle')}</PopoverTitle>
+              <p className="text-sm text-muted-foreground">{t('designSystem.popoverBody')}</p>
+            </PopoverContent>
+          </Popover>
         </div>
       </Section>
     </>

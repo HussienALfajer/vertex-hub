@@ -57,6 +57,26 @@ server {
         include snippets/vertexhub-proxy.conf;
     }
 
+    # Notifications stream (F14, ADR 0018): Server-Sent Events pass through unbuffered, and the
+    # read timeout outlasts the stream's 15-minute lifetime. The proxy snippet is not included
+    # because it sets its own read timeout; its headers are repeated here. Streams count against
+    # their own connection limit instead of the site-wide one (vertexhub-limits.conf).
+    location = /api/me/notifications/stream {
+        limit_conn vhstream 60;
+        proxy_pass http://127.0.0.1:3050;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header Connection "";
+        proxy_hide_header X-Powered-By;
+        proxy_buffering off;
+        proxy_cache off;
+        proxy_read_timeout 20m;
+        gzip off;
+    }
+
     # The API documentation is disabled in production; don't forward probes for it.
     location ^~ /api/docs { return 404; }
 

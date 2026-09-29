@@ -21,6 +21,7 @@ export * from './components/otp-field';
 export * from './components/page-header';
 export * from './components/pagination';
 export * from './components/platform-mark';
+export * from './components/popover';
 export * from './components/select';
 export * from './components/sheet';
 export * from './components/skeleton';

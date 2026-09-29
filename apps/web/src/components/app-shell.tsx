@@ -38,6 +38,7 @@ import {
 } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { NotificationBell } from '../features/notifications/notification-bell';
 import { managesTeams } from '../features/tasks/task-access';
 import { authClient, can, useMe } from '../lib/auth';
 import { useTheme } from '../lib/theme';
@@ -196,6 +197,7 @@ function TopBar({ me }: { me: MeResponse }) {
       </div>
       <div className="flex items-center gap-2">
         <ThemeToggle />
+        <NotificationBell />
         <UserMenu me={me} />
       </div>
     </header>

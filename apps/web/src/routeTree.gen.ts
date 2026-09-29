@@ -22,6 +22,8 @@ import { Route as AppClientsClientIdRouteImport } from './routes/_app/clients/$c
 import { Route as AppClientsNewRouteImport } from './routes/_app/clients/new'
 import { Route as AppDepartmentsIndexRouteImport } from './routes/_app/departments/index'
 import { Route as AppDepartmentsDepartmentIdRouteImport } from './routes/_app/departments/$departmentId'
+import { Route as AppNotificationsIndexRouteImport } from './routes/_app/notifications/index'
+import { Route as AppNotificationsSettingsRouteImport } from './routes/_app/notifications/settings'
 import { Route as AppProjectsIndexRouteImport } from './routes/_app/projects/index'
 import { Route as AppProjectsProjectIdRouteImport } from './routes/_app/projects/$projectId'
 import { Route as AppProjectsNewRouteImport } from './routes/_app/projects/new'
@@ -104,6 +106,17 @@ const AppDepartmentsDepartmentIdRoute =
   AppDepartmentsDepartmentIdRouteImport.update({
     id: '/departments/$departmentId',
     path: '/departments/$departmentId',
+    getParentRoute: () => AppRoute,
+  } as any)
+const AppNotificationsIndexRoute = AppNotificationsIndexRouteImport.update({
+  id: '/notifications/',
+  path: '/notifications/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppNotificationsSettingsRoute =
+  AppNotificationsSettingsRouteImport.update({
+    id: '/notifications/settings',
+    path: '/notifications/settings',
     getParentRoute: () => AppRoute,
   } as any)
 const AppProjectsIndexRoute = AppProjectsIndexRouteImport.update({
@@ -208,6 +221,7 @@ export interface FileRoutesByFullPath {
   '/clients/$clientId': typeof AppClientsClientIdRoute
   '/clients/new': typeof AppClientsNewRoute
   '/departments/$departmentId': typeof AppDepartmentsDepartmentIdRoute
+  '/notifications/settings': typeof AppNotificationsSettingsRoute
   '/projects/$projectId': typeof AppProjectsProjectIdRoute
   '/projects/new': typeof AppProjectsNewRoute
   '/retainers/$retainerId': typeof AppRetainersRetainerIdRoute
@@ -223,6 +237,7 @@ export interface FileRoutesByFullPath {
   '/templates/new': typeof AppTemplatesNewRoute
   '/clients/': typeof AppClientsIndexRoute
   '/departments/': typeof AppDepartmentsIndexRoute
+  '/notifications/': typeof AppNotificationsIndexRoute
   '/projects/': typeof AppProjectsIndexRoute
   '/retainers/': typeof AppRetainersIndexRoute
   '/tasks/': typeof AppTasksIndexRoute
@@ -240,6 +255,7 @@ export interface FileRoutesByTo {
   '/clients/$clientId': typeof AppClientsClientIdRoute
   '/clients/new': typeof AppClientsNewRoute
   '/departments/$departmentId': typeof AppDepartmentsDepartmentIdRoute
+  '/notifications/settings': typeof AppNotificationsSettingsRoute
   '/projects/$projectId': typeof AppProjectsProjectIdRoute
   '/projects/new': typeof AppProjectsNewRoute
   '/retainers/$retainerId': typeof AppRetainersRetainerIdRoute
@@ -255,6 +271,7 @@ export interface FileRoutesByTo {
   '/templates/new': typeof AppTemplatesNewRoute
   '/clients': typeof AppClientsIndexRoute
   '/departments': typeof AppDepartmentsIndexRoute
+  '/notifications': typeof AppNotificationsIndexRoute
   '/projects': typeof AppProjectsIndexRoute
   '/retainers': typeof AppRetainersIndexRoute
   '/tasks': typeof AppTasksIndexRoute
@@ -274,6 +291,7 @@ export interface FileRoutesById {
   '/_app/clients/$clientId': typeof AppClientsClientIdRoute
   '/_app/clients/new': typeof AppClientsNewRoute
   '/_app/departments/$departmentId': typeof AppDepartmentsDepartmentIdRoute
+  '/_app/notifications/settings': typeof AppNotificationsSettingsRoute
   '/_app/projects/$projectId': typeof AppProjectsProjectIdRoute
   '/_app/projects/new': typeof AppProjectsNewRoute
   '/_app/retainers/$retainerId': typeof AppRetainersRetainerIdRoute
@@ -289,6 +307,7 @@ export interface FileRoutesById {
   '/_app/templates/new': typeof AppTemplatesNewRoute
   '/_app/clients/': typeof AppClientsIndexRoute
   '/_app/departments/': typeof AppDepartmentsIndexRoute
+  '/_app/notifications/': typeof AppNotificationsIndexRoute
   '/_app/projects/': typeof AppProjectsIndexRoute
   '/_app/retainers/': typeof AppRetainersIndexRoute
   '/_app/tasks/': typeof AppTasksIndexRoute
@@ -308,6 +327,7 @@ export interface FileRouteTypes {
     | '/clients/$clientId'
     | '/clients/new'
     | '/departments/$departmentId'
+    | '/notifications/settings'
     | '/projects/$projectId'
     | '/projects/new'
     | '/retainers/$retainerId'
@@ -323,6 +343,7 @@ export interface FileRouteTypes {
     | '/templates/new'
     | '/clients/'
     | '/departments/'
+    | '/notifications/'
     | '/projects/'
     | '/retainers/'
     | '/tasks/'
@@ -340,6 +361,7 @@ export interface FileRouteTypes {
     | '/clients/$clientId'
     | '/clients/new'
     | '/departments/$departmentId'
+    | '/notifications/settings'
     | '/projects/$projectId'
     | '/projects/new'
     | '/retainers/$retainerId'
@@ -355,6 +377,7 @@ export interface FileRouteTypes {
     | '/templates/new'
     | '/clients'
     | '/departments'
+    | '/notifications'
     | '/projects'
     | '/retainers'
     | '/tasks'
@@ -373,6 +396,7 @@ export interface FileRouteTypes {
     | '/_app/clients/$clientId'
     | '/_app/clients/new'
     | '/_app/departments/$departmentId'
+    | '/_app/notifications/settings'
     | '/_app/projects/$projectId'
     | '/_app/projects/new'
     | '/_app/retainers/$retainerId'
@@ -388,6 +412,7 @@ export interface FileRouteTypes {
     | '/_app/templates/new'
     | '/_app/clients/'
     | '/_app/departments/'
+    | '/_app/notifications/'
     | '/_app/projects/'
     | '/_app/retainers/'
     | '/_app/tasks/'
@@ -493,6 +518,20 @@ declare module '@tanstack/react-router' {
       path: '/departments/$departmentId'
       fullPath: '/departments/$departmentId'
       preLoaderRoute: typeof AppDepartmentsDepartmentIdRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/notifications/': {
+      id: '/_app/notifications/'
+      path: '/notifications'
+      fullPath: '/notifications/'
+      preLoaderRoute: typeof AppNotificationsIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/notifications/settings': {
+      id: '/_app/notifications/settings'
+      path: '/notifications/settings'
+      fullPath: '/notifications/settings'
+      preLoaderRoute: typeof AppNotificationsSettingsRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/projects/': {
@@ -632,6 +671,7 @@ interface AppRouteChildren {
   AppClientsClientIdRoute: typeof AppClientsClientIdRoute
   AppClientsNewRoute: typeof AppClientsNewRoute
   AppDepartmentsDepartmentIdRoute: typeof AppDepartmentsDepartmentIdRoute
+  AppNotificationsSettingsRoute: typeof AppNotificationsSettingsRoute
   AppProjectsProjectIdRoute: typeof AppProjectsProjectIdRoute
   AppProjectsNewRoute: typeof AppProjectsNewRoute
   AppRetainersRetainerIdRoute: typeof AppRetainersRetainerIdRoute
@@ -647,6 +687,7 @@ interface AppRouteChildren {
   AppTemplatesNewRoute: typeof AppTemplatesNewRoute
   AppClientsIndexRoute: typeof AppClientsIndexRoute
   AppDepartmentsIndexRoute: typeof AppDepartmentsIndexRoute
+  AppNotificationsIndexRoute: typeof AppNotificationsIndexRoute
   AppProjectsIndexRoute: typeof AppProjectsIndexRoute
   AppRetainersIndexRoute: typeof AppRetainersIndexRoute
   AppTasksIndexRoute: typeof AppTasksIndexRoute
@@ -662,6 +703,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppClientsClientIdRoute: AppClientsClientIdRoute,
   AppClientsNewRoute: AppClientsNewRoute,
   AppDepartmentsDepartmentIdRoute: AppDepartmentsDepartmentIdRoute,
+  AppNotificationsSettingsRoute: AppNotificationsSettingsRoute,
   AppProjectsProjectIdRoute: AppProjectsProjectIdRoute,
   AppProjectsNewRoute: AppProjectsNewRoute,
   AppRetainersRetainerIdRoute: AppRetainersRetainerIdRoute,
@@ -677,6 +719,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppTemplatesNewRoute: AppTemplatesNewRoute,
   AppClientsIndexRoute: AppClientsIndexRoute,
   AppDepartmentsIndexRoute: AppDepartmentsIndexRoute,
+  AppNotificationsIndexRoute: AppNotificationsIndexRoute,
   AppProjectsIndexRoute: AppProjectsIndexRoute,
   AppRetainersIndexRoute: AppRetainersIndexRoute,
   AppTasksIndexRoute: AppTasksIndexRoute,
