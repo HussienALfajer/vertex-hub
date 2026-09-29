@@ -210,7 +210,6 @@ function AccountCard({
         href={account.url}
         target="_blank"
         rel="noreferrer"
-        aria-label={t('clients.platforms.open', { name })}
         className="group flex items-center gap-2 rounded-md bg-muted px-3 py-2 text-sm transition-colors duration-150 ease-out hover:bg-secondary-hover"
       >
         <span dir="ltr" className="min-w-0 flex-1 truncate text-end group-hover:underline">

@@ -38,7 +38,7 @@ import { LoadError } from '../../components/load-error';
 import { canAll, useMe } from '../../lib/auth';
 import { formatNumber } from '../../lib/format';
 import { ClientStatusBadge, HealthcareBadge, NoApprovalContactBadge } from './client-badges';
-import { accountManagersQuery, clientListQuery, sectorsQuery } from './clients.queries';
+import { clientListQuery, sectorsQuery } from './clients.queries';
 
 export interface ClientsSearch {
   search?: string;
@@ -178,7 +178,9 @@ function Filters({
 }) {
   const { t } = useTranslation();
   const me = useMe();
-  const managers = useQuery(accountManagersQuery);
+  // The users list filters by role for user managers only, so the choices come from the clients
+  // every reader can list: the account managers they actually have.
+  const everyClient = useQuery(clientListQuery({ status: [...CLIENT_STATUSES], pageSize: 100 }));
   const sectors = useQuery(sectorsQuery);
   const [text, setText] = useState(search.search ?? '');
   const isAccountManager = me.roles.includes('account_manager');
@@ -197,7 +199,16 @@ function Filters({
 
   const managerItems = [
     { value: ALL, label: t('clients.filters.allManagers') },
-    ...(managers.data?.items ?? []).map((user) => ({ value: user.id, label: user.name })),
+    ...[
+      ...new Map(
+        (everyClient.data?.items ?? []).map(({ accountManager }) => [
+          accountManager.id,
+          accountManager.name,
+        ]),
+      ),
+    ]
+      .sort(([, a], [, b]) => a.localeCompare(b, 'ar'))
+      .map(([value, label]) => ({ value, label })),
   ];
   const sectorItems = [
     { value: ALL, label: t('clients.filters.allSectors') },

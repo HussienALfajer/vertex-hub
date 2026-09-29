@@ -612,6 +612,11 @@ export async function mockApi(page: Page, options: MockOptions): Promise<void> {
       const search = url.searchParams.get('search')?.toLowerCase();
       const departmentId = url.searchParams.get('departmentId');
       const role = url.searchParams.get('role');
+      // Like the API: status and assigned-role filters are for user managers only.
+      const userManager = me.permissions.some((g) => g.permission === 'users.manage');
+      if ((status !== 'active' || (role && role !== 'department_manager')) && !userManager) {
+        return fail(route, 403, 'FORBIDDEN');
+      }
       const items = users.filter(
         (u) =>
           u.status === status &&

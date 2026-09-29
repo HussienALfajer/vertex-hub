@@ -433,7 +433,11 @@ function NoteForm({
         await update.mutateAsync({ noteId: note.id, ...values });
         toast.add({ title: t('clients.notes.saved'), type: 'success' });
       } else {
-        await create.mutateAsync(values);
+        // An untouched time means "now": the API stamps the note when it is added.
+        await create.mutateAsync({
+          ...values,
+          occurredAt: form.formState.dirtyFields.occurredAt ? values.occurredAt : undefined,
+        });
         toast.add({ title: t('clients.notes.added'), type: 'success' });
         form.reset(freshNote());
       }

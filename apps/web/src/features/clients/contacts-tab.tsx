@@ -245,7 +245,6 @@ function ContactCard({
               <a
                 dir="ltr"
                 href={`mailto:${contact.email}`}
-                aria-label={t('clients.contacts.email', { name })}
                 className="min-w-0 flex-1 truncate text-end hover:underline"
               >
                 {contact.email}

@@ -335,7 +335,7 @@ function StatusMenu({ client }: { client: ClientDetailResponse }) {
           <Button
             variant="outline"
             disabled={update.isPending}
-            aria-label={t('clients.profile.changeStatus')}
+            title={t('clients.profile.changeStatus')}
           />
         }
       >

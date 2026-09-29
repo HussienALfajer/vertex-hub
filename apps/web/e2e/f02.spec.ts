@@ -13,7 +13,7 @@ test('create a client, then add a contact with final approval', async ({ page })
   await page.getByLabel(ar.clients.form.sector).fill('مخابز');
   await page.getByRole('combobox', { name: ar.clients.form.accountManager }).click();
   await page.getByRole('option', { name: 'ليان الأحمد' }).click();
-  await page.getByRole('switch').click();
+  await page.getByRole('switch', { name: ar.clients.form.healthcare }).click();
   await page.getByRole('button', { name: ar.clients.form.create }).click();
 
   // The profile opens, warning that nobody can approve work yet (rule 9).
@@ -25,7 +25,7 @@ test('create a client, then add a contact with final approval', async ({ page })
   const dialog = page.getByRole('dialog');
   await dialog.getByLabel(ar.clients.contacts.form.name).fill('منى يوسف');
   await dialog.getByLabel(ar.clients.contacts.form.phone).fill('+963 944 777 888');
-  await dialog.getByRole('switch').click();
+  await dialog.getByRole('switch', { name: ar.clients.contacts.form.finalApproval }).click();
   await dialog.getByRole('button', { name: ar.common.save }).click();
 
   await expect(page.getByRole('heading', { name: 'منى يوسف' })).toBeVisible();
@@ -43,9 +43,7 @@ test('an employee reads the profile and logs a note, with no edit actions', asyn
 
   await page.getByRole('tab', { name: ar.clients.profile.tabs.communication }).click();
   await expect(page).toHaveURL(/tab=communication/);
-  await page
-    .getByPlaceholder(ar.clients.notes.summaryPlaceholder)
-    .fill('اتصلت هالة لتأكيد موعد التصوير.');
+  await page.getByLabel(ar.clients.notes.summary).fill('اتصلت هالة لتأكيد موعد التصوير.');
   await page.getByRole('button', { name: ar.clients.notes.channels.whatsapp }).click();
   await page.getByRole('button', { name: ar.clients.notes.add }).click();
 
@@ -61,11 +59,14 @@ test('an account manager edits their own client but creates none', async ({ page
   await mockApi(page, { signedIn: true, me: accountManagerMe });
   await page.goto('/clients');
   await expect(page.getByRole('link', { name: ar.clients.newClient })).toHaveCount(0);
+  await page.getByRole('combobox', { name: ar.clients.filters.accountManager }).click();
+  await expect(page.getByRole('option', { name: 'سارة الخطيب' })).toBeVisible();
+  await page.keyboard.press('Escape');
   await page.getByRole('button', { name: ar.clients.filters.mine }).click();
   await expect(page.getByRole('link', { name: /عيادة الشفاء/ })).toHaveCount(0);
   await page.getByRole('link', { name: /مطعم الياسمين/ }).click();
 
-  await page.getByRole('button', { name: ar.clients.profile.changeStatus }).click();
+  await page.getByRole('button', { name: /^الحالة:/ }).click();
   await page.getByRole('menuitem', { name: ar.clients.statuses.paused }).click();
   await expect(page.getByText(ar.clients.profile.statusChanged)).toBeVisible();
   await expect(page.getByRole('heading', { level: 1 }).locator('..')).toContainText(
