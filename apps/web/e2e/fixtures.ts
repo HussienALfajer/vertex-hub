@@ -45,8 +45,12 @@ import {
   type MilestoneStatus,
   type MyTaskSummary,
   mentionedUserIds,
+  NOTIFICATION_CATALOG,
+  NOTIFICATION_TYPES,
   type Note,
   type NoteChannel,
+  type Notification,
+  type NotificationType,
   OPEN_TASK_STATUSES,
   type PlatformAccount,
   type Project,
@@ -629,6 +633,10 @@ interface MockOptions {
   me?: MeResponse;
   /** Sign-in answers with the two-factor step. */
   twoFactorOnSignIn?: boolean;
+  /** Notifications for the signed-in user that arrive over the stream once the page opens. */
+  streamed?: Notification[];
+  /** Replaces the seeded notifications (`[]` for an empty bell). */
+  notifications?: NotificationRecord[];
 }
 
 const json = (route: Route, body: unknown, status = 200) => route.fulfill({ status, json: body });
@@ -663,6 +671,11 @@ export async function mockApi(page: Page, options: MockOptions): Promise<MockedA
   const tasksApi = taskRoutes({ users, clients, projects, retainers, tasks, me: () => me });
   const templates = templatesSeed();
   const templatesApi = templateRoutes({ users, clients, retainers, templates, me: () => me });
+  const notificationsApi = notificationRoutes({
+    notifications: options.notifications ?? notificationsSeed(),
+    streamed: options.streamed ?? [],
+    me: () => me,
+  });
   const templateRunsApi = templateRunRoutes({
     users,
     clients,
@@ -900,6 +913,10 @@ export async function mockApi(page: Page, options: MockOptions): Promise<MockedA
     // Work templates (F07).
     const templated = templatesApi(route, method, url, request);
     if (templated) return templated;
+
+    // Notifications (F14).
+    const notified = notificationsApi(route, method, url);
+    if (notified) return notified;
 
     if (path === '/api/audit') {
       return json(route, { items: auditSeed, total: auditSeed.length, page: 1, pageSize: 30 });
@@ -3970,6 +3987,209 @@ function templateRunRoutes({
       const result = generateMissing(retainer, cycleId, lineId);
       if ('error' in result) return fail(route, result.error[0], result.error[1]);
       return json(route, result, 201);
+    }
+    return undefined;
+  };
+}
+export type NotificationRecord = Notification & { recipientId: string };
+
+const autumnMenuSnapshot = {
+  title: 'تصاميم منيو الخريف',
+  department: 'design',
+  client: 'مطعم الياسمين',
+  project: 'الهوية البصرية الجديدة',
+} as const;
+
+/** A notification for a test user, typed by the contract. */
+export function notificationFor(
+  recipient: MeResponse,
+  n: number,
+  notification: Omit<Notification, 'id' | 'count' | 'read' | 'createdAt' | 'updatedAt'> &
+    Partial<Pick<Notification, 'count' | 'read' | 'updatedAt'>>,
+): NotificationRecord {
+  const at = notification.updatedAt ?? '2026-09-30T08:00:00.000Z';
+  return {
+    count: 1,
+    read: false,
+    ...notification,
+    id: id(n),
+    createdAt: at,
+    updatedAt: at,
+    recipientId: recipient.user.id,
+  } as NotificationRecord;
+}
+
+/** Sara's and Karim's notifications. */
+export function notificationsSeed(): NotificationRecord[] {
+  const layan = { id: id(3), name: 'ليان الأحمد' };
+  return [
+    notificationFor(manager, 5001, {
+      type: 'task_review_requested',
+      actor: layan,
+      subject: { type: 'task', id: id(1001) },
+      data: { task: autumnMenuSnapshot },
+      updatedAt: '2026-09-30T09:40:00.000Z',
+    }),
+    notificationFor(manager, 5002, {
+      type: 'task_commented',
+      actor: layan,
+      subject: { type: 'task', id: id(1001) },
+      data: { task: autumnMenuSnapshot, excerpt: 'أرفقت المسودة الثانية.' },
+      count: 2,
+      updatedAt: '2026-09-30T09:10:00.000Z',
+    }),
+    notificationFor(manager, 5003, {
+      type: 'task_overdue',
+      actor: null,
+      subject: { type: 'task', id: id(1003) },
+      data: {
+        task: {
+          title: 'بوستات أسبوع الافتتاح',
+          department: 'content_management',
+          client: 'مطعم الياسمين',
+          project: null,
+        },
+        dueDate: '2026-09-28',
+        dueTime: null,
+      },
+      updatedAt: '2026-09-30T06:00:00.000Z',
+    }),
+    notificationFor(manager, 5004, {
+      type: 'tasks_generated',
+      actor: layan,
+      subject: { type: 'template_run', id: id(5100) },
+      data: {
+        template: 'إطلاق موقع',
+        count: 4,
+        department: 'design',
+        unassigned: true,
+        client: 'عيادة الشفاء',
+        project: 'موقع العيادة',
+        retainer: null,
+      },
+      read: true,
+      updatedAt: '2026-09-29T11:00:00.000Z',
+    }),
+    notificationFor(manager, 5005, {
+      type: 'retainer_renewal_due',
+      actor: null,
+      subject: { type: 'retainer', id: id(901) },
+      data: {
+        retainer: 'إدارة السوشيال ميديا',
+        client: 'مطعم الياسمين',
+        renewalDate: '2026-10-12',
+        daysLeft: 12,
+      },
+      read: true,
+      updatedAt: '2026-09-28T06:00:00.000Z',
+    }),
+    notificationFor(manager, 5006, {
+      type: 'client_account_manager_assigned',
+      actor: { id: id(2), name: 'عمر حداد' },
+      subject: { type: 'client', id: id(602) },
+      data: { client: 'عيادة الشفاء' },
+      read: true,
+      updatedAt: '2026-09-20T10:00:00.000Z',
+    }),
+    notificationFor(employeeMe, 5010, {
+      type: 'task_assigned',
+      actor: { id: id(1), name: 'سارة الخطيب' },
+      subject: { type: 'task', id: id(1002) },
+      data: {
+        task: {
+          title: 'تصوير أطباق الموسم',
+          department: 'photography',
+          client: 'مطعم الياسمين',
+          project: null,
+        },
+      },
+      updatedAt: '2026-09-30T09:00:00.000Z',
+    }),
+  ];
+}
+
+/** The notifications API (F14) over the in-memory rows: each user reads only their own. */
+function notificationRoutes({
+  notifications,
+  streamed,
+  me,
+}: {
+  notifications: NotificationRecord[];
+  streamed: Notification[];
+  me: () => MeResponse;
+}) {
+  const muted = new Map<string, Set<NotificationType>>();
+  const mine = () => notifications.filter((n) => n.recipientId === me().user.id);
+  const unreadCount = () => mine().filter((n) => !n.read).length;
+  const strip = ({ recipientId: _, ...rest }: NotificationRecord) => rest as Notification;
+  const settings = () => {
+    const off = muted.get(me().user.id) ?? new Set();
+    return {
+      types: NOTIFICATION_TYPES.map((type) => ({
+        type,
+        category: NOTIFICATION_CATALOG[type].category,
+        mutable: NOTIFICATION_CATALOG[type].mutable,
+        muted: off.has(type),
+      })),
+    };
+  };
+
+  return (route: Route, method: string, url: URL) => {
+    const path = url.pathname;
+    if (path === '/api/me/notifications' && method === 'GET') {
+      const page = Number(url.searchParams.get('page') ?? 1);
+      const pageSize = Number(url.searchParams.get('pageSize') ?? 20);
+      const unread = url.searchParams.get('unread') === 'true';
+      const category = url.searchParams.get('category');
+      const items = mine()
+        .filter(
+          (n) =>
+            (!unread || !n.read) &&
+            (!category || NOTIFICATION_CATALOG[n.type].category === category),
+        )
+        .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+      return json(route, {
+        items: items.slice((page - 1) * pageSize, page * pageSize).map(strip),
+        total: items.length,
+        page,
+        pageSize,
+      });
+    }
+    if (path === '/api/me/notifications/unread-count') {
+      return json(route, { count: unreadCount() });
+    }
+    if (path === '/api/me/notifications/stream') {
+      // `retry` keeps EventSource from reconnecting during the test once the body ends.
+      let body = 'retry: 3600000\n\n';
+      for (const notification of streamed.splice(0)) {
+        notifications.push({ ...notification, recipientId: me().user.id });
+        const event = { notification, unreadCount: unreadCount() };
+        body += `event: notification\ndata: ${JSON.stringify(event)}\n\n`;
+      }
+      return route.fulfill({ status: 200, contentType: 'text/event-stream', body });
+    }
+    if (path === '/api/me/notifications/read-all' && method === 'POST') {
+      const unread = mine().filter((n) => !n.read);
+      for (const n of unread) n.read = true;
+      return json(route, { updated: unread.length });
+    }
+    const match = path.match(/^\/api\/me\/notifications\/([^/]+)\/(read|unread)$/);
+    if (match && method === 'POST') {
+      const item = mine().find((n) => n.id === match[1]);
+      if (!item) return fail(route, 404, 'NOT_FOUND');
+      item.read = match[2] === 'read';
+      return route.fulfill({ status: 204 });
+    }
+    if (path === '/api/me/notification-settings' && method === 'GET') {
+      return json(route, settings());
+    }
+    if (path === '/api/me/notification-settings' && method === 'PUT') {
+      const { mutedTypes } = route.request().postDataJSON() as { mutedTypes: NotificationType[] };
+      if (mutedTypes.some((type) => !NOTIFICATION_CATALOG[type].mutable)) {
+        return fail(route, 400, 'NOT_MUTABLE');
+      }
+      muted.set(me().user.id, new Set(mutedTypes));
+      return json(route, settings());
     }
     return undefined;
   };

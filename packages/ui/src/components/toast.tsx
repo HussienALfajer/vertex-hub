@@ -13,7 +13,8 @@ import { Button } from './button';
 
 /**
  * Global toast manager: `toast.add({ title, description, type })` from anywhere, where `type` is
- * `success`, `error`, `warning`, `info` or `loading`.
+ * `success`, `error`, `warning`, `info` or `loading`. `actionProps: { children, onClick }` adds a
+ * button under the text (a notification's "Open").
  */
 const toast = ToastPrimitive.createToastManager();
 
@@ -44,6 +45,11 @@ function ToastList({ closeLabel }: { closeLabel: string }) {
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <ToastPrimitive.Title className="text-base font-medium" />
         <ToastPrimitive.Description className="text-sm text-muted-foreground" />
+        {item.actionProps && (
+          <ToastPrimitive.Action
+            render={<Button variant="outline" size="sm" className="mt-1 self-start" />}
+          />
+        )}
       </div>
       <ToastPrimitive.Close
         aria-label={closeLabel}

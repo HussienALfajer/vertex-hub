@@ -33,6 +33,25 @@ export function formatTime(value: Date | string): string {
   }).format(new Date(value));
 }
 
+const RELATIVE_STEPS: [Intl.RelativeTimeFormatUnit, number][] = [
+  ['minute', 60],
+  ['hour', 60 * 60],
+  ['day', 24 * 60 * 60],
+];
+
+/**
+ * How long ago an instant was, e.g. "الآن", "قبل 5 دقائق", "أمس"; after a week, the date and
+ * time instead.
+ */
+export function formatRelativeTime(value: Date | string, now: Date = new Date()): string {
+  const seconds = Math.max(0, (now.getTime() - new Date(value).getTime()) / 1000);
+  if (seconds >= 7 * 24 * 60 * 60) return formatDateTime(value);
+  const format = new Intl.RelativeTimeFormat(APP_LOCALE, { numeric: 'auto' });
+  if (seconds < 60) return format.format(0, 'second');
+  const [unit, size] = RELATIVE_STEPS.findLast(([, step]) => seconds >= step) ?? ['minute', 60];
+  return format.format(-Math.floor(seconds / size), unit);
+}
+
 /** A time of day stored without a date (`HH:MM`, already business-timezone time), e.g. "4:00 م". */
 export function formatTimeOfDay(time: string): string {
   return new Intl.DateTimeFormat(APP_LOCALE, { timeStyle: 'short', timeZone: 'UTC' }).format(

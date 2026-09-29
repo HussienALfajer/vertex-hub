@@ -208,7 +208,12 @@
     "clientStore": "متجر النخبة",
     "meters": "المقاييس",
     "meterSteps": "{{value}} من {{max}} خطوات",
-    "meterTime": "الوقت المنقضي"
+    "meterTime": "الوقت المنقضي",
+    "openPopover": "آخر النشاط",
+    "popoverTitle": "آخر النشاط",
+    "popoverBody": "لوحة صغيرة مرتبطة بزرها، لمحتوى أغنى من قائمة.",
+    "showActionToast": "إشعار مع إجراء",
+    "toastAction": "افتح"
   },
   "errors": {
     "generic": "تعذّر إتمام الطلب. حاول مجددًا.",
@@ -2597,5 +2602,136 @@
       "monthly": "القالب الشهري",
       "monthlyHint": "يولّد مهام كل شهر من الأشهر القادمة. مهام الشهر الأول تولّدها من صفحة العقد."
     }
+  },
+  "notifications": {
+    "title": "الإشعارات",
+    "subtitle": "ما يخصك من مهام ومراجعات وتذكيرات.",
+    "bell": "الإشعارات",
+    "bellUnread": "الإشعارات، {{count}} غير مقروءة",
+    "markAllRead": "علّم الكل كمقروء",
+    "viewAll": "اعرض الكل",
+    "settingsLink": "إعدادات الإشعارات",
+    "emptyTitle": "لا إشعارات بعد",
+    "emptyHint": "ستصلك هنا المهام التي تخصك والمراجعات والتذكيرات.",
+    "emptyUnread": "لا إشعارات غير مقروءة",
+    "emptyCategory": "لا إشعارات في هذا التصنيف",
+    "emptyFilterHint": "غيّر عوامل التصفية لعرض إشعارات أخرى.",
+    "loadError": "تعذّر تحميل الإشعارات.",
+    "unread": "غير مقروء",
+    "markRead": "علّم كمقروء",
+    "markUnread": "علّم كغير مقروء",
+    "open": "افتح",
+    "system": "النظام",
+    "actions": "إجراءات الإشعار",
+    "newMany_zero": "لا إشعارات جديدة",
+    "newMany_one": "إشعار جديد",
+    "newMany_two": "إشعاران جديدان",
+    "newMany_few": "{{n}} إشعارات جديدة",
+    "newMany_many": "{{n}} إشعارًا جديدًا",
+    "newMany_other": "{{n}} إشعار جديد",
+    "readFilter": "الحالة",
+    "readFilters": {
+      "all": "الكل",
+      "unread": "غير المقروءة"
+    },
+    "category": "التصنيف",
+    "allCategories": "كل التصنيفات",
+    "categories": {
+      "tasks": "المهام",
+      "reminders": "التذكيرات",
+      "clients_projects": "العملاء والمشاريع"
+    },
+    "settings": {
+      "title": "إعدادات الإشعارات",
+      "subtitle": "اختر ما يصلك. ما يتطلب إجراءً منك يصلك دائمًا.",
+      "back": "الإشعارات",
+      "locked": "مفعّل دائمًا: يتطلب إجراءً",
+      "saved": "حُفظت إعدادات الإشعارات",
+      "loadError": "تعذّر تحميل إعدادات الإشعارات."
+    },
+    "types": {
+      "task_assigned": "مهمة أُسندت إليّ",
+      "task_mentioned": "إشارة إليّ في تعليق",
+      "task_returned": "مهمة أُعيدت إليّ للتعديل",
+      "task_review_requested": "طلب مراجعة داخلية",
+      "task_awaiting_client": "مهمة جاهزة للإرسال إلى العميل",
+      "task_over_limit": "تعديل من العميل يتجاوز الحد",
+      "task_changed": "تغيير على مهمتي: الموعد أو الإلغاء أو الإسناد",
+      "task_commented": "تعليق على مهمتي",
+      "task_requested": "طلب عمل من قسمي",
+      "tasks_generated": "مهام من قالب عمل",
+      "task_approved": "اعتماد مهمتي",
+      "task_opened": "مهمة أصبحت جاهزة للبدء",
+      "request_finished": "انتهاء عمل طلبته",
+      "task_due_soon": "مهمة مستحقة في يوم العمل التالي",
+      "task_overdue": "مهمة متأخرة",
+      "task_overdue_escalated": "تصعيد مهمة متأخرة",
+      "client_account_manager_assigned": "تعييني مدير حساب عميل",
+      "project_manager_assigned": "تعييني مدير مشروع",
+      "retainer_renewal_due": "موعد تجديد عقد شهري"
+    },
+    "text": {
+      "task_assigned": "{{actor}} أسند إليك «{{task}}»",
+      "task_mentioned": "{{actor}} أشار إليك في تعليق على «{{task}}»",
+      "task_returned": {
+        "internal": "{{actor}} أعاد «{{task}}» إليك للتعديل",
+        "client": "العميل طلب تعديلات على «{{task}}»"
+      },
+      "task_review_requested": "{{actor}} أرسل «{{task}}» للمراجعة الداخلية",
+      "task_awaiting_client": "«{{task}}» جاهزة للإرسال إلى العميل",
+      "task_over_limit": "تعديل العميل على «{{task}}» تجاوز حد التعديلات",
+      "task_changed": {
+        "due": "{{actor}} غيّر موعد «{{task}}» إلى {{due}}",
+        "dueCleared": "{{actor}} أزال موعد «{{task}}»",
+        "cancelled": "{{actor}} ألغى «{{task}}»",
+        "archived": "{{actor}} أرشف «{{task}}»",
+        "taken_away": "لم تعد «{{task}}» مسندة إليك"
+      },
+      "task_commented": "{{actor}} علّق على «{{task}}»",
+      "task_commented_merged_zero": "تعليقات جديدة على «{{task}}»",
+      "task_commented_merged_one": "تعليق جديد على «{{task}}»",
+      "task_commented_merged_two": "تعليقان جديدان على «{{task}}»",
+      "task_commented_merged_few": "{{n}} تعليقات جديدة على «{{task}}»",
+      "task_commented_merged_many": "{{n}} تعليقًا جديدًا على «{{task}}»",
+      "task_commented_merged_other": "{{n}} تعليق جديد على «{{task}}»",
+      "task_requested": "{{actor}} طلب من قسمك «{{task}}»",
+      "tasks_generated_assigned_zero": "لا مهام من قالب «{{template}}»",
+      "tasks_generated_assigned_one": "أُسندت إليك مهمة من قالب «{{template}}»",
+      "tasks_generated_assigned_two": "أُسندت إليك مهمتان من قالب «{{template}}»",
+      "tasks_generated_assigned_few": "أُسندت إليك {{n}} مهام من قالب «{{template}}»",
+      "tasks_generated_assigned_many": "أُسندت إليك {{n}} مهمة من قالب «{{template}}»",
+      "tasks_generated_assigned_other": "أُسندت إليك {{n}} مهمة من قالب «{{template}}»",
+      "tasks_generated_queued_zero": "لا مهام من قالب «{{template}}» تنتظر الإسناد في {{department}}",
+      "tasks_generated_queued_one": "مهمة من قالب «{{template}}» تنتظر الإسناد في {{department}}",
+      "tasks_generated_queued_two": "مهمتان من قالب «{{template}}» تنتظران الإسناد في {{department}}",
+      "tasks_generated_queued_few": "{{n}} مهام من قالب «{{template}}» تنتظر الإسناد في {{department}}",
+      "tasks_generated_queued_many": "{{n}} مهمة من قالب «{{template}}» تنتظر الإسناد في {{department}}",
+      "tasks_generated_queued_other": "{{n}} مهمة من قالب «{{template}}» تنتظر الإسناد في {{department}}",
+      "task_approved": {
+        "internal": "{{actor}} اعتمد «{{task}}»",
+        "client": "العميل اعتمد «{{task}}»"
+      },
+      "task_opened": "«{{task}}» جاهزة للبدء: انتهت المهام التي تسبقها",
+      "request_finished": {
+        "delivered": "سُلّمت «{{task}}» التي طلبتها",
+        "cancelled": "أُلغيت «{{task}}» التي طلبتها"
+      },
+      "task_due_soon": "«{{task}}» مستحقة في {{due}}",
+      "task_overdue": "«{{task}}» تجاوزت موعدها في {{due}}",
+      "task_overdue_escalated": {
+        "assigned": "«{{task}}» لدى {{assignee}} ما زالت متأخرة منذ {{due}}",
+        "unassigned": "«{{task}}» ما زالت متأخرة منذ {{due}}"
+      },
+      "client_account_manager_assigned": "{{actor}} جعلك مدير حساب {{client}}",
+      "project_manager_assigned": "{{actor}} جعلك مدير مشروع «{{project}}»",
+      "retainer_renewal_due_zero": "حلّ موعد تجديد عقد «{{retainer}}»",
+      "retainer_renewal_due_one": "يتجدد عقد «{{retainer}}» غدًا",
+      "retainer_renewal_due_two": "يتجدد عقد «{{retainer}}» بعد يومين",
+      "retainer_renewal_due_few": "يتجدد عقد «{{retainer}}» بعد {{n}} أيام",
+      "retainer_renewal_due_many": "يتجدد عقد «{{retainer}}» بعد {{n}} يومًا",
+      "retainer_renewal_due_other": "يتجدد عقد «{{retainer}}» بعد {{n}} يوم",
+      "retainer_renewal_reached": "حلّ موعد تجديد عقد «{{retainer}}»"
+    },
+    "dueAt": "{{date}}، {{time}}"
   }
 }
