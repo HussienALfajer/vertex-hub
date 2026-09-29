@@ -78,6 +78,8 @@ describe('retainer cycles', () => {
       projects: async () => new Map(),
       milestones: async () => new Map(),
       cycleLines: async (ids) => pick(ids),
+      openTasks: async () => [],
+      cancelOpenTasks: async () => {},
     });
   });
 

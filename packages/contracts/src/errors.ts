@@ -50,6 +50,21 @@ export const ERROR_CODES = [
   'CYCLE_CLOSED',
   'NEGATIVE_DELIVERED',
   'BILLING_NOTE_REQUIRED',
+  'ASSIGNEE_REQUIRED',
+  'INVALID_ASSIGNEE',
+  'TASK_BLOCKED',
+  'INVALID_DEPENDENCY',
+  'DEPENDENCY_CYCLE',
+  'INVALID_LINK',
+  'NO_ENGAGEMENT',
+  'EXTRA_WORK_BILLED',
+  'NOT_OVER_LIMIT',
+  'ALREADY_DECIDED',
+  'INVALID_MENTION',
+  'NOT_COMMENT_AUTHOR',
+  'TASK_ARCHIVED',
+  'TASK_NOT_ARCHIVED',
+  'TASKS_OPEN',
 ] as const;
 
 export const errorCodeSchema = z.enum(ERROR_CODES).meta({ id: 'ErrorCode' });
@@ -73,12 +88,17 @@ export const errorResponseSchema = z
 export type ErrorResponse = z.infer<typeof errorResponseSchema>;
 
 /**
- * Something a user is responsible for, which blocks archiving them (F01 rule 9, F05 rule 4) or
+ * Something a user is responsible for, which blocks archiving them (F01 rule 9, F05 rule 4, F06) or
  * removing their Account Manager role (F02 rule 8).
  */
 export const responsibilitySchema = z
   .object({
-    type: z.enum(['manages_department', 'account_manager_of_client', 'project_manager_of_project']),
+    type: z.enum([
+      'manages_department',
+      'account_manager_of_client',
+      'project_manager_of_project',
+      'assignee_of_open_tasks',
+    ]),
     id: z.uuid(),
     name: z.string(),
   })

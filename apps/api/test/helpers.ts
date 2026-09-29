@@ -19,6 +19,11 @@ import {
   retainerCycles,
   retainerDeliverables,
   retainers,
+  taskChecklistItems,
+  taskDependencies,
+  taskLinks,
+  taskRevisions,
+  tasks,
   userRoles,
   users,
 } from '@vertex-hub/db';
@@ -109,6 +114,15 @@ export async function seedUser(db: Database, input: SeedUser = {}): Promise<Seed
 /** Removes seeded users with everything that points at them (test cleanup only). */
 export async function removeUsers(db: Database, ids: string[]): Promise<void> {
   if (ids.length === 0) return;
+  await removeTasks(
+    db,
+    (
+      await db
+        .select({ id: tasks.id })
+        .from(tasks)
+        .where(or(inArray(tasks.createdById, ids), inArray(tasks.assigneeId, ids)))
+    ).map((row) => row.id),
+  );
   await db
     .delete(auditEntries)
     .where(or(inArray(auditEntries.actorId, ids), inArray(auditEntries.entityId, ids)));
@@ -122,6 +136,12 @@ export async function removeUsers(db: Database, ids: string[]): Promise<void> {
  */
 export async function removeClients(db: Database, ids: string[]): Promise<void> {
   if (ids.length === 0) return;
+  await removeTasks(
+    db,
+    (await db.select({ id: tasks.id }).from(tasks).where(inArray(tasks.clientId, ids))).map(
+      (row) => row.id,
+    ),
+  );
   const clientProjects = await db
     .select({ id: projects.id })
     .from(projects)
@@ -157,6 +177,32 @@ export async function removeClients(db: Database, ids: string[]): Promise<void> 
   await db.delete(clientContacts).where(inArray(clientContacts.clientId, ids));
   await db.delete(clientPlatformAccounts).where(inArray(clientPlatformAccounts.clientId, ids));
   await db.delete(clients).where(inArray(clients.id, ids));
+}
+
+/**
+ * Removes seeded tasks with their dependencies (both ways), checklists, links, revisions and
+ * audit entries (test cleanup only).
+ */
+export async function removeTasks(db: Database, ids: string[]): Promise<void> {
+  if (ids.length === 0) return;
+  const children = [
+    ...(await db
+      .select({ id: taskChecklistItems.id })
+      .from(taskChecklistItems)
+      .where(inArray(taskChecklistItems.taskId, ids))),
+    ...(await db
+      .select({ id: taskLinks.id })
+      .from(taskLinks)
+      .where(inArray(taskLinks.taskId, ids))),
+  ].map((row) => row.id);
+  await db.delete(auditEntries).where(inArray(auditEntries.entityId, [...ids, ...children]));
+  await db
+    .delete(taskDependencies)
+    .where(or(inArray(taskDependencies.taskId, ids), inArray(taskDependencies.dependsOnId, ids)));
+  await db.delete(taskChecklistItems).where(inArray(taskChecklistItems.taskId, ids));
+  await db.delete(taskLinks).where(inArray(taskLinks.taskId, ids));
+  await db.delete(taskRevisions).where(inArray(taskRevisions.taskId, ids));
+  await db.delete(tasks).where(inArray(tasks.id, ids));
 }
 
 /** Removes seeded projects, their milestones and audit entries (test cleanup only). */

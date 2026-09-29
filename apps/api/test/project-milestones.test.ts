@@ -57,6 +57,8 @@ describe('project milestones', () => {
       projects: async (ids) => pick(ids),
       milestones: async (ids) => pick(ids),
       cycleLines: async (ids) => pick(ids),
+      openTasks: async () => [],
+      cancelOpenTasks: async () => {},
     });
   });
 

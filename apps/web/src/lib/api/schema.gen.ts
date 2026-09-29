@@ -932,6 +932,118 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["TasksController_list"];
+        put?: never;
+        post: operations["TasksController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tasks/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["TasksController_detail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["TasksController_update"];
+        trace?: never;
+    };
+    "/api/tasks/{id}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["TasksController_changeStatus"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tasks/{id}/dependencies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["TasksController_setDependencies"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tasks/{id}/revisions/{revisionId}/decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["TasksController_decideRevision"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tasks/{id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["TasksController_archive"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tasks/{id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["TasksController_restore"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -953,9 +1065,9 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         /** @enum {string} */
-        AuditEntityType: "user" | "department" | "client" | "client_contact" | "client_platform_account" | "client_note" | "project" | "project_milestone" | "retainer" | "retainer_cycle" | "extra_work";
+        AuditEntityType: "user" | "department" | "client" | "client_contact" | "client_platform_account" | "client_note" | "project" | "project_milestone" | "retainer" | "retainer_cycle" | "extra_work" | "task" | "task_checklist_item" | "task_link" | "task_comment";
         /** @enum {string} */
-        AuditAction: "user.created" | "user.updated" | "user.roles_changed" | "user.departments_changed" | "user.archived" | "user.restored" | "user.link_issued" | "user.password_set" | "user.password_changed" | "user.two_factor_enabled" | "user.two_factor_disabled" | "user.two_factor_reset" | "user.profile_updated" | "department.updated" | "client.created" | "client.updated" | "client.status_changed" | "client.account_manager_changed" | "client.healthcare_changed" | "client.archived" | "client.restored" | "client.brand_kit_updated" | "client_contact.created" | "client_contact.updated" | "client_contact.archived" | "client_platform_account.created" | "client_platform_account.updated" | "client_platform_account.archived" | "client_note.created" | "client_note.updated" | "client_note.archived" | "project.created" | "project.updated" | "project.project_manager_changed" | "project.status_changed" | "project.money_updated" | "project.archived" | "project.restored" | "project_milestone.created" | "project_milestone.updated" | "project_milestone.reordered" | "project_milestone.completed" | "project_milestone.reopened" | "project_milestone.archived" | "retainer.created" | "retainer.updated" | "retainer.status_changed" | "retainer.deliverables_updated" | "retainer.money_updated" | "retainer.archived" | "retainer.restored" | "retainer_cycle.created" | "retainer_cycle.closed" | "retainer_cycle.line_updated" | "retainer_cycle.line_added" | "retainer_cycle.adjusted" | "extra_work.created" | "extra_work.updated" | "extra_work.billing_changed" | "extra_work.archived";
+        AuditAction: "user.created" | "user.updated" | "user.roles_changed" | "user.departments_changed" | "user.archived" | "user.restored" | "user.link_issued" | "user.password_set" | "user.password_changed" | "user.two_factor_enabled" | "user.two_factor_disabled" | "user.two_factor_reset" | "user.profile_updated" | "department.updated" | "client.created" | "client.updated" | "client.status_changed" | "client.account_manager_changed" | "client.healthcare_changed" | "client.archived" | "client.restored" | "client.brand_kit_updated" | "client_contact.created" | "client_contact.updated" | "client_contact.archived" | "client_platform_account.created" | "client_platform_account.updated" | "client_platform_account.archived" | "client_note.created" | "client_note.updated" | "client_note.archived" | "project.created" | "project.updated" | "project.project_manager_changed" | "project.status_changed" | "project.money_updated" | "project.archived" | "project.restored" | "project_milestone.created" | "project_milestone.updated" | "project_milestone.reordered" | "project_milestone.completed" | "project_milestone.reopened" | "project_milestone.archived" | "retainer.created" | "retainer.updated" | "retainer.status_changed" | "retainer.deliverables_updated" | "retainer.money_updated" | "retainer.archived" | "retainer.restored" | "retainer_cycle.created" | "retainer_cycle.closed" | "retainer_cycle.line_updated" | "retainer_cycle.line_added" | "retainer_cycle.adjusted" | "extra_work.created" | "extra_work.updated" | "extra_work.billing_changed" | "extra_work.archived" | "task.created" | "task.updated" | "task.assigned" | "task.department_changed" | "task.status_changed" | "task.dependencies_updated" | "task.archived" | "task.restored" | "task.revision_decided" | "task.request_scope_changed" | "task_checklist_item.created" | "task_checklist_item.updated" | "task_checklist_item.reordered" | "task_checklist_item.archived" | "task_link.created" | "task_link.archived" | "task_comment.created" | "task_comment.updated" | "task_comment.archived";
         /** @description Audit entries, newest first */
         AuditPage: {
             items: components["schemas"]["AuditEntry"][];
@@ -1018,7 +1130,7 @@ export interface components {
             scopes: components["schemas"]["PermissionScope"][];
         };
         /** @enum {string} */
-        Permission: "users.read" | "users.manage" | "clients.read" | "clients.manage" | "clients.log" | "leads.read" | "leads.manage" | "catalog.read" | "catalog.manage" | "quotes.read" | "quotes.manage" | "quotes.approve_discount" | "projects.read" | "projects.manage" | "tasks.read" | "tasks.work" | "tasks.manage" | "templates.read" | "templates.manage" | "content.read" | "content.manage" | "approvals.review" | "approvals.review_medical" | "shoots.read" | "shoots.manage" | "campaigns.read" | "campaigns.manage" | "invoices.read" | "invoices.manage" | "payments.manage" | "reports.read" | "reports.finance" | "audit.read";
+        Permission: "users.read" | "users.manage" | "clients.read" | "clients.manage" | "clients.log" | "leads.read" | "leads.manage" | "catalog.read" | "catalog.manage" | "quotes.read" | "quotes.manage" | "quotes.approve_discount" | "projects.read" | "projects.manage" | "tasks.read" | "tasks.request" | "tasks.work" | "tasks.manage" | "templates.read" | "templates.manage" | "content.read" | "content.manage" | "approvals.review" | "approvals.review_medical" | "shoots.read" | "shoots.manage" | "campaigns.read" | "campaigns.manage" | "invoices.read" | "invoices.manage" | "payments.manage" | "reports.read" | "reports.finance" | "audit.read";
         /** @enum {string} */
         PermissionScope: "all" | "department" | "own_clients" | "assigned";
         UpdateOwnProfile: {
@@ -1845,6 +1957,387 @@ export interface components {
         ExtraWorkBillingChange: {
             billingStatus: components["schemas"]["ExtraWorkBilling"];
             billingNote?: string | null;
+        };
+        /** @enum {string} */
+        TaskStatus: "new" | "in_progress" | "internal_review" | "awaiting_client" | "revisions" | "approved" | "delivered" | "cancelled";
+        /** @enum {string} */
+        TaskType: "work" | "client_request";
+        /** @enum {string} */
+        TaskPriority: "low" | "normal" | "high" | "urgent";
+        TaskPage: {
+            items: components["schemas"]["Task"][];
+            total: number;
+            page: number;
+            pageSize: number;
+        };
+        Task: {
+            /** Format: uuid */
+            id: string;
+            title: string;
+            type: components["schemas"]["TaskType"];
+            department: components["schemas"]["DepartmentCode"];
+            assignee: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                archived: boolean;
+                inDepartment: boolean;
+            } | null;
+            status: components["schemas"]["TaskStatus"];
+            priority: components["schemas"]["TaskPriority"];
+            /** Format: date */
+            dueDate: string;
+            dueTime: string | null;
+            overdue: boolean;
+            blocked: boolean;
+            client: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            project: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            milestone: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            retainer: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            cycle: {
+                /** Format: uuid */
+                id: string;
+                /** Format: date */
+                periodStart: string;
+                /** Format: date */
+                periodEnd: string;
+            } | null;
+            cycleLine: {
+                /** Format: uuid */
+                id: string;
+                kind: components["schemas"]["DeliverableKind"];
+                label: string | null;
+            } | null;
+            checklist: {
+                done: number;
+                total: number;
+            };
+            revisions: {
+                clientCount: number;
+                limit: number;
+            };
+            overLimitPending: boolean;
+        };
+        TaskDetail: {
+            /** Format: uuid */
+            id: string;
+            title: string;
+            type: components["schemas"]["TaskType"];
+            department: components["schemas"]["DepartmentCode"];
+            assignee: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                archived: boolean;
+                inDepartment: boolean;
+            } | null;
+            status: components["schemas"]["TaskStatus"];
+            priority: components["schemas"]["TaskPriority"];
+            /** Format: date */
+            dueDate: string;
+            dueTime: string | null;
+            overdue: boolean;
+            blocked: boolean;
+            client: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            project: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            milestone: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            retainer: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            cycle: {
+                /** Format: uuid */
+                id: string;
+                /** Format: date */
+                periodStart: string;
+                /** Format: date */
+                periodEnd: string;
+            } | null;
+            cycleLine: {
+                /** Format: uuid */
+                id: string;
+                kind: components["schemas"]["DeliverableKind"];
+                label: string | null;
+            } | null;
+            checklist: {
+                done: number;
+                total: number;
+            };
+            revisions: {
+                clientCount: number;
+                limit: number;
+            };
+            overLimitPending: boolean;
+            brief: string | null;
+            needsClientApproval: boolean;
+            clientRequest: {
+                contact: {
+                    /** Format: uuid */
+                    id: string;
+                    name: string;
+                    archived: boolean;
+                } | null;
+                /** Format: date */
+                requestedOn: string;
+                scope: components["schemas"]["RequestScope"];
+                extraWork: {
+                    /** Format: uuid */
+                    id: string;
+                    title: string;
+                    billingStatus: components["schemas"]["ExtraWorkBilling"];
+                } | null;
+            } | null;
+            dependencies: components["schemas"]["TaskDependency"][];
+            dependents: components["schemas"]["TaskDependency"][];
+            checklistItems: components["schemas"]["TaskChecklistItem"][];
+            links: components["schemas"]["TaskLink"][];
+            revisionHistory: components["schemas"]["TaskRevision"][];
+            createdBy: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            };
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** Format: date-time */
+            startedAt: string | null;
+            /** Format: date-time */
+            deliveredAt: string | null;
+            /** Format: date-time */
+            cancelledAt: string | null;
+            cancelReason: string | null;
+            /** Format: date-time */
+            archivedAt: string | null;
+            readOnly: boolean;
+            permissions: components["schemas"]["TaskPermissions"];
+            allowedTransitions: components["schemas"]["TaskStatus"][];
+        };
+        /** @enum {string} */
+        RequestScope: "in_scope" | "out_of_scope";
+        TaskDependency: {
+            /** Format: uuid */
+            id: string;
+            title: string;
+            department: components["schemas"]["DepartmentCode"];
+            status: components["schemas"]["TaskStatus"];
+            finished: boolean;
+            archived: boolean;
+        };
+        TaskChecklistItem: {
+            /** Format: uuid */
+            id: string;
+            text: string;
+            position: number;
+            done: boolean;
+            /** Format: date-time */
+            doneAt: string | null;
+            doneBy: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+        };
+        TaskLink: {
+            /** Format: uuid */
+            id: string;
+            url: string;
+            label: string | null;
+            addedBy: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            };
+            /** Format: date-time */
+            createdAt: string;
+        };
+        TaskRevision: {
+            /** Format: uuid */
+            id: string;
+            source: components["schemas"]["RevisionSource"];
+            number: number | null;
+            note: string;
+            contact: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                archived: boolean;
+            } | null;
+            overLimit: boolean;
+            decision: components["schemas"]["RevisionDecision"] | null;
+            decisionNote: string | null;
+            extraWork: {
+                /** Format: uuid */
+                id: string;
+                title: string;
+            } | null;
+            decidedBy: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            /** Format: date-time */
+            decidedAt: string | null;
+            author: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            };
+            /** Format: date-time */
+            createdAt: string;
+        };
+        /** @enum {string} */
+        RevisionSource: "internal" | "client";
+        /** @enum {string} */
+        RevisionDecision: "free" | "extra_work";
+        /** @description What the caller may do, for the UI */
+        TaskPermissions: {
+            canEdit: boolean;
+            canAssign: boolean;
+            canWork: boolean;
+            canReview: boolean;
+            canRecordClientResponse: boolean;
+            canDecideRevision: boolean;
+            canCancel: boolean;
+            canReopen: boolean;
+            canArchive: boolean;
+        };
+        CreateTask: {
+            title: string;
+            brief?: string | null;
+            department: components["schemas"]["DepartmentCode"];
+            /**
+             * Format: uuid
+             * @default null
+             */
+            assigneeId: string | null;
+            /** @default normal */
+            priority: components["schemas"]["TaskPriority"];
+            /** Format: date */
+            dueDate: string;
+            dueTime?: string | null;
+            /**
+             * Format: uuid
+             * @default null
+             */
+            clientId: string | null;
+            /**
+             * Format: uuid
+             * @default null
+             */
+            projectId: string | null;
+            /**
+             * Format: uuid
+             * @default null
+             */
+            milestoneId: string | null;
+            /**
+             * Format: uuid
+             * @default null
+             */
+            retainerCycleId: string | null;
+            /**
+             * Format: uuid
+             * @default null
+             */
+            cycleLineId: string | null;
+            needsClientApproval?: boolean;
+            /** @default 2 */
+            revisionLimit: number;
+            /** Format: uuid */
+            requestedByContactId?: string | null;
+            /** Format: date */
+            requestedOn?: string;
+            requestScope?: components["schemas"]["RequestScope"];
+            /** @default work */
+            type: components["schemas"]["TaskType"];
+            dependsOn?: string[];
+            /** @default [] */
+            checklist: string[];
+            links?: components["schemas"]["CreateTaskLink"][];
+        };
+        CreateTaskLink: {
+            url: string;
+            label?: string | null;
+        };
+        UpdateTask: {
+            title?: string;
+            brief?: string | null;
+            department?: components["schemas"]["DepartmentCode"];
+            /** Format: uuid */
+            assigneeId?: string | null;
+            priority?: components["schemas"]["TaskPriority"];
+            /** Format: date */
+            dueDate?: string;
+            dueTime?: string | null;
+            /** Format: uuid */
+            clientId?: string | null;
+            /** Format: uuid */
+            projectId?: string | null;
+            /** Format: uuid */
+            milestoneId?: string | null;
+            /** Format: uuid */
+            retainerCycleId?: string | null;
+            /** Format: uuid */
+            cycleLineId?: string | null;
+            needsClientApproval?: boolean;
+            revisionLimit?: number;
+            /** Format: uuid */
+            requestedByContactId?: string | null;
+            /** Format: date */
+            requestedOn?: string;
+            requestScope?: components["schemas"]["RequestScope"];
+        };
+        TaskStatusChange: {
+            status: components["schemas"]["TaskStatus"];
+            note?: string | null;
+            revisionSource?: components["schemas"]["RevisionSource"];
+            /** Format: uuid */
+            contactId?: string | null;
+            /** @default false */
+            overrideDependencies: boolean;
+            reason?: string | null;
+        };
+        TaskDependenciesInput: {
+            dependsOn: string[];
+        };
+        /** @description The tasks this task waits on */
+        TaskDependencyList: {
+            items: components["schemas"]["TaskDependency"][];
+        };
+        RevisionDecisionInput: {
+            decision: components["schemas"]["RevisionDecision"];
+            note?: string | null;
         };
         /** @description Liveness of the API and its dependencies */
         HealthResponse: {
@@ -3603,6 +4096,246 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    TasksController_list: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+                search?: string;
+                status?: components["schemas"]["TaskStatus"] | components["schemas"]["TaskStatus"][];
+                department?: components["schemas"]["DepartmentCode"] | components["schemas"]["DepartmentCode"][];
+                assigneeId?: string | "me";
+                unassigned?: "true" | "false";
+                clientId?: string;
+                internal?: "true" | "false";
+                projectId?: string;
+                milestoneId?: string;
+                retainerId?: string;
+                cycleLineId?: string;
+                type?: components["schemas"]["TaskType"];
+                priority?: components["schemas"]["TaskPriority"] | components["schemas"]["TaskPriority"][];
+                overdue?: "true" | "false";
+                blocked?: "true" | "false";
+                overLimit?: "true" | "false";
+                dueFrom?: string;
+                dueTo?: string;
+                createdBy?: "me";
+                archived?: "true" | "false";
+                sort?: "dueDate" | "priority" | "createdAt" | "updatedAt";
+                order?: components["schemas"]["SortOrder"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tasks; open ones by due date by default */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskPage"];
+                };
+            };
+        };
+    };
+    TasksController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateTask"];
+            };
+        };
+        responses: {
+            /** @description The new task: unassigned or assigned to oneself for anyone; any assignee with assign scope; client requests with client scope */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskDetail"];
+                };
+            };
+        };
+    };
+    TasksController_detail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A task with its dependencies, checklist, links and revisions */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskDetail"];
+                };
+            };
+        };
+    };
+    TasksController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateTask"];
+            };
+        };
+        responses: {
+            /** @description The updated task (manage scope, or the creator of an unassigned new request); assignee and department need assign scope, the request scope client scope */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskDetail"];
+                };
+            };
+        };
+    };
+    TasksController_changeStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaskStatusChange"];
+            };
+        };
+        responses: {
+            /** @description The task after the move; each move has its roles (spec F06, rule 1) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskDetail"];
+                };
+            };
+        };
+    };
+    TasksController_setDependencies: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaskDependenciesInput"];
+            };
+        };
+        responses: {
+            /** @description The tasks this task waits on (manage scope) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskDependencyList"];
+                };
+            };
+        };
+    };
+    TasksController_decideRevision: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                revisionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RevisionDecisionInput"];
+            };
+        };
+        responses: {
+            /** @description The decided over-limit revision (client scope) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskRevision"];
+                };
+            };
+        };
+    };
+    TasksController_archive: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The archived task (scope all only) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskDetail"];
+                };
+            };
+        };
+    };
+    TasksController_restore: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The restored task (scope all only) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskDetail"];
+                };
             };
         };
     };

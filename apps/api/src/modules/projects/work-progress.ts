@@ -1,15 +1,26 @@
 import { Injectable } from '@nestjs/common';
 import type { TaskCounts } from '@vertex-hub/contracts';
+import type { Transaction } from '@vertex-hub/db';
+import type { AuditActor } from '../audit/index.js';
 
 /**
- * Task counts per project, milestone and retainer cycle line, reported by the module that owns tasks (F06). Maps
- * leave out ids without tasks.
+ * Task counts per project, milestone and retainer cycle line, reported by the module that owns
+ * tasks (F06), and the project close hooks. Maps leave out ids without tasks.
  */
 export interface WorkProgressSource {
   projects(ids: string[]): Promise<Map<string, TaskCounts>>;
   milestones(ids: string[]): Promise<Map<string, TaskCounts>>;
   /** `delivered` feeds the deliverables counter (R7). */
   cycleLines(ids: string[]): Promise<Map<string, TaskCounts>>;
+  /** The project's open, non-archived tasks, for the complete check (F06). */
+  openTasks(tx: Transaction, projectId: string): Promise<{ id: string; name: string }[]>;
+  /** Cancels the project's open tasks with the project's reason, each audited (F06). */
+  cancelOpenTasks(
+    tx: Transaction,
+    projectId: string,
+    reason: string,
+    actor: AuditActor,
+  ): Promise<void>;
 }
 
 export const NO_TASKS: TaskCounts = { total: 0, delivered: 0, open: 0 };
@@ -36,6 +47,19 @@ export class WorkProgress {
 
   async cycleLines(ids: string[]): Promise<Map<string, TaskCounts>> {
     return ids.length && this.source ? this.source.cycleLines(ids) : new Map();
+  }
+
+  async openTasks(tx: Transaction, projectId: string): Promise<{ id: string; name: string }[]> {
+    return this.source ? this.source.openTasks(tx, projectId) : [];
+  }
+
+  async cancelOpenTasks(
+    tx: Transaction,
+    projectId: string,
+    reason: string,
+    actor: AuditActor,
+  ): Promise<void> {
+    await this.source?.cancelOpenTasks(tx, projectId, reason, actor);
   }
 }
 

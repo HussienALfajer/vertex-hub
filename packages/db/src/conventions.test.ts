@@ -28,6 +28,8 @@ const NOT_BUSINESS_RECORDS: Record<string, string> = {
   retainer_cycles: 'A month of a retainer; never archived on its own, it goes with its retainer',
   retainer_cycle_lines: 'Part of its cycle; a line is never removed from a month (F05 R10)',
   retainer_cycle_adjustments: 'Append-only; corrected by a new adjustment (F05 R7)',
+  task_dependencies: 'Link table; a dependency is added or removed, never archived (F06)',
+  task_revisions: 'Append-only; never archived, an over-limit decision is set once (F06 rule 10)',
 };
 
 /** Tables keyed by a natural value instead of a UUIDv7 `id`. Every entry needs a reason. */

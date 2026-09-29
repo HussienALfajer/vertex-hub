@@ -454,6 +454,16 @@ export class ProjectsService implements OnModuleInit {
             open.map((milestone) => ({ id: milestone.id, name: milestone.name })),
           );
         }
+        // F06: a project with open tasks does not complete.
+        const openTasks = await this.progress.openTasks(tx, id);
+        if (openTasks.length > 0) {
+          throw new CodedException(
+            409,
+            'TASKS_OPEN',
+            'Every task must be delivered or cancelled before the project completes',
+            openTasks,
+          );
+        }
       }
 
       const now = new Date();
@@ -467,6 +477,10 @@ export class ProjectsService implements OnModuleInit {
           ...(managerChanges && manager && { projectManagerId: manager.id }),
         })
         .where(eq(projects.id, id));
+      // F06: cancelling a project cancels its open tasks with the same reason.
+      if (to === 'cancelled') {
+        await this.progress.cancelOpenTasks(tx, id, change.reason ?? '', actorOf(actor));
+      }
       if (managerChanges && manager) {
         const previous = (await this.users.summaries([project.projectManagerId], tx)).get(
           project.projectManagerId,

@@ -510,7 +510,7 @@ function ArchiveDialog({
                     >
                       {t('users.responsibilities.openClient')}
                     </Button>
-                  ) : (
+                  ) : item.type === 'project_manager_of_project' ? (
                     <Button
                       size="sm"
                       variant="outline"
@@ -518,7 +518,7 @@ function ArchiveDialog({
                     >
                       {t('users.responsibilities.openProject')}
                     </Button>
-                  )}
+                  ) : null}
                 </li>
               ))}
             </ul>

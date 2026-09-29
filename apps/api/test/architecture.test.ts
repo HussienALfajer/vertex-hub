@@ -143,6 +143,7 @@ describe('module boundaries', () => {
     projects: 'projects',
     retainers: 'projects',
     system: null,
+    tasks: 'tasks',
   };
 
   const tablesBySchemaFile = new Map(
