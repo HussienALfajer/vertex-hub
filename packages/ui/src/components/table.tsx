@@ -1,3 +1,4 @@
+import { ArrowDownIcon, ArrowUpIcon, ChevronsUpDownIcon } from 'lucide-react';
 import type { ComponentProps } from 'react';
 import { cn } from '../lib/cn';
 
@@ -66,6 +67,47 @@ function TableHead({ className, ...props }: ComponentProps<'th'>) {
   );
 }
 
+type SortDirection = 'asc' | 'desc';
+
+type TableSortHeadProps = ComponentProps<'th'> & {
+  /** The column's direction, or null while the table is sorted by another column. */
+  direction: SortDirection | null;
+  onSort: () => void;
+};
+
+/** A column header that sorts the table by its column; `aria-sort` names the current order. */
+function TableSortHead({ direction, onSort, children, className, ...props }: TableSortHeadProps) {
+  const Icon =
+    direction === 'asc' ? ArrowUpIcon : direction === 'desc' ? ArrowDownIcon : ChevronsUpDownIcon;
+  return (
+    <th
+      data-slot="table-head"
+      aria-sort={
+        direction === 'asc' ? 'ascending' : direction === 'desc' ? 'descending' : undefined
+      }
+      className={cn(
+        'h-10 px-3 text-start align-middle font-medium whitespace-nowrap text-muted-foreground',
+        className,
+      )}
+      {...props}
+    >
+      <button
+        type="button"
+        onClick={onSort}
+        data-slot="table-sort"
+        className={cn(
+          '-mx-2 inline-flex h-8 items-center gap-1 rounded-md px-2 transition-colors duration-150 ease-out',
+          'hover:bg-surface hover:text-foreground',
+          direction && 'text-foreground',
+        )}
+      >
+        {children}
+        <Icon aria-hidden="true" className={cn('size-3.5', !direction && 'opacity-50')} />
+      </button>
+    </th>
+  );
+}
+
 function TableCell({ className, ...props }: ComponentProps<'td'>) {
   return (
     <td
@@ -86,4 +128,14 @@ function TableCaption({ className, ...props }: ComponentProps<'caption'>) {
   );
 }
 
-export { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow };
+export {
+  type SortDirection,
+  Table,
+  TableBody,
+  TableCaption,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+  TableSortHead,
+};

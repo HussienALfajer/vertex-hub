@@ -1,6 +1,7 @@
 import type { Page, Route, TestInfo } from '@playwright/test';
 import {
   type AuditEntry,
+  allowedTaskTransitions,
   type BrandKit,
   type ClientDetailResponse,
   type ClientResponse,
@@ -12,6 +13,7 @@ import {
   type CreateMilestone,
   type CreateProject,
   type CreateRetainer,
+  type CreateTaskInput,
   type Currency,
   type Cycle,
   type CycleDetail,
@@ -28,27 +30,52 @@ import {
   type HealthResponse,
   isLineBehind,
   isProjectClosed,
+  isTaskBlocked,
+  isTaskFinished,
+  isTaskOpen,
+  isTaskOverdue,
   lastOfMonth,
   type MeResponse,
   type Milestone,
   type MilestoneStatus,
+  type MyTaskSummary,
+  mentionedUserIds,
   type Note,
   type NoteChannel,
+  OPEN_TASK_STATUSES,
   type PlatformAccount,
   type Project,
   type ProjectDetail,
   type ProjectStatus,
   type ProjectStatusChange,
+  type RequestScope,
   type Retainer,
   type RetainerDeliverables,
   type RetainerDetail,
   type RetainerStatus,
   type RetainerStatusChange,
+  type RevisionDecision,
+  type RevisionDecisionInput,
+  type RevisionSource,
   deliveryRate as rateOf,
   renewalState,
+  revisionSourceOf,
+  TASK_PRIORITIES,
+  type Task,
+  type TaskComment,
+  type TaskDependenciesInput,
+  type TaskDetail,
+  type TaskPriority,
+  type TaskRights,
+  type TaskStatus,
+  type TaskStatusChange,
+  type TaskType,
+  taskMove,
   type UpdateCycleLine,
   type UpdateExtraWork,
+  type UpdateTaskInput,
   type UserResponse,
+  weekOf,
 } from '@vertex-hub/contracts';
 
 /*
@@ -595,8 +622,13 @@ function activationLink(kind: 'activation' | 'reset') {
   };
 }
 
+/** Switches the signed-in user mid-test, keeping the in-memory data; reload the page after. */
+export interface MockedApi {
+  signInAs: (next: MeResponse) => void;
+}
+
 /** Mocks the API with an in-memory team. `signedIn` decides whether /api/me finds a session. */
-export async function mockApi(page: Page, options: MockOptions): Promise<void> {
+export async function mockApi(page: Page, options: MockOptions): Promise<MockedApi> {
   let signedIn = options.signedIn;
   let me = options.me ?? manager;
   const users = teamSeed();
@@ -606,6 +638,8 @@ export async function mockApi(page: Page, options: MockOptions): Promise<void> {
   const projectsApi = projectRoutes({ users, clients, projects, me: () => me });
   const retainers = retainersSeed();
   const retainersApi = retainerRoutes({ users, clients, retainers, me: () => me });
+  const tasks = tasksSeed();
+  const tasksApi = taskRoutes({ users, clients, projects, retainers, tasks, me: () => me });
   const managers = new Map<string, string | null>(
     departmentsSeed.map((d) => [
       d.id,
@@ -754,7 +788,16 @@ export async function mockApi(page: Page, options: MockOptions): Promise<void> {
         const running = projects.filter(
           (p) => !p.archived && OPEN_STATUSES.includes(p.status) && p.projectManagerId === user.id,
         );
-        if (managed.length > 0 || accounts.length > 0 || running.length > 0) {
+        // F06: open tasks they are assignee of.
+        const assigned = tasks.filter(
+          (t) => !t.archived && isTaskOpen(t.status) && t.assigneeId === user.id,
+        );
+        if (
+          managed.length > 0 ||
+          accounts.length > 0 ||
+          running.length > 0 ||
+          assigned.length > 0
+        ) {
           return fail(route, 409, 'USER_HAS_RESPONSIBILITIES', [
             ...managed.map((d) => ({ type: 'manages_department', id: d.id, name: d.name })),
             ...accounts.map((c) => ({
@@ -763,6 +806,7 @@ export async function mockApi(page: Page, options: MockOptions): Promise<void> {
               name: c.tradeName,
             })),
             ...running.map((p) => ({ type: 'project_manager_of_project', id: p.id, name: p.name })),
+            ...assigned.map((t) => ({ type: 'assignee_of_open_tasks', id: t.id, name: t.title })),
           ]);
         }
         user.status = 'archived';
@@ -813,11 +857,20 @@ export async function mockApi(page: Page, options: MockOptions): Promise<void> {
     const retained = retainersApi(route, method, url, request);
     if (retained) return retained;
 
+    // Tasks (F06).
+    const tasked = tasksApi(route, method, url, request);
+    if (tasked) return tasked;
+
     if (path === '/api/audit') {
       return json(route, { items: auditSeed, total: auditSeed.length, page: 1, pageSize: 30 });
     }
     return fail(route, 404, 'NOT_FOUND');
   });
+  return {
+    signInAs: (next) => {
+      me = next;
+    },
+  };
 }
 
 interface ClientState {
@@ -2139,6 +2192,908 @@ function retainerRoutes({ users, clients, retainers, me }: RetainerState) {
   };
 }
 
+// Tasks (F06)
+
+interface TaskRevisionRecord {
+  id: string;
+  source: RevisionSource;
+  number: number | null;
+  note: string;
+  contactId: string | null;
+  overLimit: boolean;
+  decision: RevisionDecision | null;
+  decisionNote: string | null;
+  extraWork: { id: string; title: string } | null;
+  decidedById: string | null;
+  decidedAt: string | null;
+  authorId: string;
+  createdAt: string;
+}
+
+interface TaskCommentRecord {
+  id: string;
+  authorId: string;
+  body: string;
+  editedAt: string | null;
+  archived: boolean;
+  createdAt: string;
+}
+
+interface TaskRecord {
+  id: string;
+  title: string;
+  brief: string | null;
+  type: TaskType;
+  department: DepartmentCode;
+  assigneeId: string | null;
+  status: TaskStatus;
+  priority: TaskPriority;
+  dueDate: string;
+  dueTime: string | null;
+  clientId: string | null;
+  projectId: string | null;
+  milestoneId: string | null;
+  retainerId: string | null;
+  cycleId: string | null;
+  cycleLineId: string | null;
+  needsClientApproval: boolean;
+  revisionLimit: number;
+  request: {
+    contactId: string | null;
+    requestedOn: string;
+    scope: RequestScope;
+    extraWork: { id: string; title: string } | null;
+  } | null;
+  createdById: string;
+  createdAt: string;
+  startedAt: string | null;
+  deliveredAt: string | null;
+  cancelledAt: string | null;
+  cancelReason: string | null;
+  archived: boolean;
+  dependsOn: string[];
+  checklist: {
+    id: string;
+    text: string;
+    doneAt: string | null;
+    doneById: string | null;
+    archived: boolean;
+  }[];
+  links: { id: string; url: string; label: string | null; addedById: string; archived: boolean }[];
+  revisions: TaskRevisionRecord[];
+  comments: TaskCommentRecord[];
+}
+
+/** "Now" for the task mocks: the seeded today, morning in Asia/Damascus. */
+const TASKS_NOW = new Date(`${PROJECTS_TODAY}T09:00:00+03:00`);
+
+function taskRecord(
+  n: number,
+  fields: Partial<TaskRecord> & Pick<TaskRecord, 'title'>,
+): TaskRecord {
+  return {
+    id: id(n),
+    brief: null,
+    type: 'work',
+    department: 'design',
+    assigneeId: null,
+    status: 'new',
+    priority: 'normal',
+    dueDate: '2026-10-14',
+    dueTime: null,
+    clientId: null,
+    projectId: null,
+    milestoneId: null,
+    retainerId: null,
+    cycleId: null,
+    cycleLineId: null,
+    needsClientApproval: false,
+    revisionLimit: 2,
+    request: null,
+    createdById: id(3),
+    createdAt: '2026-10-05T08:00:00.000Z',
+    startedAt: null,
+    deliveredAt: null,
+    cancelledAt: null,
+    cancelReason: null,
+    archived: false,
+    dependsOn: [],
+    checklist: [],
+    links: [],
+    revisions: [],
+    comments: [],
+    ...fields,
+  };
+}
+
+const clientRevision = (
+  n: number,
+  number: number,
+  note: string,
+  overLimit: boolean,
+  createdAt: string,
+): TaskRevisionRecord => ({
+  id: id(n),
+  source: 'client',
+  number,
+  note,
+  contactId: id(701),
+  overLimit,
+  decision: null,
+  decisionNote: null,
+  extraWork: null,
+  decidedById: null,
+  decidedAt: null,
+  authorId: id(3),
+  createdAt,
+});
+
+/** Tasks around the seeded clients, one of each kind My tasks and the task page show. */
+export function tasksSeed(): TaskRecord[] {
+  const jasmine = id(601);
+  return [
+    taskRecord(1001, {
+      title: 'تصاميم منيو الخريف',
+      brief: 'ثلاث صفحات للمنيو الجديد بمقاس A4، بألوان الهوية الجديدة وصور الأطباق الموسمية.',
+      assigneeId: id(3),
+      status: 'in_progress',
+      priority: 'high',
+      dueDate: '2026-10-09',
+      clientId: jasmine,
+      projectId: id(801),
+      milestoneId: id(813),
+      needsClientApproval: true,
+      startedAt: '2026-10-06T07:30:00.000Z',
+      checklist: [
+        {
+          id: id(1101),
+          text: 'جمع صور الأطباق',
+          doneAt: '2026-10-06T09:00:00.000Z',
+          doneById: id(3),
+          archived: false,
+        },
+        {
+          id: id(1102),
+          text: 'مسودة الصفحة الأولى',
+          doneAt: '2026-10-07T12:00:00.000Z',
+          doneById: id(3),
+          archived: false,
+        },
+        {
+          id: id(1103),
+          text: 'الصفحتان الثانية والثالثة',
+          doneAt: null,
+          doneById: null,
+          archived: false,
+        },
+        {
+          id: id(1104),
+          text: 'تجهيز ملفات الطباعة',
+          doneAt: null,
+          doneById: null,
+          archived: false,
+        },
+      ],
+      links: [
+        {
+          id: id(1201),
+          url: 'https://drive.google.com/drive/folders/autumn-menu',
+          label: 'مجلد التصاميم',
+          addedById: id(3),
+          archived: false,
+        },
+      ],
+    }),
+    taskRecord(1002, {
+      title: 'جلسة تصوير الأطباق',
+      department: 'photography',
+      assigneeId: id(4),
+      dueDate: PROJECTS_TODAY,
+      dueTime: '16:00',
+      clientId: jasmine,
+      projectId: id(801),
+      needsClientApproval: true,
+      dependsOn: [id(1001)],
+    }),
+    taskRecord(1003, {
+      title: 'بوستات أسبوع الافتتاح',
+      brief: 'ستة بوستات لأسبوع افتتاح الفرع الجديد.',
+      assigneeId: id(3),
+      status: 'revisions',
+      dueDate: '2026-10-14',
+      clientId: jasmine,
+      retainerId: id(901),
+      cycleId: id(921),
+      cycleLineId: id(931),
+      needsClientApproval: true,
+      startedAt: '2026-10-02T08:00:00.000Z',
+      checklist: [
+        {
+          id: id(1105),
+          text: 'نصوص البوستات',
+          doneAt: '2026-10-03T09:00:00.000Z',
+          doneById: id(3),
+          archived: false,
+        },
+        {
+          id: id(1106),
+          text: 'تصميم البوستات الستة',
+          doneAt: null,
+          doneById: null,
+          archived: false,
+        },
+      ],
+      links: [
+        {
+          id: id(1202),
+          url: 'https://www.figma.com/file/opening-week',
+          label: null,
+          addedById: id(3),
+          archived: false,
+        },
+      ],
+      revisions: [
+        {
+          ...clientRevision(1301, 0, '', false, '2026-10-04T10:00:00.000Z'),
+          source: 'internal',
+          number: null,
+          note: 'وحّد الخط في البوستات الستة.',
+          contactId: null,
+        },
+        clientRevision(1302, 1, 'تكبير الشعار في البوست الأول.', false, '2026-10-06T11:00:00.000Z'),
+        clientRevision(1303, 2, 'تغيير لون الخلفية إلى الأخضر.', false, '2026-10-07T13:00:00.000Z'),
+        clientRevision(
+          1304,
+          3,
+          'إضافة صورة الشيف في البوست الأخير.',
+          true,
+          '2026-10-09T15:00:00.000Z',
+        ),
+      ],
+      comments: [
+        {
+          id: id(1401),
+          authorId: id(1),
+          body: `@{${id(3)}} العميل طلب تعديلًا ثالثًا، قرري هل نحسبه عملًا إضافيًا.`,
+          editedAt: null,
+          archived: false,
+          createdAt: '2026-10-09T15:10:00.000Z',
+        },
+        {
+          id: id(1402),
+          authorId: id(3),
+          body: 'سأراجع العقد وأرد اليوم.',
+          editedAt: '2026-10-09T16:05:00.000Z',
+          archived: false,
+          createdAt: '2026-10-09T16:00:00.000Z',
+        },
+      ],
+    }),
+    taskRecord(1004, {
+      title: 'تحديث قالب التقارير الشهرية',
+      department: 'content_management',
+      priority: 'low',
+      dueDate: '2026-10-20',
+    }),
+    taskRecord(1005, {
+      title: 'فيديو تعريفي للعيادة',
+      priority: 'urgent',
+      dueDate: '2026-10-12',
+      clientId: id(602),
+      needsClientApproval: true,
+      createdById: id(1),
+    }),
+    taskRecord(1006, {
+      title: 'مراجعة شعار العيادة',
+      assigneeId: id(5),
+      status: 'internal_review',
+      dueDate: '2026-10-13',
+      clientId: id(602),
+      needsClientApproval: true,
+      createdById: id(1),
+      startedAt: '2026-10-03T08:00:00.000Z',
+    }),
+    taskRecord(1007, {
+      title: 'غلاف فيسبوك لشهر أكتوبر',
+      assigneeId: id(3),
+      status: 'delivered',
+      dueDate: '2026-10-05',
+      clientId: jasmine,
+      retainerId: id(901),
+      cycleId: id(921),
+      cycleLineId: id(931),
+      needsClientApproval: true,
+      startedAt: '2026-10-01T08:00:00.000Z',
+      deliveredAt: '2026-10-05T12:00:00.000Z',
+    }),
+  ];
+}
+
+interface TaskState {
+  users: UserResponse[];
+  clients: ClientRecord[];
+  projects: ProjectRecord[];
+  retainers: RetainerRecord[];
+  tasks: TaskRecord[];
+  me: () => MeResponse;
+}
+
+const OPEN_TASK: TaskStatus[] = [...OPEN_TASK_STATUSES];
+
+/** The tasks API (F06) over the in-memory records, with its scopes and workflow rules. */
+function taskRoutes({ users, clients, projects, retainers, tasks, me }: TaskState) {
+  const holds = (permission: string, scope: string) =>
+    me().permissions.some((g) => g.permission === permission && g.scopes.includes(scope as never));
+  const managed = () =>
+    me()
+      .departments.filter((d) => d.isManager)
+      .map((d) => d.code);
+  const user = (userId: string) => users.find((u) => u.id === userId);
+  const person = (userId: string) => ({ id: userId, name: user(userId)?.name ?? '' });
+  const clientOf = (task: TaskRecord) => clients.find((c) => c.id === task.clientId);
+  const projectOf = (task: TaskRecord) => projects.find((p) => p.id === task.projectId);
+  const retainerOf = (task: TaskRecord) => retainers.find((r) => r.id === task.retainerId);
+  const cycleOf = (task: TaskRecord) => retainerOf(task)?.cycles.find((c) => c.id === task.cycleId);
+  const contactOf = (task: TaskRecord, contactId: string | null) => {
+    const contact = clientOf(task)?.contacts.find((c) => c.id === contactId);
+    return contact ? { id: contact.id, name: contact.name, archived: contact.archived } : null;
+  };
+  const byId = (taskId: string) => tasks.find((t) => t.id === taskId);
+  const blocked = (task: TaskRecord) =>
+    isTaskBlocked(
+      task.dependsOn.flatMap((dependencyId) => {
+        const dependency = byId(dependencyId);
+        return dependency ? [{ status: dependency.status, archived: dependency.archived }] : [];
+      }),
+    );
+  const overdue = (task: TaskRecord) => isTaskOverdue(task, TASKS_NOW);
+  const clientCount = (task: TaskRecord) =>
+    task.revisions.filter((r) => r.source === 'client').length;
+
+  // Mirrors the API's scopes (spec F06, "Scopes on tasks").
+  const rights = (task: TaskRecord): TaskRights => {
+    const inDepartment = managed().includes(task.department);
+    const ownClient = clientOf(task)?.accountManagerId === me().user.id;
+    const projectManager = projectOf(task)?.projectManagerId === me().user.id;
+    const assign =
+      holds('tasks.manage', 'all') ||
+      (holds('tasks.manage', 'department') && inDepartment) ||
+      (holds('tasks.manage', 'own_clients') && ownClient);
+    return {
+      work:
+        holds('tasks.work', 'all') ||
+        (holds('tasks.work', 'department') && inDepartment) ||
+        (holds('tasks.work', 'assigned') && task.assigneeId === me().user.id),
+      manage: assign || (holds('tasks.manage', 'assigned') && projectManager),
+      assign,
+      client:
+        !!task.clientId &&
+        (holds('tasks.manage', 'all') || (holds('tasks.manage', 'own_clients') && ownClient)),
+      creator: holds('tasks.request', 'all') && task.createdById === me().user.id,
+    };
+  };
+  const allowed = (task: TaskRecord) =>
+    task.archived
+      ? []
+      : allowedTaskTransitions(
+          {
+            status: task.status,
+            assigneeId: task.assigneeId,
+            hasClient: !!task.clientId,
+            needsClientApproval: task.needsClientApproval,
+            blocked: blocked(task),
+          },
+          rights(task),
+        );
+  const permissions = (task: TaskRecord): TaskDetail['permissions'] => {
+    const r = rights(task);
+    const live = !task.archived;
+    const request = r.creator && task.status === 'new' && task.assigneeId === null;
+    return {
+      canEdit: live && (r.manage || request),
+      canAssign: live && r.assign,
+      canWork: live && r.work,
+      canReview: live && r.manage,
+      canRecordClientResponse: live && r.client,
+      canDecideRevision: live && r.client,
+      canCancel: allowed(task).includes('cancelled'),
+      canReopen: live && r.manage,
+      canArchive: holds('tasks.manage', 'all'),
+    };
+  };
+
+  const summary = (task: TaskRecord): Task => {
+    const assignee = task.assigneeId ? user(task.assigneeId) : undefined;
+    const project = projectOf(task);
+    const retainer = retainerOf(task);
+    const cycle = cycleOf(task);
+    const line = cycle?.lines.find((l) => l.id === task.cycleLineId);
+    const milestoneRecord = project?.milestones.find((m) => m.id === task.milestoneId);
+    const items = task.checklist.filter((item) => !item.archived);
+    return {
+      id: task.id,
+      title: task.title,
+      type: task.type,
+      department: task.department,
+      assignee: assignee
+        ? {
+            id: assignee.id,
+            name: assignee.name,
+            archived: assignee.status === 'archived',
+            inDepartment: assignee.departments.some((d) => d.code === task.department),
+          }
+        : null,
+      status: task.status,
+      priority: task.priority,
+      dueDate: task.dueDate,
+      dueTime: task.dueTime,
+      overdue: overdue(task),
+      blocked: blocked(task),
+      client: clientOf(task)
+        ? { id: task.clientId as string, name: clientOf(task)?.tradeName ?? '' }
+        : null,
+      project: project ? { id: project.id, name: project.name } : null,
+      milestone: milestoneRecord ? { id: milestoneRecord.id, name: milestoneRecord.name } : null,
+      retainer: retainer ? { id: retainer.id, name: retainer.name } : null,
+      cycle: cycle
+        ? { id: cycle.id, periodStart: cycle.periodStart, periodEnd: cycle.periodEnd }
+        : null,
+      cycleLine: line ? { id: line.id, kind: line.kind, label: line.label } : null,
+      checklist: { done: items.filter((item) => item.doneAt).length, total: items.length },
+      revisions: { clientCount: clientCount(task), limit: task.revisionLimit },
+      overLimitPending: task.revisions.some((r) => r.overLimit && r.decision === null),
+    };
+  };
+  const dependencyOf = (task: TaskRecord) => ({
+    id: task.id,
+    title: task.title,
+    department: task.department,
+    status: task.status,
+    finished: isTaskFinished(task.status),
+    archived: task.archived,
+  });
+  const detail = (task: TaskRecord): TaskDetail => ({
+    ...summary(task),
+    brief: task.brief,
+    needsClientApproval: task.needsClientApproval,
+    clientRequest: task.request
+      ? {
+          contact: contactOf(task, task.request.contactId),
+          requestedOn: task.request.requestedOn,
+          scope: task.request.scope,
+          extraWork: task.request.extraWork
+            ? { ...task.request.extraWork, billingStatus: 'unbilled' }
+            : null,
+        }
+      : null,
+    dependencies: task.dependsOn.flatMap((dependencyId) => {
+      const dependency = byId(dependencyId);
+      return dependency ? [dependencyOf(dependency)] : [];
+    }),
+    dependents: tasks.filter((t) => t.dependsOn.includes(task.id)).map(dependencyOf),
+    checklistItems: task.checklist
+      .filter((item) => !item.archived)
+      .map((item, index) => ({
+        id: item.id,
+        text: item.text,
+        position: index + 1,
+        done: !!item.doneAt,
+        doneAt: item.doneAt,
+        doneBy: item.doneById ? person(item.doneById) : null,
+      })),
+    links: task.links
+      .filter((link) => !link.archived)
+      .map((link) => ({
+        id: link.id,
+        url: link.url,
+        label: link.label,
+        addedBy: person(link.addedById),
+        createdAt: task.createdAt,
+      })),
+    revisionHistory: task.revisions.map((r) => ({
+      id: r.id,
+      source: r.source,
+      number: r.number,
+      note: r.note,
+      contact: contactOf(task, r.contactId),
+      overLimit: r.overLimit,
+      decision: r.decision,
+      decisionNote: r.decisionNote,
+      extraWork: r.extraWork,
+      decidedBy: r.decidedById ? person(r.decidedById) : null,
+      decidedAt: r.decidedAt,
+      author: person(r.authorId),
+      createdAt: r.createdAt,
+    })),
+    createdBy: person(task.createdById),
+    createdAt: task.createdAt,
+    updatedAt: task.createdAt,
+    startedAt: task.startedAt,
+    deliveredAt: task.deliveredAt,
+    cancelledAt: task.cancelledAt,
+    cancelReason: task.cancelReason,
+    archivedAt: task.archived ? '2026-10-08T10:00:00.000Z' : null,
+    readOnly: task.archived,
+    permissions: permissions(task),
+    allowedTransitions: allowed(task),
+  });
+  const commentOf = (task: TaskRecord, comment: TaskCommentRecord): TaskComment => {
+    const author = user(comment.authorId);
+    const mine = comment.authorId === me().user.id && !task.archived;
+    return {
+      id: comment.id,
+      author: { ...person(comment.authorId), archived: author?.status === 'archived' },
+      body: comment.archived ? null : comment.body,
+      mentions: mentionedUserIds(comment.body).map((userId) => ({
+        ...person(userId),
+        archived: user(userId)?.status === 'archived',
+      })),
+      editedAt: comment.editedAt,
+      removed: comment.archived,
+      createdAt: comment.createdAt,
+      canEdit: mine && !comment.archived,
+      canRemove: (mine || holds('tasks.manage', 'all')) && !comment.archived,
+    };
+  };
+  /** Logs an extra work item on the task's project or retainer (rules 10 and 11). */
+  const logExtraWork = (task: TaskRecord, title: string, contactId: string | null) => {
+    const owner = projectOf(task) ?? retainerOf(task);
+    if (!owner) return null;
+    const item: ExtraWorkRecord = {
+      id: id(next++),
+      title,
+      description: null,
+      requestedOn: PROJECTS_TODAY,
+      contactId,
+      estimateMinor: null,
+      billingStatus: 'unbilled',
+      billingNote: null,
+      loggedById: me().user.id,
+      createdAt: TASKS_NOW.toISOString(),
+      archived: false,
+    };
+    owner.extraWork.push(item);
+    return { id: item.id, title };
+  };
+  let next = 1500;
+
+  const matches = (task: TaskRecord, q: URLSearchParams) => {
+    const statuses = q.getAll('status');
+    const flag = (name: string) => q.get(name);
+    const meId = me().user.id;
+    const assigneeId = q.get('assigneeId') === 'me' ? meId : q.get('assigneeId');
+    const departments = q.getAll('department');
+    const priorities = q.getAll('priority');
+    const r = rights(task);
+    return (
+      task.archived === (flag('archived') === 'true') &&
+      (statuses.length > 0 ? statuses : OPEN_TASK).includes(task.status) &&
+      (!q.get('search') || task.title.includes(q.get('search') as string)) &&
+      (departments.length === 0 || departments.includes(task.department)) &&
+      (!assigneeId || task.assigneeId === assigneeId) &&
+      (flag('unassigned') !== 'true' || task.assigneeId === null) &&
+      (!q.get('clientId') || task.clientId === q.get('clientId')) &&
+      (flag('internal') !== 'true' || task.clientId === null) &&
+      (!q.get('projectId') || task.projectId === q.get('projectId')) &&
+      (!q.get('retainerId') || task.retainerId === q.get('retainerId')) &&
+      (!q.get('type') || task.type === q.get('type')) &&
+      (priorities.length === 0 || priorities.includes(task.priority)) &&
+      (!flag('overdue') || overdue(task) === (flag('overdue') === 'true')) &&
+      (!flag('blocked') || blocked(task) === (flag('blocked') === 'true')) &&
+      (flag('overLimit') !== 'true' || summary(task).overLimitPending) &&
+      (!q.get('dueFrom') || task.dueDate >= (q.get('dueFrom') as string)) &&
+      (!q.get('dueTo') || task.dueDate <= (q.get('dueTo') as string)) &&
+      (q.get('createdBy') !== 'me' || task.createdById === meId) &&
+      (q.get('reviewer') !== 'me' || (r.manage && task.status === 'internal_review'))
+    );
+  };
+  // Like the database enum: low first.
+  const PRIORITY_ORDER: readonly TaskPriority[] = TASK_PRIORITIES;
+
+  // Answers a tasks request, or returns undefined to let the other mocks try.
+  return (route: Route, method: string, url: URL, request: Request): Promise<void> | undefined => {
+    const path = url.pathname;
+    const body = <T>() => request.postDataJSON() as T;
+
+    if (path === '/api/me/tasks/summary') {
+      const meId = me().user.id;
+      const open = tasks.filter((t) => !t.archived && OPEN_TASK.includes(t.status));
+      const mine = open.filter((t) => t.assigneeId === meId);
+      const weekEnd = weekOf(PROJECTS_TODAY).to;
+      const count = (list: TaskRecord[], test: (t: TaskRecord) => boolean) =>
+        list.filter(test).length;
+      const summaryBody: MyTaskSummary = {
+        overdue: count(mine, overdue),
+        today: count(mine, (t) => t.dueDate === PROJECTS_TODAY && !overdue(t)),
+        thisWeek: count(mine, (t) => t.dueDate > PROJECTS_TODAY && t.dueDate <= weekEnd),
+        later: count(mine, (t) => t.dueDate > weekEnd),
+        waiting: count(mine, (t) => blocked(t) || t.status === 'awaiting_client'),
+        toReview: count(open, (t) => t.status === 'internal_review' && rights(t).manage),
+        requestedByMe: count(open, (t) => t.createdById === meId && t.assigneeId !== meId),
+        unassignedInMyDepartments:
+          managed().length === 0
+            ? null
+            : count(open, (t) => t.assigneeId === null && managed().includes(t.department)),
+      };
+      return json(route, summaryBody);
+    }
+    if (path === '/api/tasks' && method === 'GET') {
+      const q = url.searchParams;
+      const sort = q.get('sort') ?? 'dueDate';
+      const order = q.get('order') === 'desc' ? -1 : 1;
+      const items = tasks
+        .filter((t) => matches(t, q))
+        .sort((a, b) =>
+          sort === 'priority'
+            ? order * (PRIORITY_ORDER.indexOf(a.priority) - PRIORITY_ORDER.indexOf(b.priority))
+            : order * a.dueDate.localeCompare(b.dueDate),
+        )
+        .map(summary);
+      const pageSize = Number(q.get('pageSize') ?? 50);
+      const page = Number(q.get('page') ?? 1);
+      return json(route, {
+        items: items.slice((page - 1) * pageSize, page * pageSize),
+        total: items.length,
+        page,
+        pageSize,
+      });
+    }
+    if (path === '/api/tasks' && method === 'POST') {
+      const input = body<CreateTaskInput>();
+      const created = taskRecord(next++, {
+        title: input.title,
+        brief: input.brief ?? null,
+        type: input.type ?? 'work',
+        department: input.department,
+        assigneeId: input.assigneeId ?? null,
+        priority: input.priority ?? 'normal',
+        dueDate: input.dueDate,
+        dueTime: input.dueTime ?? null,
+        clientId: input.clientId ?? null,
+        projectId: input.projectId ?? null,
+        milestoneId: input.milestoneId ?? null,
+        retainerId: input.retainerCycleId
+          ? (retainers.find((r) => r.cycles.some((c) => c.id === input.retainerCycleId))?.id ??
+            null)
+          : null,
+        cycleId: input.retainerCycleId ?? null,
+        cycleLineId: input.cycleLineId ?? null,
+        needsClientApproval: input.clientId ? (input.needsClientApproval ?? true) : false,
+        revisionLimit: input.revisionLimit ?? 2,
+        createdById: me().user.id,
+        createdAt: TASKS_NOW.toISOString(),
+        dependsOn: input.dependsOn ?? [],
+      });
+      const r = rights(created);
+      const self = created.assigneeId === me().user.id;
+      if (created.assigneeId && !self && !r.assign) return fail(route, 403, 'FORBIDDEN');
+      if (input.type === 'client_request') {
+        if (!r.client) return fail(route, 403, 'FORBIDDEN');
+        const scope = input.requestScope ?? 'in_scope';
+        created.request = {
+          contactId: input.requestedByContactId ?? null,
+          requestedOn: input.requestedOn ?? PROJECTS_TODAY,
+          scope,
+          extraWork:
+            scope === 'out_of_scope'
+              ? logExtraWork(created, created.title, input.requestedByContactId ?? null)
+              : null,
+        };
+      }
+      created.checklist = (input.checklist ?? []).map((text) => ({
+        id: id(next++),
+        text,
+        doneAt: null,
+        doneById: null,
+        archived: false,
+      }));
+      created.links = (input.links ?? []).map((link) => ({
+        id: id(next++),
+        url: link.url,
+        label: link.label ?? null,
+        addedById: me().user.id,
+        archived: false,
+      }));
+      tasks.push(created);
+      return json(route, detail(created), 201);
+    }
+
+    const match = path.match(/^\/api\/tasks\/([^/]+)(?:\/([^/]+))?(?:\/([^/]+))?(?:\/([^/]+))?$/);
+    if (!match) return undefined;
+    const [, taskId, part, childId, childAction] = match;
+    const task = byId(taskId as string);
+    if (!task || (task.archived && !holds('tasks.manage', 'all'))) {
+      return fail(route, 404, 'NOT_FOUND');
+    }
+    const can = permissions(task);
+    const answer = () => json(route, detail(task));
+
+    if (!part && method === 'GET') return answer();
+    if (!part && method === 'PATCH') {
+      if (!can.canEdit && !can.canAssign) return fail(route, 403, 'FORBIDDEN');
+      const input = body<UpdateTaskInput>();
+      if ((input.assigneeId !== undefined || input.department) && !can.canAssign) {
+        return fail(route, 403, 'FORBIDDEN');
+      }
+      const { requestedByContactId, requestedOn, requestScope, retainerCycleId, ...fields } = input;
+      Object.assign(task, fields);
+      if (retainerCycleId !== undefined) {
+        task.cycleId = retainerCycleId;
+        task.retainerId =
+          retainers.find((r) => r.cycles.some((c) => c.id === retainerCycleId))?.id ?? null;
+      }
+      if (task.request) {
+        if (requestedByContactId !== undefined) task.request.contactId = requestedByContactId;
+        if (requestedOn) task.request.requestedOn = requestedOn;
+        if (requestScope) task.request.scope = requestScope;
+      }
+      if (input.department && task.assigneeId) {
+        const assignee = user(task.assigneeId);
+        if (!assignee?.departments.some((d) => d.code === input.department)) task.assigneeId = null;
+      }
+      return answer();
+    }
+    if (part === 'status') {
+      const change = body<TaskStatusChange>();
+      if (!allowed(task).includes(change.status)) {
+        return fail(route, 409, 'INVALID_TRANSITION');
+      }
+      const move = taskMove(task.status, change.status);
+      if (move === 'start' && blocked(task) && !change.overrideDependencies) {
+        return fail(route, 409, 'TASK_BLOCKED');
+      }
+      const source = move ? revisionSourceOf(move) : null;
+      if (source) {
+        const number = source === 'client' ? clientCount(task) + 1 : null;
+        task.revisions.push({
+          id: id(next++),
+          source,
+          number,
+          note: change.note ?? '',
+          contactId: change.contactId ?? null,
+          overLimit: number !== null && number > task.revisionLimit,
+          decision: null,
+          decisionNote: null,
+          extraWork: null,
+          decidedById: null,
+          decidedAt: null,
+          authorId: me().user.id,
+          createdAt: TASKS_NOW.toISOString(),
+        });
+      }
+      if (move === 'start' && !task.startedAt) task.startedAt = TASKS_NOW.toISOString();
+      if (move === 'deliver') task.deliveredAt = TASKS_NOW.toISOString();
+      if (move === 'cancel') {
+        task.cancelledAt = TASKS_NOW.toISOString();
+        task.cancelReason = change.note ?? null;
+      }
+      if (move === 'reopen' || move === 'reopen_client' || move === 'reopen_internal') {
+        task.deliveredAt = null;
+        task.cancelledAt = null;
+        task.cancelReason = null;
+      }
+      task.status = change.status;
+      return answer();
+    }
+    if (part === 'dependencies' && method === 'PUT') {
+      if (!can.canReview) return fail(route, 403, 'FORBIDDEN');
+      task.dependsOn = body<TaskDependenciesInput>().dependsOn;
+      return json(route, { items: detail(task).dependencies });
+    }
+    if (part === 'archive' || part === 'restore') {
+      if (!can.canArchive) return fail(route, 403, 'FORBIDDEN');
+      task.archived = part === 'archive';
+      return answer();
+    }
+    if (part === 'revisions' && childAction === 'decision') {
+      const revision = task.revisions.find((r) => r.id === childId);
+      if (!revision) return fail(route, 404, 'NOT_FOUND');
+      if (!can.canDecideRevision) return fail(route, 403, 'FORBIDDEN');
+      const input = body<RevisionDecisionInput>();
+      if (input.decision === 'extra_work') {
+        const logged = logExtraWork(
+          task,
+          `التعديل ${revision.number}: ${task.title}`,
+          revision.contactId,
+        );
+        if (!logged) return fail(route, 409, 'NO_ENGAGEMENT');
+        revision.extraWork = logged;
+      }
+      Object.assign(revision, {
+        decision: input.decision,
+        decisionNote: input.note ?? null,
+        decidedById: me().user.id,
+        decidedAt: TASKS_NOW.toISOString(),
+      });
+      return json(
+        route,
+        detail(task).revisionHistory.find((r) => r.id === revision.id),
+      );
+    }
+    if (part === 'checklist') {
+      if (!can.canWork && !can.canReview) return fail(route, 403, 'FORBIDDEN');
+      if (!childId && method === 'POST') {
+        const created = {
+          id: id(next++),
+          text: body<{ text: string }>().text,
+          doneAt: null,
+          doneById: null,
+          archived: false,
+        };
+        task.checklist.push(created);
+        return json(route, detail(task).checklistItems.at(-1), 201);
+      }
+      if (childId === 'order') {
+        const ids = body<{ ids: string[] }>().ids;
+        task.checklist.sort((a, b) => ids.indexOf(a.id) - ids.indexOf(b.id));
+        return json(route, { items: detail(task).checklistItems });
+      }
+      const item = task.checklist.find((x) => x.id === childId);
+      if (!item) return fail(route, 404, 'NOT_FOUND');
+      if (childAction === 'archive') {
+        item.archived = true;
+        return route.fulfill({ status: 204 });
+      }
+      const input = body<{ text?: string; done?: boolean }>();
+      if (input.text) item.text = input.text;
+      if (input.done !== undefined) {
+        item.doneAt = input.done ? TASKS_NOW.toISOString() : null;
+        item.doneById = input.done ? me().user.id : null;
+      }
+      return json(
+        route,
+        detail(task).checklistItems.find((x) => x.id === item.id),
+      );
+    }
+    if (part === 'links') {
+      if (!can.canWork && !can.canReview) return fail(route, 403, 'FORBIDDEN');
+      if (!childId) {
+        const input = body<{ url: string; label?: string | null }>();
+        task.links.push({
+          id: id(next++),
+          url: input.url,
+          label: input.label || null,
+          addedById: me().user.id,
+          archived: false,
+        });
+        return json(route, detail(task).links.at(-1), 201);
+      }
+      const link = task.links.find((x) => x.id === childId);
+      if (!link) return fail(route, 404, 'NOT_FOUND');
+      link.archived = true;
+      return route.fulfill({ status: 204 });
+    }
+    if (part === 'comments') {
+      if (!childId && method === 'GET') {
+        const items = task.comments.map((comment) => commentOf(task, comment));
+        return json(route, { items, total: items.length, page: 1, pageSize: 100 });
+      }
+      if (!childId) {
+        const created: TaskCommentRecord = {
+          id: id(next++),
+          authorId: me().user.id,
+          body: body<{ body: string }>().body,
+          editedAt: null,
+          archived: false,
+          createdAt: TASKS_NOW.toISOString(),
+        };
+        task.comments.push(created);
+        return json(route, commentOf(task, created), 201);
+      }
+      const comment = task.comments.find((x) => x.id === childId);
+      if (!comment) return fail(route, 404, 'NOT_FOUND');
+      if (childAction === 'archive') {
+        comment.archived = true;
+        return route.fulfill({ status: 204 });
+      }
+      comment.body = body<{ body: string }>().body;
+      comment.editedAt = TASKS_NOW.toISOString();
+      return json(route, commentOf(task, comment));
+    }
+    return undefined;
+  };
+}
+
 /** Ids of the seeded team, for navigating straight to a profile or department. */
 export const seedIds = {
   sara: id(1),
@@ -2155,6 +3110,9 @@ export const seedIds = {
   socialRetainer: id(901),
   adsRetainer: id(902),
   endedRetainer: id(903),
+  autumnMenu: id(1001),
+  dishShoot: id(1002),
+  openingPosts: id(1003),
 };
 
 /** Viewport screenshot kept in the test output and attached to the HTML report. */
