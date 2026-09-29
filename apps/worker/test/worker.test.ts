@@ -4,6 +4,7 @@ import { NOTIFICATIONS_DAILY_JOB, RETAINER_CYCLES_JOB } from '@vertex-hub/contra
 import { type Database, workerHeartbeats } from '@vertex-hub/db';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { ENV, type Env } from '../src/core/config/env.js';
 import { DATABASE } from '../src/core/database/database.module.js';
 import { HEARTBEAT_CRON, HEARTBEAT_QUEUE, HeartbeatJob } from '../src/jobs/heartbeat.job.js';
 import { PgBossService } from '../src/jobs/pg-boss.service.js';
@@ -54,10 +55,22 @@ describe('worker against the test database', () => {
   });
 
   it('heartbeat is idempotent: repeated runs keep one row with the latest time', async () => {
-    const job = app.get(HeartbeatJob);
-    await job.beat(new Date('2026-09-28T10:00:00.000Z'));
-    await job.beat(new Date('2026-09-28T10:01:00.000Z'));
-    expect(await heartbeat()).toEqual([{ worker, beatAt: new Date('2026-09-28T10:01:00.000Z') }]);
+    // A worker name of its own: the live schedule beats every minute on `worker`'s row and would
+    // overwrite the fixed times between the two beats and the read.
+    const name = `${worker}-idempotent`;
+    const job = new HeartbeatJob(app.get(PgBossService), db, {
+      ...app.get<Env>(ENV),
+      WORKER_NAME: name,
+    });
+    try {
+      await job.beat(new Date('2026-09-28T10:00:00.000Z'));
+      await job.beat(new Date('2026-09-28T10:01:00.000Z'));
+      expect(
+        await db.select().from(workerHeartbeats).where(eq(workerHeartbeats.worker, name)),
+      ).toEqual([{ worker: name, beatAt: new Date('2026-09-28T10:01:00.000Z') }]);
+    } finally {
+      await db.delete(workerHeartbeats).where(eq(workerHeartbeats.worker, name));
+    }
   });
 
   it('processes a queued heartbeat job', async () => {
