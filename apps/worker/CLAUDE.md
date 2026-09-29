@@ -11,7 +11,7 @@ NestJS standalone context for background work: pg-boss queues and cron (ADR 0008
 - Register queues and handlers in `onApplicationBootstrap` through `PgBossService`.
 - Every job is idempotent: pg-boss retries, so running a job twice must leave the same result (upsert, check-then-act inside a transaction).
 - Job payloads carry ids, not records. Load fresh data inside the job.
-- Business rules live in the API's module services. When the worker needs one, share it through a package rather than copying the logic.
+- Business rules live in the API's module services. A scheduled job that needs one is only scheduled here and worked by the API through `JobQueue` (ADR 0008; pattern: `src/jobs/retainer-cycles.job.ts` with `apps/api/src/modules/projects/retainer-cycles.service.ts`). Shared queue names and crons live in `packages/contracts/src/jobs.ts`.
 - Logs through the Nest `Logger`, never `console.log`.
 
 ## Tests

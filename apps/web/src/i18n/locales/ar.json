@@ -246,7 +246,16 @@
     "INVALID_ORDER": "ترتيب المراحل لم يعد مطابقاً. حدّث الصفحة وأعد المحاولة.",
     "MILESTONE_DONE": "هذه المرحلة منجزة.",
     "MILESTONE_NOT_DONE": "هذه المرحلة غير منجزة.",
-    "MILESTONE_HAS_OPEN_TASKS": "لهذه المرحلة مهام مفتوحة."
+    "MILESTONE_HAS_OPEN_TASKS": "لهذه المرحلة مهام مفتوحة.",
+    "RETAINER_NAME_TAKEN": "لدى هذا العميل عقد شهري بهذا الاسم.",
+    "RETAINER_ENDED": "هذا العقد الشهري منتهٍ. أعد تفعيله قبل التعديل.",
+    "RETAINER_ARCHIVED": "هذا العقد الشهري مؤرشف ولا يمكن تعديله.",
+    "RETAINER_NOT_ARCHIVED": "هذا العقد الشهري غير مؤرشف.",
+    "RETAINER_STARTED": "لا يتغير تاريخ البدء بعد إنشاء أول دورة شهرية.",
+    "DUPLICATE_DELIVERABLE": "هذا البند مكرر: غيّر النوع أو الاسم.",
+    "CYCLE_CLOSED": "هذه الدورة الشهرية مغلقة ولا يمكن تعديلها.",
+    "NEGATIVE_DELIVERED": "لا يمكن أن يصبح عدد المسلَّم أقل من صفر.",
+    "BILLING_NOTE_REQUIRED": "اكتب ملاحظة: رقم الفاتورة أو سبب الإعفاء."
   },
   "users": {
     "title": "الفريق",
@@ -554,7 +563,10 @@
       "client_platform_account": "حساب منصة",
       "client_note": "ملاحظة تواصل",
       "project": "مشروع",
-      "project_milestone": "مرحلة مشروع"
+      "project_milestone": "مرحلة مشروع",
+      "retainer": "عقد شهري",
+      "retainer_cycle": "دورة شهرية",
+      "extra_work": "عمل إضافي"
     },
     "actions": {
       "user": {
@@ -616,6 +628,28 @@
         "completed": "أنجز مرحلة",
         "reopened": "أعاد فتح مرحلة",
         "archived": "حذف مرحلة"
+      },
+      "retainer": {
+        "created": "أنشأ العقد الشهري",
+        "updated": "عدّل العقد الشهري",
+        "status_changed": "غيّر حالة العقد الشهري",
+        "deliverables_updated": "عدّل بنود العقد الشهري",
+        "money_updated": "عدّل عملة العقد الشهري أو رسومه",
+        "archived": "أرشف العقد الشهري",
+        "restored": "استعاد العقد الشهري"
+      },
+      "retainer_cycle": {
+        "created": "أنشأ دورة شهرية",
+        "closed": "أغلق دورة شهرية",
+        "line_updated": "غيّر الكمية المتفق عليها",
+        "line_added": "أضاف بندًا لهذا الشهر",
+        "adjusted": "عدّل عدد المسلَّم"
+      },
+      "extra_work": {
+        "created": "سجّل عملًا إضافيًا",
+        "updated": "عدّل عملًا إضافيًا",
+        "billing_changed": "غيّر حالة فوترة عمل إضافي",
+        "archived": "حذف عملًا إضافيًا"
       }
     },
     "fields": {
@@ -630,7 +664,7 @@
       "manager": "المدير",
       "status": "الحالة",
       "twoFactorEnabled": "التحقق بخطوتين",
-      "kind": "نوع الرابط",
+      "kind": "النوع",
       "tradeName": "الاسم التجاري",
       "sector": "القطاع",
       "accountManager": "مدير الحساب",
@@ -666,7 +700,24 @@
       "position": "الترتيب",
       "installmentMinor": "الدفعة",
       "projectId": "المشروع",
-      "openTasks": "المهام المفتوحة"
+      "openTasks": "المهام المفتوحة",
+      "renewalDate": "تاريخ التجديد",
+      "monthlyFeeMinor": "الرسوم الشهرية",
+      "deliverables": "البنود",
+      "month": "الشهر",
+      "periodStart": "بداية الفترة",
+      "periodEnd": "نهاية الفترة",
+      "lines": "البنود",
+      "lineId": "البند",
+      "committed": "المتفق عليه",
+      "delivered": "المسلَّم",
+      "delta": "التعديل",
+      "retainerId": "العقد الشهري",
+      "requestedOn": "تاريخ الطلب",
+      "requestedByContactId": "طالب العمل",
+      "estimateMinor": "التقدير",
+      "billingStatus": "حالة الفوترة",
+      "billingNote": "ملاحظة الفوترة"
     },
     "kinds": {
       "activation": "تفعيل",

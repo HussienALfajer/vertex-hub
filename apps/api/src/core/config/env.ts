@@ -12,6 +12,11 @@ export const envSchema = z
     DATABASE_URL: z.url({ protocol: /^postgres(ql)?$/ }),
     /** Public origin of the web app; the API is served under it at /api (nginx or the Vite proxy). */
     APP_URL: z.url({ protocol: /^https?$/ }).default('http://127.0.0.1:5173'),
+    /** Works the pg-boss queues the worker schedules (ADR 0008). `false` in tests. */
+    JOBS_ENABLED: z
+      .enum(['true', 'false'])
+      .default('true')
+      .transform((value) => value === 'true'),
     /** Signs session cookies. Required in production; derived locally when unset. */
     BETTER_AUTH_SECRET: z.string().min(32).optional(),
   })

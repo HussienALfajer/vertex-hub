@@ -47,6 +47,22 @@ export const AUDIT_ACTIONS = [
   'project_milestone.completed',
   'project_milestone.reopened',
   'project_milestone.archived',
+  'retainer.created',
+  'retainer.updated',
+  'retainer.status_changed',
+  'retainer.deliverables_updated',
+  'retainer.money_updated',
+  'retainer.archived',
+  'retainer.restored',
+  'retainer_cycle.created',
+  'retainer_cycle.closed',
+  'retainer_cycle.line_updated',
+  'retainer_cycle.line_added',
+  'retainer_cycle.adjusted',
+  'extra_work.created',
+  'extra_work.updated',
+  'extra_work.billing_changed',
+  'extra_work.archived',
 ] as const;
 
 export const auditActionSchema = z.enum(AUDIT_ACTIONS).meta({ id: 'AuditAction' });
@@ -62,6 +78,9 @@ export const AUDIT_ENTITY_TYPES = [
   'client_note',
   'project',
   'project_milestone',
+  'retainer',
+  'retainer_cycle',
+  'extra_work',
 ] as const;
 
 export const auditEntityTypeSchema = z.enum(AUDIT_ENTITY_TYPES).meta({ id: 'AuditEntityType' });

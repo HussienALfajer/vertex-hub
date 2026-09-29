@@ -1,19 +1,23 @@
 import { randomUUID } from 'node:crypto';
 import {
+  businessDate,
   type ClientDetailResponse,
   type CreateClientInput,
   type CreateProjectInput,
+  type CreateRetainerInput,
   clientDetailResponseSchema,
   type ErrorResponse,
   type ProjectDetail,
   projectDetailSchema,
+  type RetainerDetail,
+  retainerDetailSchema,
 } from '@vertex-hub/contracts';
 import type { Database } from '@vertex-hub/db';
 import { expect } from 'vitest';
 import { type api, removeClients, removeUsers, seedUser } from './helpers.js';
 
 /*
- * The people the F02 and F05 tests act as, and client and project factories. Names and trade names carry the run id,
+ * The people the F02 and F05 tests act as, and client, project and retainer factories. Names and trade names carry the run id,
  * so searches see only this run's rows; `cleanup` removes clients first, then users.
  */
 
@@ -74,6 +78,26 @@ export async function seedClientCast(db: Database, client: Api) {
     return projectDetailSchema.parse(await response.json());
   }
 
+  /** A retainer of `clientId` created by the General Manager, starting today (12 designs, 4 reels). */
+  async function createRetainer(
+    clientId: string,
+    input: Partial<CreateRetainerInput> = {},
+  ): Promise<RetainerDetail> {
+    const response = await client.post('/api/retainers', gm.cookie, {
+      clientId,
+      name: `عقد ${run} ${randomUUID().slice(0, 6)}`,
+      departments: ['design'],
+      startDate: businessDate(),
+      deliverables: [
+        { kind: 'design', monthlyQuantity: 12 },
+        { kind: 'reel', monthlyQuantity: 4 },
+      ],
+      ...input,
+    });
+    expect(response.status).toBe(201);
+    return retainerDetailSchema.parse(await response.json());
+  }
+
   return {
     run,
     gm,
@@ -85,6 +109,7 @@ export async function seedClientCast(db: Database, client: Api) {
     signedIn,
     createClient,
     createProject,
+    createRetainer,
     /** Tracks a client created some other way, for cleanup. */
     trackClient: (id: string) => clients.push(id),
     trackUser: (id: string) => users.push(id),

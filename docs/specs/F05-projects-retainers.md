@@ -218,7 +218,7 @@ ended ──reactivate (scope all)──→ active   (clears ended_on, creates t
 ### Retainer rules
 - R1. A client may have several retainers, including several active ones.
 - R2. The daily cycle job (00:05 Asia/Damascus) is idempotent. For every non-archived retainer of a non-archived client it (a) closes each open cycle whose `period_end` is before today, and (b) when the retainer is `active`, its `start_date` ≤ today and it has no cycle for the current month, creates it. It writes the same cycles a late or repeated run would, so a missed day is caught up on the next run (only the current month is created; past months missed while the worker was down are not back-filled).
-- R3. Creating a retainer whose `start_date` ≤ today, resuming a paused retainer, and reactivating an ended one create the current month's cycle at once in the same transaction, if none exists. `period_start` is that day for the first cycle of a mid-month start; later cycles start on the 1st.
+- R3. Creating a retainer whose `start_date` ≤ today, resuming a paused retainer, and reactivating an ended one create the current month's cycle at once in the same transaction, if none exists. `period_start` is that day for the first cycle of a mid-month start (and for a cycle opened by resuming or reactivating); later cycles start on the 1st. Moving a retainer's start date to today or earlier (allowed only before its first cycle) opens the cycle at once too. Reactivating in the month the retainer ended keeps that month's closed cycle; the job opens the next month's.
 - R4. A new cycle copies the retainer's non-archived lines with their full `monthly_quantity`, including a partial first month (no prorating; owner decision). Quantities are then editable on the cycle.
 - R5. Pausing keeps the open cycle until month end; no cycle is created while paused. Ending closes the open cycle at once with `period_end` = today.
 - R6. `renewal_date` never changes status or cycles. The UI shows "renewal due" from 30 days before it and "renewal overdue" after it while the retainer is not `ended`. Updating the date clears the badge.
@@ -233,7 +233,7 @@ ended ──reactivate (scope all)──→ active   (clears ended_on, creates t
 ### Extra work and money rules
 - M1. Money fields are omitted from every response for callers without money access, and any request that sets one is refused with 403 for them.
 - M2. The currency of a project or retainer can change only while none of its installments, fee or estimates is set (`CURRENCY_LOCKED`); amounts are never converted.
-- M3. Extra work can be logged on an `active`, `on_hold` or `planned` project and on an `active` or `paused` retainer. `billing_status` changes need money access; `waived` and `billed` need `billing_note`. F13 will set `billed` with an invoice link; until then it is set by hand.
+- M3. Extra work can be logged on an `active`, `on_hold` or `planned` project and on an `active` or `paused` retainer. `billing_status` changes need money access; `waived` and `billed` need `billing_note`. Billing stays open on completed and cancelled projects and on ended retainers (work is billed after it is done), but not on archived ones. A request date in the future is refused with `INVALID_DATES`. F13 will set `billed` with an invoice link; until then it is set by hand.
 - M4. A retainer without a monthly fee, and an active project whose milestones have no installment, show "fee missing" / "installments missing" to users with money access.
 
 ### General
@@ -243,7 +243,7 @@ ended ──reactivate (scope all)──→ active   (clears ended_on, creates t
 
 ## API
 
-Schemas live in `packages/contracts/src/projects.ts`, `retainers.ts` and `money.ts`, reusing the shared list and error schemas. Lists take `page` and `pageSize` and return `{ items, total, page, pageSize }`. A record outside the caller's read access (archived, for callers without scope all) is a 404. Detail responses carry `permissions` flags (`canManage`, `canChangeManager`, `canCancel`, `canReopen`, `canArchive`, `canSeeMoney`, `canEditMoney`) for the UI, and a `money` object only when `canSeeMoney`.
+Schemas live in `packages/contracts/src/projects.ts`, `retainers.ts`, `extra-work.ts` and `money.ts`, reusing the shared list and error schemas. Lists take `page` and `pageSize` and return `{ items, total, page, pageSize }`. A record outside the caller's read access (archived, for callers without scope all) is a 404. Detail responses carry `permissions` flags (`canManage`, `canChangeManager`, `canCancel`, `canReopen`, `canArchive`, `canSeeMoney`, `canEditMoney`) for the UI, and a `money` object only when `canSeeMoney`.
 
 ### Projects
 | Method and path | Permission | Request | Response | Error codes |
@@ -317,7 +317,7 @@ What roles see differently: everyone sees the same pages without money; edit act
 - Audit actions: `project.created`, `project.updated`, `project.project_manager_changed`, `project.status_changed` (with reason), `project.money_updated` (currency), `project.archived`, `project.restored`; `project_milestone.created` / `updated` / `reordered` / `completed` / `reopened` / `archived` (entity `project_milestone`, `after` carries `projectId`); `retainer.created`, `retainer.updated`, `retainer.status_changed`, `retainer.deliverables_updated` (before/after lines), `retainer.money_updated`, `retainer.archived`, `retainer.restored`; `retainer_cycle.created`, `retainer_cycle.closed` (with delivered counts), `retainer_cycle.line_updated`, `retainer_cycle.line_added`, `retainer_cycle.adjusted` (entity `retainer_cycle`, `after` carries `retainerId`); `extra_work.created` / `updated` / `billing_changed` / `archived` (entity `extra_work`, `after` carries `projectId` or `retainerId`). One PATCH that changes several kinds of fields writes one entry per action.
 - Money values in audit entries are visible only to readers who also have money access. Every holder of `audit.read` (General Manager, Operations manager) also holds `invoices.read` with scope all, so the audit log shows entries unfiltered; the audit log screen links entries to their project or retainer page. `project_milestone.reordered` writes one entry per moved milestone (`position` before and after).
 - Notifications: none (F14 is not built). Later: A09 alerts the account manager and the Operations manager when a cycle is behind (R11); F14 decides renewal-due and new-project-manager notifications.
-- Jobs: `retainers.cycles`, pg-boss cron `5 0 * * *` in Asia/Damascus, in `apps/worker`, running rule R2 through the `projects` module's service; idempotent (unique `retainer_id + month`, closes only open cycles).
+- Jobs: `retainers.cycles`, pg-boss cron `5 0 * * *` in Asia/Damascus, scheduled by `apps/worker` and worked by the API process, which runs rule R2 through the `projects` module's `RetainerCyclesService` (ADR 0008 as amended for F05: the API knows F06's task counts); idempotent (unique `retainer_id + month`, closes only open cycles).
 
 ## Edge cases
 1. Two people edit the same project, milestone or retainer: last write wins; each change writes its own audit entry. Two adjustments at once both apply (they are additive).

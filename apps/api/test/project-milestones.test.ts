@@ -56,6 +56,7 @@ describe('project milestones', () => {
     app.get(WorkProgress).register({
       projects: async (ids) => pick(ids),
       milestones: async (ids) => pick(ids),
+      cycleLines: async (ids) => pick(ids),
     });
   });
 

@@ -10,9 +10,15 @@ import {
   type Database,
   departmentMembers,
   departments,
+  extraWorkItems,
   newId,
   projectMilestones,
   projects,
+  retainerCycleAdjustments,
+  retainerCycleLines,
+  retainerCycles,
+  retainerDeliverables,
+  retainers,
   userRoles,
   users,
 } from '@vertex-hub/db';
@@ -124,6 +130,14 @@ export async function removeClients(db: Database, ids: string[]): Promise<void> 
     db,
     clientProjects.map((row) => row.id),
   );
+  const clientRetainers = await db
+    .select({ id: retainers.id })
+    .from(retainers)
+    .where(inArray(retainers.clientId, ids));
+  await removeRetainers(
+    db,
+    clientRetainers.map((row) => row.id),
+  );
   const children = [
     ...(await db
       .select({ id: clientContacts.id })
@@ -154,9 +168,56 @@ export async function removeProjects(db: Database, ids: string[]): Promise<void>
       .from(projectMilestones)
       .where(inArray(projectMilestones.projectId, ids))
   ).map((row) => row.id);
-  await db.delete(auditEntries).where(inArray(auditEntries.entityId, [...ids, ...milestones]));
+  const extraWork = (
+    await db
+      .select({ id: extraWorkItems.id })
+      .from(extraWorkItems)
+      .where(inArray(extraWorkItems.projectId, ids))
+  ).map((row) => row.id);
+  await db
+    .delete(auditEntries)
+    .where(inArray(auditEntries.entityId, [...ids, ...milestones, ...extraWork]));
+  await db.delete(extraWorkItems).where(inArray(extraWorkItems.projectId, ids));
   await db.delete(projectMilestones).where(inArray(projectMilestones.projectId, ids));
   await db.delete(projects).where(inArray(projects.id, ids));
+}
+
+/** Removes seeded retainers, their lines, cycles, extra work and audit entries (test cleanup only). */
+export async function removeRetainers(db: Database, ids: string[]): Promise<void> {
+  if (ids.length === 0) return;
+  const cycles = (
+    await db
+      .select({ id: retainerCycles.id })
+      .from(retainerCycles)
+      .where(inArray(retainerCycles.retainerId, ids))
+  ).map((row) => row.id);
+  const lines = cycles.length
+    ? (
+        await db
+          .select({ id: retainerCycleLines.id })
+          .from(retainerCycleLines)
+          .where(inArray(retainerCycleLines.cycleId, cycles))
+      ).map((row) => row.id)
+    : [];
+  const extraWork = (
+    await db
+      .select({ id: extraWorkItems.id })
+      .from(extraWorkItems)
+      .where(inArray(extraWorkItems.retainerId, ids))
+  ).map((row) => row.id);
+  await db
+    .delete(auditEntries)
+    .where(inArray(auditEntries.entityId, [...ids, ...cycles, ...extraWork]));
+  if (lines.length) {
+    await db
+      .delete(retainerCycleAdjustments)
+      .where(inArray(retainerCycleAdjustments.lineId, lines));
+    await db.delete(retainerCycleLines).where(inArray(retainerCycleLines.id, lines));
+  }
+  if (cycles.length) await db.delete(retainerCycles).where(inArray(retainerCycles.id, cycles));
+  await db.delete(extraWorkItems).where(inArray(extraWorkItems.retainerId, ids));
+  await db.delete(retainerDeliverables).where(inArray(retainerDeliverables.retainerId, ids));
+  await db.delete(retainers).where(inArray(retainers.id, ids));
 }
 
 function base32Decode(input: string): Buffer {

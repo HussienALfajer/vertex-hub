@@ -1,9 +1,15 @@
 import { Inject, Injectable } from '@nestjs/common';
 import type { ClientStatus } from '@vertex-hub/contracts';
-import { clients, type Database, type Transaction } from '@vertex-hub/db';
-import { eq, getTableName, inArray, type SQL, sql } from 'drizzle-orm';
+import { clientContacts, clients, type Database, type Transaction } from '@vertex-hub/db';
+import { and, eq, getTableName, inArray, isNull, type SQL, sql } from 'drizzle-orm';
 import type { PgColumn } from 'drizzle-orm/pg-core';
 import { DATABASE } from '../../core/database/database.module.js';
+
+export interface ContactSummary {
+  id: string;
+  name: string;
+  archived: boolean;
+}
 
 export interface ClientSummary {
   id: string;
@@ -51,10 +57,58 @@ export class ClientDirectory {
     return new Map(rows.map((row) => [row.id, toSummary(row)]));
   }
 
+  /** Whether `contactId` is a non-archived contact of the client. */
+  async isActiveContact(
+    clientId: string,
+    contactId: string,
+    executor: Database | Transaction = this.db,
+  ): Promise<boolean> {
+    const [row] = await executor
+      .select({ id: clientContacts.id })
+      .from(clientContacts)
+      .where(
+        and(
+          eq(clientContacts.id, contactId),
+          eq(clientContacts.clientId, clientId),
+          isNull(clientContacts.archivedAt),
+        ),
+      );
+    return !!row;
+  }
+
+  /** Contacts by id, archived or not. */
+  async contactSummaries(ids: string[], executor: Database | Transaction = this.db) {
+    const unique = [...new Set(ids)];
+    if (unique.length === 0) return new Map<string, ContactSummary>();
+    const rows = await executor
+      .select({
+        id: clientContacts.id,
+        name: clientContacts.name,
+        archivedAt: clientContacts.archivedAt,
+      })
+      .from(clientContacts)
+      .where(inArray(clientContacts.id, unique));
+    return new Map(
+      rows.map((row) => [row.id, { id: row.id, name: row.name, archived: !!row.archivedAt }]),
+    );
+  }
+
   /** `column` holds a non-archived client (F05 rule G2). */
   isLive(column: PgColumn): SQL {
     return sql`${qualified(column)} in (select ${clients.id} from ${clients}
       where ${clients.archivedAt} is null)`;
+  }
+
+  /** `column` holds a client whose primary account manager is `userId`. */
+  managedBy(column: PgColumn, userId: string): SQL {
+    return sql`${qualified(column)} in (select ${clients.id} from ${clients}
+      where ${clients.accountManagerId} = ${userId})`;
+  }
+
+  /** The trade name of the client in `column`, lowercased, to sort by. */
+  sortName(column: PgColumn): SQL {
+    return sql`(select lower(${clients.tradeName}) from ${clients}
+      where ${clients.id} = ${qualified(column)})`;
   }
 
   /** `column` holds a client whose trade name contains `search`, case-insensitively. */

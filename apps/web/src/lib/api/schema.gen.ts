@@ -628,6 +628,310 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/retainers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["RetainersController_list"];
+        put?: never;
+        post: operations["RetainersController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/retainers/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["RetainersController_detail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["RetainersController_update"];
+        trace?: never;
+    };
+    "/api/retainers/{id}/deliverables": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["RetainersController_setDeliverables"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/retainers/{id}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["RetainersController_changeStatus"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/retainers/{id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["RetainersController_archive"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/retainers/{id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["RetainersController_restore"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/retainers/{id}/cycles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["RetainerCyclesController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/retainers/{id}/cycles/{cycleId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["RetainerCyclesController_detail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/retainers/{id}/cycles/{cycleId}/lines/{lineId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["RetainerCyclesController_updateLine"];
+        trace?: never;
+    };
+    "/api/retainers/{id}/cycles/{cycleId}/lines": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["RetainerCyclesController_addLine"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/retainers/{id}/cycles/{cycleId}/lines/{lineId}/adjustments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["RetainerCyclesController_adjust"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{id}/extra-work": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ExtraWorkController_listOfProject"];
+        put?: never;
+        post: operations["ExtraWorkController_createOnProject"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{id}/extra-work/{itemId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["ExtraWorkController_updateOnProject"];
+        trace?: never;
+    };
+    "/api/projects/{id}/extra-work/{itemId}/billing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ExtraWorkController_billOnProject"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{id}/extra-work/{itemId}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ExtraWorkController_archiveOnProject"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/retainers/{id}/extra-work": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ExtraWorkController_listOfRetainer"];
+        put?: never;
+        post: operations["ExtraWorkController_createOnRetainer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/retainers/{id}/extra-work/{itemId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["ExtraWorkController_updateOnRetainer"];
+        trace?: never;
+    };
+    "/api/retainers/{id}/extra-work/{itemId}/billing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ExtraWorkController_billOnRetainer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/retainers/{id}/extra-work/{itemId}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ExtraWorkController_archiveOnRetainer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -649,9 +953,9 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         /** @enum {string} */
-        AuditEntityType: "user" | "department" | "client" | "client_contact" | "client_platform_account" | "client_note" | "project" | "project_milestone";
+        AuditEntityType: "user" | "department" | "client" | "client_contact" | "client_platform_account" | "client_note" | "project" | "project_milestone" | "retainer" | "retainer_cycle" | "extra_work";
         /** @enum {string} */
-        AuditAction: "user.created" | "user.updated" | "user.roles_changed" | "user.departments_changed" | "user.archived" | "user.restored" | "user.link_issued" | "user.password_set" | "user.password_changed" | "user.two_factor_enabled" | "user.two_factor_disabled" | "user.two_factor_reset" | "user.profile_updated" | "department.updated" | "client.created" | "client.updated" | "client.status_changed" | "client.account_manager_changed" | "client.healthcare_changed" | "client.archived" | "client.restored" | "client.brand_kit_updated" | "client_contact.created" | "client_contact.updated" | "client_contact.archived" | "client_platform_account.created" | "client_platform_account.updated" | "client_platform_account.archived" | "client_note.created" | "client_note.updated" | "client_note.archived" | "project.created" | "project.updated" | "project.project_manager_changed" | "project.status_changed" | "project.money_updated" | "project.archived" | "project.restored" | "project_milestone.created" | "project_milestone.updated" | "project_milestone.reordered" | "project_milestone.completed" | "project_milestone.reopened" | "project_milestone.archived";
+        AuditAction: "user.created" | "user.updated" | "user.roles_changed" | "user.departments_changed" | "user.archived" | "user.restored" | "user.link_issued" | "user.password_set" | "user.password_changed" | "user.two_factor_enabled" | "user.two_factor_disabled" | "user.two_factor_reset" | "user.profile_updated" | "department.updated" | "client.created" | "client.updated" | "client.status_changed" | "client.account_manager_changed" | "client.healthcare_changed" | "client.archived" | "client.restored" | "client.brand_kit_updated" | "client_contact.created" | "client_contact.updated" | "client_contact.archived" | "client_platform_account.created" | "client_platform_account.updated" | "client_platform_account.archived" | "client_note.created" | "client_note.updated" | "client_note.archived" | "project.created" | "project.updated" | "project.project_manager_changed" | "project.status_changed" | "project.money_updated" | "project.archived" | "project.restored" | "project_milestone.created" | "project_milestone.updated" | "project_milestone.reordered" | "project_milestone.completed" | "project_milestone.reopened" | "project_milestone.archived" | "retainer.created" | "retainer.updated" | "retainer.status_changed" | "retainer.deliverables_updated" | "retainer.money_updated" | "retainer.archived" | "retainer.restored" | "retainer_cycle.created" | "retainer_cycle.closed" | "retainer_cycle.line_updated" | "retainer_cycle.line_added" | "retainer_cycle.adjusted" | "extra_work.created" | "extra_work.updated" | "extra_work.billing_changed" | "extra_work.archived";
         /** @description Audit entries, newest first */
         AuditPage: {
             items: components["schemas"]["AuditEntry"][];
@@ -1244,6 +1548,301 @@ export interface components {
         CompleteMilestone: {
             /** @default false */
             confirmOpenTasks: boolean;
+        };
+        /** @enum {string} */
+        RetainerStatus: "active" | "paused" | "ended";
+        RetainerPage: {
+            items: components["schemas"]["Retainer"][];
+            total: number;
+            page: number;
+            pageSize: number;
+        };
+        Retainer: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            client: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            };
+            accountManager: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            };
+            departments: components["schemas"]["DepartmentCode"][];
+            status: components["schemas"]["RetainerStatus"];
+            /** Format: date */
+            renewalDate: string | null;
+            renewal: components["schemas"]["RenewalState"] | null;
+            currentCycle: components["schemas"]["Cycle"] | null;
+        };
+        /** @enum {string} */
+        RenewalState: "due" | "overdue";
+        Cycle: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            retainerId: string;
+            /** Format: date */
+            month: string;
+            /** Format: date */
+            periodStart: string;
+            /** Format: date */
+            periodEnd: string;
+            status: components["schemas"]["CycleStatus"];
+            /** Format: date-time */
+            closedAt: string | null;
+            deliveryRate: number | null;
+            behind: boolean;
+            lines: components["schemas"]["CycleLine"][];
+        };
+        /** @enum {string} */
+        CycleStatus: "open" | "closed";
+        CycleLine: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            cycleId: string;
+            /** Format: uuid */
+            deliverableId: string | null;
+            kind: components["schemas"]["DeliverableKind"];
+            label: string | null;
+            position: number;
+            committed: number;
+            delivered: number;
+            deliveredAfterClose: number;
+            behind: boolean;
+            tasks: components["schemas"]["TaskCounts"];
+        };
+        /** @enum {string} */
+        DeliverableKind: "design" | "reel" | "story" | "post" | "video" | "photo_shoot" | "ad_campaign" | "monthly_report" | "other";
+        RetainerDetail: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            client: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            };
+            accountManager: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            };
+            departments: components["schemas"]["DepartmentCode"][];
+            status: components["schemas"]["RetainerStatus"];
+            /** Format: date */
+            renewalDate: string | null;
+            renewal: components["schemas"]["RenewalState"] | null;
+            currentCycle: components["schemas"]["Cycle"] | null;
+            /** Format: date */
+            startDate: string;
+            /** Format: date */
+            endedOn: string | null;
+            deliverables: components["schemas"]["DeliverableLine"][];
+            /** Format: date-time */
+            archivedAt: string | null;
+            money?: {
+                currency: components["schemas"]["Currency"];
+                monthlyFeeMinor: number | null;
+            };
+            permissions: components["schemas"]["RetainerPermissions"];
+        };
+        DeliverableLine: {
+            /** Format: uuid */
+            id: string;
+            kind: components["schemas"]["DeliverableKind"];
+            label: string | null;
+            monthlyQuantity: number;
+            position: number;
+        };
+        /** @description What the caller may do, for the UI */
+        RetainerPermissions: {
+            canManage: boolean;
+            canReactivate: boolean;
+            canArchive: boolean;
+            canSeeMoney: boolean;
+            canEditMoney: boolean;
+        };
+        CreateRetainer: {
+            name: string;
+            departments: components["schemas"]["DepartmentCode"][];
+            /** Format: date */
+            startDate: string;
+            /** Format: date */
+            renewalDate?: string | null;
+            currency?: components["schemas"]["Currency"];
+            monthlyFeeMinor?: number | null;
+            /** Format: uuid */
+            clientId: string;
+            deliverables?: components["schemas"]["NewDeliverableLine"][];
+        };
+        NewDeliverableLine: {
+            kind: components["schemas"]["DeliverableKind"];
+            label?: string | null;
+            monthlyQuantity: number;
+        };
+        UpdateRetainer: {
+            name?: string;
+            departments?: components["schemas"]["DepartmentCode"][];
+            /** Format: date */
+            startDate?: string;
+            /** Format: date */
+            renewalDate?: string | null;
+            currency?: components["schemas"]["Currency"];
+            monthlyFeeMinor?: number | null;
+        };
+        RetainerDeliverables: {
+            lines: components["schemas"]["DeliverableLineInput"][];
+        };
+        DeliverableLineInput: {
+            kind: components["schemas"]["DeliverableKind"];
+            label?: string | null;
+            monthlyQuantity: number;
+            /** Format: uuid */
+            id?: string;
+        };
+        /** @description Non-archived lines, by position */
+        DeliverableLineList: {
+            items: components["schemas"]["DeliverableLine"][];
+        };
+        RetainerStatusChange: {
+            status: components["schemas"]["RetainerStatus"];
+        };
+        /** @description Cycles, newest month first */
+        CyclePage: {
+            items: components["schemas"]["Cycle"][];
+            total: number;
+            page: number;
+            pageSize: number;
+        };
+        /** @description A cycle with each line’s adjustments, newest first */
+        CycleDetail: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            retainerId: string;
+            /** Format: date */
+            month: string;
+            /** Format: date */
+            periodStart: string;
+            /** Format: date */
+            periodEnd: string;
+            status: components["schemas"]["CycleStatus"];
+            /** Format: date-time */
+            closedAt: string | null;
+            deliveryRate: number | null;
+            behind: boolean;
+            lines: components["schemas"]["CycleLineDetail"][];
+        };
+        CycleLineDetail: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            cycleId: string;
+            /** Format: uuid */
+            deliverableId: string | null;
+            kind: components["schemas"]["DeliverableKind"];
+            label: string | null;
+            position: number;
+            committed: number;
+            delivered: number;
+            deliveredAfterClose: number;
+            behind: boolean;
+            tasks: components["schemas"]["TaskCounts"];
+            adjustments: components["schemas"]["CycleAdjustment"][];
+        };
+        CycleAdjustment: {
+            /** Format: uuid */
+            id: string;
+            delta: number;
+            reason: string;
+            author: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            };
+            /** Format: date-time */
+            createdAt: string;
+        };
+        UpdateCycleLine: {
+            committedQuantity: number;
+            reason: string;
+        };
+        CreateCycleLine: {
+            kind: components["schemas"]["DeliverableKind"];
+            label?: string | null;
+            committedQuantity: number;
+            reason: string;
+        };
+        CreateCycleAdjustment: {
+            delta: number;
+            reason: string;
+        };
+        /** @enum {string} */
+        ExtraWorkBilling: "unbilled" | "billed" | "waived";
+        /** @description Non-archived extra work, newest request first */
+        ExtraWorkPage: {
+            items: components["schemas"]["ExtraWork"][];
+            total: number;
+            page: number;
+            pageSize: number;
+        };
+        ExtraWork: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            projectId: string | null;
+            /** Format: uuid */
+            retainerId: string | null;
+            title: string;
+            description: string | null;
+            /** Format: date */
+            requestedOn: string;
+            contact: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                archived: boolean;
+            } | null;
+            loggedBy: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            };
+            billingStatus: components["schemas"]["ExtraWorkBilling"];
+            billingNote: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            money?: {
+                estimateMinor: number | null;
+                currency: components["schemas"]["Currency"];
+            };
+        };
+        CreateExtraWork: {
+            title: string;
+            description?: string | null;
+            /** Format: date */
+            requestedOn?: string;
+            /** Format: uuid */
+            requestedByContactId?: string | null;
+            estimateMinor?: number | null;
+        };
+        UpdateExtraWork: {
+            title?: string;
+            description?: string | null;
+            /** Format: date */
+            requestedOn?: string;
+            /** Format: uuid */
+            requestedByContactId?: string | null;
+            estimateMinor?: number | null;
+        };
+        ExtraWorkBillingChange: {
+            billingStatus: components["schemas"]["ExtraWorkBilling"];
+            billingNote?: string | null;
         };
         /** @description Liveness of the API and its dependencies */
         HealthResponse: {
@@ -2411,6 +3010,592 @@ export interface operations {
         requestBody?: never;
         responses: {
             /** @description The pending milestone is removed from the project */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    RetainersController_list: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+                search?: string;
+                status?: components["schemas"]["RetainerStatus"] | components["schemas"]["RetainerStatus"][];
+                clientId?: string;
+                accountManagerId?: string;
+                department?: components["schemas"]["DepartmentCode"];
+                behind?: "true" | "false";
+                renewalDue?: "true" | "false";
+                archived?: "true" | "false";
+                sort?: "clientName" | "name" | "renewalDate";
+                order?: components["schemas"]["SortOrder"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Retainers with their current cycle */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RetainerPage"];
+                };
+            };
+        };
+    };
+    RetainersController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateRetainer"];
+            };
+        };
+        responses: {
+            /** @description The new retainer (client scope; currency and fee need money access). A start date of today or earlier opens this month’s cycle at once */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RetainerDetail"];
+                };
+            };
+        };
+    };
+    RetainersController_detail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A retainer with its lines and current cycle; money only with money access */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RetainerDetail"];
+                };
+            };
+        };
+    };
+    RetainersController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateRetainer"];
+            };
+        };
+        responses: {
+            /** @description The updated retainer (client scope; currency and fee need money access) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RetainerDetail"];
+                };
+            };
+        };
+    };
+    RetainersController_setDeliverables: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RetainerDeliverables"];
+            };
+        };
+        responses: {
+            /** @description The standing lines, applied from the next cycle; lines left out are archived */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeliverableLineList"];
+                };
+            };
+        };
+    };
+    RetainersController_changeStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RetainerStatusChange"];
+            };
+        };
+        responses: {
+            /** @description The retainer after the change; reactivating needs scope all */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RetainerDetail"];
+                };
+            };
+        };
+    };
+    RetainersController_archive: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The archived retainer (scope all only) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RetainerDetail"];
+                };
+            };
+        };
+    };
+    RetainersController_restore: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The restored retainer (scope all only) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RetainerDetail"];
+                };
+            };
+        };
+    };
+    RetainerCyclesController_list: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The retainer’s cycles */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CyclePage"];
+                };
+            };
+        };
+    };
+    RetainerCyclesController_detail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                cycleId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A cycle with each line’s adjustments */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CycleDetail"];
+                };
+            };
+        };
+    };
+    RetainerCyclesController_updateLine: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                cycleId: string;
+                lineId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateCycleLine"];
+            };
+        };
+        responses: {
+            /** @description The line with its new committed quantity (open cycles, client scope) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CycleLine"];
+                };
+            };
+        };
+    };
+    RetainerCyclesController_addLine: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                cycleId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateCycleLine"];
+            };
+        };
+        responses: {
+            /** @description A line for this cycle only (open cycles, client scope) */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CycleLine"];
+                };
+            };
+        };
+    };
+    RetainerCyclesController_adjust: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                cycleId: string;
+                lineId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateCycleAdjustment"];
+            };
+        };
+        responses: {
+            /** @description The line after a reasoned change of its delivered count */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CycleLine"];
+                };
+            };
+        };
+    };
+    ExtraWorkController_listOfProject: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+                billingStatus?: components["schemas"]["ExtraWorkBilling"] | components["schemas"]["ExtraWorkBilling"][];
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Extra work, newest request first */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExtraWorkPage"];
+                };
+            };
+        };
+    };
+    ExtraWorkController_createOnProject: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateExtraWork"];
+            };
+        };
+        responses: {
+            /** @description The extra work item */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExtraWork"];
+                };
+            };
+        };
+    };
+    ExtraWorkController_updateOnProject: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                itemId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateExtraWork"];
+            };
+        };
+        responses: {
+            /** @description The extra work item */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExtraWork"];
+                };
+            };
+        };
+    };
+    ExtraWorkController_billOnProject: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                itemId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExtraWorkBillingChange"];
+            };
+        };
+        responses: {
+            /** @description The item with its billing status (client scope and money access) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExtraWork"];
+                };
+            };
+        };
+    };
+    ExtraWorkController_archiveOnProject: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                itemId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The item is removed (entered by mistake) */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ExtraWorkController_listOfRetainer: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+                billingStatus?: components["schemas"]["ExtraWorkBilling"] | components["schemas"]["ExtraWorkBilling"][];
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Extra work, newest request first */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExtraWorkPage"];
+                };
+            };
+        };
+    };
+    ExtraWorkController_createOnRetainer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateExtraWork"];
+            };
+        };
+        responses: {
+            /** @description The extra work item */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExtraWork"];
+                };
+            };
+        };
+    };
+    ExtraWorkController_updateOnRetainer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                itemId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateExtraWork"];
+            };
+        };
+        responses: {
+            /** @description The extra work item */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExtraWork"];
+                };
+            };
+        };
+    };
+    ExtraWorkController_billOnRetainer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                itemId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExtraWorkBillingChange"];
+            };
+        };
+        responses: {
+            /** @description The item with its billing status (client scope and money access) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExtraWork"];
+                };
+            };
+        };
+    };
+    ExtraWorkController_archiveOnRetainer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                itemId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The item is removed (entered by mistake) */
             204: {
                 headers: {
                     [name: string]: unknown;

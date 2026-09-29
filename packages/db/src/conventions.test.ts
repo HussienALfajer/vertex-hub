@@ -25,6 +25,9 @@ const NOT_BUSINESS_RECORDS: Record<string, string> = {
   department_members: 'Link table; a membership is added or removed, never archived',
   audit_entries: 'Append-only log; rows are never updated or archived',
   worker_heartbeats: 'System data written by the worker',
+  retainer_cycles: 'A month of a retainer; never archived on its own, it goes with its retainer',
+  retainer_cycle_lines: 'Part of its cycle; a line is never removed from a month (F05 R10)',
+  retainer_cycle_adjustments: 'Append-only; corrected by a new adjustment (F05 R7)',
 };
 
 /** Tables keyed by a natural value instead of a UUIDv7 `id`. Every entry needs a reason. */

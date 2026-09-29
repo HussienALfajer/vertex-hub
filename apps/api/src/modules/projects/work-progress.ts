@@ -2,12 +2,14 @@ import { Injectable } from '@nestjs/common';
 import type { TaskCounts } from '@vertex-hub/contracts';
 
 /**
- * Task counts per project and milestone, reported by the module that owns tasks (F06). Maps
+ * Task counts per project, milestone and retainer cycle line, reported by the module that owns tasks (F06). Maps
  * leave out ids without tasks.
  */
 export interface WorkProgressSource {
   projects(ids: string[]): Promise<Map<string, TaskCounts>>;
   milestones(ids: string[]): Promise<Map<string, TaskCounts>>;
+  /** `delivered` feeds the deliverables counter (R7). */
+  cycleLines(ids: string[]): Promise<Map<string, TaskCounts>>;
 }
 
 export const NO_TASKS: TaskCounts = { total: 0, delivered: 0, open: 0 };
@@ -30,6 +32,10 @@ export class WorkProgress {
 
   async milestones(ids: string[]): Promise<Map<string, TaskCounts>> {
     return ids.length && this.source ? this.source.milestones(ids) : new Map();
+  }
+
+  async cycleLines(ids: string[]): Promise<Map<string, TaskCounts>> {
+    return ids.length && this.source ? this.source.cycleLines(ids) : new Map();
   }
 }
 

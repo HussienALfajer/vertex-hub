@@ -8,6 +8,7 @@ import { LoggerModule } from 'nestjs-pino';
 import { ConfigModule } from './core/config/config.module.js';
 import { ENV, type Env } from './core/config/env.js';
 import { DatabaseModule } from './core/database/database.module.js';
+import { JobsModule } from './core/jobs/index.js';
 import { AuditModule } from './modules/audit/index.js';
 import { AuthModule } from './modules/auth/index.js';
 import { ClientsModule } from './modules/clients/index.js';
@@ -28,6 +29,7 @@ import { ProjectsModule } from './modules/projects/index.js';
       }),
     }),
     DatabaseModule,
+    JobsModule,
     AuditModule,
     AuthModule,
     ClientsModule,
