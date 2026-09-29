@@ -132,6 +132,20 @@ describe('module boundaries', () => {
     expect(offenders).toEqual([]);
   });
 
+  it('keeps notifications independent of the modules that emit them (ADR 0018)', () => {
+    const emitters = ['tasks', 'clients', 'projects', 'templates'];
+    const offenders = imports
+      .filter(
+        ({ file, specifier }) => moduleOf(file) === 'notifications' && specifier.startsWith('.'),
+      )
+      .filter(({ file, specifier }) => {
+        const target = moduleOf(resolve(dirname(file), specifier));
+        return target !== null && emitters.includes(target);
+      })
+      .map(({ file, specifier }) => `${display(file)} -> ${specifier}`);
+    expect(offenders).toEqual([]);
+  });
+
   /**
    * Which API module owns the tables of each schema file in packages/db (null: no API module
    * does). A new schema file must be added here, which forces the ownership decision.
@@ -140,6 +154,7 @@ describe('module boundaries', () => {
     audit: 'audit',
     auth: 'auth',
     clients: 'clients',
+    notifications: 'notifications',
     projects: 'projects',
     retainers: 'projects',
     system: null,

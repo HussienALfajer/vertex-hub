@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   businessInstant,
   isWorkDay,
+  nextWorkDay,
   nthWorkDay,
   timeOfDaySchema,
   WORK_WEEK,
@@ -73,5 +74,18 @@ describe('time of day', () => {
   it('turns a Damascus day and time into an instant (UTC+3)', () => {
     expect(businessInstant('2026-10-03', '14:00').toISOString()).toBe('2026-10-03T11:00:00.000Z');
     expect(businessInstant('2026-10-03', '01:00').toISOString()).toBe('2026-10-02T22:00:00.000Z');
+  });
+});
+
+describe('next work day (F14 rule 9)', () => {
+  it('skips Friday, so Thursday covers Friday and Saturday', () => {
+    expect(nextWorkDay('2026-10-07')).toBe('2026-10-08'); // Wed → Thu
+    expect(nextWorkDay('2026-10-08')).toBe('2026-10-10'); // Thu → Sat
+    expect(nextWorkDay('2026-10-09')).toBe('2026-10-10'); // Fri → Sat
+  });
+
+  it('crosses month and year ends', () => {
+    expect(nextWorkDay('2026-10-31')).toBe('2026-11-01');
+    expect(nextWorkDay('2026-12-31')).toBe('2027-01-02');
   });
 });

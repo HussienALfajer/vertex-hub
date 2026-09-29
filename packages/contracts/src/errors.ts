@@ -74,6 +74,7 @@ export const ERROR_CODES = [
   'NO_REPEATED_STEP',
   'NOTHING_MISSING',
   'ALREADY_GENERATED',
+  'NOT_MUTABLE',
 ] as const;
 
 export const errorCodeSchema = z.enum(ERROR_CODES).meta({ id: 'ErrorCode' });

@@ -9,3 +9,13 @@ export const RETAINER_CYCLES_JOB = {
   cron: '5 0 * * *',
   tz: 'Asia/Damascus',
 } as const;
+
+/**
+ * F14 rule 8: due-soon, overdue and renewal reminders, then the purge of old read notifications,
+ * at 09:00 on work days (Saturday to Thursday).
+ */
+export const NOTIFICATIONS_DAILY_JOB = {
+  queue: 'notifications.daily',
+  cron: '0 9 * * 0-4,6',
+  tz: 'Asia/Damascus',
+} as const;

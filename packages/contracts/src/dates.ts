@@ -89,3 +89,8 @@ export type TimeOfDay = z.infer<typeof timeOfDaySchema>;
 export function businessInstant(date: CalendarDate, time: TimeOfDay): Date {
   return new Date(Date.parse(`${date}T${time}:00Z`) - BUSINESS_UTC_OFFSET_MS);
 }
+
+/** The first work day after `date`. */
+export function nextWorkDay(date: CalendarDate): CalendarDate {
+  return nthWorkDay(addDays(date, 1), 1);
+}
