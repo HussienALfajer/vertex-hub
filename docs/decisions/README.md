@@ -21,6 +21,7 @@ Short records of decisions that shape the system. Each has a status: **Accepted*
 | [0015](0015-retainer-cycles-and-deliverables.md) | Retainer monthly cycles and the deliverables counter | Accepted |
 | [0016](0016-task-workflow-and-revisions.md) | Task workflow, requests between departments and revision counting | Accepted |
 | [0017](0017-work-templates.md) | Work templates in work days; automatic tasks for each retainer cycle | Accepted |
+| [0018](0018-in-app-notifications.md) | In-app notifications: stored per user, pushed over SSE, reminders from one daily job | Accepted |
 
 Template:
 
