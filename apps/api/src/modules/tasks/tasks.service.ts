@@ -49,6 +49,7 @@ import { CodedException } from '../../core/errors/index.js';
 import { changedFields, recordAudit } from '../audit/index.js';
 import { type CurrentUserInfo, lockAccessChanges, UserDirectory } from '../auth/index.js';
 import { ClientDirectory, type ClientSummary } from '../clients/index.js';
+import type { Notice } from '../notifications/index.js';
 import { EngagementDirectory } from '../projects/index.js';
 import {
   accessColumns,
@@ -73,6 +74,7 @@ import {
   dependenciesOf,
   dependentsOf,
 } from './task-dependencies.js';
+import { blocksDependents, type NoticeTask, TaskNotices, toTimeOfDay } from './task-notices.js';
 import { overdueSql, overLimitPendingSql } from './task-sql.js';
 
 type Executor = Database | Transaction;
@@ -95,9 +97,6 @@ const LINK_FIELDS = [
 
 const escapeLike = (value: string) => value.replace(/[\\%_]/g, (char) => `\\${char}`);
 
-/** `HH:MM:SS` from the database to `HH:MM`. */
-const toTimeOfDay = (time: string | null) => time?.slice(0, 5) ?? null;
-
 /** Tasks of every department (spec F06): list, detail, create, edit, archive and restore. */
 @Injectable()
 export class TasksService {
@@ -106,6 +105,7 @@ export class TasksService {
     private readonly users: UserDirectory,
     private readonly clients: ClientDirectory,
     private readonly engagements: EngagementDirectory,
+    private readonly notices: TaskNotices,
   ) {}
 
   private get directories() {
@@ -422,6 +422,17 @@ export class TasksService {
           ...(input.links.length > 0 && { links: input.links }),
         },
       });
+      const task = await this.notices.load(tx, created.id);
+      await this.notices.send(tx, [
+        input.assigneeId
+          ? this.notices.notice(task, 'task_assigned', [input.assigneeId], actor.id)
+          : this.notices.notice(
+              task,
+              'task_requested',
+              await this.notices.managers(tx, input.department),
+              actor.id,
+            ),
+      ]);
       return created.id;
     });
     return this.detail(actor, id);
@@ -608,6 +619,7 @@ export class TasksService {
           after: { requestScope: input.requestScope, extraWorkItemId },
         });
       }
+      await this.notifyUpdate(tx, actor, task, basics);
     });
     return this.detail(actor, id);
   }
@@ -621,6 +633,14 @@ export class TasksService {
       }
       await tx.update(tasks).set({ archivedAt: new Date() }).where(eq(tasks.id, id));
       await this.auditArchive(tx, actor, 'task.archived', id, true);
+      await this.notices.send(tx, [
+        this.notices.notice(task, 'task_changed', [task.assigneeId], actor.id, {
+          change: 'archived',
+          from: null,
+          to: null,
+        }),
+        ...(blocksDependents(task) ? await this.notices.openedDependents(tx, [id], actor.id) : []),
+      ]);
     });
     return this.detail(actor, id);
   }
@@ -636,6 +656,50 @@ export class TasksService {
       await this.auditArchive(tx, actor, 'task.restored', id, false);
     });
     return this.detail(actor, id);
+  }
+
+  /**
+   * F14: the new assignee gets `task_assigned`, the one it was taken from `task_changed`; a task
+   * moved to a department without an assignee goes to its managers; a new due date or time goes
+   * to the assignee.
+   */
+  private async notifyUpdate(
+    tx: Transaction,
+    actor: CurrentUserInfo,
+    before: TaskAccess,
+    basics: Change | null,
+  ): Promise<void> {
+    const after = await this.notices.load(tx, before.id);
+    const notice = this.notices.notice.bind(this.notices);
+    const list: Notice[] = [];
+    if (after.assigneeId !== before.assigneeId) {
+      list.push(notice(after, 'task_assigned', [after.assigneeId], actor.id));
+      list.push(
+        notice(after, 'task_changed', [before.assigneeId], actor.id, {
+          change: 'taken_away',
+          from: null,
+          to: null,
+        }),
+      );
+    }
+    if (after.department !== before.department && !after.assigneeId) {
+      const managers = await this.notices.managers(tx, after.department);
+      list.push(notice(after, 'task_requested', managers, actor.id));
+    }
+    if (basics && ('dueDate' in basics.after || 'dueTime' in basics.after)) {
+      const due = (task: NoticeTask) => ({
+        dueDate: task.dueDate,
+        dueTime: toTimeOfDay(task.dueTime),
+      });
+      list.push(
+        notice(after, 'task_changed', [after.assigneeId], actor.id, {
+          change: 'due',
+          from: due(before),
+          to: due(after),
+        }),
+      );
+    }
+    await this.notices.send(tx, list);
   }
 
   /**

@@ -3,6 +3,7 @@ import {
   allowedTaskTransitions,
   BOARD_STATUSES,
   canMakeTaskMove,
+  commentExcerpt,
   createsDependencyCycle,
   createTaskChecklistItemSchema,
   createTaskSchema,
@@ -442,6 +443,23 @@ describe('mentionedUserIds', () => {
 
   it('ignores text that only looks like a mention', () => {
     expect(mentionedUserIds('@{not-a-uuid} @name {x}')).toEqual([]);
+  });
+});
+
+describe('commentExcerpt', () => {
+  const names = new Map([[ids.user, 'Rana']]);
+  const nameOf = (id: string) => names.get(id) ?? '';
+
+  it('shows mentions by name and collapses whitespace', () => {
+    const body = `@{${ids.user.toUpperCase()}}  please
+check`;
+    expect(commentExcerpt(body, nameOf)).toBe('@Rana please check');
+  });
+
+  it('cuts long comments to 140 characters with an ellipsis', () => {
+    const excerpt = commentExcerpt('a'.repeat(200), nameOf);
+    expect(excerpt).toHaveLength(140);
+    expect(excerpt.endsWith('…')).toBe(true);
   });
 });
 

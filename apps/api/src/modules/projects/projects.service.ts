@@ -60,6 +60,7 @@ import {
   type UserSummary,
 } from '../auth/index.js';
 import { ClientDirectory, type ClientSummary } from '../clients/index.js';
+import { NotificationCenter } from '../notifications/index.js';
 import {
   actorOf,
   assertCanEditMoney,
@@ -117,6 +118,7 @@ export class ProjectsService implements OnModuleInit {
     private readonly responsibilities: ResponsibilityRegistry,
     private readonly milestones: ProjectMilestonesService,
     private readonly progress: WorkProgress,
+    private readonly notifications: NotificationCenter,
   ) {}
 
   /** Rule 4: a user cannot be archived while they manage an open project. */
@@ -319,6 +321,7 @@ export class ProjectsService implements OnModuleInit {
           milestones,
         },
       });
+      await this.notifyManager(tx, actor, created.id, manager.id, input.name, client.name);
       return created.id;
     });
     return this.detail(actor, id);
@@ -405,6 +408,10 @@ export class ProjectsService implements OnModuleInit {
       await audit('project.updated', basics);
       await audit('project.project_manager_changed', managerChange);
       await audit('project.money_updated', money);
+      if (manager) {
+        const name = input.name ?? current.name;
+        await this.notifyManager(tx, actor, id, manager.id, name, project.client.name);
+      }
     });
     return this.detail(actor, id);
   }
@@ -493,6 +500,7 @@ export class ProjectsService implements OnModuleInit {
           before: { projectManager: { id: project.projectManagerId, name: previous?.name ?? '' } },
           after: { projectManager: { id: manager.id, name: manager.name } },
         });
+        await this.notifyManager(tx, actor, id, manager.id, project.name, project.client.name);
       }
       await recordAudit(tx, {
         actor: actorOf(actor),
@@ -504,6 +512,24 @@ export class ProjectsService implements OnModuleInit {
       });
     });
     return this.detail(actor, id);
+  }
+
+  /** F14: the new project manager learns about the project. */
+  private notifyManager(
+    tx: Transaction,
+    actor: CurrentUserInfo,
+    projectId: string,
+    managerId: string,
+    name: string,
+    clientName: string,
+  ) {
+    return this.notifications.notify(tx, {
+      type: 'project_manager_assigned',
+      recipients: [managerId],
+      actorId: actor.id,
+      subjectId: projectId,
+      data: { project: name, client: clientName },
+    });
   }
 
   async archive(actor: CurrentUserInfo, id: string): Promise<ProjectDetail> {

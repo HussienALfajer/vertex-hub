@@ -33,6 +33,7 @@ import { CodedException } from '../../core/errors/index.js';
 import { recordAudit } from '../audit/index.js';
 import type { CurrentUserInfo } from '../auth/index.js';
 import { ClientDirectory } from '../clients/index.js';
+import type { Notice } from '../notifications/index.js';
 import { EngagementDirectory } from '../projects/index.js';
 import {
   actorOf,
@@ -41,7 +42,8 @@ import {
   type TaskAccess,
   taskRights,
 } from './task-access.js';
-import { assertValidDependencies, dependenciesOf } from './task-dependencies.js';
+import { assertValidDependencies, dependenciesOf, isBlocked } from './task-dependencies.js';
+import { blocksDependents, requesterOf, TaskNotices } from './task-notices.js';
 import { TasksService } from './tasks.service.js';
 
 /** Moves where the client answers, and so a contact may be named. */
@@ -58,6 +60,7 @@ export class TaskWorkflowService {
     private readonly clients: ClientDirectory,
     private readonly engagements: EngagementDirectory,
     private readonly tasks: TasksService,
+    private readonly notices: TaskNotices,
   ) {}
 
   private get directories() {
@@ -153,6 +156,8 @@ export class TaskWorkflowService {
           ...(overridden && { overrideReason: change.reason }),
         },
       });
+      const overLimit = !!revision?.overLimit;
+      await this.notices.send(tx, await this.moveNotices(tx, actor, task, move, overLimit));
     });
     return this.tasks.detail(actor, id);
   }
@@ -266,8 +271,72 @@ export class TaskWorkflowService {
         before: { dependsOn: current.map((d) => ({ id: d.id, title: d.title })) },
         after: { dependsOn: after },
       });
+      // Rule 7 (A03): removing the last open dependency opens a new task.
+      if (task.status === 'new' && isTaskBlocked(current) && !(await isBlocked(id, tx))) {
+        const recipients = await this.notices.assigneeOrManagers(tx, task);
+        await this.notices.send(tx, [
+          this.notices.notice(task, 'task_opened', recipients, actor.id),
+        ]);
+      }
     });
     return { items: await dependenciesOf(id, this.db) };
+  }
+
+  /** F14: who hears about a move ("Notification types"); `task` is as it was before the move. */
+  private async moveNotices(
+    tx: Transaction,
+    actor: CurrentUserInfo,
+    task: TaskAccess,
+    move: TaskMove,
+    overLimit: boolean,
+  ): Promise<Notice[]> {
+    const notice = this.notices.notice.bind(this.notices);
+    const assignee = [task.assigneeId];
+    const accountManager = task.client?.accountManagerId ?? null;
+    switch (move) {
+      case 'submit':
+      case 'resubmit': {
+        const managers = await this.notices.managers(tx, task.department);
+        return [notice(task, 'task_review_requested', [...managers, accountManager], actor.id)];
+      }
+      case 'return':
+        return [notice(task, 'task_returned', assignee, actor.id, { source: 'internal' })];
+      case 'client_changes':
+      case 'reopen_client':
+        return [
+          notice(task, 'task_returned', assignee, actor.id, { source: 'client' }),
+          ...(overLimit ? [notice(task, 'task_over_limit', [accountManager], actor.id)] : []),
+        ];
+      case 'send_to_client':
+        return [
+          notice(task, 'task_approved', assignee, actor.id, { source: 'internal' }),
+          notice(task, 'task_awaiting_client', [accountManager], actor.id),
+        ];
+      case 'approve':
+      case 'client_approved':
+        return [
+          notice(task, 'task_approved', assignee, actor.id, {
+            source: move === 'approve' ? 'internal' : 'client',
+          }),
+          ...(await this.notices.openedDependents(tx, [task.id], actor.id)),
+        ];
+      case 'deliver':
+        return [
+          notice(task, 'request_finished', [requesterOf(task)], actor.id, {
+            outcome: 'delivered',
+          }),
+        ];
+      case 'cancel':
+        return [
+          ...this.notices.cancelled(task, actor.id),
+          // An approved task no longer blocked anything.
+          ...(blocksDependents(task)
+            ? await this.notices.openedDependents(tx, [task.id], actor.id)
+            : []),
+        ];
+      default:
+        return [];
+    }
   }
 
   /** The move the change asks for; `INVALID_TRANSITION` when the workflow has none. */
