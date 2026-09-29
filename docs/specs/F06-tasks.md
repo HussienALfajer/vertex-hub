@@ -1,6 +1,6 @@
 # F06 — Task engine and workflow
 
-Status: Draft · Date: 2026-09-29 · Scope: `docs/product/v1-scope.md` §F06 (and A03; A06, A07, A08 build on it) · ADRs: 0007, 0013, 0014, 0015, 0016
+Status: Approved · Date: 2026-09-29 · Scope: `docs/product/v1-scope.md` §F06 (and A03; A06, A07, A08 build on it) · ADRs: 0007, 0013, 0014, 0015, 0016
 
 ## Summary
 Work at the agency is requested and tracked in WhatsApp: nobody sees who works on what, deadlines are missed silently, and clients ask for unlimited revisions. F06 makes the task the core unit of work for all ten departments: every piece of work has a department, one assignee, a due date and a status on one shared workflow (`new → in progress → internal review → awaiting client → revisions → approved → delivered`). Anyone can request work from any department and its manager assigns it; tasks link to a client and to a project milestone or retainer cycle line, feeding F05's progress and deliverables counter; dependencies hold a task until the work it needs is approved; client revisions are counted against a limit and the account manager decides what happens past it. Views: My tasks, a filterable list, a board by status and a weekly workload view; each task has a checklist, links and comments with @mentions.
