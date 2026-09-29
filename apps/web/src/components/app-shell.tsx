@@ -28,6 +28,7 @@ import {
   type LucideIcon,
   MenuIcon,
   MoonIcon,
+  RepeatIcon,
   ScrollTextIcon,
   SunIcon,
   SwatchBookIcon,
@@ -44,6 +45,7 @@ interface NavItem {
     | 'nav.home'
     | 'nav.clients'
     | 'nav.projects'
+    | 'nav.retainers'
     | 'nav.team'
     | 'nav.departments'
     | 'nav.audit'
@@ -59,6 +61,7 @@ const navItems: NavItem[] = [
   { to: '/', label: 'nav.home', icon: HouseIcon, exact: true },
   { to: '/clients', label: 'nav.clients', icon: BriefcaseBusinessIcon, permission: 'clients.read' },
   { to: '/projects', label: 'nav.projects', icon: FolderKanbanIcon, permission: 'projects.read' },
+  { to: '/retainers', label: 'nav.retainers', icon: RepeatIcon, permission: 'projects.read' },
   { to: '/team', label: 'nav.team', icon: UsersIcon },
   { to: '/departments', label: 'nav.departments', icon: Building2Icon },
   { to: '/audit', label: 'nav.audit', icon: ScrollTextIcon, permission: 'audit.read' },

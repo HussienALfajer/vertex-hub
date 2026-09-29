@@ -8,6 +8,7 @@ import {
   type AuditEntry,
   CLIENT_STATUSES,
   PROJECT_STATUSES,
+  RETAINER_STATUSES,
 } from '@vertex-hub/contracts';
 import {
   Avatar,
@@ -32,10 +33,17 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LoadError } from '../../components/load-error';
 import { canAll, useMe } from '../../lib/auth';
-import { businessDayEnd, businessDayStart, formatDateTime, formatNumber } from '../../lib/format';
+import {
+  businessDayEnd,
+  businessDayStart,
+  formatDateTime,
+  formatMonth,
+  formatNumber,
+} from '../../lib/format';
 import { clientListQuery } from '../clients/clients.queries';
 import { departmentListQuery } from '../departments/departments.queries';
 import { projectListQuery } from '../projects/projects.queries';
+import { retainerListQuery } from '../retainers/retainers.queries';
 import { userListQuery } from '../users/users.queries';
 import { auditListQuery } from './audit.queries';
 import { AuditValue } from './audit-value';
@@ -145,6 +153,7 @@ interface EntityNames {
   department: (id: string) => string | undefined;
   client: (id: string) => string | undefined;
   project: (id: string) => string | undefined;
+  retainer: (id: string) => string | undefined;
 }
 
 /**
@@ -169,6 +178,13 @@ function useEntityNames(): EntityNames {
     ...projectListQuery({ status: [...PROJECT_STATUSES], archived: 'true', pageSize: 100 }),
     enabled: canAll(me, 'projects.manage'),
   }).data;
+  const retainers = useQuery(
+    retainerListQuery({ status: [...RETAINER_STATUSES], pageSize: 100 }),
+  ).data;
+  const archivedRetainers = useQuery({
+    ...retainerListQuery({ status: [...RETAINER_STATUSES], archived: 'true', pageSize: 100 }),
+    enabled: canAll(me, 'projects.manage'),
+  }).data;
   return useMemo(() => {
     const users = [active, invited, archived]
       .flatMap((page) => page?.items ?? [])
@@ -188,12 +204,18 @@ function useEntityNames(): EntityNames {
         .flatMap((page) => page?.items ?? [])
         .map((project) => [project.id, project.name]),
     );
+    const retainerNames = new Map(
+      [retainers, archivedRetainers]
+        .flatMap((page) => page?.items ?? [])
+        .map((retainer) => [retainer.id, retainer.name]),
+    );
     return {
       users,
       user: (id) => userNames.get(id),
       department: (id) => departmentNames.get(id),
       client: (id) => clientNames.get(id),
       project: (id) => projectNames.get(id),
+      retainer: (id) => retainerNames.get(id),
     };
   }, [
     active,
@@ -204,6 +226,8 @@ function useEntityNames(): EntityNames {
     archivedClients,
     projects,
     archivedProjects,
+    retainers,
+    archivedRetainers,
   ]);
 }
 
@@ -347,13 +371,15 @@ const actionTone = (action: AuditAction) => {
   return 'neutral';
 };
 
+const LINK_FIELDS = new Set(['clientId', 'projectId', 'retainerId', 'lineId']);
+
 function AuditRow({ entry, names }: { entry: AuditEntry; names: EntityNames }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
-  // `clientId` and `projectId` on a child record's entry are where its link points, not a change.
+  // The parent's id on a child record's entry is where its link points, not a change.
   const fields = [
     ...new Set([...Object.keys(entry.before ?? {}), ...Object.keys(entry.after ?? {})]),
-  ].filter((field) => field !== 'clientId' && field !== 'projectId');
+  ].filter((field) => !LINK_FIELDS.has(field));
   const detailsId = `audit-${entry.id}`;
 
   return (
@@ -524,6 +550,21 @@ const CLIENT_TAB: Partial<Record<AuditEntityType, 'platforms' | 'communication'>
   client_note: 'communication',
 };
 
+/** The retainer a retainer, cycle or extra work entry belongs to. */
+function retainerIdOf(entry: AuditEntry): string | undefined {
+  if (entry.entityType === 'retainer') return entry.entityId;
+  if (entry.entityType !== 'retainer_cycle' && entry.entityType !== 'extra_work') return;
+  const retainerId = entry.after?.retainerId ?? entry.before?.retainerId;
+  return typeof retainerId === 'string' ? retainerId : undefined;
+}
+
+/** The retainer tab an entry's change shows on. */
+function retainerTabOf(entry: AuditEntry): 'history' | 'extra-work' | undefined {
+  if (entry.entityType === 'extra_work') return 'extra-work';
+  if (entry.action === 'retainer_cycle.closed') return 'history';
+  return undefined;
+}
+
 /** The project a project, milestone or extra work entry belongs to. */
 function projectIdOf(entry: AuditEntry): string | undefined {
   if (entry.entityType === 'project') return entry.entityId;
@@ -569,6 +610,23 @@ function EntityLink({ entry, names }: { entry: AuditEntry; names: EntityNames })
         {entry.entityType === 'project_milestone' && typeof milestoneName === 'string'
           ? t('audit.milestoneOfProject', { milestone: milestoneName, project: projectName })
           : projectName}
+      </Link>
+    );
+  }
+  const retainerId = retainerIdOf(entry);
+  if (retainerId) {
+    const retainerName = names.retainer(retainerId) ?? t('audit.openRetainer');
+    const month = entry.after?.month ?? entry.before?.month;
+    return (
+      <Link
+        to="/retainers/$retainerId"
+        params={{ retainerId }}
+        search={{ tab: retainerTabOf(entry) }}
+        className={linkClass}
+      >
+        {entry.entityType === 'retainer_cycle' && typeof month === 'string'
+          ? t('audit.cycleOfRetainer', { month: formatMonth(month), retainer: retainerName })
+          : retainerName}
       </Link>
     );
   }

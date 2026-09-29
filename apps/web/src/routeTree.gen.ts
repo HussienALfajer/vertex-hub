@@ -25,6 +25,9 @@ import { Route as AppDepartmentsDepartmentIdRouteImport } from './routes/_app/de
 import { Route as AppProjectsIndexRouteImport } from './routes/_app/projects/index'
 import { Route as AppProjectsProjectIdRouteImport } from './routes/_app/projects/$projectId'
 import { Route as AppProjectsNewRouteImport } from './routes/_app/projects/new'
+import { Route as AppRetainersIndexRouteImport } from './routes/_app/retainers/index'
+import { Route as AppRetainersRetainerIdRouteImport } from './routes/_app/retainers/$retainerId'
+import { Route as AppRetainersNewRouteImport } from './routes/_app/retainers/new'
 import { Route as AppTeamIndexRouteImport } from './routes/_app/team/index'
 import { Route as AppTeamUserIdRouteImport } from './routes/_app/team/$userId'
 import { Route as AppTeamNewRouteImport } from './routes/_app/team/new'
@@ -109,6 +112,21 @@ const AppProjectsNewRoute = AppProjectsNewRouteImport.update({
   path: '/projects/new',
   getParentRoute: () => AppRoute,
 } as any)
+const AppRetainersIndexRoute = AppRetainersIndexRouteImport.update({
+  id: '/retainers/',
+  path: '/retainers/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppRetainersRetainerIdRoute = AppRetainersRetainerIdRouteImport.update({
+  id: '/retainers/$retainerId',
+  path: '/retainers/$retainerId',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppRetainersNewRoute = AppRetainersNewRouteImport.update({
+  id: '/retainers/new',
+  path: '/retainers/new',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppTeamIndexRoute = AppTeamIndexRouteImport.update({
   id: '/team/',
   path: '/team/',
@@ -138,11 +156,14 @@ export interface FileRoutesByFullPath {
   '/departments/$departmentId': typeof AppDepartmentsDepartmentIdRoute
   '/projects/$projectId': typeof AppProjectsProjectIdRoute
   '/projects/new': typeof AppProjectsNewRoute
+  '/retainers/$retainerId': typeof AppRetainersRetainerIdRoute
+  '/retainers/new': typeof AppRetainersNewRoute
   '/team/$userId': typeof AppTeamUserIdRoute
   '/team/new': typeof AppTeamNewRoute
   '/clients/': typeof AppClientsIndexRoute
   '/departments/': typeof AppDepartmentsIndexRoute
   '/projects/': typeof AppProjectsIndexRoute
+  '/retainers/': typeof AppRetainersIndexRoute
   '/team/': typeof AppTeamIndexRoute
 }
 export interface FileRoutesByTo {
@@ -158,11 +179,14 @@ export interface FileRoutesByTo {
   '/departments/$departmentId': typeof AppDepartmentsDepartmentIdRoute
   '/projects/$projectId': typeof AppProjectsProjectIdRoute
   '/projects/new': typeof AppProjectsNewRoute
+  '/retainers/$retainerId': typeof AppRetainersRetainerIdRoute
+  '/retainers/new': typeof AppRetainersNewRoute
   '/team/$userId': typeof AppTeamUserIdRoute
   '/team/new': typeof AppTeamNewRoute
   '/clients': typeof AppClientsIndexRoute
   '/departments': typeof AppDepartmentsIndexRoute
   '/projects': typeof AppProjectsIndexRoute
+  '/retainers': typeof AppRetainersIndexRoute
   '/team': typeof AppTeamIndexRoute
 }
 export interface FileRoutesById {
@@ -180,11 +204,14 @@ export interface FileRoutesById {
   '/_app/departments/$departmentId': typeof AppDepartmentsDepartmentIdRoute
   '/_app/projects/$projectId': typeof AppProjectsProjectIdRoute
   '/_app/projects/new': typeof AppProjectsNewRoute
+  '/_app/retainers/$retainerId': typeof AppRetainersRetainerIdRoute
+  '/_app/retainers/new': typeof AppRetainersNewRoute
   '/_app/team/$userId': typeof AppTeamUserIdRoute
   '/_app/team/new': typeof AppTeamNewRoute
   '/_app/clients/': typeof AppClientsIndexRoute
   '/_app/departments/': typeof AppDepartmentsIndexRoute
   '/_app/projects/': typeof AppProjectsIndexRoute
+  '/_app/retainers/': typeof AppRetainersIndexRoute
   '/_app/team/': typeof AppTeamIndexRoute
 }
 export interface FileRouteTypes {
@@ -202,11 +229,14 @@ export interface FileRouteTypes {
     | '/departments/$departmentId'
     | '/projects/$projectId'
     | '/projects/new'
+    | '/retainers/$retainerId'
+    | '/retainers/new'
     | '/team/$userId'
     | '/team/new'
     | '/clients/'
     | '/departments/'
     | '/projects/'
+    | '/retainers/'
     | '/team/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -222,11 +252,14 @@ export interface FileRouteTypes {
     | '/departments/$departmentId'
     | '/projects/$projectId'
     | '/projects/new'
+    | '/retainers/$retainerId'
+    | '/retainers/new'
     | '/team/$userId'
     | '/team/new'
     | '/clients'
     | '/departments'
     | '/projects'
+    | '/retainers'
     | '/team'
   id:
     | '__root__'
@@ -243,11 +276,14 @@ export interface FileRouteTypes {
     | '/_app/departments/$departmentId'
     | '/_app/projects/$projectId'
     | '/_app/projects/new'
+    | '/_app/retainers/$retainerId'
+    | '/_app/retainers/new'
     | '/_app/team/$userId'
     | '/_app/team/new'
     | '/_app/clients/'
     | '/_app/departments/'
     | '/_app/projects/'
+    | '/_app/retainers/'
     | '/_app/team/'
   fileRoutesById: FileRoutesById
 }
@@ -372,6 +408,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppProjectsNewRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/retainers/': {
+      id: '/_app/retainers/'
+      path: '/retainers'
+      fullPath: '/retainers/'
+      preLoaderRoute: typeof AppRetainersIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/retainers/$retainerId': {
+      id: '/_app/retainers/$retainerId'
+      path: '/retainers/$retainerId'
+      fullPath: '/retainers/$retainerId'
+      preLoaderRoute: typeof AppRetainersRetainerIdRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/retainers/new': {
+      id: '/_app/retainers/new'
+      path: '/retainers/new'
+      fullPath: '/retainers/new'
+      preLoaderRoute: typeof AppRetainersNewRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/team/': {
       id: '/_app/team/'
       path: '/team'
@@ -406,11 +463,14 @@ interface AppRouteChildren {
   AppDepartmentsDepartmentIdRoute: typeof AppDepartmentsDepartmentIdRoute
   AppProjectsProjectIdRoute: typeof AppProjectsProjectIdRoute
   AppProjectsNewRoute: typeof AppProjectsNewRoute
+  AppRetainersRetainerIdRoute: typeof AppRetainersRetainerIdRoute
+  AppRetainersNewRoute: typeof AppRetainersNewRoute
   AppTeamUserIdRoute: typeof AppTeamUserIdRoute
   AppTeamNewRoute: typeof AppTeamNewRoute
   AppClientsIndexRoute: typeof AppClientsIndexRoute
   AppDepartmentsIndexRoute: typeof AppDepartmentsIndexRoute
   AppProjectsIndexRoute: typeof AppProjectsIndexRoute
+  AppRetainersIndexRoute: typeof AppRetainersIndexRoute
   AppTeamIndexRoute: typeof AppTeamIndexRoute
 }
 
@@ -424,11 +484,14 @@ const AppRouteChildren: AppRouteChildren = {
   AppDepartmentsDepartmentIdRoute: AppDepartmentsDepartmentIdRoute,
   AppProjectsProjectIdRoute: AppProjectsProjectIdRoute,
   AppProjectsNewRoute: AppProjectsNewRoute,
+  AppRetainersRetainerIdRoute: AppRetainersRetainerIdRoute,
+  AppRetainersNewRoute: AppRetainersNewRoute,
   AppTeamUserIdRoute: AppTeamUserIdRoute,
   AppTeamNewRoute: AppTeamNewRoute,
   AppClientsIndexRoute: AppClientsIndexRoute,
   AppDepartmentsIndexRoute: AppDepartmentsIndexRoute,
   AppProjectsIndexRoute: AppProjectsIndexRoute,
+  AppRetainersIndexRoute: AppRetainersIndexRoute,
   AppTeamIndexRoute: AppTeamIndexRoute,
 }
 

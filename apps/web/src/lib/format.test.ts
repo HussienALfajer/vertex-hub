@@ -7,6 +7,7 @@ import {
   formatDateTime,
   formatLink,
   formatLinkHost,
+  formatMonth,
   formatNumber,
   fromBusinessDateTimeInput,
   toBusinessDateTimeInput,
@@ -51,5 +52,13 @@ describe('formatting', () => {
     const formatted = formatCalendarDate('2026-10-01');
     expect(formatted).not.toMatch(ARABIC_INDIC_DIGITS);
     expect(formatted).toMatch(/^1 .+ 2026$/);
+  });
+
+  it('formats a month from its first day without moving it to the month before', () => {
+    const formatted = formatMonth('2026-10-01');
+    expect(formatted).not.toMatch(ARABIC_INDIC_DIGITS);
+    expect(formatted).toBe(formatMonth('2026-10-31'));
+    expect(formatted).not.toBe(formatMonth('2026-09-30'));
+    expect(formatted).toMatch(/2026$/);
   });
 });

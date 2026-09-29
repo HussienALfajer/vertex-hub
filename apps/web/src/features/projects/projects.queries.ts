@@ -1,18 +1,9 @@
-import {
-  infiniteQueryOptions,
-  keepPreviousData,
-  queryOptions,
-  useMutation,
-  useQueryClient,
-} from '@tanstack/react-query';
+import { keepPreviousData, queryOptions, useMutation, useQueryClient } from '@tanstack/react-query';
 import type {
   CompleteMilestone,
-  CreateExtraWork,
   CreateMilestone,
   CreateProject,
-  ExtraWorkBillingChange,
   ProjectStatusChange,
-  UpdateExtraWork,
   UpdateMilestone,
   UpdateProject,
 } from '@vertex-hub/contracts';
@@ -42,23 +33,6 @@ export const projectQuery = (id: string) =>
     queryFn: () => call(api.GET('/api/projects/{id}', { params: { path: { id } } })),
   });
 
-const EXTRA_WORK_PAGE_SIZE = 20;
-
-/** A project's extra work, newest request first, one page at a time ("Show older"). */
-export const projectExtraWorkQuery = (id: string) =>
-  infiniteQueryOptions({
-    queryKey: projectsKeys.extraWork(id),
-    queryFn: ({ pageParam }) =>
-      call(
-        api.GET('/api/projects/{id}/extra-work', {
-          params: { path: { id }, query: { page: pageParam, pageSize: EXTRA_WORK_PAGE_SIZE } },
-        }),
-      ),
-    initialPageParam: 1,
-    getNextPageParam: (last) =>
-      last.page * last.pageSize < last.total ? last.page + 1 : undefined,
-  });
-
 /**
  * A mutation on project data. Every one refreshes the whole `projects` cache, also on failure: a
  * 403 after the project changed hands (edge case 10) reloads the page without edit actions.
@@ -76,8 +50,6 @@ const path = (id: string) => ({ params: { path: { id } } });
 const milestonePath = (id: string, milestoneId: string) => ({
   params: { path: { id, milestoneId } },
 });
-
-const itemPath = (id: string, itemId: string) => ({ params: { path: { id, itemId } } });
 
 export const useCreateProject = () =>
   useProjectsMutation((input: CreateProject) => call(api.POST('/api/projects', { body: input })));
@@ -146,31 +118,4 @@ export const useArchiveMilestone = (id: string) =>
         milestonePath(id, milestoneId),
       ),
     ),
-  );
-
-export const useCreateExtraWork = (id: string) =>
-  useProjectsMutation((input: CreateExtraWork) =>
-    call(api.POST('/api/projects/{id}/extra-work', { ...path(id), body: input })),
-  );
-
-export const useUpdateExtraWork = (id: string) =>
-  useProjectsMutation(({ itemId, ...input }: UpdateExtraWork & { itemId: string }) =>
-    call(
-      api.PATCH('/api/projects/{id}/extra-work/{itemId}', { ...itemPath(id, itemId), body: input }),
-    ),
-  );
-
-export const useChangeExtraWorkBilling = (id: string) =>
-  useProjectsMutation(({ itemId, ...input }: ExtraWorkBillingChange & { itemId: string }) =>
-    call(
-      api.POST('/api/projects/{id}/extra-work/{itemId}/billing', {
-        ...itemPath(id, itemId),
-        body: input,
-      }),
-    ),
-  );
-
-export const useArchiveExtraWork = (id: string) =>
-  useProjectsMutation((itemId: string) =>
-    call(api.POST('/api/projects/{id}/extra-work/{itemId}/archive', itemPath(id, itemId))),
   );

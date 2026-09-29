@@ -1,0 +1,276 @@
+import { standardSchemaResolver } from '@hookform/resolvers/standard-schema';
+import { Link, useNavigate } from '@tanstack/react-router';
+import {
+  businessDate,
+  type ClientResponse,
+  type CreateRetainer,
+  type CreateRetainerInput,
+  createRetainerSchema,
+} from '@vertex-hub/contracts';
+import { AscentLines, Avatar, Button, Callout, PageHeader, toast } from '@vertex-hub/ui';
+import { ArrowRightIcon, CalendarPlusIcon, CalendarRangeIcon } from 'lucide-react';
+import { useState } from 'react';
+import { useForm, useWatch } from 'react-hook-form';
+import { useTranslation } from 'react-i18next';
+import { FormAlert } from '../../components/form-alert';
+import { FormSection } from '../../components/form-section';
+import { useMe } from '../../lib/auth';
+import { formatCalendarDate, formatNumber } from '../../lib/format';
+import { formatMoney } from '../../lib/money';
+import { hasMoneyAccess } from '../projects/project-access';
+import { DepartmentChips } from '../projects/project-badges';
+import { useProjectClients } from '../projects/project-form';
+import { DeliverableIcon, lineName, RetainerStatusBadge } from './retainer-badges';
+import {
+  ClientField,
+  checkDuplicateLines,
+  checkRenewal,
+  DatesFields,
+  DeliverablesEditor,
+  type DeliverablesFormMethods,
+  DepartmentsField,
+  MoneyFields,
+  NameField,
+  type RetainerFormMethods,
+  retainerFormFailure,
+} from './retainer-form';
+import { useCreateRetainer } from './retainers.queries';
+
+export interface NewRetainerSearch {
+  /** Preset from the client profile's Retainers tab. */
+  clientId?: string;
+}
+
+export function parseNewRetainerSearch(search: Record<string, unknown>): NewRetainerSearch {
+  return {
+    clientId:
+      typeof search.clientId === 'string' && search.clientId.length <= 36
+        ? search.clientId
+        : undefined,
+  };
+}
+
+export function NewRetainerPage({ search }: { search: NewRetainerSearch }) {
+  const { t } = useTranslation();
+  const me = useMe();
+  const navigate = useNavigate();
+  const create = useCreateRetainer();
+  // Retainers start for the same clients as projects (rule 1, the same permission).
+  const clients = useProjectClients();
+  const [failure, setFailure] = useState<string | null>(null);
+  const form = useForm<CreateRetainerInput, unknown, CreateRetainer>({
+    resolver: standardSchemaResolver(createRetainerSchema),
+    defaultValues: {
+      clientId: search.clientId ?? '',
+      name: '',
+      departments: [],
+      startDate: businessDate(),
+      renewalDate: null,
+      currency: 'USD',
+      monthlyFeeMinor: null,
+      deliverables: [],
+    },
+  });
+  // The lines editor also edits an existing retainer's lines; this form holds them the same way.
+  const linesForm = form as unknown as DeliverablesFormMethods;
+  const clientId = useWatch({ control: form.control, name: 'clientId' });
+  const client = clients.data?.items.find((item) => item.id === clientId);
+  // Money fields follow the chosen client's account manager (M1).
+  const money = !!client && hasMoneyAccess(me, client.accountManager.id);
+  const back = search.clientId
+    ? ({
+        to: '/clients/$clientId',
+        params: { clientId: search.clientId },
+        search: { tab: 'retainers' },
+      } as const)
+    : ({ to: '/retainers' } as const);
+
+  const submit = form.handleSubmit(async (values) => {
+    setFailure(null);
+    const renewalOk = checkRenewal(form, t, values.startDate, values.renewalDate);
+    const linesOk = checkDuplicateLines(linesForm, t, values.deliverables);
+    if (!renewalOk || !linesOk) return;
+    // Without money access the API refuses money fields, so none are sent (M1).
+    const input: CreateRetainer = money
+      ? values
+      : { ...values, currency: undefined, monthlyFeeMinor: undefined };
+    try {
+      const retainer = await create.mutateAsync(input);
+      toast.add({ title: t('retainers.new.created'), type: 'success' });
+      await navigate({ to: '/retainers/$retainerId', params: { retainerId: retainer.id } });
+    } catch (error) {
+      setFailure(retainerFormFailure(form, t, error));
+    }
+  });
+
+  return (
+    <>
+      <PageHeader
+        title={t('retainers.new.title')}
+        description={t('retainers.new.subtitle')}
+        actions={
+          <Button variant="ghost" render={<Link {...back} />}>
+            <ArrowRightIcon className="ltr:-scale-x-100" />
+            {search.clientId ? t('projects.new.backToClient') : t('retainers.new.back')}
+          </Button>
+        }
+      />
+      <form
+        className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]"
+        onSubmit={submit}
+        noValidate
+      >
+        <div className="flex min-w-0 flex-col gap-6">
+          <FormSection title={t('retainers.form.identity')} hint={t('retainers.form.identityHint')}>
+            <ClientField form={form} clients={clients.data?.items ?? []} />
+            <NameField form={form} />
+            <DepartmentsField form={form} />
+          </FormSection>
+          <FormSection title={t('retainers.form.term')} hint={t('retainers.form.termHint')}>
+            <DatesFields form={form} />
+            <FirstCycleNote form={form} />
+            {money && <MoneyFields form={form} />}
+          </FormSection>
+          <FormSection title={t('retainers.lines.title')} hint={t('retainers.form.linesHint')}>
+            <DeliverablesEditor form={linesForm} />
+          </FormSection>
+          {failure && <FormAlert>{failure}</FormAlert>}
+          <div className="flex flex-wrap items-center justify-end gap-3">
+            <Button variant="outline" render={<Link {...back} />}>
+              {t('common.cancel')}
+            </Button>
+            <Button type="submit" disabled={form.formState.isSubmitting}>
+              {form.formState.isSubmitting
+                ? t('projects.form.creating')
+                : t('retainers.form.create')}
+            </Button>
+          </div>
+        </div>
+        <Preview form={form} client={client} money={money} />
+      </form>
+    </>
+  );
+}
+
+/** R3 and R4: a start date today or earlier opens this month's cycle at once, with full quantities. */
+function FirstCycleNote({ form }: { form: RetainerFormMethods }) {
+  const { t } = useTranslation();
+  const start = useWatch({ control: form.control, name: 'startDate' });
+  if (!start) return null;
+  const now = start <= businessDate();
+  return (
+    <Callout
+      icon={<CalendarPlusIcon />}
+      title={now ? t('retainers.form.cycleNow') : t('retainers.form.cycleLater')}
+      description={
+        now
+          ? t('retainers.form.cycleNowBody')
+          : t('retainers.form.cycleLaterBody', { date: formatCalendarDate(start) })
+      }
+    />
+  );
+}
+
+/** How the retainer will read once created, updated as the form is filled in. */
+function Preview({
+  form,
+  client,
+  money,
+}: {
+  form: RetainerFormMethods;
+  client: ClientResponse | undefined;
+  money: boolean;
+}) {
+  const { t } = useTranslation();
+  const values = useWatch({ control: form.control });
+  const name = values.name?.trim() || t('retainers.form.namePlaceholder');
+  const lines = (values.deliverables ?? []).flatMap((line) =>
+    line?.kind ? [{ ...line, kind: line.kind }] : [],
+  );
+
+  return (
+    <aside
+      aria-label={t('retainers.new.preview')}
+      className="relative flex flex-col gap-4 overflow-hidden rounded-lg border border-border bg-surface p-5 lg:sticky lg:top-24"
+    >
+      <AscentLines className="absolute inset-y-0 end-0 h-full w-16 text-border" />
+      <p className="relative text-sm font-medium text-muted-foreground">
+        {t('retainers.new.preview')}
+      </p>
+      <div className="relative flex items-center gap-3">
+        <Avatar
+          name={client?.tradeName ?? name}
+          shape="square"
+          size="lg"
+          tone={client ? 'brand' : 'muted'}
+        />
+        <div className="flex min-w-0 flex-col gap-1">
+          <p className="truncate text-lg font-bold">{name}</p>
+          <p className="truncate text-sm text-muted-foreground">
+            {client?.tradeName ?? t('projects.form.clientPlaceholder')}
+          </p>
+        </div>
+      </div>
+      <div className="relative flex flex-wrap gap-1.5">
+        <RetainerStatusBadge status="active" />
+      </div>
+      {(values.departments?.length ?? 0) > 0 && (
+        <div className="relative">
+          <DepartmentChips codes={(values.departments ?? []).flatMap((code) => code ?? [])} />
+        </div>
+      )}
+      <dl className="relative flex flex-col gap-3 border-t border-border pt-4 text-sm">
+        {values.startDate && (
+          <div className="flex flex-col gap-1">
+            <dt className="text-xs text-muted-foreground">{t('retainers.form.term')}</dt>
+            <dd className="flex items-center gap-2">
+              <CalendarRangeIcon aria-hidden="true" className="size-4 text-muted-foreground" />
+              <span>
+                {values.renewalDate
+                  ? t('retainers.startRenewal', {
+                      start: formatCalendarDate(values.startDate),
+                      renewal: formatCalendarDate(values.renewalDate),
+                    })
+                  : t('retainers.startsOn', { date: formatCalendarDate(values.startDate) })}
+              </span>
+            </dd>
+          </div>
+        )}
+        <div className="flex flex-col gap-2">
+          <dt className="text-xs text-muted-foreground">{t('retainers.new.perMonth')}</dt>
+          <dd>
+            {lines.length === 0 ? (
+              <span className="text-muted-foreground">{t('retainers.noLines')}</span>
+            ) : (
+              <ul className="flex flex-col gap-1.5">
+                {lines.map((line, index) => (
+                  <li
+                    // biome-ignore lint/suspicious/noArrayIndexKey: preview rows follow the editor's order
+                    key={index}
+                    className="flex items-center justify-between gap-2"
+                  >
+                    <span className="flex min-w-0 items-center gap-2">
+                      <DeliverableIcon kind={line.kind} className="text-muted-foreground" />
+                      <span className="truncate">{lineName(t, line)}</span>
+                    </span>
+                    <span className="font-medium tabular-nums">
+                      {formatNumber(Number(line.monthlyQuantity) || 0)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </dd>
+        </div>
+        {money && values.monthlyFeeMinor != null && (
+          <div className="flex items-center justify-between gap-2">
+            <dt className="text-xs text-muted-foreground">{t('retainers.form.monthlyFee')}</dt>
+            <dd className="font-bold tabular-nums">
+              {formatMoney(values.monthlyFeeMinor, values.currency ?? 'USD')}
+            </dd>
+          </div>
+        )}
+      </dl>
+    </aside>
+  );
+}

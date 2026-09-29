@@ -137,7 +137,19 @@ function ProjectView({ project, tab }: { project: ProjectDetail; tab: ProjectTab
           <MilestonesTab project={project} editable={editable} />
         </TabsContent>
         <TabsContent value="extra-work">
-          <ExtraWorkTab project={project} />
+          <ExtraWorkTab
+            owner={{
+              kind: 'project',
+              id: project.id,
+              clientId: project.client.id,
+              canLog: editable,
+              canBill: project.permissions.canBill,
+              currency: project.money?.currency ?? null,
+              editCurrency: project.permissions.canEditMoney
+                ? (project.money?.currency ?? null)
+                : null,
+            }}
+          />
         </TabsContent>
       </Tabs>
     </>
