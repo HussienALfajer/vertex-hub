@@ -108,7 +108,7 @@ export interface TaskListSearch {
 }
 
 const PAGE_SIZE = 25;
-const ALL = 'all';
+export const ALL = 'all';
 const DEFAULT_STATUSES: TaskStatus[] = [...OPEN_TASK_STATUSES];
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -582,7 +582,7 @@ function Filters({
   );
 }
 
-function FilterSelect({
+export function FilterSelect({
   label,
   items,
   value,

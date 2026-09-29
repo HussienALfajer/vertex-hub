@@ -196,3 +196,99 @@ test('archiving a user with open tasks lists them with a link to each', async ({
   await dialog.getByRole('link', { name: ar.users.responsibilities.openTask }).click();
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('جلسة تصوير الأطباق');
 });
+
+test('the board moves a card by dragging it and through its "Move to…" menu', async ({ page }) => {
+  await page.setViewportSize({ width: 1600, height: 1100 });
+  await onTasksToday(page);
+  await mockApi(page, { signedIn: true, me: accountManagerMe });
+
+  // The Design manager finds the board in the navigation; it shows their department.
+  await page.goto('/tasks');
+  await page
+    .getByRole('navigation', { name: ar.nav.label })
+    .getByRole('link', { name: ar.nav.taskBoard })
+    .click();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(ar.tasks.board.title);
+  const column = (status: string) => page.locator(`li[data-status="${status}"]`);
+  const card = page.locator(`li[data-task="${seedIds.autumnMenu}"]`);
+  await expect(column('in_progress').locator(card)).toBeVisible();
+
+  // Dragging marks the columns the task may move to; the assignee submits it for review.
+  await card.hover();
+  await page.mouse.down();
+  await column('internal_review').hover();
+  await expect(column('internal_review')).toHaveAttribute('data-drop', 'allowed');
+  await expect(column('delivered')).toHaveAttribute('data-drop', 'refused');
+  await column('internal_review').hover({ position: { x: 40, y: 80 } });
+  await page.mouse.up();
+  await expect(page.getByText(ar.tasks.moves.done.submit)).toBeVisible();
+  await expect(column('internal_review').locator(card)).toBeVisible();
+
+  // The keyboard way: a move that needs a note opens the task page's dialog.
+  const logo = page.locator(`li[data-task="${seedIds.clinicLogo}"]`);
+  await logo.getByRole('button', { name: /انقل/ }).click();
+  await page.getByRole('menuitem', { name: ar.tasks.moves.return }).click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByRole('textbox').first().fill('وحّد درجة الأخضر');
+  await dialog.getByRole('button', { name: ar.tasks.moves.return }).click();
+  await expect(column('revisions').locator(logo)).toBeVisible();
+});
+
+test('the board is linked for managers only, and reachable by everyone', async ({ page }) => {
+  await onTasksToday(page);
+  await mockApi(page, { signedIn: true, me: employeeMe });
+  await page.goto('/tasks');
+  const nav = page.getByRole('navigation', { name: ar.nav.label });
+  await expect(nav.getByRole('link', { name: ar.nav.workload })).toBeVisible();
+  await expect(nav.getByRole('link', { name: ar.nav.taskBoard })).toHaveCount(0);
+
+  // The photographer's own department; their task waits on the menu designs, so it cannot start.
+  await page.goto('/tasks/board');
+  const shoot = page.locator(`li[data-task="${seedIds.dishShoot}"]`);
+  await expect(page.locator('li[data-status="new"]').locator(shoot)).toBeVisible();
+  await shoot.getByRole('button', { name: /انقل/ }).click();
+  await expect(page.getByRole('menuitem', { name: ar.tasks.moves.cancel })).toBeVisible();
+  await expect(page.getByRole('menuitem', { name: ar.tasks.moves.start })).toHaveCount(0);
+});
+
+test('workload counts open the matching tasks in the list', async ({ page }) => {
+  await onTasksToday(page);
+  await mockApi(page, { signedIn: true, me: accountManagerMe });
+  await page.goto('/tasks/workload');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(ar.tasks.workload.title);
+  const row = page.getByRole('row', { name: /ليان الأحمد/ });
+  await expect(row).toBeVisible();
+
+  // Next week, and back.
+  await page.getByRole('button', { name: ar.tasks.workload.nextWeek }).click();
+  await expect(page).toHaveURL(/week=2026-10-17/);
+  await page.getByRole('button', { name: ar.tasks.workload.thisWeek }).click();
+  await expect(page).not.toHaveURL(/week=/);
+
+  await row.getByRole('link', { name: /المتأخرة/ }).click();
+  await expect(page).toHaveURL(/\/tasks\/list\?.*overdue=true/);
+  await expect(page.getByRole('link', { name: 'تصاميم منيو الخريف' })).toBeVisible();
+});
+
+test('project, retainer and client pages lead to their tasks', async ({ page }) => {
+  await onTasksToday(page);
+  await mockApi(page, { signedIn: true, me: accountManagerMe });
+
+  // The project's Tasks tab groups them by milestone and presets new ones.
+  await page.goto(`/projects/${seedIds.identityProject}?tab=tasks`);
+  await expect(page.getByRole('link', { name: 'تصاميم منيو الخريف' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: ar.tasks.projectTab.noMilestone })).toBeVisible();
+  await page.getByRole('link', { name: ar.tasks.projectTab.newForMilestone }).first().click();
+  await expect(page).toHaveURL(/milestoneId=/);
+
+  // A retainer line offers a task for it.
+  await page.goto(`/retainers/${seedIds.socialRetainer}`);
+  await page.getByRole('link', { name: ar.retainers.cycle.newTask }).first().click();
+  await expect(page).toHaveURL(/cycleLineId=/);
+
+  // The client's open tasks put the pending over-limit decision first.
+  await page.goto(`/clients/${seedIds.jasmine}?tab=tasks`);
+  const rows = page.getByRole('tabpanel').getByRole('listitem');
+  await expect(rows.first()).toContainText('بوستات أسبوع الافتتاح');
+  await expect(rows.first()).toContainText(ar.tasks.overLimitPending);
+});

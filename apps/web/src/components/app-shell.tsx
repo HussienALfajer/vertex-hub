@@ -37,6 +37,7 @@ import {
 } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { managesTeams } from '../features/tasks/task-access';
 import { authClient, can, useMe } from '../lib/auth';
 import { useTheme } from '../lib/theme';
 
@@ -63,7 +64,9 @@ interface NavItem {
 
 interface NavChild {
   to: LinkProps['to'];
-  label: 'nav.myTasks' | 'nav.taskList';
+  label: 'nav.myTasks' | 'nav.taskList' | 'nav.taskBoard' | 'nav.workload';
+  /** Lists the page only for these users; others still reach it. */
+  show?: (me: MeResponse) => boolean;
 }
 
 const navItems: NavItem[] = [
@@ -76,6 +79,8 @@ const navItems: NavItem[] = [
     children: [
       { to: '/tasks', label: 'nav.myTasks' },
       { to: '/tasks/list', label: 'nav.taskList' },
+      { to: '/tasks/board', label: 'nav.taskBoard', show: managesTeams },
+      { to: '/tasks/workload', label: 'nav.workload' },
     ],
   },
   { to: '/clients', label: 'nav.clients', icon: BriefcaseBusinessIcon, permission: 'clients.read' },
@@ -142,17 +147,19 @@ function Sidebar({ me, onNavigate }: { me: MeResponse; onNavigate?: () => void }
             </Link>
             {children && (
               <div className="flex flex-col gap-0.5">
-                {children.map((child) => (
-                  <Link
-                    key={child.label}
-                    to={child.to}
-                    onClick={onNavigate}
-                    activeOptions={{ exact: true, includeSearch: false }}
-                    className={cn(navLink, 'h-8 ps-11 pe-3 text-sm')}
-                  >
-                    {t(child.label)}
-                  </Link>
-                ))}
+                {children
+                  .filter((child) => !child.show || child.show(me))
+                  .map((child) => (
+                    <Link
+                      key={child.label}
+                      to={child.to}
+                      onClick={onNavigate}
+                      activeOptions={{ exact: true, includeSearch: false }}
+                      className={cn(navLink, 'h-8 ps-11 pe-3 text-sm')}
+                    >
+                      {t(child.label)}
+                    </Link>
+                  ))}
               </div>
             )}
           </div>

@@ -28,6 +28,7 @@ import {
   ArrowRightIcon,
   BanIcon,
   CircleCheckBigIcon,
+  ListTodoIcon,
   MilestoneIcon,
   ReceiptTextIcon,
 } from 'lucide-react';
@@ -38,6 +39,7 @@ import { LoadError } from '../../components/load-error';
 import { ApiError } from '../../lib/api/client';
 import { formatCalendarDate, formatDateTime, formatNumber } from '../../lib/format';
 import { formatMoney } from '../../lib/money';
+import { ProjectTasksTab } from '../tasks/project-tasks-tab';
 import { ExtraWorkTab } from './extra-work-tab';
 import { MilestonesTab } from './milestones-tab';
 import { ProjectActions, ReopenButton } from './project-actions';
@@ -51,7 +53,7 @@ import {
 import { projectQuery, useRestoreProject } from './projects.queries';
 import { scheduleOf } from './schedule';
 
-const PROJECT_TABS = ['milestones', 'extra-work'] as const;
+const PROJECT_TABS = ['milestones', 'tasks', 'extra-work'] as const;
 
 type ProjectTab = (typeof PROJECT_TABS)[number];
 
@@ -128,6 +130,15 @@ function ProjectView({ project, tab }: { project: ProjectDetail; tab: ProjectTab
               </Badge>
             )}
           </TabsTrigger>
+          <TabsTrigger value="tasks">
+            <ListTodoIcon />
+            {t('projects.page.tabs.tasks')}
+            {project.tasks.open > 0 && (
+              <Badge tone="neutral" className="h-5 min-w-5 justify-center px-1.5 tabular-nums">
+                {formatNumber(project.tasks.open)}
+              </Badge>
+            )}
+          </TabsTrigger>
           <TabsTrigger value="extra-work">
             <ReceiptTextIcon />
             {t('projects.page.tabs.extraWork')}
@@ -135,6 +146,9 @@ function ProjectView({ project, tab }: { project: ProjectDetail; tab: ProjectTab
         </TabsList>
         <TabsContent value="milestones">
           <MilestonesTab project={project} editable={editable} />
+        </TabsContent>
+        <TabsContent value="tasks">
+          <ProjectTasksTab project={project} />
         </TabsContent>
         <TabsContent value="extra-work">
           <ExtraWorkTab

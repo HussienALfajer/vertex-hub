@@ -1,5 +1,7 @@
 import { standardSchemaResolver } from '@hookform/resolvers/standard-schema';
+import { Link } from '@tanstack/react-router';
 import {
+  BOARD_STATUSES,
   type CreateMilestone,
   type CreateMilestoneInput,
   type Currency,
@@ -421,13 +423,21 @@ function MilestoneStep({
               </span>
             )}
             {milestone.tasks.total > 0 && (
-              <span className="flex items-center gap-1.5">
+              <Link
+                to="/tasks/list"
+                search={{
+                  projectId: milestone.projectId,
+                  milestoneId: milestone.id,
+                  status: [...BOARD_STATUSES],
+                }}
+                className="flex items-center gap-1.5 hover:text-foreground hover:underline"
+              >
                 <ListChecksIcon aria-hidden="true" className="size-4" />
                 {t('projects.milestones.tasks', {
                   delivered: formatNumber(milestone.tasks.delivered),
                   total: formatNumber(milestone.tasks.total),
                 })}
-              </span>
+              </Link>
             )}
           </p>
         </div>
