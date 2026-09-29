@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/index.js';
 import { ClientsModule } from '../clients/index.js';
+import { CycleOpenedHooks } from './cycle-opened-hooks.js';
 import { EngagementDirectory } from './engagement-directory.js';
 import { ExtraWorkController } from './extra-work.controller.js';
 import { ExtraWorkService } from './extra-work.service.js';
@@ -19,7 +20,7 @@ import { WorkProgress } from './work-progress.js';
  * clients through `clients`' `ClientDirectory`, registers the project-manager responsibility
  * (rule 4), takes task counts from whatever registers in `WorkProgress` (F06), and works the
  * `retainers.cycles` job that `apps/worker` schedules (R2). Exports `EngagementDirectory` for
- * the `tasks` module.
+ * the `tasks` and `templates` modules, and `CycleOpenedHooks` for `templates` (F07 rule 16).
  */
 @Module({
   imports: [AuthModule, ClientsModule],
@@ -38,7 +39,8 @@ import { WorkProgress } from './work-progress.js';
     ExtraWorkService,
     WorkProgress,
     EngagementDirectory,
+    CycleOpenedHooks,
   ],
-  exports: [WorkProgress, EngagementDirectory],
+  exports: [WorkProgress, EngagementDirectory, CycleOpenedHooks],
 })
 export class ProjectsModule {}

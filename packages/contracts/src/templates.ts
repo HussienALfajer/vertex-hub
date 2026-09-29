@@ -1,11 +1,21 @@
 import { z } from 'zod';
+import {
+  addDays,
+  type CalendarDate,
+  calendarDateSchema,
+  isWorkDay,
+  nthWorkDay,
+  workDaysBetween,
+} from './dates.js';
 import { type DepartmentCode, departmentCodeSchema } from './departments.js';
 import { pageQuerySchema, pageSchema, queryBooleanSchema, sortOrderSchema } from './lists.js';
 import { type DeliverableKind, deliverableKindSchema } from './retainers.js';
 import {
   DEFAULT_REVISION_LIMIT,
   TASK_LIMITS,
+  type TaskPriority,
   taskPrioritySchema,
+  taskStatusSchema,
   taskTitleSchema,
 } from './tasks.js';
 import { optionalText } from './text.js';
@@ -39,6 +49,8 @@ export const TEMPLATE_LIMITS = {
   projectDueDay: 260,
   /** Last due day or spread start of a monthly step. */
   cycleDueDay: 27,
+  /** Tasks one run creates at most (rule 14). */
+  runTasks: 300,
 } as const;
 
 // Inputs
@@ -158,8 +170,10 @@ export function templateIssues(kind: TemplateKind, doc: TemplateDocument): Templ
     step.dependsOn.forEach((key, j) => {
       const index = stepIndex.get(key);
       if (index === undefined) issue(['steps', i, 'dependsOn', j], 'Not an earlier step');
-      else if (kind === 'retainer_cycle' && !repeated && doc.steps[index]?.repeatKind)
-        issue(['steps', i, 'dependsOn', j], 'A fixed step cannot wait on a repeated step');
+      // A step waiting on a repeated step would wait on up to 999 tasks, or on keys that
+      // match no single task (rule 2).
+      else if (kind === 'retainer_cycle' && doc.steps[index]?.repeatKind)
+        issue(['steps', i, 'dependsOn', j], 'No step can wait on a repeated step');
     });
     stepIndex.set(step.key, i);
   });
@@ -307,3 +321,426 @@ export const templatePageSchema = pageSchema(templateListItemSchema).meta({
 });
 
 export type TemplatePage = z.infer<typeof templatePageSchema>;
+// Runs (rules 6–19)
+
+export const templateRunInputSchema = z
+  .object({
+    /** A project run; exactly one of `projectId` and `retainerCycleId`. */
+    projectId: z.uuid().optional(),
+    /** A run on the retainer's open current cycle. */
+    retainerCycleId: z.uuid().optional(),
+    /** Project runs only: default the later of the project's start date and today (rule 6). */
+    startDate: calendarDateSchema.optional(),
+    /** Per department: a user, or null for its queue; others get the template's default. */
+    assignees: z
+      .array(z.object({ department: departmentCodeSchema, userId: z.uuid().nullable() }))
+      .max(20)
+      .default([]),
+  })
+  .superRefine((input, ctx) => {
+    if (!input.projectId === !input.retainerCycleId) {
+      ctx.addIssue({ code: 'custom', path: ['projectId'], message: 'A project or a cycle' });
+    }
+    if (input.startDate && !input.projectId) {
+      ctx.addIssue({ code: 'custom', path: ['startDate'], message: 'Project runs only' });
+    }
+    const departments = input.assignees.map((a) => a.department);
+    if (new Set(departments).size !== departments.length) {
+      ctx.addIssue({ code: 'custom', path: ['assignees'], message: 'One entry per department' });
+    }
+  })
+  .meta({ id: 'TemplateRunInput' });
+
+export type TemplateRunInput = z.infer<typeof templateRunInputSchema>;
+
+export type TemplateRunInputBody = z.input<typeof templateRunInputSchema>;
+
+export const TEMPLATE_RUN_WARNINGS = [
+  /** Tasks due after the project's due date (rule 7). */
+  'due_after_project',
+  /** The template was applied to the project before (rule 15). */
+  'applied_before',
+  /** A department's assignee is no longer a member: its tasks go to the queue (rule 10). */
+  'assignee_replaced',
+  /** Repeated instances left out at the task cap (rule 14). */
+  'over_cap',
+] as const;
+
+export const templateRunWarningSchema = z
+  .object({
+    type: z.enum(TEMPLATE_RUN_WARNINGS),
+    /** `assignee_replaced` only. */
+    department: departmentCodeSchema.nullable(),
+    /** The tasks it concerns; for `applied_before`, the earlier runs. */
+    count: z.number().int().min(1),
+  })
+  .meta({ id: 'TemplateRunWarning' });
+
+export type TemplateRunWarning = z.infer<typeof templateRunWarningSchema>;
+
+export const templatePlannedTaskSchema = z
+  .object({
+    /** The step id, with `:<instance>` for a repeated step. */
+    key: z.string(),
+    title: z.string(),
+    department: departmentCodeSchema,
+    /** Null: the department's queue. */
+    assignee: personSchema.nullable(),
+    /** The chosen assignee is no longer a member of the department (rule 10). */
+    assigneeReplaced: z.boolean(),
+    dueDate: calendarDateSchema,
+    /** Project runs: the milestone of the step's stage; `existingId` null for a new one. */
+    milestone: z.object({ existingId: z.uuid().nullable(), name: z.string() }).nullable(),
+    /** Cycle runs: the line a repeated instance counts for. */
+    cycleLineId: z.uuid().nullable(),
+    /** Keys of the tasks of this run it waits on. */
+    dependsOn: z.array(z.string()),
+  })
+  .meta({ id: 'TemplatePlannedTask' });
+
+export const templateRunPlanSchema = z
+  .object({
+    startDate: calendarDateSchema,
+    tasks: z.array(templatePlannedTaskSchema),
+    /** New milestones in the order they are appended (rule 13). */
+    milestonesToCreate: z.array(z.object({ name: z.string(), dueDate: calendarDateSchema })),
+    warnings: z.array(templateRunWarningSchema),
+    taskCount: z.number().int().min(0),
+  })
+  .meta({ id: 'TemplateRunPlan' });
+
+export type TemplateRunPlanResponse = z.infer<typeof templateRunPlanSchema>;
+
+/** A planned task with the fields the run copies from its step (rule 11). */
+export type PlannedTask = z.infer<typeof templatePlannedTaskSchema> & {
+  stepId: string;
+  /** Repeated steps: the instance number. */
+  instance: number | null;
+  brief: string | null;
+  priority: TaskPriority;
+  needsClientApproval: boolean;
+  revisionLimit: number;
+  checklist: string[];
+};
+
+export type TemplateRunPlan = Omit<TemplateRunPlanResponse, 'tasks'> & { tasks: PlannedTask[] };
+
+/** A line of the cycle a run generates for. */
+export interface PlanCycleLine {
+  id: string;
+  kind: DeliverableKind;
+  label: string | null;
+  committed: number;
+}
+
+export type PlanTarget =
+  | {
+      type: 'project';
+      startDate: CalendarDate;
+      /** The project's due date, for the `due_after_project` warning. */
+      dueDate: CalendarDate;
+      /** The project's non-archived milestones. */
+      milestones: { id: string; name: string; position: number; status: 'pending' | 'done' }[];
+      /** Earlier runs of this template on the project. */
+      earlierRuns: number;
+    }
+  | { type: 'cycle'; startDate: CalendarDate; periodEnd: CalendarDate; lines: PlanCycleLine[] }
+  | {
+      /** Rule 18: `missing` more instances for one line, numbered after its `existing` tasks. */
+      type: 'missing';
+      startDate: CalendarDate;
+      periodEnd: CalendarDate;
+      line: PlanCycleLine;
+      existing: number;
+      missing: number;
+    };
+
+export interface PlanInput {
+  template: { stages: { id: string; name: string; position: number }[]; steps: TemplateStep[] };
+  target: PlanTarget;
+  /** The assignee per department; a department left out goes to its queue. */
+  assignees: { department: DepartmentCode; user: { id: string; name: string } | null }[];
+  /** Whether the user is a non-archived member of the department at run time (rule 10). */
+  isMember: (userId: string, department: DepartmentCode) => boolean;
+}
+
+const sameName = (a: string, b: string) =>
+  a.trim().toLocaleLowerCase('ar') === b.trim().toLocaleLowerCase('ar');
+
+/** The step that repeats for a cycle line: same kind, and same label for `other` (rule 9). */
+export function repeatedStepFor<T extends Pick<TemplateStep, 'repeatKind' | 'repeatLabel'>>(
+  steps: readonly T[],
+  line: { kind: DeliverableKind; label: string | null },
+): T | undefined {
+  return steps.find(
+    (step) =>
+      step.repeatKind === line.kind &&
+      (line.kind !== 'other' || sameName(step.repeatLabel ?? '', line.label ?? '')),
+  );
+}
+
+/**
+ * Rule 8: the last work day on or before the period end, or the period end when the run starts
+ * after it; never before the start, so no task is due before the run.
+ */
+export function cycleLastWorkDay(start: CalendarDate, periodEnd: CalendarDate): CalendarDate {
+  if (start > periodEnd) return start;
+  let last = periodEnd;
+  while (!isWorkDay(last) && last > start) last = addDays(last, -1);
+  return isWorkDay(last) ? last : periodEnd;
+}
+
+/**
+ * Rule 9: `n` due dates spread over the work days from `from` to `last` (or `last` alone when that
+ * range is empty); instance i falls on D[⌈i·W/n⌉ − 1], so the last one is on `last`.
+ */
+export function spreadDueDates(from: CalendarDate, last: CalendarDate, n: number): CalendarDate[] {
+  const range = workDaysBetween(from, last);
+  const days = range.length > 0 ? range : [last];
+  const w = days.length;
+  return Array.from({ length: n }, (_, k) => days[Math.ceil(((k + 1) * w) / n) - 1] as string);
+}
+
+/** "<title> <i>", cut so it stays a valid task title. */
+const instanceTitle = (title: string, i: number) => {
+  const suffix = ` ${i}`;
+  return `${title.slice(0, 160 - suffix.length)}${suffix}`;
+};
+
+type TaskFields = Pick<
+  PlannedTask,
+  'key' | 'title' | 'dueDate' | 'milestone' | 'cycleLineId' | 'instance' | 'dependsOn'
+>;
+
+/**
+ * Plans a run (rules 7–14 and 18) without side effects: the preview returns it and the apply
+ * creates it. The caller checks the target (rules 15–18) and resolves the start date (rule 6).
+ */
+export function planTemplateRun(input: PlanInput): TemplateRunPlan {
+  const { template, target } = input;
+  const start = target.startDate;
+  const replaced = new Map<DepartmentCode, number>();
+  const chosen = new Map(input.assignees.map((a) => [a.department, a.user]));
+  const taskOf = (step: TemplateStep, fields: TaskFields): PlannedTask => {
+    const user = chosen.get(step.department) ?? null;
+    const stale = !!user && !input.isMember(user.id, step.department);
+    if (stale) replaced.set(step.department, (replaced.get(step.department) ?? 0) + 1);
+    return {
+      ...fields,
+      stepId: step.id,
+      department: step.department,
+      assignee: stale ? null : user,
+      assigneeReplaced: stale,
+      brief: step.brief,
+      priority: step.priority,
+      needsClientApproval: step.needsClientApproval,
+      revisionLimit: step.revisionLimit,
+      checklist: step.checklist,
+    };
+  };
+
+  const tasks: PlannedTask[] = [];
+  const milestonesToCreate: { name: string; dueDate: CalendarDate }[] = [];
+  const warnings: TemplateRunWarning[] = [];
+
+  if (target.type === 'project') {
+    const stages = [...template.stages].sort((a, b) => a.position - b.position);
+    const pending = target.milestones
+      .filter((m) => m.status === 'pending')
+      .sort((a, b) => a.position - b.position);
+    const milestoneOf = new Map(
+      stages.map((stage) => [
+        stage.id,
+        {
+          existingId: pending.find((m) => sameName(m.name, stage.name))?.id ?? null,
+          name: stage.name,
+        },
+      ]),
+    );
+    for (const step of template.steps) {
+      tasks.push(
+        taskOf(step, {
+          key: step.id,
+          title: step.title,
+          dueDate: nthWorkDay(start, step.dueDay ?? 1),
+          milestone: step.stageId ? (milestoneOf.get(step.stageId) ?? null) : null,
+          cycleLineId: null,
+          instance: null,
+          dependsOn: step.dependsOn,
+        }),
+      );
+    }
+    // Rule 13: each stage used by a step and matching no pending milestone, in stage order.
+    for (const stage of stages) {
+      if (milestoneOf.get(stage.id)?.existingId) continue;
+      const dates = template.steps.flatMap((step, i) =>
+        step.stageId === stage.id ? [tasks[i]?.dueDate as CalendarDate] : [],
+      );
+      if (dates.length === 0) continue;
+      milestonesToCreate.push({ name: stage.name, dueDate: dates.sort().at(-1) as CalendarDate });
+    }
+    const late = tasks.filter((task) => task.dueDate > target.dueDate).length;
+    if (late > 0) warnings.push({ type: 'due_after_project', department: null, count: late });
+    if (target.earlierRuns > 0) {
+      warnings.push({ type: 'applied_before', department: null, count: target.earlierRuns });
+    }
+  } else {
+    const last = cycleLastWorkDay(start, target.periodEnd);
+    let skipped = 0;
+    /** Adds up to `n` instances of a repeated step within the cap (rule 14). */
+    const addInstances = (
+      step: TemplateStep,
+      line: PlanCycleLine,
+      n: number,
+      from: CalendarDate,
+      firstNumber: number,
+      dependsOn: string[],
+    ) => {
+      const dates = spreadDueDates(from, last, n);
+      const kept = Math.min(n, TEMPLATE_LIMITS.runTasks - tasks.length);
+      skipped += n - kept;
+      for (let k = 0; k < kept; k += 1) {
+        const i = firstNumber + k;
+        tasks.push(
+          taskOf(step, {
+            key: `${step.id}:${i}`,
+            title: instanceTitle(step.title, i),
+            dueDate: dates[k] as CalendarDate,
+            milestone: null,
+            cycleLineId: line.id,
+            instance: i,
+            dependsOn,
+          }),
+        );
+      }
+    };
+
+    if (target.type === 'cycle') {
+      for (const step of template.steps.filter((s) => s.repeatKind === null)) {
+        const due = nthWorkDay(start, step.dueDay ?? 1);
+        tasks.push(
+          taskOf(step, {
+            key: step.id,
+            title: step.title,
+            dueDate: due < last ? due : last,
+            milestone: null,
+            cycleLineId: null,
+            instance: null,
+            dependsOn: step.dependsOn,
+          }),
+        );
+      }
+      for (const step of template.steps.filter((s) => s.repeatKind !== null)) {
+        const line = target.lines.find((l) => repeatedStepFor([step], l));
+        if (!line || line.committed <= 0) continue;
+        const from = nthWorkDay(start, step.spreadFromDay ?? 1);
+        addInstances(step, line, line.committed, from, 1, step.dependsOn);
+      }
+    } else {
+      const step = repeatedStepFor(template.steps, target.line);
+      // Rule 18: spread from the start over the remaining work days, without dependencies.
+      if (step && target.missing > 0) {
+        addInstances(step, target.line, target.missing, start, target.existing + 1, []);
+      }
+    }
+    if (skipped > 0) warnings.push({ type: 'over_cap', department: null, count: skipped });
+  }
+
+  for (const [department, count] of replaced) {
+    warnings.push({ type: 'assignee_replaced', department, count });
+  }
+  // Rule 12: only tasks of this run; a stored template never waits on a repeated step (rule 2).
+  const planned = new Set(tasks.map((task) => task.key));
+  for (const task of tasks) task.dependsOn = task.dependsOn.filter((key) => planned.has(key));
+  return { startDate: start, tasks, milestonesToCreate, warnings, taskCount: tasks.length };
+}
+
+export const templateRunTaskSchema = z
+  .object({ id: z.uuid(), title: z.string(), status: taskStatusSchema })
+  .meta({ id: 'TemplateRunTask' });
+
+export const templateRunSchema = z
+  .object({
+    id: z.uuid(),
+    template: personSchema.extend({ archived: z.boolean() }),
+    trigger: templateRunTriggerSchema,
+    project: personSchema.nullable(),
+    cycle: z.object({ id: z.uuid(), month: calendarDateSchema, retainer: personSchema }).nullable(),
+    /** `missing_tasks` runs: the line they filled. */
+    cycleLine: z
+      .object({ id: z.uuid(), kind: deliverableKindSchema, label: z.string().nullable() })
+      .nullable(),
+    startDate: calendarDateSchema,
+    taskCount: z.number().int().min(0),
+    milestonesCreated: z.number().int().min(0),
+    /** Null for automatic runs. */
+    createdBy: personSchema.nullable(),
+    createdAt: z.iso.datetime(),
+    /** With `include=tasks`: the run's non-archived tasks. */
+    tasks: z.array(templateRunTaskSchema).optional(),
+  })
+  .meta({ id: 'TemplateRun' });
+
+export type TemplateRun = z.infer<typeof templateRunSchema>;
+
+/** Exactly one of `projectId`, `retainerId` and `taskId`; the API answers 400 otherwise. */
+export const templateRunListQuerySchema = pageQuerySchema.extend({
+  projectId: z.uuid().optional(),
+  retainerId: z.uuid().optional(),
+  taskId: z.uuid().optional(),
+  include: z.enum(['tasks']).optional(),
+});
+
+export type TemplateRunListQuery = z.infer<typeof templateRunListQuerySchema>;
+
+export const templateRunPageSchema = pageSchema(templateRunSchema).meta({
+  id: 'TemplateRunPage',
+  description: 'Template runs, newest first',
+});
+
+export type TemplateRunPage = z.infer<typeof templateRunPageSchema>;
+
+// A retainer's monthly template (rules 16–19)
+
+export const setRetainerTemplateSchema = z
+  .object({ templateId: z.uuid().nullable() })
+  .meta({ id: 'SetRetainerTemplate' });
+
+export type SetRetainerTemplate = z.infer<typeof setRetainerTemplateSchema>;
+
+export const retainerTemplateLineSchema = z
+  .object({
+    id: z.uuid(),
+    kind: deliverableKindSchema,
+    label: z.string().nullable(),
+    committed: z.number().int().min(0),
+    /** The line's non-archived, non-cancelled tasks, any origin. */
+    tasks: z.number().int().min(0),
+    /** committed − tasks, at least 0 (rule 18). */
+    missing: z.number().int().min(0),
+    /** The linked template is not archived and has a repeated step for the line. */
+    canGenerate: z.boolean(),
+  })
+  .meta({ id: 'RetainerTemplateLine' });
+
+export const retainerTemplateSchema = z
+  .object({
+    template: personSchema.extend({ archived: z.boolean() }).nullable(),
+    /** The open current cycle, or null. */
+    cycle: z
+      .object({
+        id: z.uuid(),
+        month: calendarDateSchema,
+        periodStart: calendarDateSchema,
+        periodEnd: calendarDateSchema,
+      })
+      .nullable(),
+    /** The cycle's full run (`manual` or `cycle_opened`), or null. */
+    run: templateRunSchema.nullable(),
+    lines: z.array(retainerTemplateLineSchema),
+    /** Link and generate need `projects.manage` over the client. */
+    permissions: z.object({ canLink: z.boolean(), canGenerate: z.boolean() }),
+  })
+  .meta({ id: 'RetainerTemplate' });
+
+export type RetainerTemplate = z.infer<typeof retainerTemplateSchema>;

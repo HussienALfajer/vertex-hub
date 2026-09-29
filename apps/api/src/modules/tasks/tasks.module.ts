@@ -4,6 +4,7 @@ import { ClientsModule } from '../clients/index.js';
 import { ProjectsModule } from '../projects/index.js';
 import { TaskCommentsController } from './task-comments.controller.js';
 import { TaskCommentsService } from './task-comments.service.js';
+import { TaskGenerator } from './task-generator.js';
 import { TaskHooksService } from './task-hooks.service.js';
 import { TaskPartsController } from './task-parts.controller.js';
 import { TaskPartsService } from './task-parts.service.js';
@@ -17,7 +18,8 @@ import { TasksService } from './tasks.service.js';
  * Tasks of every department (F06, ADR 0016). Reads users through `auth`'s `UserDirectory`,
  * clients through `clients`' `ClientDirectory` and projects and retainers through `projects`'
  * `EngagementDirectory`; feeds task counts and the project close hooks into `projects`'
- * `WorkProgress` and open assigned tasks into `auth`'s `ResponsibilityRegistry`.
+ * `WorkProgress` and open assigned tasks into `auth`'s `ResponsibilityRegistry`. Exports
+ * `TaskGenerator` for the `templates` module (F07).
  */
 @Module({
   imports: [AuthModule, ClientsModule, ProjectsModule],
@@ -30,6 +32,8 @@ import { TasksService } from './tasks.service.js';
     TaskPartsService,
     TaskCommentsService,
     TaskViewsService,
+    TaskGenerator,
   ],
+  exports: [TaskGenerator],
 })
 export class TasksModule {}

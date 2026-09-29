@@ -95,7 +95,7 @@ At most 60 steps per template. Within a template, `(repeat_kind, lower(repeat_la
 | `step_id` | uuid → `work_template_steps.id` | the waiting step |
 | `depends_on_step_id` | uuid → `work_template_steps.id` | a step of the same template with a lower `position` (so no cycle is possible) |
 
-Primary key `(step_id, depends_on_step_id)`. At most 10 per step (the F06 limit). In a monthly template a fixed step cannot depend on a repeated step (it would wait on up to 999 tasks); a repeated step may depend on fixed steps, and each of its instances then depends on the generated fixed tasks.
+Primary key `(step_id, depends_on_step_id)`. At most 10 per step (the F06 limit). In a monthly template no step can depend on a repeated step (it would wait on up to 999 tasks); a repeated step may depend on fixed steps, and each of its instances then depends on the generated fixed tasks.
 
 ### `work_template_assignees`
 | Field | Type | Rules |
@@ -135,7 +135,7 @@ A partial unique index on `retainer_cycle_id` where `trigger` is `manual` or `cy
 `(run_id → template_runs.id, task_id → tasks.id)`, primary key both, plus `step_id` (uuid, not a foreign key: the step may be edited away later) and `instance` (integer, repeated steps only). Lets the run history list its tasks without a templates column on `tasks`.
 
 ### Change to F06 data
-- `tasks.created_by_id` and `task_dependencies.created_by_id` become nullable: null means created by the system (a `cycle_opened` run). The task page shows "created automatically from <template>" for them. Every other path still sets them from the session.
+- `tasks.created_by_id` and `task_dependencies.created_by_id` become nullable: null means created by the system (a `cycle_opened` run of the daily job). The task page shows "created automatically from <template>" for them. Every other path still sets them from the session.
 
 ## States and rules
 
@@ -148,7 +148,7 @@ Templates have no workflow: they are active or archived. Runs are immediate and 
 
 ### Template rules
 1. Only the fields above are valid per kind: stages, and `due_day` beyond 27, only in `project` templates; `repeat_kind` only in `retainer_cycle` templates; a step's stage belongs to the same template. Violations are validation errors (400).
-2. Dependencies point to earlier steps only (by position), at most 10 per step; in monthly templates never from a fixed step to a repeated step (validation).
+2. Dependencies point to earlier steps only (by position), at most 10 per step; in monthly templates no step depends on a repeated step (validation).
 3. A template needs at least one step to be saved.
 4. Default assignees must be valid when saved (`INVALID_ASSIGNEE`); later invalidity produces a warning, never an error. Only a new or changed default is checked on save: resending an unchanged default that became invalid keeps it (and its warning), so the rest of the template can still be edited.
 5. Editing or archiving a template never changes tasks already generated or past runs.
@@ -159,7 +159,7 @@ Templates have no workflow: they are active or archived. Runs are immediate and 
 8. **Fixed monthly steps.** Due date = `nthWorkDay(start, due_day)`, clamped to the cycle's **last work day** (the last work day on or before the period end, or the period end when the run starts after it).
 9. **Repeated monthly steps.** For the cycle line matching `repeat_kind` (and label for `other`), n = the line's committed quantity. Instances are numbered 1…n and titled "<step title> <i>". With D = the work days from `nthWorkDay(start, spread_from_day)` to the last work day (or just the last work day when that range is empty) and W = |D|, instance i is due on D[⌈i·W/n⌉ − 1]: evenly spread, the last one on the last work day. Each instance is linked to the cycle line. Lines without a matching repeated step, and repeated steps without a matching line (or with committed 0), generate nothing.
 10. **Assignee.** Per department, the one chosen in the preview (default: the template's default assignee). An assignee who is not a non-archived member of the department at run time is replaced by "unassigned" (the task joins the department's queue, F06 rule 6); the preview shows it. Automatic runs use the template defaults.
-11. **Task fields.** Each task gets the step's title, brief, department, priority, needs client approval, revision limit and checklist; type `work`; status `new`; the engagement's client; the project and milestone (project runs) or the cycle and, for repeated instances, the cycle line (cycle runs). `created_by_id` is the applier, or null for automatic runs.
+11. **Task fields.** Each task gets the step's title, brief, department, priority, needs client approval, revision limit and checklist; type `work`; status `new`; the engagement's client; the project and milestone (project runs) or the cycle and, for repeated instances, the cycle line (cycle runs). `created_by_id` is the applier; a `cycle_opened` run takes the user whose action opened the cycle (start, resume, reactivate), or null from the daily job.
 12. **Dependencies.** Each generated task depends on the tasks generated from the steps it depends on in the same run. A repeated instance depending on a fixed step depends on that step's task. `missing_tasks` runs create no dependencies.
 13. **Stages → milestones.** Each stage used by at least one step maps to the project's non-archived `pending` milestone with the same name (trimmed, case-insensitive; the first by position if several); otherwise a new milestone is created with that name, due on the latest due date of the stage's tasks, appended after the existing milestones in stage order, without an installment. Past the 30-milestone limit the run is refused (`LIMIT_REACHED`). Stages without steps are ignored.
 14. **Size.** A run creates at most 300 tasks. A cycle run past the cap stops adding repeated instances at the cap (lines keep "missing" tasks for rule 18); a project run cannot exceed it (60 steps).
@@ -211,7 +211,7 @@ All screens: Arabic RTL, strings through i18next (`templates.*`), dates in Asia/
 What roles see differently: everyone reads templates and runs; only `templates.manage` edits templates; the generate and link actions appear for users who may manage the project or retainer.
 
 ## Audit, notifications and jobs
-- Audit actions: `template.created`, `template.updated` (before/after of name and description, and the names of the stages and the titles of the steps added, changed and removed as `stagesAdded`, `stagesChanged`, `stagesRemoved`, `stepsAdded`, `stepsChanged`, `stepsRemoved`), `template.assignees_updated` (one entry per department whose default changed, on create too: `department` and `user` before/after), `template.archived`, `template.restored` (entity `template`); `template_run.created` (entity `template_run`: template, trigger, target, start date, task count, milestones created); `retainer.template_changed` (entity `retainer`: template before/after). Generated tasks write F06's `task.created` (with `templateRunId`) and dependencies; created milestones write F05's `project_milestone.created`. All in the run's transaction; automatic runs have a null actor.
+- Audit actions: `template.created`, `template.updated` (before/after of name and description, and the names of the stages and the titles of the steps added, changed and removed as `stagesAdded`, `stagesChanged`, `stagesRemoved`, `stepsAdded`, `stepsChanged`, `stepsRemoved`), `template.assignees_updated` (one entry per department whose default changed, on create too: `department` and `user` before/after), `template.archived`, `template.restored` (entity `template`); `template_run.created` (entity `template_run`: template, trigger, target, start date, task count, milestones created); `retainer.template_changed` (entity `retainer`: template before/after). Generated tasks write F06's `task.created` (with `templateRunId`) and dependencies; created milestones write F05's `project_milestone.created`. All in the run's transaction; runs of the daily job have a null actor.
 - Notification events (F14 delivers them; F07 ships none): a run notifies each assignee once with the number of tasks assigned to them ("12 tasks from Monthly social media — <client>"), and each department's managers once for the tasks left unassigned in their department, instead of one F06 "assigned" event per task. Linking a template whose default assignee is invalid is not a notification; it is the template warning.
 - Jobs: no new job. The daily `retainers.cycles` job (F05) runs the automatic cycle runs through `CycleOpenedHooks`.
 
