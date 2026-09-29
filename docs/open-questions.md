@@ -7,7 +7,6 @@ Decisions that belong to the owner. Agents must not guess answers to these. When
 | Q4 | Off-server backup destination (none exists on the server today) | Launch | Required before launch: the system holds invoices and client data |
 | Q5 | Email provider for notifications (SMTP) | F14 email | — |
 | Q7 | Add swap on the server (none today) as a safety margin for Chromium PDF rendering? | Launch | 2–4 GB |
-| Q8 | ISO currency code (and minor unit) used for the redenominated Syrian pound | F13 | Confirm current official code. Until then F05 stores `SYP` with 2 decimals as the new pound (owner, 2026-09-29); a different code is a data migration |
 | Q9 | Work week and first day of the week in calendars (weekend days) | F08, F11 | — |
 | Q10 | License for the public repository (none means all rights reserved) | Anytime | — |
 | Q11 | Madani Arabic: is a license owned that covers web embedding and server-side PDF embedding? Which weights are available (need at least 400, 500, 700)? Provide the font files (WOFF2 preferred) privately | Design system (fallback works until then); required before launch | Buy/confirm a web license covering the number of users and PDF embedding |
@@ -31,3 +30,4 @@ Decisions that belong to the owner. Agents must not guess answers to these. When
 | Digits in the UI (was Q3) | Latin digits (123), formatted with the `ar-u-nu-latn` locale | 2026-09-28 |
 | Permission map details (was Q13) | Users, roles and the audit log: General Manager + Internal Operations manager. Medical review: members of Medical Consultation. Leads: General Communication and Marketing (all), account managers (their own). Templates: managed by General Manager + Internal Operations manager, read by department managers. Finance: financial reports only (`docs/specs/F01-users-roles.md`, ADR 0014) | 2026-09-28 |
 | Local PostgreSQL for development (was Q6) | PostgreSQL 17 installed natively on Windows, matching production | 2026-09-28 |
+| Currency code of the new Syrian pound (was Q8) | `SYP` with 2 decimal places, final (owner) | 2026-09-29 |

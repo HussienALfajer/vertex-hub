@@ -52,7 +52,8 @@ export type Permission = z.infer<typeof permissionSchema>;
  * - `all`: every record.
  * - `department`: records of the departments the user manages.
  * - `own_clients`: records of clients the user is primary account manager for.
- * - `assigned`: records the user is assigned to or participates in.
+ * - `assigned`: records the user is assigned to or participates in (for projects: the projects the
+ *   user is project manager of).
  */
 export const PERMISSION_SCOPES = ['all', 'department', 'own_clients', 'assigned'] as const;
 
@@ -69,8 +70,6 @@ export const PERMISSION_MAP: Readonly<Record<Role, Grants>> = {
   general_manager: everything,
   department_manager: {
     'catalog.read': 'all',
-    'projects.read': 'department',
-    'projects.manage': 'department',
     'tasks.read': 'department',
     'tasks.work': 'department',
     'tasks.manage': 'department',
@@ -86,7 +85,8 @@ export const PERMISSION_MAP: Readonly<Record<Role, Grants>> = {
     'users.read': 'all',
     'clients.read': 'all',
     'clients.log': 'all',
-    'projects.read': 'assigned',
+    'projects.read': 'all',
+    'projects.manage': 'assigned',
     'tasks.read': 'assigned',
     'tasks.work': 'assigned',
     'content.read': 'assigned',
@@ -99,7 +99,7 @@ export const PERMISSION_MAP: Readonly<Record<Role, Grants>> = {
     'catalog.read': 'all',
     'quotes.read': 'own_clients',
     'quotes.manage': 'own_clients',
-    'projects.read': 'own_clients',
+    'projects.manage': 'own_clients',
     'tasks.read': 'own_clients',
     'tasks.manage': 'own_clients',
     'content.read': 'own_clients',
@@ -114,7 +114,6 @@ export const PERMISSION_MAP: Readonly<Record<Role, Grants>> = {
   finance: {
     'catalog.read': 'all',
     'quotes.read': 'all',
-    'projects.read': 'all',
     'invoices.read': 'all',
     'invoices.manage': 'all',
     'payments.manage': 'all',
@@ -136,6 +135,8 @@ export const DEPARTMENT_CAPABILITIES: Readonly<
       'audit.read': 'all',
       'templates.read': 'all',
       'templates.manage': 'all',
+      'projects.manage': 'all',
+      'invoices.read': 'all',
     },
   },
   medical_consultation: { member: { 'approvals.review_medical': 'all' } },

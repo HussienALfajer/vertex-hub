@@ -2,15 +2,18 @@ import { randomUUID } from 'node:crypto';
 import {
   type ClientDetailResponse,
   type CreateClientInput,
+  type CreateProjectInput,
   clientDetailResponseSchema,
   type ErrorResponse,
+  type ProjectDetail,
+  projectDetailSchema,
 } from '@vertex-hub/contracts';
 import type { Database } from '@vertex-hub/db';
 import { expect } from 'vitest';
 import { type api, removeClients, removeUsers, seedUser } from './helpers.js';
 
 /*
- * The people the F02 tests act as, and a client factory. Names and trade names carry the run id,
+ * The people the F02 and F05 tests act as, and client and project factories. Names and trade names carry the run id,
  * so searches see only this run's rows; `cleanup` removes clients first, then users.
  */
 
@@ -53,6 +56,24 @@ export async function seedClientCast(db: Database, client: Api) {
     return created;
   }
 
+  /** A project of `clientId` created by the General Manager; the employee manages it. */
+  async function createProject(
+    clientId: string,
+    input: Partial<CreateProjectInput> = {},
+  ): Promise<ProjectDetail> {
+    const response = await client.post('/api/projects', gm.cookie, {
+      clientId,
+      name: `مشروع ${run} ${randomUUID().slice(0, 6)}`,
+      projectManagerId: employee.id,
+      departments: ['design'],
+      startDate: '2026-10-01',
+      dueDate: '2099-12-31',
+      ...input,
+    });
+    expect(response.status).toBe(201);
+    return projectDetailSchema.parse(await response.json());
+  }
+
   return {
     run,
     gm,
@@ -63,6 +84,7 @@ export async function seedClientCast(db: Database, client: Api) {
     /** Seeds another user and signs them in. */
     signedIn,
     createClient,
+    createProject,
     /** Tracks a client created some other way, for cleanup. */
     trackClient: (id: string) => clients.push(id),
     trackUser: (id: string) => users.push(id),

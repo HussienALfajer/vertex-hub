@@ -62,7 +62,7 @@ One permission pair covers both projects and retainers.
 
 Module ownership: the `projects` module owns every table below, for projects and retainers alike. Both share permissions, extra work and the client profile tabs, so the separate `retainers` module listed in `docs/architecture.md` is merged into `projects`. It reads users through `auth`'s `UserDirectory`, clients and contacts through a service that `clients` exports (F05 adds it; `clients/index.ts` exports only the module today), and registers the project manager check in `auth`'s `ResponsibilityRegistry`.
 
-Dates without a time (`date`) are calendar days in Asia/Damascus. Money fields are integer minor units in the record's currency (ADR 0006); `currency` is `currencySchema` (`SYP`, `USD`), a new shared schema in `packages/contracts/src/money.ts`. `SYP` means the new Syrian pound (Q8, provisional until confirmed before F13). Both currencies use 2 decimal places in V1.
+Dates without a time (`date`) are calendar days in Asia/Damascus. Money fields are integer minor units in the record's currency (ADR 0006); `currency` is `currencySchema` (`SYP`, `USD`), a new shared schema in `packages/contracts/src/money.ts`. `SYP` means the new Syrian pound (owner decision, was Q8). Both currencies use 2 decimal places in V1.
 
 ### `projects` (business table)
 | Field | Type | Rules |
@@ -248,11 +248,11 @@ Schemas live in `packages/contracts/src/projects.ts`, `retainers.ts` and `money.
 ### Projects
 | Method and path | Permission | Request | Response | Error codes |
 |---|---|---|---|---|
-| `GET /api/projects` | `projects.read` | `projectListQuerySchema`: `search` (name, client name), `status[]` (default `planned`, `active`, `on_hold`), `clientId`, `projectManagerId`, `department`, `overdue`, `archived` (scope all), `sort` (`dueDate` default, `name`, `createdAt`), `order` | `projectPageSchema`: id, name, client (id, name), project manager (id, name, archived), departments, status, dates, `overdue`, `milestones { done, total }`, `progress` | — |
+| `GET /api/projects` | `projects.read` | `projectListQuerySchema`: `search` (name, client name), `status[]` (default `planned`, `active`, `on_hold`), `clientId`, `projectManagerId`, `department`, `overdue`, `archived` (scope all), `sort` (`dueDate` default, `name`, `createdAt`), `order` | `projectPageSchema`: id, name, client (id, name), project manager (id, name, archived), departments, status, dates, `overdue`, `milestoneProgress { done, total }`, `progress` | — |
 | `GET /api/projects/:id` | `projects.read` | — | `projectDetailSchema`: list fields + description, milestones (with `overdue`, task counts, and `installmentMinor` inside `money`), `money { currency, totalMinor }`, `archivedAt`, `permissions` | 404 |
 | `POST /api/projects` | `projects.manage` (client scope) | `createProjectSchema`: clientId, name, description, projectManagerId, departments, startDate, dueDate, status (`planned` default or `active`), currency, milestones[] (name, dueDate, installmentMinor) | `projectDetailSchema` | 403, `CLIENT_ARCHIVED`, `CLIENT_ENDED`, `INVALID_PROJECT_MANAGER`, `INVALID_DATES`, `PROJECT_NAME_TAKEN`, `LIMIT_REACHED` |
 | `PATCH /api/projects/:id` | `projects.manage` | `updateProjectSchema`: name, description, departments, startDate, dueDate; projectManagerId (client scope); currency (money) | `projectDetailSchema` | 403, 404, `PROJECT_CLOSED`, `PROJECT_ARCHIVED`, `INVALID_PROJECT_MANAGER`, `INVALID_DATES`, `PROJECT_NAME_TAKEN`, `CURRENCY_LOCKED` |
-| `POST /api/projects/:id/status` | `projects.manage` | `projectStatusChangeSchema`: status, reason (required for `cancelled`) | `projectDetailSchema` | 403, 404, `INVALID_TRANSITION`, `MILESTONES_OPEN`, `PROJECT_ARCHIVED` |
+| `POST /api/projects/:id/status` | `projects.manage` | `projectStatusChangeSchema`: status, reason (required for `cancelled`), projectManagerId (reopening only, to replace an archived manager; edge case 8) | `projectDetailSchema` | 403, 404, `INVALID_TRANSITION`, `MILESTONES_OPEN`, `PROJECT_ARCHIVED` |
 | `POST /api/projects/:id/archive` · `/restore` | `projects.manage` (scope all) | — | `projectDetailSchema` | 403, 404, `PROJECT_ARCHIVED` / `PROJECT_NOT_ARCHIVED`, `PROJECT_NAME_TAKEN`, `CLIENT_ARCHIVED` |
 | `POST /api/projects/:id/milestones` | `projects.manage` | `createMilestoneSchema`: name, dueDate, installmentMinor (money) | `milestoneSchema` | 403, 404, `PROJECT_CLOSED`, `PROJECT_ARCHIVED`, `LIMIT_REACHED` |
 | `PATCH /api/projects/:id/milestones/:milestoneId` | `projects.manage` | `updateMilestoneSchema` (same, optional) | `milestoneSchema` | 403, 404, `PROJECT_CLOSED`, `PROJECT_ARCHIVED` |
@@ -315,7 +315,7 @@ What roles see differently: everyone sees the same pages without money; edit act
 
 ## Audit, notifications and jobs
 - Audit actions: `project.created`, `project.updated`, `project.project_manager_changed`, `project.status_changed` (with reason), `project.money_updated` (currency), `project.archived`, `project.restored`; `project_milestone.created` / `updated` / `reordered` / `completed` / `reopened` / `archived` (entity `project_milestone`, `after` carries `projectId`); `retainer.created`, `retainer.updated`, `retainer.status_changed`, `retainer.deliverables_updated` (before/after lines), `retainer.money_updated`, `retainer.archived`, `retainer.restored`; `retainer_cycle.created`, `retainer_cycle.closed` (with delivered counts), `retainer_cycle.line_updated`, `retainer_cycle.line_added`, `retainer_cycle.adjusted` (entity `retainer_cycle`, `after` carries `retainerId`); `extra_work.created` / `updated` / `billing_changed` / `archived` (entity `extra_work`, `after` carries `projectId` or `retainerId`). One PATCH that changes several kinds of fields writes one entry per action.
-- Money values in audit entries are visible only to readers who also have money access; the audit log screen links entries to their project or retainer page.
+- Money values in audit entries are visible only to readers who also have money access. Every holder of `audit.read` (General Manager, Operations manager) also holds `invoices.read` with scope all, so the audit log shows entries unfiltered; the audit log screen links entries to their project or retainer page. `project_milestone.reordered` writes one entry per moved milestone (`position` before and after).
 - Notifications: none (F14 is not built). Later: A09 alerts the account manager and the Operations manager when a cycle is behind (R11); F14 decides renewal-due and new-project-manager notifications.
 - Jobs: `retainers.cycles`, pg-boss cron `5 0 * * *` in Asia/Damascus, in `apps/worker`, running rule R2 through the `projects` module's service; idempotent (unique `retainer_id + month`, closes only open cycles).
 
@@ -327,7 +327,7 @@ What roles see differently: everyone sees the same pages without money; edit act
 5. A retainer is paused and resumed in the same month: the same cycle continues. Paused across a whole month: no cycle for that month; history shows the gap.
 6. A retainer is ended on the 1st before the job: ending closes the open cycle of the previous month too (every open cycle closes).
 7. A deliverable line is removed while the current cycle has it: the cycle keeps its line (R10); tasks linked to it still count.
-8. The project manager is archived: refused while they manage an open project (rule 4). A completed or cancelled project may keep an archived project manager, shown with an "archived" badge; reopening requires a valid one (`INVALID_PROJECT_MANAGER`).
+8. The project manager is archived: refused while they manage an open project (rule 4). A completed or cancelled project may keep an archived project manager, shown with an "archived" badge; reopening requires a valid one (`INVALID_PROJECT_MANAGER`); the reopen request may name a new project manager (owner decision), and the UI asks for one when the current one is archived. Restoring an archived project keeps its manager as it is; an archived one is then replaced with a normal edit.
 9. The client's account manager changes: `own_clients` access to its projects and retainers moves at once, like F02.
 10. A project manager loses access to a project (changed manager) while editing: the next edit returns 403 and the page refreshes.
 11. A user without money access edits a milestone: money fields are neither shown nor sent; the saved installment is kept.
@@ -339,7 +339,7 @@ What roles see differently: everyone sees the same pages without money; edit act
 17. ~20 clients, a few dozen projects and retainers, and 12 cycles a year each need no special limits; list `pageSize` rules from ADR 0013 apply.
 
 ## Open questions
-- **Q8** (currency code of the new Syrian pound) is not fully resolved: the owner chose to store `SYP` provisionally with 2 decimals; the code and minor unit are confirmed before F13, and a change is a data migration. Nothing else blocks F05.
+- None blocks F05. Q8 is resolved: `SYP` with 2 decimals is final (owner, 2026-09-29).
 - F06 defines how tasks attach to milestones and cycle lines (the columns listed under "Links F06 fills"), and Q14 (Operations manager across departments) is answered in the F06 spec.
 
 ## Acceptance

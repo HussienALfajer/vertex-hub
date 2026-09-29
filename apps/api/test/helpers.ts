@@ -11,6 +11,8 @@ import {
   departmentMembers,
   departments,
   newId,
+  projectMilestones,
+  projects,
   userRoles,
   users,
 } from '@vertex-hub/db';
@@ -108,9 +110,20 @@ export async function removeUsers(db: Database, ids: string[]): Promise<void> {
   await db.delete(users).where(inArray(users.id, ids));
 }
 
-/** Removes seeded clients, their contacts, accounts, notes and audit entries (test cleanup only). */
+/**
+ * Removes seeded clients, their contacts, accounts, notes, projects and audit entries (test
+ * cleanup only).
+ */
 export async function removeClients(db: Database, ids: string[]): Promise<void> {
   if (ids.length === 0) return;
+  const clientProjects = await db
+    .select({ id: projects.id })
+    .from(projects)
+    .where(inArray(projects.clientId, ids));
+  await removeProjects(
+    db,
+    clientProjects.map((row) => row.id),
+  );
   const children = [
     ...(await db
       .select({ id: clientContacts.id })
@@ -130,6 +143,20 @@ export async function removeClients(db: Database, ids: string[]): Promise<void> 
   await db.delete(clientContacts).where(inArray(clientContacts.clientId, ids));
   await db.delete(clientPlatformAccounts).where(inArray(clientPlatformAccounts.clientId, ids));
   await db.delete(clients).where(inArray(clients.id, ids));
+}
+
+/** Removes seeded projects, their milestones and audit entries (test cleanup only). */
+export async function removeProjects(db: Database, ids: string[]): Promise<void> {
+  if (ids.length === 0) return;
+  const milestones = (
+    await db
+      .select({ id: projectMilestones.id })
+      .from(projectMilestones)
+      .where(inArray(projectMilestones.projectId, ids))
+  ).map((row) => row.id);
+  await db.delete(auditEntries).where(inArray(auditEntries.entityId, [...ids, ...milestones]));
+  await db.delete(projectMilestones).where(inArray(projectMilestones.projectId, ids));
+  await db.delete(projects).where(inArray(projects.id, ids));
 }
 
 function base32Decode(input: string): Buffer {

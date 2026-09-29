@@ -1,4 +1,4 @@
-import { timestamp, uuid } from 'drizzle-orm/pg-core';
+import { bigint, timestamp, uuid } from 'drizzle-orm/pg-core';
 import { newId } from '../id.js';
 
 /*
@@ -20,3 +20,6 @@ export const timestamps = () => ({
 
 /** Set when a business record is archived; business records are never hard-deleted. */
 export const archivedAt = () => timestamp('archived_at', { withTimezone: true });
+
+/** A money amount in minor units of the record's currency (ADR 0006), as `<name>_minor`. */
+export const minorAmount = (name: `${string}_minor`) => bigint(name, { mode: 'number' });

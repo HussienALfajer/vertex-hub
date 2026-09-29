@@ -34,6 +34,19 @@ export const AUDIT_ACTIONS = [
   'client_note.created',
   'client_note.updated',
   'client_note.archived',
+  'project.created',
+  'project.updated',
+  'project.project_manager_changed',
+  'project.status_changed',
+  'project.money_updated',
+  'project.archived',
+  'project.restored',
+  'project_milestone.created',
+  'project_milestone.updated',
+  'project_milestone.reordered',
+  'project_milestone.completed',
+  'project_milestone.reopened',
+  'project_milestone.archived',
 ] as const;
 
 export const auditActionSchema = z.enum(AUDIT_ACTIONS).meta({ id: 'AuditAction' });
@@ -47,6 +60,8 @@ export const AUDIT_ENTITY_TYPES = [
   'client_contact',
   'client_platform_account',
   'client_note',
+  'project',
+  'project_milestone',
 ] as const;
 
 export const auditEntityTypeSchema = z.enum(AUDIT_ENTITY_TYPES).meta({ id: 'AuditEntityType' });

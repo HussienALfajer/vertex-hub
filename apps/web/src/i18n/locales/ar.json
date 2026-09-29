@@ -232,7 +232,21 @@
       "INVALID_TWO_FACTOR_COOKIE": "انتهت مهلة التحقق. ادخل من جديد.",
       "ACCOUNT_TEMPORARILY_LOCKED": "أُقفل التحقق مؤقتًا بعد محاولات كثيرة. حاول لاحقًا.",
       "PASSWORD_TOO_SHORT": "كلمة المرور قصيرة: 12 حرفًا على الأقل."
-    }
+    },
+    "CLIENT_ENDED": "انتهى التعامل مع هذا العميل، فلا يمكن إضافة عمل جديد له.",
+    "INVALID_PROJECT_MANAGER": "اختر مدير مشروع من المستخدمين غير المؤرشفين.",
+    "INVALID_DATES": "تاريخ التسليم يجب أن يكون في تاريخ البدء أو بعده.",
+    "PROJECT_NAME_TAKEN": "لدى هذا العميل مشروع بهذا الاسم.",
+    "PROJECT_CLOSED": "المشروع مكتمل أو ملغى. أعد فتحه قبل التعديل.",
+    "PROJECT_ARCHIVED": "هذا المشروع مؤرشف ولا يمكن تعديله.",
+    "PROJECT_NOT_ARCHIVED": "هذا المشروع غير مؤرشف.",
+    "CURRENCY_LOCKED": "لا يمكن تغيير العملة بعد إدخال مبالغ.",
+    "INVALID_TRANSITION": "لا يمكن الانتقال إلى هذه الحالة من الحالة الحالية.",
+    "MILESTONES_OPEN": "لا يمكن إكمال المشروع قبل إنجاز كل المراحل.",
+    "INVALID_ORDER": "ترتيب المراحل لم يعد مطابقاً. حدّث الصفحة وأعد المحاولة.",
+    "MILESTONE_DONE": "هذه المرحلة منجزة.",
+    "MILESTONE_NOT_DONE": "هذه المرحلة غير منجزة.",
+    "MILESTONE_HAS_OPEN_TASKS": "لهذه المرحلة مهام مفتوحة."
   },
   "users": {
     "title": "الفريق",
@@ -375,7 +389,8 @@
       "manages_department": "يدير قسم {{name}}",
       "open": "افتح القسم",
       "account_manager_of_client": "مدير حساب العميل {{name}}",
-      "openClient": "افتح ملف العميل"
+      "openClient": "افتح ملف العميل",
+      "project_manager_of_project": "مدير المشروع {{name}}"
     },
     "managerBadge": "مدير القسم"
   },
@@ -537,7 +552,9 @@
       "client": "عميل",
       "client_contact": "جهة اتصال",
       "client_platform_account": "حساب منصة",
-      "client_note": "ملاحظة تواصل"
+      "client_note": "ملاحظة تواصل",
+      "project": "مشروع",
+      "project_milestone": "مرحلة مشروع"
     },
     "actions": {
       "user": {
@@ -582,6 +599,23 @@
         "created": "أضاف ملاحظة تواصل",
         "updated": "عدّل ملاحظة تواصل",
         "archived": "سحب ملاحظة تواصل"
+      },
+      "project": {
+        "created": "أنشأ المشروع",
+        "updated": "عدّل المشروع",
+        "project_manager_changed": "غيّر مدير المشروع",
+        "status_changed": "غيّر حالة المشروع",
+        "money_updated": "عدّل عملة المشروع",
+        "archived": "أرشف المشروع",
+        "restored": "استعاد المشروع"
+      },
+      "project_milestone": {
+        "created": "أضاف مرحلة",
+        "updated": "عدّل مرحلة",
+        "reordered": "أعاد ترتيب المراحل",
+        "completed": "أنجز مرحلة",
+        "reopened": "أعاد فتح مرحلة",
+        "archived": "حذف مرحلة"
       }
     },
     "fields": {
@@ -619,7 +653,20 @@
       "occurredAt": "وقت التواصل",
       "channel": "القناة",
       "contactId": "جهة الاتصال",
-      "summary": "الملخص"
+      "summary": "الملخص",
+      "description": "الوصف",
+      "departments": "الأقسام",
+      "startDate": "تاريخ البدء",
+      "dueDate": "تاريخ التسليم",
+      "currency": "العملة",
+      "projectManager": "مدير المشروع",
+      "client": "العميل",
+      "milestones": "المراحل",
+      "reason": "السبب",
+      "position": "الترتيب",
+      "installmentMinor": "الدفعة",
+      "projectId": "المشروع",
+      "openTasks": "المهام المفتوحة"
     },
     "kinds": {
       "activation": "تفعيل",
