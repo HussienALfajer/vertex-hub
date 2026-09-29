@@ -56,13 +56,14 @@ vertex-hub/
 
 ## API modules
 
-`auth` · `clients` · `leads` · `catalog` · `quotes` · `projects` · `retainers` · `tasks` · `templates` · `content` · `approvals` · `files` · `shoots` · `campaigns` · `billing` · `notifications` · `reports` · `audit`
+`auth` · `clients` · `leads` · `catalog` · `quotes` · `projects` · `tasks` · `templates` · `content` · `approvals` · `files` · `shoots` · `campaigns` · `billing` · `notifications` · `reports` · `audit`
 
 Rules (module anatomy, naming and the tests that enforce them: ADR 0013):
 - A module owns its tables. Other modules call its exported service; they never query its tables.
 - Controllers stay thin: validate (Zod DTO), authorize (guard), delegate to a service.
 - `auth` owns identity and access: the Better Auth tables, `user_roles`, `departments` and `department_members`, with the team, department and `/api/me` endpoints. Better Auth needs the `users` table and the guard needs roles and departments, so splitting them into another module would create a dependency cycle (F01 plan).
 - `clients` owns `clients`, `client_contacts`, `client_platform_accounts` and `client_notes` (F02). It reads users through `auth`'s exported `UserDirectory`. Modules that make a user responsible for something (F02: the account manager of a live client) register a check in `auth`'s `ResponsibilityRegistry`, which archiving a user or removing their role consults, so `auth` never imports them.
+- `projects` owns projects, milestones, retainers, their monthly cycles and extra work (F05; retainers share its permissions, so there is no separate `retainers` module). It reads clients through `clients`' exported service and registers the project manager check in `ResponsibilityRegistry`.
 - `audit` sits below every other module: it owns `audit_entries` and exports `recordAudit`, which each module calls inside the transaction of its change. The access decorators live in `src/core/access/` so that `audit` does not depend on `auth`.
 - Anything slow or scheduled (PDF, email, reminders, monthly cycles) is enqueued with pg-boss and handled by `apps/worker`, which reuses the same modules.
 
