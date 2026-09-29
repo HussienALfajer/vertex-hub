@@ -932,6 +932,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/tasks/board": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["TaskViewsController_board"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tasks/workload": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["TaskViewsController_workload"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/me/tasks/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["TaskViewsController_summary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/tasks": {
         parameters: {
             query?: never;
@@ -1038,6 +1086,150 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["TasksController_restore"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tasks/{id}/checklist": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["TaskPartsController_addChecklistItem"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tasks/{id}/checklist/order": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["TaskPartsController_reorderChecklist"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tasks/{id}/checklist/{itemId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["TaskPartsController_updateChecklistItem"];
+        trace?: never;
+    };
+    "/api/tasks/{id}/checklist/{itemId}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["TaskPartsController_archiveChecklistItem"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tasks/{id}/links": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["TaskPartsController_addLink"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tasks/{id}/links/{linkId}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["TaskPartsController_archiveLink"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tasks/{id}/comments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["TaskCommentsController_list"];
+        put?: never;
+        post: operations["TaskCommentsController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tasks/{id}/comments/{commentId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["TaskCommentsController_update"];
+        trace?: never;
+    };
+    "/api/tasks/{id}/comments/{commentId}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["TaskCommentsController_archive"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1958,18 +2150,16 @@ export interface components {
             billingStatus: components["schemas"]["ExtraWorkBilling"];
             billingNote?: string | null;
         };
+        TaskBoard: {
+            departments: components["schemas"]["DepartmentCode"][];
+            columns: {
+                status: components["schemas"]["TaskStatus"];
+                items: components["schemas"]["Task"][];
+                total: number;
+            }[];
+        };
         /** @enum {string} */
         TaskStatus: "new" | "in_progress" | "internal_review" | "awaiting_client" | "revisions" | "approved" | "delivered" | "cancelled";
-        /** @enum {string} */
-        TaskType: "work" | "client_request";
-        /** @enum {string} */
-        TaskPriority: "low" | "normal" | "high" | "urgent";
-        TaskPage: {
-            items: components["schemas"]["Task"][];
-            total: number;
-            page: number;
-            pageSize: number;
-        };
         Task: {
             /** Format: uuid */
             id: string;
@@ -2033,6 +2223,50 @@ export interface components {
                 limit: number;
             };
             overLimitPending: boolean;
+        };
+        /** @enum {string} */
+        TaskType: "work" | "client_request";
+        /** @enum {string} */
+        TaskPriority: "low" | "normal" | "high" | "urgent";
+        TaskWorkload: {
+            week: {
+                /** Format: date */
+                from: string;
+                /** Format: date */
+                to: string;
+            };
+            departments: components["schemas"]["DepartmentCode"][];
+            people: {
+                user: {
+                    /** Format: uuid */
+                    id: string;
+                    name: string;
+                };
+                departments: components["schemas"]["DepartmentCode"][];
+                overdue: number;
+                dueThisWeek: number;
+                open: number;
+            }[];
+            unassigned: {
+                department: components["schemas"]["DepartmentCode"];
+                count: number;
+            }[];
+        };
+        MyTaskSummary: {
+            overdue: number;
+            today: number;
+            thisWeek: number;
+            later: number;
+            waiting: number;
+            toReview: number;
+            requestedByMe: number;
+            unassignedInMyDepartments: number | null;
+        };
+        TaskPage: {
+            items: components["schemas"]["Task"][];
+            total: number;
+            page: number;
+            pageSize: number;
         };
         TaskDetail: {
             /** Format: uuid */
@@ -2338,6 +2572,53 @@ export interface components {
         RevisionDecisionInput: {
             decision: components["schemas"]["RevisionDecision"];
             note?: string | null;
+        };
+        CreateTaskChecklistItem: {
+            text: string;
+        };
+        TaskChecklistOrder: {
+            ids: string[];
+        };
+        /** @description Non-archived items, by position */
+        TaskChecklist: {
+            items: components["schemas"]["TaskChecklistItem"][];
+        };
+        UpdateTaskChecklistItem: {
+            text?: string;
+            done?: boolean;
+        };
+        TaskCommentPage: {
+            items: components["schemas"]["TaskComment"][];
+            total: number;
+            page: number;
+            pageSize: number;
+        };
+        TaskComment: {
+            /** Format: uuid */
+            id: string;
+            author: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                archived: boolean;
+            };
+            body: string | null;
+            mentions: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                archived: boolean;
+            }[];
+            /** Format: date-time */
+            editedAt: string | null;
+            removed: boolean;
+            /** Format: date-time */
+            createdAt: string;
+            canEdit: boolean;
+            canRemove: boolean;
+        };
+        TaskCommentInput: {
+            body: string;
         };
         /** @description Liveness of the API and its dependencies */
         HealthResponse: {
@@ -4099,6 +4380,73 @@ export interface operations {
             };
         };
     };
+    TaskViewsController_board: {
+        parameters: {
+            query?: {
+                department?: components["schemas"]["DepartmentCode"] | components["schemas"]["DepartmentCode"][];
+                assigneeId?: string | "me";
+                clientId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Columns by status for the departments (default: the ones the caller manages, else their own); delivered holds the last 14 days */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskBoard"];
+                };
+            };
+        };
+    };
+    TaskViewsController_workload: {
+        parameters: {
+            query?: {
+                department?: components["schemas"]["DepartmentCode"] | components["schemas"]["DepartmentCode"][];
+                week?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Open, overdue and due-this-week counts per person of the departments */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskWorkload"];
+                };
+            };
+        };
+    };
+    TaskViewsController_summary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Counts for the sections of My tasks */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyTaskSummary"];
+                };
+            };
+        };
+    };
     TasksController_list: {
         parameters: {
             query?: {
@@ -4123,6 +4471,7 @@ export interface operations {
                 dueFrom?: string;
                 dueTo?: string;
                 createdBy?: "me";
+                reviewer?: "me";
                 archived?: "true" | "false";
                 sort?: "dueDate" | "priority" | "createdAt" | "updatedAt";
                 order?: components["schemas"]["SortOrder"];
@@ -4336,6 +4685,252 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["TaskDetail"];
                 };
+            };
+        };
+    };
+    TaskPartsController_addChecklistItem: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateTaskChecklistItem"];
+            };
+        };
+        responses: {
+            /** @description The new checklist item, last in the list (assignee, department manager or manage scope) */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskChecklistItem"];
+                };
+            };
+        };
+    };
+    TaskPartsController_reorderChecklist: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaskChecklistOrder"];
+            };
+        };
+        responses: {
+            /** @description The checklist in its new order */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskChecklist"];
+                };
+            };
+        };
+    };
+    TaskPartsController_updateChecklistItem: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                itemId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateTaskChecklistItem"];
+            };
+        };
+        responses: {
+            /** @description The renamed, ticked or unticked item */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskChecklistItem"];
+                };
+            };
+        };
+    };
+    TaskPartsController_archiveChecklistItem: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                itemId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The item is removed from the checklist */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    TaskPartsController_addLink: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateTaskLink"];
+            };
+        };
+        responses: {
+            /** @description The new link (assignee, department manager or manage scope) */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskLink"];
+                };
+            };
+        };
+    };
+    TaskPartsController_archiveLink: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                linkId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The link is removed from the task */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    TaskCommentsController_list: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Comments, oldest first; removed ones stay in place without their body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskCommentPage"];
+                };
+            };
+        };
+    };
+    TaskCommentsController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaskCommentInput"];
+            };
+        };
+        responses: {
+            /** @description The new comment; mentions are `@{userId}` tokens of active users */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskComment"];
+                };
+            };
+        };
+    };
+    TaskCommentsController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                commentId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaskCommentInput"];
+            };
+        };
+        responses: {
+            /** @description The edited comment (its author only) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskComment"];
+                };
+            };
+        };
+    };
+    TaskCommentsController_archive: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                commentId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The comment is removed (its author, or `tasks.manage` with scope all) */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

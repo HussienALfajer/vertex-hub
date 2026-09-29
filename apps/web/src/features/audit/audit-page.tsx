@@ -556,6 +556,12 @@ const KNOWN_FIELDS = [
   'overrideReason',
   'revisionId',
   'decision',
+  'taskId',
+  'text',
+  'done',
+  'site',
+  'body',
+  'mentionedUserIds',
 ] as const;
 
 function fieldLabel(t: TFunction, field: string): string {

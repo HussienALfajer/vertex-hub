@@ -1,22 +1,29 @@
 import { describe, expect, it } from 'vitest';
 import {
   allowedTaskTransitions,
+  BOARD_STATUSES,
   canMakeTaskMove,
   createsDependencyCycle,
+  createTaskChecklistItemSchema,
   createTaskSchema,
   isTaskBlocked,
   isTaskOverdue,
+  mentionedUserIds,
   revisionDecisionInputSchema,
   revisionSourceOf,
   TASK_STATUSES,
   type TaskRights,
   type TaskState,
+  taskBoardQuerySchema,
+  taskCommentInputSchema,
   taskDependenciesInputSchema,
   taskLinkProblem,
   taskListQuerySchema,
   taskMove,
   taskMoveNeedsNote,
   taskStatusChangeSchema,
+  taskWorkloadQuerySchema,
+  updateTaskChecklistItemSchema,
   updateTaskSchema,
 } from './tasks.js';
 
@@ -424,5 +431,65 @@ describe('other inputs', () => {
     expect(taskListQuerySchema.parse({ assigneeId: 'me' }).assigneeId).toBe('me');
     expect(taskListQuerySchema.safeParse({ assigneeId: 'someone' }).success).toBe(false);
     expect(taskListQuerySchema.parse({ department: 'design' }).department).toEqual(['design']);
+  });
+});
+
+describe('mentionedUserIds', () => {
+  it('lists each mentioned user once, in order, lowercased', () => {
+    const body = `@{${ids.user.toUpperCase()}} please check with @{${ids.contact}} and @{${ids.user}}`;
+    expect(mentionedUserIds(body)).toEqual([ids.user, ids.contact]);
+  });
+
+  it('ignores text that only looks like a mention', () => {
+    expect(mentionedUserIds('@{not-a-uuid} @name {x}')).toEqual([]);
+  });
+});
+
+describe('taskCommentInputSchema', () => {
+  it('trims the body and keeps line breaks', () => {
+    expect(taskCommentInputSchema.parse({ body: '  Line one\nLine two ' })).toEqual({
+      body: 'Line one\nLine two',
+    });
+  });
+
+  it('refuses an empty or too long body', () => {
+    expect(taskCommentInputSchema.safeParse({ body: '   ' }).success).toBe(false);
+    expect(taskCommentInputSchema.safeParse({ body: 'x'.repeat(4001) }).success).toBe(false);
+  });
+
+  it('refuses more than 20 mentioned people', () => {
+    const mention = (n: number) => `@{01a0e97d-0028-7d46-8479-${String(n).padStart(12, '0')}}`;
+    const body = (count: number) => Array.from({ length: count }, (_, n) => mention(n)).join(' ');
+    expect(taskCommentInputSchema.safeParse({ body: body(20) }).success).toBe(true);
+    expect(taskCommentInputSchema.safeParse({ body: body(21) }).success).toBe(false);
+  });
+});
+
+describe('checklist inputs', () => {
+  it('trims item text and limits it to 200 characters', () => {
+    expect(createTaskChecklistItemSchema.parse({ text: ' Crop ' })).toEqual({ text: 'Crop' });
+    expect(createTaskChecklistItemSchema.safeParse({ text: 'x'.repeat(201) }).success).toBe(false);
+    expect(updateTaskChecklistItemSchema.parse({ done: true })).toEqual({ done: true });
+  });
+});
+
+describe('views', () => {
+  it('shows every status but cancelled on the board', () => {
+    expect(BOARD_STATUSES).toEqual(TASK_STATUSES.filter((status) => status !== 'cancelled'));
+  });
+
+  it('takes one or several departments', () => {
+    expect(taskBoardQuerySchema.parse({ department: 'design' })).toEqual({
+      department: ['design'],
+    });
+    expect(taskWorkloadQuerySchema.parse({ department: ['design', 'content_management'] })).toEqual(
+      { department: ['design', 'content_management'] },
+    );
+    expect(taskWorkloadQuerySchema.safeParse({ week: '2026-13-01' }).success).toBe(false);
+  });
+
+  it('filters the list by what the caller may review', () => {
+    expect(taskListQuerySchema.parse({ reviewer: 'me' })).toMatchObject({ reviewer: 'me' });
+    expect(taskListQuerySchema.safeParse({ reviewer: ids.user }).success).toBe(false);
   });
 });
