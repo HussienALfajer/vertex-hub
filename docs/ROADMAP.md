@@ -28,12 +28,13 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done. Feature IDs
 - [x] Automations A03, A07, A08 (delivered by F14's daily job and task events)
 - [x] Pre-deploy audit and remediation (`docs/audit/claude/`, `docs/audit/codex/`): every finding fixed except off-server backups (SEC-01, waits on Q4 below); owner decisions recorded in F01, F05, F06, F14, ADR 0006, `brand/identity.md` §9 and `docs/deployment.md`
 - [ ] Pilot with 2–3 real clients
-- [ ] Production deploy of Phase 1
+- [ ] Production deploy of Phase 1 — postponed by the owner (2026-09-30); Phase 2 is built first and deploys follow the owner's call
 
 ## Phase 2 — Production and client
-- [ ] F08 Content calendar
+Build order (owner, 2026-09-30): F10 → F09 → F08 → F11. F09 approves exact file versions from F10; F08 attaches files and sends month plans for approval through F09.
+- [~] F10 Files and versions (spec: `docs/specs/F10-files-versions.md`, ADR 0019)
 - [ ] F09 Internal review and client approval (incl. medical review)
-- [ ] F10 Files and versions
+- [ ] F08 Content calendar
 - [ ] F11 Unified calendar and shoots
 - [ ] Automations A04, A05, A06, A09, A13 (A02 task part moved to F07)
 - [ ] Production deploy of Phase 2
