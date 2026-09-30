@@ -1,10 +1,12 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/index.js';
 import { ClientsModule } from '../clients/index.js';
+import { FilesModule } from '../files/index.js';
 import { NotificationsModule } from '../notifications/index.js';
 import { ProjectsModule } from '../projects/index.js';
 import { TaskCommentsController } from './task-comments.controller.js';
 import { TaskCommentsService } from './task-comments.service.js';
+import { TaskFileOwner } from './task-file-owner.js';
 import { TaskGenerator } from './task-generator.js';
 import { TaskHooksService } from './task-hooks.service.js';
 import { TaskNotices } from './task-notices.js';
@@ -23,10 +25,11 @@ import { TasksService } from './tasks.service.js';
  * `EngagementDirectory`; feeds task counts and the project close hooks into `projects`'
  * `WorkProgress` and open assigned tasks into `auth`'s `ResponsibilityRegistry`. Exports
  * `TaskGenerator` for the `templates` module (F07). Sends the task notifications and registers
- * the A07/A08 reminders of the daily job through `notifications` (F14).
+ * the A07/A08 reminders of the daily job through `notifications` (F14). Registers the `task`
+ * owner policy in `files` and calls its `FileVersions` on approval and client changes (F10).
  */
 @Module({
-  imports: [AuthModule, ClientsModule, ProjectsModule, NotificationsModule],
+  imports: [AuthModule, ClientsModule, ProjectsModule, NotificationsModule, FilesModule],
   // The views come first: `tasks/board` and `tasks/workload` must not match `tasks/:id`.
   controllers: [TaskViewsController, TasksController, TaskPartsController, TaskCommentsController],
   providers: [
@@ -39,6 +42,7 @@ import { TasksService } from './tasks.service.js';
     TaskGenerator,
     TaskNotices,
     TaskReminders,
+    TaskFileOwner,
   ],
   exports: [TaskGenerator],
 })

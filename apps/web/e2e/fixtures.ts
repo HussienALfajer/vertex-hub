@@ -2761,6 +2761,7 @@ function taskRoutes({ users, clients, projects, retainers, tasks, me }: TaskStat
         addedBy: person(link.addedById),
         createdAt: task.createdAt,
       })),
+    fileCounts: { deliverables: 0, references: 0 },
     revisionHistory: task.revisions.map((r) => ({
       id: r.id,
       source: r.source,

@@ -30,7 +30,7 @@ server {
     root /srv/hub.vertexmedia.pro/current/apps/web/dist;
     index index.html;
 
-    # Uploads (F10) will raise this for their own route only.
+    # Uploads (F10) raise this for their own route only.
     client_max_body_size 2m;
     client_body_timeout 20s;
     server_tokens off;
@@ -82,6 +82,42 @@ server {
         proxy_cache off;
         proxy_read_timeout 20m;
         gzip off;
+    }
+
+    # File uploads (F10, ADR 0019): up to 250 MB on this route only, streamed to the API as they
+    # arrive (it hashes and stores them on the way), with timeouts for slow links. The proxy
+    # snippet is not included because it sets its own read timeout; its headers are repeated.
+    location = /api/files/uploads {
+        client_max_body_size 250m;
+        client_body_timeout 120s;
+        proxy_request_buffering off;
+        proxy_pass http://127.0.0.1:3050;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header Connection "";
+        proxy_hide_header X-Powered-By;
+        proxy_send_timeout 120s;
+        proxy_read_timeout 120s;
+    }
+
+    # File content (F10 rule 16): the API checks access, then answers with X-Accel-Redirect to
+    # this internal location, which serves the bytes with range requests. The API's
+    # Content-Type, Content-Disposition and Cache-Control pass through; the headers are set
+    # here because a redirected response drops the others. SAMEORIGIN framing lets the app show
+    # PDFs in its preview dialog.
+    location /_files/ {
+        internal;
+        alias /srv/hub.vertexmedia.pro/shared/files/;
+        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header X-Frame-Options "SAMEORIGIN" always;
+        add_header Content-Security-Policy "frame-ancestors 'self'" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+        add_header X-Robots-Tag "noindex, nofollow" always;
+        access_log off;
     }
 
     # The API documentation is disabled in production; don't forward probes for it.

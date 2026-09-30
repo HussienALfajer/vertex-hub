@@ -27,6 +27,7 @@ blob-report/
 # Local uploads and storage
 storage/
 uploads/
+.data/
 
 # Logs
 *.log

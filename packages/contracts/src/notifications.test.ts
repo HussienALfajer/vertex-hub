@@ -19,6 +19,7 @@ describe('notification catalog', () => {
         'task_changed',
         'task_commented',
         'task_due_soon',
+        'task_file_added',
         'task_mentioned',
         'task_opened',
       ].sort(),
@@ -67,6 +68,11 @@ describe('first match per recipient (rule 2)', () => {
       { recipientId: 'a', subjectId: 'run', type: 'tasks_generated' as const },
     ];
     expect(firstMatchPerRecipient(items)).toEqual(items);
+  });
+
+  it('puts task_file_added right after task_commented (F10)', () => {
+    const at = NOTIFICATION_TYPES.indexOf('task_commented');
+    expect(NOTIFICATION_TYPES[at + 1]).toBe('task_file_added');
   });
 
   it('follows the spec order for the first eight types', () => {

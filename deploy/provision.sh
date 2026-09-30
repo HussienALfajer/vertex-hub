@@ -45,7 +45,11 @@ chmod 750 "/home/$APP_USER"
 
 step "Directories"
 install -d -o "$APP_USER" -g "$APP_USER" -m 755 "$SITE_DIR" "$SITE_DIR/releases" "$SITE_DIR/fonts" "$SITE_DIR/fonts/madani"
-install -d -o "$APP_USER" -g "$APP_USER" -m 700 "$SITE_DIR/shared"
+# nginx (group www-data) may only pass through shared/ to reach the files it serves for
+# X-Accel-Redirect (F10, ADR 0019); .env stays 600, and files/ is setgid so new folders keep
+# the group.
+install -d -o "$APP_USER" -g www-data -m 710 "$SITE_DIR/shared"
+install -d -o "$APP_USER" -g www-data -m 2750 "$SITE_DIR/shared/files"
 install -d -o "$APP_USER" -g "$APP_USER" -m 750 "$LOG_DIR"
 install -d -o root -g root -m 700 "$BACKUP_DIR"
 install -d -o root -g root -m 755 "$ACME_ROOT"
@@ -98,6 +102,7 @@ APP_URL=https://$DOMAIN
 BETTER_AUTH_SECRET=$(openssl rand -hex 32)
 DATABASE_URL=postgres://$DB:$db_password@127.0.0.1:5432/$DB
 WORKER_NAME=production
+FILES_ROOT=$SITE_DIR/shared/files
 EOF
   )
   chown "$APP_USER:$APP_USER" "$env_file"
@@ -107,6 +112,8 @@ else
   [ -f "$env_file" ] || { echo "role $DB exists but $env_file is missing" >&2; exit 1; }
   echo "already set up"
 fi
+# Files (F10) arrived after the first provisioning: add their root to an existing .env once.
+grep -q '^FILES_ROOT=' "$env_file" || echo "FILES_ROOT=$SITE_DIR/shared/files" >>"$env_file"
 chmod 600 "$env_file"
 
 step "nginx"

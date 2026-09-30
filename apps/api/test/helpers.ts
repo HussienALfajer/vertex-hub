@@ -11,6 +11,9 @@ import {
   departmentMembers,
   departments,
   extraWorkItems,
+  fileItems,
+  fileUploads,
+  fileVersions,
   newId,
   notificationReminders,
   notificationSettings,
@@ -41,7 +44,7 @@ import {
   workTemplates,
 } from '@vertex-hub/db';
 import { hashPassword } from 'better-auth/crypto';
-import { eq, inArray, like, or } from 'drizzle-orm';
+import { eq, inArray, like, or, type SQL } from 'drizzle-orm';
 
 /*
  * Shared helpers for API integration tests: seed users straight into the test database, sign in
@@ -127,6 +130,21 @@ export async function seedUser(db: Database, input: SeedUser = {}): Promise<Seed
 /** Removes seeded users with everything that points at them (test cleanup only). */
 export async function removeUsers(db: Database, ids: string[]): Promise<void> {
   if (ids.length === 0) return;
+  const touched = await db
+    .selectDistinct({ id: fileVersions.fileItemId })
+    .from(fileVersions)
+    .where(or(inArray(fileVersions.uploadedById, ids), inArray(fileVersions.finalMarkedById, ids)));
+  await removeFileItems(
+    db,
+    or(
+      inArray(fileItems.createdById, ids),
+      inArray(
+        fileItems.id,
+        touched.map((row) => row.id),
+      ),
+    ) as SQL,
+  );
+  await db.delete(fileUploads).where(inArray(fileUploads.userId, ids));
   await removeTasks(
     db,
     (
@@ -184,6 +202,7 @@ export async function removeLeftoverUsers(db: Database): Promise<number> {
  */
 export async function removeClients(db: Database, ids: string[]): Promise<void> {
   if (ids.length === 0) return;
+  await removeFileItems(db, inArray(fileItems.clientId, ids));
   await removeTasks(
     db,
     (await db.select({ id: tasks.id }).from(tasks).where(inArray(tasks.clientId, ids))).map(
@@ -233,6 +252,7 @@ export async function removeClients(db: Database, ids: string[]): Promise<void> 
  */
 export async function removeTasks(db: Database, ids: string[]): Promise<void> {
   if (ids.length === 0) return;
+  await removeFileItems(db, inArray(fileItems.taskId, ids));
   const children = [
     ...(await db
       .select({ id: taskChecklistItems.id })
@@ -260,6 +280,17 @@ export async function removeTasks(db: Database, ids: string[]): Promise<void> {
   await db.delete(tasks).where(inArray(tasks.id, ids));
 }
 
+/** Removes file items with their versions and audit entries; content stays on disk (test cleanup only). */
+async function removeFileItems(db: Database, filter: SQL): Promise<void> {
+  const items = (await db.select({ id: fileItems.id }).from(fileItems).where(filter)).map(
+    (row) => row.id,
+  );
+  if (items.length === 0) return;
+  await db.delete(auditEntries).where(inArray(auditEntries.entityId, items));
+  await db.delete(fileVersions).where(inArray(fileVersions.fileItemId, items));
+  await db.delete(fileItems).where(inArray(fileItems.id, items));
+}
+
 /** Removes template runs with their task links and audit entries (test cleanup only). */
 async function removeRuns(db: Database, runIds: string[]): Promise<void> {
   if (runIds.length === 0) return;
@@ -271,6 +302,7 @@ async function removeRuns(db: Database, runIds: string[]): Promise<void> {
 /** Removes seeded projects, their milestones, template runs and audit entries (test cleanup only). */
 export async function removeProjects(db: Database, ids: string[]): Promise<void> {
   if (ids.length === 0) return;
+  await removeFileItems(db, inArray(fileItems.projectId, ids));
   await removeRuns(
     db,
     (
@@ -306,6 +338,7 @@ export async function removeProjects(db: Database, ids: string[]): Promise<void>
  */
 export async function removeRetainers(db: Database, ids: string[]): Promise<void> {
   if (ids.length === 0) return;
+  await removeFileItems(db, inArray(fileItems.retainerId, ids));
   await db.delete(notificationReminders).where(inArray(notificationReminders.subjectId, ids));
   const cycles = (
     await db

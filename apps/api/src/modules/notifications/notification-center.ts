@@ -11,6 +11,9 @@ import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { UserDirectory } from '../auth/index.js';
 import { NOTIFICATIONS_CHANNEL, pushPayloads } from './notification-channel.js';
 
+/** Types merged into the recipient's unread notification of the same type and task (rule 5, F10). */
+const MERGED_TYPES: readonly NotificationType[] = ['task_commented', 'task_file_added'];
+
 /** One type of notification for one change, as the owning module resolved its recipients. */
 export type Notice = NotificationContent & {
   recipients: readonly string[];
@@ -32,7 +35,8 @@ export class NotificationCenter {
    * Rule 2: drops the actor, archived users, duplicates and recipients who muted the type; when
    * the notices give one recipient several types for one subject, keeps only the first by the
    * catalog order (other subjects and several notices of that type all stay). Rule
-   * 5: merges a comment into the recipient's unread comment notification on the same task. The
+   * 5: merges a comment (or an added file, F10) into the recipient's unread notification of the
+   * same type on the same task. The
    * `pg_notify` runs in the transaction, so PostgreSQL delivers it only on commit (rule 4).
    * Returns the number of notifications stored or merged.
    */
@@ -64,10 +68,9 @@ export class NotificationCenter {
     const pushed: { recipientId: string; notificationId: string }[] = [];
     for (const { recipientId, notice } of deliverable) {
       const data = NOTIFICATION_DATA_SCHEMAS[notice.type].parse(notice.data);
-      const merged =
-        notice.type === 'task_commented'
-          ? await this.mergeComment(tx, recipientId, notice, data)
-          : null;
+      const merged = MERGED_TYPES.includes(notice.type)
+        ? await this.mergeUnread(tx, recipientId, notice, data)
+        : null;
       const notificationId = merged ?? newId();
       if (!merged) {
         await tx.insert(notifications).values({
@@ -98,17 +101,17 @@ export class NotificationCenter {
     );
   }
 
-  /** The id of the unread comment notification it merged into, or null (rule 5). */
-  private async mergeComment(
+  /** The id of the unread notification of the same type it merged into, or null (rule 5). */
+  private async mergeUnread(
     tx: Transaction,
     recipientId: string,
     notice: Notice,
     data: unknown,
   ): Promise<string | null> {
-    // Two first comments at once would each find no row to lock and insert one: a transaction
+    // Two first comments (or files) at once would each find no row to lock and insert one: a transaction
     // lock per recipient and task makes the second wait and merge.
     await tx.execute(
-      sql`select pg_advisory_xact_lock(hashtextextended(${`task_commented:${recipientId}:${notice.subjectId}`}, 0))`,
+      sql`select pg_advisory_xact_lock(hashtextextended(${`${notice.type}:${recipientId}:${notice.subjectId}`}, 0))`,
     );
     const [open] = await tx
       .select({ id: notifications.id })
@@ -116,7 +119,7 @@ export class NotificationCenter {
       .where(
         and(
           eq(notifications.recipientId, recipientId),
-          eq(notifications.type, 'task_commented'),
+          eq(notifications.type, notice.type),
           eq(notifications.subjectId, notice.subjectId),
           isNull(notifications.readAt),
         ),
