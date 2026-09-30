@@ -466,6 +466,46 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await screenshot(page, testInfo, `task-page-${colorScheme}`);
     });
 
+    test('task files, preview and upload', async ({ page }, testInfo) => {
+      await page.setViewportSize({ width: 1280, height: 1600 });
+      await page.clock.setFixedTime(new Date(`${PROJECTS_TODAY}T09:00:00+03:00`));
+      await mockApi(page, { signedIn: true, me: manager });
+      await page.goto(`/tasks/${seedIds.autumnMenu}`);
+      const files = page
+        .locator('section')
+        .filter({ has: page.getByRole('heading', { level: 2, name: ar.tasks.files.title }) });
+      await files.getByRole('button', { name: ar.files.versions_two }).click();
+      // Thumbnails are decorative (`alt=""`): the cover and the dishes photo.
+      await expect(files.locator('img')).toHaveCount(2);
+      await page.waitForFunction(() => [...document.images].every((image) => image.complete));
+      await files.scrollIntoViewIfNeeded();
+      await screenshot(page, testInfo, `task-files-${colorScheme}`);
+
+      await files.getByRole('button', { name: 'عاين صور الأطباق' }).click();
+      await expect(
+        page.getByRole('dialog', { name: 'صور الأطباق' }).getByRole('img', { name: 'صور الأطباق' }),
+      ).toBeVisible();
+      await screenshot(page, testInfo, `file-preview-image-${colorScheme}`);
+      await page.keyboard.press('ArrowRight');
+      await expect(
+        page.getByRole('dialog', { name: 'دليل الهوية' }).locator('iframe'),
+      ).toBeVisible();
+      await screenshot(page, testInfo, `file-preview-pdf-${colorScheme}`);
+      await page.keyboard.press('Escape');
+
+      // An upload that stays under way next to one refused before sending.
+      await page.route('**/api/files/uploads', () => {});
+      await files.getByRole('button', { name: ar.tasks.files.addDeliverable }).click();
+      const dialog = page.getByRole('dialog', { name: ar.tasks.files.addDeliverableTitle });
+      await dialog.locator('input[type=file]').setInputFiles([
+        { name: 'menu-reel.mp4', mimeType: 'video/mp4', buffer: Buffer.alloc(2048) },
+        { name: 'setup.exe', mimeType: 'application/x-msdownload', buffer: Buffer.alloc(16) },
+      ]);
+      await expect(dialog.getByRole('progressbar')).toBeVisible();
+      await expect(dialog.getByRole('alert')).toHaveText(ar.errors.FILE_TYPE_BLOCKED);
+      await screenshot(page, testInfo, `file-upload-${colorScheme}`);
+    });
+
     test('task board', async ({ page }, testInfo) => {
       await page.setViewportSize({ width: 1600, height: 1000 });
       await page.clock.setFixedTime(new Date(`${PROJECTS_TODAY}T09:00:00+03:00`));

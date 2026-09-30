@@ -106,6 +106,24 @@ export function businessDay(value: Date | string): string {
   return toBusinessDateTimeInput(value).slice(0, 10);
 }
 
+const SIZE_UNITS = ['byte', 'kilobyte', 'megabyte', 'gigabyte'] as const;
+
+/** A file size in the largest unit that keeps it at 1 or more (1024 steps), e.g. "1.2 ميغابايت". */
+export function formatFileSize(bytes: number): string {
+  let value = bytes;
+  let unit = 0;
+  while (value >= 1024 && unit < SIZE_UNITS.length - 1) {
+    value /= 1024;
+    unit += 1;
+  }
+  return formatNumber(value, {
+    style: 'unit',
+    unit: SIZE_UNITS[unit],
+    unitDisplay: 'long',
+    maximumFractionDigits: unit < 2 ? 0 : 1,
+  });
+}
+
 /** A web link's host without `www.`, for showing a link compactly (`instagram.com`). */
 export function formatLinkHost(url: string): string {
   try {

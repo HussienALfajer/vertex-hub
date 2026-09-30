@@ -151,7 +151,7 @@ function itemPermissions(
       owner.task?.status !== 'cancelled' &&
       owner.rights.manageTask,
     canSetConfidential: live && item.role === 'document' && canSetConfidential(owner),
-    canRestore: owner.rights.scopeAll && !owner.archivedCode,
+    canRestore: owner.rights.scopeAll && isWritable(owner),
   };
 }
 

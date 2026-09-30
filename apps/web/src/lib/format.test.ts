@@ -5,6 +5,7 @@ import {
   businessDayStart,
   formatCalendarDate,
   formatDateTime,
+  formatFileSize,
   formatLink,
   formatLinkHost,
   formatList,
@@ -91,5 +92,14 @@ describe('formatting', () => {
 
   it('joins names as Arabic lists them', () => {
     expect(formatList(['أ', 'ب', 'ج'])).toBe('أ وب وج');
+  });
+
+  it('formats file sizes in 1024 steps with Latin digits', () => {
+    expect(formatFileSize(512).replace(/\D/g, '')).toBe('512');
+    expect(formatFileSize(1536).replace(/\D/g, '')).toBe('2');
+    const mega = formatFileSize(1.25 * 1024 * 1024);
+    expect(mega).not.toMatch(ARABIC_INDIC_DIGITS);
+    expect(mega).toContain('1.3');
+    expect(formatFileSize(3 * 1024 ** 4)).toContain('3,072');
   });
 });

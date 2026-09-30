@@ -640,6 +640,9 @@ describe('files (F10)', () => {
       // Delivered: read-only for files, but the marker can still move (rule 10).
       await cast.moveOk(task.id, cast.designer.cookie, { status: 'delivered' });
       await expectError(await addVersion(cast.designer.cookie, poster.id), 409, 'TASK_CLOSED');
+      // Restore is refused on a closed task (rule 5), so its flag is off even for scope all.
+      const closed = await listItems(cast.gm.cookie, 'task', task.id, '&role=deliverable');
+      expect(closed.items.find((i) => i.id === poster.id)?.permissions.canRestore).toBe(false);
       const reset = await client.post(
         `/api/files/versions/${posterV2?.id}/final`,
         cast.designManager.cookie,

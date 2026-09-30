@@ -32,6 +32,7 @@ import {
   TaskStatusBadge,
 } from './task-badges';
 import { CommentsSection } from './task-comments';
+import { TaskFilesSection } from './task-files';
 import { ChecklistSection, DependenciesSection, LinksSection, TaskSection } from './task-parts';
 import { RevisionsSection } from './task-revisions';
 import { taskQuery, useRestoreTask } from './tasks.queries';
@@ -70,6 +71,7 @@ function TaskView({ task }: { task: TaskDetail }) {
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
         <div className="flex min-w-0 flex-col gap-6">
           <BriefSection task={task} />
+          <TaskFilesSection task={task} />
           <ChecklistSection task={task} />
           <RevisionsSection task={task} />
           <CommentsSection task={task} />

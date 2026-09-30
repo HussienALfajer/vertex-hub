@@ -55,6 +55,7 @@ import {
   PopoverContent,
   PopoverTitle,
   PopoverTrigger,
+  Progress,
   Select,
   SelectContent,
   SelectItem,
@@ -238,6 +239,13 @@ function DesignSystemPage() {
               value={40 + index * 25}
               tone={tone}
               aria-label={t('designSystem.meterTime')}
+            />
+          ))}
+          {[35, null].map((value) => (
+            <Progress
+              key={String(value)}
+              value={value}
+              aria-label={t('designSystem.progressUpload')}
             />
           ))}
         </div>
