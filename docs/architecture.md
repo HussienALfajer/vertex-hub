@@ -36,7 +36,7 @@ vertex-hub/
 | Authorization | Own role/permission map in `packages/contracts`, enforced by NestJS guards | 0007 |
 | Background jobs | pg-boss (queue and cron inside PostgreSQL) | 0008 |
 | PDF | HTML → PDF with Playwright/Chromium in the worker | 0008 |
-| Files | Local disk behind a storage interface; nginx serves after API authorization | 0009 |
+| Files | Local disk behind a storage interface; nginx serves after API authorization; versioned items | 0009, 0019 |
 | Images | sharp (thumbnails) | — |
 | Email | Nodemailer over SMTP, React Email templates | — |
 | Logging | pino (nestjs-pino) | — |
