@@ -69,7 +69,8 @@ function AscentMeter({ value, max, tone, size, className, ...props }: AscentMete
       data-complete={summit || undefined}
       value={reached}
       max={steps}
-      className={cn(ascentMeterVariants({ size }), className)}
+      // Many steps close their gaps, so the bars still fit the meter's width.
+      className={cn(ascentMeterVariants({ size }), steps > 12 && 'gap-px', className)}
       {...props}
     >
       {Array.from({ length: steps }, (_, index) => {

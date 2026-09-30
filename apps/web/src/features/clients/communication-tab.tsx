@@ -67,6 +67,7 @@ import {
   fromBusinessDateTimeInput,
   toBusinessDateTimeInput,
 } from '../../lib/format';
+import { ALL } from '../../lib/search-params';
 import {
   type NoteFilters,
   notesQuery,
@@ -82,8 +83,6 @@ const channelIcon: Record<NoteChannel, LucideIcon> = {
   email: MailIcon,
   other: StickyNoteIcon,
 };
-
-const ALL = 'all';
 
 export function CommunicationTab({
   client,

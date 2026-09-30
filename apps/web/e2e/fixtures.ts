@@ -27,6 +27,7 @@ import {
   type DepartmentCode,
   type DepartmentDetailResponse,
   type DepartmentResponse,
+  type ErrorCode,
   type ExtraWork,
   type ExtraWorkBilling,
   type ExtraWorkBillingChange,
@@ -102,6 +103,7 @@ import {
   updateTemplateSchema,
   weekOf,
 } from '@vertex-hub/contracts';
+import { isDeclaredEndpoint, reportApiProblem } from './test';
 
 /*
  * The E2E suite covers the SPA alone: API responses are mocked here with the shared contract
@@ -640,8 +642,15 @@ interface MockOptions {
 }
 
 const json = (route: Route, body: unknown, status = 200) => route.fulfill({ status, json: body });
-const fail = (route: Route, status: number, code: string, details?: unknown) =>
-  route.fulfill({ status, json: { statusCode: status, code, message: code, details } });
+/**
+ * An error as the API answers it: a coded one (`ErrorCode`), or with `null` a plain 401, 403 or
+ * 404, which carries no code.
+ */
+const fail = (route: Route, status: number, code: ErrorCode | null, details?: unknown) =>
+  route.fulfill({
+    status,
+    json: { statusCode: status, ...(code && { code }), message: code ?? 'Error', details },
+  });
 
 function activationLink(kind: 'activation' | 'reset') {
   return {
@@ -720,10 +729,14 @@ export async function mockApi(page: Page, options: MockOptions): Promise<MockedA
     const url = new URL(request.url());
     const path = url.pathname;
     const method = request.method();
+    // The mock answers only what the real API declares (openapi.json): drift fails the test.
+    if (!isDeclaredEndpoint(method, path)) {
+      reportApiProblem(page, `Not in the API: ${method} ${path}`);
+    }
 
     if (path === '/api/health') return json(route, healthy);
     if (path === '/api/me' && method === 'GET') {
-      return signedIn ? json(route, me) : fail(route, 401, 'UNAUTHORIZED');
+      return signedIn ? json(route, me) : fail(route, 401, null);
     }
 
     // Better Auth.
@@ -770,7 +783,7 @@ export async function mockApi(page: Page, options: MockOptions): Promise<MockedA
         ? route.fulfill({ status: 204 })
         : fail(route, 400, 'LINK_INVALID');
     }
-    if (!signedIn) return fail(route, 401, 'UNAUTHORIZED');
+    if (!signedIn) return fail(route, 401, null);
 
     // Users.
     if (path === '/api/users' && method === 'GET') {
@@ -781,7 +794,7 @@ export async function mockApi(page: Page, options: MockOptions): Promise<MockedA
       // Like the API: status and assigned-role filters are for user managers only.
       const userManager = me.permissions.some((g) => g.permission === 'users.manage');
       if ((status !== 'active' || (role && role !== 'department_manager')) && !userManager) {
-        return fail(route, 403, 'FORBIDDEN');
+        return fail(route, 403, null);
       }
       const items = users.filter(
         (u) =>
@@ -813,7 +826,7 @@ export async function mockApi(page: Page, options: MockOptions): Promise<MockedA
     const userMatch = path.match(/^\/api\/users\/([^/]+)(?:\/(.+))?$/);
     if (userMatch) {
       const user = users.find((u) => u.id === userMatch[1]);
-      if (!user) return fail(route, 404, 'NOT_FOUND');
+      if (!user) return fail(route, 404, null);
       const action = userMatch[2];
       if (!action && method === 'GET') return json(route, user);
       if (!action && method === 'PATCH') {
@@ -878,7 +891,7 @@ export async function mockApi(page: Page, options: MockOptions): Promise<MockedA
     const departmentMatch = path.match(/^\/api\/departments\/([^/]+)$/);
     if (departmentMatch) {
       const department = departmentsSeed.find((d) => d.id === departmentMatch[1]);
-      if (!department) return fail(route, 404, 'NOT_FOUND');
+      if (!department) return fail(route, 404, null);
       if (method === 'PATCH') {
         const body = request.postDataJSON() as { managerId?: string | null };
         if (body.managerId !== undefined) managers.set(department.id, body.managerId);
@@ -921,7 +934,8 @@ export async function mockApi(page: Page, options: MockOptions): Promise<MockedA
     if (path === '/api/audit') {
       return json(route, { items: auditSeed, total: auditSeed.length, page: 1, pageSize: 30 });
     }
-    return fail(route, 404, 'NOT_FOUND');
+    reportApiProblem(page, `No mock for ${method} ${path}`);
+    return fail(route, 404, null);
   });
   return {
     signInAs: (next) => {
@@ -1048,12 +1062,12 @@ function clientRoutes({ users, clients, me }: ClientState) {
     const [, clientId, part, childId, childAction] = match;
     const client = clients.find((c) => c.id === clientId);
     if (!client || (client.archived && !holds('clients.manage', 'all'))) {
-      return fail(route, 404, 'NOT_FOUND');
+      return fail(route, 404, null);
     }
 
     if (!part) {
       if (method === 'GET') return json(route, detail(client));
-      if (!canManage(client)) return fail(route, 403, 'FORBIDDEN');
+      if (!canManage(client)) return fail(route, 403, null);
       Object.assign(client, body());
       return json(route, detail(client));
     }
@@ -1070,14 +1084,14 @@ function clientRoutes({ users, clients, me }: ClientState) {
         id: string;
         archived: boolean;
       }[];
-      if (!canManage(client)) return fail(route, 403, 'FORBIDDEN');
+      if (!canManage(client)) return fail(route, 403, null);
       if (!childId) {
         const created = { id: id(next++), clientId: client.id, archived: false, ...body() };
         list.push(created);
         return json(route, strip(created), 201);
       }
       const item = list.find((x) => x.id === childId);
-      if (!item) return fail(route, 404, 'NOT_FOUND');
+      if (!item) return fail(route, 404, null);
       if (childAction === 'archive') {
         item.archived = true;
         return route.fulfill({ status: 204 });
@@ -1120,7 +1134,7 @@ function clientRoutes({ users, clients, me }: ClientState) {
         return json(route, note(client, created), 201);
       }
       const item = client.notes.find((n) => n.id === childId);
-      if (!item) return fail(route, 404, 'NOT_FOUND');
+      if (!item) return fail(route, 404, null);
       if (childAction === 'archive') {
         if (!note(client, item).canArchive) return fail(route, 403, 'NOT_NOTE_AUTHOR');
         item.archived = true;
@@ -1512,7 +1526,7 @@ function projectRoutes({ users, clients, projects, me }: ProjectState) {
         ),
         extraWork: [],
       };
-      if (!clientScope(created)) return fail(route, 403, 'FORBIDDEN');
+      if (!clientScope(created)) return fail(route, 403, null);
       projects.push(created);
       return json(route, detail(created), 201);
     }
@@ -1524,13 +1538,13 @@ function projectRoutes({ users, clients, projects, me }: ProjectState) {
     const [, projectId, part, childId, childAction] = match;
     const project = projects.find((p) => p.id === projectId);
     if (!project || (project.archived && !holds('projects.manage', 'all'))) {
-      return fail(route, 404, 'NOT_FOUND');
+      return fail(route, 404, null);
     }
     const allowed = permissions(project);
 
     if (!part) {
       if (method === 'GET') return json(route, detail(project));
-      if (!allowed.canManage) return fail(route, 403, 'FORBIDDEN');
+      if (!allowed.canManage) return fail(route, 403, null);
       Object.assign(project, body<Partial<ProjectRecord>>());
       return json(route, detail(project));
     }
@@ -1557,7 +1571,7 @@ function projectRoutes({ users, clients, projects, me }: ProjectState) {
       return json(route, detail(project));
     }
     if (part === 'milestones') {
-      if (!allowed.canManage) return fail(route, 403, 'FORBIDDEN');
+      if (!allowed.canManage) return fail(route, 403, null);
       if (childId === 'order') {
         const { ids } = body<{ ids: string[] }>();
         project.milestones.sort((a, b) => ids.indexOf(a.id) - ids.indexOf(b.id));
@@ -1575,7 +1589,7 @@ function projectRoutes({ users, clients, projects, me }: ProjectState) {
         return json(route, milestoneOf(project, created), 201);
       }
       const item = project.milestones.find((m) => m.id === childId);
-      if (!item) return fail(route, 404, 'NOT_FOUND');
+      if (!item) return fail(route, 404, null);
       if (childAction === 'archive') {
         item.archived = true;
         return route.fulfill({ status: 204 });
@@ -1602,7 +1616,7 @@ function projectRoutes({ users, clients, projects, me }: ProjectState) {
         return json(route, { items, total: items.length, page: 1, pageSize: 20 });
       }
       if (childAction === 'billing' ? !allowed.canBill : !allowed.canManage) {
-        return fail(route, 403, 'FORBIDDEN');
+        return fail(route, 403, null);
       }
       if (!childId) {
         const input = body<CreateExtraWork>();
@@ -1623,7 +1637,7 @@ function projectRoutes({ users, clients, projects, me }: ProjectState) {
         return json(route, extraWorkOf(project, created), 201);
       }
       const item = project.extraWork.find((x) => x.id === childId);
-      if (!item) return fail(route, 404, 'NOT_FOUND');
+      if (!item) return fail(route, 404, null);
       if (childAction === 'archive') {
         item.archived = true;
         return route.fulfill({ status: 204 });
@@ -2093,7 +2107,7 @@ function retainerRoutes({ users, clients, retainers, me }: RetainerState) {
         cycles: [],
         extraWork: [],
       };
-      if (!clientScope(created)) return fail(route, 403, 'FORBIDDEN');
+      if (!clientScope(created)) return fail(route, 403, null);
       if (created.startDate <= today) openCurrent(created, created.startDate);
       retainers.push(created);
       return json(route, detail(created), 201);
@@ -2106,18 +2120,18 @@ function retainerRoutes({ users, clients, retainers, me }: RetainerState) {
     const [, retainerId, part, childId, childPart, lineId, lineAction] = match;
     const retainer = retainers.find((r) => r.id === retainerId);
     if (!retainer || (retainer.archived && !holds('projects.manage', 'all'))) {
-      return fail(route, 404, 'NOT_FOUND');
+      return fail(route, 404, null);
     }
     const allowed = permissions(retainer);
 
     if (!part) {
       if (method === 'GET') return json(route, detail(retainer));
-      if (!allowed.canManage) return fail(route, 403, 'FORBIDDEN');
+      if (!allowed.canManage) return fail(route, 403, null);
       Object.assign(retainer, body<Partial<RetainerRecord>>());
       return json(route, detail(retainer));
     }
     if (part === 'deliverables') {
-      if (!allowed.canManage) return fail(route, 403, 'FORBIDDEN');
+      if (!allowed.canManage) return fail(route, 403, null);
       const { lines } = body<RetainerDeliverables>();
       const kept = new Set(lines.flatMap((line) => (line.id ? [line.id] : [])));
       for (const d of retainer.deliverables) if (!kept.has(d.id)) d.archived = true;
@@ -2137,7 +2151,7 @@ function retainerRoutes({ users, clients, retainers, me }: RetainerState) {
     if (part === 'status') {
       const { status } = body<RetainerStatusChange>();
       if (status === 'active' ? !allowed.canManage && !allowed.canReactivate : !allowed.canManage) {
-        return fail(route, 403, 'FORBIDDEN');
+        return fail(route, 403, null);
       }
       if (status === 'ended') {
         for (const c of retainer.cycles.filter((c) => c.status === 'open')) {
@@ -2167,9 +2181,9 @@ function retainerRoutes({ users, clients, retainers, me }: RetainerState) {
         return json(route, { items, total: items.length, page: 1, pageSize: 12 });
       }
       const cycle = retainer.cycles.find((c) => c.id === childId);
-      if (!cycle) return fail(route, 404, 'NOT_FOUND');
+      if (!cycle) return fail(route, 404, null);
       if (!childPart) return json(route, cycleDetailOf(retainer, cycle));
-      if (!allowed.canManage) return fail(route, 403, 'FORBIDDEN');
+      if (!allowed.canManage) return fail(route, 403, null);
       if (cycle.status === 'closed') return fail(route, 409, 'CYCLE_CLOSED');
       if (!lineId) {
         const input = body<CreateCycleLine>();
@@ -2185,7 +2199,7 @@ function retainerRoutes({ users, clients, retainers, me }: RetainerState) {
         return json(route, lineOf(retainer, cycle, line), 201);
       }
       const line = cycle.lines.find((l) => l.id === lineId);
-      if (!line) return fail(route, 404, 'NOT_FOUND');
+      if (!line) return fail(route, 404, null);
       if (lineAction === 'adjustments') {
         const input = body<CreateCycleAdjustment>();
         if (deliveredOf(line) + input.delta < 0) return fail(route, 409, 'NEGATIVE_DELIVERED');
@@ -2210,7 +2224,7 @@ function retainerRoutes({ users, clients, retainers, me }: RetainerState) {
         return json(route, { items, total: items.length, page: 1, pageSize: 20 });
       }
       if (childPart === 'billing' ? !allowed.canBill : !allowed.canManage) {
-        return fail(route, 403, 'FORBIDDEN');
+        return fail(route, 403, null);
       }
       if (!childId) {
         const input = body<CreateExtraWork>();
@@ -2231,7 +2245,7 @@ function retainerRoutes({ users, clients, retainers, me }: RetainerState) {
         return json(route, extraWorkOf(retainer, created), 201);
       }
       const item = retainer.extraWork.find((x) => x.id === childId);
-      if (!item) return fail(route, 404, 'NOT_FOUND');
+      if (!item) return fail(route, 404, null);
       if (childPart === 'archive') {
         item.archived = true;
         return route.fulfill({ status: 204 });
@@ -2925,9 +2939,9 @@ function taskRoutes({ users, clients, projects, retainers, tasks, me }: TaskStat
       });
       const r = rights(created);
       const self = created.assigneeId === me().user.id;
-      if (created.assigneeId && !self && !r.assign) return fail(route, 403, 'FORBIDDEN');
+      if (created.assigneeId && !self && !r.assign) return fail(route, 403, null);
       if (input.type === 'client_request') {
-        if (!r.client) return fail(route, 403, 'FORBIDDEN');
+        if (!r.client) return fail(route, 403, null);
         const scope = input.requestScope ?? 'in_scope';
         created.request = {
           contactId: input.requestedByContactId ?? null,
@@ -3036,17 +3050,17 @@ function taskRoutes({ users, clients, projects, retainers, tasks, me }: TaskStat
     const [, taskId, part, childId, childAction] = match;
     const task = byId(taskId as string);
     if (!task || (task.archived && !holds('tasks.manage', 'all'))) {
-      return fail(route, 404, 'NOT_FOUND');
+      return fail(route, 404, null);
     }
     const can = permissions(task);
     const answer = () => json(route, detail(task));
 
     if (!part && method === 'GET') return answer();
     if (!part && method === 'PATCH') {
-      if (!can.canEdit && !can.canAssign) return fail(route, 403, 'FORBIDDEN');
+      if (!can.canEdit && !can.canAssign) return fail(route, 403, null);
       const input = body<UpdateTaskInput>();
       if ((input.assigneeId !== undefined || input.department) && !can.canAssign) {
-        return fail(route, 403, 'FORBIDDEN');
+        return fail(route, 403, null);
       }
       const { requestedByContactId, requestedOn, requestScope, retainerCycleId, ...fields } = input;
       Object.assign(task, fields);
@@ -3109,19 +3123,19 @@ function taskRoutes({ users, clients, projects, retainers, tasks, me }: TaskStat
       return answer();
     }
     if (part === 'dependencies' && method === 'PUT') {
-      if (!can.canReview) return fail(route, 403, 'FORBIDDEN');
+      if (!can.canReview) return fail(route, 403, null);
       task.dependsOn = body<TaskDependenciesInput>().dependsOn;
       return json(route, { items: detail(task).dependencies });
     }
     if (part === 'archive' || part === 'restore') {
-      if (!can.canArchive) return fail(route, 403, 'FORBIDDEN');
+      if (!can.canArchive) return fail(route, 403, null);
       task.archived = part === 'archive';
       return answer();
     }
     if (part === 'revisions' && childAction === 'decision') {
       const revision = task.revisions.find((r) => r.id === childId);
-      if (!revision) return fail(route, 404, 'NOT_FOUND');
-      if (!can.canDecideRevision) return fail(route, 403, 'FORBIDDEN');
+      if (!revision) return fail(route, 404, null);
+      if (!can.canDecideRevision) return fail(route, 403, null);
       const input = body<RevisionDecisionInput>();
       if (input.decision === 'extra_work') {
         const logged = logExtraWork(
@@ -3144,7 +3158,7 @@ function taskRoutes({ users, clients, projects, retainers, tasks, me }: TaskStat
       );
     }
     if (part === 'checklist') {
-      if (!can.canWork && !can.canReview) return fail(route, 403, 'FORBIDDEN');
+      if (!can.canWork && !can.canReview) return fail(route, 403, null);
       if (!childId && method === 'POST') {
         const created = {
           id: id(next++),
@@ -3162,7 +3176,7 @@ function taskRoutes({ users, clients, projects, retainers, tasks, me }: TaskStat
         return json(route, { items: detail(task).checklistItems });
       }
       const item = task.checklist.find((x) => x.id === childId);
-      if (!item) return fail(route, 404, 'NOT_FOUND');
+      if (!item) return fail(route, 404, null);
       if (childAction === 'archive') {
         item.archived = true;
         return route.fulfill({ status: 204 });
@@ -3179,7 +3193,7 @@ function taskRoutes({ users, clients, projects, retainers, tasks, me }: TaskStat
       );
     }
     if (part === 'links') {
-      if (!can.canWork && !can.canReview) return fail(route, 403, 'FORBIDDEN');
+      if (!can.canWork && !can.canReview) return fail(route, 403, null);
       if (!childId) {
         const input = body<{ url: string; label?: string | null }>();
         task.links.push({
@@ -3192,7 +3206,7 @@ function taskRoutes({ users, clients, projects, retainers, tasks, me }: TaskStat
         return json(route, detail(task).links.at(-1), 201);
       }
       const link = task.links.find((x) => x.id === childId);
-      if (!link) return fail(route, 404, 'NOT_FOUND');
+      if (!link) return fail(route, 404, null);
       link.archived = true;
       return route.fulfill({ status: 204 });
     }
@@ -3214,7 +3228,7 @@ function taskRoutes({ users, clients, projects, retainers, tasks, me }: TaskStat
         return json(route, commentOf(task, created), 201);
       }
       const comment = task.comments.find((x) => x.id === childId);
-      if (!comment) return fail(route, 404, 'NOT_FOUND');
+      if (!comment) return fail(route, 404, null);
       if (childAction === 'archive') {
         comment.archived = true;
         return route.fulfill({ status: 204 });
@@ -3559,7 +3573,7 @@ function templateRoutes({ users, clients, retainers, templates, me }: TemplateSt
     const path = url.pathname;
     if (path === '/api/templates' && method === 'GET') {
       const archived = url.searchParams.get('archived') === 'true';
-      if (archived && !manages()) return fail(route, 403, 'FORBIDDEN');
+      if (archived && !manages()) return fail(route, 403, null);
       const kind = url.searchParams.get('kind');
       const search = url.searchParams.get('search')?.toLowerCase();
       const items = templates
@@ -3574,7 +3588,7 @@ function templateRoutes({ users, clients, retainers, templates, me }: TemplateSt
       return json(route, { items, total: items.length, page: 1, pageSize: 25 });
     }
     if (path === '/api/templates' && method === 'POST') {
-      if (!manages()) return fail(route, 403, 'FORBIDDEN');
+      if (!manages()) return fail(route, 403, null);
       const input: CreateTemplate = createTemplateSchema.parse(request.postDataJSON());
       if (nameTaken(input.name)) return fail(route, 409, 'TEMPLATE_NAME_TAKEN');
       const wrong = invalidAssignee(null, input);
@@ -3598,10 +3612,10 @@ function templateRoutes({ users, clients, retainers, templates, me }: TemplateSt
     const match = path.match(/^\/api\/templates\/([^/]+)(?:\/(archive|restore))?$/);
     if (!match) return undefined;
     const template = templates.find((t) => t.id === match[1]);
-    if (!template || (template.archived && !manages())) return fail(route, 404, 'NOT_FOUND');
+    if (!template || (template.archived && !manages())) return fail(route, 404, null);
     const action = match[2];
     if (!action && method === 'GET') return json(route, detail(template));
-    if (!manages()) return fail(route, 403, 'FORBIDDEN');
+    if (!manages()) return fail(route, 403, null);
     if (!action && method === 'PUT') {
       if (template.archived) return fail(route, 409, 'TEMPLATE_ARCHIVED');
       const input = updateTemplateSchema.parse(request.postDataJSON());
@@ -3650,7 +3664,7 @@ interface TemplateRunState {
   me: () => MeResponse;
 }
 
-type RunError = { error: readonly [number, string] };
+type RunError = { error: readonly [number, ErrorCode | null] };
 
 /** Template runs (F07 rules 6–19) over the in-memory records, planned with `planTemplateRun`. */
 function templateRunRoutes({
@@ -3745,8 +3759,8 @@ function templateRunRoutes({
     const assignees = assigneesOf(template, input.assignees);
     if (input.projectId) {
       const project = projects.find((p) => p.id === input.projectId);
-      if (!project) return { error: [404, 'NOT_FOUND'] };
-      if (!managesProject(project)) return { error: [403, 'FORBIDDEN'] };
+      if (!project) return { error: [404, null] };
+      if (!managesProject(project)) return { error: [403, null] };
       if (template.kind !== 'project') return { error: [400, 'TEMPLATE_KIND_MISMATCH'] };
       const startDate = input.startDate ?? later(project.startDate, today);
       if (startDate < today) return { error: [400, 'INVALID_DATES'] };
@@ -3766,9 +3780,9 @@ function templateRunRoutes({
       return { project, plan: planTemplateRun({ template, target, assignees, isMember }) };
     }
     const found = input.retainerCycleId ? cycleOf(input.retainerCycleId) : undefined;
-    if (!found) return { error: [404, 'NOT_FOUND'] };
+    if (!found) return { error: [404, null] };
     const { retainer, cycle } = found;
-    if (!clientScope(retainer.clientId)) return { error: [403, 'FORBIDDEN'] };
+    if (!clientScope(retainer.clientId)) return { error: [403, null] };
     const linked = linkedTo(retainer.id);
     if (!linked) return { error: [400, 'NO_TEMPLATE'] };
     if (linked.id !== template.id) return { error: [400, 'TEMPLATE_NOT_LINKED'] };
@@ -3899,7 +3913,7 @@ function templateRunRoutes({
     const cycle = retainer.cycles.find((c) => c.id === cycleId && c.status === 'open');
     if (!cycle) return { error: [409, 'CYCLE_CLOSED'] } as RunError;
     const line = cycle.lines.find((l) => l.id === lineId);
-    if (!line) return { error: [404, 'NOT_FOUND'] } as RunError;
+    if (!line) return { error: [404, null] } as RunError;
     const template = linkedTo(retainer.id);
     if (!template) return { error: [400, 'NO_TEMPLATE'] } as RunError;
     if (template.archived) return { error: [409, 'TEMPLATE_ARCHIVED'] } as RunError;
@@ -3926,7 +3940,7 @@ function templateRunRoutes({
     const runMatch = path.match(/^\/api\/templates\/([^/]+)\/(preview|runs)$/);
     if (runMatch && method === 'POST') {
       const template = templates.find((t) => t.id === runMatch[1]);
-      if (!template) return fail(route, 404, 'NOT_FOUND');
+      if (!template) return fail(route, 404, null);
       const result = plan(template, templateRunInputSchema.parse(request.postDataJSON()));
       if ('error' in result) return fail(route, result.error[0], result.error[1]);
       if (runMatch[2] === 'runs') return json(route, apply(template, result, 'manual'), 201);
@@ -3966,15 +3980,15 @@ function templateRunRoutes({
     if (!match) return undefined;
     const [, retainerId, cycleId, lineId] = match;
     const retainer = retainers.find((r) => r.id === retainerId);
-    if (!retainer) return fail(route, 404, 'NOT_FOUND');
+    if (!retainer) return fail(route, 404, null);
     if (!cycleId && method === 'GET') return json(route, retainerState(retainer));
-    if (!clientScope(retainer.clientId)) return fail(route, 403, 'FORBIDDEN');
+    if (!clientScope(retainer.clientId)) return fail(route, 403, null);
     if (retainer.archived) return fail(route, 409, 'RETAINER_ARCHIVED');
     if (retainer.status === 'ended') return fail(route, 409, 'RETAINER_ENDED');
     if (!cycleId && method === 'PUT') {
       const { templateId } = setRetainerTemplateSchema.parse(request.postDataJSON());
       const next = templates.find((t) => t.id === templateId);
-      if (templateId && !next) return fail(route, 404, 'NOT_FOUND');
+      if (templateId && !next) return fail(route, 404, null);
       if (next?.kind === 'project') return fail(route, 400, 'TEMPLATE_KIND_MISMATCH');
       if (next?.archived) return fail(route, 409, 'TEMPLATE_ARCHIVED');
       for (const t of templates) {
@@ -4176,7 +4190,7 @@ function notificationRoutes({
     const match = path.match(/^\/api\/me\/notifications\/([^/]+)\/(read|unread)$/);
     if (match && method === 'POST') {
       const item = mine().find((n) => n.id === match[1]);
-      if (!item) return fail(route, 404, 'NOT_FOUND');
+      if (!item) return fail(route, 404, null);
       item.read = match[2] === 'read';
       return route.fulfill({ status: 204 });
     }

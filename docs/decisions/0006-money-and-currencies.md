@@ -17,3 +17,4 @@ The agency invoices in the new Syrian pound (after redenomination) and in US dol
 ## Consequences
 - Every money calculation lives in one tested module and is reused.
 - Reports convert using stored rates, never today's rate, so historical figures never change.
+- A child amount takes the currency of its parent instead of a column of its own: a project milestone's `installment_minor` and an extra work item's `estimate_minor` are in their project's or retainer's currency, which `CURRENCY_LOCKED` keeps fixed once such amounts exist (checked under the parent's row lock). Invoices and reports (F13) read the currency through the parent; an amount that can differ from its parent's currency gets its own currency column.

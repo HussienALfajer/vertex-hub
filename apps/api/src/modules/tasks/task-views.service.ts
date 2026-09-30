@@ -6,6 +6,7 @@ import {
   DEPARTMENT_CODES,
   type DepartmentCode,
   type MyTaskSummary,
+  permissionScopes,
   type TaskBoard,
   type TaskBoardQuery,
   type TaskWorkload,
@@ -211,10 +212,16 @@ export class TaskViewsService {
   }
 }
 
-/** The departments the actor manages, else their own, else all of them. */
+/**
+ * The departments the actor manages; else all of them for those who oversee work across
+ * departments (General Manager, Operations: scope all; account managers: their clients' work);
+ * else their own departments, else all of them.
+ */
 function defaultDepartments(actor: CurrentUserInfo): DepartmentCode[] {
   const managed = actor.access.departments.filter((d) => d.isManager).map((d) => d.code);
   if (managed.length > 0) return managed;
+  const scopes = permissionScopes(actor.access, 'tasks.manage');
+  if (scopes.includes('all') || scopes.includes('own_clients')) return [...DEPARTMENT_CODES];
   const own = actor.access.departments.map((d) => d.code);
   return own.length > 0 ? own : [...DEPARTMENT_CODES];
 }

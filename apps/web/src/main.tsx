@@ -5,8 +5,11 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import i18n from './i18n';
 import { ApiError } from './lib/api/client';
+import { leaveSession } from './lib/auth';
 import { routeTree } from './routeTree.gen';
 import './styles.css';
+// The Madani Arabic faces, when the licensed files exist at build time (vite.config.ts).
+import 'virtual:madani-fonts';
 
 /**
  * Reacts to access changes found by any request (F01 edge cases 2-4): a user who must set up 2FA
@@ -19,11 +22,21 @@ function onApiError(error: Error) {
     void router.navigate({ to: '/setup-two-factor' });
   } else if (error.status === 403) {
     void queryClient.invalidateQueries({ queryKey: ['me'] });
-  } else if (error.status === 401) {
-    queryClient.setQueryData(['me'], null);
-    void router.navigate({ to: '/login' });
+  } else if (error.status === 401 && !sessionEnding) {
+    // Back to the same page after signing in again (WEB-03); the cache goes with the session.
+    sessionEnding = true;
+    const location = router.state.location;
+    const redirect = location.pathname === '/login' ? undefined : location.href;
+    void leaveSession(queryClient, () =>
+      router.navigate({ to: '/login', search: redirect ? { redirect } : {} }),
+    ).finally(() => {
+      sessionEnding = false;
+    });
   }
 }
+
+/** Several requests fail with 401 at once when a session ends: handle it once. */
+let sessionEnding = false;
 
 const queryClient = new QueryClient({
   queryCache: new QueryCache({ onError: onApiError }),

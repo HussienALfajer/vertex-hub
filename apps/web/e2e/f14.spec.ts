@@ -1,6 +1,6 @@
-import { expect, test } from '@playwright/test';
 import ar from '../src/i18n/locales/ar.json' with { type: 'json' };
 import { employeeMe, manager, mockApi, notificationFor, seedIds } from './fixtures';
+import { expect, test } from './test';
 
 // F14 notification screens against the mocked API (the real rules are covered by apps/api/test).
 

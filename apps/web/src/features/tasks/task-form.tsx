@@ -48,6 +48,7 @@ import { ApiError } from '../../lib/api/client';
 import { useMe } from '../../lib/auth';
 import { errorMessage, fieldError, SCREEN_ERROR } from '../../lib/errors';
 import { formatMonth, formatNumber } from '../../lib/format';
+import { useDebouncedValue } from '../../lib/use-search-text';
 import { ClientStatusBadge } from '../clients/client-badges';
 import { clientListQuery, clientQuery } from '../clients/clients.queries';
 import { departmentListQuery } from '../departments/departments.queries';
@@ -474,13 +475,16 @@ export function EngagementFields({
     control: form.control,
     name: ['clientId', 'projectId', 'retainerCycleId'],
   });
+  // No placeholder: another client's projects must never be offered while these load.
   const projects = useQuery({
     ...projectListQuery({ clientId: clientId ?? undefined, pageSize: 100 }),
     enabled: !!clientId,
+    placeholderData: undefined,
   });
   const retainers = useQuery({
     ...retainerListQuery({ clientId: clientId ?? undefined, pageSize: 100 }),
     enabled: !!clientId,
+    placeholderData: undefined,
   });
   const project = useQuery({ ...projectQuery(projectId ?? ''), enabled: !!projectId });
   if (!clientId) return null;
@@ -815,30 +819,42 @@ export interface DependencyOption {
   status: TaskDependency['status'];
 }
 
-/** Open tasks of the client (or internal ones) a task may wait on. */
+/**
+ * Open tasks of the client (or internal ones) a task may wait on, searched on the server by the
+ * typed title, so any of them can be found however many there are. Options of another client
+ * are never shown while the new ones load.
+ */
 export function useDependencyOptions(clientId: string | null, excludeId?: string) {
-  const tasks = useQuery(
-    taskListQuery({
+  const [search, setSearch] = useState('');
+  const debounced = useDebouncedValue(search);
+  const tasks = useQuery({
+    ...taskListQuery({
       ...(clientId ? { clientId } : { internal: 'true' }),
       // Only unfinished work can hold a task up (rule 3).
       status: [...OPEN_TASK_STATUSES],
-      pageSize: 100,
+      ...(debounced && { search: debounced }),
+      pageSize: 50,
     }),
-  );
-  return (tasks.data?.items ?? [])
+    placeholderData: (previous, previousQuery) =>
+      previousQuery?.queryKey[2]?.clientId === (clientId ?? undefined) ? previous : undefined,
+  });
+  const options = (tasks.data?.items ?? [])
     .filter((task) => task.id !== excludeId)
     .map(({ id, title, status }) => ({ id, title, status }));
+  return { options, onSearch: setSearch };
 }
 
 export function DependenciesPicker({
   id,
   options,
+  onSearch,
   value,
   onChange,
   invalid,
 }: {
   id?: string;
   options: DependencyOption[];
+  onSearch?: (text: string) => void;
   value: DependencyOption[];
   onChange: (next: DependencyOption[]) => void;
   invalid?: boolean;
@@ -848,6 +864,7 @@ export function DependenciesPicker({
     <MultiCombobox
       id={id}
       items={options}
+      onSearch={onSearch}
       value={value}
       onValueChange={(next) => onChange(next.slice(0, TASK_LIMITS.dependencies))}
       itemToLabel={(item) => item.title}
@@ -864,7 +881,7 @@ export function DependenciesField({ form }: { form: TaskFormMethods }) {
   const { t } = useTranslation();
   const id = useId();
   const clientId = useWatch({ control: form.control, name: 'clientId' });
-  const options = useDependencyOptions(clientId ?? null);
+  const { options, onSearch } = useDependencyOptions(clientId ?? null);
   const error = form.formState.errors.dependsOn;
   return (
     <Field invalid={!!error}>
@@ -879,6 +896,7 @@ export function DependenciesField({ form }: { form: TaskFormMethods }) {
           <DependenciesPicker
             id={id}
             options={options}
+            onSearch={onSearch}
             value={(field.value ?? []).flatMap(
               (taskId) => options.find((option) => option.id === taskId) ?? [],
             )}

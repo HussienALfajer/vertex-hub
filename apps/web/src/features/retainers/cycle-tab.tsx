@@ -458,6 +458,8 @@ function CommittedDialog({
   const [failure, setFailure] = useState<string | null>(null);
   const form = useForm<UpdateCycleLine>({
     resolver: standardSchemaResolver(updateCycleLineSchema),
+    // A refetch keeps what the user already changed.
+    resetOptions: { keepDirtyValues: true },
     values: { committedQuantity: line.committed, reason: '' },
   });
   const errors = form.formState.errors;
@@ -545,6 +547,8 @@ function AdjustDialog({
   // `delta` holds the amount; the direction gives its sign when sent.
   const form = useForm<CreateCycleAdjustment>({
     resolver: standardSchemaResolver(createCycleAdjustmentSchema),
+    // A refetch keeps what the user already changed.
+    resetOptions: { keepDirtyValues: true },
     values: { delta: 1, reason: '' },
   });
   const amount = useWatch({ control: form.control, name: 'delta' });

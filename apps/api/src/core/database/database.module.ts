@@ -1,5 +1,5 @@
 import { Global, Inject, Module, type OnApplicationShutdown } from '@nestjs/common';
-import { createDatabase, type DatabaseConnection } from '@vertex-hub/db';
+import { createDatabase, type DatabaseConnection, SERVER_DATABASE_LIMITS } from '@vertex-hub/db';
 import { ENV, type Env } from '../config/env.js';
 
 /** Injection token for the Drizzle database. */
@@ -12,7 +12,7 @@ const DATABASE_CONNECTION = Symbol('DATABASE_CONNECTION');
     {
       provide: DATABASE_CONNECTION,
       inject: [ENV],
-      useFactory: (env: Env) => createDatabase(env.DATABASE_URL),
+      useFactory: (env: Env) => createDatabase(env.DATABASE_URL, SERVER_DATABASE_LIMITS),
     },
     {
       provide: DATABASE,

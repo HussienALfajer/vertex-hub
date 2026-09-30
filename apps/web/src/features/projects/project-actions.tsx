@@ -347,7 +347,7 @@ function CancelDialog({
           {failure && <FormAlert>{failure}</FormAlert>}
           <DialogFooter>
             <DialogClose render={<Button variant="outline" type="button" />}>
-              {t('projects.cancel.keep')}
+              {t('common.cancel')}
             </DialogClose>
             <Button type="submit" variant="destructive" disabled={form.formState.isSubmitting}>
               {t('projects.actions.cancel')}
@@ -493,6 +493,8 @@ function EditProject({ project }: { project: ProjectDetail }) {
   const [failure, setFailure] = useState<string | null>(null);
   const form = useForm<CreateProjectInput, unknown, CreateProject>({
     resolver: standardSchemaResolver(createProjectSchema),
+    // A refetch keeps what the user already changed.
+    resetOptions: { keepDirtyValues: true },
     values: {
       clientId: project.client.id,
       name: project.name,
@@ -542,10 +544,7 @@ function EditProject({ project }: { project: ProjectDetail }) {
         {t('common.edit')}
       </Button>
       <Dialog open={open} onOpenChange={(next) => !next && close()}>
-        <DialogContent
-          closeLabel={t('common.close')}
-          className="max-h-[90dvh] max-w-2xl overflow-y-auto"
-        >
+        <DialogContent closeLabel={t('common.close')} className="max-w-2xl">
           <form className="grid gap-5" onSubmit={submit} noValidate>
             <DialogHeader>
               <DialogTitle>{t('projects.edit.title')}</DialogTitle>

@@ -43,6 +43,7 @@ import { Controller, useFieldArray, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { FormAlert } from '../../components/form-alert';
 import { TabHeader } from '../../components/tab-header';
+import { UnsavedChangesGuard } from '../../components/unsaved-changes-guard';
 import { errorMessage } from '../../lib/errors';
 import { useReplaceBrandKit } from './clients.queries';
 
@@ -169,6 +170,7 @@ export function BrandKitForm({
           {form.formState.isSubmitting ? t('common.saving') : t('clients.brandKit.form.save')}
         </Button>
       </div>
+      <UnsavedChangesGuard dirty={form.formState.isDirty && !form.formState.isSubmitting} />
     </form>
   );
 }

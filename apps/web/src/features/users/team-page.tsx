@@ -23,11 +23,14 @@ import {
   TableRow,
 } from '@vertex-hub/ui';
 import { SearchIcon, UserPlusIcon, UsersIcon } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LoadError } from '../../components/load-error';
 import { can, useMe } from '../../lib/auth';
-import { formatNumber } from '../../lib/format';
+import { formatList, formatNumber } from '../../lib/format';
+import { idParam, oneOfParam, pageParam, textParam } from '../../lib/search-params';
+import { usePageInRange } from '../../lib/use-page-in-range';
+import { useSearchText } from '../../lib/use-search-text';
 import { departmentListQuery } from '../departments/departments.queries';
 import { DepartmentChips, TwoFactorIndicator, UserStatusBadge } from './user-badges';
 import { skillsQuery, userListQuery } from './users.queries';
@@ -45,15 +48,12 @@ const ALL = 'all';
 
 /** Reads the directory filters from the URL, dropping anything malformed. */
 export function parseTeamSearch(search: Record<string, unknown>): TeamSearch {
-  const text = (value: unknown) =>
-    typeof value === 'string' && value.trim() ? value.trim().slice(0, 100) : undefined;
-  const page = Number(search.page);
   return {
-    search: text(search.search),
-    departmentId: text(search.departmentId),
-    skill: text(search.skill),
-    status: USER_STATUSES.find((status) => status === search.status),
-    page: Number.isInteger(page) && page > 1 ? page : undefined,
+    search: textParam(search.search, 100),
+    departmentId: idParam(search.departmentId),
+    skill: textParam(search.skill, 100),
+    status: oneOfParam(USER_STATUSES, search.status),
+    page: pageParam(search.page),
   };
 }
 
@@ -73,6 +73,16 @@ export function TeamPage({ search }: { search: TeamSearch }) {
       page,
       pageSize: PAGE_SIZE,
     }),
+  );
+  usePageInRange(
+    page,
+    users.data?.total,
+    PAGE_SIZE,
+    useCallback(
+      (next: number | undefined) =>
+        navigate({ search: (previous) => ({ ...previous, page: next }), replace: true }),
+      [navigate],
+    ),
   );
 
   const setFilter = useCallback(
@@ -146,18 +156,7 @@ function Filters({
   const { t } = useTranslation();
   const departments = useQuery(departmentListQuery);
   const skills = useQuery(skillsQuery);
-  const [text, setText] = useState(search.search ?? '');
-
-  // Follow the URL when it changes from outside (the sidebar link clears the search).
-  useEffect(() => setText(search.search ?? ''), [search.search]);
-
-  // Search as the user types, without a request per keystroke.
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if ((search.search ?? '') !== text.trim()) onChange({ search: text.trim() || undefined });
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [text, search.search, onChange]);
+  const [text, setText] = useSearchText(search.search, onChange);
 
   const departmentItems = [
     { value: ALL, label: t('users.allDepartments') },
@@ -335,7 +334,7 @@ function SkillList({ skills }: { skills: string[] }) {
         </Badge>
       ))}
       {skills.length > shown.length && (
-        <Badge tone="outline" dir="ltr" title={skills.slice(3).join('، ')}>
+        <Badge tone="outline" dir="ltr" title={formatList(skills.slice(3))}>
           {t('users.moreSkills', { count: skills.length - shown.length })}
         </Badge>
       )}

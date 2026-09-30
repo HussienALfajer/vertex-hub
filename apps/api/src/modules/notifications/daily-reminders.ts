@@ -14,7 +14,7 @@ import {
 } from '@vertex-hub/db';
 import { and, eq, inArray, lt } from 'drizzle-orm';
 import { DATABASE } from '../../core/database/database.module.js';
-import { JobQueue } from '../../core/jobs/index.js';
+import { JobQueue, runEach } from '../../core/jobs/index.js';
 import { type Notice, NotificationCenter } from './notification-center.js';
 
 /** A module's part of the daily job; returns how many reminders it sent. */
@@ -64,12 +64,31 @@ export class DailyReminders implements OnModuleInit {
     now: Date = new Date(),
   ): Promise<{ sent: number; purged: number }> {
     let sent = 0;
-    for (const [name, source] of this.sources) {
-      const count = await source(today);
-      this.logger.log(`Daily source ${name}: ${count} sent`);
-      sent += count;
-    }
-    return { sent, purged: await this.purge(now) };
+    let purged = 0;
+    // A failing source holds back neither the other sources nor the purge; the run fails at the end.
+    const steps: [string, () => Promise<void>][] = [
+      ...[...this.sources].map(([name, source]): [string, () => Promise<void>] => [
+        `Daily source ${name}`,
+        async () => {
+          const count = await source(today);
+          this.logger.log(`Daily source ${name}: ${count} sent`);
+          sent += count;
+        },
+      ]),
+      [
+        'Notification purge',
+        async () => {
+          purged = await this.purge(now);
+        },
+      ],
+    ];
+    await runEach(
+      steps,
+      this.logger,
+      ([name]) => name,
+      ([, step]) => step(),
+    );
+    return { sent, purged };
   }
 
   /**
@@ -99,10 +118,11 @@ export class DailyReminders implements OnModuleInit {
   async sentOn(
     kind: NotificationReminderKind,
     subjects: readonly { subjectId: string; occurrence: CalendarDate }[],
+    executor: Database | Transaction = this.db,
   ): Promise<Map<string, CalendarDate>> {
     if (subjects.length === 0) return new Map();
     const occurrences = new Map(subjects.map((subject) => [subject.subjectId, subject.occurrence]));
-    const rows = await this.db
+    const rows = await executor
       .select({
         subjectId: notificationReminders.subjectId,
         occurrence: notificationReminders.occurrence,

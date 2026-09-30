@@ -15,47 +15,7 @@
 @import "@fontsource/noto-kufi-arabic/arabic-700.css";
 
 /*
- * Madani Arabic is commercial and never committed. Its @font-face covers the Arabic range only,
- * so Latin letters and digits fall through to Montserrat. The files are served at /fonts/madani/:
- * locally from the git-ignored brand/fonts/private/ (see apps/web/vite.config.ts), in production
- * from a server path outside the repository. When they are missing, Arabic renders in
- * Noto Kufi Arabic.
+ * Madani Arabic is commercial and never committed: its faces are in madani.css, which the app
+ * loads only when the files exist at build time (apps/web/vite.config.ts), so a build without
+ * them requests nothing and Arabic renders in Noto Kufi Arabic.
  */
-@font-face {
-  font-family: "Madani Arabic";
-  font-style: normal;
-  font-weight: 400;
-  font-display: swap;
-  src:
-    local("Madani Arabic"),
-    url("/fonts/madani/MadaniArabic-Regular.woff2") format("woff2");
-  unicode-range:
-    U+0600-06FF, U+0750-077F, U+0870-088E, U+0890-0891, U+0897-08E1, U+08E3-08FF, U+200C-200E,
-    U+2010-2011, U+204F, U+2E41, U+FB50-FDFF, U+FE70-FE74, U+FE76-FEFC;
-}
-
-@font-face {
-  font-family: "Madani Arabic";
-  font-style: normal;
-  font-weight: 500;
-  font-display: swap;
-  src:
-    local("Madani Arabic Medium"),
-    url("/fonts/madani/MadaniArabic-Medium.woff2") format("woff2");
-  unicode-range:
-    U+0600-06FF, U+0750-077F, U+0870-088E, U+0890-0891, U+0897-08E1, U+08E3-08FF, U+200C-200E,
-    U+2010-2011, U+204F, U+2E41, U+FB50-FDFF, U+FE70-FE74, U+FE76-FEFC;
-}
-
-@font-face {
-  font-family: "Madani Arabic";
-  font-style: normal;
-  font-weight: 700;
-  font-display: swap;
-  src:
-    local("Madani Arabic Bold"),
-    url("/fonts/madani/MadaniArabic-Bold.woff2") format("woff2");
-  unicode-range:
-    U+0600-06FF, U+0750-077F, U+0870-088E, U+0890-0891, U+0897-08E1, U+08E3-08FF, U+200C-200E,
-    U+2010-2011, U+204F, U+2E41, U+FB50-FDFF, U+FE70-FE74, U+FE76-FEFC;
-}

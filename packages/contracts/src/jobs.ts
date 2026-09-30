@@ -3,11 +3,13 @@
  * schedule, the API process works the queue through its module services.
  */
 
+import { BUSINESS_TIME_ZONE } from './dates.js';
+
 /** F05 R2: closes past retainer cycles and opens the current month's, once a day. */
 export const RETAINER_CYCLES_JOB = {
   queue: 'retainers.cycles',
   cron: '5 0 * * *',
-  tz: 'Asia/Damascus',
+  tz: BUSINESS_TIME_ZONE,
 } as const;
 
 /**
@@ -17,5 +19,5 @@ export const RETAINER_CYCLES_JOB = {
 export const NOTIFICATIONS_DAILY_JOB = {
   queue: 'notifications.daily',
   cron: '0 9 * * 0-4,6',
-  tz: 'Asia/Damascus',
+  tz: BUSINESS_TIME_ZONE,
 } as const;

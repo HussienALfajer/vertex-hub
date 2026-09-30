@@ -16,6 +16,16 @@ type Executor = Database | Transaction;
  * Dependencies between tasks (spec F06, rules 3 and 4). Blocked is computed, never stored.
  */
 
+/**
+ * Serializes changes to existing dependency edges and to the client of a linked task, so two
+ * concurrent edits cannot each pass the cycle check and together close a cycle (rule 4). Taken
+ * before any task row lock (and after `lockAccessChanges`). A new task needs no lock: nothing
+ * can depend on it before it commits.
+ */
+export async function lockDependencyGraph(tx: Transaction): Promise<void> {
+  await tx.execute(sql`select pg_advisory_xact_lock(${7_140_016})`);
+}
+
 /** SQL over a row of `tasks`: it waits on a live dependency that is not finished (rule 3). */
 export const blockedSql = sql<boolean>`exists (
   select 1 from ${taskDependencies} as d

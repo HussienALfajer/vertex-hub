@@ -35,8 +35,7 @@ import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { FormAlert } from '../../components/form-alert';
-import { LoadError } from '../../components/load-error';
-import { ApiError } from '../../lib/api/client';
+import { isMissing, LoadError } from '../../components/load-error';
 import { can, useMe } from '../../lib/auth';
 import { errorMessage } from '../../lib/errors';
 import { formatNumber } from '../../lib/format';
@@ -65,11 +64,12 @@ export function DepartmentPage({ departmentId }: { departmentId: string }) {
       ) : department.isError ? (
         <LoadError
           message={
-            department.error instanceof ApiError && department.error.status === 404
+            isMissing(department.error)
               ? t('departments.detail.notFound')
               : t('departments.detail.loadError')
           }
           onRetry={() => department.refetch()}
+          error={department.error}
         />
       ) : (
         <Department department={department.data} />
@@ -222,6 +222,8 @@ function RenameDialog({
     formState: { errors, isSubmitting },
   } = useForm({
     resolver: standardSchemaResolver(renameSchema),
+    // A refetch keeps what the user already changed.
+    resetOptions: { keepDirtyValues: true },
     values: { name: department.name },
   });
 

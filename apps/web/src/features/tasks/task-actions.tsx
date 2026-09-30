@@ -85,6 +85,9 @@ import {
 } from './task-form';
 import { useArchiveTask, useChangeTaskStatus, useUpdateTask } from './tasks.queries';
 
+/** Icons that point along the reading direction, so they mirror in RTL (brand §6). */
+export const MIRRORED_ICONS: ReadonlySet<LucideIcon> = new Set([SendIcon, UndoIcon]);
+
 export const MOVE_ICONS: Record<TaskMove, LucideIcon> = {
   start: PlayIcon,
   submit: SendIcon,
@@ -169,7 +172,7 @@ export function TaskActions({ task }: { task: TaskDetail }) {
             disabled={change.isPending}
             onClick={() => run(target)}
           >
-            <Icon />
+            <Icon className={MIRRORED_ICONS.has(Icon) ? 'rtl:-scale-x-100' : undefined} />
             {t(`tasks.moves.${target.move}`)}
           </Button>
         );
@@ -452,10 +455,7 @@ function EditTaskDialog({ task, onClose }: { task: TaskDetail; onClose: () => vo
 
   return (
     <Dialog open onOpenChange={(next) => !next && onClose()}>
-      <DialogContent
-        closeLabel={t('common.close')}
-        className="max-h-[90dvh] max-w-2xl overflow-y-auto"
-      >
+      <DialogContent closeLabel={t('common.close')} className="max-w-2xl">
         <form className="grid gap-5" onSubmit={submit} noValidate>
           <DialogHeader>
             <DialogTitle>{t('tasks.edit.title')}</DialogTitle>
@@ -525,7 +525,10 @@ function ReassignDialog({ task, onClose }: { task: TaskDetail; onClose: () => vo
       ...(department !== task.department && { department }),
       ...(next !== (task.assignee?.id ?? null) && { assigneeId: next }),
     });
-    if (!parsed.success) return;
+    if (!parsed.success) {
+      setFailure(t('errors.generic'));
+      return;
+    }
     try {
       if (Object.keys(parsed.data).length > 0) await update.mutateAsync(parsed.data);
       toast.add({ title: t('tasks.reassign.done'), type: 'success' });

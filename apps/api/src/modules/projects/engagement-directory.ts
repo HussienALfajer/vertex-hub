@@ -243,8 +243,7 @@ export class EngagementDirectory {
   }
 
   /**
-   * The lines of the cycles by position, with their task counts. Counts are read outside the
-   * transaction: lines created in it count 0.
+   * The lines of the cycles by position, with their task counts, read through `executor`.
    */
   async cycleLineSummaries(
     cycleIds: string[],
@@ -262,7 +261,10 @@ export class EngagementDirectory {
       .from(retainerCycleLines)
       .where(inArray(retainerCycleLines.cycleId, cycleIds))
       .orderBy(asc(retainerCycleLines.position), asc(retainerCycleLines.id));
-    const counts = await this.progress.cycleLines(rows.map((row) => row.id));
+    const counts = await this.progress.cycleLines(
+      rows.map((row) => row.id),
+      executor,
+    );
     return rows.map((row) => ({ ...row, tasks: (counts.get(row.id) ?? NO_TASKS).total }));
   }
 

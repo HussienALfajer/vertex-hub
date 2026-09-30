@@ -289,6 +289,8 @@ function ContactDialog({
   const contact = editing === 'new' ? null : editing;
   const form = useForm<CreateContactInput, unknown, CreateContact>({
     resolver: standardSchemaResolver(createContactSchema),
+    // A refetch keeps what the user already changed.
+    resetOptions: { keepDirtyValues: true },
     values: contact
       ? {
           name: contact.name,

@@ -35,10 +35,10 @@ import {
 import { type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '../../components/confirm-dialog';
-import { LoadError } from '../../components/load-error';
-import { ApiError } from '../../lib/api/client';
+import { isMissing, LoadError } from '../../components/load-error';
 import { formatCalendarDate, formatDateTime, formatNumber } from '../../lib/format';
 import { formatMoney } from '../../lib/money';
+import { idParam } from '../../lib/search-params';
 import { ProjectTasksTab } from '../tasks/project-tasks-tab';
 import { ExtraWorkTab } from './extra-work-tab';
 import { MilestonesTab } from './milestones-tab';
@@ -64,15 +64,10 @@ export interface ProjectPageSearch {
   generate?: string;
 }
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
 export function parseProjectPageSearch(search: Record<string, unknown>): ProjectPageSearch {
   return {
     tab: PROJECT_TABS.find((tab) => tab !== 'milestones' && tab === search.tab),
-    generate:
-      typeof search.generate === 'string' && UUID.test(search.generate)
-        ? search.generate
-        : undefined,
+    generate: idParam(search.generate),
   };
 }
 
@@ -99,11 +94,10 @@ export function ProjectPage({
       ) : project.isError ? (
         <LoadError
           message={
-            project.error instanceof ApiError && project.error.status === 404
-              ? t('projects.page.notFound')
-              : t('projects.page.loadError')
+            isMissing(project.error) ? t('projects.page.notFound') : t('projects.page.loadError')
           }
           onRetry={() => project.refetch()}
+          error={project.error}
         />
       ) : (
         <ProjectView

@@ -1,6 +1,7 @@
-import { expect, type Page, test } from '@playwright/test';
+import type { Page } from '@playwright/test';
 import ar from '../src/i18n/locales/ar.json' with { type: 'json' };
 import { employeeMe, mockApi, PROJECTS_TODAY, seedIds } from './fixtures';
+import { expect, test } from './test';
 
 // F07 template screens against the mocked API (the real rules are covered by apps/api/test).
 

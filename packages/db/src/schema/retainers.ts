@@ -147,6 +147,10 @@ export const retainerCycleLines = pgTable(
       sql`lower(coalesce(${table.label}, ''))`,
     ),
     check('retainer_cycle_lines_quantity_check', sql`${table.committedQuantity} between 0 and 999`),
+    check(
+      'retainer_cycle_lines_delivered_check',
+      sql`${table.deliveredAtClose} is null or ${table.deliveredAtClose} >= 0`,
+    ),
   ],
 );
 

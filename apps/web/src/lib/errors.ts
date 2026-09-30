@@ -26,7 +26,12 @@ export function errorMessage(t: TFunction, error: unknown): string {
   if (error instanceof ApiError) {
     if (error.status === 429) return t('errors.TOO_MANY_REQUESTS');
     const code = error.knownCode;
-    return code ? t(`errors.${code}`) : t('errors.generic');
+    if (code) return t(`errors.${code}`);
+    // Errors without a code: retrying would fail again, so say why instead.
+    if (error.status === 401) return t('errors.SESSION_ENDED');
+    if (error.status === 403) return t('errors.FORBIDDEN');
+    if (error.status === 404) return t('errors.NOT_FOUND');
+    return t('errors.generic');
   }
   const auth = error as Partial<AuthClientError> | null;
   if (auth?.status === 429) return t('errors.TOO_MANY_REQUESTS');

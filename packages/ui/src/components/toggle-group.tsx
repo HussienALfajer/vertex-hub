@@ -31,7 +31,8 @@ function ToggleGroupItem({ className, ...props }: TogglePrimitive.Props) {
         'inline-flex h-8 items-center justify-center gap-1.5 rounded-sm px-3 text-sm whitespace-nowrap text-muted-foreground select-none',
         'transition-colors duration-150 ease-out hover:text-foreground',
         "[&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
-        'data-pressed:bg-surface data-pressed:font-medium data-pressed:text-foreground data-pressed:ring-1 data-pressed:ring-border',
+        // Pressed reads at a glance (WCAG 1.4.11): the primary fill, not a near-white step.
+        'data-pressed:bg-primary data-pressed:font-medium data-pressed:text-primary-foreground data-pressed:hover:bg-primary-hover data-pressed:hover:text-primary-foreground',
         'data-disabled:cursor-not-allowed',
         className,
       )}

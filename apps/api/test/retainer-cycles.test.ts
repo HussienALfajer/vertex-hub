@@ -7,15 +7,15 @@ import {
   cycleLineSchema,
   cyclePageSchema,
   firstOfMonth,
-  isLineBehind,
   lastOfMonth,
   type TaskCounts,
 } from '@vertex-hub/contracts';
 import { auditEntries, createDatabase, retainerCycles } from '@vertex-hub/db';
 import { testDatabaseUrl } from '@vertex-hub/db/testing';
 import { eq } from 'drizzle-orm';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { WorkProgress } from '../src/modules/projects/index.js';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { JobItemsFailedError } from '../src/core/jobs/index.js';
+import { CycleOpenedHooks, WorkProgress } from '../src/modules/projects/index.js';
 import { RetainerCyclesService } from '../src/modules/projects/retainer-cycles.service.js';
 import { expectError, seedClientCast } from './client-cast.js';
 import { api } from './helpers.js';
@@ -139,7 +139,25 @@ describe('retainer cycles', () => {
           author: { id: cast.am.id, name: expect.any(String) },
         }),
       ]);
-      expect(line?.behind).toBe(isLineBehind({ committed: 12, delivered: 5 }, shown, today));
+      // R11 on known dates, whatever day the suite runs: three days left with 5 of 12 is behind.
+      await db
+        .update(retainerCycles)
+        .set({ periodStart: addDays(today, -27), periodEnd: addDays(today, 3) })
+        .where(eq(retainerCycles.id, cycle.id));
+      const late = await cycleDetail(retainer.id, cycle.id, cast.employee.cookie);
+      expect(late.lines.find((candidate) => candidate.id === design.id)?.behind).toBe(true);
+      expect(late.behind).toBe(true);
+      // A month just begun, with most still to come, is not.
+      await db
+        .update(retainerCycles)
+        .set({ periodStart: today, periodEnd: addDays(today, 29) })
+        .where(eq(retainerCycles.id, cycle.id));
+      const early = await cycleDetail(retainer.id, cycle.id, cast.employee.cookie);
+      expect(early.lines.find((candidate) => candidate.id === design.id)?.behind).toBe(false);
+      await db
+        .update(retainerCycles)
+        .set({ periodStart: cycle.periodStart, periodEnd: cycle.periodEnd })
+        .where(eq(retainerCycles.id, cycle.id));
       const entries = await db
         .select()
         .from(auditEntries)
@@ -155,6 +173,19 @@ describe('retainer cycles', () => {
         delta: 3,
         retainerId: retainer.id,
       });
+    });
+
+    it('applies two adjustments sent at the same time (edge case 1)', async () => {
+      const { retainer, cycle, design } = await started();
+      const responses = await Promise.all([
+        adjust(retainer.id, cycle.id, design.id, cast.am.cookie, { delta: 2, reason: 'One' }),
+        adjust(retainer.id, cycle.id, design.id, cast.gm.cookie, { delta: 3, reason: 'Two' }),
+      ]);
+      expect(responses.map((response) => response.status)).toEqual([201, 201]);
+      const line = (await cycleDetail(retainer.id, cycle.id, cast.gm.cookie)).lines.find(
+        (one) => one.id === design.id,
+      );
+      expect(line?.delivered).toBe(5);
     });
 
     it('computes the delivery rate over capped lines (R13)', async () => {
@@ -305,6 +336,49 @@ describe('retainer cycles', () => {
       );
     });
 
+    it('freezes a delivered count never below zero (R7, R8)', async () => {
+      const { retainer, cycle, design } = await started();
+      tasks.set(design.id, { total: 1, delivered: 1, open: 0 });
+      await adjust(retainer.id, cycle.id, design.id, cast.am.cookie, {
+        delta: -1,
+        reason: 'Counted twice',
+      });
+      // The delivered task is reopened (or archived) before the month closes.
+      tasks.set(design.id, { total: 1, delivered: 0, open: 1 });
+      await app.get(RetainerCyclesService).runDaily(nextMonth);
+      const closed = await cycleDetail(retainer.id, cycle.id, cast.gm.cookie);
+      expect(closed.status).toBe('closed');
+      expect(closed.lines.find((line) => line.id === design.id)?.delivered).toBe(0);
+      expect(closed.deliveryRate).toBeGreaterThanOrEqual(0);
+      tasks.delete(design.id);
+    });
+
+    it('opens the new month at 00:30 in Damascus on the 1st, still the 31st in UTC (edge case 16)', async () => {
+      const { retainer } = await started();
+      // The API runs in this process: faking Date moves its clock too (timers stay real).
+      vi.useFakeTimers({ toFake: ['Date'] });
+      try {
+        const firstOfNext = addDays(lastOfMonth(nextMonth), 1);
+        vi.setSystemTime(new Date(`${addDays(firstOfNext, -1)}T21:30:00.000Z`));
+        expect(businessDate()).toBe(firstOfNext);
+        await app.get(RetainerCyclesService).runDaily();
+      } finally {
+        vi.useRealTimers();
+      }
+      const months = (await cycles(retainer.id, cast.gm.cookie)).map((c) => [c.month, c.status]);
+      expect(months[0]).toEqual([addDays(lastOfMonth(nextMonth), 1), 'open']);
+    });
+
+    it('opens one cycle when runs overlap (edge case 2)', async () => {
+      const { retainer, cycle } = await started();
+      const job = app.get(RetainerCyclesService);
+      await Promise.all([job.runDaily(nextMonth), job.runDaily(nextMonth)]);
+      expect((await cycles(retainer.id, cast.gm.cookie)).map((c) => [c.month, c.status])).toEqual([
+        [nextMonth, 'open'],
+        [cycle.month, 'closed'],
+      ]);
+    });
+
     it('creates no cycle while paused across a month (R5, edge case 5)', async () => {
       const { retainer, cycle } = await started();
       await client.post(`/api/retainers/${retainer.id}/status`, cast.gm.cookie, {
@@ -332,6 +406,26 @@ describe('retainer cycles', () => {
         'open',
         'closed',
       ]);
+    });
+
+    it('keeps going past a retainer that fails, then reports the failure (ADR 0015)', async () => {
+      const broken = await started();
+      const healthy = await started();
+      app.get(CycleOpenedHooks).register(async (_tx, event) => {
+        if (event.retainerId === broken.retainer.id) throw new Error('Broken template');
+      });
+      await expect(app.get(RetainerCyclesService).runDaily(nextMonth)).rejects.toBeInstanceOf(
+        JobItemsFailedError,
+      );
+      expect((await cycles(healthy.retainer.id, cast.gm.cookie)).map((c) => c.status)).toEqual([
+        'open',
+        'closed',
+      ]);
+      // The broken retainer's month rolled back: still open, retried on the next run.
+      expect((await cycles(broken.retainer.id, cast.gm.cookie)).map((c) => c.status)).toEqual([
+        'open',
+      ]);
+      await client.post(`/api/retainers/${broken.retainer.id}/archive`, cast.gm.cookie);
     });
 
     it('starts a future retainer on its start date, from that day', async () => {

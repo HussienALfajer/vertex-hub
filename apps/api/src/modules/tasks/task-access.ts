@@ -3,6 +3,7 @@ import {
   allowedTaskTransitions,
   type DepartmentCode,
   hasPermission,
+  isProjectClosed,
   type Permission,
   permissionScopes,
   type RequestScope,
@@ -194,6 +195,13 @@ export function taskRights(actor: CurrentUserInfo, task: TaskAccess): TaskRights
   };
 }
 
+/**
+ * A task of a completed or cancelled project stays closed until the project is reopened (F05
+ * rule 7, F06 edge case 7): reopening or restoring it answers `PROJECT_CLOSED`.
+ */
+export const inClosedProject = (task: TaskAccess) =>
+  !!task.project && isProjectClosed(task.project.status);
+
 /** The creator of an unassigned request may edit and withdraw it while it is new (rule 13). */
 export const ownsOpenRequest = (rights: TaskRights, task: TaskAccess) =>
   rights.creator && task.status === 'new' && task.assigneeId === null;
@@ -206,19 +214,20 @@ export function taskPermissions(
 ): { permissions: TaskPermissions; allowedTransitions: TaskStatus[] } {
   const rights = taskRights(actor, task);
   const readOnly = isReadOnly(task);
-  const allowedTransitions = readOnly
-    ? []
-    : allowedTaskTransitions(
-        {
-          status: task.status,
-          assigneeId: task.assigneeId,
-          hasClient: !!task.clientId,
-          needsClientApproval: task.needsClientApproval,
-          blocked,
-        },
-        rights,
-      );
   const closed = task.status === 'delivered' || task.status === 'cancelled';
+  const allowedTransitions =
+    readOnly || (closed && inClosedProject(task))
+      ? []
+      : allowedTaskTransitions(
+          {
+            status: task.status,
+            assigneeId: task.assigneeId,
+            hasClient: !!task.clientId,
+            needsClientApproval: task.needsClientApproval,
+            blocked,
+          },
+          rights,
+        );
   return {
     permissions: {
       canEdit: !readOnly && (rights.manage || ownsOpenRequest(rights, task)),

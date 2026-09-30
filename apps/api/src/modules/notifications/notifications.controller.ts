@@ -4,6 +4,7 @@ import {
   Controller,
   Get,
   HttpCode,
+  Inject,
   Param,
   ParseUUIDPipe,
   Post,
@@ -23,8 +24,6 @@ import {
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import {
-  NOTIFICATION_STREAM_LIFETIME_MS,
-  NOTIFICATION_STREAM_PING_MS,
   type NotificationListQuery,
   type NotificationPage,
   type NotificationSettings,
@@ -40,7 +39,7 @@ import {
 } from '@vertex-hub/contracts';
 import { RequireSession } from '../../core/access/index.js';
 import { CurrentUser, type CurrentUserInfo } from '../auth/index.js';
-import { NotificationStream } from './notification-stream.js';
+import { NotificationStream, STREAM_TIMING, type StreamTiming } from './notification-stream.js';
 import { NotificationsService } from './notifications.service.js';
 
 /** The caller's own notifications and settings (spec F14); another user's id answers 404. */
@@ -52,6 +51,7 @@ export class NotificationsController {
   constructor(
     private readonly notifications: NotificationsService,
     private readonly stream: NotificationStream,
+    @Inject(STREAM_TIMING) private readonly timing: StreamTiming,
   ) {}
 
   @Get('notifications')
@@ -73,8 +73,8 @@ export class NotificationsController {
 
   /**
    * Server-Sent Events (rule 4, ADR 0018): a `notification` event (`NotificationStreamEvent`)
-   * per notification committed for the caller, a `: ping` comment every 25 s, closed after 15
-   * minutes so the client reconnects and the session is checked again.
+   * per notification committed for the caller, a `: ping` comment every 25 s, closed when the
+   * session ends (checked at each ping) and after 15 minutes, so the client reconnects.
    */
   @Get('notifications/stream')
   @ApiProduces('text/event-stream')
@@ -110,8 +110,16 @@ export class NotificationsController {
       send: (event) => response.write(`event: notification\ndata: ${JSON.stringify(event)}\n\n`),
       close,
     });
-    const ping = setInterval(() => response.write(': ping\n\n'), NOTIFICATION_STREAM_PING_MS);
-    const lifetime = setTimeout(close, NOTIFICATION_STREAM_LIFETIME_MS);
+    const sessionId = current.sessionId;
+    const ping = setInterval(() => {
+      response.write(': ping\n\n');
+      if (!sessionId) return;
+      this.stream.sessionEnded(sessionId).then(
+        (ended) => ended && close(),
+        () => close(),
+      );
+    }, this.timing.pingMs);
+    const lifetime = setTimeout(close, this.timing.lifetimeMs);
     request.on('close', close);
     response.write(': connected\n\n');
   }

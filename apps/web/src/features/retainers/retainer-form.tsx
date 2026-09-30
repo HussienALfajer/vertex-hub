@@ -309,14 +309,17 @@ export type DeliverablesFormMethods = UseFormReturn<DeliverablesFormValues>;
 
 /**
  * Checks the lines dialog against the contract (`retainerDeliverablesSchema`), putting each
- * problem on its row; returns the lines to send, or null.
+ * problem on its row; returns the lines to send, or null. `onOther` receives a problem no row
+ * shows (too many lines), so the dialog never fails without a message.
  */
 export function parseLines(
   form: DeliverablesFormMethods,
   lines: DeliverableLineInput[],
+  onOther: () => void,
 ): RetainerDeliverables['lines'] | null {
   const result = retainerDeliverablesSchema.safeParse({ lines });
   if (result.success) return result.data.lines;
+  let placed = true;
   for (const issue of result.error.issues) {
     const [, index, field] = issue.path;
     if (typeof index === 'number' && (field === 'label' || field === 'monthlyQuantity')) {
@@ -324,8 +327,11 @@ export function parseLines(
         type: SCREEN_ERROR,
         message: '',
       });
+    } else {
+      placed = false;
     }
   }
+  if (!placed) onOther();
   return null;
 }
 

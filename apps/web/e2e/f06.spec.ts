@@ -1,6 +1,7 @@
-import { expect, type Page, test } from '@playwright/test';
+import type { Page } from '@playwright/test';
 import ar from '../src/i18n/locales/ar.json' with { type: 'json' };
 import { accountManagerMe, employeeMe, mockApi, PROJECTS_TODAY, seedIds } from './fixtures';
+import { expect, test } from './test';
 
 // F06 task flows against the mocked API (the real rules are covered by apps/api/test).
 
@@ -192,7 +193,7 @@ test('archiving a user with open tasks lists them with a link to each', async ({
     .getByRole('button', { name: ar.users.confirm.archiveAction })
     .click();
   const dialog = page.getByRole('alertdialog');
-  await expect(dialog.getByText('منفّذ المهمة المفتوحة جلسة تصوير الأطباق')).toBeVisible();
+  await expect(dialog.getByText('تنفيذ المهمة المفتوحة جلسة تصوير الأطباق')).toBeVisible();
   await dialog.getByRole('link', { name: ar.users.responsibilities.openTask }).click();
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('جلسة تصوير الأطباق');
 });

@@ -63,7 +63,6 @@ export class UserLinksService {
    * session of the user ends (F01 rule 13).
    */
   async redeem({ token, password }: RedeemLink): Promise<void> {
-    const passwordHash = await hashPassword(password);
     await this.db.transaction(async (tx) => {
       const [link] = await tx
         .select({ userId: verifications.value })
@@ -84,6 +83,8 @@ export class UserLinksService {
       if (!user || user.archivedAt) {
         throw new CodedException(400, 'LINK_INVALID', 'The link is invalid or has expired');
       }
+      // Hashed only for a valid link: an anonymous request with a made-up token costs no scrypt.
+      const passwordHash = await hashPassword(password);
 
       const [account] = await tx
         .select({ id: accounts.id })

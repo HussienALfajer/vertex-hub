@@ -592,6 +592,35 @@ describe('templates', () => {
       cast.employee.cookie,
     );
     expect(templatePageSchema.parse(await response.json()).items[0]?.linkedRetainerCount).toBe(1);
+
+    // Archiving the client hides its retainer from the template too (F05 G2).
+    expect((await client.post(`/api/clients/${clientId}/archive`, cast.gm.cookie)).status).toBe(
+      200,
+    );
+    expect((await detail(monthly.id, cast.employee.cookie)).linkedRetainers).toEqual([]);
+    const hidden = await client.get(
+      `/api/templates?search=${encodeURIComponent(monthly.name)}`,
+      cast.employee.cookie,
+    );
+    expect(templatePageSchema.parse(await hidden.json()).items[0]?.linkedRetainerCount).toBe(0);
     await db.delete(retainerTemplates).where(and(eq(retainerTemplates.retainerId, retainer.id)));
+  });
+
+  it('answers a name taken by a concurrent create with its code, not a server error', async () => {
+    const name = `Race ${cast.run}`;
+    const responses = await Promise.all(
+      [0, 1, 2].map(() =>
+        client.post('/api/templates', cast.operations.cookie, { ...projectInput(), name }),
+      ),
+    );
+    const statuses = responses.map((response) => response.status).sort();
+    expect(statuses[0]).toBe(201);
+    expect(statuses.slice(1)).toEqual([409, 409]);
+    for (const response of responses.filter((one) => one.status === 409)) {
+      expect(((await response.json()) as { code: string }).code).toBe('TEMPLATE_NAME_TAKEN');
+    }
+    for (const response of responses.filter((one) => one.status === 201)) {
+      templates.push(((await response.json()) as { id: string }).id);
+    }
   });
 });

@@ -136,7 +136,7 @@ invited | active ──(archive)──→ archived ──(restore)──→ invi
 2. Effective roles = assigned roles + Employee (every non-archived user) + Department Manager (while managing at least one department).
 3. Effective permissions = the union of role grants and department capability grants (tables above). When the same permission comes from several sources, all its scopes apply.
 4. Permissions are computed on every request, so role, department and manager changes apply to open sessions immediately.
-5. Only a General Manager can grant or remove the General Manager role. A user manager who is not a General Manager cannot edit, archive, restore, issue links for, or reset 2FA of a user who holds it (`GENERAL_MANAGER_ONLY`).
+5. Only a General Manager can grant or remove the General Manager and Finance roles (separation of duties: Finance holds money access, owner decision 2026-09-30). Nobody changes their own roles (`CANNOT_CHANGE_OWN_ROLES`). A user manager who is not a General Manager cannot edit, archive, restore, issue links for, or reset 2FA of a user who holds it (`GENERAL_MANAGER_ONLY`).
 6. The last active General Manager cannot lose the role or be archived (`LAST_GENERAL_MANAGER`).
 7. A user cannot archive themselves (`CANNOT_ARCHIVE_SELF`).
 8. A department has at most one manager; one user can manage several departments. The manager must be an active member (primary or secondary) of the department (`MANAGER_NOT_MEMBER`). A user cannot be removed from a department they manage until the manager changes (`MANAGER_MEMBERSHIP_REQUIRED`).
@@ -149,7 +149,7 @@ invited | active ──(archive)──→ archived ──(restore)──→ invi
 15. Two-factor sign-in is required for users holding General Manager or Finance, and for the Operations manager. A required user without 2FA enabled can use only `GET /api/me`, the 2FA setup endpoints and sign-out until they enable it (`TWO_FACTOR_REQUIRED`); the web app sends them to the setup page. A required user cannot disable 2FA.
 16. 2FA is TOTP (authenticator app) with 10 single-use backup codes shown once at setup. No "trust this device". Verification is asked at every sign-in.
 17. Resetting a user's 2FA (lost phone) disables it; if it is required, the user sets it up again at the next request.
-18. Sign-in and 2FA verification are limited to 5 attempts per minute per client IP.
+18. Sign-in and 2FA verification are limited to 20 attempts per minute per client IP (an office shares one public IP), and sign-in to 10 failed attempts per account in 15 minutes, whatever the IP (owner decision 2026-09-30).
 19. A user edits only their own phone and skills (plus password and 2FA). Name, email, departments, title and roles are edited by user managers.
 20. Email changes by a user manager keep the user's sessions and password.
 21. Department names are unique; codes never change.
@@ -190,7 +190,7 @@ The `user:create` CLI stays for bootstrapping the first General Manager: it gain
 All screens: Arabic RTL, strings through i18next (`users.*`, `departments.*`, `account.*`, `audit.*`), loading, empty and error states. Navigation shows "Team" and "Departments" to everyone, "Audit log" to holders of `audit.read`.
 
 1. **Team directory** `/team` — table: initials avatar, name, primary department (secondary as chips), title, phone, skills. Search, filters by department and skill. With `users.manage`: status filter (active / invited / archived), roles and 2FA columns, "New user" button. Empty: "no users match".
-2. **New user** `/team/new` (`users.manage`) — form with the fields of `createUserSchema`; skills input suggests skills in use; General Manager role checkbox shown only to General Managers. On success, a dialog shows the activation link with a copy button and its expiry, and explains it must be sent by hand.
+2. **New user** `/team/new` (`users.manage`) — form with the fields of `createUserSchema`; skills input suggests skills in use; General Manager and Finance role checkboxes shown only to General Managers; roles are not editable on one's own account. On success, a dialog shows the activation link with a copy button and its expiry, and explains it must be sent by hand.
 3. **User profile** `/team/$userId` — everyone: directory fields and the departments they manage. With `users.manage`: edit form, status, roles, 2FA state, and actions "Copy activation/reset link", "Reset 2FA", "Archive" (confirmation; on `USER_HAS_RESPONSIBILITIES` lists what must be moved first, with links), "Restore".
 4. **Departments** `/departments` — the ten departments: name, manager, member count. **Department** `/departments/$departmentId` — members (primary first), manager. With `users.manage`: rename, change manager (picker lists active members only).
 5. **My account** `/account` — own profile (read-only fields), edit phone and skills, change password, enable 2FA or disable it (hidden when required), regenerate backup codes.

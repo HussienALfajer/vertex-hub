@@ -25,9 +25,9 @@ export class TaskHooksService implements OnModuleInit {
 
   onModuleInit(): void {
     this.progress.register({
-      projects: (ids) => this.counts(tasks.projectId, ids),
-      milestones: (ids) => this.counts(tasks.milestoneId, ids),
-      cycleLines: (ids) => this.counts(tasks.cycleLineId, ids),
+      projects: (ids, executor) => this.counts(tasks.projectId, ids, executor),
+      milestones: (ids, executor) => this.counts(tasks.milestoneId, ids, executor),
+      cycleLines: (ids, executor) => this.counts(tasks.cycleLineId, ids, executor),
       openTasks: (tx, projectId) => this.openTasks(tx, projectId),
       cancelOpenTasks: (tx, projectId, reason, actor) =>
         this.cancelOpenTasks(tx, projectId, reason, actor),
@@ -52,8 +52,12 @@ export class TaskHooksService implements OnModuleInit {
   }
 
   /** `total`: non-archived, non-cancelled tasks; `delivered`: those delivered. */
-  private async counts(column: PgColumn, ids: string[]): Promise<Map<string, TaskCounts>> {
-    const rows = await this.db
+  private async counts(
+    column: PgColumn,
+    ids: string[],
+    executor: Database | Transaction = this.db,
+  ): Promise<Map<string, TaskCounts>> {
+    const rows = await executor
       .select({
         id: sql<string>`${column}`,
         total: count(),
@@ -99,6 +103,8 @@ export class TaskHooksService implements OnModuleInit {
       .select({ id: tasks.id, status: tasks.status, extraWorkItemId: tasks.extraWorkItemId })
       .from(tasks)
       .where(this.openTaskFilter(projectId))
+      // By id, the order every task lock set follows, so a concurrent move cannot deadlock.
+      .orderBy(asc(tasks.id))
       .for('update');
     if (open.length === 0) return;
     await tx

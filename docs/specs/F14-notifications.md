@@ -111,7 +111,7 @@ A notification is **unread** or **read**; the recipient moves it both ways.
 9. **Due soon (A07).** On work day D, every open, non-archived, assigned task whose due date falls after D and on or before the next work day after D (so on Thursday: Friday and Saturday) gets `task_due_soon`, once per `(task, due date)`. A task created or re-dated after that day's run gets no reminder for that date.
 10. **Overdue (A08).** On work day D, every open, non-archived task that is overdue at run time (F06 rule 12) with a due date before D gets `task_overdue`, once per `(task, due date)`: to its assignee, or to its department's managers when unassigned.
 11. **Escalation (A08).** On work day D, a task still open and overdue whose `overdue` reminder for the current due date was sent on a work day before D gets `task_overdue_escalated` to its department's managers, once per `(task, due date)`. An unassigned task is not escalated (its managers already got `task_overdue`). Changing the due date starts the cycle again for the new date; overdue notices are not repeated otherwise (owner decision).
-12. **Renewal (F05 R6).** On work day D, for each retainer that is not `ended` or archived and has a renewal date R: when `R − 30 days ≤ D < R`, `retainer_renewal_due` ("renews in n days") once per `(retainer, R)`; when `R ≤ D`, `retainer_renewal_due` ("renewal date reached") once per `(retainer, R)` (kind `renewal_reached`). Changing R starts again. The recipient is the client's primary account manager.
+12. **Renewal (F05 R6).** On work day D, for each retainer that is not `ended` or archived, of a client that is not archived (F05 G2), and has a renewal date R: when `R − 30 days ≤ D < R`, `retainer_renewal_due` ("renews in n days") once per `(retainer, R)`; when `R ≤ D`, `retainer_renewal_due` ("renewal date reached") once per `(retainer, R)` (kind `renewal_reached`). Changing R starts again. The recipient is the client's primary account manager.
 13. **Retention.** The daily job deletes notifications read more than 90 days ago (owner decision). Unread ones stay. Marking one unread again keeps it.
 14. **Recipients by role** use the state at the moment of the change: managers of a department are its current managers (all of them); the client's account manager is the current primary account manager; a task without a client has no account manager recipient.
 15. **Display.** The bell shows the unread count (`99+` above 99). A notification opens its subject: a task, client, project or retainer page, or for `tasks_generated` the task list filtered to the assignee's tasks, newest first, or to the department's unassigned queue (the list has no template run filter; owner decision). Opening it marks it read.
@@ -135,7 +135,7 @@ All routes use the session guard; each acts only on the caller's own rows (anoth
 | `POST /api/me/notifications/:id/read` | session | — | 204 | 404 |
 | `POST /api/me/notifications/:id/unread` | session | — | 204 | 404 |
 | `POST /api/me/notifications/read-all` | session | — | `{ updated }` | — |
-| `GET /api/me/notifications/stream` | session | — | `text/event-stream`: `notification` events (`{ notification, unreadCount }`), a `: ping` comment every 25 s; the server closes the stream after 15 minutes so the client reconnects and the session is checked again | 401 |
+| `GET /api/me/notifications/stream` | session | — | `text/event-stream`: `notification` events (`{ notification, unreadCount }`), a `: ping` comment every 25 s, at which the session is checked: the stream closes once the session has ended (sign-out elsewhere, password reset, archiving), and after 15 minutes in any case, so the client reconnects | 401 |
 | `GET /api/me/notification-settings` | session | — | `notificationSettingsSchema`: every type with `category`, `mutable`, `muted` | — |
 | `PUT /api/me/notification-settings` | session | `updateNotificationSettingsSchema`: `mutedTypes[]` | `notificationSettingsSchema` | `NOT_MUTABLE` |
 
@@ -159,7 +159,7 @@ The stream client lives once in the shell: on `notification` it updates the coun
 4. **Task finished or cancelled before the job runs:** no reminder. Finished after `task_overdue`: no escalation.
 5. **Reassigned after `task_overdue`:** the escalation still goes to the managers; the new assignee got `task_assigned`, not a new overdue notice for the same due date.
 6. **The actor is the recipient** (a manager assigns a task to themselves, the account manager records a client revision over the limit): no notification; the page they are on shows the state.
-7. **Recipient archived later:** their notifications stay until purged or the user is restored; they receive nothing while archived. Their open streams end at the next session check (≤ 15 minutes).
+7. **Recipient archived later:** their notifications stay until purged or the user is restored; they receive nothing while archived. Their open streams end at the next ping (≤ 25 s).
 8. **Subject archived later:** the notification still opens it; the page shows it archived. Snapshot text is unchanged.
 9. **Muted type unmuted later:** earlier events are not recreated.
 10. **Mark read in two tabs at once:** idempotent; both succeed.

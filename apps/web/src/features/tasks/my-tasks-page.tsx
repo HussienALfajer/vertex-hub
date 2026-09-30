@@ -172,7 +172,7 @@ export function NewTaskButtons() {
   return (
     <div className="flex flex-wrap items-center gap-2">
       <Button variant="outline" render={<Link to="/tasks/new" search={{ mode: 'request' }} />}>
-        <SendIcon />
+        <SendIcon className="rtl:-scale-x-100" />
         {t('tasks.actions.request')}
       </Button>
       <Button render={<Link to="/tasks/new" />}>

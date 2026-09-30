@@ -86,12 +86,18 @@ export const invitedAccountManagersQuery = userListQuery({
 /**
  * A mutation on client data. Every one refreshes the whole `clients` cache, also on failure: a
  * 403 after the account manager changed (edge case 2) reloads the profile without edit actions.
+ * Archiving a client hides its projects, retainers and tasks (F02, F05 G2), so those refresh too.
  */
 function useClientsMutation<Input, Output>(mutationFn: (input: Input) => Promise<Output>) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn,
-    onSettled: () => queryClient.invalidateQueries({ queryKey: clientsKeys.all }),
+    onSettled: () =>
+      Promise.all(
+        [clientsKeys.all, ['projects'], ['retainers'], ['tasks']].map((queryKey) =>
+          queryClient.invalidateQueries({ queryKey }),
+        ),
+      ),
   });
 }
 

@@ -1,6 +1,6 @@
-import { expect, test } from '@playwright/test';
 import ar from '../src/i18n/locales/ar.json' with { type: 'json' };
 import { manager, mockApi } from './fixtures';
+import { expect, test } from './test';
 
 test('sends visitors without a session to the login page and back after signing in', async ({
   page,
@@ -41,5 +41,6 @@ test('signs out from the user menu', async ({ page }) => {
 test('ignores redirect targets outside the app', async ({ page }) => {
   await mockApi(page, { signedIn: true });
   await page.goto('/login?redirect=//evil.example');
-  await expect(page).toHaveURL(/127\.0\.0\.1:4173\/$/);
+  // The start page: My tasks, until the F15 dashboards.
+  await expect(page).toHaveURL(/127\.0\.0\.1:4173\/tasks$/);
 });

@@ -12,6 +12,7 @@ import {
   departments,
   extraWorkItems,
   newId,
+  notificationReminders,
   notificationSettings,
   notifications,
   projectMilestones,
@@ -32,6 +33,7 @@ import {
   templateRunTasks,
   userRoles,
   users,
+  verifications,
   workTemplateAssignees,
   workTemplateStages,
   workTemplateStepDependencies,
@@ -39,7 +41,7 @@ import {
   workTemplates,
 } from '@vertex-hub/db';
 import { hashPassword } from 'better-auth/crypto';
-import { eq, inArray, or } from 'drizzle-orm';
+import { eq, inArray, like, or } from 'drizzle-orm';
 
 /*
  * Shared helpers for API integration tests: seed users straight into the test database, sign in
@@ -151,8 +153,29 @@ export async function removeUsers(db: Database, ids: string[]): Promise<void> {
     .delete(notifications)
     .where(or(inArray(notifications.recipientId, ids), inArray(notifications.actorId, ids)));
   await db.delete(notificationSettings).where(inArray(notificationSettings.userId, ids));
+  // Activation and reset links keep the user id as their value.
+  await db.delete(verifications).where(inArray(verifications.value, ids));
   await db.update(departments).set({ managerId: null }).where(inArray(departments.managerId, ids));
   await db.delete(users).where(inArray(users.id, ids));
+}
+
+/** The domain of every seeded user's email (`uniqueEmail`). */
+export const TEST_EMAIL_DOMAIN = '@test.vertex.local';
+
+/**
+ * Removes users an interrupted earlier run left behind, so the next run starts from a clean
+ * database: daily-job and directory tests read every row (ADR 0013, test data per run).
+ */
+export async function removeLeftoverUsers(db: Database): Promise<number> {
+  const leftovers = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(like(users.email, `%${TEST_EMAIL_DOMAIN}`));
+  await removeUsers(
+    db,
+    leftovers.map((row) => row.id),
+  );
+  return leftovers.length;
 }
 
 /**
@@ -233,6 +256,7 @@ export async function removeTasks(db: Database, ids: string[]): Promise<void> {
   await db.delete(taskLinks).where(inArray(taskLinks.taskId, ids));
   await db.delete(taskComments).where(inArray(taskComments.taskId, ids));
   await db.delete(taskRevisions).where(inArray(taskRevisions.taskId, ids));
+  await db.delete(notificationReminders).where(inArray(notificationReminders.subjectId, ids));
   await db.delete(tasks).where(inArray(tasks.id, ids));
 }
 
@@ -282,6 +306,7 @@ export async function removeProjects(db: Database, ids: string[]): Promise<void>
  */
 export async function removeRetainers(db: Database, ids: string[]): Promise<void> {
   if (ids.length === 0) return;
+  await db.delete(notificationReminders).where(inArray(notificationReminders.subjectId, ids));
   const cycles = (
     await db
       .select({ id: retainerCycles.id })

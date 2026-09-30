@@ -1,4 +1,4 @@
-import { queryOptions, useQuery } from '@tanstack/react-query';
+import { type QueryClient, queryOptions, useQuery } from '@tanstack/react-query';
 import { useRouteContext } from '@tanstack/react-router';
 import type { MeResponse, Permission, PermissionScope } from '@vertex-hub/contracts';
 import { createAuthClient } from 'better-auth/client';
@@ -60,13 +60,39 @@ export function scopesOf(me: MeResponse, permission: Permission): PermissionScop
   return me.permissions.find((granted) => granted.permission === permission)?.scopes ?? [];
 }
 
+/**
+ * Leaves the signed-in state after sign-out or an expired session: stops running requests, marks
+ * the session gone, runs `navigate` (to the sign-in page), then drops every cached answer once
+ * the app's pages have unmounted, so nothing refetches with the old session and the next user
+ * never sees the previous one's data.
+ */
+export async function leaveSession(
+  queryClient: QueryClient,
+  navigate: () => Promise<void>,
+): Promise<void> {
+  await queryClient.cancelQueries();
+  queryClient.setQueryData(meQuery.queryKey, null);
+  await navigate();
+  queryClient.removeQueries({ predicate: (query) => query.queryKey[0] !== meQuery.queryKey[0] });
+}
+
 /** Two-factor sign-in is required and not set up yet: the user must go to the setup page. */
 export function needsTwoFactorSetup(me: MeResponse): boolean {
   return me.twoFactor.required && !me.twoFactor.enabled;
 }
 
-/** Accepts only same-origin paths as a post-login destination, to prevent open redirects. */
+/**
+ * Accepts only same-origin paths as a post-login destination, to prevent open redirects. The
+ * target is resolved as the browser would: URL parsing drops tabs and line breaks, so "/\n/host"
+ * would otherwise become "//host", another site.
+ */
 export function safeRedirect(target: unknown): string {
-  // "//host" and "/\host" are protocol-relative URLs to another site.
-  return typeof target === 'string' && /^\/(?![/\\])/.test(target) ? target : '/';
+  if (typeof target !== 'string' || !target.startsWith('/')) return '/';
+  // Control characters have no place in a path of the app.
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: matching them is the point.
+  if (/[\u0000-\u001f\u007f]/.test(target)) return '/';
+  const origin = window.location.origin;
+  const resolved = new URL(target, origin);
+  if (resolved.origin !== origin) return '/';
+  return `${resolved.pathname}${resolved.search}${resolved.hash}`;
 }

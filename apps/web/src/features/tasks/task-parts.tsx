@@ -38,6 +38,7 @@ import {
 import { type ReactNode, useId, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
+import { ConfirmDialog } from '../../components/confirm-dialog';
 import { FormAlert } from '../../components/form-alert';
 import { errorMessage } from '../../lib/errors';
 import { formatLink, formatLinkHost, formatNumber } from '../../lib/format';
@@ -144,7 +145,10 @@ function DependencyList({
                 ) : (
                   <HourglassIcon
                     aria-hidden="true"
-                    className={cn('size-4', gone ? 'text-muted-foreground' : 'text-warning-text')}
+                    className={cn(
+                      'size-4',
+                      gone ? 'text-muted-foreground' : 'text-status-warning-foreground',
+                    )}
                   />
                 )}
                 <Link
@@ -174,7 +178,7 @@ function DependenciesDialog({ task, onClose }: { task: TaskDetail; onClose: () =
   const { t } = useTranslation();
   const id = useId();
   const save = useSetTaskDependencies(task.id);
-  const options = useDependencyOptions(task.client?.id ?? null, task.id);
+  const { options, onSearch } = useDependencyOptions(task.client?.id ?? null, task.id);
   const [value, setValue] = useState<DependencyOption[]>(
     task.dependencies.map(({ id, title, status }) => ({ id, title, status })),
   );
@@ -205,7 +209,13 @@ function DependenciesDialog({ task, onClose }: { task: TaskDetail; onClose: () =
           </DialogHeader>
           <Field>
             <FieldLabel htmlFor={id}>{t('tasks.dependencies.waitingOn')}</FieldLabel>
-            <DependenciesPicker id={id} options={options} value={value} onChange={setValue} />
+            <DependenciesPicker
+              id={id}
+              options={options}
+              onSearch={onSearch}
+              value={value}
+              onChange={setValue}
+            />
           </Field>
           {failure && <FormAlert>{failure}</FormAlert>}
           <DialogFooter>
@@ -232,6 +242,7 @@ export function ChecklistSection({ task }: { task: TaskDetail }) {
   const update = useUpdateChecklistItem(task.id);
   const reorder = useReorderChecklist(task.id);
   const remove = useArchiveChecklistItem(task.id);
+  const [removing, setRemoving] = useState<{ id: string; text: string } | null>(null);
   const done = items.filter((item) => item.done).length;
 
   async function attempt(action: () => Promise<unknown>) {
@@ -312,7 +323,7 @@ export function ChecklistSection({ task }: { task: TaskDetail }) {
                     size="icon-sm"
                     aria-label={t('common.remove', { label: item.text })}
                     disabled={remove.isPending}
-                    onClick={() => attempt(() => remove.mutateAsync(item.id))}
+                    onClick={() => setRemoving({ id: item.id, text: item.text })}
                   >
                     <XIcon />
                   </Button>
@@ -323,6 +334,19 @@ export function ChecklistSection({ task }: { task: TaskDetail }) {
         </ul>
       )}
       {editable && items.length < TASK_LIMITS.checklist && <AddChecklistItem task={task} />}
+      <ConfirmDialog
+        open={removing !== null}
+        onClose={() => setRemoving(null)}
+        title={t('tasks.checklist.removeTitle')}
+        body={t('tasks.checklist.removeBody', { text: removing?.text ?? '' })}
+        action={t('tasks.checklist.removeAction')}
+        destructive
+        pending={remove.isPending}
+        onConfirm={async () => {
+          if (removing) await remove.mutateAsync(removing.id);
+          toast.add({ title: t('tasks.checklist.removed'), type: 'success' });
+        }}
+      />
     </TaskSection>
   );
 }
@@ -358,6 +382,7 @@ function AddChecklistItem({ task }: { task: TaskDetail }) {
           {t('tasks.form.addItem')}
         </Button>
       </div>
+      {form.formState.errors.text && <FormAlert>{t('tasks.checklist.invalid')}</FormAlert>}
       {failure && <FormAlert>{failure}</FormAlert>}
     </form>
   );
@@ -371,6 +396,7 @@ export function LinksSection({ task }: { task: TaskDetail }) {
   const editable = canWorkOn(task);
   const remove = useArchiveTaskLink(task.id);
   const [adding, setAdding] = useState(false);
+  const [removing, setRemoving] = useState<{ id: string; label: string } | null>(null);
   return (
     <TaskSection
       title={t('tasks.links.title')}
@@ -417,13 +443,9 @@ export function LinksSection({ task }: { task: TaskDetail }) {
                   size="icon-sm"
                   aria-label={t('common.remove', { label: link.label ?? formatLinkHost(link.url) })}
                   disabled={remove.isPending}
-                  onClick={async () => {
-                    try {
-                      await remove.mutateAsync(link.id);
-                    } catch (error) {
-                      toast.add({ title: errorMessage(t, error), type: 'error' });
-                    }
-                  }}
+                  onClick={() =>
+                    setRemoving({ id: link.id, label: link.label ?? formatLinkHost(link.url) })
+                  }
                 >
                   <XIcon />
                 </Button>
@@ -433,6 +455,19 @@ export function LinksSection({ task }: { task: TaskDetail }) {
         </ul>
       )}
       {adding && <AddLinkDialog task={task} onClose={() => setAdding(false)} />}
+      <ConfirmDialog
+        open={removing !== null}
+        onClose={() => setRemoving(null)}
+        title={t('tasks.links.removeTitle')}
+        body={t('tasks.links.removeBody', { label: removing?.label ?? '' })}
+        action={t('tasks.links.removeAction')}
+        destructive
+        pending={remove.isPending}
+        onConfirm={async () => {
+          if (removing) await remove.mutateAsync(removing.id);
+          toast.add({ title: t('tasks.links.removed'), type: 'success' });
+        }}
+      />
     </TaskSection>
   );
 }

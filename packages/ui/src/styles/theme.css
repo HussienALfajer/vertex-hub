@@ -177,7 +177,8 @@
   --surface: var(--color-green-900);
   --surface-foreground: var(--color-neutral-100);
   --muted: var(--color-green-800);
-  --muted-foreground: var(--color-neutral-400);
+  /* neutral-300: muted text also sits on the muted surface (table heads, toggles). */
+  --muted-foreground: var(--color-neutral-300);
   --border: var(--color-green-700);
   --input: var(--color-green-500);
   --primary: var(--color-gold-400);

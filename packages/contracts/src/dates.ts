@@ -5,12 +5,44 @@ export const calendarDateSchema = z.iso.date();
 
 export type CalendarDate = z.infer<typeof calendarDateSchema>;
 
-/** Syria keeps UTC+3 all year (no daylight saving since 2022). */
-const BUSINESS_UTC_OFFSET_MS = 3 * 60 * 60 * 1000;
+/**
+ * The business time zone. Dates and times follow the time zone database, as the scheduled jobs
+ * do (`jobs.ts`), so a change of Syria's offset needs no code change.
+ */
+export const BUSINESS_TIME_ZONE = 'Asia/Damascus';
+
+const businessClock = new Intl.DateTimeFormat('en-CA', {
+  timeZone: BUSINESS_TIME_ZONE,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  second: '2-digit',
+  hourCycle: 'h23',
+});
+
+/** The wall clock in Asia/Damascus at an instant, as `YYYY-MM-DDTHH:MM:SS`. */
+function businessWallClock(now: Date): string {
+  const part = (type: Intl.DateTimeFormatPartTypes) =>
+    businessClock.formatToParts(now).find((p) => p.type === type)?.value ?? '00';
+  return `${part('year')}-${part('month')}-${part('day')}T${part('hour')}:${part('minute')}:${part('second')}`;
+}
+
+/** How far Asia/Damascus is ahead of UTC at an instant, in milliseconds. */
+function businessOffsetMs(instant: Date): number {
+  const wall = Date.parse(`${businessWallClock(instant)}Z`);
+  return wall - Math.floor(instant.getTime() / 1000) * 1000;
+}
 
 /** The calendar day of an instant in Asia/Damascus, as `YYYY-MM-DD` (spec F05 edge case 16). */
 export function businessDate(now: Date = new Date()): CalendarDate {
-  return new Date(now.getTime() + BUSINESS_UTC_OFFSET_MS).toISOString().slice(0, 10);
+  return businessWallClock(now).slice(0, 10);
+}
+
+/** The time of day of an instant in Asia/Damascus, as `HH:MM:SS`. */
+export function businessTimeOfDay(now: Date = new Date()): string {
+  return businessWallClock(now).slice(11, 19);
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -87,7 +119,10 @@ export type TimeOfDay = z.infer<typeof timeOfDaySchema>;
 
 /** The instant a calendar day and time of day in Asia/Damascus stand for. */
 export function businessInstant(date: CalendarDate, time: TimeOfDay): Date {
-  return new Date(Date.parse(`${date}T${time}:00Z`) - BUSINESS_UTC_OFFSET_MS);
+  const wall = Date.parse(`${date}T${time}:00Z`);
+  // The offset at the wall time, checked again at the instant found (the day of a change).
+  const first = wall - businessOffsetMs(new Date(wall));
+  return new Date(wall - businessOffsetMs(new Date(first)));
 }
 
 /** The first work day after `date`. */

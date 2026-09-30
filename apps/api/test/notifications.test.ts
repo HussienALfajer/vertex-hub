@@ -8,7 +8,7 @@ import {
   notificationPageSchema,
   notificationSettingsSchema,
 } from '@vertex-hub/contracts';
-import { createDatabase, notificationReminders, notifications } from '@vertex-hub/db';
+import { createDatabase, notificationReminders, notifications, sessions } from '@vertex-hub/db';
 import { testDatabaseUrl } from '@vertex-hub/db/testing';
 import { and, eq, inArray } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -17,7 +17,10 @@ import {
   type Notice,
   NotificationCenter,
 } from '../src/modules/notifications/index.js';
-import { NotificationStream } from '../src/modules/notifications/notification-stream.js';
+import {
+  NotificationStream,
+  STREAM_TIMING,
+} from '../src/modules/notifications/notification-stream.js';
 import { api, removeUsers, seedUser } from './helpers.js';
 import { startApp } from './start-app.js';
 
@@ -423,6 +426,59 @@ describe('notifications', () => {
       let done = false;
       while (!done) ({ done } = await reader.read());
       expect(done).toBe(true);
+    });
+  });
+
+  describe('stream lifetime', () => {
+    let quick: INestApplication;
+    let quickUrl: string;
+
+    beforeAll(async () => {
+      ({ app: quick, url: quickUrl } = await startApp({
+        override: (builder) =>
+          builder.overrideProvider(STREAM_TIMING).useValue({ pingMs: 100, lifetimeMs: 1_500 }),
+      }));
+    });
+
+    afterAll(async () => {
+      await quick?.close();
+    });
+
+    /** Opens a stream as `cookie` and resolves how long it stayed open, in milliseconds. */
+    async function openFor(cookie: string, whileOpen?: () => Promise<void>) {
+      const started = Date.now();
+      const response = await fetch(`${quickUrl}/api/me/notifications/stream`, {
+        headers: { cookie, origin: 'http://127.0.0.1:5173' },
+      });
+      expect(response.status).toBe(200);
+      const reader = (response.body as ReadableStream<Uint8Array>).getReader();
+      await reader.read();
+      await whileOpen?.();
+      let done = false;
+      while (!done) ({ done } = await reader.read());
+      return Date.now() - started;
+    }
+
+    it('closes the stream after its lifetime, so the session is checked again (edge case 7)', async () => {
+      const user = await seedUser(db);
+      seeded.push(user.id);
+      const open = await openFor(await api(quickUrl).signIn(user.email));
+      expect(open).toBeGreaterThanOrEqual(1_400);
+      expect(open).toBeLessThan(5_000);
+    });
+
+    it('closes the stream at the next ping once its session has ended', async () => {
+      const user = await seedUser(db);
+      seeded.push(user.id);
+      const cookie = await api(quickUrl).signIn(user.email);
+      const open = await openFor(cookie, async () => {
+        // A password reset or "sign out other sessions" deletes the session.
+        await db.delete(sessions).where(eq(sessions.userId, user.id));
+      });
+      expect(open).toBeLessThan(1_400);
+      // Reconnecting with the ended session is refused.
+      const again = await fetch(`${quickUrl}/api/me/notifications/stream`, { headers: { cookie } });
+      expect(again.status).toBe(401);
     });
   });
 

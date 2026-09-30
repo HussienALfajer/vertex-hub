@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useRouterState } from '@tanstack/react-router';
-import type { NotificationStreamEvent } from '@vertex-hub/contracts';
+import { type NotificationStreamEvent, notificationStreamEventSchema } from '@vertex-hub/contracts';
 import { toast } from '@vertex-hub/ui';
 import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -49,7 +49,13 @@ export function useNotificationStream(openBell: () => void) {
         connected = true;
       });
       source.addEventListener('notification', (message) => {
-        const event = JSON.parse((message as MessageEvent<string>).data) as NotificationStreamEvent;
+        const event = parseStreamEvent((message as MessageEvent<string>).data);
+        // An event this version cannot read (malformed, or from a newer API) still counts:
+        // the lists are fetched again instead.
+        if (!event) {
+          refresh();
+          return;
+        }
         void applyStreamEvent(queryClient, event);
         latest.current(event);
       });
@@ -135,4 +141,14 @@ function useEventToast(openBell: () => void) {
     });
     current.toastIds.push(id);
   };
+}
+
+/** A pushed event checked against the contract, or null. */
+function parseStreamEvent(data: string): NotificationStreamEvent | null {
+  try {
+    const parsed = notificationStreamEventSchema.safeParse(JSON.parse(data));
+    return parsed.success ? parsed.data : null;
+  } catch {
+    return null;
+  }
 }

@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  businessDate,
   businessInstant,
+  businessTimeOfDay,
   isWorkDay,
   nextWorkDay,
   nthWorkDay,
@@ -74,6 +76,16 @@ describe('time of day', () => {
   it('turns a Damascus day and time into an instant (UTC+3)', () => {
     expect(businessInstant('2026-10-03', '14:00').toISOString()).toBe('2026-10-03T11:00:00.000Z');
     expect(businessInstant('2026-10-03', '01:00').toISOString()).toBe('2026-10-02T22:00:00.000Z');
+  });
+
+  it('reads the Damascus calendar day and time of an instant from the time zone database', () => {
+    const lateUtc = new Date('2026-10-31T21:30:00.000Z');
+    expect(businessDate(lateUtc)).toBe('2026-11-01');
+    expect(businessTimeOfDay(lateUtc)).toBe('00:30:00');
+    expect(businessDate(new Date('2026-10-31T20:59:59.000Z'))).toBe('2026-10-31');
+    // Round trip through the instant of a day and time.
+    const instant = businessInstant('2026-11-01', '00:30');
+    expect([businessDate(instant), businessTimeOfDay(instant)]).toEqual(['2026-11-01', '00:30:00']);
   });
 });
 

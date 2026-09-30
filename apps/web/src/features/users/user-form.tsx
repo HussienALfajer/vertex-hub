@@ -51,11 +51,16 @@ interface UserFormProps {
   onSubmit: (values: CreateUser) => Promise<void>;
   submitLabel: string;
   submittingLabel: string;
-  /** Only a General Manager may grant or remove the General Manager role (F01 rule 5). */
+  /** Only a General Manager may grant or remove the General Manager and Finance roles (F01 rule 5). */
   canGrantGeneralManager: boolean;
+  /** The user edits their own account: roles are changed by someone else (F01 rule 5). */
+  ownAccount?: boolean;
   /** Extra actions beside the submit button, such as cancel. */
   actions?: ReactNode;
 }
+
+/** Roles only a General Manager grants or removes (F01 rule 5; the API enforces it). */
+const GENERAL_MANAGER_GRANTED: readonly AssignableRole[] = ['general_manager', 'finance'];
 
 /** Create or edit a team member: identity, departments and roles, then profile details. */
 export function UserForm({
@@ -64,6 +69,7 @@ export function UserForm({
   submitLabel,
   submittingLabel,
   canGrantGeneralManager,
+  ownAccount = false,
   actions,
 }: UserFormProps) {
   const { t } = useTranslation();
@@ -87,12 +93,15 @@ export function UserForm({
   const primaryId = watch('primaryDepartmentId');
   const departmentList = departments.data?.items ?? [];
   const departmentItems = departmentList.map((d) => ({ value: d.id, label: d.name }));
+  // General Manager and Finance: shown to others only when the user already holds them, locked.
   const roles = ASSIGNABLE_ROLES.filter(
     (role) =>
-      role !== 'general_manager' ||
+      !GENERAL_MANAGER_GRANTED.includes(role) ||
       canGrantGeneralManager ||
-      defaultValues.roles?.includes('general_manager'),
+      defaultValues.roles?.includes(role),
   );
+  const locked = (role: AssignableRole) =>
+    ownAccount || (GENERAL_MANAGER_GRANTED.includes(role) && !canGrantGeneralManager);
 
   const submit = handleSubmit(async (values) => {
     setFailure(null);
@@ -200,7 +209,7 @@ export function UserForm({
                     key={role}
                     role={role}
                     checked={field.value?.includes(role) ?? false}
-                    disabled={role === 'general_manager' && !canGrantGeneralManager}
+                    disabled={locked(role)}
                     onChange={(checked) => {
                       const current = field.value ?? [];
                       field.onChange(
@@ -212,7 +221,9 @@ export function UserForm({
               </div>
             )}
           />
-          <p className="text-sm text-muted-foreground">{t('users.form.rolesHint')}</p>
+          <p className="text-sm text-muted-foreground">
+            {ownAccount ? t('users.form.ownRolesHint') : t('users.form.rolesHint')}
+          </p>
         </fieldset>
       </FormSection>
 

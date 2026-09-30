@@ -24,6 +24,12 @@ export const envSchema = z
     message: 'BETTER_AUTH_SECRET is required in production',
     path: ['BETTER_AUTH_SECRET'],
   })
+  // Production is served over TLS: an http origin would issue cookies without `Secure` and trust
+  // the wrong origin, so a lost or wrong value stops the start instead of weakening it.
+  .refine((env) => env.NODE_ENV !== 'production' || env.APP_URL.startsWith('https://'), {
+    message: 'APP_URL must be an https origin in production',
+    path: ['APP_URL'],
+  })
   .transform(({ BETTER_AUTH_SECRET, ...env }) => ({
     ...env,
     // Outside production, fall back to a stable per-machine value: DATABASE_URL carries the random

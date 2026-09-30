@@ -20,6 +20,7 @@ import { FormSection } from '../../components/form-section';
 import { useMe } from '../../lib/auth';
 import { formatCalendarDate, formatNumber } from '../../lib/format';
 import { formatMoney } from '../../lib/money';
+import { idParam } from '../../lib/search-params';
 import { stageMilestones } from '../templates/template-document';
 import { ProjectTemplateField } from '../templates/template-pickers';
 import { MilestonesEditor, suggestedMilestones } from './milestones-editor';
@@ -49,10 +50,7 @@ export interface NewProjectSearch {
 
 export function parseNewProjectSearch(search: Record<string, unknown>): NewProjectSearch {
   return {
-    clientId:
-      typeof search.clientId === 'string' && search.clientId.length <= 36
-        ? search.clientId
-        : undefined,
+    clientId: idParam(search.clientId),
   };
 }
 

@@ -32,11 +32,19 @@ import { useTranslation } from 'react-i18next';
 import { LoadError } from '../../components/load-error';
 import { errorMessage } from '../../lib/errors';
 import { formatNumber } from '../../lib/format';
+import { idParam, listParam } from '../../lib/search-params';
 import { clientListQuery } from '../clients/clients.queries';
 import { departmentListQuery } from '../departments/departments.queries';
 import { userListQuery } from '../users/users.queries';
 import { NewTaskButtons } from './my-tasks-page';
-import { MOVE_ICONS, MoveDialog, needsDialog, type Target, targetsOf } from './task-actions';
+import {
+  MIRRORED_ICONS,
+  MOVE_ICONS,
+  MoveDialog,
+  needsDialog,
+  type Target,
+  targetsOf,
+} from './task-actions';
 import {
   BlockedBadge,
   formatDue,
@@ -56,19 +64,12 @@ export interface TaskBoardSearch {
   clientId?: string;
 }
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
 /** Reads the board filters from the URL, dropping anything malformed. */
 export function parseTaskBoardSearch(search: Record<string, unknown>): TaskBoardSearch {
-  const id = (value: unknown) =>
-    typeof value === 'string' && UUID.test(value) ? value : undefined;
-  const departments = Array.isArray(search.department)
-    ? DEPARTMENT_CODES.filter((code) => (search.department as unknown[]).includes(code))
-    : [];
   return {
-    department: departments.length > 0 ? departments : undefined,
-    assignee: search.assignee === 'me' ? 'me' : id(search.assignee),
-    clientId: id(search.clientId),
+    department: listParam(DEPARTMENT_CODES, search.department),
+    assignee: search.assignee === 'me' ? 'me' : idParam(search.assignee),
+    clientId: idParam(search.clientId),
   };
 }
 
@@ -373,7 +374,7 @@ function BoardCard({
       onDragEnd={onDragEnd}
       data-task={task.id}
       className={cn(
-        'flex cursor-grab flex-col gap-2 rounded-md border border-border bg-surface p-3 shadow-xs active:cursor-grabbing',
+        'flex cursor-grab flex-col gap-2 rounded-md border border-border bg-surface p-3 active:cursor-grabbing',
         dragging && 'opacity-50',
       )}
     >
@@ -450,6 +451,7 @@ function MoveMenu({
             variant="ghost"
             size="icon-sm"
             aria-label={t('tasks.board.moveTo', { title: task.title })}
+            title={t('tasks.board.moveTo', { title: task.title })}
           />
         }
       >
@@ -468,7 +470,7 @@ function MoveMenu({
               const Icon = MOVE_ICONS[target.move];
               return (
                 <DropdownMenuItem key={target.to} onClick={() => onMove(data, target)}>
-                  <Icon />
+                  <Icon className={MIRRORED_ICONS.has(Icon) ? 'rtl:-scale-x-100' : undefined} />
                   {t(`tasks.moves.${target.move}`)}
                 </DropdownMenuItem>
               );

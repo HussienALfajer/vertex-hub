@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Entry point for deploys (root): ssh vertex "vertexhub-deploy [<ref>|rollback]"
+# Entry point for deploys (root): ssh vertex "vertexhub-deploy [<ref>|rollback|restore <release>]"
 # Fetches the repository as `vertexhub` and runs the latest deploy/deploy.sh from origin/main
 # as that user, so changes to the deploy script apply on the same deploy.
 set -euo pipefail

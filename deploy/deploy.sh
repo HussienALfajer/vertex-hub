@@ -2,8 +2,9 @@
 # Deploys a commit of Vertex Hub as an atomic release. Runs as the `vertexhub` user, started by
 # /usr/local/bin/vertexhub-deploy (root), which always runs the latest copy of this script.
 #
-#   deploy.sh [<git ref>]   build and switch to a release (default: origin/main)
-#   deploy.sh rollback      switch back to the previous release (migrations are not reverted)
+#   deploy.sh [<git ref>]       build and switch to a release (default: origin/main)
+#   deploy.sh rollback          switch back to the previous release (migrations are not reverted)
+#   deploy.sh restore <release> restore the database snapshot taken before that release migrated
 #
 # Nothing touches the running release until the new one is built, the database is backed up
 # and migrated. If the new release fails its health check, the previous one is restored.
@@ -39,11 +40,38 @@ healthy() {
   return 1
 }
 
+# Returns non-zero instead of exiting when PM2 fails, so the caller can still restore the
+# previous release (set -e does not apply inside a function called from a condition).
+# The worker process is online in PM2 and has stayed up (it has no HTTP health endpoint).
+worker_online() {
+  sleep 5
+  pm2 jlist | node -e '
+    let input = "";
+    process.stdin.on("data", (chunk) => (input += chunk));
+    process.stdin.on("end", () => {
+      const worker = JSON.parse(input).find((app) => app.name === "vertexhub-worker");
+      process.exit(worker && worker.pm2_env.status === "online" ? 0 : 1);
+    });'
+}
+
 switch_to() {
-  ln -sfn "$1" "$SITE_DIR/current.next"
-  mv -T "$SITE_DIR/current.next" "$CURRENT"
-  pm2 startOrReload "$ECOSYSTEM" --update-env >/dev/null
-  pm2 save >/dev/null
+  ln -sfn "$1" "$SITE_DIR/current.next" &&
+    mv -T "$SITE_DIR/current.next" "$CURRENT" &&
+    pm2 startOrReload "$ECOSYSTEM" --update-env >/dev/null &&
+    pm2 save >/dev/null
+}
+
+# libpq reads the password from the environment of pg_dump/pg_restore only: other users on the
+# server can read process arguments (as provision.sh notes), never another user's environment.
+load_database_env() {
+  set -a
+  # shellcheck disable=SC1091
+  . "$SHARED/.env"
+  set +a
+  PGPASSWORD=$(node -e 'process.stdout.write(decodeURIComponent(new URL(process.env.DATABASE_URL).password))')
+  export PGPASSWORD
+  # The connection string without its password, safe to pass as an argument.
+  DATABASE_TARGET=$(node -e 'const u = new URL(process.env.DATABASE_URL); u.password = ""; process.stdout.write(u.href)')
 }
 
 if [ "${1:-}" = rollback ]; then
@@ -53,9 +81,21 @@ if [ "${1:-}" = rollback ]; then
     awk -v active="$active" '$0 < active' | tail -1)
   [ -n "$previous" ] || fail "no previous release to roll back to"
   log "rolling back to $(basename "$previous")"
-  switch_to "$previous"
+  switch_to "$previous" || fail "PM2 could not start the previous release; check: pm2 logs"
   healthy || fail "previous release is not healthy either; check: pm2 logs"
   log "rolled back to $(basename "$previous")"
+  exit 0
+fi
+
+if [ "${1:-}" = restore ]; then
+  name="${2:-}"
+  [[ "$name" =~ ^[0-9]{8}T[0-9]{6}Z-[0-9a-f]{7}$ ]] || fail "usage: deploy.sh restore <release>"
+  snapshot="$SHARED/db-snapshots/$name.dump"
+  [ -f "$snapshot" ] || fail "no snapshot $snapshot"
+  load_database_env
+  log "restoring the database from $name (taken before that release migrated)"
+  pg_restore --clean --if-exists --no-owner --dbname="$DATABASE_TARGET" "$snapshot"
+  log "restored; run a release whose code matches this schema (deploy.sh rollback or a ref)"
   exit 0
 fi
 
@@ -77,18 +117,16 @@ ln -s "$SHARED/.env" "$release/.env"
 (
   cd "$release"
   corepack pnpm install --frozen-lockfile --reporter=append-only
-  corepack pnpm build
+  # The web build loads the Madani Arabic faces only when their files are on the server.
+  MADANI_FONTS_DIR="$SITE_DIR/fonts/madani" corepack pnpm build
 )
 
 # A snapshot right before migrating, restorable with pg_restore if a migration goes wrong.
 mkdir -p "$SHARED/db-snapshots"
-set -a
-# shellcheck disable=SC1091
-. "$SHARED/.env"
-set +a
+load_database_env
 snapshot="$SHARED/db-snapshots/$(basename "$release").dump"
 log "database snapshot"
-(umask 077 && pg_dump --format=custom --file="$snapshot" "$DATABASE_URL")
+(umask 077 && pg_dump --format=custom --file="$snapshot" --dbname="$DATABASE_TARGET")
 ls -1t "$SHARED"/db-snapshots/*.dump 2>/dev/null | tail -n +$((KEEP_DB_SNAPSHOTS + 1)) | xargs -r rm -f
 
 log "migrating"
@@ -97,13 +135,15 @@ trap - ERR
 
 previous=$(readlink -f "$CURRENT" 2>/dev/null || true)
 log "switching to $(basename "$release")"
-switch_to "$release"
-
-if ! healthy; then
-  log "new release failed its health check"
+# The worker must be online too: the API health check does not see it.
+if ! { switch_to "$release" && healthy && worker_online; }; then
+  log "new release failed to start or its health check"
   if [ -n "$previous" ] && [ -d "$previous" ]; then
-    switch_to "$previous"
-    healthy && log "restored $(basename "$previous")" || log "previous release is unhealthy too"
+    if switch_to "$previous" && healthy; then
+      log "restored $(basename "$previous")"
+    else
+      log "previous release is unhealthy too"
+    fi
   fi
   fail "release ${sha:0:7} is not healthy; logs: pm2 logs vertexhub-api --err"
 fi

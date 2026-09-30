@@ -148,6 +148,13 @@ export function taskMove(from: TaskStatus, to: TaskStatus): TaskMove | null {
   }
 }
 
+/**
+ * The title of the extra work item an over-limit revision becomes (rule 10). Stored in Arabic,
+ * the language of the records, and shown as is by the decision dialog.
+ */
+export const revisionExtraWorkTitle = (revisionNumber: number, taskTitle: string): string =>
+  `التعديل ${revisionNumber}: ${taskTitle}`;
+
 /** Moves that need a note: what must change, or why (rule 1). */
 export function taskMoveNeedsNote(move: TaskMove): boolean {
   return [

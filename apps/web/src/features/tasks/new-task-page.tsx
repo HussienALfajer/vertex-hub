@@ -28,6 +28,7 @@ import { FormAlert } from '../../components/form-alert';
 import { FormSection } from '../../components/form-section';
 import { useMe } from '../../lib/auth';
 import { SCREEN_ERROR } from '../../lib/errors';
+import { idParam, oneOfParam } from '../../lib/search-params';
 import { hasClientScope, logsClientRequests, memberOf } from './task-access';
 import {
   ApprovalFields,
@@ -64,20 +65,16 @@ export interface NewTaskSearch {
   cycleLineId?: string;
 }
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
 /** Presets from a project, milestone, retainer line or client; anything malformed is dropped. */
 export function parseNewTaskSearch(search: Record<string, unknown>): NewTaskSearch {
-  const id = (value: unknown) =>
-    typeof value === 'string' && UUID.test(value) ? value : undefined;
   return {
     mode: search.mode === 'request' ? 'request' : undefined,
-    department: DEPARTMENT_CODES.find((code) => code === search.department),
-    clientId: id(search.clientId),
-    projectId: id(search.projectId),
-    milestoneId: id(search.milestoneId),
-    retainerCycleId: id(search.retainerCycleId),
-    cycleLineId: id(search.cycleLineId),
+    department: oneOfParam(DEPARTMENT_CODES, search.department),
+    clientId: idParam(search.clientId),
+    projectId: idParam(search.projectId),
+    milestoneId: idParam(search.milestoneId),
+    retainerCycleId: idParam(search.retainerCycleId),
+    cycleLineId: idParam(search.cycleLineId),
   };
 }
 
@@ -259,7 +256,7 @@ function ModeField({ mode, onChange }: { mode: Mode; onChange: (mode: Mode) => v
         }}
       >
         <ToggleGroupItem value="request">
-          <SendIcon />
+          <SendIcon className="rtl:-scale-x-100" />
           {t('tasks.form.modes.request')}
         </ToggleGroupItem>
         <ToggleGroupItem value="assign">

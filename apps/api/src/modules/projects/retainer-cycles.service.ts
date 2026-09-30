@@ -32,7 +32,7 @@ import {
 import { and, asc, count, desc, eq, inArray, isNull, lt, max, sql, sum } from 'drizzle-orm';
 import { DATABASE } from '../../core/database/database.module.js';
 import { CodedException } from '../../core/errors/index.js';
-import { JobQueue } from '../../core/jobs/index.js';
+import { JobQueue, runEach } from '../../core/jobs/index.js';
 import { type AuditActor, recordAudit } from '../audit/index.js';
 import { type CurrentUserInfo, lockAccessChanges, UserDirectory } from '../auth/index.js';
 import { ClientDirectory } from '../clients/index.js';
@@ -123,42 +123,48 @@ export class RetainerCyclesService implements OnModuleInit {
       .orderBy(asc(retainers.id));
     let closed = 0;
     let opened = 0;
-    for (const { id } of candidates) {
-      await this.db.transaction(async (tx) => {
-        // An opening cycle may assign its tasks (F07 rule 16); taken before the retainer lock.
-        await lockAccessChanges(tx);
-        const [retainer] = await tx
-          .select({
-            status: retainers.status,
-            startDate: retainers.startDate,
-            archivedAt: retainers.archivedAt,
-            clientId: retainers.clientId,
-          })
-          .from(retainers)
-          .where(eq(retainers.id, id))
-          .for('update');
-        if (!retainer || retainer.archivedAt) return;
-        const client = await this.clients.summary(retainer.clientId, tx);
-        if (!client || client.archived) return;
-        const ended = await tx
-          .select(cycleColumns)
-          .from(retainerCycles)
-          .where(
-            and(
-              eq(retainerCycles.retainerId, id),
-              eq(retainerCycles.status, 'open'),
-              lt(retainerCycles.periodEnd, today),
-            ),
-          );
-        for (const cycle of ended) {
-          await this.close(tx, cycle, null);
-          closed += 1;
-        }
-        if (retainer.status === 'active' && retainer.startDate <= today) {
-          if (await this.open(tx, id, retainer.startDate, today, null)) opened += 1;
-        }
-      });
-    }
+    // One retainer failing does not hold back the others (ADR 0015); the run fails at the end.
+    await runEach(
+      candidates,
+      this.logger,
+      ({ id }) => `Retainer ${id}`,
+      async ({ id }) => {
+        await this.db.transaction(async (tx) => {
+          // An opening cycle may assign its tasks (F07 rule 16); taken before the retainer lock.
+          await lockAccessChanges(tx);
+          const [retainer] = await tx
+            .select({
+              status: retainers.status,
+              startDate: retainers.startDate,
+              archivedAt: retainers.archivedAt,
+              clientId: retainers.clientId,
+            })
+            .from(retainers)
+            .where(eq(retainers.id, id))
+            .for('update');
+          if (!retainer || retainer.archivedAt) return;
+          const client = await this.clients.summary(retainer.clientId, tx);
+          if (!client || client.archived) return;
+          const ended = await tx
+            .select(cycleColumns)
+            .from(retainerCycles)
+            .where(
+              and(
+                eq(retainerCycles.retainerId, id),
+                eq(retainerCycles.status, 'open'),
+                lt(retainerCycles.periodEnd, today),
+              ),
+            );
+          for (const cycle of ended) {
+            await this.close(tx, cycle, null);
+            closed += 1;
+          }
+          if (retainer.status === 'active' && retainer.startDate <= today) {
+            if (await this.open(tx, id, retainer.startDate, today, null)) opened += 1;
+          }
+        });
+      },
+    );
     return { closed, opened };
   }
 
@@ -247,10 +253,13 @@ export class RetainerCyclesService implements OnModuleInit {
     endOn?: string,
   ): Promise<void> {
     const lines = await this.lineRows([cycle.id], tx);
-    const delivered = await this.liveDelivered(
+    // Frozen as presented: never below zero, even when a delivered task counted by a negative
+    // adjustment was reopened or archived since (R7, R8).
+    const live = await this.liveDelivered(
       lines.map((line) => line.id),
       tx,
     );
+    const delivered = new Map([...live].map(([id, value]) => [id, Math.max(0, value)]));
     for (const line of lines) {
       await tx
         .update(retainerCycleLines)
@@ -517,7 +526,7 @@ export class RetainerCyclesService implements OnModuleInit {
     const lineIds = lines.map((line) => line.id);
     const [live, tasks] = await Promise.all([
       this.liveDelivered(lineIds, executor),
-      this.progress.cycleLines(lineIds),
+      this.progress.cycleLines(lineIds, executor),
     ]);
     const today = businessDate();
     return cycles.map((cycle) => {
@@ -586,7 +595,7 @@ export class RetainerCyclesService implements OnModuleInit {
         .from(retainerCycleAdjustments)
         .where(inArray(retainerCycleAdjustments.lineId, lineIds))
         .groupBy(retainerCycleAdjustments.lineId),
-      this.progress.cycleLines(lineIds),
+      this.progress.cycleLines(lineIds, executor),
     ]);
     const adjusted = new Map(sums.map((row) => [row.lineId, Number(row.total)]));
     return new Map(

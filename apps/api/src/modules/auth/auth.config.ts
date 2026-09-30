@@ -11,6 +11,7 @@ import {
 import { BASE_ERROR_CODES, betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { APIError, createAuthMiddleware, getSessionFromCtx } from 'better-auth/api';
+import { hashPassword } from 'better-auth/crypto';
 import { twoFactor } from 'better-auth/plugins';
 import { eq } from 'drizzle-orm';
 import type { Env } from '../../core/config/env.js';
@@ -56,6 +57,46 @@ const OPEN_WHILE_TWO_FACTOR_PENDING = ['/get-session', '/sign-out', '/two-factor
 /** Paths that turn two-factor sign-in on or off for the signed-in user; audited. */
 const TWO_FACTOR_SWITCHES = ['/two-factor/verify-totp', '/two-factor/disable'];
 
+/**
+ * Sign-in limits (F01 rule 18). Per client IP, loose enough for an office behind one public
+ * address; per account, whatever the address, so guessing spread over many addresses is slowed.
+ */
+export const SIGN_IN_LIMITS = {
+  perIpPerMinute: 20,
+  failuresPerAccount: 10,
+  accountWindowMs: 15 * 60 * 1000,
+} as const;
+
+/** Failed sign-ins per email in a sliding window; memory is enough for one API process. */
+class AccountFailures {
+  private readonly failures = new Map<string, number[]>();
+
+  private recent(email: string, now: number): number[] {
+    const since = now - SIGN_IN_LIMITS.accountWindowMs;
+    const kept = (this.failures.get(email) ?? []).filter((at) => at > since);
+    if (kept.length > 0) this.failures.set(email, kept);
+    else this.failures.delete(email);
+    return kept;
+  }
+
+  blocked(email: string, now = Date.now()): boolean {
+    return this.recent(email, now).length >= SIGN_IN_LIMITS.failuresPerAccount;
+  }
+
+  fail(email: string, now = Date.now()): void {
+    this.failures.set(email, [...this.recent(email, now), now]);
+  }
+
+  clear(email: string): void {
+    this.failures.delete(email);
+  }
+}
+
+const emailOf = (body: unknown): string => {
+  const email = (body as { email?: unknown } | undefined)?.email;
+  return typeof email === 'string' ? email.trim().toLowerCase() : '';
+};
+
 function twoFactorRequiredError() {
   const code: ErrorCode = 'TWO_FACTOR_REQUIRED';
   return new APIError('FORBIDDEN', { code, message: 'Two-factor sign-in is required' });
@@ -64,6 +105,7 @@ function twoFactorRequiredError() {
 export function createAuth(db: Database, env: Env) {
   /** 2FA state of each session token before a switch request, to audit real changes only. */
   const twoFactorBefore = new Map<string, boolean>();
+  const accountFailures = new AccountFailures();
 
   async function twoFactorEnabled(userId: string): Promise<boolean> {
     const [user] = await db
@@ -107,9 +149,9 @@ export function createAuth(db: Database, env: Env) {
       window: 60,
       max: 100,
       customRules: {
-        '/sign-in/email': { window: 60, max: 5 },
-        '/two-factor/verify-totp': { window: 60, max: 5 },
-        '/two-factor/verify-backup-code': { window: 60, max: 5 },
+        '/sign-in/email': { window: 60, max: SIGN_IN_LIMITS.perIpPerMinute },
+        '/two-factor/verify-totp': { window: 60, max: SIGN_IN_LIMITS.perIpPerMinute },
+        '/two-factor/verify-backup-code': { window: 60, max: SIGN_IN_LIMITS.perIpPerMinute },
       },
     },
     plugins: [
@@ -139,13 +181,20 @@ export function createAuth(db: Database, env: Env) {
       before: createAuthMiddleware(async (ctx) => {
         if (DISABLED_ROUTES.includes(ctx.path)) throw new APIError('NOT_FOUND');
         if (ctx.path === '/sign-in/email') {
-          // An archived user gets the same error as a wrong password (F01 rule 10).
-          const email = typeof ctx.body?.email === 'string' ? ctx.body.email.toLowerCase() : '';
+          const email = emailOf(ctx.body);
+          if (accountFailures.blocked(email)) {
+            throw new APIError('TOO_MANY_REQUESTS', { message: 'Too many failed sign-ins' });
+          }
+          // An archived user gets the same error as a wrong password (F01 rule 10), after the
+          // same password hashing work, so the answer time does not tell former staff apart.
           const [user] = await db
             .select({ archivedAt: users.archivedAt })
             .from(users)
             .where(eq(users.email, email));
           if (user?.archivedAt) {
+            const password = (ctx.body as { password?: unknown } | undefined)?.password;
+            await hashPassword(typeof password === 'string' ? password : '');
+            accountFailures.fail(email);
             throw APIError.from('UNAUTHORIZED', BASE_ERROR_CODES.INVALID_EMAIL_OR_PASSWORD);
           }
           return;
@@ -179,6 +228,16 @@ export function createAuth(db: Database, env: Env) {
       }),
       // Changes made inside Better Auth are audited right after they commit (F01 rule 22).
       after: createAuthMiddleware(async (ctx) => {
+        if (ctx.path === '/sign-in/email') {
+          const returned = ctx.context.returned;
+          const email = emailOf(ctx.body);
+          if (returned instanceof APIError) {
+            if (returned.statusCode === 401) accountFailures.fail(email);
+          } else {
+            accountFailures.clear(email);
+          }
+          return;
+        }
         if (ctx.path !== '/change-password' && !TWO_FACTOR_SWITCHES.includes(ctx.path)) return;
         const session = ctx.context.session ?? (await getSessionFromCtx(ctx));
         if (!session) return;

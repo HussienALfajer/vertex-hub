@@ -59,6 +59,7 @@ import {
   hasAssignScope,
   hasClientScope,
   holdsAll,
+  inClosedProject,
   ownsOpenRequest,
   readableTask,
   type TaskAccess,
@@ -73,6 +74,7 @@ import {
   blockedSql,
   dependenciesOf,
   dependentsOf,
+  lockDependencyGraph,
 } from './task-dependencies.js';
 import { blocksDependents, type NoticeTask, TaskNotices, toTimeOfDay } from './task-notices.js';
 import { overdueSql, overLimitPendingSql } from './task-sql.js';
@@ -419,7 +421,13 @@ export class TasksService {
           ...(extraWorkItemId && { extraWorkItemId }),
           ...(dependsOn.length > 0 && { dependsOn }),
           ...(input.checklist.length > 0 && { checklist: input.checklist }),
-          ...(input.links.length > 0 && { links: input.links }),
+          // Links may carry share tokens: the audit keeps the label and the site only.
+          ...(input.links.length > 0 && {
+            links: input.links.map((link) => ({
+              label: link.label ?? null,
+              site: new URL(link.url).host,
+            })),
+          }),
         },
       });
       const task = await this.notices.load(tx, created.id);
@@ -442,6 +450,8 @@ export class TasksService {
     await this.db.transaction(async (tx) => {
       const movesPeople = input.assigneeId !== undefined || input.department !== undefined;
       if (movesPeople) await lockAccessChanges(tx);
+      // A new client for a linked task changes the dependency graph's rule (same client only).
+      if (input.clientId !== undefined) await lockDependencyGraph(tx);
       const task = await readableTask(tx, this.directories, actor, id, { forUpdate: true });
       const rights = taskRights(actor, task);
       if (!rights.manage && !ownsOpenRequest(rights, task)) throw new ForbiddenException();
@@ -573,6 +583,24 @@ export class TasksService {
         await this.engagements.archiveExtraWork(tx, task.extraWorkItemId, actorOf(actor));
         extraWorkItemId = null;
       }
+      // Rule 11: an out-of-scope request keeps an engagement, and its extra work follows it to
+      // another project or retainer while unbilled (`EXTRA_WORK_BILLED` once billed or waived).
+      let extraWorkMoved = false;
+      if (!scopeGiven && task.requestScope === 'out_of_scope' && linksChange) {
+        const owner = await this.engagementOf(tx, links);
+        const previous = await this.engagementOf(tx, pickLinks(task));
+        if (owner.kind !== previous.kind || owner.id !== previous.id) {
+          if (task.extraWorkItemId) {
+            await this.engagements.archiveExtraWork(tx, task.extraWorkItemId, actorOf(actor));
+          }
+          extraWorkItemId = await this.createRequestExtraWork(tx, actor, {
+            ...task,
+            ...basics?.after,
+            ...links,
+          });
+          extraWorkMoved = true;
+        }
+      }
 
       await tx
         .update(tasks)
@@ -580,7 +608,8 @@ export class TasksService {
           ...basics?.after,
           department,
           assigneeId,
-          ...(scopeGiven && { requestScope: input.requestScope, extraWorkItemId }),
+          ...(scopeGiven && { requestScope: input.requestScope }),
+          ...((scopeGiven || extraWorkMoved) && { extraWorkItemId }),
         })
         .where(eq(tasks.id, id));
 
@@ -619,6 +648,12 @@ export class TasksService {
           after: { requestScope: input.requestScope, extraWorkItemId },
         });
       }
+      if (extraWorkMoved) {
+        await audit('task.extra_work_moved', {
+          before: { extraWorkItemId: task.extraWorkItemId },
+          after: { extraWorkItemId },
+        });
+      }
       await this.notifyUpdate(tx, actor, task, basics);
     });
     return this.detail(actor, id);
@@ -648,12 +683,37 @@ export class TasksService {
   async restore(actor: CurrentUserInfo, id: string): Promise<TaskDetail> {
     if (!holdsAll(actor, 'tasks.manage')) throw new ForbiddenException();
     await this.db.transaction(async (tx) => {
+      // Taken before the row lock: restoring open work waits for user archiving (rule 6).
+      await lockAccessChanges(tx);
       const task = await readableTask(tx, this.directories, actor, id, { forUpdate: true });
       if (!task.archivedAt) {
         throw new CodedException(409, 'TASK_NOT_ARCHIVED', 'The task is not archived');
       }
-      await tx.update(tasks).set({ archivedAt: null }).where(eq(tasks.id, id));
+      const open = task.status !== 'delivered' && task.status !== 'cancelled';
+      if (open && inClosedProject(task)) {
+        throw new CodedException(409, 'PROJECT_CLOSED', 'Reopen the project first');
+      }
+      // An archived assignee cannot take the work back: it returns to the department queue.
+      const unassign =
+        open && !!task.assigneeId && !(await this.users.activeUser(task.assigneeId, tx));
+      await tx
+        .update(tasks)
+        .set({ archivedAt: null, ...(unassign && { assigneeId: null }) })
+        .where(eq(tasks.id, id));
       await this.auditArchive(tx, actor, 'task.restored', id, false);
+      if (unassign && task.assigneeId) {
+        const people = await this.users.summaries([task.assigneeId], tx);
+        await recordAudit(tx, {
+          actor: actorOf(actor),
+          action: 'task.assigned',
+          entityType: 'task',
+          entityId: id,
+          before: {
+            assignee: { id: task.assigneeId, name: people.get(task.assigneeId)?.name ?? '' },
+          },
+          after: { assignee: null },
+        });
+      }
     });
     return this.detail(actor, id);
   }

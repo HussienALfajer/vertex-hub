@@ -70,7 +70,12 @@ export class PermissionsGuard implements CanActivate {
     if (required && !required.every((permission) => hasPermission(resolved.access, permission))) {
       throw new ForbiddenException();
     }
-    request.currentUser = { id: session.user.id, name: session.user.name, ...resolved };
+    request.currentUser = {
+      id: session.user.id,
+      name: session.user.name,
+      sessionId: session.session.id,
+      ...resolved,
+    };
     return true;
   }
 }

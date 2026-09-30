@@ -318,7 +318,11 @@ export class TemplatesService {
     return this.detail(actor, id);
   }
 
-  /** A template with what a run plans from (rules 6–14), or null. */
+  /**
+   * A template with what a run plans from (rules 6–14), or null. Inside a transaction the share
+   * lock on the template waits for an edit in progress (editors lock it for update), so stages,
+   * steps and assignees are all read from one saved version.
+   */
   async forRun(executor: Executor, id: string): Promise<TemplateForRun | null> {
     const [row] = await executor
       .select({
@@ -328,7 +332,8 @@ export class TemplatesService {
         archivedAt: workTemplates.archivedAt,
       })
       .from(workTemplates)
-      .where(eq(workTemplates.id, id));
+      .where(eq(workTemplates.id, id))
+      .for('share');
     if (!row) return null;
     // One after another: a transaction's client runs one query at a time.
     const stages = await executor
@@ -592,7 +597,10 @@ export class TemplatesService {
       pairs.has(`${a.userId}:${a.department}`);
   }
 
-  /** The non-archived retainers linked to the templates, by retainer name. */
+  /**
+   * The linked retainers still in use, by retainer name: not archived, nor under an archived
+   * client (F05 G2 hides those from everyone below scope all, so the template shows none).
+   */
   private async linkedRetainers(templateIds: string[]) {
     if (templateIds.length === 0) return [];
     const links = await this.db
@@ -603,10 +611,15 @@ export class TemplatesService {
       .from(retainerTemplates)
       .where(inArray(retainerTemplates.templateId, templateIds));
     const retainers = await this.engagements.retainers(links.map((link) => link.retainerId));
+    const clients = await this.clients.summaries(
+      [...retainers.values()].map((retainer) => retainer.clientId),
+    );
     return links
       .flatMap((link) => {
         const retainer = retainers.get(link.retainerId);
-        return retainer && !retainer.archived ? [{ ...retainer, templateId: link.templateId }] : [];
+        const live =
+          retainer && !retainer.archived && clients.get(retainer.clientId)?.archived === false;
+        return live ? [{ ...retainer, templateId: link.templateId }] : [];
       })
       .sort((a, b) => a.name.localeCompare(b.name, 'ar'));
   }

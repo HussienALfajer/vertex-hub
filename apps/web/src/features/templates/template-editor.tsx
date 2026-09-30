@@ -55,7 +55,7 @@ import { Controller, type UseFormReturn, useForm, useWatch } from 'react-hook-fo
 import { useTranslation } from 'react-i18next';
 import { ApiError } from '../../lib/api/client';
 import { errorMessage, fieldError, SCREEN_ERROR } from '../../lib/errors';
-import { formatNumber } from '../../lib/format';
+import { formatList, formatNumber } from '../../lib/format';
 import { useDepartmentNames } from '../projects/project-badges';
 import { useDepartmentMembers } from '../tasks/task-form';
 import { StepDialog } from './step-dialog';
@@ -680,7 +680,7 @@ function StepCard({
         {waitsOn.length > 0 && (
           <p className="flex items-start gap-1.5 text-sm text-muted-foreground">
             <LinkIcon aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
-            {t('templates.waitsOn', { titles: waitsOn.join('، ') })}
+            {t('templates.waitsOn', { titles: formatList(waitsOn) })}
           </p>
         )}
         {readOnly && (step.brief || checklist.length > 0) && (

@@ -53,7 +53,7 @@ import { type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '../../components/confirm-dialog';
 import { FormAlert } from '../../components/form-alert';
-import { LoadError } from '../../components/load-error';
+import { isMissing, LoadError } from '../../components/load-error';
 import { ApiError } from '../../lib/api/client';
 import { can, useMe } from '../../lib/auth';
 import { errorMessage } from '../../lib/errors';
@@ -84,8 +84,12 @@ export function UserProfilePage({ userId }: { userId: string }) {
       {user.isPending ? (
         <ProfileSkeleton />
       ) : user.isError ? (
-        user.error instanceof ApiError && user.error.status === 404 ? (
-          <LoadError message={t('users.profile.notFound')} onRetry={() => user.refetch()} />
+        isMissing(user.error) ? (
+          <LoadError
+            message={t('users.profile.notFound')}
+            onRetry={() => user.refetch()}
+            error={user.error}
+          />
         ) : (
           <LoadError message={t('users.profile.loadError')} onRetry={() => user.refetch()} />
         )
@@ -640,6 +644,7 @@ function EditUser({ user, onDone }: { user: UserResponse; onDone: () => void }) 
           roles: user.roles ?? [],
         }}
         canGrantGeneralManager={me.roles.includes('general_manager')}
+        ownAccount={user.id === me.user.id}
         submitLabel={t('users.form.save')}
         submittingLabel={t('common.saving')}
         onSubmit={async (values) => {

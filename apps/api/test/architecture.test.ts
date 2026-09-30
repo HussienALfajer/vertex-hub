@@ -5,6 +5,7 @@ import type { Type } from '@nestjs/common';
 import { METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants.js';
 import { ModulesContainer } from '@nestjs/core';
 import { Test } from '@nestjs/testing';
+import ts from 'typescript';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AppModule } from '../src/app.module.js';
 import { REQUIRE_SESSION, REQUIRED_PERMISSIONS } from '../src/core/access/index.js';
@@ -66,6 +67,8 @@ interface SourceImport {
   file: string;
   specifier: string;
   names: string[];
+  /** Everything the target exports: `import * as`, `export *`, a dynamic `import()`. */
+  namespace: boolean;
 }
 
 function sourceFiles(dir: string): string[] {
@@ -74,25 +77,67 @@ function sourceFiles(dir: string): string[] {
     .map((entry) => join(entry.parentPath, entry.name));
 }
 
-/** Static imports of a file, with the named bindings they bring in. */
-function importsOf(file: string): SourceImport[] {
-  const source = readFileSync(file, 'utf8');
-  const pattern = /import\s+(?:type\s+)?(?:\{([^}]*)\}|[\w*\s,]+)\s+from\s+'([^']+)'/g;
-  return [...source.matchAll(pattern)].map((match) => ({
-    file,
-    specifier: match[2] as string,
-    names: (match[1] ?? '')
-      .split(',')
-      .map(
-        (name) =>
-          name
-            .replace(/^\s*type\s+/, '')
-            .split(/\s+as\s+/)[0]
-            ?.trim() ?? '',
-      )
-      .filter(Boolean),
-  }));
+/**
+ * Every import of a file, read by the TypeScript parser: static imports (named, default,
+ * namespace, type-only), re-exports and dynamic `import()`, whatever the quotes.
+ */
+function importsOf(file: string, source = readFileSync(file, 'utf8')): SourceImport[] {
+  const tree = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, false, ts.ScriptKind.TS);
+  const found: SourceImport[] = [];
+  const named = (elements: readonly (ts.ImportSpecifier | ts.ExportSpecifier)[]) =>
+    elements.map((element) => (element.propertyName ?? element.name).text);
+  const visit = (node: ts.Node) => {
+    if (
+      (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) &&
+      node.moduleSpecifier &&
+      ts.isStringLiteral(node.moduleSpecifier)
+    ) {
+      let names: string[] = [];
+      let namespace = false;
+      if (ts.isImportDeclaration(node)) {
+        const bindings = node.importClause?.namedBindings;
+        if (bindings && ts.isNamespaceImport(bindings)) namespace = true;
+        if (bindings && ts.isNamedImports(bindings)) names = named(bindings.elements);
+        if (node.importClause?.name) names.push('default');
+      } else if (node.exportClause && ts.isNamedExports(node.exportClause)) {
+        names = named(node.exportClause.elements);
+      } else {
+        namespace = true;
+      }
+      found.push({ file, specifier: node.moduleSpecifier.text, names, namespace });
+    }
+    if (
+      ts.isCallExpression(node) &&
+      node.expression.kind === ts.SyntaxKind.ImportKeyword &&
+      node.arguments[0] &&
+      ts.isStringLiteralLike(node.arguments[0])
+    ) {
+      found.push({ file, specifier: node.arguments[0].text, names: [], namespace: true });
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(tree);
+  return found;
 }
+
+describe('import reading', () => {
+  it('finds every form of import the boundary rules must see', () => {
+    const source = [
+      "import Default, { a, type B as C } from '../other/a.js';",
+      'import * as db from "@vertex-hub/db";',
+      "export { d } from '../other/d.js';",
+      "export * from '../other/e.js';",
+      "const f = await import('../other/f.js');",
+    ].join('\n');
+    expect(importsOf('x.ts', source)).toEqual([
+      { file: 'x.ts', specifier: '../other/a.js', names: ['a', 'B', 'default'], namespace: false },
+      { file: 'x.ts', specifier: '@vertex-hub/db', names: [], namespace: true },
+      { file: 'x.ts', specifier: '../other/d.js', names: ['d'], namespace: false },
+      { file: 'x.ts', specifier: '../other/e.js', names: [], namespace: true },
+      { file: 'x.ts', specifier: '../other/f.js', names: [], namespace: true },
+    ]);
+  });
+});
 
 const display = (file: string) => relative(apiRoot, file).split(sep).join('/');
 
@@ -105,7 +150,7 @@ function moduleOf(file: string): string | null {
 const moduleNames = readdirSync(modulesDir, { withFileTypes: true })
   .filter((entry) => entry.isDirectory())
   .map((entry) => entry.name);
-const imports = sourceFiles(srcDir).flatMap(importsOf);
+const imports = sourceFiles(srcDir).flatMap((file) => importsOf(file));
 
 describe('module boundaries', () => {
   it('finds the modules it checks', () => {
@@ -193,6 +238,13 @@ describe('module boundaries', () => {
           .filter((name) => ownerOfTable.has(name) && ownerOfTable.get(name) !== moduleOf(file))
           .map((name) => `${display(file)} uses ${name} (owned by ${ownerOfTable.get(name)})`),
       );
+    expect(offenders).toEqual([]);
+  });
+
+  it('never imports all of @vertex-hub/db at once, which would hide the tables used', () => {
+    const offenders = imports
+      .filter(({ specifier, namespace }) => specifier === '@vertex-hub/db' && namespace)
+      .map(({ file }) => display(file));
     expect(offenders).toEqual([]);
   });
 });

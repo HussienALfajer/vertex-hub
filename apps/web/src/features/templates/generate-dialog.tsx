@@ -41,7 +41,7 @@ import { useTranslation } from 'react-i18next';
 import { FormAlert } from '../../components/form-alert';
 import { ApiError } from '../../lib/api/client';
 import { errorMessage } from '../../lib/errors';
-import { formatCalendarDate, formatNumber } from '../../lib/format';
+import { formatCalendarDate, formatList, formatNumber } from '../../lib/format';
 import { useDepartmentNames } from '../projects/project-badges';
 import { DeliverableIcon, lineName } from '../retainers/retainer-badges';
 import { useDepartmentMembers } from '../tasks/task-form';
@@ -81,10 +81,7 @@ export function GenerateTasksDialog({
   const { t } = useTranslation();
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
-      <DialogContent
-        closeLabel={t('common.close')}
-        className="max-h-[90dvh] overflow-y-auto sm:max-w-3xl"
-      >
+      <DialogContent closeLabel={t('common.close')} className="sm:max-w-3xl">
         {open && (
           <GenerateForm target={target} initialTemplateId={initialTemplateId} onDone={onClose} />
         )}
@@ -517,7 +514,9 @@ function PlannedTaskRow({ task, titles }: { task: PlannedTask; titles: Map<strin
         {waits.length > 0 && (
           <span className="flex items-center gap-1">
             <LinkIcon aria-hidden="true" className="size-3.5" />
-            {t('templates.waitsOn', { titles: waits.join('، ') })}
+            {t('templates.waitsOn', {
+              titles: formatList(waits.filter((title): title is string => !!title)),
+            })}
           </span>
         )}
       </p>
