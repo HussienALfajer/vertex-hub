@@ -13,6 +13,7 @@ Server work needs the owner's explicit approval in the current conversation (AGE
 | Releases | `/srv/hub.vertexmedia.pro/releases/<UTC time>-<sha>`; `current` links to the active one |
 | Repository mirror | `/srv/hub.vertexmedia.pro/repo.git` (public repo over HTTPS, no credentials) |
 | Environment | `/srv/hub.vertexmedia.pro/shared/.env` (600), linked into each release as `.env` |
+| Uploaded files (F10) | `/srv/hub.vertexmedia.pro/shared/files/` (`FILES_ROOT`; 2750 `vertexhub:www-data`, outside the releases). nginx serves them only through its internal `/_files/` location after the API answers `X-Accel-Redirect`; `shared/` is 710 so nginx can pass through it without listing it |
 | Pre-migration DB snapshots | `/srv/hub.vertexmedia.pro/shared/db-snapshots/` (last 10) |
 | Madani font files | `/srv/hub.vertexmedia.pro/fonts/madani/` (ADR 0011; empty until Q11). The web build loads them only when they are there, so copy them in, then deploy again |
 | App logs | `/var/log/hub.vertexmedia.pro/{api,worker}.{out,err}.log` (14 days) |
@@ -91,13 +92,19 @@ ssh vertex "cat /srv/hub.vertexmedia.pro/current/REVISION"      # deployed commi
 
 ## Backups and restore
 
-`vertexhub-backup` writes the database dump, its table of contents, the environment, the nginx site and the deployed revision. Restore the database from a daily backup:
+`vertexhub-backup` writes the database dump, its table of contents, the environment, the nginx site, the deployed revision and the uploaded files. Files are a hard-linked snapshot of the previous backup (`rsync --link-dest`): a stored file never changes, so unchanged files take no extra space. Restore the database from a daily backup:
 
 ```bash
 ssh vertex "runuser -u postgres -- pg_restore --clean --if-exists --no-owner --role=vertex_hub -d vertex_hub /var/backups/hub.vertexmedia.pro/<time>/database.dump"
 ```
 
-Backups stay on the server until an off-server destination is chosen (Q4). That is required before launch.
+Restore the files the same way (they belong to the same moment as the dump):
+
+```bash
+ssh vertex "rsync -a /var/backups/hub.vertexmedia.pro/<time>/files/ /srv/hub.vertexmedia.pro/shared/files/ && chown -R vertexhub:www-data /srv/hub.vertexmedia.pro/shared/files"
+```
+
+Backups stay on the server until an off-server destination is chosen (Q4). That is required before launch, and more pressing since files are stored (F10).
 
 ## First-time setup
 
@@ -114,5 +121,6 @@ ssh vertex "systemctl enable --now vertexhub-health.timer"
 ## Changing configuration
 
 - nginx, systemd, logrotate or scripts: change `deploy/`, merge, then re-run `provision.sh`.
+- F10 (files): the first deploy that contains it needs `provision.sh` re-run first, for the files directory, `FILES_ROOT` in `shared/.env`, the upload route and the internal files location in nginx. The API refuses to start in production without an absolute `FILES_ROOT`.
 - The inline theme script in `apps/web/index.html`: its hash is in the CSP in `deploy/nginx/vertexhub-headers.conf`, and `apps/web/src/csp.test.ts` fails until both match.
 - Secrets: edit `shared/.env` on the server as `vertexhub`, then `pm2 reload all --update-env`. Rotating `BETTER_AUTH_SECRET` signs everyone out.

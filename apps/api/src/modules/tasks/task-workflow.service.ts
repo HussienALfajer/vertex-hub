@@ -35,6 +35,7 @@ import { CodedException } from '../../core/errors/index.js';
 import { recordAudit } from '../audit/index.js';
 import { type CurrentUserInfo, lockAccessChanges, UserDirectory } from '../auth/index.js';
 import { ClientDirectory } from '../clients/index.js';
+import { FileVersions } from '../files/index.js';
 import type { Notice } from '../notifications/index.js';
 import { EngagementDirectory } from '../projects/index.js';
 import {
@@ -74,6 +75,7 @@ export class TaskWorkflowService {
     private readonly tasks: TasksService,
     private readonly notices: TaskNotices,
     private readonly users: UserDirectory,
+    private readonly files: FileVersions,
   ) {}
 
   private get directories() {
@@ -184,6 +186,8 @@ export class TaskWorkflowService {
           ...(overridden && { overrideReason: change.reason }),
         },
       });
+      // F10 rule 9: approval marks the latest version of each deliverable final.
+      if (to === 'approved') await this.files.markLatestFinal(tx, id, actorOf(actor));
       const overLimit = !!revision?.overLimit;
       await this.notices.send(tx, await this.moveNotices(tx, actor, task, move, overLimit));
     });

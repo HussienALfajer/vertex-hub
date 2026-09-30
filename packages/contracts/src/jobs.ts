@@ -21,3 +21,13 @@ export const NOTIFICATIONS_DAILY_JOB = {
   cron: '0 9 * * 0-4,6',
   tz: BUSINESS_TIME_ZONE,
 } as const;
+
+/** F10 rule 18: renders the thumbnail and preview of an image upload; queued on attach. */
+export const FILES_PREVIEW_JOB = { queue: 'files.preview', retryLimit: 3 } as const;
+
+/** F10: deletes uploads left unattached for 24 hours, and their content, daily at 03:00. */
+export const FILES_PURGE_UPLOADS_JOB = {
+  queue: 'files.purge-uploads',
+  cron: '0 3 * * *',
+  tz: BUSINESS_TIME_ZONE,
+} as const;

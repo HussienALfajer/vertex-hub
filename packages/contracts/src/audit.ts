@@ -90,6 +90,16 @@ export const AUDIT_ACTIONS = [
   'template.restored',
   'template_run.created',
   'retainer.template_changed',
+  'file_item.created',
+  'file_item.renamed',
+  'file_item.confidential_changed',
+  'file_item.archived',
+  'file_item.restored',
+  'file_version.created',
+  'file_version.archived',
+  'file_version.restored',
+  'file_version.final_set',
+  'file_version.final_cleared',
 ] as const;
 
 export const auditActionSchema = z.enum(AUDIT_ACTIONS).meta({ id: 'AuditAction' });
@@ -114,6 +124,7 @@ export const AUDIT_ENTITY_TYPES = [
   'task_comment',
   'template',
   'template_run',
+  'file_item',
 ] as const;
 
 export const auditEntityTypeSchema = z.enum(AUDIT_ENTITY_TYPES).meta({ id: 'AuditEntityType' });

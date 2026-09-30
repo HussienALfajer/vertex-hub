@@ -226,6 +226,15 @@ What roles see differently: everyone sees task files, brand files and non-confid
 15. **A file named with only an extension or unusual characters:** the default item name falls back to "File"; download names replace characters that are unsafe in file names.
 16. **Library of a client with many files:** paged by 50; thumbnails are 400 px WebP served with `Cache-Control: private, max-age=86400` (a version's content never changes).
 
+## Implementation notes
+Details settled while building PR 1 (API), within the rules above:
+- **Previews (rule 18).** The `pending` status is the queue: attaching sets it in the attaching transaction, and the `files.preview` job is sent after commit as a nudge. Each run renders up to 20 pending images, trying each up to 3 times before `failed`, and sends itself again while some are left; the daily `files.purge-uploads` run nudges it too, so a preview queued just before a restart is not lost.
+- **Large images.** Images above 50 MB (`FILE_PREVIEW_MAX_BYTES`) are not rendered: `preview_status` `none`, the type icon, and they still preview in the browser when their type is served inline. Rendering reads the image into memory, which stays bounded on the shared server. An upload's width and height come from the first 512 KB kept while streaming (null when the header is not there); the preview job sets them from the full image.
+- **Status codes.** `UPLOAD_NOT_FOUND`, `LINK_NOT_ALLOWED`, `NOT_DELIVERABLE`, `FILE_EMPTY` and `FILE_TYPE_BLOCKED` answer 400; `NOT_CONFIDENTIAL_READER` 403; `FILE_TOO_LARGE` 413; `STORAGE_FULL` 507; the others 409.
+- **Removed items.** A removed (archived) item accepts only restore; any other change answers 404. Removing a whole deliverable is for manage scope or its creator while they are a task worker; removing a version, for manage scope or its uploader while they are a task worker.
+- **Serving.** `FILES_X_ACCEL` (default on in production) switches content to `X-Accel-Redirect` to nginx's internal `/_files/` location; development streams with single-range support. The API refuses to start in production without an absolute `FILES_ROOT`.
+- **Deploy.** `shared/` becomes 710 `vertexhub:www-data` so nginx can pass through it to `shared/files/` (2750, setgid); `.env` stays 600.
+
 ## Open questions
 - None block F10. The owner decided every question of the interview on 2026-09-30.
 - Q4 (off-server backups) becomes more pressing: files are backed up only on the same server until it is answered.

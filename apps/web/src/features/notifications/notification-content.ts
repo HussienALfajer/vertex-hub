@@ -135,6 +135,14 @@ function taskText(t: TFunction, notification: TaskNotification, actor: string): 
             task,
           })
         : t('notifications.text.task_commented', { actor, task });
+    case 'task_file_added':
+      return notification.count > 1
+        ? t('notifications.text.task_file_added_merged', {
+            count: notification.count,
+            n: formatNumber(notification.count),
+            task,
+          })
+        : t('notifications.text.task_file_added', { actor, task, file: notification.data.file });
     case 'request_finished':
       return t(`notifications.text.request_finished.${notification.data.outcome}`, { task });
     case 'task_due_soon':

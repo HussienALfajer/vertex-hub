@@ -33,6 +33,9 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done. Feature IDs
 ## Phase 2 — Production and client
 Build order (owner, 2026-09-30): F10 → F09 → F08 → F11. F09 approves exact file versions from F10; F08 attaches files and sends month plans for approval through F09.
 - [~] F10 Files and versions (spec: `docs/specs/F10-files-versions.md`, ADR 0019)
+  - [x] PR 1: API, contracts, database, jobs and deploy configuration (`feat/f10-files-api`)
+  - [ ] PR 2: upload control, preview dialog, task Files section
+  - [ ] PR 3: client Files tab, brand kit files, project and retainer documents
 - [ ] F09 Internal review and client approval (incl. medical review)
 - [ ] F08 Content calendar
 - [ ] F11 Unified calendar and shoots

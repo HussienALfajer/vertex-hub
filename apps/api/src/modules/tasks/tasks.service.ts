@@ -49,6 +49,7 @@ import { CodedException } from '../../core/errors/index.js';
 import { changedFields, recordAudit } from '../audit/index.js';
 import { type CurrentUserInfo, lockAccessChanges, UserDirectory } from '../auth/index.js';
 import { ClientDirectory, type ClientSummary } from '../clients/index.js';
+import { FileVersions } from '../files/index.js';
 import type { Notice } from '../notifications/index.js';
 import { EngagementDirectory } from '../projects/index.js';
 import {
@@ -108,6 +109,7 @@ export class TasksService {
     private readonly clients: ClientDirectory,
     private readonly engagements: EngagementDirectory,
     private readonly notices: TaskNotices,
+    private readonly files: FileVersions,
   ) {}
 
   private get directories() {
@@ -185,7 +187,7 @@ export class TasksService {
   async detail(actor: CurrentUserInfo, id: string): Promise<TaskDetail> {
     const task = await readableTask(this.db, this.directories, actor, id);
     const now = new Date();
-    const [[item], dependencies, dependents, checklist, links, revisions, extras] =
+    const [[item], dependencies, dependents, checklist, links, revisions, extras, fileCounts] =
       await Promise.all([
         this.present([task], this.db, now),
         dependenciesOf(id, this.db),
@@ -215,6 +217,7 @@ export class TasksService {
           })
           .from(tasks)
           .where(eq(tasks.id, id)),
+        this.files.taskFileCounts(id, this.db),
       ]);
     const row = extras[0];
     if (!item || !row) throw new NotFoundException();
@@ -274,6 +277,7 @@ export class TasksService {
         addedBy: person(l.addedById),
         createdAt: l.createdAt.toISOString(),
       })),
+      fileCounts,
       revisionHistory: revisions.map((r) => {
         const extra = r.extraWorkItemId ? extraWork.get(r.extraWorkItemId) : undefined;
         return {
@@ -612,6 +616,10 @@ export class TasksService {
           ...((scopeGiven || extraWorkMoved) && { extraWorkItemId }),
         })
         .where(eq(tasks.id, id));
+      // F10 rule 4: the task's files follow its client.
+      if (links.clientId !== task.clientId) {
+        await this.files.moveTaskClient(tx, id, links.clientId);
+      }
 
       const audit = async (action: AuditAction, change: Change | null) => {
         if (!change) return;

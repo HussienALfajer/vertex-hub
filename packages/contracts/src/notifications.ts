@@ -21,6 +21,7 @@ export const NOTIFICATION_TYPES = [
   'task_over_limit',
   'task_changed',
   'task_commented',
+  'task_file_added',
   'task_requested',
   'tasks_generated',
   'task_approved',
@@ -74,6 +75,7 @@ export const NOTIFICATION_CATALOG: Record<
   task_over_limit: { category: 'tasks', subject: 'task', mutable: false },
   task_changed: { category: 'tasks', subject: 'task', mutable: true },
   task_commented: { category: 'tasks', subject: 'task', mutable: true },
+  task_file_added: { category: 'tasks', subject: 'task', mutable: true },
   task_requested: { category: 'tasks', subject: 'task', mutable: false },
   tasks_generated: { category: 'tasks', subject: 'template_run', mutable: false },
   task_approved: { category: 'tasks', subject: 'task', mutable: true },
@@ -159,6 +161,8 @@ export const NOTIFICATION_DATA_SCHEMAS = {
     to: dueSchema.nullable(),
   }),
   task_commented: commentData,
+  /** Merged like `task_commented`: the latest file name, `count` files (F10). */
+  task_file_added: taskData.extend({ file: nameSchema }),
   task_requested: taskData,
   tasks_generated: z.object({
     template: nameSchema,
@@ -205,7 +209,7 @@ const notificationBaseSchema = z.object({
   /** Null for the daily job and automatic runs. */
   actor: z.object({ id: z.uuid(), name: z.string() }).nullable(),
   subject: z.object({ type: notificationSubjectTypeSchema, id: z.uuid() }),
-  /** Merged `task_commented` notifications count the comments (rule 5); otherwise 1. */
+  /** Merged `task_commented` and `task_file_added` notifications count their items (rule 5); otherwise 1. */
   count: z.number().int().min(1),
   read: z.boolean(),
   createdAt: z.iso.datetime(),

@@ -1,6 +1,10 @@
 import type { INestApplicationContext } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-import { NOTIFICATIONS_DAILY_JOB, RETAINER_CYCLES_JOB } from '@vertex-hub/contracts';
+import {
+  FILES_PURGE_UPLOADS_JOB,
+  NOTIFICATIONS_DAILY_JOB,
+  RETAINER_CYCLES_JOB,
+} from '@vertex-hub/contracts';
 import { type Database, workerHeartbeats } from '@vertex-hub/db';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -49,6 +53,13 @@ describe('worker against the test database', () => {
   it('schedules the daily notifications run at 09:00 Damascus time on work days', async () => {
     const { queue, cron, tz } = NOTIFICATIONS_DAILY_JOB;
     expect(cron).toBe('0 9 * * 0-4,6');
+    expect(await app.get(PgBossService).boss.getSchedules(queue)).toEqual([
+      expect.objectContaining({ cron, timezone: tz }),
+    ]);
+  });
+
+  it('schedules the daily purge of unattached uploads at 03:00 Damascus time (F10)', async () => {
+    const { queue, cron, tz } = FILES_PURGE_UPLOADS_JOB;
     expect(await app.get(PgBossService).boss.getSchedules(queue)).toEqual([
       expect.objectContaining({ cron, timezone: tz }),
     ]);

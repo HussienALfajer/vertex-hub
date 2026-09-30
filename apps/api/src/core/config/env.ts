@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { isAbsolute } from 'node:path';
 import { z } from 'zod';
 
 export const envSchema = z
@@ -17,6 +18,16 @@ export const envSchema = z
       .enum(['true', 'false'])
       .default('true')
       .transform((value) => value === 'true'),
+    /** Where uploaded files live (F10, ADR 0019): outside the releases in production. */
+    FILES_ROOT: z.string().min(1).default('./.data/files'),
+    /**
+     * Serve file content through nginx's internal location (`X-Accel-Redirect`) instead of
+     * streaming it; defaults to on in production, where nginx is in front.
+     */
+    FILES_X_ACCEL: z
+      .enum(['true', 'false'])
+      .optional()
+      .transform((value) => (value === undefined ? undefined : value === 'true')),
     /** Signs session cookies. Required in production; derived locally when unset. */
     BETTER_AUTH_SECRET: z.string().min(32).optional(),
   })
@@ -26,12 +37,18 @@ export const envSchema = z
   })
   // Production is served over TLS: an http origin would issue cookies without `Secure` and trust
   // the wrong origin, so a lost or wrong value stops the start instead of weakening it.
+  // A relative root would put uploads inside a release, which the next deploys delete.
+  .refine((env) => env.NODE_ENV !== 'production' || isAbsolute(env.FILES_ROOT), {
+    message: 'FILES_ROOT must be an absolute path in production',
+    path: ['FILES_ROOT'],
+  })
   .refine((env) => env.NODE_ENV !== 'production' || env.APP_URL.startsWith('https://'), {
     message: 'APP_URL must be an https origin in production',
     path: ['APP_URL'],
   })
-  .transform(({ BETTER_AUTH_SECRET, ...env }) => ({
+  .transform(({ BETTER_AUTH_SECRET, FILES_X_ACCEL, ...env }) => ({
     ...env,
+    FILES_X_ACCEL: FILES_X_ACCEL ?? env.NODE_ENV === 'production',
     // Outside production, fall back to a stable per-machine value: DATABASE_URL carries the random
     // password that `pnpm db:setup-local` generated, and it never leaves the machine.
     BETTER_AUTH_SECRET:

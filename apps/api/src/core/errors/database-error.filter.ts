@@ -14,6 +14,7 @@ const UNIQUE_CODES: Record<string, ErrorCode> = {
   retainer_cycle_lines_kind_label_idx: 'DUPLICATE_DELIVERABLE',
   work_templates_name_idx: 'TEMPLATE_NAME_TAKEN',
   template_runs_one_full_run_idx: 'ALREADY_GENERATED',
+  file_items_name_unique: 'FILE_NAME_TAKEN',
 };
 
 /** PostgreSQL codes of a write that lost a race: unique violation, deadlock, serialization. */

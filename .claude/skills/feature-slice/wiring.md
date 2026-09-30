@@ -30,6 +30,7 @@ Everything a new module, permission, error or screen must be connected to. Tests
 - [ ] `test/<module>.test.ts`: per endpoint, success, 401, 403 and out of scope; the spec's numbered rules each have a test; seeded rows removed in `afterAll`.
 - [ ] `docs/architecture.md` ("API modules") updated if module ownership differs from the list there.
 - [ ] A scheduled job: the queue name and cron in `packages/contracts/src/jobs.ts`, the schedule in `apps/worker/src/jobs/<name>.job.ts`, the handler registered with `JobQueue.work` in the module service (ADR 0008); tests call the service method directly.
+- [ ] A job queued by a change (F10 `files.preview`): the queue name in `jobs.ts`, `JobQueue.send(queue)` after the transaction commits, and a handler that also picks up work it missed (the rows' state is the queue, the job only a nudge).
 
 ### bridge
 - [ ] `apps/web/src/lib/api/openapi.json` and `schema.gen.ts` regenerated and committed **(CI: OpenAPI drift)**.

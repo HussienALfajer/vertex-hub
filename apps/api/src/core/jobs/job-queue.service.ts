@@ -26,6 +26,20 @@ export class JobQueue implements OnApplicationBootstrap, OnApplicationShutdown {
     this.handlers.set(queue, handler);
   }
 
+  /**
+   * Queues a job for a queue this process works, after the change that needs it committed. A
+   * no-op while pg-boss is off (tests, the OpenAPI export): the handler's service must also pick
+   * up work it missed, since a job is only a nudge.
+   */
+  async send(queue: string): Promise<void> {
+    if (!this.boss) return;
+    try {
+      await this.boss.send(queue, {});
+    } catch (error) {
+      this.logger.error(error, `Could not queue ${queue}`);
+    }
+  }
+
   async onApplicationBootstrap(): Promise<void> {
     if (!this.env.JOBS_ENABLED || this.handlers.size === 0) return;
     const boss = new PgBoss(this.env.DATABASE_URL);

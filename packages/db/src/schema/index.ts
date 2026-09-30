@@ -1,6 +1,7 @@
 export * from './audit.js';
 export * from './auth.js';
 export * from './clients.js';
+export * from './files.js';
 export * from './notifications.js';
 export * from './projects.js';
 export * from './retainers.js';

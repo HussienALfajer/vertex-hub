@@ -191,6 +191,18 @@ describe('module boundaries', () => {
     expect(offenders).toEqual([]);
   });
 
+  it('keeps files independent of the modules that own files (ADR 0019)', () => {
+    const owners = ['tasks', 'clients', 'projects'];
+    const offenders = imports
+      .filter(({ file, specifier }) => moduleOf(file) === 'files' && specifier.startsWith('.'))
+      .filter(({ file, specifier }) => {
+        const target = moduleOf(resolve(dirname(file), specifier));
+        return target !== null && owners.includes(target);
+      })
+      .map(({ file, specifier }) => `${display(file)} -> ${specifier}`);
+    expect(offenders).toEqual([]);
+  });
+
   /**
    * Which API module owns the tables of each schema file in packages/db (null: no API module
    * does). A new schema file must be added here, which forces the ownership decision.
@@ -199,6 +211,7 @@ describe('module boundaries', () => {
     audit: 'audit',
     auth: 'auth',
     clients: 'clients',
+    files: 'files',
     notifications: 'notifications',
     projects: 'projects',
     retainers: 'projects',

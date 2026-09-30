@@ -40,6 +40,7 @@ const NOT_BUSINESS_RECORDS: Record<string, string> = {
   notifications: 'Personal, not a business record: purged after reading, never archived (F14)',
   notification_settings: 'Personal mute settings, one row per user (F14)',
   notification_reminders: 'Idempotency keys of the daily job, insert-only (F14 rule 8)',
+  file_uploads: 'Temporary: deleted when attached or purged after 24 hours (F10)',
 };
 
 /** Tables keyed by a natural value instead of a UUIDv7 `id`. Every entry needs a reason. */

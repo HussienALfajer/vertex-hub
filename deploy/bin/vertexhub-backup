@@ -4,6 +4,7 @@
 # question Q4) and are required before launch.
 #
 # Restore: pg_restore --clean --if-exists --no-owner --role=vertex_hub -d vertex_hub database.dump
+# Files (F10): rsync -a <backup>/files/ /srv/hub.vertexmedia.pro/shared/files/
 set -euo pipefail
 umask 077
 
@@ -12,6 +13,7 @@ DB=vertex_hub
 DEST=/var/backups/$SITE
 KEEP_DAYS=14
 
+previous=$(find "$DEST" -mindepth 1 -maxdepth 1 -type d -name '20*' | sort | tail -n 1)
 target="$DEST/$(date -u +%Y%m%dT%H%M%SZ)"
 mkdir -p "$target"
 
@@ -20,6 +22,13 @@ runuser -u postgres -- pg_dump --format=custom "$DB" >"$target/database.dump"
 pg_restore --list "$target/database.dump" >"$target/database-contents.txt"
 cp "/srv/$SITE/shared/.env" "$target/environment"
 cp "/etc/nginx/sites-available/$SITE" "$target/nginx.conf"
+# Uploaded files (F10) as a hard-linked snapshot of the previous backup: files never change
+# once stored, so an unchanged file takes no extra space.
+if [ -d "/srv/$SITE/shared/files" ]; then
+  link_dest=()
+  [ -n "$previous" ] && [ -d "$previous/files" ] && link_dest=(--link-dest="$previous/files")
+  rsync -a --delete "${link_dest[@]}" "/srv/$SITE/shared/files/" "$target/files/"
+fi
 readlink -f "/srv/$SITE/current" >"$target/release.txt" 2>/dev/null || true
 cat "/srv/$SITE/current/REVISION" >>"$target/release.txt" 2>/dev/null || true
 

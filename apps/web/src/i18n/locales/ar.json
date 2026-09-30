@@ -299,7 +299,21 @@
     "NOTHING_MISSING": "لا مهام ناقصة لهذا البند.",
     "ALREADY_GENERATED": "مهام هذا الشهر مولَّدة من قبل.",
     "NOT_MUTABLE": "هذا النوع يتطلب إجراءً ولا يمكن كتمه.",
-    "CONCURRENT_CHANGE": "تغيّر هذا السجل في اللحظة نفسها من طلب آخر. أعد المحاولة."
+    "CONCURRENT_CHANGE": "تغيّر هذا السجل في اللحظة نفسها من طلب آخر. أعد المحاولة.",
+    "FILE_EMPTY": "الملف فارغ.",
+    "FILE_TOO_LARGE": "الملف أكبر من 250 ميغابايت. أضفه كرابط.",
+    "FILE_TYPE_BLOCKED": "هذا النوع من الملفات غير مسموح (برامج وسكربتات).",
+    "STORAGE_FULL": "مساحة التخزين ممتلئة. أبلغ مدير العمليات.",
+    "UPLOAD_NOT_FOUND": "انتهت صلاحية الملف المرفوع. ارفعه من جديد.",
+    "LINK_NOT_ALLOWED": "المراجع ملفات مرفوعة فقط. أضف الرابط في روابط المهمة.",
+    "NOT_VERSIONED": "المراجع ليس لها إصدارات.",
+    "NOT_DELIVERABLE": "العلامة النهائية للمخرجات فقط.",
+    "FILE_NAME_TAKEN": "يوجد ملف بهذا الاسم هنا.",
+    "VERSION_FINAL": "هذا الإصدار نهائي. ألغِ العلامة النهائية أولًا.",
+    "LAST_VERSION": "هذا آخر إصدار. أزل الملف كله بدلًا منه.",
+    "TASK_CLOSED": "المهمة مسلّمة أو ملغاة. أعد فتحها لتغيير ملفاتها.",
+    "TASK_NOT_APPROVED": "تُحدَّد العلامة النهائية بعد اعتماد المهمة.",
+    "NOT_CONFIDENTIAL_READER": "لا يمكنك تغيير سرية هذا المستند."
   },
   "users": {
     "title": "الفريق",
@@ -611,7 +625,8 @@
       "task_link": "رابط مهمة",
       "task_comment": "تعليق على مهمة",
       "template": "قالب عمل",
-      "template_run": "توليد من قالب"
+      "template_run": "توليد من قالب",
+      "file_item": "ملف"
     },
     "actions": {
       "user": {
@@ -734,6 +749,20 @@
         "created": "أضاف تعليقًا",
         "updated": "عدّل تعليقًا",
         "archived": "أزال تعليقًا"
+      },
+      "file_item": {
+        "created": "أضاف ملفًا",
+        "renamed": "عدّل ملفًا",
+        "confidential_changed": "غيّر سرية مستند",
+        "archived": "أزال ملفًا",
+        "restored": "استعاد ملفًا"
+      },
+      "file_version": {
+        "created": "أضاف إصدارًا",
+        "archived": "أزال إصدارًا",
+        "restored": "استعاد إصدارًا",
+        "final_set": "حدّد الإصدار النهائي",
+        "final_cleared": "ألغى العلامة النهائية"
       }
     },
     "fields": {
@@ -2664,6 +2693,7 @@
       "task_over_limit": "تعديل من العميل يتجاوز الحد",
       "task_changed": "تغيير على مهمتي: الموعد أو الإلغاء أو الإسناد",
       "task_commented": "تعليق على مهمتي",
+      "task_file_added": "ملفات جديدة على مهمتي",
       "task_requested": "طلب عمل من قسمي",
       "tasks_generated": "مهام من قالب عمل",
       "task_approved": "اعتماد مهمتي",
@@ -2700,6 +2730,13 @@
       "task_commented_merged_few": "{{n}} تعليقات جديدة على «{{task}}»",
       "task_commented_merged_many": "{{n}} تعليقًا جديدًا على «{{task}}»",
       "task_commented_merged_other": "{{n}} تعليق جديد على «{{task}}»",
+      "task_file_added": "أضاف {{actor}} الملف «{{file}}» إلى «{{task}}»",
+      "task_file_added_merged_zero": "ملفات جديدة على «{{task}}»",
+      "task_file_added_merged_one": "ملف جديد على «{{task}}»",
+      "task_file_added_merged_two": "ملفان جديدان على «{{task}}»",
+      "task_file_added_merged_few": "{{n}} ملفات جديدة على «{{task}}»",
+      "task_file_added_merged_many": "{{n}} ملفًا جديدًا على «{{task}}»",
+      "task_file_added_merged_other": "{{n}} ملف جديد على «{{task}}»",
       "task_requested": "طلب جديد لقسمك «{{task}}» من {{actor}}",
       "tasks_generated_assigned_zero": "لا مهام من قالب «{{template}}»",
       "tasks_generated_assigned_one": "أُسندت إليك مهمة من قالب «{{template}}»",

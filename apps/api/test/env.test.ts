@@ -12,6 +12,7 @@ describe('environment', () => {
       NODE_ENV: 'production',
       BETTER_AUTH_SECRET: 'x'.repeat(32),
       APP_URL: 'https://hub.example.com',
+      FILES_ROOT: '/srv/hub.example.com/shared/files',
     };
     expect(parseEnv(production).APP_URL).toBe('https://hub.example.com');
     expect(() => parseEnv({ ...production, BETTER_AUTH_SECRET: undefined })).toThrow(
@@ -20,6 +21,22 @@ describe('environment', () => {
     expect(() => parseEnv({ ...production, APP_URL: 'http://hub.example.com' })).toThrow(/APP_URL/);
     // A lost APP_URL falls back to the local origin, which production refuses.
     expect(() => parseEnv({ ...production, APP_URL: undefined })).toThrow(/APP_URL/);
+  });
+
+  it('keeps production files outside the releases and serves them through nginx (F10)', () => {
+    const production = {
+      ...base,
+      NODE_ENV: 'production',
+      BETTER_AUTH_SECRET: 'x'.repeat(32),
+      APP_URL: 'https://hub.example.com',
+    };
+    expect(() => parseEnv(production)).toThrow(/FILES_ROOT/);
+    const env = parseEnv({ ...production, FILES_ROOT: '/srv/files' });
+    expect(env.FILES_X_ACCEL).toBe(true);
+    expect(
+      parseEnv({ ...production, FILES_ROOT: '/srv/files', FILES_X_ACCEL: 'false' }).FILES_X_ACCEL,
+    ).toBe(false);
+    expect(parseEnv({ ...base }).FILES_X_ACCEL).toBe(false);
   });
 
   it('runs locally with defaults and a derived secret', () => {

@@ -1,9 +1,11 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/index.js';
 import { ClientsModule } from '../clients/index.js';
+import { FilesModule } from '../files/index.js';
 import { NotificationsModule } from '../notifications/index.js';
 import { CycleOpenedHooks } from './cycle-opened-hooks.js';
 import { EngagementDirectory } from './engagement-directory.js';
+import { EngagementFileOwners } from './engagement-file-owners.js';
 import { ExtraWorkController } from './extra-work.controller.js';
 import { ExtraWorkService } from './extra-work.service.js';
 import { ProjectMilestonesController } from './project-milestones.controller.js';
@@ -24,9 +26,10 @@ import { WorkProgress } from './work-progress.js';
  * `retainers.cycles` job that `apps/worker` schedules (R2). Notifies new project managers and
  * registers the renewal reminder in `notifications`' daily job (F14). Exports `EngagementDirectory` for
  * the `tasks` and `templates` modules, and `CycleOpenedHooks` for `templates` (F07 rule 16).
+ * Registers the `project` and `retainer` owner policies in `files` (F10).
  */
 @Module({
-  imports: [AuthModule, ClientsModule, NotificationsModule],
+  imports: [AuthModule, ClientsModule, NotificationsModule, FilesModule],
   controllers: [
     ProjectsController,
     ProjectMilestonesController,
@@ -44,6 +47,7 @@ import { WorkProgress } from './work-progress.js';
     EngagementDirectory,
     CycleOpenedHooks,
     RetainerRenewals,
+    EngagementFileOwners,
   ],
   exports: [WorkProgress, EngagementDirectory, CycleOpenedHooks],
 })

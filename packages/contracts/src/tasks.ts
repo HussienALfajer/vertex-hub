@@ -601,6 +601,11 @@ export const taskDetailSchema = taskSchema
     checklistItems: z.array(taskChecklistItemSchema),
     /** Non-archived links, oldest first. */
     links: z.array(taskLinkSchema),
+    /** Non-archived file items of the task (F10). */
+    fileCounts: z.object({
+      deliverables: z.number().int().min(0),
+      references: z.number().int().min(0),
+    }),
     /** Oldest first. */
     revisionHistory: z.array(taskRevisionSchema),
     /** Null for a task the system created (an automatic template run, F07). */

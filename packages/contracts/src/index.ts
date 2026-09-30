@@ -5,6 +5,7 @@ export * from './dates.js';
 export * from './departments.js';
 export * from './errors.js';
 export * from './extra-work.js';
+export * from './files.js';
 export * from './health.js';
 export * from './jobs.js';
 export * from './lists.js';
