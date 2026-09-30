@@ -31,6 +31,10 @@ import {
   type ExtraWork,
   type ExtraWorkBilling,
   type ExtraWorkBillingChange,
+  type FileItem,
+  type FileUpload,
+  type FileVersion,
+  fileTypeOf,
   firstOfMonth,
   grantedPermissions,
   type HealthResponse,
@@ -2761,7 +2765,7 @@ function taskRoutes({ users, clients, projects, retainers, tasks, me }: TaskStat
         addedBy: person(link.addedById),
         createdAt: task.createdAt,
       })),
-    fileCounts: { deliverables: 0, references: 0 },
+    fileCounts: taskFiles.counts(task.id),
     revisionHistory: task.revisions.map((r) => ({
       id: r.id,
       source: r.source,
@@ -2828,6 +2832,7 @@ function taskRoutes({ users, clients, projects, retainers, tasks, me }: TaskStat
     return { id: item.id, title };
   };
   let next = 1500;
+  const taskFiles = taskFileRoutes({ users, tasks, me, rights });
 
   const matches = (task: TaskRecord, q: URLSearchParams) => {
     const statuses = q.getAll('status');
@@ -2868,6 +2873,10 @@ function taskRoutes({ users, clients, projects, retainers, tasks, me }: TaskStat
   return (route: Route, method: string, url: URL, request: Request): Promise<void> | undefined => {
     const path = url.pathname;
     const body = <T>() => request.postDataJSON() as T;
+
+    // Files (F10) of tasks.
+    const filed = taskFiles.handle(route, method, url, request);
+    if (filed) return filed;
 
     if (path === '/api/me/tasks/summary') {
       const meId = me().user.id;
@@ -3260,6 +3269,453 @@ interface TemplateRecord {
 type StepSeed = Partial<TemplateStep> & Pick<TemplateStep, 'title' | 'department'>;
 
 /** Steps numbered in order; `after` lists step numbers, as in the spec's seed tables. */
+// Files (F10)
+
+type FileVersionRecord = Omit<FileVersion, 'canRemove' | 'type'>;
+
+interface FileRecord {
+  id: string;
+  taskId: string;
+  role: 'deliverable' | 'reference';
+  name: string;
+  createdById: string;
+  createdAt: string;
+  archivedAt: string | null;
+  versions: FileVersionRecord[];
+}
+
+type Uploader = { id: string; name: string };
+
+const uploadVersion = (
+  n: number,
+  number: number,
+  file: { name: string; mimeType: string; sizeBytes: number },
+  uploadedBy: Uploader,
+  createdAt: string,
+  fields: Partial<FileVersionRecord> = {},
+): FileVersionRecord => ({
+  id: id(n),
+  number,
+  kind: 'upload',
+  originalName: file.name,
+  mimeType: file.mimeType,
+  sizeBytes: file.sizeBytes,
+  previewStatus: file.mimeType.startsWith('image/') ? 'ready' : 'none',
+  width: null,
+  height: null,
+  url: null,
+  linkLabel: null,
+  note: null,
+  uploadedBy,
+  isFinal: false,
+  finalSource: null,
+  finalMarkedBy: null,
+  finalMarkedAt: null,
+  createdAt,
+  archivedAt: null,
+  ...fields,
+});
+
+const linkVersion = (
+  n: number,
+  number: number,
+  link: { url: string; label: string | null },
+  uploadedBy: Uploader,
+  createdAt: string,
+  note: string | null = null,
+): FileVersionRecord => ({
+  ...uploadVersion(n, number, { name: '', mimeType: '', sizeBytes: 0 }, uploadedBy, createdAt),
+  kind: 'link',
+  originalName: null,
+  mimeType: null,
+  sizeBytes: null,
+  previewStatus: 'none',
+  url: link.url,
+  linkLabel: link.label,
+  note,
+});
+
+/** Deliverables and references on the autumn menu task, and a delivered task with its final. */
+export function taskFilesSeed(): FileRecord[] {
+  const layan = { id: id(3), name: 'ليان الأحمد' };
+  const sara = { id: id(1), name: 'سارة الخطيب' };
+  const png = (name: string, sizeBytes: number) => ({ name, mimeType: 'image/png', sizeBytes });
+  const file = (
+    n: number,
+    taskId: string,
+    role: FileRecord['role'],
+    name: string,
+    versions: FileVersionRecord[],
+  ): FileRecord => ({
+    id: id(n),
+    taskId,
+    role,
+    name,
+    createdById: versions.at(-1)?.uploadedBy.id ?? layan.id,
+    createdAt: versions.at(-1)?.createdAt ?? '2026-10-06T08:00:00.000Z',
+    archivedAt: null,
+    versions,
+  });
+  return [
+    file(1301, id(1001), 'deliverable', 'غلاف المنيو', [
+      uploadVersion(
+        1351,
+        2,
+        png('menu-cover-v2.png', 2_726_297),
+        layan,
+        '2026-10-08T11:20:00.000Z',
+        {
+          note: 'ألوان الهوية الجديدة وصورة الطبق الموسمي.',
+        },
+      ),
+      uploadVersion(1352, 1, png('menu-cover.png', 2_516_582), layan, '2026-10-07T09:10:00.000Z'),
+    ]),
+    file(1302, id(1001), 'deliverable', 'فيديو المنيو', [
+      linkVersion(
+        1353,
+        1,
+        {
+          url: 'https://drive.google.com/file/d/autumn-menu-video',
+          label: 'النسخة الأولى على Drive',
+        },
+        layan,
+        '2026-10-08T13:00:00.000Z',
+      ),
+    ]),
+    file(1303, id(1001), 'reference', 'صور الأطباق', [
+      uploadVersion(
+        1354,
+        1,
+        { name: 'dishes.jpg', mimeType: 'image/jpeg', sizeBytes: 4_404_019 },
+        sara,
+        '2026-10-05T10:00:00.000Z',
+      ),
+    ]),
+    file(1304, id(1001), 'reference', 'دليل الهوية', [
+      uploadVersion(
+        1355,
+        1,
+        { name: 'brand-guide.pdf', mimeType: 'application/pdf', sizeBytes: 1_153_434 },
+        sara,
+        '2026-10-05T10:05:00.000Z',
+      ),
+    ]),
+    file(1305, id(1007), 'deliverable', 'غلاف أكتوبر', [
+      uploadVersion(
+        1356,
+        2,
+        png('october-cover-v2.png', 1_887_437),
+        layan,
+        '2026-10-03T12:00:00.000Z',
+        {
+          isFinal: true,
+          finalSource: 'auto',
+          finalMarkedAt: '2026-10-04T09:00:00.000Z',
+        },
+      ),
+      uploadVersion(
+        1357,
+        1,
+        png('october-cover.png', 1_782_579),
+        layan,
+        '2026-10-02T12:00:00.000Z',
+      ),
+    ]),
+  ];
+}
+
+/** A stand-in image for thumbnails, previews and image content. */
+const MOCK_IMAGE =
+  '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300"><rect width="400" height="300" fill="#1f4d3a"/><path d="M0 300 L160 80 L230 180 L280 120 L400 300 Z" fill="#d8c3a0"/><circle cx="320" cy="70" r="30" fill="#f4efe6"/></svg>';
+
+/** A one-page PDF for the preview dialog. */
+const MOCK_PDF = [
+  '%PDF-1.4',
+  '1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj',
+  '2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj',
+  '3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 595 842]/Contents 4 0 R/Resources<</Font<</F1 5 0 R>>>>>>endobj',
+  '4 0 obj<</Length 44>>stream',
+  'BT /F1 24 Tf 72 760 Td (Brand guide) Tj ET',
+  'endstream endobj',
+  '5 0 obj<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>endobj',
+  'trailer<</Root 1 0 R>>',
+  '%%EOF',
+].join('\n');
+
+type FileSourceBody = { uploadId: string } | { url: string; label?: string | null };
+
+interface TaskFileState {
+  users: UserResponse[];
+  tasks: TaskRecord[];
+  me: () => MeResponse;
+  rights: (task: TaskRecord) => TaskRights;
+}
+
+/** The files API (F10) for task owners, with the owner rights of the task mock. */
+function taskFileRoutes({ users, tasks, me, rights }: TaskFileState) {
+  const files = taskFilesSeed();
+  const uploads = new Map<string, { name: string; mimeType: string; sizeBytes: number }>();
+  let next = 1400;
+  const now = () => TASKS_NOW.toISOString();
+  const person = (userId: string) => ({
+    id: userId,
+    name: users.find((u) => u.id === userId)?.name ?? '',
+  });
+  const holdsAll = () =>
+    me().permissions.some((g) => g.permission === 'tasks.manage' && g.scopes.includes('all'));
+  const taskOf = (record: FileRecord) => tasks.find((t) => t.id === record.taskId) as TaskRecord;
+
+  // Rules 5–8 and the actions table, as the API's task policy answers them.
+  const ownerRights = (task: TaskRecord) => {
+    const r = rights(task);
+    return {
+      addDeliverable: r.work || r.manage,
+      manage: r.manage,
+      scopeAll: holdsAll(),
+      writable: !task.archived && task.status !== 'delivered' && task.status !== 'cancelled',
+    };
+  };
+  const itemOf = (record: FileRecord): FileItem => {
+    const task = taskOf(record);
+    const o = ownerRights(task);
+    const meId = me().user.id;
+    const live = o.writable && !record.archivedAt;
+    const deliverable = record.role === 'deliverable';
+    return {
+      id: record.id,
+      ownerType: 'task',
+      ownerId: task.id,
+      clientId: task.clientId,
+      role: record.role,
+      name: record.name,
+      brandKind: null,
+      confidential: false,
+      createdBy: person(record.createdById),
+      createdAt: record.createdAt,
+      updatedAt: record.createdAt,
+      archivedAt: record.archivedAt,
+      versions: record.versions
+        .filter((v) => o.scopeAll || !v.archivedAt)
+        .map((v) => ({
+          ...v,
+          type: fileTypeOf(v.kind, v.mimeType),
+          canRemove: deliverable && (o.manage || (o.addDeliverable && v.uploadedBy.id === meId)),
+        })),
+      permissions: {
+        canAddVersion: live && deliverable && o.addDeliverable,
+        canRename: live && deliverable && o.addDeliverable,
+        canRemove:
+          live && (o.manage || (record.createdById === meId && (!deliverable || o.addDeliverable))),
+        canSetFinal:
+          deliverable &&
+          !record.archivedAt &&
+          !task.archived &&
+          task.status !== 'cancelled' &&
+          o.manage,
+        canSetConfidential: false,
+        canRestore: o.scopeAll && o.writable,
+      },
+    };
+  };
+  const findVersion = (versionId: string) => {
+    for (const record of files) {
+      const version = record.versions.find((v) => v.id === versionId);
+      if (version) return { record, version };
+    }
+    return undefined;
+  };
+  const versionFrom = (
+    source: FileSourceBody,
+    number: number,
+    note: string | null,
+  ): FileVersionRecord | null => {
+    const uploader = person(me().user.id);
+    if ('url' in source) {
+      return linkVersion(
+        next++,
+        number,
+        { url: source.url, label: source.label ?? null },
+        uploader,
+        now(),
+        note,
+      );
+    }
+    const upload = uploads.get(source.uploadId);
+    if (!upload) return null;
+    uploads.delete(source.uploadId);
+    return { ...uploadVersion(next++, number, upload, uploader, now()), note };
+  };
+
+  const handle = (
+    route: Route,
+    method: string,
+    url: URL,
+    request: Request,
+  ): Promise<void> | undefined => {
+    const path = url.pathname;
+    if (!path.startsWith('/api/files/')) return undefined;
+    const body = <T>() => request.postDataJSON() as T;
+
+    if (path === '/api/files/uploads' && method === 'POST') {
+      // Multipart: the file name is in the part's header, as UTF-8 bytes.
+      const raw = request.postDataBuffer()?.toString('latin1') ?? '';
+      const name = Buffer.from(raw.match(/filename="([^"]*)"/)?.[1] ?? 'file', 'latin1').toString(
+        'utf8',
+      );
+      const extension = name.split('.').pop()?.toLowerCase() ?? '';
+      const types: Record<string, string> = {
+        png: 'image/png',
+        jpg: 'image/jpeg',
+        pdf: 'application/pdf',
+        mp4: 'video/mp4',
+      };
+      const upload: FileUpload = {
+        uploadId: id(next++),
+        name,
+        sizeBytes: 1_048_576,
+        mimeType: types[extension] ?? 'application/octet-stream',
+      };
+      uploads.set(upload.uploadId, { ...upload });
+      return json(route, upload, 201);
+    }
+    if (path === '/api/files/items' && method === 'GET') {
+      const task = tasks.find((t) => t.id === url.searchParams.get('ownerId'));
+      if (!task || url.searchParams.get('ownerType') !== 'task') return fail(route, 404, null);
+      const o = ownerRights(task);
+      const withRemoved = url.searchParams.get('includeArchived') === 'true' && o.scopeAll;
+      const items = files
+        .filter((f) => f.taskId === task.id && (withRemoved || !f.archivedAt))
+        .reverse()
+        .map(itemOf);
+      return json(route, {
+        items,
+        rights: {
+          canAddDeliverable: o.writable && o.addDeliverable,
+          canAddReference: o.writable,
+          canManageDocuments: false,
+          canSetConfidential: false,
+          canSeeRemoved: o.scopeAll,
+        },
+      });
+    }
+    if (path === '/api/files/items' && method === 'POST') {
+      const input = body<{
+        ownerId: string;
+        role: FileRecord['role'];
+        name?: string;
+        note?: string | null;
+        source: FileSourceBody;
+      }>();
+      const task = tasks.find((t) => t.id === input.ownerId);
+      if (!task) return fail(route, 404, null);
+      const o = ownerRights(task);
+      if (input.role === 'deliverable' && !o.addDeliverable) return fail(route, 403, null);
+      if (!o.writable) return fail(route, 409, 'TASK_CLOSED');
+      const version = versionFrom(input.source, 1, input.note ?? null);
+      if (!version) return fail(route, 400, 'UPLOAD_NOT_FOUND');
+      const name =
+        input.name ??
+        (version.originalName?.replace(/\.[^.]+$/, '') || version.linkLabel || 'File');
+      const taken = files.some(
+        (f) => f.taskId === task.id && f.role === input.role && !f.archivedAt && f.name === name,
+      );
+      if (taken && input.role === 'deliverable') return fail(route, 409, 'FILE_NAME_TAKEN');
+      const record: FileRecord = {
+        id: id(next++),
+        taskId: task.id,
+        role: input.role,
+        name,
+        createdById: me().user.id,
+        createdAt: now(),
+        archivedAt: null,
+        versions: [version],
+      };
+      files.push(record);
+      return json(route, itemOf(record), 201);
+    }
+    const itemMatch = path.match(/^\/api\/files\/items\/([^/]+)(?:\/(.+))?$/);
+    if (itemMatch) {
+      const record = files.find((f) => f.id === itemMatch[1]);
+      if (!record) return fail(route, 404, null);
+      const action = itemMatch[2];
+      if (action === 'versions') {
+        const input = body<{ note?: string | null; source: FileSourceBody }>();
+        const number = Math.max(...record.versions.map((v) => v.number)) + 1;
+        const version = versionFrom(input.source, number, input.note ?? null);
+        if (!version) return fail(route, 400, 'UPLOAD_NOT_FOUND');
+        record.versions.unshift(version);
+        return json(route, itemOf(record));
+      }
+      if (action === 'archive') {
+        record.archivedAt = now();
+        return route.fulfill({ status: 204 });
+      }
+      if (action === 'restore') {
+        record.archivedAt = null;
+        return json(route, itemOf(record));
+      }
+      if (!action && method === 'PATCH') {
+        record.name = body<{ name?: string }>().name ?? record.name;
+        return json(route, itemOf(record));
+      }
+    }
+    const versionMatch = path.match(/^\/api\/files\/versions\/([^/]+)\/(.+)$/);
+    if (versionMatch) {
+      const found = findVersion(versionMatch[1] ?? '');
+      if (!found) return fail(route, 404, null);
+      const { record, version } = found;
+      const action = versionMatch[2];
+      if (action === 'content' || action === 'thumbnail' || action === 'preview') {
+        if (version.kind === 'link') return fail(route, 404, null);
+        const pdf = action === 'content' && version.mimeType === 'application/pdf';
+        return route.fulfill({
+          status: 200,
+          contentType: pdf ? 'application/pdf' : 'image/svg+xml',
+          body: pdf ? MOCK_PDF : MOCK_IMAGE,
+        });
+      }
+      if (action === 'archive') {
+        if (version.isFinal) return fail(route, 409, 'VERSION_FINAL');
+        if (record.versions.filter((v) => !v.archivedAt).length === 1) {
+          return fail(route, 409, 'LAST_VERSION');
+        }
+        version.archivedAt = now();
+        return json(route, itemOf(record));
+      }
+      if (action === 'restore') {
+        version.archivedAt = null;
+        return json(route, itemOf(record));
+      }
+      if (action === 'final') {
+        const task = taskOf(record);
+        const { final } = body<{ final: boolean }>();
+        if (final && task.status !== 'approved' && task.status !== 'delivered') {
+          return fail(route, 409, 'TASK_NOT_APPROVED');
+        }
+        for (const v of record.versions) {
+          if (!v.isFinal && v.id !== version.id) continue;
+          const marked = final && v.id === version.id;
+          v.isFinal = marked;
+          v.finalSource = marked ? 'manual' : null;
+          v.finalMarkedBy = marked ? person(me().user.id) : null;
+          v.finalMarkedAt = marked ? now() : null;
+        }
+        return json(route, itemOf(record));
+      }
+    }
+    return undefined;
+  };
+
+  const count = (taskId: string, role: FileRecord['role']) =>
+    files.filter((f) => f.taskId === taskId && f.role === role && !f.archivedAt).length;
+  return {
+    handle,
+    counts: (taskId: string) => ({
+      deliverables: count(taskId, 'deliverable'),
+      references: count(taskId, 'reference'),
+    }),
+  };
+}
 function templateSteps(first: number, steps: (StepSeed & { after?: number[] })[]): TemplateStep[] {
   return steps.map(({ after = [], ...step }, i) => ({
     id: id(first + i),
@@ -4216,6 +4672,7 @@ export const seedIds = {
   layan: id(3),
   design: design.id,
   karim: id(4),
+  basel: id(6),
   jasmine: id(601),
   shifa: id(602),
   identityProject: id(801),
@@ -4229,6 +4686,7 @@ export const seedIds = {
   dishShoot: id(1002),
   openingPosts: id(1003),
   clinicLogo: id(1006),
+  octoberCover: id(1007),
   websiteTemplate: id(2000),
   monthlyTemplate: id(2100),
 };
