@@ -73,6 +73,7 @@ export const AUDIT_ACTIONS = [
   'task.restored',
   'task.revision_decided',
   'task.request_scope_changed',
+  'task.extra_work_moved',
   'task_checklist_item.created',
   'task_checklist_item.updated',
   'task_checklist_item.reordered',

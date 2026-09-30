@@ -164,7 +164,7 @@ export class UsersService {
 
   async create(actor: CurrentUserInfo, input: CreateUser): Promise<UserWithLinkResponse> {
     const roles = input.roles ?? [];
-    if (roles.includes('general_manager') && !isGeneralManager(actor)) {
+    if (roles.some(isGeneralManagerGranted) && !isGeneralManager(actor)) {
       throw this.generalManagerOnly();
     }
     const id = newId();
@@ -442,8 +442,13 @@ export class UsersService {
     const added = roles.filter((role) => !current.roles.includes(role));
     const removed = current.roles.filter((role) => !roles.includes(role));
     if (added.length === 0 && removed.length === 0) return;
-    const touchesGeneralManager = [...added, ...removed].includes('general_manager');
-    if (touchesGeneralManager && !isGeneralManager(actor)) throw this.generalManagerOnly();
+    // Separation of duties (F01 rule 7): nobody changes their own roles, and only a General
+    // Manager grants or removes General Manager and Finance (money access, F13).
+    if (current.id === actor.id) {
+      throw new CodedException(403, 'CANNOT_CHANGE_OWN_ROLES', 'Another user changes your roles');
+    }
+    const touchesGuarded = [...added, ...removed].some(isGeneralManagerGranted);
+    if (touchesGuarded && !isGeneralManager(actor)) throw this.generalManagerOnly();
     if (removed.includes('general_manager') && current.status === 'active') {
       await this.assertAnotherActiveGeneralManager(tx, current.id);
     }
@@ -656,7 +661,10 @@ export class UsersService {
     return new CodedException(
       403,
       'GENERAL_MANAGER_ONLY',
-      'Only a General Manager can change a General Manager',
+      'Only a General Manager can change a General Manager or grant Finance',
     );
   }
 }
+
+/** Roles only a General Manager grants or removes (F01 rule 7). */
+const isGeneralManagerGranted = (role: string) => role === 'general_manager' || role === 'finance';

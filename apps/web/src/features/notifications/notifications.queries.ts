@@ -12,8 +12,11 @@ import type {
   UnreadCount,
   UpdateNotificationSettings,
 } from '@vertex-hub/contracts';
+import { toast } from '@vertex-hub/ui';
+import { useTranslation } from 'react-i18next';
 import { api, call } from '../../lib/api/client';
 import type { paths } from '../../lib/api/schema.gen';
+import { errorMessage } from '../../lib/errors';
 
 /** The list endpoint's query string as the API reads it: flags are `'true'` or `'false'`. */
 export type NotificationListFilters = NonNullable<
@@ -87,9 +90,17 @@ export async function applyStreamEvent(queryClient: QueryClient, event: Notifica
   });
 }
 
+/** A read-state change that failed says so: the dot and count would otherwise just stay. */
+function useFailureToast() {
+  const { t } = useTranslation();
+  return (error: Error) => toast.add({ title: errorMessage(t, error), type: 'error' });
+}
+
 export function useMarkRead() {
   const queryClient = useQueryClient();
+  const onError = useFailureToast();
   return useMutation({
+    onError,
     mutationFn: (id: string) =>
       call(api.POST('/api/me/notifications/{id}/read', { params: { path: { id } } })),
     onSuccess: () => refreshNotifications(queryClient),
@@ -98,7 +109,9 @@ export function useMarkRead() {
 
 export function useMarkUnread() {
   const queryClient = useQueryClient();
+  const onError = useFailureToast();
   return useMutation({
+    onError,
     mutationFn: (id: string) =>
       call(api.POST('/api/me/notifications/{id}/unread', { params: { path: { id } } })),
     onSuccess: () => refreshNotifications(queryClient),
@@ -107,7 +120,9 @@ export function useMarkUnread() {
 
 export function useMarkAllRead() {
   const queryClient = useQueryClient();
+  const onError = useFailureToast();
   return useMutation({
+    onError,
     mutationFn: () => call(api.POST('/api/me/notifications/read-all')),
     onSuccess: () => refreshNotifications(queryClient),
   });

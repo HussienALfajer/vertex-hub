@@ -19,6 +19,7 @@ function AlertDialogContent({ className, children, ...props }: AlertDialogPrimit
         data-slot="alert-dialog-content"
         className={cn(
           'fixed start-1/2 top-1/2 z-50 grid w-[calc(100%-2rem)] max-w-md -translate-y-1/2 gap-4 rounded-xl border border-border bg-surface p-6 text-surface-foreground shadow-float outline-none',
+          'max-h-[calc(100dvh-2rem)] overflow-y-auto',
           'ltr:-translate-x-1/2 rtl:translate-x-1/2',
           dialogMotion,
           className,

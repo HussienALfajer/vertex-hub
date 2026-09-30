@@ -26,8 +26,7 @@ import {
 import { type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '../../components/confirm-dialog';
-import { LoadError } from '../../components/load-error';
-import { ApiError } from '../../lib/api/client';
+import { isMissing, LoadError } from '../../components/load-error';
 import { formatCalendarDate, formatMonth, formatNumber } from '../../lib/format';
 import { formatMoney } from '../../lib/money';
 import { ExtraWorkTab } from '../projects/extra-work-tab';
@@ -74,11 +73,10 @@ export function RetainerPage({
       ) : retainer.isError ? (
         <LoadError
           message={
-            retainer.error instanceof ApiError && retainer.error.status === 404
-              ? t('retainers.page.notFound')
-              : t('retainers.page.loadError')
+            isMissing(retainer.error) ? t('retainers.page.notFound') : t('retainers.page.loadError')
           }
           onRetry={() => retainer.refetch()}
+          error={retainer.error}
         />
       ) : (
         <RetainerView retainer={retainer.data} tab={search.tab ?? 'this-month'} />

@@ -3,7 +3,7 @@ import type { DepartmentCode, ProjectStatus } from '@vertex-hub/contracts';
 import { AscentMeter, Avatar, Badge } from '@vertex-hub/ui';
 import { ArchiveIcon, CalendarClockIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { formatNumber } from '../../lib/format';
+import { formatList, formatNumber } from '../../lib/format';
 import { departmentListQuery } from '../departments/departments.queries';
 
 /** Running work in the workflow colors; completed takes Vertex Green, like delivered work (§2). */
@@ -96,7 +96,7 @@ export function DepartmentChips({
         </Badge>
       ))}
       {hidden.length > 0 && (
-        <Badge tone="neutral" title={hidden.map(nameOf).join('، ')}>
+        <Badge tone="neutral" title={formatList(hidden.map(nameOf))}>
           +{formatNumber(hidden.length)}
         </Badge>
       )}

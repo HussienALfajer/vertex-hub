@@ -4,6 +4,7 @@ import {
   type RevisionDecision,
   type RevisionDecisionInput,
   revisionDecisionInputSchema,
+  revisionExtraWorkTitle,
   type TaskDetail,
   type TaskRevision,
 } from '@vertex-hub/contracts';
@@ -223,10 +224,7 @@ function DecisionDialog({
             <FieldDescription>
               {decision === 'extra_work'
                 ? t('tasks.revisions.extraWorkHint', {
-                    title: t('tasks.revisions.extraWorkTitle', {
-                      number: formatNumber(revision.number ?? 0),
-                      title: task.title,
-                    }),
+                    title: revisionExtraWorkTitle(revision.number ?? 0, task.title),
                   })
                 : t('tasks.revisions.freeHint')}
             </FieldDescription>

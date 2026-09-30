@@ -1,4 +1,11 @@
-import { keepPreviousData, queryOptions, useMutation, useQueryClient } from '@tanstack/react-query';
+import {
+  infiniteQueryOptions,
+  keepPreviousData,
+  type QueryKey,
+  queryOptions,
+  useMutation,
+  useQueryClient,
+} from '@tanstack/react-query';
 import type {
   CreateTask,
   CreateTaskChecklistItem,
@@ -45,16 +52,34 @@ export const taskQuery = (id: string) =>
     queryFn: () => call(api.GET('/api/tasks/{id}', { params: { path: { id } } })),
   });
 
-/** Every comment of a task, oldest first (a task holds far fewer than the page maximum). */
+const COMMENTS_PAGE_SIZE = 50;
+
+/** The page param of the newest page, before the total is known. */
+const NEWEST_COMMENTS = 0;
+
+/**
+ * A task's comments, shown oldest first: the newest page loads first, older pages on request
+ * ("Show older"), so a long conversation always shows its latest comments. The API pages oldest
+ * first, so the newest page is found from the total.
+ */
 export const taskCommentsQuery = (id: string) =>
-  queryOptions({
+  infiniteQueryOptions({
     queryKey: tasksKeys.comments(id),
-    queryFn: () =>
-      call(
-        api.GET('/api/tasks/{id}/comments', {
-          params: { path: { id }, query: { pageSize: 100 } },
-        }),
-      ),
+    queryFn: async ({ pageParam }) => {
+      const page = (number: number) =>
+        call(
+          api.GET('/api/tasks/{id}/comments', {
+            params: { path: { id }, query: { page: number, pageSize: COMMENTS_PAGE_SIZE } },
+          }),
+        );
+      if (pageParam !== NEWEST_COMMENTS) return page(pageParam);
+      const first = await page(1);
+      const last = Math.max(1, Math.ceil(first.total / first.pageSize));
+      return last === 1 ? first : page(last);
+    },
+    initialPageParam: NEWEST_COMMENTS,
+    getNextPageParam: () => undefined,
+    getPreviousPageParam: (oldest) => (oldest.page > 1 ? oldest.page - 1 : undefined),
   });
 
 export const myTaskSummaryQuery = queryOptions({
@@ -77,24 +102,31 @@ export const taskWorkloadQuery = (filters: TaskWorkloadFilters) =>
   });
 
 /**
- * A mutation on task data. Every one refreshes the whole `tasks` cache, also on failure: a 403
- * after the task changed hands (edge case 15) reloads the page without the lost actions. Task
- * counts show on projects and retainers (F05) and against a monthly template's lines (F07), so
- * those refresh too.
+ * A mutation on task data, refreshing `refreshes` also on failure: a 403 after the task changed
+ * hands (edge case 15) reloads the page without the lost actions. By default the whole `tasks`
+ * cache, and projects, retainers and monthly templates, which show task counts (F05, F07).
+ * Parts that change no count refresh less: the checklist only task views (its progress shows in
+ * lists), links and comments only their task.
  */
-function useTasksMutation<Input, Output>(mutationFn: (input: Input) => Promise<Output>) {
+function useTasksMutation<Input, Output>(
+  mutationFn: (input: Input) => Promise<Output>,
+  refreshes: readonly QueryKey[] = [
+    tasksKeys.all,
+    ['projects'],
+    ['retainers'],
+    ['templates', 'retainer'],
+  ],
+) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn,
     onSettled: () =>
-      Promise.all([
-        queryClient.invalidateQueries({ queryKey: tasksKeys.all }),
-        queryClient.invalidateQueries({ queryKey: ['projects'] }),
-        queryClient.invalidateQueries({ queryKey: ['retainers'] }),
-        queryClient.invalidateQueries({ queryKey: ['templates', 'retainer'] }),
-      ]),
+      Promise.all(refreshes.map((queryKey) => queryClient.invalidateQueries({ queryKey }))),
   });
 }
+
+/** What a link or comment change refreshes: the task and its conversation. */
+const ownTask = (id: string): QueryKey[] => [tasksKeys.detail(id), tasksKeys.comments(id)];
 
 const path = (id: string) => ({ params: { path: { id } } });
 
@@ -143,33 +175,49 @@ export const useRestoreTask = (id: string) =>
 const itemPath = (id: string, itemId: string) => ({ params: { path: { id, itemId } } });
 
 export const useAddChecklistItem = (id: string) =>
-  useTasksMutation((input: CreateTaskChecklistItem) =>
-    call(api.POST('/api/tasks/{id}/checklist', { ...path(id), body: input })),
+  useTasksMutation(
+    (input: CreateTaskChecklistItem) =>
+      call(api.POST('/api/tasks/{id}/checklist', { ...path(id), body: input })),
+    [tasksKeys.all],
   );
 
 export const useUpdateChecklistItem = (id: string) =>
-  useTasksMutation(({ itemId, ...input }: UpdateTaskChecklistItem & { itemId: string }) =>
-    call(api.PATCH('/api/tasks/{id}/checklist/{itemId}', { ...itemPath(id, itemId), body: input })),
+  useTasksMutation(
+    ({ itemId, ...input }: UpdateTaskChecklistItem & { itemId: string }) =>
+      call(
+        api.PATCH('/api/tasks/{id}/checklist/{itemId}', { ...itemPath(id, itemId), body: input }),
+      ),
+    [tasksKeys.all],
   );
 
 export const useReorderChecklist = (id: string) =>
-  useTasksMutation((ids: string[]) =>
-    call(api.PUT('/api/tasks/{id}/checklist/order', { ...path(id), body: { ids } })),
+  useTasksMutation(
+    (ids: string[]) =>
+      call(api.PUT('/api/tasks/{id}/checklist/order', { ...path(id), body: { ids } })),
+    [tasksKeys.all],
   );
 
 export const useArchiveChecklistItem = (id: string) =>
-  useTasksMutation((itemId: string) =>
-    call(api.POST('/api/tasks/{id}/checklist/{itemId}/archive', itemPath(id, itemId))),
+  useTasksMutation(
+    (itemId: string) =>
+      call(api.POST('/api/tasks/{id}/checklist/{itemId}/archive', itemPath(id, itemId))),
+    [tasksKeys.all],
   );
 
 export const useAddTaskLink = (id: string) =>
-  useTasksMutation((input: CreateTaskLink) =>
-    call(api.POST('/api/tasks/{id}/links', { ...path(id), body: input })),
+  useTasksMutation(
+    (input: CreateTaskLink) =>
+      call(api.POST('/api/tasks/{id}/links', { ...path(id), body: input })),
+    ownTask(id),
   );
 
 export const useArchiveTaskLink = (id: string) =>
-  useTasksMutation((linkId: string) =>
-    call(api.POST('/api/tasks/{id}/links/{linkId}/archive', { params: { path: { id, linkId } } })),
+  useTasksMutation(
+    (linkId: string) =>
+      call(
+        api.POST('/api/tasks/{id}/links/{linkId}/archive', { params: { path: { id, linkId } } }),
+      ),
+    ownTask(id),
   );
 
 // Comments
@@ -179,21 +227,27 @@ const commentPath = (id: string, commentId: string) => ({
 });
 
 export const useAddComment = (id: string) =>
-  useTasksMutation((input: TaskCommentInput) =>
-    call(api.POST('/api/tasks/{id}/comments', { ...path(id), body: input })),
+  useTasksMutation(
+    (input: TaskCommentInput) =>
+      call(api.POST('/api/tasks/{id}/comments', { ...path(id), body: input })),
+    ownTask(id),
   );
 
 export const useEditComment = (id: string) =>
-  useTasksMutation(({ commentId, ...input }: TaskCommentInput & { commentId: string }) =>
-    call(
-      api.PATCH('/api/tasks/{id}/comments/{commentId}', {
-        ...commentPath(id, commentId),
-        body: input,
-      }),
-    ),
+  useTasksMutation(
+    ({ commentId, ...input }: TaskCommentInput & { commentId: string }) =>
+      call(
+        api.PATCH('/api/tasks/{id}/comments/{commentId}', {
+          ...commentPath(id, commentId),
+          body: input,
+        }),
+      ),
+    ownTask(id),
   );
 
 export const useRemoveComment = (id: string) =>
-  useTasksMutation((commentId: string) =>
-    call(api.POST('/api/tasks/{id}/comments/{commentId}/archive', commentPath(id, commentId))),
+  useTasksMutation(
+    (commentId: string) =>
+      call(api.POST('/api/tasks/{id}/comments/{commentId}/archive', commentPath(id, commentId))),
+    ownTask(id),
   );

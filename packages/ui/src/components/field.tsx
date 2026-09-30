@@ -15,10 +15,15 @@ function Field({ className, ...props }: FieldPrimitive.Root.Props) {
   );
 }
 
+/**
+ * The field's label. Rendered as another element (a `<span>` naming a select or a group), it is
+ * not a native `<label>`, so label behaviour is off unless `nativeLabel` says otherwise.
+ */
 function FieldLabel({ className, ...props }: FieldPrimitive.Label.Props) {
   return (
     <FieldPrimitive.Label
       data-slot="field-label"
+      nativeLabel={props.render === undefined}
       className={cn('text-sm font-medium text-foreground select-none', className)}
       {...props}
     />

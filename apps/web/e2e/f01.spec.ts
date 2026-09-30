@@ -1,6 +1,6 @@
-import { expect, test } from '@playwright/test';
 import ar from '../src/i18n/locales/ar.json' with { type: 'json' };
 import { financeWithoutTwoFactor, manager, mockApi, seedIds, VALID_LINK_TOKEN } from './fixtures';
+import { expect, test } from './test';
 
 // F01 flows against the mocked API (the real rules are covered by apps/api/test).
 
@@ -68,7 +68,8 @@ test('a user who must use 2FA sets it up before anything else', async ({ page })
   await expect(finish).toBeDisabled();
   await page.getByRole('checkbox', { name: ar.twoFactorSetup.confirmSaved }).click();
   await finish.click();
-  await expect(page).toHaveURL(/127\.0\.0\.1:4173\/$/);
+  // The start page: My tasks, until the F15 dashboards.
+  await expect(page).toHaveURL(/127\.0\.0\.1:4173\/tasks$/);
 });
 
 test('sign-in asks for the code, and a wrong code is explained', async ({ page }) => {
@@ -107,7 +108,7 @@ test('archiving is blocked while the user manages a department, then allowed', a
   await archive();
   const dialog = page.getByRole('alertdialog');
   await expect(dialog.getByText(ar.users.responsibilities.title)).toBeVisible();
-  await expect(dialog.getByText('يدير قسم العمليات الداخلية')).toBeVisible();
+  await expect(dialog.getByText('إدارة قسم العمليات الداخلية')).toBeVisible();
   await dialog.getByRole('link', { name: ar.users.responsibilities.open }).click();
 
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('العمليات الداخلية');

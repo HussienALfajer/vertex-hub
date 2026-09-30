@@ -5,11 +5,30 @@ import {
   Logger,
   type OnApplicationShutdown,
 } from '@nestjs/common';
-import type { NotificationStreamEvent } from '@vertex-hub/contracts';
+import {
+  NOTIFICATION_STREAM_LIFETIME_MS,
+  NOTIFICATION_STREAM_PING_MS,
+  type NotificationStreamEvent,
+} from '@vertex-hub/contracts';
 import { type Listener, listen } from '@vertex-hub/db';
 import { ENV, type Env } from '../../core/config/env.js';
+import { UserDirectory } from '../auth/index.js';
 import { NOTIFICATIONS_CHANNEL, parsePayload } from './notification-channel.js';
 import { NotificationsService } from './notifications.service.js';
+
+/** How often an open stream pings (and checks its session), and when it closes (rule 4). */
+export interface StreamTiming {
+  pingMs: number;
+  lifetimeMs: number;
+}
+
+/** Injection token for `StreamTiming`: the contract's values, shortened by tests. */
+export const STREAM_TIMING = Symbol('STREAM_TIMING');
+
+export const DEFAULT_STREAM_TIMING: StreamTiming = {
+  pingMs: NOTIFICATION_STREAM_PING_MS,
+  lifetimeMs: NOTIFICATION_STREAM_LIFETIME_MS,
+};
 
 /** One open `GET /api/me/notifications/stream` connection. */
 export interface StreamSubscriber {
@@ -31,7 +50,16 @@ export class NotificationStream implements BeforeApplicationShutdown, OnApplicat
   constructor(
     @Inject(ENV) private readonly env: Env,
     private readonly notifications: NotificationsService,
+    private readonly users: UserDirectory,
   ) {}
+
+  /**
+   * Whether a stream's session has ended since it opened (password reset, sign-out of other
+   * sessions, archiving). Checked on every ping, so a revoked session stops receiving at once.
+   */
+  async sessionEnded(sessionId: string): Promise<boolean> {
+    return !(await this.users.sessionActive(sessionId));
+  }
 
   /** Opens the listener if needed; call before answering a stream request, so a failure is a 500. */
   async connect(): Promise<void> {

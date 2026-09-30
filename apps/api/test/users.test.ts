@@ -484,6 +484,48 @@ describe('users', () => {
       await db.delete(userRoles).where(eq(userRoles.userId, other.id));
     });
 
+    it('lets only a General Manager grant or remove Finance (rule 5)', async () => {
+      const plain = await seed();
+      await expectError(
+        await patch(`/api/users/${plain.id}`, operations.cookie, { roles: ['finance'] }),
+        403,
+        'GENERAL_MANAGER_ONLY',
+      );
+      await expectError(
+        await client.post('/api/users', operations.cookie, {
+          name: 'مالية',
+          email: uniqueEmail('finance'),
+          primaryDepartmentId: design,
+          roles: ['finance'],
+        }),
+        403,
+        'GENERAL_MANAGER_ONLY',
+      );
+      expect(
+        (await patch(`/api/users/${plain.id}`, gm.cookie, { roles: ['finance'] })).status,
+      ).toBe(200);
+      await expectError(
+        await patch(`/api/users/${plain.id}`, operations.cookie, { roles: [] }),
+        403,
+        'GENERAL_MANAGER_ONLY',
+      );
+      expect((await patch(`/api/users/${plain.id}`, gm.cookie, { roles: [] })).status).toBe(200);
+    });
+
+    it('refuses changes to the actor’s own roles (rule 5)', async () => {
+      await expectError(
+        await patch(`/api/users/${operations.id}`, operations.cookie, {
+          roles: ['account_manager'],
+        }),
+        403,
+        'CANNOT_CHANGE_OWN_ROLES',
+      );
+      // Unchanged roles are not a change: the rest of the own record still saves.
+      expect(
+        (await patch(`/api/users/${gm.id}`, gm.cookie, { roles: ['general_manager'] })).status,
+      ).toBe(200);
+    });
+
     it('keeps the last active General Manager (rule 6)', async () => {
       const activeGeneralManagers = await db
         .select({ id: users.id })
@@ -492,19 +534,13 @@ describe('users', () => {
         .where(and(eq(userRoles.role, 'general_manager'), isNull(users.archivedAt)));
       // Only `gm` may be an active General Manager here, or the rule cannot apply.
       expect(activeGeneralManagers.map((row) => row.id)).toEqual([gm.id]);
+      // Only another General Manager may remove the role (rule 5), who is then an active one:
+      // removing the last one's role is refused before the rule is reached.
       await expectError(
         await patch(`/api/users/${gm.id}`, gm.cookie, { roles: [] }),
-        409,
-        'LAST_GENERAL_MANAGER',
+        403,
+        'CANNOT_CHANGE_OWN_ROLES',
       );
-      // An invited General Manager does not count as another active one.
-      const invited = await seed({ password: null, roles: ['general_manager'] });
-      await expectError(
-        await patch(`/api/users/${gm.id}`, gm.cookie, { roles: [] }),
-        409,
-        'LAST_GENERAL_MANAGER',
-      );
-      await db.delete(userRoles).where(eq(userRoles.userId, invited.id));
     });
 
     it('lets a General Manager archive another one while an active one remains', async () => {
@@ -753,6 +789,30 @@ describe('users', () => {
       expect(
         (await client.post(`/api/users/${manager.id}/archive`, operations.cookie)).status,
       ).toBe(200);
+    });
+  });
+
+  // Last: archiving a General Manager ends their sessions, which the tests above use.
+  describe('concurrency', () => {
+    it('always keeps an active General Manager when two archive each other at once (rule 6)', async () => {
+      const second = await client.signInWithTwoFactor(db, {
+        roles: ['general_manager'],
+        departments: [{ code: 'general_management' }],
+      });
+      seeded.push(second.id);
+      const [first, other] = await Promise.all([
+        client.post(`/api/users/${second.id}/archive`, gm.cookie),
+        client.post(`/api/users/${gm.id}/archive`, second.cookie),
+      ]);
+      // The access-change lock serializes them: the second sees the first's result.
+      expect([first.status, other.status].filter((status) => status === 200)).toHaveLength(1);
+      const active = await db
+        .select({ id: users.id })
+        .from(userRoles)
+        .innerJoin(users, eq(users.id, userRoles.userId))
+        .where(and(eq(userRoles.role, 'general_manager'), isNull(users.archivedAt)));
+      expect(active).toHaveLength(1);
+      await db.delete(userRoles).where(eq(userRoles.userId, second.id));
     });
   });
 });

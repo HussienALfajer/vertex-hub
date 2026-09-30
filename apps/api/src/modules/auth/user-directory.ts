@@ -4,11 +4,12 @@ import {
   type Database,
   departmentMembers,
   departments,
+  sessions,
   type Transaction,
   userRoles,
   users,
 } from '@vertex-hub/db';
-import { and, eq, inArray, isNull } from 'drizzle-orm';
+import { and, eq, gt, inArray, isNull } from 'drizzle-orm';
 import { DATABASE } from '../../core/database/database.module.js';
 
 export interface UserSummary {
@@ -33,6 +34,15 @@ export class UserDirectory {
     return new Map<string, UserSummary>(
       rows.map((row) => [row.id, { id: row.id, name: row.name, archived: !!row.archivedAt }]),
     );
+  }
+
+  /** Whether the session still exists and has not expired (it ends on sign-out, reset, archive). */
+  async sessionActive(sessionId: string): Promise<boolean> {
+    const [row] = await this.db
+      .select({ id: sessions.id })
+      .from(sessions)
+      .where(and(eq(sessions.id, sessionId), gt(sessions.expiresAt, new Date())));
+    return !!row;
   }
 
   /** A non-archived user; an invited user qualifies. */

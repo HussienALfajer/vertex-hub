@@ -57,6 +57,13 @@ server {
         include snippets/vertexhub-proxy.conf;
     }
 
+    # Activation and reset links are anonymous and set a password: the same tight limit.
+    location = /api/password-links/redeem {
+        limit_req zone=vhsignin burst=5 nodelay;
+        proxy_pass http://127.0.0.1:3050;
+        include snippets/vertexhub-proxy.conf;
+    }
+
     # Notifications stream (F14, ADR 0018): Server-Sent Events pass through unbuffered, and the
     # read timeout outlasts the stream's 15-minute lifetime. The proxy snippet is not included
     # because it sets its own read timeout; its headers are repeated here. Streams count against

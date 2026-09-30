@@ -16,6 +16,8 @@ const common = {
   max_memory_restart: '768M',
   time: true,
   merge_logs: true,
+  // Set here as well as in .env: production behaviour never depends on one hand-edited file.
+  env: { NODE_ENV: 'production' },
 };
 
 module.exports = {

@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/index.js';
 import { DailyReminders } from './daily-reminders.js';
 import { NotificationCenter } from './notification-center.js';
-import { NotificationStream } from './notification-stream.js';
+import { DEFAULT_STREAM_TIMING, NotificationStream, STREAM_TIMING } from './notification-stream.js';
 import { NotificationsController } from './notifications.controller.js';
 import { NotificationsService } from './notifications.service.js';
 
@@ -15,7 +15,13 @@ import { NotificationsService } from './notifications.service.js';
 @Module({
   imports: [AuthModule],
   controllers: [NotificationsController],
-  providers: [NotificationsService, NotificationCenter, NotificationStream, DailyReminders],
+  providers: [
+    NotificationsService,
+    NotificationCenter,
+    NotificationStream,
+    DailyReminders,
+    { provide: STREAM_TIMING, useValue: DEFAULT_STREAM_TIMING },
+  ],
   exports: [NotificationCenter, DailyReminders],
 })
 export class NotificationsModule {}

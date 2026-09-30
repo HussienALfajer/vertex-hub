@@ -262,6 +262,8 @@ function AccountDialog({
   const account = editing === 'new' ? null : editing;
   const form = useForm<CreatePlatformAccountInput, unknown, CreatePlatformAccount>({
     resolver: standardSchemaResolver(createPlatformAccountSchema),
+    // A refetch keeps what the user already changed.
+    resetOptions: { keepDirtyValues: true },
     values: account
       ? {
           platform: account.platform,

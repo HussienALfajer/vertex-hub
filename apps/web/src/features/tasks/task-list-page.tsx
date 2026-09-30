@@ -52,11 +52,23 @@ import {
   SearchIcon,
   SendIcon,
 } from 'lucide-react';
-import { useCallback, useEffect, useId, useState } from 'react';
+import { useCallback, useId } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LoadError } from '../../components/load-error';
 import { canAll, useMe } from '../../lib/auth';
 import { formatNumber } from '../../lib/format';
+import {
+  ALL,
+  dayParam,
+  flagParam,
+  idParam,
+  listParam,
+  oneOfParam,
+  pageParam,
+  textParam,
+} from '../../lib/search-params';
+import { usePageInRange } from '../../lib/use-page-in-range';
+import { useSearchText } from '../../lib/use-search-text';
 import { clientListQuery } from '../clients/clients.queries';
 import { departmentListQuery } from '../departments/departments.queries';
 import { projectListQuery } from '../projects/projects.queries';
@@ -108,51 +120,39 @@ export interface TaskListSearch {
 }
 
 const PAGE_SIZE = 25;
-export const ALL = 'all';
+
+export { ALL };
+
 const DEFAULT_STATUSES: TaskStatus[] = [...OPEN_TASK_STATUSES];
-const DAY = /^\d{4}-\d{2}-\d{2}$/;
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Reads the task list filters from the URL, dropping anything malformed. */
 export function parseTaskListSearch(search: Record<string, unknown>): TaskListSearch {
-  const text = (value: unknown, max: number) =>
-    typeof value === 'string' && value.trim() ? value.trim().slice(0, max) : undefined;
-  const id = (value: unknown) =>
-    typeof value === 'string' && UUID.test(value) ? value : undefined;
-  const day = (value: unknown) =>
-    typeof value === 'string' && DAY.test(value) ? value : undefined;
-  const flag = (value: unknown) => (value === true ? true : undefined);
-  const list = <T extends string>(known: readonly T[], value: unknown): T[] | undefined => {
-    const picked = Array.isArray(value) ? known.filter((item) => value.includes(item)) : [];
-    return picked.length > 0 ? picked : undefined;
-  };
-  const page = Number(search.page);
   return {
-    search: text(search.search, 100),
-    status: list(TASK_STATUSES, search.status),
-    department: list(DEPARTMENT_CODES, search.department),
+    search: textParam(search.search, 100),
+    status: listParam(TASK_STATUSES, search.status),
+    department: listParam(DEPARTMENT_CODES, search.department),
     assignee:
       search.assignee === 'me' || search.assignee === 'unassigned'
         ? search.assignee
-        : id(search.assignee),
-    clientId: search.clientId === 'internal' ? 'internal' : id(search.clientId),
-    projectId: id(search.projectId),
-    retainerId: id(search.retainerId),
-    milestoneId: id(search.milestoneId),
-    cycleLineId: id(search.cycleLineId),
-    type: TASK_TYPES.find((type) => type === search.type),
-    priority: list(TASK_PRIORITIES, search.priority),
-    overdue: flag(search.overdue),
-    blocked: flag(search.blocked),
-    overLimit: flag(search.overLimit),
+        : idParam(search.assignee),
+    clientId: search.clientId === 'internal' ? 'internal' : idParam(search.clientId),
+    projectId: idParam(search.projectId),
+    retainerId: idParam(search.retainerId),
+    milestoneId: idParam(search.milestoneId),
+    cycleLineId: idParam(search.cycleLineId),
+    type: oneOfParam(TASK_TYPES, search.type),
+    priority: listParam(TASK_PRIORITIES, search.priority),
+    overdue: flagParam(search.overdue),
+    blocked: flagParam(search.blocked),
+    overLimit: flagParam(search.overLimit),
     createdBy: search.createdBy === 'me' ? 'me' : undefined,
     reviewer: search.reviewer === 'me' ? 'me' : undefined,
-    dueFrom: day(search.dueFrom),
-    dueTo: day(search.dueTo),
-    archived: flag(search.archived),
+    dueFrom: dayParam(search.dueFrom),
+    dueTo: dayParam(search.dueTo),
+    archived: flagParam(search.archived),
     sort: TASK_SORTS.find((sort) => sort !== 'dueDate' && sort === search.sort),
     order: search.order === 'desc' ? 'desc' : undefined,
-    page: Number.isInteger(page) && page > 1 ? page : undefined,
+    page: pageParam(search.page),
   };
 }
 
@@ -196,6 +196,16 @@ export function TaskListPage({ search }: { search: TaskListSearch }) {
   const archived = scopeAll && search.archived === true;
   const tasks = useQuery(
     taskListQuery({ ...filtersOf(search, archived), page, pageSize: PAGE_SIZE }),
+  );
+  usePageInRange(
+    page,
+    tasks.data?.total,
+    PAGE_SIZE,
+    useCallback(
+      (next: number | undefined) =>
+        navigate({ search: (previous) => ({ ...previous, page: next }), replace: true }),
+      [navigate],
+    ),
   );
 
   const setFilter = useCallback(
@@ -317,18 +327,7 @@ function Filters({
     ...retainerListQuery({ clientId, status: ['active', 'paused', 'ended'], pageSize: 100 }),
     enabled: !!clientId,
   });
-  const [text, setText] = useState(search.search ?? '');
-
-  // Follow the URL when it changes from outside (the sidebar link clears the search).
-  useEffect(() => setText(search.search ?? ''), [search.search]);
-
-  // Search as the user types, without a request per keystroke.
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if ((search.search ?? '') !== text.trim()) onChange({ search: text.trim() || undefined });
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [text, search.search, onChange]);
+  const [text, setText] = useSearchText(search.search, onChange);
 
   const clientItems = [
     { value: ALL, label: t('tasks.filters.allClients') },

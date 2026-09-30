@@ -10,12 +10,14 @@ import {
   canMakeTaskMove,
   isTaskBlocked,
   type RevisionDecisionInput,
+  revisionExtraWorkTitle,
   revisionSourceOf,
   type TaskDependenciesInput,
   type TaskDependencyList,
   type TaskDetail,
   type TaskMove,
   type TaskRevision,
+  type TaskStatus,
   type TaskStatusChange,
   taskMove,
   taskMoveNeedsNote,
@@ -31,23 +33,33 @@ import { and, count, eq, inArray } from 'drizzle-orm';
 import { DATABASE } from '../../core/database/database.module.js';
 import { CodedException } from '../../core/errors/index.js';
 import { recordAudit } from '../audit/index.js';
-import type { CurrentUserInfo } from '../auth/index.js';
+import { type CurrentUserInfo, lockAccessChanges, UserDirectory } from '../auth/index.js';
 import { ClientDirectory } from '../clients/index.js';
 import type { Notice } from '../notifications/index.js';
 import { EngagementDirectory } from '../projects/index.js';
 import {
   actorOf,
   assertTaskWritable,
+  inClosedProject,
   readableTask,
   type TaskAccess,
   taskRights,
 } from './task-access.js';
-import { assertValidDependencies, dependenciesOf, isBlocked } from './task-dependencies.js';
+import {
+  assertValidDependencies,
+  dependenciesOf,
+  isBlocked,
+  lockDependencyGraph,
+} from './task-dependencies.js';
 import { blocksDependents, requesterOf, TaskNotices } from './task-notices.js';
 import { TasksService } from './tasks.service.js';
 
 /** Moves where the client answers, and so a contact may be named. */
 const CLIENT_MOVES: readonly TaskMove[] = ['client_approved', 'client_changes', 'reopen_client'];
+
+/** Moves that turn a delivered or cancelled task back into open work. */
+const REOPEN_MOVES: readonly TaskMove[] = ['reopen', 'reopen_client', 'reopen_internal'];
+const REOPEN_TARGETS: readonly TaskStatus[] = ['new', 'in_progress', 'revisions'];
 
 /**
  * The task workflow (spec F06, "Task status" and rules 1–5, 9–14): status moves, over-limit
@@ -61,6 +73,7 @@ export class TaskWorkflowService {
     private readonly engagements: EngagementDirectory,
     private readonly tasks: TasksService,
     private readonly notices: TaskNotices,
+    private readonly users: UserDirectory,
   ) {}
 
   private get directories() {
@@ -73,11 +86,26 @@ export class TaskWorkflowService {
     change: TaskStatusChange,
   ): Promise<TaskDetail> {
     await this.db.transaction(async (tx) => {
+      // A reopen must not hand open work back to an archived user (rule 6, edge case 4): it
+      // waits for user archiving, which checks open tasks under the same lock, taken first.
+      if (REOPEN_TARGETS.includes(change.status)) await lockAccessChanges(tx);
       // The row lock makes a second concurrent move see the first one's status (edge case 1).
       const task = await readableTask(tx, this.directories, actor, id, { forUpdate: true });
       assertTaskWritable(task);
       const move = this.moveOf(task, change);
       const rights = taskRights(actor, task);
+      if (REOPEN_MOVES.includes(move)) {
+        if (inClosedProject(task)) {
+          throw new CodedException(409, 'PROJECT_CLOSED', 'Reopen the project first');
+        }
+        if (task.assigneeId && !(await this.users.activeUser(task.assigneeId, tx))) {
+          throw new CodedException(
+            409,
+            'INVALID_ASSIGNEE',
+            'The assignee is archived: assign the task to someone else first',
+          );
+        }
+      }
 
       if (move === 'start' && !task.assigneeId) {
         throw new CodedException(409, 'ASSIGNEE_REQUIRED', 'Assign the task before starting it');
@@ -192,7 +220,7 @@ export class TaskWorkflowService {
           tx,
           {
             owner,
-            title: `Revision ${revision.number}: ${task.title}`,
+            title: revisionExtraWorkTitle(revision.number ?? 0, task.title),
             description: revision.note,
             requestedOn: businessDate(),
             requestedByContactId: revision.contactId,
@@ -239,6 +267,7 @@ export class TaskWorkflowService {
     input: TaskDependenciesInput,
   ): Promise<TaskDependencyList> {
     await this.db.transaction(async (tx) => {
+      await lockDependencyGraph(tx);
       const task = await readableTask(tx, this.directories, actor, id, { forUpdate: true });
       if (!taskRights(actor, task).manage) throw new ForbiddenException();
       assertTaskWritable(task);

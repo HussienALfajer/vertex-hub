@@ -375,6 +375,8 @@ function ExtraWorkDialog({
   const [failure, setFailure] = useState<string | null>(null);
   const form = useForm<CreateExtraWorkInput, unknown, CreateExtraWork>({
     resolver: standardSchemaResolver(createExtraWorkSchema),
+    // A refetch keeps what the user already changed.
+    resetOptions: { keepDirtyValues: true },
     values: {
       title: item?.title ?? '',
       description: item?.description ?? '',
@@ -449,7 +451,7 @@ function ExtraWorkDialog({
 
   return (
     <Dialog open={open} onOpenChange={(next) => !next && close()}>
-      <DialogContent closeLabel={t('common.close')} className="max-h-[90dvh] overflow-y-auto">
+      <DialogContent closeLabel={t('common.close')}>
         <form className="grid gap-5" onSubmit={submit} noValidate>
           <DialogHeader>
             <DialogTitle>
@@ -579,6 +581,8 @@ function BillingDialog({
   const [failure, setFailure] = useState<string | null>(null);
   const form = useForm<ExtraWorkBillingChange>({
     resolver: standardSchemaResolver(extraWorkBillingChangeSchema),
+    // A refetch keeps what the user already changed.
+    resetOptions: { keepDirtyValues: true },
     values: { billingStatus: item.billingStatus, billingNote: item.billingNote ?? '' },
   });
   const status = form.watch('billingStatus');

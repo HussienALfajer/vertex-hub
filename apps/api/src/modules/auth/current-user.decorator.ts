@@ -5,6 +5,8 @@ import type { ResolvedAccess } from './resolve-access.js';
 export interface CurrentUserInfo extends ResolvedAccess {
   id: string;
   name: string;
+  /** The session of the request, when it came through the permissions guard. */
+  sessionId?: string;
 }
 
 export interface RequestWithUser {

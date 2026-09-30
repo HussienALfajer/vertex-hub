@@ -59,7 +59,7 @@ Kept visibly distinct from the brand: success is a brighter emerald (not Vertex 
 | App background | neutral-50 `#F4F8F7` | green-950 `#031B17` |
 | Surface (cards, panels) | white | green-900 `#0B2D28` |
 | Text | neutral-900 `#222827` | neutral-100 `#E7EFED` |
-| Muted text | neutral-600 `#616866` | neutral-400 `#99A09F` |
+| Muted text | neutral-600 `#616866` | neutral-300 `#B8BFBE` |
 | Border | neutral-200 `#D4DBD9` | green-700 `#235B52` |
 | Primary action | green-800 bg, white text | gold-400 bg, green-950 text |
 | Accent | gold-400 | gold-400 |
@@ -81,7 +81,10 @@ The dark theme is the logo's own inverse: sand on deep green.
 | gold-700 on white | 8.13 | AAA |
 | neutral-100 on green-950 | 15.32 | AAA |
 | neutral-100 on green-800 (sidebar) | 9.90 | AAA |
-| neutral-400 on green-900 (dark muted) | 5.55 | AA |
+| neutral-300 on green-900 (dark muted) | 7.90 | AAA |
+| neutral-300 on green-800 (dark muted on muted surface) | 6.19 | AA |
+| neutral-600 on neutral-100 (muted on muted surface, light) | 4.88 | AA |
+| white on green-800 (pressed toggle, light) | 11.57 | AAA |
 | gold-400 on green-900 (dark accent) | 6.30 | AA |
 | gold-500 focus ring on neutral-50 | 3.68 | AA non-text (≥ 3) |
 | **Vertex Sand on white** | **2.35** | **Fails — never use for text or icons on light surfaces** |
@@ -144,7 +147,7 @@ Scale (size / line height, px), Arabic-friendly line heights:
 The logo's parallel strokes at 60° become the product's recognizable detail, used sparingly:
 - A short sand diagonal bar at the start of page titles.
 - Parallel 60° hairlines as a quiet pattern on the login screen and empty states.
-- The retainer deliverables meter drawn as ascending stepped bars reaching a peak when the month's commitment is met.
+- The retainer deliverables meter drawn as ascending stepped bars reaching a peak when the month's commitment is met. Exception (owner decision 2026-09-30): a line commits up to 999 pieces, too many bars for a readable meter, so retainer lines keep the flat meter; the stepped meter serves project milestones (at most 30).
 
 Never animate it continuously, never use it as a full-page background behind content.
 
@@ -172,3 +175,20 @@ Extend this list after each design review.
 ## 9. Voice (UI copy)
 
 Modern Standard Arabic, clear and concise. Verbs on buttons ("احفظ", "أرسل للعميل"). Numbers and dates formatted consistently. No exclamation marks in system messages.
+
+- **Gender-neutral actors.** Users have no grammatical gender on record, so a sentence about someone's action uses the passive or a noun, then the name: "أُسندت إليك «…» بواسطة ليان", "تعليق جديد على «…» من سارة". Never a gendered verb before a name ("ليان أرسل").
+- **Dismiss buttons** say "تراجع", so they never read like the destructive "ألغِ المهمة" beside them.
+- **Dates** use one style, month names as read in Damascus (أيلول، تشرين الأول) through the `ar-SY` calendar, Latin digits: "20 أيلول 2026، 1:00 م".
+- **Counts** agree with their number: plural forms per count (`_one`, `_two`, `_few`, `_many`, `_other`), or a phrasing without a counted noun ("المنجز 3 من 12").
+- **Tanween** is written after the alif: "أولًا", not "أولاً".
+
+Glossary: one term per concept.
+
+| Concept | Term | Not |
+|---|---|---|
+| Project milestone, and the template stage that becomes one | مرحلة | محطة |
+| Paused client | متوقف مؤقتًا | معلّق (reserved for a project on hold) |
+| Task checklist | قائمة الخطوات | قائمة المهام |
+| Task due date and time | الاستحقاق | التسليم |
+| Clearing filters | امسح التصفية | امسح المرشحات |
+| An archived child record in the audit log | أزال | حذف (records are archived, never deleted) |

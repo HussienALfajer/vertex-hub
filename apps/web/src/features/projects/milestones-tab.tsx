@@ -644,6 +644,8 @@ function MilestoneDialog({
   const [failure, setFailure] = useState<string | null>(null);
   const form = useForm<CreateMilestoneInput, unknown, CreateMilestone>({
     resolver: standardSchemaResolver(createMilestoneSchema),
+    // A refetch keeps what the user already changed.
+    resetOptions: { keepDirtyValues: true },
     values: {
       name: milestone?.name ?? '',
       dueDate: milestone?.dueDate ?? null,

@@ -45,11 +45,22 @@ import {
   SproutIcon,
   UserRoundCheckIcon,
 } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LoadError } from '../../components/load-error';
 import { canAll, useMe } from '../../lib/auth';
 import { formatCalendarDate, formatNumber } from '../../lib/format';
+import {
+  ALL,
+  flagParam,
+  idParam,
+  listParam,
+  oneOfParam,
+  pageParam,
+  textParam,
+} from '../../lib/search-params';
+import { usePageInRange } from '../../lib/use-page-in-range';
+import { useSearchText } from '../../lib/use-search-text';
 import { clientListQuery } from '../clients/clients.queries';
 import { departmentListQuery } from '../departments/departments.queries';
 import { userListQuery } from '../users/users.queries';
@@ -77,26 +88,19 @@ export interface ProjectsSearch {
 }
 
 const PAGE_SIZE = 25;
-const ALL = 'all';
 const DEFAULT_STATUSES: ProjectStatus[] = [...OPEN_PROJECT_STATUSES];
 
 /** Reads the project list filters from the URL, dropping anything malformed. */
 export function parseProjectsSearch(search: Record<string, unknown>): ProjectsSearch {
-  const text = (value: unknown, max: number) =>
-    typeof value === 'string' && value.trim() ? value.trim().slice(0, max) : undefined;
-  const statuses = Array.isArray(search.status)
-    ? PROJECT_STATUSES.filter((status) => (search.status as unknown[]).includes(status))
-    : [];
-  const page = Number(search.page);
   return {
-    search: text(search.search, 100),
-    status: statuses.length > 0 ? statuses : undefined,
-    clientId: text(search.clientId, 36),
-    projectManagerId: text(search.projectManagerId, 36),
-    department: DEPARTMENT_CODES.find((code) => code === search.department),
-    overdue: search.overdue === true ? true : undefined,
-    archived: search.archived === true ? true : undefined,
-    page: Number.isInteger(page) && page > 1 ? page : undefined,
+    search: textParam(search.search, 100),
+    status: listParam(PROJECT_STATUSES, search.status),
+    clientId: idParam(search.clientId),
+    projectManagerId: idParam(search.projectManagerId),
+    department: oneOfParam(DEPARTMENT_CODES, search.department),
+    overdue: flagParam(search.overdue),
+    archived: flagParam(search.archived),
+    page: pageParam(search.page),
   };
 }
 
@@ -122,6 +126,16 @@ export function ProjectsPage({ search }: { search: ProjectsSearch }) {
       page,
       pageSize: PAGE_SIZE,
     }),
+  );
+  usePageInRange(
+    page,
+    projects.data?.total,
+    PAGE_SIZE,
+    useCallback(
+      (next: number | undefined) =>
+        navigate({ search: (previous) => ({ ...previous, page: next }), replace: true }),
+      [navigate],
+    ),
   );
 
   const setFilter = useCallback(
@@ -317,19 +331,8 @@ function Filters({
   );
   const managers = useQuery(userListQuery({ pageSize: 100 }));
   const departments = useQuery(departmentListQuery);
-  const [text, setText] = useState(search.search ?? '');
+  const [text, setText] = useSearchText(search.search, onChange);
   const mine = search.projectManagerId === me.user.id;
-
-  // Follow the URL when it changes from outside (the sidebar link clears the search).
-  useEffect(() => setText(search.search ?? ''), [search.search]);
-
-  // Search as the user types, without a request per keystroke.
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if ((search.search ?? '') !== text.trim()) onChange({ search: text.trim() || undefined });
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [text, search.search, onChange]);
 
   const clientItems = [
     { value: ALL, label: t('projects.filters.allClients') },

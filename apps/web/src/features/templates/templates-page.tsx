@@ -22,11 +22,14 @@ import {
   TableRow,
 } from '@vertex-hub/ui';
 import { LayoutTemplateIcon, PlusIcon, SearchIcon, TriangleAlertIcon } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LoadError } from '../../components/load-error';
 import { can, useMe } from '../../lib/auth';
 import { formatDate, formatNumber } from '../../lib/format';
+import { ALL, flagParam, oneOfParam, pageParam, textParam } from '../../lib/search-params';
+import { usePageInRange } from '../../lib/use-page-in-range';
+import { useSearchText } from '../../lib/use-search-text';
 import { DepartmentChips } from '../projects/project-badges';
 import { TemplateKindBadge } from './template-badges';
 import { templateListQuery } from './templates.queries';
@@ -39,19 +42,14 @@ export interface TemplatesSearch {
 }
 
 const PAGE_SIZE = 25;
-const ALL = 'all';
 
 /** Reads the list filters from the URL, dropping anything malformed. */
 export function parseTemplatesSearch(search: Record<string, unknown>): TemplatesSearch {
-  const page = Number(search.page);
   return {
-    search:
-      typeof search.search === 'string' && search.search.trim()
-        ? search.search.trim().slice(0, 100)
-        : undefined,
-    kind: TEMPLATE_KINDS.find((kind) => kind === search.kind),
-    archived: search.archived === true || search.archived === 'true' ? true : undefined,
-    page: Number.isInteger(page) && page > 1 ? page : undefined,
+    search: textParam(search.search, 100),
+    kind: oneOfParam(TEMPLATE_KINDS, search.kind),
+    archived: flagParam(search.archived),
+    page: pageParam(search.page),
   };
 }
 
@@ -71,6 +69,16 @@ export function TemplatesPage({ search }: { search: TemplatesSearch }) {
       page,
       pageSize: PAGE_SIZE,
     }),
+  );
+  usePageInRange(
+    page,
+    templates.data?.total,
+    PAGE_SIZE,
+    useCallback(
+      (next: number | undefined) =>
+        navigate({ search: (previous) => ({ ...previous, page: next }), replace: true }),
+      [navigate],
+    ),
   );
 
   const setFilter = useCallback(
@@ -145,18 +153,7 @@ function Filters({
   onChange: (next: Partial<TemplatesSearch>) => void;
 }) {
   const { t } = useTranslation();
-  const [text, setText] = useState(search.search ?? '');
-
-  // Follow the URL when it changes from outside (the sidebar link clears the search).
-  useEffect(() => setText(search.search ?? ''), [search.search]);
-
-  // Search as the user types, without a request per keystroke.
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if ((search.search ?? '') !== text.trim()) onChange({ search: text.trim() || undefined });
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [text, search.search, onChange]);
+  const [text, setText] = useSearchText(search.search, onChange);
 
   const kindItems = [
     { value: ALL, label: t('templates.allKinds') },

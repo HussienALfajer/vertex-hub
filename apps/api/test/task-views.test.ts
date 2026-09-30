@@ -1,6 +1,7 @@
 import type { INestApplication } from '@nestjs/common';
 import {
   addDays,
+  BOARD_LIMITS,
   BOARD_STATUSES,
   businessDate,
   myTaskSummarySchema,
@@ -209,6 +210,24 @@ describe('task views: board, workload, My tasks', () => {
     expect(await toReview(cast.contentManager.cookie)).toEqual([]);
     expect(await toReview(cast.designer.cookie)).toEqual([]);
     expect(await toReview(cast.gm.cookie)).toEqual([reviewed.id]);
+  });
+
+  it('caps each board column at 200 cards, with the column total (edge case 16)', async () => {
+    const { id: clientId } = await cast.createClient();
+    await db.insert(tasks).values(
+      Array.from({ length: BOARD_LIMITS.cards + 1 }, (_, index) => ({
+        title: `بطاقة ${index}`,
+        department: 'design' as const,
+        dueDate: cast.inDays(3),
+        clientId,
+        needsClientApproval: false,
+        createdById: cast.gm.id,
+      })),
+    );
+    const shown = await board(cast.gm.cookie, `?department=design&clientId=${clientId}`);
+    const column = shown.columns.find((one) => one.status === 'new');
+    expect(column?.items).toHaveLength(BOARD_LIMITS.cards);
+    expect(column?.total).toBe(BOARD_LIMITS.cards + 1);
   });
 
   it('leaves out the tasks of an archived client (rule 17)', async () => {

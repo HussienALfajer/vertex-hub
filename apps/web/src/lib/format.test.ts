@@ -7,6 +7,7 @@ import {
   formatDateTime,
   formatLink,
   formatLinkHost,
+  formatList,
   formatMonth,
   formatNumber,
   formatRelativeTime,
@@ -80,5 +81,15 @@ describe('formatting', () => {
     expect(ago(3 * 60 * 60)).not.toBe(ago(3 * 60));
     expect(ago(8 * 24 * 60 * 60)).toBe(formatDateTime('2026-10-02T12:00:00Z'));
     expect(ago(5 * 60)).not.toMatch(ARABIC_INDIC_DIGITS);
+  });
+
+  it('writes moments like calendar dates, with the month names read in Damascus', () => {
+    // 10:00 UTC is 13:00 in Damascus.
+    expect(formatDateTime('2026-09-20T10:00:00Z')).toBe('20 أيلول 2026 في 1:00 م');
+    expect(formatCalendarDate('2026-10-05')).toContain('تشرين الأول');
+  });
+
+  it('joins names as Arabic lists them', () => {
+    expect(formatList(['أ', 'ب', 'ج'])).toBe('أ وب وج');
   });
 });

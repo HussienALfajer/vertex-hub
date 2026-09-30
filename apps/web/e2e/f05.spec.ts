@@ -1,6 +1,7 @@
-import { expect, type Page, test } from '@playwright/test';
+import type { Page } from '@playwright/test';
 import ar from '../src/i18n/locales/ar.json' with { type: 'json' };
 import { employeeMe, financeWithoutTwoFactor, mockApi, PROJECTS_TODAY, seedIds } from './fixtures';
+import { expect, test } from './test';
 
 // F05 project and retainer flows against the mocked API (the real rules are covered by apps/api/test).
 
@@ -163,7 +164,7 @@ test('a project manager cannot be archived while their projects are open', async
     .click();
 
   const dialog = page.getByRole('alertdialog');
-  await expect(dialog.getByText('مدير المشروع الهوية البصرية الجديدة')).toBeVisible();
+  await expect(dialog.getByText('إدارة المشروع الهوية البصرية الجديدة')).toBeVisible();
   await dialog.getByRole('link', { name: ar.users.responsibilities.openProject }).first().click();
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('الهوية البصرية الجديدة');
 });
@@ -242,7 +243,7 @@ test('a retainer shows its behind lines, renewal badge and closed months', async
   await expect(page).toHaveURL(/tab=history/);
   const history = page.getByRole('list', { name: ar.retainers.history.title });
   await expect(history.getByRole('listitem')).toHaveCount(2);
-  await history.getByRole('button', { name: /أغسطس/ }).click();
+  await history.getByRole('button', { name: /آب/ }).click();
   const cycle = page.getByRole('dialog');
   await expect(cycle.getByText('تغطية افتتاح الفرع')).toBeVisible();
   await expect(

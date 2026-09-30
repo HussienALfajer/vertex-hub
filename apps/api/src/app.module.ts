@@ -3,11 +3,12 @@ import {
   StandardSchemaSerializerInterceptor,
   StandardSchemaValidationPipe,
 } from '@nestjs/common';
-import { APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core';
+import { APP_FILTER, APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core';
 import { LoggerModule } from 'nestjs-pino';
 import { ConfigModule } from './core/config/config.module.js';
 import { ENV, type Env } from './core/config/env.js';
 import { DatabaseModule } from './core/database/database.module.js';
+import { DatabaseErrorFilter } from './core/errors/database-error.filter.js';
 import { JobsModule } from './core/jobs/index.js';
 import { AuditModule } from './modules/audit/index.js';
 import { AuthModule } from './modules/auth/index.js';
@@ -47,6 +48,8 @@ import { TemplatesModule } from './modules/templates/index.js';
     { provide: APP_PIPE, useValue: new StandardSchemaValidationPipe() },
     // Shapes responses declared with `@SerializeOptions({ schema })`, dropping unknown fields.
     { provide: APP_INTERCEPTOR, useClass: StandardSchemaSerializerInterceptor },
+    // A write that lost a race (unique index, deadlock) answers its coded 409, not a 500.
+    { provide: APP_FILTER, useClass: DatabaseErrorFilter },
   ],
 })
 export class AppModule {}

@@ -9,14 +9,14 @@ import {
   RepeatIcon,
   TriangleAlertIcon,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '../../components/confirm-dialog';
 import { FormAlert } from '../../components/form-alert';
 import { FormSection } from '../../components/form-section';
-import { LoadError } from '../../components/load-error';
-import { ApiError } from '../../lib/api/client';
-import { formatDateTime, formatNumber } from '../../lib/format';
+import { isMissing, LoadError } from '../../components/load-error';
+import { UnsavedChangesGuard } from '../../components/unsaved-changes-guard';
+import { formatDateTime, formatList, formatNumber } from '../../lib/format';
 import { useDepartmentNames } from '../projects/project-badges';
 import { TemplateKindBadge } from './template-badges';
 import { templateFormValues } from './template-document';
@@ -54,39 +54,73 @@ export function TemplatePage({ templateId }: { templateId: string }) {
       ) : template.isError ? (
         <LoadError
           message={
-            template.error instanceof ApiError && template.error.status === 404
-              ? t('templates.notFound')
-              : t('templates.loadOneError')
+            isMissing(template.error) ? t('templates.notFound') : t('templates.loadOneError')
           }
           onRetry={() => template.refetch()}
+          error={template.error}
         />
       ) : (
-        // A save returns the template with new ids, and archiving makes it read-only: the form
-        // starts again from the stored template.
-        <Template
-          key={`${template.data.updatedAt}:${template.data.archivedAt ?? ''}`}
-          template={template.data}
-        />
+        <TemplateHost template={template.data} />
       )}
     </>
   );
 }
 
+/**
+ * Holds the stored version the form started from. A refetch (another editor saved, or the
+ * window regained focus) never restarts the form under unsaved work: the editor offers the newer
+ * version instead. The form starts again from the user's own save (new step ids), and when the
+ * template is archived or restored (read-only changes).
+ */
+function TemplateHost({ template }: { template: TemplateDetail }) {
+  const [base, setBase] = useState(template);
+  if (base.archivedAt !== template.archivedAt) setBase(template);
+  return (
+    <Template
+      key={`${base.updatedAt}:${base.archivedAt ?? ''}`}
+      base={base}
+      template={template}
+      onLoad={setBase}
+    />
+  );
+}
+
 /** The template as one document: editors change it and save it whole, readers see it read-only. */
-function Template({ template }: { template: TemplateDetail }) {
+function Template({
+  base,
+  template,
+  onLoad,
+}: {
+  /** The version the form started from. */
+  base: TemplateDetail;
+  /** The latest stored version. */
+  template: TemplateDetail;
+  /** Starts the form again from a stored version. */
+  onLoad: (version: TemplateDetail) => void;
+}) {
   const { t } = useTranslation();
   const readOnly = !template.permissions.canEdit;
-  const form = useTemplateForm(templateFormValues(template));
+  const form = useTemplateForm(templateFormValues(base));
   const update = useUpdateTemplate(template.id);
   const [failure, setFailure] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<'archive' | 'restore' | null>(null);
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
   const departmentName = useDepartmentNames();
+  const dirty = form.formState.isDirty;
+  // Later only: right after the own save, the cached template may still be the older one.
+  const newer = template.updatedAt > base.updatedAt;
+
+  // Nothing to lose: take the newer version at once.
+  useEffect(() => {
+    if (newer && !dirty && !form.formState.isSubmitting) onLoad(template);
+  }, [newer, dirty, form.formState.isSubmitting, onLoad, template]);
 
   const submit = form.handleSubmit(async ({ kind: _, ...values }) => {
     setFailure(null);
     try {
-      await update.mutateAsync(values);
+      const saved = await update.mutateAsync(values);
       toast.add({ title: t('templates.saved'), type: 'success' });
+      onLoad(saved);
     } catch (error) {
       setFailure(templateFormFailure(form, t, error));
     }
@@ -131,8 +165,22 @@ function Template({ template }: { template: TemplateDetail }) {
           icon={<TriangleAlertIcon />}
           title={t('templates.warningsTitle')}
           description={t('templates.warningsBody', {
-            departments: template.warnings.map((w) => departmentName(w.department)).join('، '),
+            departments: formatList(template.warnings.map((w) => departmentName(w.department))),
           })}
+        />
+      )}
+
+      {newer && dirty && (
+        <Callout
+          tone="warning"
+          icon={<TriangleAlertIcon />}
+          title={t('templates.changedTitle')}
+          description={t('templates.changedBody', { when: formatDateTime(template.updatedAt) })}
+          action={
+            <Button variant="outline" size="sm" onClick={() => onLoad(template)}>
+              {t('templates.loadLatest')}
+            </Button>
+          }
         />
       )}
 
@@ -166,10 +214,7 @@ function Template({ template }: { template: TemplateDetail }) {
               <Button
                 variant="outline"
                 disabled={!form.formState.isDirty || form.formState.isSubmitting}
-                onClick={() => {
-                  setFailure(null);
-                  form.reset();
-                }}
+                onClick={() => setConfirmDiscard(true)}
               >
                 {t('templates.discard')}
               </Button>
@@ -185,6 +230,20 @@ function Template({ template }: { template: TemplateDetail }) {
       </form>
 
       <ArchiveDialogs template={template} open={confirm} onClose={() => setConfirm(null)} />
+      <ConfirmDialog
+        open={confirmDiscard}
+        onClose={() => setConfirmDiscard(false)}
+        title={t('common.unsaved.title')}
+        body={t('templates.discardBody')}
+        action={t('common.unsaved.discard')}
+        destructive
+        pending={false}
+        onConfirm={async () => {
+          setFailure(null);
+          form.reset();
+        }}
+      />
+      <UnsavedChangesGuard dirty={dirty && !form.formState.isSubmitting} />
     </>
   );
 }

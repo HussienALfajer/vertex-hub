@@ -1,4 +1,4 @@
-import { Inject, Injectable, type OnModuleInit } from '@nestjs/common';
+import { Inject, Injectable, Logger, type OnModuleInit } from '@nestjs/common';
 import {
   type CalendarDate,
   isWorkDay,
@@ -6,9 +6,10 @@ import {
   nextWorkDay,
   OPEN_TASK_STATUSES,
 } from '@vertex-hub/contracts';
-import { type Database, tasks } from '@vertex-hub/db';
-import { and, gt, inArray, isNotNull, lt, lte } from 'drizzle-orm';
+import { type Database, type Transaction, tasks } from '@vertex-hub/db';
+import { and, asc, eq, gt, inArray, isNotNull, lt, lte, type SQL } from 'drizzle-orm';
 import { DATABASE } from '../../core/database/database.module.js';
+import { runEach } from '../../core/jobs/index.js';
 import { UserDirectory } from '../auth/index.js';
 import { DailyReminders, type Notice } from '../notifications/index.js';
 import { type NoticeTask, TaskNotices, toTimeOfDay } from './task-notices.js';
@@ -21,6 +22,8 @@ import { TasksService } from './tasks.service.js';
  */
 @Injectable()
 export class TaskReminders implements OnModuleInit {
+  private readonly logger = new Logger(TaskReminders.name);
+
   constructor(
     @Inject(DATABASE) private readonly db: Database,
     private readonly users: UserDirectory,
@@ -35,29 +38,43 @@ export class TaskReminders implements OnModuleInit {
 
   async remind(today: CalendarDate): Promise<number> {
     if (!isWorkDay(today)) return 0;
-    return (await this.dueSoon(today)) + (await this.overdue(today)) + (await this.escalate(today));
+    let sent = 0;
+    // The three kinds run independently: one failing does not hold back the others.
+    const kinds: [string, () => Promise<number>][] = [
+      ['Due-soon reminders', () => this.dueSoon(today)],
+      ['Overdue reminders', () => this.overdue(today)],
+      ['Overdue escalations', () => this.escalate(today)],
+    ];
+    await runEach(
+      kinds,
+      this.logger,
+      ([name]) => name,
+      async ([, run]) => {
+        sent += await run();
+      },
+    );
+    return sent;
   }
 
   /** Rule 9: assigned tasks due after `today` and on or before the next work day. */
-  private async dueSoon(today: CalendarDate): Promise<number> {
-    const due = await this.open(
+  private dueSoon(today: CalendarDate): Promise<number> {
+    const filters = [
       isNotNull(tasks.assigneeId),
       gt(tasks.dueDate, today),
       lte(tasks.dueDate, nextWorkDay(today)),
-    );
-    return this.send(today, due, 'due_soon', async (task) =>
+    ];
+    return this.send(today, 'due_soon', filters, async (_tx, task) =>
       this.notices.notice(task, 'task_due_soon', [task.assigneeId], null, dueOf(task)),
     );
   }
 
   /** Rule 10: open tasks due before `today`, to the assignee or the department's managers. */
-  private async overdue(today: CalendarDate): Promise<number> {
-    const late = await this.open(lt(tasks.dueDate, today));
-    return this.send(today, late, 'overdue', async (task) =>
+  private overdue(today: CalendarDate): Promise<number> {
+    return this.send(today, 'overdue', [lt(tasks.dueDate, today)], async (tx, task) =>
       this.notices.notice(
         task,
         'task_overdue',
-        await this.notices.assigneeOrManagers(this.db, task),
+        await this.notices.assigneeOrManagers(tx, task),
         null,
         dueOf(task),
       ),
@@ -68,61 +85,78 @@ export class TaskReminders implements OnModuleInit {
    * Rule 11: assigned tasks still overdue whose overdue reminder for the current due date went
    * out on an earlier work day, to the department's managers.
    */
-  private async escalate(today: CalendarDate): Promise<number> {
-    const late = await this.open(isNotNull(tasks.assigneeId), lt(tasks.dueDate, today));
-    const sent = await this.reminders.sentOn(
-      'overdue',
-      late.map((task) => ({ subjectId: task.id, occurrence: task.dueDate })),
-    );
-    const due = late.filter((task) => {
-      const sentOn = sent.get(task.id);
-      return !!sentOn && sentOn < today;
-    });
-    const people = await this.users.summaries(due.flatMap((task) => task.assigneeId ?? []));
-    return this.send(today, due, 'overdue_escalated', async (task) =>
-      this.notices.notice(
+  private escalate(today: CalendarDate): Promise<number> {
+    const filters = [isNotNull(tasks.assigneeId), lt(tasks.dueDate, today)];
+    return this.send(today, 'overdue_escalated', filters, async (tx, task) => {
+      const sentOn = (
+        await this.reminders.sentOn(
+          'overdue',
+          [{ subjectId: task.id, occurrence: task.dueDate }],
+          tx,
+        )
+      ).get(task.id);
+      if (!sentOn || sentOn >= today) return null;
+      const people = await this.users.summaries(task.assigneeId ? [task.assigneeId] : [], tx);
+      return this.notices.notice(
         task,
         'task_overdue_escalated',
-        await this.notices.managers(this.db, task.department),
+        await this.notices.managers(tx, task.department),
         null,
         {
           ...dueOf(task),
           assignee: (task.assigneeId && people.get(task.assigneeId)?.name) || null,
         },
-      ),
-    );
+      );
+    });
   }
 
   /** Open tasks shown in views (not archived, nor under archived work) matching `filters`. */
-  private async open(...filters: Parameters<typeof and>): Promise<NoticeTask[]> {
-    const rows = await this.db
-      .select({ id: tasks.id })
-      .from(tasks)
-      .where(
-        and(inArray(tasks.status, [...OPEN_TASK_STATUSES]), this.tasks.visibleSql(), ...filters),
-      );
-    return this.notices.loadMany(
-      this.db,
-      rows.map((row) => row.id),
-    );
+  private eligible(filters: SQL[]): SQL {
+    return and(
+      inArray(tasks.status, [...OPEN_TASK_STATUSES]),
+      this.tasks.visibleSql(),
+      ...filters,
+    ) as SQL;
   }
 
-  /** One transaction per reminder: recorded first, sent only if this run recorded it (rule 8). */
+  /**
+   * One transaction per reminder (rule 8). The task is locked and checked again inside it, so a
+   * task delivered, re-dated or reassigned since the candidates were read gets no stale notice;
+   * the reminder is recorded first and sent only if this run recorded it.
+   */
   private async send(
     today: CalendarDate,
-    due: NoticeTask[],
     kind: NotificationReminderKind,
-    build: (task: NoticeTask) => Promise<Notice>,
+    filters: SQL[],
+    build: (tx: Transaction, task: NoticeTask) => Promise<Notice | null>,
   ): Promise<number> {
+    const candidates = await this.db
+      .select({ id: tasks.id })
+      .from(tasks)
+      .where(this.eligible(filters))
+      .orderBy(asc(tasks.id));
     let sent = 0;
-    for (const task of due) {
-      const notice = await build(task);
-      const key = { kind, subjectId: task.id, occurrence: task.dueDate };
-      const recorded = await this.db.transaction((tx) =>
-        this.reminders.remindOnce(tx, key, today, notice),
-      );
-      if (recorded) sent += 1;
-    }
+    await runEach(
+      candidates,
+      this.logger,
+      ({ id }) => `Task ${kind} reminder ${id}`,
+      async ({ id }) => {
+        const recorded = await this.db.transaction(async (tx) => {
+          const [row] = await tx
+            .select({ id: tasks.id })
+            .from(tasks)
+            .where(and(eq(tasks.id, id), this.eligible(filters)))
+            .for('update', { of: tasks });
+          if (!row) return false;
+          const task = await this.notices.load(tx, id);
+          const notice = await build(tx, task);
+          if (!notice) return false;
+          const key = { kind, subjectId: task.id, occurrence: task.dueDate };
+          return this.reminders.remindOnce(tx, key, today, notice);
+        });
+        if (recorded) sent += 1;
+      },
+    );
     return sent;
   }
 }

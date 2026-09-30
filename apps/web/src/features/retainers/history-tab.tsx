@@ -150,10 +150,7 @@ function CycleDialog({
 
   return (
     <Dialog open onOpenChange={(next) => !next && onClose()}>
-      <DialogContent
-        closeLabel={t('common.close')}
-        className="max-h-[90dvh] max-w-2xl overflow-y-auto"
-      >
+      <DialogContent closeLabel={t('common.close')} className="max-w-2xl">
         {cycle.isPending ? (
           <div className="flex flex-col gap-3">
             <Skeleton className="h-7 w-48" />

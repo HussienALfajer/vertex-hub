@@ -217,7 +217,8 @@ export class ProjectMilestonesService {
       if (current.status === 'done') {
         throw new CodedException(409, 'MILESTONE_DONE', 'The milestone is already done');
       }
-      const openTasks = (await this.progress.milestones([milestoneId])).get(milestoneId)?.open ?? 0;
+      const openTasks =
+        (await this.progress.milestones([milestoneId], tx)).get(milestoneId)?.open ?? 0;
       if (openTasks > 0 && !input.confirmOpenTasks) {
         throw new CodedException(
           409,

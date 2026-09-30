@@ -6,13 +6,15 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
+      "env": ["MADANI_FONTS_DIR"],
       "outputs": ["dist/**"]
     },
     "typecheck": {
       "dependsOn": ["^build"]
     },
     "test": {
-      "dependsOn": ["^build"]
+      "dependsOn": ["^build"],
+      "cache": false
     },
     "test:e2e": {
       "dependsOn": ["build"],

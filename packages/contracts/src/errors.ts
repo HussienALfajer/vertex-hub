@@ -10,6 +10,7 @@ export const ERROR_CODES = [
   'GENERAL_MANAGER_ONLY',
   'LAST_GENERAL_MANAGER',
   'CANNOT_ARCHIVE_SELF',
+  'CANNOT_CHANGE_OWN_ROLES',
   'USER_HAS_RESPONSIBILITIES',
   'USER_ARCHIVED',
   'USER_NOT_ARCHIVED',
@@ -75,6 +76,7 @@ export const ERROR_CODES = [
   'NOTHING_MISSING',
   'ALREADY_GENERATED',
   'NOT_MUTABLE',
+  'CONCURRENT_CHANGE',
 ] as const;
 
 export const errorCodeSchema = z.enum(ERROR_CODES).meta({ id: 'ErrorCode' });

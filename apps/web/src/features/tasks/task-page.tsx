@@ -14,8 +14,7 @@ import {
 import { type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '../../components/confirm-dialog';
-import { LoadError } from '../../components/load-error';
-import { ApiError } from '../../lib/api/client';
+import { isMissing, LoadError } from '../../components/load-error';
 import { can, useMe } from '../../lib/auth';
 import { formatCalendarDate, formatDateTime, formatNumber } from '../../lib/format';
 import { PersonName, useDepartmentNames } from '../projects/project-badges';
@@ -52,12 +51,9 @@ export function TaskPage({ taskId }: { taskId: string }) {
         <PageSkeleton />
       ) : task.isError ? (
         <LoadError
-          message={
-            task.error instanceof ApiError && task.error.status === 404
-              ? t('tasks.page.notFound')
-              : t('tasks.page.loadError')
-          }
+          message={isMissing(task.error) ? t('tasks.page.notFound') : t('tasks.page.loadError')}
           onRetry={() => task.refetch()}
+          error={task.error}
         />
       ) : (
         <TaskView task={task.data} />

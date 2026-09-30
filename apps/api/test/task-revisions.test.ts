@@ -118,7 +118,7 @@ describe('task revisions (rules 9, 10)', () => {
     expect(decided).toMatchObject({
       decision: 'extra_work',
       decidedBy: { id: cast.am.id },
-      extraWork: { title: `Revision 3: ${task.title}` },
+      extraWork: { title: `التعديل 3: ${task.title}` },
     });
     const [item] = await db
       .select()

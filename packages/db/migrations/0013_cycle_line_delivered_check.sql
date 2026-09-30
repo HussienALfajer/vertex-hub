@@ -1,0 +1,1 @@
+ALTER TABLE "retainer_cycle_lines" ADD CONSTRAINT "retainer_cycle_lines_delivered_check" CHECK ("retainer_cycle_lines"."delivered_at_close" is null or "retainer_cycle_lines"."delivered_at_close" >= 0);

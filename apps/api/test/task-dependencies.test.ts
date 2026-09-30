@@ -183,6 +183,37 @@ describe('task dependencies (rules 3, 4, 5)', () => {
     expect(detail).toMatchObject({ blocked: false, dependencies: [{ status: 'cancelled' }] });
   });
 
+  it('blocks a new task again when its finished dependency is reopened (edge case 3)', async () => {
+    const { id: clientId } = await cast.createClient();
+    const dependency = await cast.taskAt('delivered', { clientId });
+    const waiting = await cast.createTask(cast.am.cookie, { clientId, dependsOn: [dependency.id] });
+    expect((await cast.detail(waiting.id, cast.gm.cookie)).blocked).toBe(false);
+    await cast.moveOk(dependency.id, cast.designManager.cookie, {
+      status: 'in_progress',
+      note: 'One more change',
+    });
+    expect((await cast.detail(waiting.id, cast.gm.cookie)).blocked).toBe(true);
+  });
+
+  it('never lets two concurrent edits close a cycle between them (rule 4, edge case 2)', async () => {
+    const { id: clientId } = await cast.createClient();
+    const [a, b, c, d] = await Promise.all(
+      [0, 1, 2, 3].map(() => cast.createTask(cast.am.cookie, { clientId })),
+    );
+    if (!a || !b || !c || !d) throw new Error('Tasks missing');
+    // C waits on B and D waits on A: A→C and B→D together would close A→C→B→D→A.
+    expect((await put(c.id, cast.am.cookie, [b.id])).status).toBe(200);
+    expect((await put(d.id, cast.am.cookie, [a.id])).status).toBe(200);
+    const [first, second] = await Promise.all([
+      put(a.id, cast.am.cookie, [c.id]),
+      put(b.id, cast.am.cookie, [d.id]),
+    ]);
+    const statuses = [first.status, second.status].sort();
+    expect(statuses).toEqual([200, 409]);
+    const refused = first.status === 409 ? first : second;
+    expect(((await refused.json()) as { code: string }).code).toBe('DEPENDENCY_CYCLE');
+  });
+
   it('keeps dependencies within one client, without cycles, at most 10 (rule 4)', async () => {
     const { id: clientId } = await cast.createClient();
     const { id: otherId } = await cast.createClient();

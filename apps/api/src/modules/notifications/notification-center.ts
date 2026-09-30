@@ -105,6 +105,11 @@ export class NotificationCenter {
     notice: Notice,
     data: unknown,
   ): Promise<string | null> {
+    // Two first comments at once would each find no row to lock and insert one: a transaction
+    // lock per recipient and task makes the second wait and merge.
+    await tx.execute(
+      sql`select pg_advisory_xact_lock(hashtextextended(${`task_commented:${recipientId}:${notice.subjectId}`}, 0))`,
+    );
     const [open] = await tx
       .select({ id: notifications.id })
       .from(notifications)

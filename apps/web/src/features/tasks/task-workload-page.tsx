@@ -31,6 +31,7 @@ import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LoadError } from '../../components/load-error';
 import { formatCalendarDate, formatNumber } from '../../lib/format';
+import { dayParam, listParam } from '../../lib/search-params';
 import { departmentListQuery } from '../departments/departments.queries';
 import { useDepartmentNames } from '../projects/project-badges';
 import type { TaskListSearch } from './task-list-page';
@@ -43,21 +44,12 @@ export interface TaskWorkloadSearch {
   week?: string;
 }
 
-const DAY = /^\d{4}-\d{2}-\d{2}$/;
-
 /** Reads the workload filters from the URL, dropping anything malformed. */
 export function parseTaskWorkloadSearch(search: Record<string, unknown>): TaskWorkloadSearch {
-  const departments = Array.isArray(search.department)
-    ? DEPARTMENT_CODES.filter((code) => (search.department as unknown[]).includes(code))
-    : [];
-  const week =
-    typeof search.week === 'string' &&
-    DAY.test(search.week) &&
-    !Number.isNaN(Date.parse(search.week))
-      ? weekOf(search.week).from
-      : undefined;
+  const day = dayParam(search.week);
+  const week = day ? weekOf(day).from : undefined;
   return {
-    department: departments.length > 0 ? departments : undefined,
+    department: listParam(DEPARTMENT_CODES, search.department),
     week: week === weekOf(businessDate()).from ? undefined : week,
   };
 }

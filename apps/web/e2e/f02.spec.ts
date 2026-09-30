@@ -1,6 +1,6 @@
-import { expect, test } from '@playwright/test';
 import ar from '../src/i18n/locales/ar.json' with { type: 'json' };
 import { accountManagerMe, employeeMe, mockApi, seedIds } from './fixtures';
+import { expect, test } from './test';
 
 // F02 flows against the mocked API (the real rules are covered by apps/api/test).
 
@@ -10,11 +10,19 @@ test('create a client, then add a contact with final approval', async ({ page })
   await page.getByRole('link', { name: ar.clients.newClient }).click();
 
   await page.getByLabel(ar.clients.form.tradeName).fill('مخبز السنابل');
-  await page.getByLabel(ar.clients.form.sector).fill('مخابز');
-  await page.getByRole('combobox', { name: ar.clients.form.accountManager }).click();
+  await page.getByLabel(ar.clients.form.sector, { exact: true }).fill('مخابز');
+  const manager = page.getByRole('combobox', { name: ar.clients.form.accountManager });
+  await manager.click();
   await page.getByRole('option', { name: 'ليان الأحمد' }).click();
+  // The choice is made before submitting, and the create request is answered before the page
+  // is expected to change (the test was flaky without both waits).
+  await expect(manager).toHaveText(/ليان الأحمد/);
   await page.getByRole('switch', { name: ar.clients.form.healthcare }).click();
+  const created = page.waitForResponse(
+    (response) => response.url().endsWith('/api/clients') && response.request().method() === 'POST',
+  );
   await page.getByRole('button', { name: ar.clients.form.create }).click();
+  expect((await created).status()).toBe(201);
 
   // The profile opens, warning that nobody can approve work yet (rule 9).
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('مخبز السنابل');
@@ -92,7 +100,7 @@ test('a user who manages clients cannot be archived until they are reassigned', 
   await archive();
   const dialog = page.getByRole('alertdialog');
   await expect(dialog.getByText(ar.users.responsibilities.title)).toBeVisible();
-  await expect(dialog.getByText('مدير حساب العميل مطعم الياسمين')).toBeVisible();
+  await expect(dialog.getByText('إدارة حساب العميل مطعم الياسمين')).toBeVisible();
   // An ended client does not block (rule 8).
   await expect(dialog.getByText(/متجر النخبة/)).toHaveCount(0);
   await dialog.getByRole('link', { name: ar.users.responsibilities.openClient }).click();
@@ -106,7 +114,7 @@ test('a user who manages clients cannot be archived until they are reassigned', 
 
   // Only the department she manages is left to hand over.
   await archive();
-  await expect(dialog.getByText('يدير قسم التصميم')).toBeVisible();
+  await expect(dialog.getByText('إدارة قسم التصميم')).toBeVisible();
   await expect(dialog.getByText(/مطعم الياسمين/)).toHaveCount(0);
 });
 
@@ -146,4 +154,19 @@ test('form errors from the contract schema show in Arabic, never in English', as
   await page.getByRole('button', { name: ar.clients.form.create }).click();
   await expect(page.getByText(ar.clients.form.errors.tradeName)).toBeVisible();
   await expect(page.getByText(/Too small|expected string|Invalid input/)).toHaveCount(0);
+});
+
+test('Enter adds a typed font as a chip, without submitting the brand kit', async ({ page }) => {
+  await mockApi(page, { signedIn: true });
+  await page.goto(`/clients/${seedIds.jasmine}`);
+  await page.getByRole('tab', { name: ar.clients.profile.tabs.brandKit }).click();
+  await page.getByRole('button', { name: ar.clients.brandKit.edit }).click();
+  const fonts = page.getByLabel(ar.clients.brandKit.fonts, { exact: true });
+  await fonts.fill('Cairo');
+  await fonts.press('Enter');
+  // The form stays open, with the new chip.
+  await expect(page.getByRole('heading', { name: ar.clients.brandKit.form.title })).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: ar.common.remove.replace('{{label}}', 'Cairo') }),
+  ).toBeVisible();
 });

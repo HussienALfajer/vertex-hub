@@ -7,6 +7,7 @@ import {
 } from '@vertex-hub/contracts';
 import {
   createDatabase,
+  departments,
   notificationReminders,
   notifications,
   templateRunTasks,
@@ -394,6 +395,21 @@ describe('notification events', () => {
       expect(await inbox(cast.designer.id, task.id)).toHaveLength(2);
     });
 
+    it('merges two first comments sent at the same time into one (rule 5)', async () => {
+      const task = await cast.createTask(cast.designManager.cookie, {
+        assigneeId: cast.designer.id,
+      });
+      await clear(task.id);
+      const responses = await Promise.all([
+        comment(task.id, cast.am.cookie, 'تعليق متزامن 1'),
+        comment(task.id, cast.designManager.cookie, 'تعليق متزامن 2'),
+      ]);
+      expect(responses.map((response) => response.status)).toEqual([201, 201]);
+      expect(await inbox(cast.designer.id, task.id)).toMatchObject([
+        { type: 'task_commented', count: 2 },
+      ]);
+    });
+
     it('drops muted types, and a muted mention gives way to the comment (rules 2, 3)', async () => {
       const task = await cast.createTask(cast.designManager.cookie, {
         assigneeId: cast.designer.id,
@@ -543,6 +559,58 @@ describe('notification events', () => {
       expect(await typesOf(cast.designManager.id, task.id)).toEqual([]);
     });
 
+    it('skips a due-soon reminder whose day was missed, and sends the overdue one (edge case 2)', async () => {
+      const task = await assignedTo(saturday);
+      // No run on Thursday: on Sunday the task is already overdue.
+      await reminders.remind(sunday);
+      expect(await typesOf(late.id, task.id)).toEqual(['task_overdue']);
+    });
+
+    it('escalates to the managers after a reassignment, without a second overdue notice (edge case 5)', async () => {
+      const task = await assignedTo(thursday);
+      await reminders.remind(saturday);
+      expect(await typesOf(late.id, task.id)).toEqual(['task_overdue']);
+      const next = await cast.signedIn({ departments: [{ code: 'design' }] });
+      expect(
+        (await patch(`/api/tasks/${task.id}`, cast.designManager.cookie, { assigneeId: next.id }))
+          .status,
+      ).toBe(200);
+      await reminders.remind(sunday);
+      expect(await typesOf(cast.designManager.id, task.id)).toContain('task_overdue_escalated');
+      expect(await typesOf(next.id, task.id)).not.toContain('task_overdue');
+    });
+
+    it('skips unassigned reminders and escalations in a department without a manager (edge case 13)', async () => {
+      const [photography] = await db
+        .select({ id: departments.id, managerId: departments.managerId })
+        .from(departments)
+        .where(eq(departments.code, 'photography'));
+      if (!photography) throw new Error('No photography department');
+      await db
+        .update(departments)
+        .set({ managerId: null })
+        .where(eq(departments.id, photography.id));
+      try {
+        const task = await cast.createTask(cast.gm.cookie, {
+          department: 'photography',
+          dueDate: thursday,
+        });
+        reminderSubjects.push(task.id);
+        await clear(task.id);
+        await expect(reminders.remind(saturday)).resolves.toBeGreaterThanOrEqual(0);
+        const [row] = await db
+          .select({ id: notifications.id })
+          .from(notifications)
+          .where(eq(notifications.subjectId, task.id));
+        expect(row).toBeUndefined();
+      } finally {
+        await db
+          .update(departments)
+          .set({ managerId: photography.managerId })
+          .where(eq(departments.id, photography.id));
+      }
+    });
+
     it('sends nothing for finished tasks or on the weekend', async () => {
       const task = await assignedTo(thursday);
       await reminders.remind('2026-10-09');
@@ -579,6 +647,22 @@ describe('notification events', () => {
         { daysLeft: 30 },
         { daysLeft: 0 },
       ]);
+    });
+
+    it('sends no renewal reminder for a retainer of an archived client (F05 G2)', async () => {
+      const { id: clientId } = await cast.createClient();
+      const retainer = await cast.createRetainer(clientId, { renewalDate: '2026-11-07' });
+      reminderSubjects.push(retainer.id);
+      expect((await client.post(`/api/clients/${clientId}/archive`, cast.gm.cookie)).status).toBe(
+        200,
+      );
+      await app.get(RetainerRenewals).remind('2026-11-07');
+      expect(await typesOf(cast.am.id, retainer.id)).toEqual([]);
+      const recorded = await db
+        .select()
+        .from(notificationReminders)
+        .where(eq(notificationReminders.subjectId, retainer.id));
+      expect(recorded).toEqual([]);
     });
   });
 });

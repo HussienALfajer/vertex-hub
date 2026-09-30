@@ -68,7 +68,10 @@ describe('design tokens', () => {
     expect(c('green-950', 'gold-400')).toBeGreaterThanOrEqual(7); // primary button, dark
     expect(c('neutral-900', 'neutral-50')).toBeGreaterThanOrEqual(7); // body text, light
     expect(c('neutral-600', '#ffffff')).toBeGreaterThanOrEqual(4.5); // muted text, light
-    expect(c('neutral-400', 'green-900')).toBeGreaterThanOrEqual(4.5); // muted text, dark
+    expect(c('neutral-300', 'green-900')).toBeGreaterThanOrEqual(4.5); // muted text, dark
+    // Muted text on the muted surface: table heads and toggle groups (UX audit).
+    expect(c('neutral-300', 'green-800')).toBeGreaterThanOrEqual(4.5); // dark
+    expect(c('neutral-600', 'neutral-100')).toBeGreaterThanOrEqual(4.5); // light
     expect(c('neutral-100', 'green-800')).toBeGreaterThanOrEqual(7); // sidebar text
     expect(c('gold-700', '#ffffff')).toBeGreaterThanOrEqual(4.5); // accent as text, light
     expect(c('neutral-500', '#ffffff')).toBeGreaterThanOrEqual(3); // input border, light

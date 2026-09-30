@@ -5,11 +5,13 @@ import { testDatabaseUrl } from '@vertex-hub/db/testing';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { RequirePermissions, RequireSession } from '../src/core/access/index.js';
+import { SIGN_IN_LIMITS } from '../src/modules/auth/auth.config.js';
 import { createUser, resetTwoFactor } from '../src/modules/auth/index.js';
 import {
   api,
   clientIp,
   cookieHeader,
+  ORIGIN,
   PASSWORD,
   removeUsers,
   type SeededUser,
@@ -298,20 +300,57 @@ describe('authentication and permissions', () => {
     expect((await client.post('/api/auth/sign-out', cookie)).status).toBe(200);
   });
 
-  it('limits sign-in to 5 attempts per minute per client address', async () => {
-    const user = await seed();
+  it('limits sign-in to 20 attempts per minute per client address (rule 18)', async () => {
     const ip = clientIp();
     const statuses: number[] = [];
-    for (let attempt = 0; attempt < 6; attempt++) {
+    // Different accounts, as an office behind one address: the per-account limit stays out.
+    for (let attempt = 0; attempt < SIGN_IN_LIMITS.perIpPerMinute + 1; attempt++) {
       const response = await client.request('POST', '/api/auth/sign-in/email', {
-        body: { email: user.email, password: 'wrong-password-here' },
+        body: { email: uniqueEmail('nobody'), password: 'wrong-password-here' },
         ip,
       });
       statuses.push(response.status);
     }
-    expect(statuses).toEqual([401, 401, 401, 401, 401, 429]);
+    expect(statuses.slice(0, -1).every((status) => status === 401)).toBe(true);
+    expect(statuses.at(-1)).toBe(429);
     // Another address is not affected.
-    expect((await client.signIn(user.email)).length).toBeGreaterThan(0);
+    expect((await client.signIn((await seed()).email)).length).toBeGreaterThan(0);
+  });
+
+  it('limits failed sign-ins per account, whatever the address (rule 18)', async () => {
+    const user = await seed();
+    for (let attempt = 0; attempt < SIGN_IN_LIMITS.failuresPerAccount; attempt++) {
+      const response = await client.request('POST', '/api/auth/sign-in/email', {
+        body: { email: user.email, password: 'wrong-password-here' },
+      });
+      expect(response.status).toBe(401);
+    }
+    // Each attempt came from a new address, and even the right password is held back now.
+    const blocked = await client.request('POST', '/api/auth/sign-in/email', {
+      body: { email: user.email, password: PASSWORD },
+    });
+    expect(blocked.status).toBe(429);
+    // Other accounts sign in as usual.
+    expect((await client.signIn((await seed()).email)).length).toBeGreaterThan(0);
+  });
+
+  it('refuses cross-origin state changes on API routes (CSRF)', async () => {
+    const cookie = await client.signIn((await seed()).email);
+    const url = await app.getUrl();
+    const post = (headers: Record<string, string>) =>
+      fetch(`${url}/api/me/notifications/read-all`, {
+        method: 'POST',
+        headers: { cookie, 'x-forwarded-for': clientIp(), ...headers },
+      });
+    expect((await post({ origin: 'https://evil.vertexmedia.pro' })).status).toBe(403);
+    expect((await post({ 'sec-fetch-site': 'same-site' })).status).toBe(403);
+    expect((await post({ origin: ORIGIN })).status).toBe(200);
+    expect((await post({ 'sec-fetch-site': 'same-origin' })).status).toBe(200);
+    // Reading is never refused.
+    const read = await fetch(`${url}/api/me`, {
+      headers: { cookie, origin: 'https://evil.vertexmedia.pro' },
+    });
+    expect(read.status).toBe(200);
   });
 
   it('ends the session on sign-out', async () => {

@@ -1,19 +1,39 @@
-/** Arabic locale with Latin digits (open question Q3, resolved: Latin digits in the UI). */
-export const APP_LOCALE = 'ar-u-nu-latn';
+import {
+  addDays,
+  BUSINESS_TIME_ZONE,
+  businessDate,
+  businessInstant,
+  businessTimeOfDay,
+} from '@vertex-hub/contracts';
+
+/**
+ * Arabic as read in Damascus (Levantine month names: أيلول، تشرين الأول) with Latin digits (open
+ * question Q3, resolved: Latin digits in the UI; month names: owner decision 2026-09-30).
+ */
+export const APP_LOCALE = 'ar-SY-u-nu-latn';
 
 /** Timestamps are stored in UTC and displayed in the business timezone. */
-export const BUSINESS_TIME_ZONE = 'Asia/Damascus';
+export { BUSINESS_TIME_ZONE };
 
 export function formatNumber(value: number, options?: Intl.NumberFormatOptions): string {
   return new Intl.NumberFormat(APP_LOCALE, options).format(value);
 }
 
+/** A moment, in the same day-month-year style as calendar dates: "20 أيلول 2026 في 1:00 م". */
 export function formatDateTime(value: Date | string): string {
   return new Intl.DateTimeFormat(APP_LOCALE, {
-    dateStyle: 'medium',
-    timeStyle: 'short',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
     timeZone: BUSINESS_TIME_ZONE,
   }).format(new Date(value));
+}
+
+/** Names joined as Arabic lists them: "أ وب وج". */
+export function formatList(items: readonly string[]): string {
+  return new Intl.ListFormat(APP_LOCALE, { type: 'conjunction' }).format(items);
 }
 
 export function formatDate(value: Date | string): string {
@@ -105,30 +125,23 @@ export function formatLink(url: string): string {
   }
 }
 
-/**
- * Syria keeps UTC+3 all year (no daylight saving since 2022), so a calendar day in the business
- * timezone starts and ends at these instants.
- */
-const BUSINESS_UTC_OFFSET = '+03:00';
-const BUSINESS_UTC_OFFSET_MS = 3 * 60 * 60 * 1000;
-
 /** The first instant of a business day given as `YYYY-MM-DD`, as an ISO timestamp. */
 export function businessDayStart(day: string): string {
-  return new Date(`${day}T00:00:00${BUSINESS_UTC_OFFSET}`).toISOString();
+  return businessInstant(day, '00:00').toISOString();
 }
 
 /** The last instant of a business day given as `YYYY-MM-DD`, as an ISO timestamp. */
 export function businessDayEnd(day: string): string {
-  return new Date(`${day}T23:59:59.999${BUSINESS_UTC_OFFSET}`).toISOString();
+  return new Date(businessInstant(addDays(day, 1), '00:00').getTime() - 1).toISOString();
 }
 
 /** An instant as the value of a `datetime-local` input in the business timezone (`YYYY-MM-DDTHH:mm`). */
 export function toBusinessDateTimeInput(value: Date | string): string {
-  const shifted = new Date(new Date(value).getTime() + BUSINESS_UTC_OFFSET_MS);
-  return shifted.toISOString().slice(0, 16);
+  const instant = new Date(value);
+  return `${businessDate(instant)}T${businessTimeOfDay(instant).slice(0, 5)}`;
 }
 
 /** A `datetime-local` value entered in the business timezone, as an ISO timestamp. */
 export function fromBusinessDateTimeInput(value: string): string {
-  return new Date(`${value}:00${BUSINESS_UTC_OFFSET}`).toISOString();
+  return businessInstant(value.slice(0, 10), value.slice(11, 16)).toISOString();
 }

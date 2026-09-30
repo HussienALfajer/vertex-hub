@@ -17,7 +17,7 @@ import {
   tasks,
 } from '@vertex-hub/db';
 import { testDatabaseUrl } from '@vertex-hub/db/testing';
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { expectError } from './client-cast.js';
 import { api } from './helpers.js';
@@ -681,6 +681,151 @@ describe('tasks', () => {
         409,
         'PROJECT_CLOSED',
       );
+    });
+  });
+
+  describe('engagement changes of out-of-scope requests (rule 11)', () => {
+    it('moves unbilled extra work with the request, refuses removing its engagement', async () => {
+      const { id: clientId } = await cast.createClient();
+      const first = await cast.createProject(clientId, { status: 'active' });
+      const second = await cast.createProject(clientId, { status: 'active' });
+      const request = await cast.createTask(cast.am.cookie, {
+        type: 'client_request',
+        clientId,
+        projectId: first.id,
+        requestScope: 'out_of_scope',
+      });
+      const firstItem = request.clientRequest?.extraWork?.id ?? '';
+
+      await expectError(
+        await patch(request.id, cast.am.cookie, { projectId: null }),
+        409,
+        'NO_ENGAGEMENT',
+      );
+
+      const moved = taskDetailSchema.parse(
+        await (await patch(request.id, cast.am.cookie, { projectId: second.id })).json(),
+      );
+      const secondItem = moved.clientRequest?.extraWork?.id ?? '';
+      expect(secondItem).not.toBe(firstItem);
+      const items = await db
+        .select()
+        .from(extraWorkItems)
+        .where(inArray(extraWorkItems.id, [firstItem, secondItem]));
+      expect(items.find((item) => item.id === firstItem)?.archivedAt).not.toBeNull();
+      expect(items.find((item) => item.id === secondItem)).toMatchObject({
+        projectId: second.id,
+        archivedAt: null,
+      });
+      expect((await auditOf(request.id)).map((entry) => entry.action)).toContain(
+        'task.extra_work_moved',
+      );
+
+      // Billed extra work stays where it was billed: the move is refused.
+      await db
+        .update(extraWorkItems)
+        .set({ billingStatus: 'billed', billingNote: 'INV-2' })
+        .where(eq(extraWorkItems.id, secondItem));
+      await expectError(
+        await patch(request.id, cast.am.cookie, { projectId: first.id }),
+        409,
+        'EXTRA_WORK_BILLED',
+      );
+      expect((await cast.detail(request.id, cast.gm.cookie)).project?.id).toBe(second.id);
+    });
+
+    it('keeps only the label and site of links in the task.created audit entry', async () => {
+      const task = await cast.createTask(cast.designer.cookie, {
+        links: [
+          { url: 'https://drive.example.com/file/d/secret-token?usp=sharing', label: 'Brief' },
+        ],
+      });
+      const [created] = (await auditOf(task.id)).filter((entry) => entry.action === 'task.created');
+      expect(created?.after).toMatchObject({
+        links: [{ label: 'Brief', site: 'drive.example.com' }],
+      });
+      expect(JSON.stringify(created?.after)).not.toContain('secret-token');
+    });
+  });
+
+  describe('closed projects and archived assignees (F05 rule 7, F06 rule 6)', () => {
+    it('refuses to reopen or restore work of a completed or cancelled project', async () => {
+      const { id: clientId } = await cast.createClient();
+      const project = await cast.createProject(clientId, { status: 'active' });
+      const delivered = await cast.taskAt('delivered', { clientId, projectId: project.id });
+      const archivedOpen = await cast.createTask(cast.designManager.cookie, {
+        clientId,
+        projectId: project.id,
+      });
+      expect(
+        (await client.post(`/api/tasks/${archivedOpen.id}/archive`, cast.gm.cookie)).status,
+      ).toBe(200);
+      expect(
+        (
+          await client.post(`/api/projects/${project.id}/status`, cast.gm.cookie, {
+            status: 'completed',
+          })
+        ).status,
+      ).toBe(200);
+      expect((await cast.detail(delivered.id, cast.gm.cookie)).allowedTransitions).toEqual([]);
+      await expectError(
+        await cast.move(delivered.id, cast.designManager.cookie, {
+          status: 'in_progress',
+          note: 'Once more',
+        }),
+        409,
+        'PROJECT_CLOSED',
+      );
+      await expectError(
+        await client.post(`/api/tasks/${archivedOpen.id}/restore`, cast.gm.cookie),
+        409,
+        'PROJECT_CLOSED',
+      );
+      // Reopening the project first allows both.
+      await client.post(`/api/projects/${project.id}/status`, cast.gm.cookie, { status: 'active' });
+      await cast.moveOk(delivered.id, cast.designManager.cookie, {
+        status: 'in_progress',
+        note: 'Once more',
+      });
+      expect(
+        (await client.post(`/api/tasks/${archivedOpen.id}/restore`, cast.gm.cookie)).status,
+      ).toBe(200);
+    });
+
+    it('never hands open work back to an archived user', async () => {
+      const worker = await cast.signedIn({ name: `عامل ${cast.run}` });
+      const cancelled = await cast.createTask(cast.designManager.cookie, { assigneeId: worker.id });
+      await cast.moveOk(cancelled.id, cast.designManager.cookie, {
+        status: 'cancelled',
+        note: 'Not needed',
+      });
+      const archivedTask = await cast.createTask(cast.designManager.cookie, {
+        assigneeId: worker.id,
+      });
+      expect(
+        (await client.post(`/api/tasks/${archivedTask.id}/archive`, cast.gm.cookie)).status,
+      ).toBe(200);
+      expect((await client.post(`/api/users/${worker.id}/archive`, cast.gm.cookie)).status).toBe(
+        200,
+      );
+
+      await expectError(
+        await cast.move(cancelled.id, cast.designManager.cookie, {
+          status: 'in_progress',
+          note: 'Back on',
+        }),
+        409,
+        'INVALID_ASSIGNEE',
+      );
+      // Restored open work returns to the department queue, the change audited.
+      const restored = taskDetailSchema.parse(
+        await (await client.post(`/api/tasks/${archivedTask.id}/restore`, cast.gm.cookie)).json(),
+      );
+      expect(restored.assignee).toBeNull();
+      expect((await auditOf(archivedTask.id)).at(-1)).toMatchObject({
+        action: 'task.assigned',
+        after: { assignee: null },
+      });
     });
   });
 

@@ -17,6 +17,7 @@ import { FormSection } from '../../components/form-section';
 import { useMe } from '../../lib/auth';
 import { formatCalendarDate, formatNumber } from '../../lib/format';
 import { formatMoney } from '../../lib/money';
+import { idParam } from '../../lib/search-params';
 import { hasMoneyAccess } from '../projects/project-access';
 import { DepartmentChips } from '../projects/project-badges';
 import { useProjectClients } from '../projects/project-form';
@@ -45,10 +46,7 @@ export interface NewRetainerSearch {
 
 export function parseNewRetainerSearch(search: Record<string, unknown>): NewRetainerSearch {
   return {
-    clientId:
-      typeof search.clientId === 'string' && search.clientId.length <= 36
-        ? search.clientId
-        : undefined,
+    clientId: idParam(search.clientId),
   };
 }
 

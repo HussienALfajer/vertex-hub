@@ -1,4 +1,3 @@
-import { expect, test } from '@playwright/test';
 import ar from '../src/i18n/locales/ar.json' with { type: 'json' };
 import {
   accountManagerMe,
@@ -12,6 +11,7 @@ import {
   seedIds,
   VALID_LINK_TOKEN,
 } from './fixtures';
+import { expect, test } from './test';
 
 // RTL screenshots of every screen in both themes: the design review evidence.
 for (const colorScheme of ['light', 'dark'] as const) {
@@ -30,11 +30,10 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await mockApi(page, { signedIn: true });
       await page.goto('/');
       const nav = page.getByRole('navigation', { name: ar.nav.label });
-      await expect(nav.getByRole('link', { name: ar.nav.home })).toHaveAttribute(
+      await expect(nav.getByRole('link', { name: ar.nav.myTasks })).toHaveAttribute(
         'aria-current',
         'page',
       );
-      await expect(page.getByText(ar.status.ok, { exact: true })).toBeVisible();
       await screenshot(page, testInfo, `shell-${colorScheme}`);
     });
 
@@ -204,7 +203,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await mockApi(page, { signedIn: true });
       await page.goto('/clients/new');
       await page.getByLabel(ar.clients.form.tradeName).fill('مخبز السنابل');
-      await page.getByLabel(ar.clients.form.sector).fill('مخابز');
+      await page.getByLabel(ar.clients.form.sector, { exact: true }).fill('مخابز');
       await page.getByRole('combobox', { name: ar.clients.form.accountManager }).click();
       await page.getByRole('option', { name: 'ليان الأحمد' }).click();
       await expect(page.getByRole('complementary', { name: ar.clients.new.preview })).toContainText(
@@ -371,7 +370,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await expect(page.getByText(ar.retainers.history.title).first()).toBeVisible();
       await screenshot(page, testInfo, `retainer-history-${colorScheme}`);
 
-      await page.getByRole('button', { name: /أغسطس/ }).click();
+      await page.getByRole('button', { name: /آب/ }).click();
       await expect(page.getByRole('dialog').getByText('تغطية افتتاح الفرع')).toBeVisible();
       await screenshot(page, testInfo, `retainer-cycle-${colorScheme}`);
       await page.keyboard.press('Escape');
@@ -639,6 +638,33 @@ test('phone layout opens the navigation in a sheet', async ({ page }, testInfo) 
   const nav = page.getByRole('dialog').getByRole('navigation', { name: ar.nav.label });
   await expect(nav).toBeVisible();
   await screenshot(page, testInfo, 'shell-phone-nav');
-  await nav.getByRole('link', { name: ar.nav.designSystem }).click();
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText(ar.designSystem.title);
+  // The developer gallery is not listed in a production build.
+  await expect(nav.getByRole('link', { name: ar.nav.designSystem })).toHaveCount(0);
+  await nav.getByRole('link', { name: ar.nav.audit }).click();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(ar.audit.title);
+});
+
+test('phone navigation scrolls to its last link on a short screen', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 560 });
+  await mockApi(page, { signedIn: true });
+  await page.goto('/');
+  await page.getByRole('button', { name: ar.nav.open }).click();
+  const nav = page.getByRole('dialog').getByRole('navigation', { name: ar.nav.label });
+  const last = nav.getByRole('link', { name: ar.nav.audit });
+  await last.scrollIntoViewIfNeeded();
+  await expect(last).toBeInViewport();
+});
+
+test('a long dialog scrolls instead of losing its buttons on a short phone', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 600 });
+  await mockApi(page, { signedIn: true });
+  await page.goto(`/clients/${seedIds.jasmine}`);
+  await page.getByRole('button', { name: ar.clients.contacts.add }).first().click();
+  const dialog = page.getByRole('dialog');
+  const box = await dialog.boundingBox();
+  expect(box?.y).toBeGreaterThanOrEqual(0);
+  expect((box?.y ?? 0) + (box?.height ?? 0)).toBeLessThanOrEqual(600);
+  const save = dialog.getByRole('button', { name: ar.common.save });
+  await save.scrollIntoViewIfNeeded();
+  await expect(save).toBeInViewport();
 });

@@ -20,9 +20,12 @@ import {
   ToggleGroupItem,
 } from '@vertex-hub/ui';
 import { BellIcon, CheckCheckIcon, MailIcon, MailOpenIcon, SettingsIcon } from 'lucide-react';
+import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LoadError } from '../../components/load-error';
 import { formatNumber } from '../../lib/format';
+import { ALL, flagParam, oneOfParam, pageParam } from '../../lib/search-params';
+import { usePageInRange } from '../../lib/use-page-in-range';
 import { NotificationItem } from './notification-item';
 import {
   notificationListQuery,
@@ -39,15 +42,13 @@ export interface NotificationsSearch {
 }
 
 const PAGE_SIZE = 20;
-const ALL = 'all';
 
 /** Reads the notification filters from the URL, dropping anything malformed. */
 export function parseNotificationsSearch(search: Record<string, unknown>): NotificationsSearch {
-  const page = Number(search.page);
   return {
-    unread: search.unread === true || search.unread === 'true' ? true : undefined,
-    category: NOTIFICATION_CATEGORIES.find((category) => category === search.category),
-    page: Number.isInteger(page) && page > 1 ? page : undefined,
+    unread: flagParam(search.unread),
+    category: oneOfParam(NOTIFICATION_CATEGORIES, search.category),
+    page: pageParam(search.page),
   };
 }
 
@@ -63,6 +64,16 @@ export function NotificationsPage({ search }: { search: NotificationsSearch }) {
       page,
       pageSize: PAGE_SIZE,
     }),
+  );
+  usePageInRange(
+    page,
+    list.data?.total,
+    PAGE_SIZE,
+    useCallback(
+      (next: number | undefined) =>
+        navigate({ search: (previous) => ({ ...previous, page: next }), replace: true }),
+      [navigate],
+    ),
   );
   const unread = useQuery(unreadCountQuery);
   const markAll = useMarkAllRead();

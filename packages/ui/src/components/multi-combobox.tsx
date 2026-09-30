@@ -18,14 +18,18 @@ interface MultiComboboxProps<Item> {
   removeLabel: (label: string) => string;
   /** Lets the user add the typed text as a new item, offered as "Add “text”". */
   create?: { label: (text: string) => string; toItem: (text: string) => Item };
+  /** Called with the typed text, for items searched on the server; `items` then holds matches. */
+  onSearch?: (text: string) => void;
   invalid?: boolean;
   disabled?: boolean;
   className?: string;
 }
 
 /**
- * Picks several items, shown as removable chips, with type-ahead filtering. Backspace removes
- * the last chip; arrow keys move between chips and the list.
+ * Picks several items, shown as removable chips, with type-ahead filtering. The first match is
+ * highlighted, so Enter picks it (or adds the typed text); Enter with typed text never submits
+ * the surrounding form. Backspace removes the last chip; arrow keys move between chips and the
+ * list.
  */
 function MultiCombobox<Item>({
   id,
@@ -38,6 +42,7 @@ function MultiCombobox<Item>({
   emptyLabel,
   removeLabel,
   create,
+  onSearch,
   invalid,
   disabled,
   className,
@@ -68,9 +73,14 @@ function MultiCombobox<Item>({
       onValueChange={(next) => {
         onValueChange(next as Item[]);
         setInput('');
+        onSearch?.('');
       }}
       inputValue={input}
-      onInputValueChange={setInput}
+      onInputValueChange={(next) => {
+        setInput(next);
+        onSearch?.(next.trim());
+      }}
+      autoHighlight
       itemToStringLabel={itemToLabel}
       itemToStringValue={itemToKey}
       isItemEqualToValue={(a, b) => itemToKey(a) === itemToKey(b)}
@@ -81,7 +91,9 @@ function MultiCombobox<Item>({
         aria-invalid={invalid || undefined}
         className={cn(
           'flex min-h-9 w-full cursor-text items-center rounded-md border border-input bg-surface px-1 py-1',
-          'transition-colors duration-150 ease-out focus-within:border-primary aria-invalid:border-destructive-text',
+          'transition-colors duration-150 ease-out aria-invalid:border-destructive-text',
+          // The focus ring every control has (brand §2), drawn around the whole group.
+          'focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ring',
           'data-disabled:cursor-not-allowed data-disabled:opacity-50',
           className,
         )}
@@ -107,6 +119,10 @@ function MultiCombobox<Item>({
           <ComboboxPrimitive.Input
             id={id}
             placeholder={value.length > 0 ? undefined : placeholder}
+            onKeyDown={(event) => {
+              // Typed text with nothing to pick must not submit the form and lose the text.
+              if (event.key === 'Enter' && text) event.preventDefault();
+            }}
             className="h-7 min-w-24 flex-1 bg-transparent px-2 text-base text-foreground outline-none placeholder:text-muted-foreground"
           />
         </ComboboxPrimitive.Chips>

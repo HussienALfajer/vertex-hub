@@ -2,6 +2,7 @@ import type { INestApplication } from '@nestjs/common';
 import { DocumentBuilder, type OpenAPIObject, SwaggerModule } from '@nestjs/swagger';
 import { Logger } from 'nestjs-pino';
 import { ENV, type Env } from './core/config/env.js';
+import { sameOriginOnly } from './core/http/same-origin.js';
 
 export const API_PREFIX = 'api';
 
@@ -12,6 +13,8 @@ export function configureApp(app: INestApplication): void {
   app.setGlobalPrefix(API_PREFIX);
   // Don't advertise the framework in every response.
   app.getHttpAdapter().getInstance().disable('x-powered-by');
+  // Refuses cross-origin state changes on every route (CSRF), Better Auth's included.
+  app.use(sameOriginOnly(env.APP_URL));
 
   if (env.NODE_ENV !== 'production') {
     SwaggerModule.setup(`${API_PREFIX}/docs`, app, createOpenApiDocument(app));

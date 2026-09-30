@@ -61,8 +61,7 @@ import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '../../components/confirm-dialog';
 import { FormAlert } from '../../components/form-alert';
-import { LoadError } from '../../components/load-error';
-import { ApiError } from '../../lib/api/client';
+import { isMissing, LoadError } from '../../components/load-error';
 import { canAll, useMe } from '../../lib/auth';
 import { errorMessage } from '../../lib/errors';
 import { formatNumber } from '../../lib/format';
@@ -132,11 +131,10 @@ export function ClientProfilePage({
       ) : client.isError ? (
         <LoadError
           message={
-            client.error instanceof ApiError && client.error.status === 404
-              ? t('clients.profile.notFound')
-              : t('clients.profile.loadError')
+            isMissing(client.error) ? t('clients.profile.notFound') : t('clients.profile.loadError')
           }
           onRetry={() => client.refetch()}
+          error={client.error}
         />
       ) : (
         <Profile client={client.data} tab={search.tab ?? 'contacts'} />
@@ -485,6 +483,8 @@ function EditBasics({ client, scopeAll }: { client: ClientDetailResponse; scopeA
   const [failure, setFailure] = useState<string | null>(null);
   const form = useForm<CreateClientInput, unknown, CreateClient>({
     resolver: standardSchemaResolver(createClientSchema),
+    // A refetch keeps what the user already changed.
+    resetOptions: { keepDirtyValues: true },
     values: {
       tradeName: client.tradeName,
       sector: client.sector ?? '',

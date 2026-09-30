@@ -4,6 +4,7 @@ import {
   type CreateRetainer,
   type CreateRetainerInput,
   createRetainerSchema,
+  RETAINER_LIMITS,
   type RetainerDetail,
   type RetainerStatus,
   type UpdateRetainer,
@@ -41,6 +42,7 @@ import { ConfirmDialog } from '../../components/confirm-dialog';
 import { FormAlert } from '../../components/form-alert';
 import { ApiError } from '../../lib/api/client';
 import { errorMessage } from '../../lib/errors';
+import { formatNumber } from '../../lib/format';
 import {
   checkDuplicateLines,
   checkRenewal,
@@ -210,6 +212,8 @@ function EditRetainer({ retainer }: { retainer: RetainerDetail }) {
   const started = retainer.startDate <= businessDate();
   const form = useForm<CreateRetainerInput, unknown, CreateRetainer>({
     resolver: standardSchemaResolver(createRetainerSchema),
+    // A refetch keeps what the user already changed.
+    resetOptions: { keepDirtyValues: true },
     values: {
       clientId: retainer.client.id,
       name: retainer.name,
@@ -257,10 +261,7 @@ function EditRetainer({ retainer }: { retainer: RetainerDetail }) {
         {t('common.edit')}
       </Button>
       <Dialog open={open} onOpenChange={(next) => !next && close()}>
-        <DialogContent
-          closeLabel={t('common.close')}
-          className="max-h-[90dvh] max-w-2xl overflow-y-auto"
-        >
+        <DialogContent closeLabel={t('common.close')} className="max-w-2xl">
           <form className="grid gap-5" onSubmit={submit} noValidate>
             <DialogHeader>
               <DialogTitle>{t('retainers.edit.title')}</DialogTitle>
@@ -297,6 +298,8 @@ function EditLines({ retainer }: { retainer: RetainerDetail }) {
   const [open, setOpen] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
   const form = useForm<DeliverablesFormValues>({
+    // A refetch keeps what the user already changed.
+    resetOptions: { keepDirtyValues: true },
     values: {
       deliverables: retainer.deliverables.map(({ id, kind, label, monthlyQuantity }) => ({
         id,
@@ -315,7 +318,13 @@ function EditLines({ retainer }: { retainer: RetainerDetail }) {
 
   const submit = form.handleSubmit(async (values) => {
     setFailure(null);
-    const lines = parseLines(form, values.deliverables);
+    const lines = parseLines(form, values.deliverables, () =>
+      setFailure(
+        t('retainers.lines.errors.invalid', {
+          max: formatNumber(RETAINER_LIMITS.deliverables),
+        }),
+      ),
+    );
     if (!lines || !checkDuplicateLines(form, t, lines)) return;
     try {
       await update.mutateAsync({ lines });
@@ -336,10 +345,7 @@ function EditLines({ retainer }: { retainer: RetainerDetail }) {
         {t('retainers.actions.editLines')}
       </Button>
       <Dialog open={open} onOpenChange={(next) => !next && close()}>
-        <DialogContent
-          closeLabel={t('common.close')}
-          className="max-h-[90dvh] max-w-3xl overflow-y-auto"
-        >
+        <DialogContent closeLabel={t('common.close')} className="max-w-3xl">
           <form className="grid gap-5" onSubmit={submit} noValidate>
             <DialogHeader>
               <DialogTitle>{t('retainers.lines.editTitle')}</DialogTitle>

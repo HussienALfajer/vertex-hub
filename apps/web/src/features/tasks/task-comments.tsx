@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   type TaskComment,
   type TaskCommentInput,
@@ -24,9 +24,18 @@ import { ConfirmDialog } from '../../components/confirm-dialog';
 import { FormAlert } from '../../components/form-alert';
 import { LoadError } from '../../components/load-error';
 import { errorMessage } from '../../lib/errors';
+import { everyPage } from '../../lib/every-page';
 import { formatDateTime } from '../../lib/format';
 import { userListQuery } from '../users/users.queries';
-import { type MentionedPerson, splitMentions, toBody, toDraft } from './mentions';
+import {
+  EMPTY_DRAFT,
+  editDraft,
+  insertMention,
+  type MentionDraft,
+  splitMentions,
+  toBody,
+  toDraft,
+} from './mentions';
 import { TaskSection } from './task-parts';
 import {
   taskCommentsQuery,
@@ -38,7 +47,8 @@ import {
 /** The conversation on a task, oldest first, with @mentions of active users (rule 16). */
 export function CommentsSection({ task }: { task: TaskDetail }) {
   const { t } = useTranslation();
-  const comments = useQuery(taskCommentsQuery(task.id));
+  const comments = useInfiniteQuery(taskCommentsQuery(task.id));
+  const items = comments.data?.pages.flatMap((page) => page.items) ?? [];
   const add = useAddComment(task.id);
   const closed = task.archivedAt !== null || task.readOnly;
   return (
@@ -50,14 +60,26 @@ export function CommentsSection({ task }: { task: TaskDetail }) {
         </div>
       ) : comments.isError ? (
         <LoadError message={t('tasks.comments.loadError')} onRetry={() => comments.refetch()} />
-      ) : comments.data.items.length === 0 ? (
+      ) : items.length === 0 ? (
         <p className="text-sm text-muted-foreground">{t('tasks.comments.empty')}</p>
       ) : (
-        <ol className="flex flex-col gap-4">
-          {comments.data.items.map((comment) => (
-            <CommentItem key={comment.id} task={task} comment={comment} />
-          ))}
-        </ol>
+        <>
+          {comments.hasPreviousPage && (
+            <Button
+              variant="outline"
+              className="self-center"
+              onClick={() => comments.fetchPreviousPage()}
+              disabled={comments.isFetchingPreviousPage}
+            >
+              {comments.isFetchingPreviousPage ? t('common.loading') : t('tasks.comments.older')}
+            </Button>
+          )}
+          <ol className="flex flex-col gap-4">
+            {items.map((comment) => (
+              <CommentItem key={comment.id} task={task} comment={comment} />
+            ))}
+          </ol>
+        </>
       )}
       {!closed && (
         <Composer
@@ -117,7 +139,6 @@ function CommentItem({ task, comment }: { task: TaskDetail; comment: TaskComment
         ) : editing ? (
           <Composer
             initial={toDraft(comment.body, comment.mentions)}
-            initialMentions={comment.mentions}
             submitLabel={t('common.save')}
             onCancel={() => setEditing(false)}
             onSubmit={async (input) => {
@@ -173,45 +194,45 @@ function CommentBody({ body, mentions }: { body: string; mentions: TaskComment['
  * tokens; typing a name without picking it leaves it as text.
  */
 function Composer({
-  initial = '',
-  initialMentions = [],
+  initial = EMPTY_DRAFT,
   submitLabel,
   onSubmit,
   onCancel,
 }: {
-  initial?: string;
-  initialMentions?: MentionedPerson[];
+  initial?: MentionDraft;
   submitLabel: string;
   onSubmit: (input: TaskCommentInput) => Promise<void>;
   onCancel?: () => void;
 }) {
   const { t } = useTranslation();
-  const users = useQuery(userListQuery({ pageSize: 100 }));
+  const queryClient = useQueryClient();
+  // Every active user can be mentioned, however many there are.
+  const users = useQuery({
+    queryKey: ['users', 'mentionable'],
+    queryFn: () =>
+      everyPage((page) => queryClient.fetchQuery(userListQuery({ page, pageSize: 100 }))),
+    staleTime: 60_000,
+  });
   const input = useRef<HTMLTextAreaElement>(null);
-  const [draft, setDraft] = useState(initial);
-  const [picked, setPicked] = useState<MentionedPerson[]>(initialMentions);
+  const [draft, setDraft] = useState<MentionDraft>(initial);
   const [failure, setFailure] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
-  function mention(person: MentionedPerson) {
-    const at = input.current?.selectionStart ?? draft.length;
-    const before = draft.slice(0, at);
-    const spacer = before && !/\s$/.test(before) ? ' ' : '';
-    const next = `${before}${spacer}@${person.name} ${draft.slice(at)}`;
+  function mention(person: { id: string; name: string }) {
+    const at = input.current?.selectionStart ?? draft.text.length;
+    const { draft: next, caret } = insertMention(draft, at, person);
     setDraft(next);
-    setPicked((current) =>
-      current.some((item) => item.id === person.id) ? current : [...current, person],
-    );
     requestAnimationFrame(() => {
-      const caret = before.length + spacer.length + person.name.length + 2;
       input.current?.focus();
       input.current?.setSelectionRange(caret, caret);
     });
   }
 
   async function submit() {
+    // The keyboard shortcut reaches here too: never send the same comment twice.
+    if (pending) return;
     setFailure(null);
-    const parsed = taskCommentInputSchema.safeParse({ body: toBody(draft, picked) });
+    const parsed = taskCommentInputSchema.safeParse({ body: toBody(draft) });
     if (!parsed.success) {
       setFailure(t('tasks.comments.errors.body'));
       return;
@@ -219,8 +240,7 @@ function Composer({
     setPending(true);
     try {
       await onSubmit(parsed.data);
-      setDraft('');
-      setPicked([]);
+      setDraft(EMPTY_DRAFT);
     } catch (error) {
       setFailure(errorMessage(t, error));
     } finally {
@@ -233,10 +253,10 @@ function Composer({
       <Textarea
         ref={input}
         rows={3}
-        value={draft}
+        value={draft.text}
         aria-label={t('tasks.comments.label')}
         placeholder={t('tasks.comments.placeholder')}
-        onChange={(event) => setDraft(event.target.value)}
+        onChange={(event) => setDraft((current) => editDraft(current, event.target.value))}
         onKeyDown={(event) => {
           if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
             event.preventDefault();
@@ -252,7 +272,7 @@ function Composer({
             {t('tasks.comments.mention')}
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="max-h-72 overflow-y-auto">
-            {(users.data?.items ?? []).map((user) => (
+            {(users.data ?? []).map((user) => (
               <DropdownMenuItem
                 key={user.id}
                 onClick={() => mention({ id: user.id, name: user.name })}
@@ -269,8 +289,8 @@ function Composer({
               {t('common.cancel')}
             </Button>
           )}
-          <Button size="sm" type="button" disabled={pending || !draft.trim()} onClick={submit}>
-            <SendIcon />
+          <Button size="sm" type="button" disabled={pending || !draft.text.trim()} onClick={submit}>
+            <SendIcon className="rtl:-scale-x-100" />
             {submitLabel}
           </Button>
         </span>

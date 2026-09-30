@@ -8,15 +8,18 @@ on:
 permissions:
   contents: read
 
+# A new push to a pull request supersedes its running checks; runs on main always finish.
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
+# Third-party actions are pinned to full commit SHAs (the tag in the comment); Dependabot
+# proposes updates (.github/dependabot.yml).
 jobs:
   checks:
     name: Typecheck, lint, test, build
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     services:
       postgres:
         image: postgres:17
@@ -35,13 +38,15 @@ jobs:
       DATABASE_URL: postgres://vertex_hub:ci-only-password@localhost:5432/vertex_hub_test
       TEST_DATABASE_URL: postgres://vertex_hub:ci-only-password@localhost:5432/vertex_hub_test
     steps:
-      - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: .node-version
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: No known high-severity advisory in production dependencies
+        run: pnpm audit --prod --audit-level=high
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test
@@ -56,22 +61,44 @@ jobs:
           pnpm --filter @vertex-hub/api openapi:export
           pnpm --filter @vertex-hub/web api:generate
           git diff --exit-code -- apps/web/src/lib/api
+      # What deploy.sh runs, on the built files: the migrate CLI, then the API and the worker
+      # as PM2 starts them. The API must answer its health check; the worker must schedule its
+      # jobs and stay up.
+      - name: The built API and worker start
+        env:
+          WORKER_NAME: ci
+        run: |
+          node packages/db/dist/cli/migrate.js
+          node apps/api/dist/main.js > api.log 2>&1 &
+          node apps/worker/dist/main.js > worker.log 2>&1 &
+          worker=$!
+          curl --retry 30 --retry-delay 1 --retry-all-errors -fsS http://127.0.0.1:3000/api/health
+          for _ in $(seq 1 30); do
+            if grep -q 'Scheduled system.heartbeat' worker.log; then
+              sleep 5
+              kill -0 "$worker" && exit 0
+              break
+            fi
+            sleep 2
+          done
+          echo "The worker did not start"; cat api.log worker.log; exit 1
 
   e2e:
     name: Playwright smoke
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: .node-version
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @vertex-hub/web exec playwright install --with-deps chromium
       - run: pnpm test:e2e
-      - uses: actions/upload-artifact@v7
+      # The report and the RTL screenshots (light and dark) are the review evidence of each run.
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
           name: playwright-report
@@ -85,10 +112,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-      - uses: gitleaks/gitleaks-action@v3
+      - uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITLEAKS_ENABLE_COMMENTS: false

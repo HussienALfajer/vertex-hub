@@ -792,6 +792,41 @@ describe('template runs', () => {
       );
     });
 
+    it('generates a month once when two runs arrive together (edge case 2)', async () => {
+      const { retainer, cycle } = await startedRetainer();
+      await linkTemplate(retainer.id, cast.am.cookie, monthlyTemplate);
+      const responses = await Promise.all([
+        apply(monthlyTemplate, cast.am.cookie, { retainerCycleId: cycle.id }),
+        apply(monthlyTemplate, cast.gm.cookie, { retainerCycleId: cycle.id }),
+      ]);
+      expect(responses.map((response) => response.status).sort()).toEqual([201, 409]);
+      const refused = responses.find((response) => response.status === 409);
+      if (!refused) throw new Error('No refused run');
+      expect(((await refused.json()) as { code: string }).code).toBe('ALREADY_GENERATED');
+      expect((await retainerTemplate(retainer.id)).lines[0]).toMatchObject({ tasks: 12 });
+    });
+
+    it('counts a cancelled generated task as missing again, and regenerates it (edge case 14)', async () => {
+      const { retainer, cycle, lines } = await startedRetainer();
+      const designId = lines[0]?.id ?? '';
+      await linkTemplate(retainer.id, cast.am.cookie, monthlyTemplate);
+      const run = await applied(monthlyTemplate, cast.am.cookie, { retainerCycleId: cycle.id });
+      const design = (await runTasks(run.id)).find((task) => task.title === 'Design 1');
+      const cancelled = await client.post(`/api/tasks/${design?.id}/status`, cast.gm.cookie, {
+        status: 'cancelled',
+        note: 'The client dropped this one',
+      });
+      expect(cancelled.status).toBe(200);
+      expect((await retainerTemplate(retainer.id)).lines[0]).toMatchObject({
+        tasks: 11,
+        missing: 1,
+        canGenerate: true,
+      });
+      const response = await missingTasks(retainer.id, cycle.id, designId, cast.am.cookie);
+      expect(response.status).toBe(201);
+      expect(templateRunSchema.parse(await response.json()).taskCount).toBe(1);
+    });
+
     it('keeps an archived linked template, which generates nothing', async () => {
       const template = await createTemplate({
         name: `قالب شهري مؤرشف ${cast.run}`,

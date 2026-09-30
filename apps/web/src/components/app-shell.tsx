@@ -23,7 +23,6 @@ import {
   ChevronDownIcon,
   CircleUserIcon,
   FolderKanbanIcon,
-  HouseIcon,
   LayoutTemplateIcon,
   ListTodoIcon,
   LogOutIcon,
@@ -40,13 +39,13 @@ import { type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { NotificationBell } from '../features/notifications/notification-bell';
 import { managesTeams } from '../features/tasks/task-access';
-import { authClient, can, useMe } from '../lib/auth';
+import { authClient, can, leaveSession, useMe } from '../lib/auth';
+import { formatList } from '../lib/format';
 import { useTheme } from '../lib/theme';
 
 interface NavItem {
   to: LinkProps['to'];
   label:
-    | 'nav.home'
     | 'nav.clients'
     | 'nav.tasks'
     | 'nav.projects'
@@ -75,7 +74,6 @@ interface NavChild {
 }
 
 const navItems: NavItem[] = [
-  { to: '/', label: 'nav.home', icon: HouseIcon, exact: true },
   {
     to: '/tasks',
     label: 'nav.tasks',
@@ -96,19 +94,34 @@ const navItems: NavItem[] = [
   { to: '/team', label: 'nav.team', icon: UsersIcon },
   { to: '/departments', label: 'nav.departments', icon: Building2Icon },
   { to: '/audit', label: 'nav.audit', icon: ScrollTextIcon, permission: 'audit.read' },
-  { to: '/design-system', label: 'nav.designSystem', icon: SwatchBookIcon, exact: true },
+  // A developer gallery (and the screenshot tests' page): listed in development only.
+  {
+    to: '/design-system',
+    label: 'nav.designSystem',
+    icon: SwatchBookIcon,
+    exact: true,
+    show: () => import.meta.env.DEV,
+  },
 ];
 
 export function AppShell({ children }: { children: ReactNode }) {
+  const { t } = useTranslation();
   const me = useMe();
   return (
     <div className="flex min-h-dvh bg-background">
+      {/* Keyboard users skip the navigation on every page (WCAG 2.4.1). */}
+      <a
+        href="#main"
+        className="sr-only focus-visible:not-sr-only focus-visible:fixed focus-visible:start-4 focus-visible:top-4 focus-visible:z-50 focus-visible:rounded-md focus-visible:bg-surface focus-visible:px-4 focus-visible:py-2 focus-visible:text-sm focus-visible:font-medium focus-visible:text-foreground focus-visible:shadow-float"
+      >
+        {t('nav.skip')}
+      </a>
       <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 md:flex">
         <Sidebar me={me} />
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">
         <TopBar me={me} />
-        <main className="flex-1">
+        <main id="main" tabIndex={-1} className="flex-1 outline-none">
           <div className="mx-auto flex max-w-6xl flex-col gap-8 px-4 py-8 md:px-8">{children}</div>
         </main>
       </div>
@@ -138,11 +151,15 @@ function Sidebar({ me, onNavigate }: { me: MeResponse; onNavigate?: () => void }
   );
   return (
     <div className="flex h-full w-full flex-col border-e border-sidebar-border bg-sidebar text-sidebar-foreground [--ring:var(--sidebar-ring)]">
-      <div className="flex h-16 items-center gap-3 border-b border-sidebar-border px-5">
+      <div className="flex h-16 shrink-0 items-center gap-3 border-b border-sidebar-border px-5">
         <VertexMark className="w-8 text-sidebar-marker" />
         <span className="text-lg font-bold">{t('app.name')}</span>
       </div>
-      <nav aria-label={t('nav.label')} className="flex flex-col gap-1 p-3">
+      {/* The links scroll under the fixed header on short screens and phones. */}
+      <nav
+        aria-label={t('nav.label')}
+        className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto p-3"
+      >
         {items.map(({ to, label, icon: Icon, exact, children }) => (
           <div key={to} className="flex flex-col gap-1">
             <Link
@@ -222,8 +239,7 @@ function UserMenu({ me }: { me: MeResponse }) {
 
   async function signOut() {
     await authClient.signOut();
-    queryClient.clear();
-    await router.navigate({ to: '/login' });
+    await leaveSession(queryClient, () => router.navigate({ to: '/login' }));
   }
 
   return (
@@ -245,7 +261,7 @@ function UserMenu({ me }: { me: MeResponse }) {
           </span>
           {me.roles.length > 0 && (
             <span className="mt-1 text-xs text-muted-foreground">
-              {me.roles.map((role) => t(`roles.${role}`)).join('، ')}
+              {formatList(me.roles.map((role) => t(`roles.${role}`)))}
             </span>
           )}
         </DropdownMenuHeader>

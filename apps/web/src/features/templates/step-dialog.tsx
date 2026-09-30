@@ -235,10 +235,7 @@ export function StepDialog({
 
   return (
     <Dialog open onOpenChange={(next) => !next && onClose()}>
-      <DialogContent
-        closeLabel={t('common.close')}
-        className="max-h-[90dvh] overflow-y-auto sm:max-w-2xl"
-      >
+      <DialogContent closeLabel={t('common.close')} className="sm:max-w-2xl">
         <form
           className="grid gap-5"
           // The dialog renders in a portal inside the page form: its submit must not reach that form.

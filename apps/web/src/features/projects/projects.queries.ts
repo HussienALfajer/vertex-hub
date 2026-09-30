@@ -35,13 +35,18 @@ export const projectQuery = (id: string) =>
 
 /**
  * A mutation on project data. Every one refreshes the whole `projects` cache, also on failure: a
- * 403 after the project changed hands (edge case 10) reloads the page without edit actions.
+ * 403 after the project changed hands (edge case 10) reloads the page without edit actions. Task
+ * views refresh too: cancelling a project cancels its open tasks, archiving hides them (F06).
  */
 function useProjectsMutation<Input, Output>(mutationFn: (input: Input) => Promise<Output>) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn,
-    onSettled: () => queryClient.invalidateQueries({ queryKey: projectsKeys.all }),
+    onSettled: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: projectsKeys.all }),
+        queryClient.invalidateQueries({ queryKey: ['tasks'] }),
+      ]),
   });
 }
 

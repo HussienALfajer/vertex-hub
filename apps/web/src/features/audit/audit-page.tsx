@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from '@tanstack/react-router';
 import {
   AUDIT_ACTIONS,
@@ -29,10 +29,12 @@ import {
 } from '@vertex-hub/ui';
 import type { TFunction } from 'i18next';
 import { ChevronDownIcon, CpuIcon, FilterXIcon, HistoryIcon } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LoadError } from '../../components/load-error';
+import { SystemStatus } from '../../components/system-status';
 import { canAll, useMe } from '../../lib/auth';
+import { everyPage } from '../../lib/every-page';
 import {
   businessDayEnd,
   businessDayStart,
@@ -40,6 +42,8 @@ import {
   formatMonth,
   formatNumber,
 } from '../../lib/format';
+import { ALL, dayParam, idParam, oneOfParam, pageParam } from '../../lib/search-params';
+import { usePageInRange } from '../../lib/use-page-in-range';
 import { clientListQuery } from '../clients/clients.queries';
 import { departmentListQuery } from '../departments/departments.queries';
 import { projectListQuery } from '../projects/projects.queries';
@@ -59,23 +63,16 @@ export interface AuditSearch {
 }
 
 const PAGE_SIZE = 30;
-const ALL = 'all';
-const DAY = /^\d{4}-\d{2}-\d{2}$/;
 
 export function parseAuditSearch(search: Record<string, unknown>): AuditSearch {
-  const day = (value: unknown) =>
-    typeof value === 'string' && DAY.test(value) ? value : undefined;
-  const id = (value: unknown) =>
-    typeof value === 'string' && /^[0-9a-f-]{36}$/i.test(value) ? value : undefined;
-  const page = Number(search.page);
   return {
-    entityType: AUDIT_ENTITY_TYPES.find((type) => type === search.entityType),
-    action: AUDIT_ACTIONS.find((action) => action === search.action),
-    actorId: id(search.actorId),
-    entityId: id(search.entityId),
-    from: day(search.from),
-    to: day(search.to),
-    page: Number.isInteger(page) && page > 1 ? page : undefined,
+    entityType: oneOfParam(AUDIT_ENTITY_TYPES, search.entityType),
+    action: oneOfParam(AUDIT_ACTIONS, search.action),
+    actorId: idParam(search.actorId),
+    entityId: idParam(search.entityId),
+    from: dayParam(search.from),
+    to: dayParam(search.to),
+    page: pageParam(search.page),
   };
 }
 
@@ -97,6 +94,16 @@ export function AuditPage({ search }: { search: AuditSearch }) {
       pageSize: PAGE_SIZE,
     }),
   );
+  usePageInRange(
+    page,
+    entries.data?.total,
+    PAGE_SIZE,
+    useCallback(
+      (next: number | undefined) =>
+        navigate({ search: (previous) => ({ ...previous, page: next }), replace: true }),
+      [navigate],
+    ),
+  );
 
   const setFilter = (next: Partial<AuditSearch>) =>
     navigate({ search: (previous) => ({ ...previous, ...next, page: undefined }), replace: true });
@@ -104,7 +111,11 @@ export function AuditPage({ search }: { search: AuditSearch }) {
 
   return (
     <>
-      <PageHeader title={t('audit.title')} description={t('audit.subtitle')} />
+      <PageHeader
+        title={t('audit.title')}
+        description={t('audit.subtitle')}
+        actions={<SystemStatus />}
+      />
       <Filters search={search} actors={names.users} onChange={setFilter} filtered={filtered} />
       {entries.isPending ? (
         <div className="flex flex-col gap-2">
@@ -157,60 +168,122 @@ interface EntityNames {
 }
 
 /**
- * Names for the entities and actors in the log: every user (any status), department and client
- * (archived clients only for those who may see them).
+ * Names for the entities and actors in the log: every user (any status), department, client,
+ * project and retainer, however many (archived ones only for those who may see them).
  */
 function useEntityNames(): EntityNames {
   const me = useMe();
-  const active = useQuery(userListQuery({ status: 'active', pageSize: 100 })).data;
-  const invited = useQuery(userListQuery({ status: 'invited', pageSize: 100 })).data;
-  const archived = useQuery(userListQuery({ status: 'archived', pageSize: 100 })).data;
+  const queryClient = useQueryClient();
+  const all = <T,>(name: string, fetchPage: Parameters<typeof everyPage<T>>[0], enabled = true) =>
+    ({
+      queryKey: ['audit', 'names', name],
+      queryFn: () => everyPage(fetchPage),
+      enabled,
+      staleTime: 60_000,
+    }) as const;
+  const users = useQuery(
+    all('users', (page) =>
+      Promise.all(
+        (['active', 'invited', 'archived'] as const).map((status) =>
+          queryClient.fetchQuery(userListQuery({ status, page, pageSize: 100 })),
+        ),
+      ).then((pages) => ({
+        items: pages.flatMap((one) => one.items),
+        total: Math.max(...pages.map((one) => one.total)),
+        pageSize: 100,
+      })),
+    ),
+  ).data;
   const departments = useQuery(departmentListQuery).data;
-  const clients = useQuery(clientListQuery({ status: [...CLIENT_STATUSES], pageSize: 100 })).data;
-  const archivedClients = useQuery({
-    ...clientListQuery({ status: [...CLIENT_STATUSES], archived: 'true', pageSize: 100 }),
-    enabled: canAll(me, 'clients.manage'),
-  }).data;
+  const clients = useQuery(
+    all('clients', (page) =>
+      queryClient.fetchQuery(
+        clientListQuery({ status: [...CLIENT_STATUSES], page, pageSize: 100 }),
+      ),
+    ),
+  ).data;
+  const archivedClients = useQuery(
+    all(
+      'archived-clients',
+      (page) =>
+        queryClient.fetchQuery(
+          clientListQuery({ status: [...CLIENT_STATUSES], archived: 'true', page, pageSize: 100 }),
+        ),
+      canAll(me, 'clients.manage'),
+    ),
+  ).data;
   const projects = useQuery(
-    projectListQuery({ status: [...PROJECT_STATUSES], pageSize: 100 }),
+    all('projects', (page) =>
+      queryClient.fetchQuery(
+        projectListQuery({ status: [...PROJECT_STATUSES], page, pageSize: 100 }),
+      ),
+    ),
   ).data;
-  const archivedProjects = useQuery({
-    ...projectListQuery({ status: [...PROJECT_STATUSES], archived: 'true', pageSize: 100 }),
-    enabled: canAll(me, 'projects.manage'),
-  }).data;
+  const archivedProjects = useQuery(
+    all(
+      'archived-projects',
+      (page) =>
+        queryClient.fetchQuery(
+          projectListQuery({
+            status: [...PROJECT_STATUSES],
+            archived: 'true',
+            page,
+            pageSize: 100,
+          }),
+        ),
+      canAll(me, 'projects.manage'),
+    ),
+  ).data;
   const retainers = useQuery(
-    retainerListQuery({ status: [...RETAINER_STATUSES], pageSize: 100 }),
+    all('retainers', (page) =>
+      queryClient.fetchQuery(
+        retainerListQuery({ status: [...RETAINER_STATUSES], page, pageSize: 100 }),
+      ),
+    ),
   ).data;
-  const archivedRetainers = useQuery({
-    ...retainerListQuery({ status: [...RETAINER_STATUSES], archived: 'true', pageSize: 100 }),
-    enabled: canAll(me, 'projects.manage'),
-  }).data;
+  const archivedRetainers = useQuery(
+    all(
+      'archived-retainers',
+      (page) =>
+        queryClient.fetchQuery(
+          retainerListQuery({
+            status: [...RETAINER_STATUSES],
+            archived: 'true',
+            page,
+            pageSize: 100,
+          }),
+        ),
+      canAll(me, 'projects.manage'),
+    ),
+  ).data;
   return useMemo(() => {
-    const users = [active, invited, archived]
-      .flatMap((page) => page?.items ?? [])
+    const people = (users ?? [])
       .map(({ id, name }) => ({ id, name }))
       .sort((a, b) => a.name.localeCompare(b.name, 'ar'));
-    const userNames = new Map(users.map((user) => [user.id, user.name]));
+    const userNames = new Map(people.map((user) => [user.id, user.name]));
     const departmentNames = new Map(
       (departments?.items ?? []).map((department) => [department.id, department.name]),
     );
     const clientNames = new Map(
-      [clients, archivedClients]
-        .flatMap((page) => page?.items ?? [])
-        .map((client) => [client.id, client.tradeName]),
+      [...(clients ?? []), ...(archivedClients ?? [])].map((client) => [
+        client.id,
+        client.tradeName,
+      ]),
     );
     const projectNames = new Map(
-      [projects, archivedProjects]
-        .flatMap((page) => page?.items ?? [])
-        .map((project) => [project.id, project.name]),
+      [...(projects ?? []), ...(archivedProjects ?? [])].map((project) => [
+        project.id,
+        project.name,
+      ]),
     );
     const retainerNames = new Map(
-      [retainers, archivedRetainers]
-        .flatMap((page) => page?.items ?? [])
-        .map((retainer) => [retainer.id, retainer.name]),
+      [...(retainers ?? []), ...(archivedRetainers ?? [])].map((retainer) => [
+        retainer.id,
+        retainer.name,
+      ]),
     );
     return {
-      users,
+      users: people,
       user: (id) => userNames.get(id),
       department: (id) => departmentNames.get(id),
       client: (id) => clientNames.get(id),
@@ -218,9 +291,7 @@ function useEntityNames(): EntityNames {
       retainer: (id) => retainerNames.get(id),
     };
   }, [
-    active,
-    invited,
-    archived,
+    users,
     departments,
     clients,
     archivedClients,

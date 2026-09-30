@@ -16,10 +16,12 @@ export function AuthLayout({ children, wide }: { children: ReactNode; wide?: boo
           {children}
         </div>
       </main>
-      <aside className="relative hidden flex-col items-center justify-center gap-8 overflow-hidden bg-green-800 p-12 md:flex dark:bg-green-900">
-        <AscentLines className="absolute inset-y-0 end-0 h-full w-1/4 text-gold-400 opacity-20" />
-        <VertexLogo label={t('app.brand')} className="relative w-56 text-gold-400" />
-        <p className="relative text-center text-lg text-neutral-300">{t('app.tagline')}</p>
+      <aside className="relative hidden flex-col items-center justify-center gap-8 overflow-hidden bg-sidebar p-12 md:flex">
+        <AscentLines className="absolute inset-y-0 end-0 h-full w-1/4 text-sidebar-marker opacity-20" />
+        <VertexLogo label={t('app.brand')} className="relative w-56 text-sidebar-marker" />
+        <p className="relative text-center text-lg text-sidebar-muted-foreground">
+          {t('app.tagline')}
+        </p>
       </aside>
     </div>
   );
