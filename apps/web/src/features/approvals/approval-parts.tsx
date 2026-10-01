@@ -1,5 +1,6 @@
 import { Link } from '@tanstack/react-router';
 import type {
+  ApprovalItemKind,
   ApprovalItemStatus,
   ApprovalRequest,
   ApprovalRequestState,
@@ -17,7 +18,14 @@ import {
   TableHeader,
   TableRow,
 } from '@vertex-hub/ui';
-import { CheckIcon, CopyIcon, MessageCircleIcon } from 'lucide-react';
+import {
+  CheckIcon,
+  CopyIcon,
+  type LucideIcon,
+  MessageCircleIcon,
+  NewspaperIcon,
+  SquareCheckBigIcon,
+} from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { can, scopesOf } from '../../lib/auth';
 import { useCopy } from '../../lib/clipboard';
@@ -59,6 +67,23 @@ const ITEM_TONES: Record<ApprovalItemStatus, BadgeProps['tone']> = {
 export function ItemStatusBadge({ status }: { status: ApprovalItemStatus }) {
   const { t } = useTranslation();
   return <Badge tone={ITEM_TONES[status]}>{t(`approvals.itemStatuses.${status}`)}</Badge>;
+}
+
+const KIND_ICONS: Record<ApprovalItemKind, LucideIcon> = {
+  task: SquareCheckBigIcon,
+  post: NewspaperIcon,
+};
+
+/** Whether an item is a task or a post (F08): shown where both are listed together. */
+export function ItemKindBadge({ kind }: { kind: ApprovalItemKind }) {
+  const { t } = useTranslation();
+  const Icon = KIND_ICONS[kind];
+  return (
+    <Badge tone="outline" className="shrink-0">
+      <Icon aria-hidden="true" />
+      {t(`approvals.kinds.${kind}`)}
+    </Badge>
+  );
 }
 
 /** Requests as rows: who was asked, how far the answers are, and until when the link works. */

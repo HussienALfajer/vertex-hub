@@ -19,6 +19,7 @@ import {
   type ClientApprovals,
   type ClientDetailResponse,
   type ClientResponse,
+  type ClientResponseEntry,
   type ClientStatus,
   type Contact,
   type ContentCalendar,
@@ -103,6 +104,7 @@ import {
   type ProjectStatusChange,
   type PublicApproval,
   type PublicApprovalItem,
+  type PublicApproveAll,
   type PublicResponse,
   type PublishedLink,
   planTemplateRun,
@@ -825,7 +827,9 @@ export async function mockApi(page: Page, options: MockOptions): Promise<MockedA
   const retainers = retainersSeed();
   const retainersApi = retainerRoutes({ users, clients, retainers, me: () => me });
   const sent = options.approvals ? approvalsSeed() : { tasks: [], files: [], requests: [] };
-  const planned = options.content ? contentSeed() : { posts: [], tasks: [], files: [] };
+  const planned = options.content
+    ? contentSeed()
+    : { posts: [], tasks: [], files: [], requests: [] };
   const tasks = [...tasksSeed(), ...sent.tasks, ...planned.tasks];
   const tasksApi = taskRoutes({
     users,
@@ -835,7 +839,7 @@ export async function mockApi(page: Page, options: MockOptions): Promise<MockedA
     tasks,
     posts: planned.posts,
     files: [...sent.files, ...planned.files],
-    requests: sent.requests,
+    requests: [...sent.requests, ...planned.requests],
     me: () => me,
   });
   const templates = templatesSeed();
@@ -2843,15 +2847,17 @@ export function tasksSeed(): TaskRecord[] {
 
 interface ApprovalItemRecord {
   id: string;
-  taskId: string;
-  /** What the client reads instead of the task's title. */
+  /** A task item (F09), or a post item (F08): one of the two. */
+  taskId: string | null;
+  postId: string | null;
+  /** What the client reads instead of the internal title. */
   title: string;
-  /** The snapshot sent: a pass of the task. */
+  /** The snapshot sent: a pass of the task or of the post. */
   reviewId: string;
   status: ApprovalItemStatus;
   withdrawnReason: ApprovalWithdrawnReason | null;
   closedAt: string | null;
-  /** The task's client response that closed the item. */
+  /** The client response of the task or the post that closed the item. */
   responseId: string | null;
 }
 
@@ -2875,6 +2881,8 @@ interface ApprovalRequestRecord {
 /** The links of the seeded requests (`MockOptions.approvals`): `/a/<token>`. */
 export const OPEN_LINK_TOKEN = 'open-link-token';
 export const EXPIRED_LINK_TOKEN = 'expired-link-token';
+/** The month link of Jasmine's content plan (`MockOptions.content`, F08). */
+export const CONTENT_LINK_TOKEN = 'content-link-token';
 
 /**
  * Jasmine's work with the client (F09), added with `MockOptions.approvals`: an open request with
@@ -2955,6 +2963,7 @@ export function approvalsSeed(): {
   ): ApprovalItemRecord => ({
     id: id(n),
     taskId: id(taskId),
+    postId: null,
     title,
     reviewId: id(reviewId),
     status: 'pending',
@@ -3476,6 +3485,12 @@ function taskRoutes({
     me,
     taskSummary: summary,
     media: taskFiles.media,
+    // Called once a request arrives, when the approvals helpers below exist.
+    approval: {
+      pending: (post) => postPendingApproval(post),
+      ready: (post) => postReady(post),
+      settle: (post, response) => settlePostItem(post, response),
+    },
   });
 
   // Approval requests (F09): the links sent to clients, and what they answered.
@@ -3511,6 +3526,66 @@ function taskRoutes({
         }
       : null;
   };
+  // Post items (F08 rules 20–25), as the task items above.
+  const postById = (postId: string | null) => posts.find((p) => p.id === postId);
+  const pendingPostItem = (post: PostRecord) => {
+    for (const request of requests) {
+      const item = request.items.find((i) => i.postId === post.id && i.status === 'pending');
+      if (item) return { request, item };
+    }
+    return undefined;
+  };
+  const postCleared = (post: PostRecord) =>
+    post.reviews.find((review) => review.id === post.clearedReviewId) ?? null;
+  const postReady = (post: PostRecord) => {
+    const pending = pendingPostItem(post);
+    return (
+      !post.archived &&
+      post.status === 'awaiting_client' &&
+      clientScope(post.clientId) &&
+      (!clients.find((c) => c.id === post.clientId)?.isHealthcare ||
+        postCleared(post)?.stage === 'medical') &&
+      !(pending && stateOf(pending.request) !== 'expired')
+    );
+  };
+  const postPendingApproval = (post: PostRecord): PostDetail['pendingApproval'] => {
+    const pending = pendingPostItem(post);
+    return pending
+      ? {
+          requestId: pending.request.id,
+          state: stateOf(pending.request),
+          issuedAt: pending.request.issuedAt,
+          expiresAt: pending.request.expiresAt,
+        }
+      : null;
+  };
+  const settlePostItem = (post: PostRecord, response: PostClientResponse | null) => {
+    const pending = pendingPostItem(post);
+    if (!pending) return;
+    if (response) {
+      pending.item.responseId = response.id;
+      closeItem(pending.request, pending.item, response.decision);
+    } else {
+      closeItem(pending.request, pending.item, 'withdrawn', 'post_moved');
+    }
+  };
+  const postReviewOf = (item: ApprovalItemRecord) =>
+    postById(item.postId)?.reviews.find((review) => review.id === item.reviewId);
+  /** What a post item showed: the post as its snapshot passed it (rule 27). */
+  const shownPost = (item: ApprovalItemRecord) => {
+    const post = postById(item.postId);
+    const snapshot = postReviewOf(item);
+    return post && snapshot
+      ? {
+          type: snapshot.type ?? post.type,
+          platforms: snapshot.platforms,
+          publishDate: snapshot.publishDate ?? post.publishDate,
+          publishTime: snapshot.publishTime,
+          caption: snapshot.caption,
+          hashtags: snapshot.hashtags,
+        }
+      : null;
+  };
   const closeItem = (
     request: ApprovalRequestRecord,
     item: ApprovalItemRecord,
@@ -3535,9 +3610,16 @@ function taskRoutes({
     (holds('tasks.manage', 'own_clients') &&
       clients.find((c) => c.id === clientId)?.accountManagerId === me().user.id);
   const reviewOf = (item: ApprovalItemRecord) =>
-    byId(item.taskId)?.reviews.find((review) => review.id === item.reviewId);
+    item.taskId
+      ? byId(item.taskId)?.reviews.find((review) => review.id === item.reviewId)
+      : undefined;
+  /** The versions an item sent: its task's pass or its post's. */
+  const sentOf = (item: ApprovalItemRecord) =>
+    (item.postId ? postReviewOf(item) : reviewOf(item))?.versions ?? [];
   const responseOf = (item: ApprovalItemRecord) =>
-    byId(item.taskId)?.responses.find((response) => response.id === item.responseId);
+    (item.taskId ? byId(item.taskId)?.responses : postById(item.postId)?.responses)?.find(
+      (response) => response.id === item.responseId,
+    );
   const countsOf = (request: ApprovalRequestRecord) => {
     const count = (status: ApprovalItemStatus) =>
       request.items.filter((i) => i.status === status).length;
@@ -3573,19 +3655,19 @@ function taskRoutes({
       message: request.message,
       items: request.items.map((item, index): ApprovalItem => {
         const response = responseOf(item);
+        const post = postById(item.postId);
+        const shown = shownPost(item);
         return {
           id: item.id,
           position: index + 1,
-          kind: 'task',
+          kind: item.postId ? 'post' : 'task',
           title: item.title,
-          task: { id: item.taskId, title: byId(item.taskId)?.title ?? '' },
-          post: null,
+          task: item.taskId ? { id: item.taskId, title: byId(item.taskId)?.title ?? '' } : null,
+          post: post && shown ? { ...shown, id: post.id, title: post.title } : null,
           status: item.status,
           withdrawnReason: item.withdrawnReason,
           closedAt: item.closedAt,
-          versions: (reviewOf(item)?.versions ?? []).flatMap(
-            (version) => taskFiles.sent(version.id) ?? [],
-          ),
+          versions: sentOf(item).flatMap((version) => taskFiles.sent(version.id) ?? []),
           text: reviewOf(item)?.clientText ?? null,
           response: response
             ? {
@@ -3615,15 +3697,22 @@ function taskRoutes({
     return { ...requestDetail(request), link: `${origin}/a/${request.token}` };
   };
   const publicItem = (item: ApprovalItemRecord): PublicApprovalItem => {
-    const review = item.status === 'withdrawn' ? undefined : reviewOf(item);
+    const withdrawn = item.status === 'withdrawn';
+    const review = withdrawn ? undefined : reviewOf(item);
     const response = responseOf(item);
     return {
       id: item.id,
-      kind: 'task',
+      kind: item.postId ? 'post' : 'task',
       title: item.title,
       text: review?.clientText ?? null,
-      post: null,
-      files: (review?.versions ?? []).flatMap((version) => taskFiles.shown(version.id) ?? []),
+      post: item.postId && !withdrawn ? shownPost(item) : null,
+      files: withdrawn
+        ? []
+        : sentOf(item).flatMap((version) => {
+            const file = taskFiles.shown(version.id);
+            // Rule 27: never the internal titles of a post's files.
+            return file ? [item.postId ? { ...file, name: '' } : file] : [];
+          }),
       status: item.status,
       note: response?.note ?? null,
       decidedAt: response?.createdAt ?? null,
@@ -3829,9 +3918,22 @@ function taskRoutes({
     // Tasks ready to send, by client (F09 rule 8).
     if (path === '/api/approvals/ready') {
       const sendable = tasks.filter(readyToSend);
+      const month = url.searchParams.get('month');
+      const postsReady = posts
+        .filter((p) => postReady(p) && (!month || p.publishDate.startsWith(month)))
+        .sort(
+          (a, b) =>
+            a.publishDate.localeCompare(b.publishDate) ||
+            (a.publishTime ?? '').localeCompare(b.publishTime ?? ''),
+        );
       const ready: ApprovalReady = {
         clients: clients
-          .filter((c) => sendable.some((t) => t.clientId === c.id))
+          .filter(
+            (c) =>
+              (!url.searchParams.get('clientId') || c.id === url.searchParams.get('clientId')) &&
+              (sendable.some((t) => t.clientId === c.id) ||
+                postsReady.some((p) => p.clientId === c.id)),
+          )
           .sort((a, b) => a.tradeName.localeCompare(b.tradeName, 'ar'))
           .map((c) => ({
             client: { id: c.id, name: c.tradeName },
@@ -3849,7 +3951,21 @@ function taskRoutes({
                   hasText: !!cleared(t)?.clientText,
                 },
               })),
-            posts: [],
+            posts: postsReady
+              .filter((p) => p.clientId === c.id)
+              .map((p) => {
+                const versions = postCleared(p)?.versions ?? [];
+                return {
+                  ...contentApi.summary(p),
+                  snapshot: {
+                    files: versions.length,
+                    caption: postCleared(p)?.caption ?? null,
+                    thumbnailVersionId:
+                      versions.find((v) => taskFiles.sent(v.id)?.previewStatus === 'ready')?.id ??
+                      null,
+                  },
+                };
+              }),
           })),
       };
       return json(route, ready);
@@ -3893,13 +4009,21 @@ function taskRoutes({
       if (!contact || contact.archived || !contact.hasFinalApproval) {
         return fail(route, 409, 'CONTACT_NOT_APPROVER');
       }
-      // Post items arrive with the F08 screens: the mock sends tasks only.
+      if (input.items.length > APPROVAL_LIMITS.items) return fail(route, 409, 'LIMIT_REACHED');
       const sending = input.items.flatMap((entry) =>
         'taskId' in entry ? [{ entry, task: byId(entry.taskId) }] : [],
       );
       for (const { entry, task } of sending) {
         if (!task || task.clientId !== client.id || !readyToSend(task)) {
           return fail(route, 409, 'TASK_NOT_READY', { taskId: entry.taskId });
+        }
+      }
+      const sendingPosts = input.items.flatMap((entry) =>
+        'postId' in entry ? [{ entry, post: postById(entry.postId) }] : [],
+      );
+      for (const { entry, post } of sendingPosts) {
+        if (!post || post.clientId !== client.id || !postReady(post)) {
+          return fail(route, 409, 'POST_NOT_READY', { postId: entry.postId });
         }
       }
       const created: ApprovalRequestRecord = {
@@ -3924,6 +4048,7 @@ function taskRoutes({
             {
               id: id(next++),
               taskId: task.id,
+              postId: null,
               title: entry.title ?? task.title,
               reviewId: task.clearedReviewId ?? '',
               status: 'pending' as const,
@@ -3934,6 +4059,25 @@ function taskRoutes({
           ];
         }),
       };
+      // F08 rule 27: the posts after the tasks, in publish order.
+      for (const { entry, post } of sendingPosts.sort((a, b) =>
+        (a.post?.publishDate ?? '').localeCompare(b.post?.publishDate ?? ''),
+      )) {
+        if (!post) continue;
+        const old = pendingPostItem(post);
+        if (old) closeItem(old.request, old.item, 'withdrawn', 'resent');
+        created.items.push({
+          id: id(next++),
+          taskId: null,
+          postId: post.id,
+          title: entry.title ?? post.title,
+          reviewId: post.clearedReviewId ?? '',
+          status: 'pending',
+          withdrawnReason: null,
+          closedAt: null,
+          responseId: null,
+        });
+      }
       requests.push(created);
       return json(route, issue(created, url.origin), 201);
     }
@@ -3966,12 +4110,26 @@ function taskRoutes({
           tasks
             .filter((t) => t.clientId === clientId)
             .flatMap((t) =>
-              t.responses.map((response) => ({
-                ...response,
-                kind: 'task' as const,
-                task: { id: t.id, title: t.title },
-                post: null,
-              })),
+              t.responses.map(
+                (response): ClientResponseEntry => ({
+                  ...response,
+                  kind: 'task',
+                  task: { id: t.id, title: t.title },
+                  post: null,
+                }),
+              ),
+            )
+            .concat(
+              posts
+                .filter((p) => p.clientId === clientId)
+                .flatMap((p) =>
+                  p.responses.map((response) => ({
+                    ...response,
+                    kind: 'post' as const,
+                    task: null,
+                    post: { id: p.id, title: p.title },
+                  })),
+                ),
             )
             .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
         ),
@@ -4002,21 +4160,50 @@ function taskRoutes({
         const versionId = versionMatch[1] ?? '';
         const sent = linked.items.some(
           (item) =>
-            item.status !== 'withdrawn' &&
-            reviewOf(item)?.versions.some((version) => version.id === versionId),
+            item.status !== 'withdrawn' && sentOf(item).some((version) => version.id === versionId),
         );
         return sent
           ? taskFiles.serveVersion(route, versionId, versionMatch[2] ?? '')
           : fail(route, 404, 'APPROVAL_LINK_INVALID');
       }
+      const contact = requestContact(linked);
+      const respondToPost = (item: ApprovalItemRecord, input: PublicResponse) => {
+        const post = postById(item.postId) as PostRecord;
+        const response: PostClientResponse = {
+          id: id(next++),
+          decision: input.decision,
+          channel: 'link',
+          contact: { id: contact.id, name: contact.name, archived: false },
+          note: input.note ?? null,
+          versions: postCleared(post)?.versions ?? [],
+          recordedBy: null,
+          createdAt: TASKS_NOW.toISOString(),
+        };
+        post.responses.push(response);
+        // Rule 22: approved, or back in production with the client's note.
+        post.status = input.decision === 'approved' ? 'approved' : 'in_production';
+        item.responseId = response.id;
+        closeItem(linked, item, input.decision);
+      };
+      if (rest === 'approve-all' && method === 'POST') {
+        // Rule 23: every pending post item, with the same note; tasks never.
+        const note = body<PublicApproveAll>().note ?? null;
+        const decided = linked.items.filter((i) => i.postId && i.status === 'pending');
+        for (const item of decided) respondToPost(item, { decision: 'approved', note });
+        return json(route, { items: decided.map(publicItem) });
+      }
       const responseMatch = rest.match(/^items\/([^/]+)\/response$/);
       const item = linked.items.find((i) => i.id === responseMatch?.[1]);
-      const task = item && byId(item.taskId);
-      if (!item || !task) return fail(route, 404, null);
+      if (!item) return fail(route, 404, null);
       if (item.status === 'withdrawn') return fail(route, 409, 'ITEM_WITHDRAWN');
       if (item.status !== 'pending') return fail(route, 409, 'ITEM_ALREADY_DECIDED');
       const input = body<PublicResponse>();
-      const contact = requestContact(linked);
+      if (item.postId) {
+        respondToPost(item, input);
+        return json(route, publicItem(item));
+      }
+      const task = item.taskId ? byId(item.taskId) : undefined;
+      if (!task) return fail(route, 404, null);
       const response = recordResponse(
         task,
         input.decision,
@@ -4456,9 +4643,15 @@ function postRecord(
 
 /**
  * Jasmine's October content plan, one post of each status, with the design tasks that produce
- * their media, and a post of the healthcare client waiting in the medical stage.
+ * their media, and a post of the healthcare client waiting in the medical stage. Two posts wait
+ * in the month's approval link, and one more is ready to send.
  */
-export function contentSeed(): { posts: PostRecord[]; tasks: TaskRecord[]; files: FileRecord[] } {
+export function contentSeed(): {
+  posts: PostRecord[];
+  tasks: TaskRecord[];
+  files: FileRecord[];
+  requests: ApprovalRequestRecord[];
+} {
   const jasmine = id(601);
   const layan = { id: id(3), name: 'ليان الأحمد' };
   const sara = { id: id(1), name: 'سارة الخطيب' };
@@ -4508,6 +4701,18 @@ export function contentSeed(): { posts: PostRecord[]; tasks: TaskRecord[]; files
     createdAt: '2026-10-08T11:00:00.000Z',
   });
   const autumnCaption = 'أطباق الخريف وصلت: يقطين مشوي، شوربة عدس بالليمون، وكنافة بالقشطة.';
+  const sweetsCaption = 'حلويات الجمعة: كنافة نابلسية، مدلوقة، وبلورية بالفستق الحلبي.';
+  const postItem = (n: number, postId: number, title: string, reviewId: number) => ({
+    id: id(n),
+    taskId: null,
+    postId: id(postId),
+    title,
+    reviewId: id(reviewId),
+    status: 'pending' as const,
+    withdrawnReason: null,
+    closedAt: null,
+    responseId: null,
+  });
   return {
     posts: [
       postRecord(1601, {
@@ -4619,6 +4824,49 @@ export function contentSeed(): { posts: PostRecord[]; tasks: TaskRecord[]; files
         reviews: [pass(1676, 'ثلاث عادات يومية تحمي أسنانك.')],
       }),
       postRecord(1612, { title: 'حملة تشرين الثاني', publishDate: '2026-11-02' }),
+      postRecord(1613, {
+        title: 'كاروسيل حلويات الجمعة',
+        type: 'carousel',
+        platforms: ['instagram', 'facebook'],
+        caption: sweetsCaption,
+        hashtags: '#مطعم_الياسمين #حلويات',
+        publishDate: '2026-10-16',
+        publishTime: '17:00',
+        status: 'awaiting_client',
+        reviews: [
+          {
+            ...pass(1677, sweetsCaption, [
+              { id: id(1645), fileItemId: id(1635), name: 'كنافة نابلسية', number: 1 },
+              { id: id(1646), fileItemId: id(1636), name: 'بلورية بالفستق', number: 1 },
+            ]),
+            hashtags: '#مطعم_الياسمين #حلويات',
+            type: 'carousel',
+            platforms: ['instagram', 'facebook'],
+            publishDate: '2026-10-16',
+            publishTime: '17:00',
+          },
+        ],
+        clearedReviewId: id(1677),
+      }),
+      postRecord(1614, {
+        title: 'ريل تحضير القهوة',
+        type: 'reel',
+        platforms: ['instagram', 'tiktok'],
+        caption: 'من الحبة إلى الفنجان في ثلاثين ثانية.',
+        publishDate: '2026-10-19',
+        publishTime: '20:00',
+        status: 'awaiting_client',
+        reviews: [
+          {
+            ...pass(1678, 'من الحبة إلى الفنجان في ثلاثين ثانية.'),
+            type: 'reel',
+            platforms: ['instagram', 'tiktok'],
+            publishDate: '2026-10-19',
+            publishTime: '20:00',
+          },
+        ],
+        clearedReviewId: id(1678),
+      }),
     ],
     tasks: [
       taskRecord(1621, {
@@ -4660,6 +4908,38 @@ export function contentSeed(): { posts: PostRecord[]; tasks: TaskRecord[]; files
         'شوربة العدس',
         uploadVersion(1644, 1, png('lentil-soup.png'), sara, '2026-10-07T08:05:00.000Z'),
       ),
+      deliverableFile(
+        1635,
+        { type: 'post', id: id(1613) },
+        'كنافة نابلسية',
+        uploadVersion(1645, 1, png('knafeh.png'), sara, '2026-10-08T08:00:00.000Z'),
+      ),
+      deliverableFile(
+        1636,
+        { type: 'post', id: id(1613) },
+        'بلورية بالفستق',
+        uploadVersion(1646, 1, png('balloriyeh.png'), sara, '2026-10-08T08:05:00.000Z'),
+      ),
+    ],
+    requests: [
+      {
+        id: id(1681),
+        token: CONTENT_LINK_TOKEN,
+        clientId: jasmine,
+        contactId: id(611),
+        message: 'خطة محتوى تشرين الأول جاهزة لمراجعتكم.',
+        issuedAt: '2026-10-09T07:00:00.000Z',
+        expiresAt: '2026-10-16T07:00:00.000Z',
+        remindedAt: null,
+        revokedAt: null,
+        completedAt: null,
+        createdById: layan.id,
+        createdAt: '2026-10-09T07:00:00.000Z',
+        items: [
+          postItem(1682, 1608, 'عرض نهاية الأسبوع', 1674),
+          postItem(1683, 1613, 'حلويات الجمعة', 1677),
+        ],
+      },
     ],
   };
 }
@@ -4677,6 +4957,13 @@ interface ContentState {
   taskSummary: (task: TaskRecord) => Task;
   /** Rule 5: the post's own files, then the finals of its linked tasks. */
   media: (postId: string, taskIds: string[]) => PostMediaRecord[];
+  /** The post's place in approval requests (F08 rules 20–25), kept by the approvals mocks. */
+  approval: {
+    pending: (post: PostRecord) => PostDetail['pendingApproval'];
+    ready: (post: PostRecord) => boolean;
+    /** Closes the pending item with the response, or withdraws it without one. */
+    settle: (post: PostRecord, response: PostClientResponse | null) => void;
+  };
 }
 
 /** The content API (F08) over the in-memory posts, with its scopes and workflow rules. */
@@ -4689,6 +4976,7 @@ function contentRoutes({
   me,
   taskSummary,
   media,
+  approval,
 }: ContentState) {
   let next = 1700;
   const now = () => TASKS_NOW.toISOString();
@@ -4801,8 +5089,7 @@ function contentRoutes({
       clearedReview: post.reviews.find((review) => review.id === post.clearedReviewId) ?? null,
       reviewHistory: post.reviews,
       clientResponses: post.responses,
-      // Post items of approval requests arrive with the F08 approvals screens.
-      pendingApproval: null,
+      pendingApproval: approval.pending(post),
       scheduledAt: post.scheduledAt,
       publishedAt: post.publishedAt,
       publishedBy: post.publishedById ? person(post.publishedById) : null,
@@ -4823,7 +5110,7 @@ function contentRoutes({
           post.reviewStage === 'medical' &&
           holds('approvals.review_medical', 'all') &&
           post.responsibleId !== me().user.id,
-        canSendForApproval: false,
+        canSendForApproval: live && approval.ready(post),
         canRecordResponse: live && r.client && post.status === 'awaiting_client',
         canArchive: holds('content.review', 'all'),
       },
@@ -4902,7 +5189,12 @@ function contentRoutes({
   const live = () => posts.filter((post) => !post.archived && !clientOf(post)?.archived);
 
   // Answers a content request, or returns undefined to let the other mocks try.
-  return (route: Route, method: string, url: URL, request: Request): Promise<void> | undefined => {
+  const handle = (
+    route: Route,
+    method: string,
+    url: URL,
+    request: Request,
+  ): Promise<void> | undefined => {
     const path = url.pathname;
     const q = url.searchParams;
     const body = <T>() => request.postDataJSON() as T;
@@ -5005,6 +5297,8 @@ function contentRoutes({
       }
       const tasksReady = linked(post).every((t) => t.status === 'approved');
       const stage = post.reviewStage;
+      const waiting = post.status === 'awaiting_client';
+      let response: PostClientResponse | null = null;
       post.reviewStage = null;
       switch (move) {
         case 'submit':
@@ -5035,7 +5329,7 @@ function contentRoutes({
         case 'client_changes': {
           const contact = clientOf(post)?.contacts.find((c) => c.id === input.contactId);
           if (!contact) return fail(route, 400, 'UNKNOWN_CONTACT');
-          post.responses.push({
+          response = {
             id: id(next++),
             decision: move === 'client_approved' ? 'approved' : 'changes_requested',
             channel: 'manual',
@@ -5045,7 +5339,8 @@ function contentRoutes({
               post.reviews.find((review) => review.id === post.clearedReviewId)?.versions ?? [],
             recordedBy: person(me().user.id),
             createdAt: now(),
-          });
+          };
+          post.responses.push(response);
           break;
         }
         case 'schedule':
@@ -5081,6 +5376,8 @@ function contentRoutes({
           break;
       }
       post.status = input.to;
+      // Rules 24 and 25: leaving the client closes or withdraws the pending item.
+      if (waiting) approval.settle(post, response);
       return json(route, detail(post));
     }
     if (action === 'medical-review') {
@@ -5121,6 +5418,7 @@ function contentRoutes({
     }
     if (action === 'archive' || action === 'restore') {
       if (!holds('content.review', 'all')) return fail(route, 403, null);
+      if (action === 'archive' && post.status === 'awaiting_client') approval.settle(post, null);
       post.archived = action === 'archive';
       return action === 'archive' ? route.fulfill({ status: 204 }) : json(route, detail(post));
     }
@@ -5197,6 +5495,7 @@ function contentRoutes({
     }
     return fail(route, 404, null);
   };
+  return Object.assign(handle, { summary });
 }
 
 // Work templates (F07).
@@ -7075,6 +7374,9 @@ export const seedIds = {
   hotDrinksPost: id(1607),
   weekendOffer: id(1608),
   dentalTips: id(1611),
+  sweetsCarousel: id(1613),
+  coffeeReel: id(1614),
+  contentRequest: id(1681),
   openingDesign: id(1621),
   drinksDesign: id(1622),
   websiteTemplate: id(2000),

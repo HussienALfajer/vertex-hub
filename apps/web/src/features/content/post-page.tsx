@@ -27,6 +27,7 @@ import {
   formatNumber,
   formatTimeOfDay,
 } from '../../lib/format';
+import { PostApprovalSection } from '../approvals/task-approval-panel';
 import { PersonName } from '../projects/project-badges';
 import { lineName } from '../retainers/retainer-badges';
 import { TaskSection } from '../tasks/task-parts';
@@ -78,6 +79,7 @@ function PostView({ post }: { post: PostDetail }) {
           <PostClientResponsesSection post={post} />
         </div>
         <div className="flex min-w-0 flex-col gap-6">
+          <PostApprovalSection post={post} />
           <ScheduleSection post={post} />
           <PublishingSection post={post} />
         </div>

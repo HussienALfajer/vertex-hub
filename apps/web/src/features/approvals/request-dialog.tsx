@@ -7,6 +7,7 @@ import {
   createApprovalRequestSchema,
   type IssuedApprovalRequest,
   type ReadyClient,
+  type ReadyPost,
   type ReadyTask,
 } from '@vertex-hub/contracts';
 import {
@@ -36,7 +37,8 @@ import { useTranslation } from 'react-i18next';
 import { FormAlert } from '../../components/form-alert';
 import { errorMessage } from '../../lib/errors';
 import { formatDateTime, formatNumber, isolateLtr } from '../../lib/format';
-import { IssuedLink } from './approval-parts';
+import { PostFacts, PostThumbnail } from '../content/post-parts';
+import { IssuedLink, ItemKindBadge } from './approval-parts';
 import { useCreateApprovalRequest } from './approvals.queries';
 
 /** What a ready task would send: its snapshot's files and whether it has a text (rule 2). */
@@ -50,17 +52,47 @@ export function SnapshotSummary({ snapshot }: { snapshot: ReadyTask['snapshot'] 
 }
 
 /**
- * A new approval request (spec F09, screen 2): ready tasks of one client for a contact with
- * final-approval authority, with the titles the client will read. On success the link is shown
- * this once (rule 9).
+ * What a ready post would send (F08 rule 27): its type, date and platforms, the media of its
+ * snapshot and the start of its caption.
+ */
+export function PostSnapshotSummary({ post }: { post: ReadyPost }) {
+  const { t } = useTranslation();
+  return (
+    <span className="flex min-w-0 items-start gap-2">
+      {post.snapshot.thumbnailVersionId && (
+        <PostThumbnail versionId={post.snapshot.thumbnailVersionId} className="size-10" />
+      )}
+      <span className="flex min-w-0 flex-col gap-0.5">
+        <PostFacts post={post} />
+        <span className="line-clamp-2 text-xs text-muted-foreground">
+          {[
+            post.snapshot.files > 0 &&
+              t('approvals.ready.media', { n: formatNumber(post.snapshot.files) }),
+            post.snapshot.caption,
+          ]
+            .filter(Boolean)
+            .join(' · ') || t('approvals.ready.noCaption')}
+        </span>
+      </span>
+    </span>
+  );
+}
+
+/**
+ * A new approval request (spec F09, screen 2; F08 rule 21): ready tasks and posts of one client
+ * for a contact with final-approval authority, with the titles the client will read. Tasks come
+ * first, then the posts in publish order, as the client page lists them. On success the link is
+ * shown this once (rule 9).
  */
 export function RequestDialog({
   client,
   tasks,
+  posts = [],
   onClose,
 }: {
   client: ReadyClient;
   tasks: ReadyTask[];
+  posts?: ReadyPost[];
   onClose: () => void;
 }) {
   const { t } = useTranslation();
@@ -71,20 +103,25 @@ export function RequestDialog({
         {issued ? (
           <IssuedStep request={issued} onClose={onClose} />
         ) : (
-          <RequestForm client={client} tasks={tasks} onIssued={setIssued} />
+          <RequestForm client={client} tasks={tasks} posts={posts} onIssued={setIssued} />
         )}
       </DialogContent>
     </Dialog>
   );
 }
 
+/** A row of the form: a task or a post, in the order of `items`. */
+type Entry = { kind: 'task'; task: ReadyTask } | { kind: 'post'; post: ReadyPost };
+
 function RequestForm({
   client,
   tasks,
+  posts,
   onIssued,
 }: {
   client: ReadyClient;
   tasks: ReadyTask[];
+  posts: ReadyPost[];
   onIssued: (request: IssuedApprovalRequest) => void;
 }) {
   const { t } = useTranslation();
@@ -97,9 +134,17 @@ function RequestForm({
       clientId: client.client.id,
       contactId: client.contacts.length === 1 ? client.contacts[0]?.id : '',
       message: '',
-      items: tasks.map((task) => ({ taskId: task.id, title: task.title })),
+      items: [
+        ...tasks.map((task) => ({ taskId: task.id, title: task.title })),
+        ...posts.map((post) => ({ postId: post.id, title: post.title })),
+      ],
     },
   });
+  const entries: Entry[] = [
+    ...tasks.map((task) => ({ kind: 'task' as const, task })),
+    ...posts.map((post) => ({ kind: 'post' as const, post })),
+  ];
+  const mixed = tasks.length > 0 && posts.length > 0;
   const errors = form.formState.errors;
   const contactId = form.watch('contactId');
   const contact = client.contacts.find((candidate) => candidate.id === contactId);
@@ -173,17 +218,25 @@ function RequestForm({
       <fieldset className="flex flex-col gap-3">
         <legend className="mb-1 text-sm font-medium">{t('approvals.request.items')}</legend>
         <p className="text-sm text-muted-foreground">{t('approvals.request.itemsHint')}</p>
-        {tasks.map((task, index) => {
+        {entries.map((entry, index) => {
           const error = errors.items?.[index]?.title;
-          const id = `${ids.items}-${task.id}`;
+          const item = entry.kind === 'task' ? entry.task : entry.post;
+          const id = `${ids.items}-${item.id}`;
           return (
-            <Field key={task.id} invalid={!!error}>
+            <Field key={item.id} invalid={!!error}>
               <FieldLabel htmlFor={id} className="sr-only">
-                {t('approvals.request.itemTitle', { title: task.title })}
+                {t('approvals.request.itemTitle', { title: item.title })}
               </FieldLabel>
-              <Input id={id} dir="auto" {...form.register(`items.${index}.title`)} />
+              <span className="flex items-center gap-2">
+                {mixed && <ItemKindBadge kind={entry.kind} />}
+                <Input id={id} dir="auto" {...form.register(`items.${index}.title`)} />
+              </span>
               <FieldDescription>
-                <SnapshotSummary snapshot={task.snapshot} />
+                {entry.kind === 'task' ? (
+                  <SnapshotSummary snapshot={entry.task.snapshot} />
+                ) : (
+                  <PostSnapshotSummary post={entry.post} />
+                )}
               </FieldDescription>
               <FieldError match={!!error}>{t('approvals.request.errors.title')}</FieldError>
             </Field>
@@ -199,11 +252,14 @@ function RequestForm({
         </p>
         {message && <p className="whitespace-pre-line">{message}</p>}
         <ol className="flex list-inside list-decimal flex-col gap-1">
-          {tasks.map((task, index) => (
-            <li key={task.id} dir="auto">
-              {titles[index]?.title || task.title}
-            </li>
-          ))}
+          {entries.map((entry, index) => {
+            const item = entry.kind === 'task' ? entry.task : entry.post;
+            return (
+              <li key={item.id} dir="auto">
+                {titles[index]?.title || item.title}
+              </li>
+            );
+          })}
         </ol>
       </div>
       {failure && <FormAlert>{failure}</FormAlert>}

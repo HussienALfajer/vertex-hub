@@ -24,10 +24,12 @@ import { useTranslation } from 'react-i18next';
 import { LoadError } from '../../components/load-error';
 import { can, useMe } from '../../lib/auth';
 import { flagParam, idParam, listParam, oneOfParam, pageParam } from '../../lib/search-params';
+import { postListQuery } from '../content/content.queries';
+import { formatPublish, PostPlatforms } from '../content/post-parts';
 import { useDepartmentNames } from '../projects/project-badges';
 import { formatDue, PriorityBadge, TaskOverdueBadge } from '../tasks/task-badges';
 import { taskListQuery } from '../tasks/tasks.queries';
-import { reviewsMedical, sendsApprovals } from './approval-parts';
+import { ItemKindBadge, reviewsMedical, sendsApprovals } from './approval-parts';
 import { ReadyTab } from './ready-tab';
 import { type SentSearch, SentTab } from './sent-tab';
 
@@ -133,18 +135,19 @@ export function ApprovalsPage({ search }: { search: ApprovalsSearch }) {
   );
 }
 
-/** The medical stage has few tasks at a time: one request holds the whole queue. */
+/** The medical stage has few items at a time: one request holds each queue. */
 const QUEUE_SIZE = 100;
 
 /**
- * Tasks in the medical stage, the longest untouched first. A reviewer's own task is listed too,
- * marked: another member reviews it (rule 4, edge case 8).
+ * Tasks and posts in the medical stage (F09 rule 4, F08 rule 13): tasks the longest untouched
+ * first, then posts by publish date. A reviewer's own task or post is listed too, marked: another
+ * member reviews it (edge case 8).
  */
 function MedicalQueue() {
   const { t } = useTranslation();
   const me = useMe();
   const departmentName = useDepartmentNames();
-  const queue = useQuery(
+  const tasks = useQuery(
     taskListQuery({
       reviewStage: 'medical',
       status: ['internal_review'],
@@ -153,7 +156,10 @@ function MedicalQueue() {
       pageSize: QUEUE_SIZE,
     }),
   );
-  if (queue.isPending) {
+  const posts = useQuery(
+    postListQuery({ reviewStage: 'medical', status: ['internal_review'], pageSize: QUEUE_SIZE }),
+  );
+  if (tasks.isPending || posts.isPending) {
     return (
       <div className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-4">
         <Skeleton className="h-10" />
@@ -162,10 +168,15 @@ function MedicalQueue() {
       </div>
     );
   }
-  if (queue.isError) {
-    return <LoadError message={t('approvals.medical.loadError')} onRetry={() => queue.refetch()} />;
+  if (tasks.isError || posts.isError) {
+    return (
+      <LoadError
+        message={t('approvals.medical.loadError')}
+        onRetry={() => Promise.all([tasks.refetch(), posts.refetch()])}
+      />
+    );
   }
-  if (queue.data.items.length === 0) {
+  if (tasks.data.items.length === 0 && posts.data.items.length === 0) {
     return (
       <EmptyState
         icon={<StethoscopeIcon />}
@@ -174,18 +185,27 @@ function MedicalQueue() {
       />
     );
   }
+  const person = (person: { id: string; name: string; archived: boolean }) => (
+    <span className="flex items-center gap-2">
+      <Avatar name={person.name} size="sm" tone={person.archived ? 'muted' : 'brand'} />
+      <span className="flex flex-wrap items-center gap-2">
+        {person.name}
+        {person.id === me.user.id && <Badge tone="outline">{t('approvals.medical.own')}</Badge>}
+      </span>
+    </span>
+  );
   return (
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead>{t('approvals.medical.columns.task')}</TableHead>
-          <TableHead>{t('approvals.medical.columns.department')}</TableHead>
-          <TableHead>{t('approvals.medical.columns.assignee')}</TableHead>
-          <TableHead>{t('approvals.medical.columns.due')}</TableHead>
+          <TableHead>{t('approvals.medical.columns.item')}</TableHead>
+          <TableHead>{t('approvals.medical.columns.kind')}</TableHead>
+          <TableHead>{t('approvals.medical.columns.person')}</TableHead>
+          <TableHead>{t('approvals.medical.columns.date')}</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
-        {queue.data.items.map((task) => (
+        {tasks.data.items.map((task) => (
           <TableRow key={task.id}>
             <TableCell className="min-w-64 whitespace-normal">
               <span className="flex flex-col items-start gap-0.5">
@@ -196,25 +216,17 @@ function MedicalQueue() {
                 >
                   {task.title}
                 </Link>
-                <span className="text-xs text-muted-foreground">{task.client?.name}</span>
+                <span className="text-xs text-muted-foreground">
+                  {[task.client?.name, departmentName(task.department)].filter(Boolean).join(' · ')}
+                </span>
               </span>
             </TableCell>
-            <TableCell>{departmentName(task.department)}</TableCell>
+            <TableCell>
+              <ItemKindBadge kind="task" />
+            </TableCell>
             <TableCell>
               {task.assignee ? (
-                <span className="flex items-center gap-2">
-                  <Avatar
-                    name={task.assignee.name}
-                    size="sm"
-                    tone={task.assignee.archived ? 'muted' : 'brand'}
-                  />
-                  <span className="flex flex-wrap items-center gap-2">
-                    {task.assignee.name}
-                    {task.assignee.id === me.user.id && (
-                      <Badge tone="outline">{t('approvals.medical.own')}</Badge>
-                    )}
-                  </span>
-                </span>
+                person(task.assignee)
               ) : (
                 <span className="text-muted-foreground">{t('tasks.unassigned')}</span>
               )}
@@ -224,6 +236,34 @@ function MedicalQueue() {
                 {formatDue(task)}
                 <PriorityBadge priority={task.priority} />
                 {task.overdue && <TaskOverdueBadge />}
+              </span>
+            </TableCell>
+          </TableRow>
+        ))}
+        {posts.data.items.map((post) => (
+          <TableRow key={post.id}>
+            <TableCell className="min-w-64 whitespace-normal">
+              <span className="flex flex-col items-start gap-0.5">
+                <Link
+                  to="/content/posts/$postId"
+                  params={{ postId: post.id }}
+                  className="font-medium hover:underline"
+                >
+                  {post.title}
+                </Link>
+                <span className="text-xs text-muted-foreground">
+                  {[post.client.name, t(`content.types.${post.type}`)].join(' · ')}
+                </span>
+              </span>
+            </TableCell>
+            <TableCell>
+              <ItemKindBadge kind="post" />
+            </TableCell>
+            <TableCell>{person(post.responsible)}</TableCell>
+            <TableCell>
+              <span className="flex flex-wrap items-center gap-2 tabular-nums">
+                {formatPublish(post)}
+                <PostPlatforms platforms={post.platforms} />
               </span>
             </TableCell>
           </TableRow>

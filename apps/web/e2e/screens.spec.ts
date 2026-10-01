@@ -1,6 +1,7 @@
 import ar from '../src/i18n/locales/ar.json' with { type: 'json' };
 import {
   accountManagerMe,
+  CONTENT_LINK_TOKEN,
   EXPIRED_LINK_TOKEN,
   employeeMe,
   financeWithoutTwoFactor,
@@ -941,6 +942,81 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await page.goto(`/content/posts/${seedIds.coffeeDay}`);
       await expect(page.getByRole('link', { name: /instagram\.com/ })).toBeVisible();
       await screenshot(page, testInfo, `post-published-${colorScheme}`);
+    });
+
+    test('posts in approvals: queues, send month, request page, post panel, client page', async ({
+      page,
+    }, testInfo) => {
+      await page.setViewportSize({ width: 1280, height: 900 });
+      await page.clock.setFixedTime(new Date(`${PROJECTS_TODAY}T09:00:00+03:00`));
+      const api = await mockApi(page, { signedIn: true, me: medicalReviewerMe, content: true });
+      // Off-screen thumbnails load lazily (the calendar behind a dialog, the media strip).
+      const loaded = () =>
+        page.waitForFunction(() =>
+          [...document.images].every((image) => {
+            const box = image.getBoundingClientRect();
+            const shown =
+              box.bottom > 0 && box.top < innerHeight && box.right > 0 && box.left < innerWidth;
+            return image.complete || !shown;
+          }),
+        );
+
+      // The medical queue with a post beside the tasks.
+      await page.goto('/approvals');
+      await expect(page.getByRole('link', { name: 'نصائح العناية بالأسنان' })).toBeVisible();
+      await screenshot(page, testInfo, `approvals-medical-posts-${colorScheme}`);
+
+      // Ready to send with posts, and the Month picker.
+      api.signInAs(accountManagerMe);
+      await page.goto('/approvals?tab=ready');
+      const jasmine = page.getByRole('region', { name: 'مطعم الياسمين' });
+      await expect(jasmine.getByRole('link', { name: 'ريل تحضير القهوة' })).toBeVisible();
+      await jasmine.getByRole('checkbox', { name: /ريل تحضير القهوة/ }).click();
+      await screenshot(page, testInfo, `approvals-ready-posts-${colorScheme}`);
+
+      // "Send month for approval" on the client's Content tab, then its dialog.
+      await page.setViewportSize({ width: 1440, height: 1100 });
+      await page.goto(`/clients/${seedIds.jasmine}?tab=content`);
+      const send = page.getByRole('button', { name: /^أرسل الشهر للاعتماد \(1\)$/ });
+      await expect(send).toBeEnabled();
+      await screenshot(page, testInfo, `client-content-send-month-${colorScheme}`);
+      await send.click();
+      await expect(page.getByRole('dialog').getByText(ar.approvals.request.preview)).toBeVisible();
+      await loaded();
+      await screenshot(page, testInfo, `approval-request-posts-new-${colorScheme}`);
+      await page.keyboard.press('Escape');
+
+      // The month link's request page with its post items.
+      await page.setViewportSize({ width: 1280, height: 1300 });
+      await page.goto(`/approvals/requests/${seedIds.contentRequest}`);
+      await expect(
+        page.getByRole('link', { name: 'المنشور: كاروسيل حلويات الجمعة' }),
+      ).toBeVisible();
+      await loaded();
+      await screenshot(page, testInfo, `approval-request-posts-${colorScheme}`);
+
+      // The post waiting in the link: its Client approval panel.
+      await page.goto(`/content/posts/${seedIds.sweetsCarousel}`);
+      await expect(
+        page.getByRole('heading', { level: 2, name: ar.tasks.approval.title }),
+      ).toBeVisible();
+      await loaded();
+      await screenshot(page, testInfo, `post-client-approval-${colorScheme}`);
+
+      // The client page at phone width: the content plan and "Approve all".
+      await page.setViewportSize({ width: 390, height: 844 });
+      await page.goto(`/a/${CONTENT_LINK_TOKEN}`);
+      await expect(
+        page.getByRole('heading', { level: 2, name: ar.approvals.public.contentPlan }),
+      ).toBeVisible();
+      await loaded();
+      await page
+        .getByRole('heading', { level: 2, name: ar.approvals.public.contentPlan })
+        .scrollIntoViewIfNeeded();
+      await screenshot(page, testInfo, `client-page-content-plan-${colorScheme}`);
+      await page.getByRole('button', { name: /^اعتمد الكل/ }).click();
+      await expect(page.getByRole('dialog')).toBeVisible();
+      await screenshot(page, testInfo, `client-page-approve-all-${colorScheme}`);
     });
 
     test('task page with the Post line', async ({ page }, testInfo) => {

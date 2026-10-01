@@ -1,32 +1,66 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
-import { APPROVAL_LIMITS, type ReadyClient, type ReadyTask } from '@vertex-hub/contracts';
-import { Button, Callout, Checkbox, EmptyState, Skeleton } from '@vertex-hub/ui';
+import {
+  APPROVAL_LIMITS,
+  type ApprovalItemKind,
+  type ReadyClient,
+  type ReadyPost,
+  type ReadyTask,
+} from '@vertex-hub/contracts';
+import {
+  Button,
+  Callout,
+  Checkbox,
+  EmptyState,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  Skeleton,
+} from '@vertex-hub/ui';
 import { LinkIcon, SendToBackIcon, ShieldAlertIcon } from 'lucide-react';
-import { useState } from 'react';
+import { type ReactNode, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LoadError } from '../../components/load-error';
-import { formatNumber } from '../../lib/format';
+import { formatMonth, formatNumber } from '../../lib/format';
 import { HealthcareBadge } from '../clients/client-badges';
 import { formatDue, TaskOverdueBadge } from '../tasks/task-badges';
+import { ItemKindBadge } from './approval-parts';
 import { approvalReadyQuery } from './approvals.queries';
-import { RequestDialog, SnapshotSummary } from './request-dialog';
+import { PostSnapshotSummary, RequestDialog, SnapshotSummary } from './request-dialog';
 
 /** What a new request holds: kept while its dialog is open, whatever the list reloads to. */
-interface Draft {
+export interface RequestDraft {
   client: ReadyClient;
   tasks: ReadyTask[];
+  posts: ReadyPost[];
 }
 
+/** A month of publishing, `YYYY-MM`. */
+const monthOf = (post: ReadyPost) => post.publishDate.slice(0, 7);
+
 /**
- * Tasks ready to send (spec F09, screen 1, rule 8), by client: pick tasks of one client and
- * create its approval link. A client with no final-approval contact cannot be sent anything
- * (F02 rule 9).
+ * Tasks and posts ready to send (spec F09, screen 1, rule 8; F08 screen 6, rule 20), by client:
+ * pick items of one client and create its approval link. The Month picker keeps the posts
+ * published in one month; tasks stay. A client with no final-approval contact cannot be sent
+ * anything (F02 rule 9).
  */
 export function ReadyTab() {
   const { t } = useTranslation();
   const ready = useQuery(approvalReadyQuery());
-  const [draft, setDraft] = useState<Draft | null>(null);
+  const [month, setMonth] = useState<string | null>(null);
+  const [draft, setDraft] = useState<RequestDraft | null>(null);
+  const months = [
+    ...new Set(ready.data?.clients.flatMap((entry) => entry.posts.map(monthOf)) ?? []),
+  ].sort();
+  // A month whose posts were all sent leaves the picker, and the filter with it.
+  const active = month && months.includes(month) ? month : null;
+  const clients = (ready.data?.clients ?? [])
+    .map((entry) =>
+      active ? { ...entry, posts: entry.posts.filter((post) => monthOf(post) === active) } : entry,
+    )
+    .filter((entry) => entry.tasks.length > 0 || entry.posts.length > 0);
   return (
     <>
       {ready.isPending ? (
@@ -44,35 +78,116 @@ export function ReadyTab() {
         />
       ) : (
         <div className="flex flex-col gap-4">
-          {ready.data.clients.map((entry) => (
-            <ReadyClientCard key={entry.client.id} entry={entry} onCreate={setDraft} />
-          ))}
+          {months.length > 0 && <MonthPicker months={months} value={active} onChange={setMonth} />}
+          {clients.length === 0 ? (
+            <EmptyState
+              icon={<SendToBackIcon />}
+              title={t('approvals.ready.emptyMonthTitle')}
+              description={t('approvals.ready.emptyMonthHint')}
+            />
+          ) : (
+            clients.map((entry) => (
+              <ReadyClientCard key={entry.client.id} entry={entry} onCreate={setDraft} />
+            ))
+          )}
         </div>
       )}
       {draft && (
-        <RequestDialog client={draft.client} tasks={draft.tasks} onClose={() => setDraft(null)} />
+        <RequestDialog
+          client={draft.client}
+          tasks={draft.tasks}
+          posts={draft.posts}
+          onClose={() => setDraft(null)}
+        />
       )}
     </>
   );
 }
+
+/** The months the ready posts are published in; none chosen shows every post. */
+function MonthPicker({
+  months,
+  value,
+  onChange,
+}: {
+  months: string[];
+  value: string | null;
+  onChange: (month: string | null) => void;
+}) {
+  const { t } = useTranslation();
+  const id = useId();
+  const all = 'all';
+  const items = [
+    { value: all, label: t('approvals.ready.allMonths') },
+    ...months.map((month) => ({ value: month, label: formatMonth(`${month}-01`) })),
+  ];
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <span id={id} className="text-sm font-medium">
+        {t('approvals.ready.month')}
+      </span>
+      <Select
+        items={items}
+        value={value ?? all}
+        onValueChange={(next) => onChange(next && next !== all ? next : null)}
+      >
+        <SelectTrigger aria-labelledby={id} className="w-48">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {items.map((item) => (
+            <SelectItem key={item.value} value={item.value}>
+              {item.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
+
+const keyOf = (kind: ApprovalItemKind, id: string) => `${kind}:${id}`;
 
 function ReadyClientCard({
   entry,
   onCreate,
 }: {
   entry: ReadyClient;
-  onCreate: (draft: Draft) => void;
+  onCreate: (draft: RequestDraft) => void;
 }) {
   const { t } = useTranslation();
   const [selected, setSelected] = useState<string[]>([]);
-  // A task sent or moved meanwhile leaves the list, and the selection with it.
-  const chosen = entry.tasks.filter((task) => selected.includes(task.id));
-  const full = chosen.length >= APPROVAL_LIMITS.items;
+  // An item sent, moved or out of the month meanwhile leaves the list, and the selection with it.
+  const tasks = entry.tasks.filter((task) => selected.includes(keyOf('task', task.id)));
+  const posts = entry.posts.filter((post) => selected.includes(keyOf('post', post.id)));
+  const count = tasks.length + posts.length;
+  const full = count >= APPROVAL_LIMITS.items;
   const canSend = entry.contacts.length > 0;
-  const toggle = (taskId: string, checked: boolean) =>
+  const mixed = entry.tasks.length > 0 && entry.posts.length > 0;
+  const toggle = (key: string, checked: boolean) =>
     setSelected((previous) =>
-      checked ? [...previous, taskId] : previous.filter((id) => id !== taskId),
+      checked ? [...previous, key] : previous.filter((other) => other !== key),
     );
+  const everything = [
+    ...entry.tasks.map((task) => keyOf('task', task.id)),
+    ...entry.posts.map((post) => keyOf('post', post.id)),
+  ];
+  const row = (key: string, title: string, body: ReactNode) => {
+    const checked = selected.includes(key);
+    return (
+      <li key={key} className="flex items-center gap-3 px-4 py-3">
+        {canSend && (
+          <Checkbox
+            checked={checked}
+            disabled={!checked && full}
+            onCheckedChange={(next) => toggle(key, next)}
+            aria-label={t('approvals.ready.select', { title })}
+          />
+        )}
+        {body}
+      </li>
+    );
+  };
   return (
     <section
       aria-label={entry.client.name}
@@ -91,29 +206,25 @@ function ReadyClientCard({
         {entry.isHealthcare && <HealthcareBadge />}
         {canSend && (
           <div className="ms-auto flex flex-wrap items-center gap-2">
-            {entry.tasks.length > 1 && (
+            {everything.length > 1 && (
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() =>
-                  setSelected(
-                    chosen.length > 0
-                      ? []
-                      : entry.tasks.slice(0, APPROVAL_LIMITS.items).map((task) => task.id),
-                  )
+                  setSelected(count > 0 ? [] : everything.slice(0, APPROVAL_LIMITS.items))
                 }
               >
-                {chosen.length > 0 ? t('approvals.ready.clear') : t('approvals.ready.selectAll')}
+                {count > 0 ? t('approvals.ready.clear') : t('approvals.ready.selectAll')}
               </Button>
             )}
             <Button
               size="sm"
-              disabled={chosen.length === 0}
-              onClick={() => onCreate({ client: entry, tasks: chosen })}
+              disabled={count === 0}
+              onClick={() => onCreate({ client: entry, tasks, posts })}
             >
               <LinkIcon />
-              {chosen.length > 0
-                ? t('approvals.ready.createFor', { n: formatNumber(chosen.length) })
+              {count > 0
+                ? t('approvals.ready.createFor', { n: formatNumber(count) })
                 : t('approvals.ready.create')}
             </Button>
           </div>
@@ -139,26 +250,22 @@ function ReadyClientCard({
         </div>
       )}
       <ul className="flex flex-col divide-y divide-border">
-        {entry.tasks.map((task) => {
-          const checked = selected.includes(task.id);
-          return (
-            <li key={task.id} className="flex items-center gap-3 px-4 py-3">
-              {canSend && (
-                <Checkbox
-                  checked={checked}
-                  disabled={!checked && full}
-                  onCheckedChange={(next) => toggle(task.id, next)}
-                  aria-label={t('approvals.ready.select', { title: task.title })}
-                />
-              )}
+        {entry.tasks.map((task) =>
+          row(
+            keyOf('task', task.id),
+            task.title,
+            <>
               <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                <Link
-                  to="/tasks/$taskId"
-                  params={{ taskId: task.id }}
-                  className="w-fit font-medium hover:underline"
-                >
-                  {task.title}
-                </Link>
+                <span className="flex flex-wrap items-center gap-2">
+                  {mixed && <ItemKindBadge kind="task" />}
+                  <Link
+                    to="/tasks/$taskId"
+                    params={{ taskId: task.id }}
+                    className="w-fit font-medium hover:underline"
+                  >
+                    {task.title}
+                  </Link>
+                </span>
                 <span className="text-xs text-muted-foreground">
                   <SnapshotSummary snapshot={task.snapshot} />
                 </span>
@@ -167,9 +274,28 @@ function ReadyClientCard({
                 {formatDue(task)}
                 {task.overdue && <TaskOverdueBadge />}
               </span>
-            </li>
-          );
-        })}
+            </>,
+          ),
+        )}
+        {entry.posts.map((post) =>
+          row(
+            keyOf('post', post.id),
+            post.title,
+            <div className="flex min-w-0 flex-1 flex-col gap-1">
+              <span className="flex flex-wrap items-center gap-2">
+                {mixed && <ItemKindBadge kind="post" />}
+                <Link
+                  to="/content/posts/$postId"
+                  params={{ postId: post.id }}
+                  className="w-fit font-medium hover:underline"
+                >
+                  {post.title}
+                </Link>
+              </span>
+              <PostSnapshotSummary post={post} />
+            </div>,
+          ),
+        )}
       </ul>
     </section>
   );

@@ -1,5 +1,9 @@
 import { keepPreviousData, queryOptions, useMutation, useQueryClient } from '@tanstack/react-query';
-import type { CreateApprovalRequest, PublicResponse } from '@vertex-hub/contracts';
+import type {
+  CreateApprovalRequest,
+  PublicApproveAll,
+  PublicResponse,
+} from '@vertex-hub/contracts';
 import { api, call } from '../../lib/api/client';
 import type { paths } from '../../lib/api/schema.gen';
 
@@ -10,7 +14,8 @@ export type ApprovalRequestFilters = NonNullable<
 
 export const approvalsKeys = {
   all: ['approvals'] as const,
-  ready: (clientId?: string) => ['approvals', 'ready', clientId ?? null] as const,
+  ready: (clientId?: string, month?: string) =>
+    ['approvals', 'ready', clientId ?? null, month ?? null] as const,
   requests: (filters: ApprovalRequestFilters) => ['approvals', 'requests', filters] as const,
   request: (id: string) => ['approvals', 'request', id] as const,
   client: (clientId: string, page: number) => ['approvals', 'client', clientId, page] as const,
@@ -18,13 +23,15 @@ export const approvalsKeys = {
 };
 
 /**
- * The tasks ready to send to a client, under the caller's client scope (F09 rule 8): every
- * client's, or one client's.
+ * The tasks and posts ready to send to a client, under the caller's client scope (F09 rule 8,
+ * F08 rule 20): every client's, or one client's. `month` (`YYYY-MM`) keeps the posts published
+ * in it, for "Send month for approval"; it never filters tasks.
  */
-export const approvalReadyQuery = (clientId?: string) =>
+export const approvalReadyQuery = (clientId?: string, month?: string) =>
   queryOptions({
-    queryKey: approvalsKeys.ready(clientId),
-    queryFn: () => call(api.GET('/api/approvals/ready', { params: { query: { clientId } } })),
+    queryKey: approvalsKeys.ready(clientId, month),
+    queryFn: () =>
+      call(api.GET('/api/approvals/ready', { params: { query: { clientId, month } } })),
   });
 
 export const approvalRequestListQuery = (filters: ApprovalRequestFilters) =>
@@ -57,8 +64,8 @@ export const clientApprovalsQuery = (clientId: string, page: number) =>
 
 /**
  * A change to an approval request, refreshing also on failure (a request closed meanwhile shows
- * its current state): approvals, and tasks, which show their pending link and whether they are
- * ready to send.
+ * its current state): approvals, and tasks and posts, which show their pending link and whether
+ * they are ready to send.
  */
 function useApprovalsMutation<Input, Output>(mutationFn: (input: Input) => Promise<Output>) {
   const queryClient = useQueryClient();
@@ -66,7 +73,7 @@ function useApprovalsMutation<Input, Output>(mutationFn: (input: Input) => Promi
     mutationFn,
     onSettled: () =>
       Promise.all(
-        [approvalsKeys.all, ['tasks']].map((queryKey) =>
+        [approvalsKeys.all, ['tasks'], ['content']].map((queryKey) =>
           queryClient.invalidateQueries({ queryKey }),
         ),
       ),
@@ -106,6 +113,21 @@ export function useRespondToApproval(token: string) {
       call(
         api.POST('/api/public/approvals/{token}/items/{itemId}/response', {
           params: { path: { token, itemId } },
+          body: input,
+        }),
+      ),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: approvalsKeys.public(token) }),
+  });
+}
+
+/** F08 rule 23: every pending post item of the link at once; task items are never included. */
+export function useApproveAllPosts(token: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: PublicApproveAll) =>
+      call(
+        api.POST('/api/public/approvals/{token}/approve-all', {
+          params: { path: { token } },
           body: input,
         }),
       ),

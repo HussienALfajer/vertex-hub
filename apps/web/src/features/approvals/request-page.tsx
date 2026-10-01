@@ -25,8 +25,15 @@ import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '../../components/confirm-dialog';
 import { isMissing, LoadError } from '../../components/load-error';
 import { formatDateTime, formatNumber } from '../../lib/format';
+import { PostFacts } from '../content/post-parts';
 import { FileThumbnail, VersionBadge } from '../files/file-parts';
-import { IssuedLink, ItemStatusBadge, RequestStateBadge, WhatsAppButton } from './approval-parts';
+import {
+  IssuedLink,
+  ItemKindBadge,
+  ItemStatusBadge,
+  RequestStateBadge,
+  WhatsAppButton,
+} from './approval-parts';
 import {
   approvalRequestQuery,
   useReissueApprovalRequest,
@@ -147,7 +154,11 @@ function RequestView({ request }: { request: ApprovalRequestDetail }) {
 
       <ol className="flex flex-col gap-4">
         {request.items.map((item) => (
-          <ItemCard key={item.id} item={item} />
+          <ItemCard
+            key={item.id}
+            item={item}
+            mixed={request.items.some((other) => other.kind !== item.kind)}
+          />
         ))}
       </ol>
     </>
@@ -255,18 +266,20 @@ function RequestActions({ request }: { request: ApprovalRequestDetail }) {
   );
 }
 
-/** One task of the request: the snapshot that was sent, and the client's answer on it. */
-function ItemCard({ item }: { item: ApprovalItem }) {
+/**
+ * One task or post of the request: the snapshot that was sent, and the client's answer on it. A
+ * post shows its type, date, platforms and the start of its caption (F08 screen 6).
+ */
+function ItemCard({ item, mixed }: { item: ApprovalItem; mixed: boolean }) {
   const { t } = useTranslation();
-  const { response } = item;
+  const { response, post } = item;
   return (
     <li className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-5">
       <div className="flex flex-wrap items-start gap-3">
-        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
           <h2 className="text-base font-bold" dir="auto">
             {item.title}
           </h2>
-          {/* A post item shows its title only: its page arrives with the F08 screens. */}
           {item.task && (
             <Link
               to="/tasks/$taskId"
@@ -276,8 +289,23 @@ function ItemCard({ item }: { item: ApprovalItem }) {
               {t('approvals.requestPage.task', { title: item.task.title })}
             </Link>
           )}
+          {post && (
+            <>
+              <Link
+                to="/content/posts/$postId"
+                params={{ postId: post.id }}
+                className="w-fit text-sm text-muted-foreground hover:text-foreground hover:underline"
+              >
+                {t('approvals.requestPage.post', { title: post.title })}
+              </Link>
+              <PostFacts post={post} />
+            </>
+          )}
         </div>
-        <ItemStatusBadge status={item.status} />
+        <span className="flex items-center gap-2">
+          {mixed && <ItemKindBadge kind={item.kind} />}
+          <ItemStatusBadge status={item.status} />
+        </span>
       </div>
       {item.versions.length > 0 && (
         <ul className="flex flex-wrap gap-3">
@@ -291,6 +319,14 @@ function ItemCard({ item }: { item: ApprovalItem }) {
             </li>
           ))}
         </ul>
+      )}
+      {post?.caption && (
+        <p
+          className="line-clamp-3 rounded-md bg-muted px-3 py-2 text-sm whitespace-pre-line"
+          dir="auto"
+        >
+          {post.caption}
+        </p>
       )}
       {item.text && (
         <div className="flex flex-col gap-1 rounded-md bg-muted px-3 py-2 text-sm">

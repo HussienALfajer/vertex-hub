@@ -8,7 +8,7 @@ import { useTranslation } from 'react-i18next';
 import { LoadError } from '../../components/load-error';
 import { TabHeader } from '../../components/tab-header';
 import { formatDateTime, formatNumber } from '../../lib/format';
-import { RequestsTable } from './approval-parts';
+import { ItemKindBadge, RequestsTable } from './approval-parts';
 import { CLIENT_APPROVALS_PAGE_SIZE, clientApprovalsQuery } from './approvals.queries';
 
 /**
@@ -101,11 +101,17 @@ function ResponseRow({ response }: { response: ClientResponseEntry }) {
             {response.task.title}
           </Link>
         ) : (
-          // A response on a post: its page arrives with the F08 screens.
-          <span className="font-medium" dir="auto">
-            {response.post?.title}
-          </span>
+          response.post && (
+            <Link
+              to="/content/posts/$postId"
+              params={{ postId: response.post.id }}
+              className="font-medium hover:underline"
+            >
+              {response.post.title}
+            </Link>
+          )
         )}
+        <ItemKindBadge kind={response.kind} />
         <Badge tone={response.decision === 'approved' ? 'success' : 'warning'}>
           {t(`tasks.responses.decisions.${response.decision}`)}
         </Badge>
