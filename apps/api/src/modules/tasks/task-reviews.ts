@@ -148,7 +148,8 @@ export class TaskReviews {
     source: RevisionSource,
     note: string,
     contactId: string | null,
-    authorId: string,
+    /** Null for changes the client asked for through an approval link. */
+    authorId: string | null,
   ) {
     let number: number | null = null;
     if (source === 'client') {

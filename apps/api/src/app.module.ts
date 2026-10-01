@@ -9,7 +9,9 @@ import { ConfigModule } from './core/config/config.module.js';
 import { ENV, type Env } from './core/config/env.js';
 import { DatabaseModule } from './core/database/database.module.js';
 import { DatabaseErrorFilter } from './core/errors/database-error.filter.js';
+import { redactLoggedRequest } from './core/http/redact-link-token.js';
 import { JobsModule } from './core/jobs/index.js';
+import { ApprovalsModule } from './modules/approvals/index.js';
 import { AuditModule } from './modules/audit/index.js';
 import { AuthModule } from './modules/auth/index.js';
 import { ClientsModule } from './modules/clients/index.js';
@@ -29,6 +31,8 @@ import { TemplatesModule } from './modules/templates/index.js';
         pinoHttp: {
           level: env.LOG_LEVEL,
           redact: ['req.headers.authorization', 'req.headers.cookie', 'res.headers["set-cookie"]'],
+          // The token of an approval link is in the URL of its public routes (F09).
+          serializers: { req: redactLoggedRequest },
           ...(env.NODE_ENV === 'development' && { transport: { target: 'pino-pretty' } }),
         },
       }),
@@ -42,6 +46,7 @@ import { TemplatesModule } from './modules/templates/index.js';
     ClientsModule,
     ProjectsModule,
     TasksModule,
+    ApprovalsModule,
     TemplatesModule,
     HealthModule,
   ],

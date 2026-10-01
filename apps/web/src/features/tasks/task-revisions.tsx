@@ -82,7 +82,7 @@ export function RevisionsSection({ task }: { task: TaskDetail }) {
                 )}
                 <span className="text-xs text-muted-foreground">
                   {t('tasks.revisions.by', {
-                    name: revision.author.name,
+                    name: revision.author?.name ?? revision.contact?.name ?? '',
                     date: formatDateTime(revision.createdAt),
                   })}
                 </span>

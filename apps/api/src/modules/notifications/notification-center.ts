@@ -11,8 +11,15 @@ import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { UserDirectory } from '../auth/index.js';
 import { NOTIFICATIONS_CHANNEL, pushPayloads } from './notification-channel.js';
 
-/** Types merged into the recipient's unread notification of the same type and task (rule 5, F10). */
-const MERGED_TYPES: readonly NotificationType[] = ['task_commented', 'task_file_added'];
+/**
+ * Types merged into the recipient's unread notification of the same type and subject (rule 5,
+ * F10, F09).
+ */
+const MERGED_TYPES: readonly NotificationType[] = [
+  'task_commented',
+  'task_file_added',
+  'approval_responded',
+];
 
 /** One type of notification for one change, as the owning module resolved its recipients. */
 export type Notice = NotificationContent & {

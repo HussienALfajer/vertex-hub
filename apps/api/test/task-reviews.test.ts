@@ -509,6 +509,7 @@ describe('task reviews (F09 rules 1–7, 13–19)', () => {
       const task = await cast.taskAt('awaiting_client', { clientId });
       const now = new Date();
       pending.set(task.id, {
+        itemId: randomUUID(),
         requestId: randomUUID(),
         state: 'open',
         issuedAt: now,
@@ -736,6 +737,7 @@ describe('task reviews (F09 rules 1–7, 13–19)', () => {
       const sentTask = await cast.taskAt('awaiting_client', { clientId });
       const now = new Date();
       pending.set(sentTask.id, {
+        itemId: randomUUID(),
         requestId: randomUUID(),
         state: 'open',
         issuedAt: now,

@@ -229,9 +229,8 @@ export const taskRevisions = pgTable(
     extraWorkItemId: uuid('extra_work_item_id').references(() => extraWorkItems.id),
     decidedById: uuid('decided_by_id').references(() => users.id),
     decidedAt: timestamp('decided_at', { withTimezone: true }),
-    authorId: uuid('author_id')
-      .notNull()
-      .references(() => users.id),
+    /** Null for changes the client asked for through an approval link (F09). */
+    authorId: uuid('author_id').references(() => users.id),
     ...timestamps(),
   },
   (table) => [

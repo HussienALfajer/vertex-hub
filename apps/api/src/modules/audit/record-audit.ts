@@ -9,6 +9,8 @@ export interface AuditActor {
 
 export interface NewAuditEntry {
   actor: AuditActor | null;
+  /** Without an actor: the client contact who answered through an approval link (F09). */
+  actorName?: string;
   action: AuditAction;
   entityType: AuditEntityType;
   entityId: string;
@@ -27,7 +29,7 @@ export async function recordAudit(
 ): Promise<void> {
   await executor.insert(auditEntries).values({
     actorId: entry.actor?.id ?? null,
-    actorName: entry.actor?.name ?? null,
+    actorName: entry.actor?.name ?? entry.actorName ?? null,
     action: entry.action,
     entityType: entry.entityType,
     entityId: entry.entityId,

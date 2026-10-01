@@ -244,7 +244,10 @@ export class TasksService {
         ...(task.createdById ? [task.createdById] : []),
         ...checklist.flatMap((i) => (i.doneById ? [i.doneById] : [])),
         ...links.map((l) => l.addedById),
-        ...revisions.flatMap((r) => [r.authorId, ...(r.decidedById ? [r.decidedById] : [])]),
+        ...revisions.flatMap((r) => [
+          ...(r.authorId ? [r.authorId] : []),
+          ...(r.decidedById ? [r.decidedById] : []),
+        ]),
       ]),
       this.clients.contactSummaries([
         ...(task.requestedByContactId ? [task.requestedByContactId] : []),
@@ -317,7 +320,7 @@ export class TasksService {
           extraWork: extra ? { id: extra.id, title: extra.title } : null,
           decidedBy: r.decidedById ? person(r.decidedById) : null,
           decidedAt: r.decidedAt?.toISOString() ?? null,
-          author: person(r.authorId),
+          author: r.authorId ? person(r.authorId) : null,
           createdAt: r.createdAt.toISOString(),
         };
       }),

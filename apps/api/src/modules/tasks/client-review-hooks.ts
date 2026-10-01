@@ -9,6 +9,7 @@ type Executor = Database | Transaction;
 
 /** The approval request that holds a task's pending item. */
 export interface PendingApproval {
+  itemId: string;
   requestId: string;
   state: ApprovalRequestState;
   issuedAt: Date;

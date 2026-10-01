@@ -638,7 +638,8 @@ export const taskRevisionSchema = z
     extraWork: z.object({ id: z.uuid(), title: z.string() }).nullable(),
     decidedBy: personSchema.nullable(),
     decidedAt: z.iso.datetime().nullable(),
-    author: personSchema,
+    /** Null for changes the client asked for through an approval link (F09). */
+    author: personSchema.nullable(),
     createdAt: z.iso.datetime(),
   })
   .meta({ id: 'TaskRevision' });
