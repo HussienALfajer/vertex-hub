@@ -138,7 +138,30 @@ export function formatPublish(post: Pick<Post, 'publishDate' | 'publishTime'>): 
   return post.publishTime ? `${date} · ${formatTimeOfDay(post.publishTime)}` : date;
 }
 
-function PostThumbnail({ versionId, className }: { versionId: string; className?: string }) {
+/**
+ * What goes out and when, in one line: the type, the publish date and time, and the platforms.
+ * Approval screens show it under a post item's title.
+ */
+export function PostFacts({
+  post,
+}: {
+  post: Pick<Post, 'type' | 'platforms' | 'publishDate' | 'publishTime'>;
+}) {
+  const { t } = useTranslation();
+  const Icon = POST_TYPE_ICONS[post.type];
+  return (
+    <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+      <span className="flex items-center gap-1">
+        <Icon aria-hidden="true" className="size-3.5 shrink-0" />
+        {t(`content.types.${post.type}`)}
+      </span>
+      <span className="tabular-nums">{formatPublish(post)}</span>
+      <PostPlatforms platforms={post.platforms} />
+    </span>
+  );
+}
+
+export function PostThumbnail({ versionId, className }: { versionId: string; className?: string }) {
   return (
     <img
       src={fileThumbnailUrl(versionId)}

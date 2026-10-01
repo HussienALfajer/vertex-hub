@@ -144,6 +144,8 @@ export const publicApproveAllSchema = z
 
 export type PublicApproveAll = z.infer<typeof publicApproveAllSchema>;
 
+export type PublicApproveAllInput = z.input<typeof publicApproveAllSchema>;
+
 // Responses
 
 const personSchema = z.object({ id: z.uuid(), name: z.string() });

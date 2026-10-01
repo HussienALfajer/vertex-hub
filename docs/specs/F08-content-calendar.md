@@ -336,6 +336,12 @@ Details the implementation settled (PR 3, `feat/f08-content-web`):
 - **Shared error texts** (`NOTHING_TO_APPROVE`, `REVIEW_CONTENT_CHANGED`, `MEDICAL_REVIEW_REQUIRED`, `SELF_REVIEW`) are worded for tasks and posts alike.
 - **Client approval panel** of the post page, "Send month for approval" and the post items of Approvals arrive with PR 4.
 
+Details the implementation settled (PR 4, `feat/f08-approvals-web`):
+- **Month picker** on Ready to send lists the months the ready posts are published in ("All months" first) and filters the posts only, on the page; tasks stay listed. `month` on `GET /api/approvals/ready` serves "Send month for approval".
+- **Send month for approval** sits in the month bar of the client Content tab, beside the month's counts, for client-scope users. It is disabled with a hint when no post of the month is ready or the client has no final-approval contact (the F02 warning itself stays at the top of the profile). It selects at most 60 posts, in publish order.
+- **Kind badge** shows where tasks and posts are listed together: the medical queue always, Ready to send, the new-request dialog and the request page only when a client or request has both, and every entry of a client's approval history.
+- **Client page.** Post media is shown without names (rule 27) and numbered for the preview ("Media 1"); a post with two or more files shows them as a strip to swipe through. "Approve all" takes one optional note, as rule 23 says.
+
 ## Acceptance
 - Owner check in the browser (content writer W and manager CM of Content Management, designer D and Design manager M, the client's account manager A, a Medical Consultation member R; a client C with an active retainer whose cycle has lines design 4 and reel 1 and generated tasks, with a final-approval contact with a phone; a healthcare client H):
   1. As W, open C's Content tab and create three posts for this month (a post, a carousel, a reel) with captions, platforms and dates; they show on the month and week views and on `/content`.

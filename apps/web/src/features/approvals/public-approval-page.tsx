@@ -5,14 +5,18 @@ import {
   type PublicApproval,
   type PublicApprovalFile,
   type PublicApprovalItem,
+  type PublicApproveAll,
+  type PublicApproveAllInput,
   type PublicResponse,
   type PublicResponseInput,
+  publicApproveAllSchema,
   publicResponseSchema,
 } from '@vertex-hub/contracts';
 import {
   AscentBar,
   Badge,
   Button,
+  cn,
   Dialog,
   DialogClose,
   DialogContent,
@@ -45,14 +49,22 @@ import { FormAlert } from '../../components/form-alert';
 import { LoadError } from '../../components/load-error';
 import { ApiError } from '../../lib/api/client';
 import { errorMessage, SCREEN_ERROR } from '../../lib/errors';
-import { formatDateTime, formatFileSize } from '../../lib/format';
+import { formatDateTime, formatFileSize, formatNumber } from '../../lib/format';
+import { formatPublish, POST_TYPE_ICONS, PostPlatforms } from '../content/post-parts';
 import { FileTypeIcon } from '../files/file-parts';
-import { publicApprovalQuery, publicVersionUrl, useRespondToApproval } from './approvals.queries';
+import {
+  publicApprovalQuery,
+  publicVersionUrl,
+  useApproveAllPosts,
+  useRespondToApproval,
+} from './approvals.queries';
 
 /*
- * The client page (spec F09, screen 4, rules 20–23): what the holder of an approval link sees,
- * with no account and outside the app shell. Phone width first: most clients open it from
- * WhatsApp. View only: a download is offered only for files the browser cannot show (rule 22).
+ * The client page (spec F09, screen 4, rules 20–23; F08 screen 7, rules 23 and 27): what the
+ * holder of an approval link sees, with no account and outside the app shell. Task items first,
+ * then the posts under "Content plan" in publish order. Phone width first: most clients open it
+ * from WhatsApp. View only: a download is offered only for files the browser cannot show
+ * (rule 22).
  */
 
 export function PublicApprovalPage({ token }: { token: string }) {
@@ -106,6 +118,11 @@ function LinkMessage({ icon, title, body }: { icon: ReactNode; title: string; bo
 
 function ApprovalView({ token, approval }: { token: string; approval: PublicApproval }) {
   const { t } = useTranslation();
+  const planId = useId();
+  const [approvingAll, setApprovingAll] = useState(false);
+  const tasks = approval.items.filter((item) => item.kind === 'task');
+  const posts = approval.items.filter((item) => item.kind === 'post');
+  const pendingPosts = posts.filter((item) => item.status === 'pending');
   return (
     <>
       <section className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-5">
@@ -126,40 +143,117 @@ function ApprovalView({ token, approval }: { token: string; approval: PublicAppr
           {t('approvals.public.validUntil', { date: formatDateTime(approval.expiresAt) })}
         </p>
       </section>
-      <ol className="flex flex-col gap-4">
-        {approval.items.map((item) => (
-          <ItemCard key={item.id} token={token} item={item} />
-        ))}
-      </ol>
+      {tasks.length > 0 && (
+        <ol className="flex flex-col gap-4">
+          {tasks.map((item) => (
+            <ItemCard key={item.id} token={token} item={item} />
+          ))}
+        </ol>
+      )}
+      {posts.length > 0 && (
+        <section aria-labelledby={planId} className="flex flex-col gap-4">
+          <div className="flex flex-wrap items-center gap-3 pt-2">
+            <h2 id={planId} className="text-lg font-bold">
+              {t('approvals.public.contentPlan')}
+            </h2>
+            {pendingPosts.length > 1 && (
+              <Button className="ms-auto" onClick={() => setApprovingAll(true)}>
+                <CheckCheckIcon />
+                {t('approvals.public.approveAll', { n: formatNumber(pendingPosts.length) })}
+              </Button>
+            )}
+          </div>
+          <ol className="flex flex-col gap-4">
+            {posts.map((item) => (
+              <ItemCard key={item.id} token={token} item={item} />
+            ))}
+          </ol>
+        </section>
+      )}
+      {approvingAll && (
+        <ApproveAllDialog
+          token={token}
+          count={pendingPosts.length}
+          onClose={() => setApprovingAll(false)}
+        />
+      )}
     </>
   );
 }
 
+/**
+ * One task or post. A post shows its date and time, type and platforms first, its media as a
+ * strip to swipe through, then the caption and hashtags (F08 rule 27).
+ */
 function ItemCard({ token, item }: { token: string; item: PublicApprovalItem }) {
   const { t } = useTranslation();
   const [deciding, setDeciding] = useState<ClientDecision | null>(null);
   const [previewing, setPreviewing] = useState<PublicApprovalFile | null>(null);
+  const { post } = item;
+  // The files of a post carry no name (rule 27): they are numbered instead.
+  const files = item.files.map((file, index) =>
+    file.name
+      ? file
+      : { ...file, name: t('approvals.public.media', { n: formatNumber(index + 1) }) },
+  );
+  const strip = post !== null && files.length > 1;
+  const Icon = post ? POST_TYPE_ICONS[post.type] : null;
+  // Posts sit under the "Content plan" heading.
+  const Heading = item.kind === 'post' ? 'h3' : 'h2';
   return (
     <li className="flex flex-col gap-4 rounded-lg border border-border bg-surface p-5">
-      <h2 className="text-lg font-bold" dir="auto">
-        {item.title}
-      </h2>
+      <div className="flex flex-col gap-2">
+        {post && Icon && (
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
+            <span className="font-medium text-foreground tabular-nums">{formatPublish(post)}</span>
+            <span className="flex items-center gap-1">
+              <Icon aria-hidden="true" className="size-4 shrink-0" />
+              {t(`content.types.${post.type}`)}
+            </span>
+            <PostPlatforms platforms={post.platforms} size="sm" />
+          </div>
+        )}
+        <Heading className="text-lg font-bold" dir="auto">
+          {item.title}
+        </Heading>
+      </div>
       {item.text && (
         <p className="whitespace-pre-line" dir="auto">
           {item.text}
         </p>
       )}
-      {item.files.length > 0 && (
-        <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-          {item.files.map((file) => (
+      {files.length > 0 && (
+        <ul
+          aria-label={strip ? t('approvals.public.mediaStrip') : undefined}
+          className={
+            strip
+              ? '-mx-5 flex snap-x snap-mandatory gap-3 overflow-x-auto px-5 pb-2'
+              : post
+                ? 'grid grid-cols-1 gap-3'
+                : 'grid grid-cols-2 gap-3 sm:grid-cols-3'
+          }
+        >
+          {files.map((file) => (
             <FileTile
               key={file.versionId}
               token={token}
               file={file}
+              showName={post === null}
+              className={strip ? 'w-4/5 shrink-0 snap-start sm:w-1/2' : undefined}
               onPreview={() => setPreviewing(file)}
             />
           ))}
         </ul>
+      )}
+      {post?.caption && (
+        <p className="whitespace-pre-line" dir="auto">
+          {post.caption}
+        </p>
+      )}
+      {post?.hashtags && (
+        <p className="text-sm text-muted-foreground" dir="auto">
+          {post.hashtags}
+        </p>
       )}
       {item.status === 'pending' ? (
         <div className="flex flex-col gap-2 border-t border-border pt-4 sm:flex-row">
@@ -239,10 +333,15 @@ function Outcome({ item }: { item: PublicApprovalItem }) {
 function FileTile({
   token,
   file,
+  showName = true,
+  className,
   onPreview,
 }: {
   token: string;
   file: PublicApprovalFile;
+  /** Post media is shown without names. */
+  showName?: boolean;
+  className?: string;
   onPreview: () => void;
 }) {
   const { t } = useTranslation();
@@ -258,7 +357,7 @@ function FileTile({
   ) : (
     <FileTypeIcon type={file.type} className="size-8" />
   );
-  const name = (
+  const name = showName && (
     <span className="truncate text-sm" dir="auto" title={file.name}>
       {file.name}
     </span>
@@ -266,7 +365,7 @@ function FileTile({
   // An image the browser cannot show itself (TIFF) still has its rendered preview.
   if (file.display === 'inline' || (file.type === 'image' && file.previewAvailable)) {
     return (
-      <li className="flex min-w-0 flex-col gap-1.5">
+      <li className={cn('flex min-w-0 flex-col gap-1.5', className)}>
         <button
           type="button"
           className={`${frame} focus-visible:outline-2 focus-visible:outline-ring`}
@@ -281,7 +380,7 @@ function FileTile({
   }
   const link = file.display === 'link';
   return (
-    <li className="flex min-w-0 flex-col gap-1.5">
+    <li className={cn('flex min-w-0 flex-col gap-1.5', className)}>
       <span className={frame}>{picture}</span>
       {name}
       {!link && file.sizeBytes !== null && (
@@ -447,6 +546,69 @@ function DecisionDialog({
             </DialogClose>
             <Button type="submit" disabled={form.formState.isSubmitting}>
               {approving ? t('approvals.public.confirmApprove') : t('approvals.public.sendChanges')}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/**
+ * "Approve all" (F08 rule 23): every pending post of the link at once, with one optional note.
+ * Final like each decision, so the count is confirmed first; tasks are never included.
+ */
+function ApproveAllDialog({
+  token,
+  count,
+  onClose,
+}: {
+  token: string;
+  count: number;
+  onClose: () => void;
+}) {
+  const { t } = useTranslation();
+  const id = useId();
+  const approveAll = useApproveAllPosts(token);
+  const [failure, setFailure] = useState<string | null>(null);
+  const form = useForm<PublicApproveAllInput, unknown, PublicApproveAll>({
+    resolver: standardSchemaResolver(publicApproveAllSchema),
+    defaultValues: { note: '' },
+  });
+  const noteError = form.formState.errors.note;
+  const submit = form.handleSubmit(async (values) => {
+    setFailure(null);
+    try {
+      await approveAll.mutateAsync({ note: values.note || undefined });
+      onClose();
+    } catch (error) {
+      setFailure(errorMessage(t, error));
+    }
+  });
+  return (
+    <Dialog open onOpenChange={(next) => !next && onClose()}>
+      <DialogContent closeLabel={t('common.close')}>
+        <form className="grid gap-5" onSubmit={submit} noValidate>
+          <DialogHeader>
+            <DialogTitle className="pe-8">
+              {t('approvals.public.approveAllTitle', { n: formatNumber(count) })}
+            </DialogTitle>
+            <DialogDescription>{t('approvals.public.approveAllBody')}</DialogDescription>
+          </DialogHeader>
+          <Field invalid={!!noteError}>
+            <FieldLabel htmlFor={id}>{t('approvals.public.note')}</FieldLabel>
+            <Textarea id={id} rows={2} dir="auto" {...form.register('note')} />
+            <FieldError match={!!noteError}>
+              {t('approvals.public.errors.approveAllNote')}
+            </FieldError>
+          </Field>
+          {failure && <FormAlert>{failure}</FormAlert>}
+          <DialogFooter>
+            <DialogClose render={<Button variant="outline" type="button" />}>
+              {t('common.cancel')}
+            </DialogClose>
+            <Button type="submit" disabled={form.formState.isSubmitting}>
+              {t('approvals.public.confirmApproveAll')}
             </Button>
           </DialogFooter>
         </form>
