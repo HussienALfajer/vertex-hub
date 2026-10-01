@@ -46,7 +46,8 @@ export class ApprovalsController {
   @RequirePermissions('tasks.manage')
   @SerializeOptions({ schema: approvalReadySchema })
   @ApiOkResponse({
-    description: 'Tasks ready to send under the caller’s client scope, grouped by client',
+    description:
+      'Tasks and posts ready to send under the caller’s client scope, grouped by client; `month` keeps the posts of one publish month',
     standardSchema: approvalReadySchema,
   })
   ready(
@@ -94,7 +95,7 @@ export class ApprovalsController {
   })
   @ApiConflictResponse({
     description:
-      '`CLIENT_ARCHIVED`, `CONTACT_NOT_APPROVER`, `TASK_NOT_READY`, `MEDICAL_REVIEW_REQUIRED`, `LIMIT_REACHED`',
+      '`CLIENT_ARCHIVED`, `CONTACT_NOT_APPROVER`, `TASK_NOT_READY`, `POST_NOT_READY`, `MEDICAL_REVIEW_REQUIRED`, `LIMIT_REACHED`',
   })
   create(
     @CurrentUser() actor: CurrentUserInfo,
@@ -126,7 +127,8 @@ export class ApprovalsController {
   @RequirePermissions('tasks.manage')
   @SerializeOptions({ schema: approvalRequestDetailSchema })
   @ApiOkResponse({
-    description: 'The revoked request: its pending items are withdrawn, the tasks ready again',
+    description:
+      'The revoked request: its pending items are withdrawn, the tasks and posts ready again',
     standardSchema: approvalRequestDetailSchema,
   })
   @ApiConflictResponse({ description: '`REQUEST_CLOSED`' })

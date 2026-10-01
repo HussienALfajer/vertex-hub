@@ -1,6 +1,8 @@
 import { z } from 'zod';
+import { calendarDateSchema, timeOfDaySchema } from './dates.js';
 import { filePreviewStatusSchema, fileTypeSchema, fileVersionKindSchema } from './files.js';
 import { pageQuerySchema, pageSchema, queryListSchema } from './lists.js';
+import { postPlatformSchema, postTypeSchema } from './post-values.js';
 import { optionalText } from './text.js';
 
 /*
@@ -43,8 +45,13 @@ export const approvalItemStatusSchema = z
 
 export type ApprovalItemStatus = z.infer<typeof approvalItemStatusSchema>;
 
-/** Why an item left `pending` without a decision (rules 8, 12 and 17). */
-export const APPROVAL_WITHDRAWN_REASONS = ['revoked', 'resent', 'task_moved'] as const;
+/** Why an item left `pending` without a decision (rules 8, 12 and 17; F08 rule 25). */
+export const APPROVAL_WITHDRAWN_REASONS = [
+  'revoked',
+  'resent',
+  'task_moved',
+  'post_moved',
+] as const;
 
 export const approvalWithdrawnReasonSchema = z
   .enum(APPROVAL_WITHDRAWN_REASONS)
@@ -53,8 +60,8 @@ export const approvalWithdrawnReasonSchema = z
 export type ApprovalWithdrawnReason = z.infer<typeof approvalWithdrawnReasonSchema>;
 
 export const APPROVAL_LIMITS = {
-  /** Tasks in one request; the API answers `LIMIT_REACHED` past it. */
-  items: 20,
+  /** Tasks and posts in one request (a month of posts); `LIMIT_REACHED` past it. */
+  items: 60,
   /** A link is valid this many days after it is issued. */
   linkDays: 7,
   /** Rule 24: the "no response" notice goes out this many hours after the link is issued. */
@@ -74,12 +81,26 @@ export function approvalRequestState(
 
 // Inputs
 
-/** What the client reads instead of the task's internal title. */
+/** What an approval item sends: a task (F09) or a finished post (F08). */
+export const APPROVAL_ITEM_KINDS = ['task', 'post'] as const;
+
+export const approvalItemKindSchema = z.enum(APPROVAL_ITEM_KINDS).meta({ id: 'ApprovalItemKind' });
+
+export type ApprovalItemKind = z.infer<typeof approvalItemKindSchema>;
+
+/** What the client reads instead of the internal title of the task or the post. */
 const itemTitleSchema = z.string().trim().min(1).max(160);
+
+/** A task or a post, never both. */
+const createApprovalItemSchema = z.union([
+  z.strictObject({ taskId: z.uuid(), title: itemTitleSchema.optional() }),
+  z.strictObject({ postId: z.uuid(), title: itemTitleSchema.optional() }),
+]);
 
 /**
  * The API checks what needs the database: the client scope, the contact (`CONTACT_NOT_APPROVER`),
- * that each task is ready (rule 8) and the limit of `APPROVAL_LIMITS.items`.
+ * that each task and post is ready (F09 rule 8, F08 rule 20) and the limit of
+ * `APPROVAL_LIMITS.items`.
  */
 export const createApprovalRequestSchema = z
   .object({
@@ -88,11 +109,14 @@ export const createApprovalRequestSchema = z
     /** Shown to the client at the top of the page. */
     message: optionalText(1000).optional(),
     items: z
-      .array(z.object({ taskId: z.uuid(), title: itemTitleSchema.optional() }))
+      .array(createApprovalItemSchema)
       .min(1)
-      .refine((items) => new Set(items.map((item) => item.taskId)).size === items.length, {
-        message: 'A task is sent once in a request',
-      }),
+      .refine(
+        (items) =>
+          new Set(items.map((item) => ('taskId' in item ? item.taskId : item.postId))).size ===
+          items.length,
+        { message: 'A task or a post is sent once in a request' },
+      ),
   })
   .meta({ id: 'CreateApprovalRequest' });
 
@@ -112,6 +136,13 @@ export const publicResponseSchema = z
 export type PublicResponse = z.infer<typeof publicResponseSchema>;
 
 export type PublicResponseInput = z.input<typeof publicResponseSchema>;
+
+/** F08 rule 23: approves every pending post item of the link, with the same optional note. */
+export const publicApproveAllSchema = z
+  .object({ note: optionalText(2000).optional() })
+  .meta({ id: 'PublicApproveAll' });
+
+export type PublicApproveAll = z.infer<typeof publicApproveAllSchema>;
 
 // Responses
 
@@ -154,17 +185,35 @@ export const approvalVersionSchema = z
 
 export type ApprovalVersion = z.infer<typeof approvalVersionSchema>;
 
+/** The post of a snapshot, as the client is shown it beside the media (F08 rule 27). */
+const postSnapshotSchema = z.object({
+  type: postTypeSchema,
+  platforms: z.array(postPlatformSchema),
+  publishDate: calendarDateSchema,
+  publishTime: timeOfDaySchema.nullable(),
+  caption: z.string().nullable(),
+  hashtags: z.string().nullable(),
+});
+
 export const approvalItemSchema = z
   .object({
     id: z.uuid(),
     position: z.number().int().min(1),
+    kind: approvalItemKindSchema,
     title: z.string(),
-    task: z.object({ id: z.uuid(), title: z.string() }),
+    /** Task items only. */
+    task: z.object({ id: z.uuid(), title: z.string() }).nullable(),
+    /** Post items only: the post, and its snapshot beside the versions. */
+    post: postSnapshotSchema.extend({ id: z.uuid(), title: z.string() }).nullable(),
     status: approvalItemStatusSchema,
     withdrawnReason: approvalWithdrawnReasonSchema.nullable(),
     closedAt: z.iso.datetime().nullable(),
-    /** The snapshot sent: never the task's current versions and text. */
+    /**
+     * The snapshot sent, never the current versions and text: a task's by name, a post's in the
+     * display order of its media.
+     */
     versions: z.array(approvalVersionSchema),
+    /** Task items only: the text for the client. */
     text: z.string().nullable(),
     response: z
       .object({
@@ -244,8 +293,12 @@ export type PublicApprovalFile = z.infer<typeof publicApprovalFileSchema>;
 export const publicApprovalItemSchema = z
   .object({
     id: z.uuid(),
+    kind: approvalItemKindSchema,
     title: z.string(),
+    /** Task items only. */
     text: z.string().nullable(),
+    /** Post items only; null once the agency withdrew the item. */
+    post: postSnapshotSchema.nullable(),
     files: z.array(publicApprovalFileSchema),
     status: approvalItemStatusSchema,
     /** The client's note with a decision. */
@@ -258,7 +311,14 @@ export const publicApprovalItemSchema = z
 
 export type PublicApprovalItem = z.infer<typeof publicApprovalItemSchema>;
 
-/** What the holder of a link sees (rule 21): nothing internal about the tasks. */
+/** The post items "Approve all" decided (F08 rule 23). */
+export const publicApprovalItemsSchema = z
+  .object({ items: z.array(publicApprovalItemSchema) })
+  .meta({ id: 'PublicApprovalItems' });
+
+export type PublicApprovalItems = z.infer<typeof publicApprovalItemsSchema>;
+
+/** What the holder of a link sees (rule 21): nothing internal about the tasks and the posts. */
 export const publicApprovalSchema = z
   .object({
     clientName: z.string(),
@@ -266,6 +326,7 @@ export const publicApprovalSchema = z
     accountManagerName: z.string(),
     message: z.string().nullable(),
     expiresAt: z.iso.datetime(),
+    /** Task items by position, then post items in publish order (F08 rule 27). */
     items: z.array(publicApprovalItemSchema),
   })
   .meta({ id: 'PublicApproval' });

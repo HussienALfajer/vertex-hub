@@ -1,9 +1,5 @@
 import {
-  CLIENT_DECISIONS,
   REQUEST_SCOPES,
-  RESPONSE_CHANNELS,
-  REVIEW_OUTCOMES,
-  REVIEW_STAGES,
   REVISION_DECISIONS,
   REVISION_SOURCES,
   TASK_PRIORITIES,
@@ -24,19 +20,28 @@ import {
   text,
   time,
   timestamp,
+  uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
 import { approvalItems } from './approvals.js';
 import { departmentCodeEnum, users } from './auth.js';
 import { clientContacts, clients } from './clients.js';
 import { archivedAt, id, timestamps } from './columns.js';
+import { contentPosts, postClientResponses } from './content.js';
 import { projectMilestones, projects } from './projects.js';
 import { extraWorkItems, retainerCycleLines, retainerCycles } from './retainers.js';
+import {
+  clientDecisionEnum,
+  responseChannelEnum,
+  reviewOutcomeEnum,
+  reviewStageEnum,
+} from './reviews.js';
 
 /*
  * Tasks of every department (F06, ADR 0016), owned by the api `tasks` module. Dates without a
  * time are calendar days in Asia/Damascus, read and written as `YYYY-MM-DD`; `due_time` is a time
- * of day there. Review stages, review snapshots and client responses are F09 (ADR 0020).
+ * of day there. Review stages, review snapshots and client responses are F09 (ADR 0020); their
+ * enums are in `reviews.ts`. A task may produce the media of a post (F08, ADR 0021).
  */
 
 export const taskTypeEnum = pgEnum('task_type', TASK_TYPES);
@@ -50,14 +55,6 @@ export const requestScopeEnum = pgEnum('request_scope', REQUEST_SCOPES);
 export const revisionSourceEnum = pgEnum('revision_source', REVISION_SOURCES);
 
 export const revisionDecisionEnum = pgEnum('revision_decision', REVISION_DECISIONS);
-
-export const reviewStageEnum = pgEnum('review_stage', REVIEW_STAGES);
-
-export const reviewOutcomeEnum = pgEnum('review_outcome', REVIEW_OUTCOMES);
-
-export const clientDecisionEnum = pgEnum('client_decision', CLIENT_DECISIONS);
-
-export const responseChannelEnum = pgEnum('response_channel', RESPONSE_CHANNELS);
 
 export const tasks = pgTable(
   'tasks',
@@ -91,6 +88,12 @@ export const tasks = pgTable(
     requestScope: requestScopeEnum('request_scope'),
     /** Set while an out-of-scope client request has its extra work item (rule 11). */
     extraWorkItemId: uuid('extra_work_item_id').references(() => extraWorkItems.id),
+    /**
+     * The post this task produces media for (F08 rule 7), and when it was linked; set and
+     * cleared together. The client approves the post, never the linked task.
+     */
+    postId: uuid('post_id').references((): AnyPgColumn => contentPosts.id),
+    postLinkedAt: timestamp('post_linked_at', { withTimezone: true }),
     /** Null for tasks the system created (an automatic template run, F07). */
     createdById: uuid('created_by_id').references(() => users.id),
     startedAt: timestamp('started_at', { withTimezone: true }),
@@ -114,6 +117,13 @@ export const tasks = pgTable(
     index('tasks_extra_work_item_id_idx').on(table.extraWorkItemId),
     index('tasks_created_by_id_idx').on(table.createdById),
     index('tasks_cleared_review_id_idx').on(table.clearedReviewId),
+    index('tasks_post_id_idx').on(table.postId, table.postLinkedAt),
+    check(
+      'tasks_post_check',
+      sql`(${table.postId} is null) = (${table.postLinkedAt} is null)
+        and (${table.postId} is null
+          or (${table.clientId} is not null and not ${table.needsClientApproval}))`,
+    ),
     check(
       'tasks_review_stage_check',
       sql`(${table.status} = 'internal_review') = (${table.reviewStage} is not null)`,
@@ -231,10 +241,14 @@ export const taskRevisions = pgTable(
     decidedAt: timestamp('decided_at', { withTimezone: true }),
     /** Null for changes the client asked for through an approval link (F09). */
     authorId: uuid('author_id').references(() => users.id),
+    /** The client response on the task's post that caused this client revision (F08 rule 12). */
+    postResponseId: uuid('post_response_id').references((): AnyPgColumn => postClientResponses.id),
     ...timestamps(),
   },
   (table) => [
     index('task_revisions_task_id_idx').on(table.taskId),
+    /** A response on a post sends a linked task back once (`ALREADY_RETURNED`). */
+    uniqueIndex('task_revisions_post_response_unique').on(table.postResponseId, table.taskId),
     index('task_revisions_contact_id_idx').on(table.contactId),
     index('task_revisions_extra_work_item_id_idx').on(table.extraWorkItemId),
     index('task_revisions_decided_by_id_idx').on(table.decidedById),
@@ -242,7 +256,8 @@ export const taskRevisions = pgTable(
     check(
       'task_revisions_source_check',
       sql`case when ${table.source} = 'client' then ${table.number} >= 1
-        else ${table.number} is null and ${table.contactId} is null and not ${table.overLimit} end`,
+        else ${table.number} is null and ${table.contactId} is null and not ${table.overLimit}
+          and ${table.postResponseId} is null end`,
     ),
     check(
       'task_revisions_decision_check',

@@ -4,11 +4,16 @@ import { ClientsModule } from '../clients/index.js';
 import { FilesModule } from '../files/index.js';
 import { NotificationsModule } from '../notifications/index.js';
 import { ProjectsModule } from '../projects/index.js';
+import { TasksModule } from '../tasks/index.js';
 import { ContentController } from './content.controller.js';
 import { ContentService } from './content.service.js';
+import { PostApprovals } from './post-approvals.js';
 import { PostHooksService } from './post-hooks.service.js';
+import { PostLinksService } from './post-links.service.js';
+import { PostMedia } from './post-media.js';
 import { PostNotices } from './post-notices.js';
 import { PostReminders } from './post-reminders.js';
+import { PostReviewHooks } from './post-review-hooks.js';
 import { PostReviews } from './post-reviews.js';
 import { PostWorkflowService } from './post-workflow.service.js';
 
@@ -20,17 +25,32 @@ import { PostWorkflowService } from './post-workflow.service.js';
  * `EngagementDirectory` and adds the posts counted directly to `WorkProgress`; registers the
  * `post` owner policy in `files` and reads post media through `FileVersions`; sends the post
  * notifications and registers the publish reminders of the daily job through `notifications`.
+ * Links tasks to posts through `tasks`' `PostTasks` and registers into its `PostTaskHooks`
+ * (a linked task approved, cancelled or archived). Exports `PostApprovals` and the
+ * `PostReviewHooks` registry for the `approvals` module, which it never imports.
  */
 @Module({
-  imports: [AuthModule, ClientsModule, ProjectsModule, NotificationsModule, FilesModule],
+  imports: [
+    AuthModule,
+    ClientsModule,
+    ProjectsModule,
+    NotificationsModule,
+    FilesModule,
+    TasksModule,
+  ],
   controllers: [ContentController],
   providers: [
     ContentService,
     PostWorkflowService,
+    PostLinksService,
     PostHooksService,
     PostReviews,
+    PostMedia,
     PostNotices,
     PostReminders,
+    PostApprovals,
+    PostReviewHooks,
   ],
+  exports: [PostApprovals, PostReviewHooks],
 })
 export class ContentModule {}

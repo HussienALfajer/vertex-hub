@@ -406,7 +406,9 @@ export class TaskApprovals {
       items: rows.map(
         ({ response, title }): ClientResponseEntry => ({
           id: response.id,
+          kind: 'task',
           task: { id: response.taskId, title },
+          post: null,
           decision: response.decision,
           channel: response.channel,
           contact: contacts.get(response.contactId) ?? {

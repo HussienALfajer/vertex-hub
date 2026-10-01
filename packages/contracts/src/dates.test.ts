@@ -10,6 +10,7 @@ import {
   WORK_WEEK,
   weekday,
   weekOf,
+  workDaysBefore,
   workDaysBetween,
 } from './dates.js';
 
@@ -86,6 +87,15 @@ describe('time of day', () => {
     // Round trip through the instant of a day and time.
     const instant = businessInstant('2026-11-01', '00:30');
     expect([businessDate(instant), businessTimeOfDay(instant)]).toEqual(['2026-11-01', '00:30:00']);
+  });
+});
+
+describe('work days before (F08 rule 9)', () => {
+  it('counts back over Friday', () => {
+    expect(workDaysBefore('2026-10-07', 2)).toBe('2026-10-05'); // Wed → Mon
+    expect(workDaysBefore('2026-10-11', 2)).toBe('2026-10-08'); // Sun → Sat, Thu
+    expect(workDaysBefore('2026-10-10', 1)).toBe('2026-10-08'); // Sat → Thu
+    expect(workDaysBefore('2026-11-01', 2)).toBe('2026-10-29');
   });
 });
 

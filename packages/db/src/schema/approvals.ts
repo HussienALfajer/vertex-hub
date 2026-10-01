@@ -15,12 +15,13 @@ import {
 import { users } from './auth.js';
 import { clientContacts, clients } from './clients.js';
 import { id, timestamps } from './columns.js';
+import { contentPosts, postClientResponses, postReviews } from './content.js';
 import { taskClientResponses, taskReviews, tasks } from './tasks.js';
 
 /*
- * Approval requests (F09, ADR 0020), owned by the api `approvals` module: ready tasks of one
- * client bundled into a link for a contact with final-approval authority. Requests are revoked,
- * never archived.
+ * Approval requests (F09, ADR 0020), owned by the api `approvals` module: ready tasks and posts
+ * (F08, ADR 0021) of one client bundled into a link for a contact with final-approval authority.
+ * Requests are revoked, never archived.
  */
 
 export const approvalItemStatusEnum = pgEnum('approval_item_status', APPROVAL_ITEM_STATUSES);
@@ -79,19 +80,19 @@ export const approvalItems = pgTable(
     requestId: uuid('request_id')
       .notNull()
       .references(() => approvalRequests.id),
-    taskId: uuid('task_id')
-      .notNull()
-      .references(() => tasks.id),
+    /** An item sends a task or a post, never both. */
+    taskId: uuid('task_id').references((): AnyPgColumn => tasks.id),
+    postId: uuid('post_id').references((): AnyPgColumn => contentPosts.id),
     /** Display order, dense from 1. */
     position: integer('position').notNull(),
-    /** What the client reads instead of the task's internal title. */
+    /** What the client reads instead of the internal title of the task or the post. */
     title: text('title').notNull(),
-    /** The snapshot sent: the task's cleared review when the request was created. */
-    reviewId: uuid('review_id')
-      .notNull()
-      .references(() => taskReviews.id),
+    /** The snapshot sent: the cleared review of the task or the post when the request was created. */
+    reviewId: uuid('review_id').references((): AnyPgColumn => taskReviews.id),
+    postReviewId: uuid('post_review_id').references((): AnyPgColumn => postReviews.id),
     status: approvalItemStatusEnum('status').notNull().default('pending'),
     responseId: uuid('response_id').references((): AnyPgColumn => taskClientResponses.id),
+    postResponseId: uuid('post_response_id').references((): AnyPgColumn => postClientResponses.id),
     withdrawnReason: approvalWithdrawnReasonEnum('withdrawn_reason'),
     closedAt: timestamp('closed_at', { withTimezone: true }),
     ...timestamps(),
@@ -101,16 +102,31 @@ export const approvalItems = pgTable(
     index('approval_items_task_id_idx').on(table.taskId),
     index('approval_items_review_id_idx').on(table.reviewId),
     index('approval_items_response_id_idx').on(table.responseId),
-    /** A task waits on one link at a time (rule 8). */
+    index('approval_items_post_id_idx').on(table.postId),
+    index('approval_items_post_review_id_idx').on(table.postReviewId),
+    index('approval_items_post_response_id_idx').on(table.postResponseId),
+    /** A task waits on one link at a time (rule 8), and so does a post (F08 rule 20). */
     uniqueIndex('approval_items_pending_unique')
       .on(table.taskId)
       .where(sql`${table.status} = 'pending'`),
+    uniqueIndex('approval_items_post_pending_unique')
+      .on(table.postId)
+      .where(sql`${table.status} = 'pending'`),
+    check(
+      'approval_items_kind_check',
+      sql`case when ${table.taskId} is not null
+        then ${table.reviewId} is not null and ${table.postId} is null
+          and ${table.postReviewId} is null and ${table.postResponseId} is null
+        else ${table.postId} is not null and ${table.postReviewId} is not null
+          and ${table.reviewId} is null and ${table.responseId} is null end`,
+    ),
     check('approval_items_title_check', sql`char_length(${table.title}) between 1 and 160`),
     check('approval_items_position_check', sql`${table.position} >= 1`),
     check(
       'approval_items_status_check',
       sql`(${table.status} = 'pending') = (${table.closedAt} is null)
-        and (${table.status} in ('approved', 'changes_requested')) = (${table.responseId} is not null)
+        and (${table.status} in ('approved', 'changes_requested'))
+          = (${table.responseId} is not null or ${table.postResponseId} is not null)
         and (${table.status} = 'withdrawn') = (${table.withdrawnReason} is not null)`,
     ),
   ],

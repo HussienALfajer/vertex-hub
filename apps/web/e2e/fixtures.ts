@@ -3297,6 +3297,7 @@ function taskRoutes({
       checklist: { done: items.filter((item) => item.doneAt).length, total: items.length },
       revisions: { clientCount: clientCount(task), limit: task.revisionLimit },
       overLimitPending: task.revisions.some((r) => r.overLimit && r.decision === null),
+      postId: null,
     };
   };
   const dependencyOf = (task: TaskRecord) => ({
@@ -3527,8 +3528,10 @@ function taskRoutes({
         return {
           id: item.id,
           position: index + 1,
+          kind: 'task',
           title: item.title,
           task: { id: item.taskId, title: byId(item.taskId)?.title ?? '' },
+          post: null,
           status: item.status,
           withdrawnReason: item.withdrawnReason,
           closedAt: item.closedAt,
@@ -3568,8 +3571,10 @@ function taskRoutes({
     const response = responseOf(item);
     return {
       id: item.id,
+      kind: 'task',
       title: item.title,
       text: review?.clientText ?? null,
+      post: null,
       files: (review?.versions ?? []).flatMap((version) => taskFiles.shown(version.id) ?? []),
       status: item.status,
       note: response?.note ?? null,
@@ -3792,6 +3797,7 @@ function taskRoutes({
                   hasText: !!cleared(t)?.clientText,
                 },
               })),
+            posts: [],
           })),
       };
       return json(route, ready);
@@ -3835,7 +3841,10 @@ function taskRoutes({
       if (!contact || contact.archived || !contact.hasFinalApproval) {
         return fail(route, 409, 'CONTACT_NOT_APPROVER');
       }
-      const sending = input.items.map((entry) => ({ entry, task: byId(entry.taskId) }));
+      // Post items arrive with the F08 screens: the mock sends tasks only.
+      const sending = input.items.flatMap((entry) =>
+        'taskId' in entry ? [{ entry, task: byId(entry.taskId) }] : [],
+      );
       for (const { entry, task } of sending) {
         if (!task || task.clientId !== client.id || !readyToSend(task)) {
           return fail(route, 409, 'TASK_NOT_READY', { taskId: entry.taskId });
@@ -3905,7 +3914,12 @@ function taskRoutes({
           tasks
             .filter((t) => t.clientId === clientId)
             .flatMap((t) =>
-              t.responses.map((response) => ({ ...response, task: { id: t.id, title: t.title } })),
+              t.responses.map((response) => ({
+                ...response,
+                kind: 'task' as const,
+                task: { id: t.id, title: t.title },
+                post: null,
+              })),
             )
             .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
         ),

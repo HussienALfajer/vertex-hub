@@ -215,8 +215,9 @@ describe('module boundaries', () => {
     expect(offenders).toEqual([]);
   });
 
-  it('keeps clients and projects independent of content, and content of approvals (ADR 0021)', () => {
+  it('keeps tasks, clients and projects independent of content, and content of approvals (ADR 0021)', () => {
     const forbidden: Record<string, string> = {
+      tasks: 'content',
       clients: 'content',
       projects: 'content',
       content: 'approvals',
@@ -245,6 +246,7 @@ describe('module boundaries', () => {
     notifications: 'notifications',
     projects: 'projects',
     retainers: 'projects',
+    reviews: 'tasks',
     system: null,
     tasks: 'tasks',
     templates: 'templates',

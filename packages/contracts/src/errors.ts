@@ -108,6 +108,13 @@ export const ERROR_CODES = [
   'POST_ARCHIVED',
   'INVALID_RESPONSIBLE',
   'PUBLISH_TIME_REQUIRED',
+  'POST_NOT_READY',
+  'POST_TASKS_NOT_READY',
+  'POST_COUNTED_BY_TASK',
+  'LINKED_TO_POST',
+  'TASK_ALREADY_LINKED',
+  'TASK_NOT_LINKABLE',
+  'ALREADY_RETURNED',
 ] as const;
 
 export const errorCodeSchema = z.enum(ERROR_CODES).meta({ id: 'ErrorCode' });

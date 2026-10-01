@@ -1,21 +1,32 @@
 import { z } from 'zod';
 import { approvalVersionSchema, clientDecisionSchema, responseChannelSchema } from './approvals.js';
-import type { ClientPlatform } from './clients.js';
 import {
   businessDate,
   type CalendarDate,
   calendarDateSchema,
   daysInclusive,
   timeOfDaySchema,
+  workDaysBefore,
 } from './dates.js';
+import { type DepartmentCode, departmentCodeSchema } from './departments.js';
 import { pageQuerySchema, pageSchema, queryBooleanSchema, queryListSchema } from './lists.js';
+import {
+  POST_PLATFORMS,
+  type PostType,
+  postPlatformSchema,
+  postTypeSchema,
+} from './post-values.js';
 import { deliverableKindSchema } from './retainers.js';
 import {
+  pendingApprovalSchema,
   type ReviewStage,
   reviewContentToken,
   reviewOutcomeSchema,
   reviewStageSchema,
   reviewVersionSchema,
+  taskSchema,
+  taskStatusSchema,
+  taskTitleSchema,
 } from './tasks.js';
 import { httpUrlSchema, optionalText } from './text.js';
 
@@ -24,28 +35,6 @@ import { httpUrlSchema, optionalText } from './text.js';
  * on a calendar, reviewed like a task (snapshots, medical stage, client response) and marked
  * scheduled and published by hand.
  */
-
-export const POST_TYPES = ['post', 'reel', 'story', 'carousel'] as const;
-
-export const postTypeSchema = z.enum(POST_TYPES).meta({ id: 'PostType' });
-
-export type PostType = z.infer<typeof postTypeSchema>;
-
-/** The platforms a post is published on: the client platforms without `website` and `other`. */
-export const POST_PLATFORMS = [
-  'instagram',
-  'facebook',
-  'tiktok',
-  'x',
-  'linkedin',
-  'youtube',
-  'snapchat',
-  'google_business',
-] as const satisfies readonly ClientPlatform[];
-
-export const postPlatformSchema = z.enum(POST_PLATFORMS).meta({ id: 'PostPlatform' });
-
-export type PostPlatform = z.infer<typeof postPlatformSchema>;
 
 export const POST_STATUSES = [
   'idea',
@@ -84,6 +73,10 @@ export const POST_LIMITS = {
   notes: 2000,
   /** Non-archived files of the post itself (edge case 14). */
   files: 10,
+  /** Tasks linked to one post (rule 6). */
+  tasks: 5,
+  /** Tasks the link-task dialog is offered at once. */
+  linkableTasks: 50,
   /** The widest range one calendar request covers, in days. */
   calendarDays: 45,
 } as const;
@@ -241,6 +234,44 @@ export function postContentToken(
   return reviewContentToken(versionIds, JSON.stringify([caption ?? '', hashtags ?? '']));
 }
 
+/** The latest thing that sent a post back, as "Send back for changes" reads it (rule 12). */
+export type PostReturnEvent = { kind: 'review' | 'response'; changesRequested: boolean };
+
+/**
+ * Rule 12: a linked task sent back counts as a client revision only when the latest review or
+ * client response of the post is the client asking for changes.
+ */
+export const isClientReturn = (latest: PostReturnEvent | null): boolean =>
+  latest?.kind === 'response' && latest.changesRequested;
+
+/**
+ * The title prefix of a task requested from a post (rule 9). Stored in Arabic, the language of
+ * the records.
+ */
+const POST_TASK_PREFIXES: Record<PostType, string> = {
+  post: 'منشور',
+  reel: 'ريل',
+  story: 'ستوري',
+  carousel: 'كاروسيل',
+};
+
+/** Rule 9: "<type>: <post title>", cut to the length of a task title. */
+export const postTaskTitle = (type: PostType, title: string): string =>
+  `${POST_TASK_PREFIXES[type]}: ${title}`.slice(0, 160);
+
+/** Rule 9: a reel is filmed, everything else is designed. */
+export const postTaskDepartment = (type: PostType): DepartmentCode =>
+  type === 'reel' ? 'photography' : 'design';
+
+/** Rule 9: two work days before the publish date, never before today. */
+export function postTaskDueDate(
+  publishDate: CalendarDate,
+  today: CalendarDate = businessDate(),
+): CalendarDate {
+  const due = workDaysBefore(publishDate, 2);
+  return due < today ? today : due;
+}
+
 // Inputs
 
 const postTitleSchema = z.string().trim().min(1).max(POST_LIMITS.title);
@@ -354,6 +385,42 @@ export const duplicatePostSchema = z
 
 export type DuplicatePost = z.infer<typeof duplicatePostSchema>;
 
+/** Offered by the link-task dialog: a search over the title and a department. */
+export const linkableTaskQuerySchema = z.object({
+  q: z.string().trim().min(1).max(100).optional(),
+  department: departmentCodeSchema.optional(),
+});
+
+export type LinkableTaskQuery = z.infer<typeof linkableTaskQuerySchema>;
+
+/**
+ * Rule 9: a task requested from the post, in a department's queue. Left out: the title is
+ * `postTaskTitle`, the brief the post's notes and caption, the due date `postTaskDueDate`. The API
+ * checks the due date (`INVALID_DATES`) and the cycle line (`INVALID_LINK`, `CYCLE_CLOSED`,
+ * `POST_COUNTED_BY_TASK`).
+ */
+export const createPostTaskSchema = z
+  .object({
+    department: departmentCodeSchema,
+    title: taskTitleSchema.optional(),
+    brief: optionalText(5000).optional(),
+    dueDate: calendarDateSchema.optional(),
+    /** A line of an open cycle of a retainer of the post's client. */
+    cycleLineId: z.uuid().nullable().default(null),
+  })
+  .meta({ id: 'CreatePostTask' });
+
+export type CreatePostTask = z.infer<typeof createPostTaskSchema>;
+
+export type CreatePostTaskInput = z.input<typeof createPostTaskSchema>;
+
+/** Rule 12: what must change in the task's work. */
+export const returnPostTaskSchema = z
+  .object({ note: z.string().trim().min(1).max(2000) })
+  .meta({ id: 'ReturnPostTask' });
+
+export type ReturnPostTask = z.infer<typeof returnPostTaskSchema>;
+
 // Responses
 
 const personSchema = z.object({ id: z.uuid(), name: z.string() });
@@ -425,6 +492,50 @@ export const postClientResponseSchema = z
 
 export type PostClientResponse = z.infer<typeof postClientResponseSchema>;
 
+/** A media version of a post (rule 5): of its own file, or the final version of a linked task. */
+export const postMediaSchema = approvalVersionSchema
+  .extend({
+    /** The linked task the version comes from; null for a file of the post itself. */
+    task: z.object({ id: z.uuid(), title: z.string() }).nullable(),
+  })
+  .meta({ id: 'PostMedia' });
+
+export type PostMedia = z.infer<typeof postMediaSchema>;
+
+/** A task linked to the post, by link time. */
+export const postTaskSchema = z
+  .object({
+    id: z.uuid(),
+    title: z.string(),
+    department: departmentCodeSchema,
+    assignee: archivablePersonSchema.nullable(),
+    status: taskStatusSchema,
+    /** The line the unit counts on through this task (rule 16). */
+    cycleLine: z
+      .object({ id: z.uuid(), kind: deliverableKindSchema, label: z.string().nullable() })
+      .nullable(),
+  })
+  .meta({ id: 'PostTask' });
+
+export type PostTask = z.infer<typeof postTaskSchema>;
+
+/** A task the post may link (rule 6). */
+export const linkableTaskSchema = taskSchema
+  .extend({
+    /** Of the retainer cycle of the post's publish date: offered first (ADR 0017). */
+    inPublishCycle: z.boolean(),
+  })
+  .meta({ id: 'LinkableTask' });
+
+export type LinkableTask = z.infer<typeof linkableTaskSchema>;
+
+export const linkableTaskListSchema = z.object({ items: z.array(linkableTaskSchema) }).meta({
+  id: 'LinkableTaskList',
+  description: 'Open unlinked tasks of the client, the publish cycle first, then by due date',
+});
+
+export type LinkableTaskList = z.infer<typeof linkableTaskListSchema>;
+
 export const postPermissionsSchema = z
   .object({
     /** Edit scope on a post that is not read-only. */
@@ -436,6 +547,7 @@ export const postPermissionsSchema = z
     canMedicalReview: z.boolean(),
     /** Client scope on a post ready to send (rule 20). */
     canSendForApproval: z.boolean(),
+    /** Client scope on a post waiting for the client, cleared for them (rule 24). */
     canRecordResponse: z.boolean(),
     canArchive: z.boolean(),
   })
@@ -452,8 +564,10 @@ export const postDetailSchema = postSchema
     hashtags: z.string().nullable(),
     notes: z.string().nullable(),
     needsClientApproval: z.boolean(),
-    /** Rule 5, in display order. */
-    media: z.array(approvalVersionSchema),
+    /** Rule 5, in display order: the post's own files, then the linked tasks' final versions. */
+    media: z.array(postMediaSchema),
+    /** By link time. */
+    linkedTasks: z.array(postTaskSchema),
     cycleLine: z
       .object({
         id: z.uuid(),
@@ -470,6 +584,8 @@ export const postDetailSchema = postSchema
     reviewHistory: z.array(postReviewSchema),
     /** Oldest first. */
     clientResponses: z.array(postClientResponseSchema),
+    /** The approval request holding the post's pending item. */
+    pendingApproval: pendingApprovalSchema.nullable(),
     scheduledAt: z.iso.datetime().nullable(),
     publishedAt: z.iso.datetime().nullable(),
     publishedBy: personSchema.nullable(),
@@ -497,6 +613,8 @@ const postFiltersSchema = z.object({
   platform: postPlatformSchema.optional(),
   type: postTypeSchema.optional(),
   responsible: z.union([z.uuid(), z.literal('me')]).optional(),
+  /** Posts in this stage of internal review: `medical` is the medical queue (F09). */
+  reviewStage: reviewStageSchema.optional(),
 });
 
 /** Posts with a publish date in `[from, to]`, at most `POST_LIMITS.calendarDays` days. */

@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { INestApplication } from '@nestjs/common';
 import {
+  APPROVAL_LIMITS,
   type ApprovalRequestState,
   approvalReadySchema,
   approvalRequestDetailSchema,
@@ -326,7 +327,9 @@ describe('approval requests (F09 rules 8–12, 16–17, 24–25)', () => {
       }
       expect((await create({ taskIds: [task.id, task.id] })).status).toBe(400);
       await expectError(
-        await create({ taskIds: Array.from({ length: 21 }, () => randomUUID()) }),
+        await create({
+          taskIds: Array.from({ length: APPROVAL_LIMITS.items + 1 }, () => randomUUID()),
+        }),
         409,
         'LIMIT_REACHED',
       );

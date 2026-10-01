@@ -248,6 +248,50 @@ export class FileVersions {
     return media;
   }
 
+  /**
+   * F08 rule 5: the final version of each live deliverable of the tasks, deliverables by
+   * creation. A deliverable without a final version gives nothing.
+   */
+  async finalVersions(
+    taskIds: readonly string[],
+    executor: Executor = this.db,
+  ): Promise<Map<string, SentVersion[]>> {
+    const finals = new Map<string, SentVersion[]>();
+    if (taskIds.length === 0) return finals;
+    const rows = await executor
+      .select({
+        taskId: fileItems.taskId,
+        id: fileVersions.id,
+        fileItemId: fileVersions.fileItemId,
+        name: fileItems.name,
+        number: fileVersions.number,
+        kind: fileVersions.kind,
+        mimeType: fileVersions.mimeType,
+        sizeBytes: fileVersions.sizeBytes,
+        previewStatus: fileVersions.previewStatus,
+        url: fileVersions.url,
+        linkLabel: fileVersions.linkLabel,
+      })
+      .from(fileVersions)
+      .innerJoin(fileItems, eq(fileItems.id, fileVersions.fileItemId))
+      .where(
+        and(
+          inArray(fileItems.taskId, [...taskIds]),
+          eq(fileItems.role, 'deliverable'),
+          eq(fileVersions.isFinal, true),
+          isNull(fileItems.archivedAt),
+          isNull(fileVersions.archivedAt),
+        ),
+      )
+      // Item ids are UUIDv7, so their order is the order of creation.
+      .orderBy(fileVersions.fileItemId);
+    for (const { taskId, ...version } of rows) {
+      if (!taskId) continue;
+      finals.set(taskId, [...(finals.get(taskId) ?? []), { ...version, removed: false }]);
+    }
+    return finals;
+  }
+
   /** Versions by id, removed or not, with their file's current name. */
   async versionRefs(
     ids: readonly string[],

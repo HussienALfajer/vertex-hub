@@ -1,12 +1,14 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   Param,
   ParseUUIDPipe,
   Patch,
   Post,
+  Put,
   Query,
   SerializeOptions,
 } from '@nestjs/common';
@@ -21,11 +23,17 @@ import {
   type ContentCalendar,
   type ContentCalendarQuery,
   type CreatePost,
+  type CreatePostTask,
   contentCalendarQuerySchema,
   contentCalendarSchema,
   createPostSchema,
+  createPostTaskSchema,
   type DuplicatePost,
   duplicatePostSchema,
+  type LinkableTaskList,
+  type LinkableTaskQuery,
+  linkableTaskListSchema,
+  linkableTaskQuerySchema,
   type MedicalReview,
   type MyContentSummary,
   medicalReviewSchema,
@@ -38,12 +46,15 @@ import {
   postListQuerySchema,
   postPageSchema,
   postStatusChangeSchema,
+  type ReturnPostTask,
+  returnPostTaskSchema,
   type UpdatePost,
   updatePostSchema,
 } from '@vertex-hub/contracts';
 import { RequirePermissions } from '../../core/access/index.js';
 import { CurrentUser, type CurrentUserInfo } from '../auth/index.js';
 import { ContentService } from './content.service.js';
+import { PostLinksService } from './post-links.service.js';
 import { PostWorkflowService } from './post-workflow.service.js';
 
 @ApiTags('content')
@@ -52,6 +63,7 @@ export class ContentController {
   constructor(
     private readonly content: ContentService,
     private readonly workflow: PostWorkflowService,
+    private readonly links: PostLinksService,
   ) {}
 
   @Get('content/calendar')
@@ -132,7 +144,8 @@ export class ContentController {
     standardSchema: postDetailSchema,
   })
   @ApiConflictResponse({
-    description: '`POST_LOCKED`, `POST_ARCHIVED`, `INVALID_TRANSITION`, `CYCLE_CLOSED`',
+    description:
+      '`POST_LOCKED`, `POST_ARCHIVED`, `INVALID_TRANSITION`, `CYCLE_CLOSED`, `POST_COUNTED_BY_TASK`',
   })
   update(
     @CurrentUser() actor: CurrentUserInfo,
@@ -152,7 +165,7 @@ export class ContentController {
   })
   @ApiConflictResponse({
     description:
-      '`INVALID_TRANSITION`, `NOTHING_TO_APPROVE`, `REVIEW_CONTENT_CHANGED`, `PUBLISH_TIME_REQUIRED`, `POST_ARCHIVED`',
+      '`INVALID_TRANSITION`, `NOTHING_TO_APPROVE`, `POST_TASKS_NOT_READY`, `REVIEW_CONTENT_CHANGED`, `PUBLISH_TIME_REQUIRED`, `POST_ARCHIVED`',
   })
   changeStatus(
     @CurrentUser() actor: CurrentUserInfo,
@@ -194,6 +207,97 @@ export class ContentController {
     @Body({ schema: duplicatePostSchema }) input: DuplicatePost,
   ): Promise<PostDetail> {
     return this.content.duplicate(actor, id, input);
+  }
+
+  @Get('content/posts/:id/linkable-tasks')
+  @RequirePermissions('content.manage')
+  @SerializeOptions({ schema: linkableTaskListSchema })
+  @ApiOkResponse({
+    description:
+      'The open unlinked tasks of the client the post may link (edit scope), at most 50: those of the retainer cycle of its publish date first',
+    standardSchema: linkableTaskListSchema,
+  })
+  linkableTasks(
+    @CurrentUser() actor: CurrentUserInfo,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query({ schema: linkableTaskQuerySchema }) query: LinkableTaskQuery,
+  ): Promise<LinkableTaskList> {
+    return this.links.linkable(actor, id, query);
+  }
+
+  @Put('content/posts/:id/tasks/:taskId')
+  @RequirePermissions('content.manage')
+  @SerializeOptions({ schema: postDetailSchema })
+  @ApiOkResponse({
+    description:
+      'The post with the task linked (edit scope): the client approves the post, never the task; an idea starts production',
+    standardSchema: postDetailSchema,
+  })
+  @ApiConflictResponse({
+    description:
+      '`POST_LOCKED`, `POST_ARCHIVED`, `TASK_ALREADY_LINKED`, `TASK_NOT_LINKABLE`, `LIMIT_REACHED`, `POST_COUNTED_BY_TASK`',
+  })
+  linkTask(
+    @CurrentUser() actor: CurrentUserInfo,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('taskId', ParseUUIDPipe) taskId: string,
+  ): Promise<PostDetail> {
+    return this.links.link(actor, id, taskId);
+  }
+
+  @Delete('content/posts/:id/tasks/:taskId')
+  @RequirePermissions('content.manage')
+  @SerializeOptions({ schema: postDetailSchema })
+  @ApiOkResponse({
+    description: 'The post without the task (edit scope), which is free for another post',
+    standardSchema: postDetailSchema,
+  })
+  @ApiConflictResponse({ description: '`POST_LOCKED`, `POST_ARCHIVED`' })
+  unlinkTask(
+    @CurrentUser() actor: CurrentUserInfo,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('taskId', ParseUUIDPipe) taskId: string,
+  ): Promise<PostDetail> {
+    return this.links.unlink(actor, id, taskId);
+  }
+
+  @Post('content/posts/:id/tasks')
+  @RequirePermissions('content.manage')
+  @SerializeOptions({ schema: postDetailSchema })
+  @ApiCreatedResponse({
+    description:
+      'The post with a new task requested in the department’s queue and linked to it (edit scope)',
+    standardSchema: postDetailSchema,
+  })
+  @ApiConflictResponse({
+    description:
+      '`POST_LOCKED`, `POST_ARCHIVED`, `LIMIT_REACHED`, `CYCLE_CLOSED`, `POST_COUNTED_BY_TASK`, `CLIENT_ENDED`',
+  })
+  createTask(
+    @CurrentUser() actor: CurrentUserInfo,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body({ schema: createPostTaskSchema }) input: CreatePostTask,
+  ): Promise<PostDetail> {
+    return this.links.createTask(actor, id, input);
+  }
+
+  @Post('content/posts/:id/tasks/:taskId/return')
+  @HttpCode(200)
+  @RequirePermissions('content.manage')
+  @SerializeOptions({ schema: postDetailSchema })
+  @ApiOkResponse({
+    description:
+      'The post with the approved task sent back for changes (edit scope): a client revision after the client asked for changes, an internal one otherwise',
+    standardSchema: postDetailSchema,
+  })
+  @ApiConflictResponse({ description: '`INVALID_TRANSITION`, `ALREADY_RETURNED`, `POST_ARCHIVED`' })
+  returnTask(
+    @CurrentUser() actor: CurrentUserInfo,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('taskId', ParseUUIDPipe) taskId: string,
+    @Body({ schema: returnPostTaskSchema }) input: ReturnPostTask,
+  ): Promise<PostDetail> {
+    return this.links.returnTask(actor, id, taskId, input);
   }
 
   @Post('content/posts/:id/archive')

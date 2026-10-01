@@ -5,6 +5,8 @@ import { FilesModule } from '../files/index.js';
 import { NotificationsModule } from '../notifications/index.js';
 import { ProjectsModule } from '../projects/index.js';
 import { ClientReviewHooks } from './client-review-hooks.js';
+import { PostTaskHooks } from './post-task-hooks.js';
+import { PostTasks } from './post-tasks.js';
 import { TaskApprovals } from './task-approvals.js';
 import { TaskCommentsController } from './task-comments.controller.js';
 import { TaskCommentsService } from './task-comments.service.js';
@@ -34,7 +36,9 @@ import { TasksService } from './tasks.service.js';
  * owner policy in `files` and calls its `FileVersions` on approval and client changes (F10).
  * Owns the review stage, the review snapshots and the client responses (F09, ADR 0020): registers
  * into `clients`' `ClientFlagHooks` for healthcare flag changes, and exports `TaskApprovals` and
- * the `ClientReviewHooks` registry for the `approvals` module, which it never imports.
+ * the `ClientReviewHooks` registry for the `approvals` module, which it never imports. Owns the
+ * link of a task to a post (F08, ADR 0021): exports `PostTasks` and the `PostTaskHooks` registry
+ * for the `content` module, which it never imports either.
  */
 @Module({
   imports: [AuthModule, ClientsModule, ProjectsModule, NotificationsModule, FilesModule],
@@ -61,7 +65,9 @@ import { TasksService } from './tasks.service.js';
     TaskReviewsService,
     TaskApprovals,
     ClientReviewHooks,
+    PostTasks,
+    PostTaskHooks,
   ],
-  exports: [TaskGenerator, TaskApprovals, ClientReviewHooks],
+  exports: [TaskGenerator, TaskApprovals, ClientReviewHooks, PostTasks, PostTaskHooks],
 })
 export class TasksModule {}

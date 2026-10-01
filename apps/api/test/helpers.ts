@@ -302,24 +302,8 @@ export async function removeTasks(db: Database, ids: string[]): Promise<void> {
   await db.delete(taskComments).where(inArray(taskComments.taskId, ids));
   // F09: responses and reviews point at revisions, and tasks at their cleared review.
   await db.update(tasks).set({ clearedReviewId: null }).where(inArray(tasks.id, ids));
-  const requests = (
-    await db
-      .selectDistinct({ id: approvalItems.requestId })
-      .from(approvalItems)
-      .where(inArray(approvalItems.taskId, ids))
-  ).map((row) => row.id);
-  // Approval items and responses point at each other: the items let go first, as withdrawn.
-  await db
-    .update(approvalItems)
-    .set({ status: 'withdrawn', withdrawnReason: 'task_moved', responseId: null })
-    .where(and(inArray(approvalItems.taskId, ids), isNotNull(approvalItems.responseId)));
+  await removeRequests(db, inArray(approvalItems.taskId, ids));
   await db.delete(taskClientResponses).where(inArray(taskClientResponses.taskId, ids));
-  if (requests.length > 0) {
-    await db.delete(approvalItems).where(inArray(approvalItems.requestId, requests));
-    await db.delete(notifications).where(inArray(notifications.subjectId, requests));
-    await db.delete(auditEntries).where(inArray(auditEntries.entityId, requests));
-    await db.delete(approvalRequests).where(inArray(approvalRequests.id, requests));
-  }
   await db.delete(taskReviews).where(inArray(taskReviews.taskId, ids));
   await db.delete(taskRevisions).where(inArray(taskRevisions.taskId, ids));
   await db.delete(notificationReminders).where(inArray(notificationReminders.subjectId, ids));
@@ -327,16 +311,70 @@ export async function removeTasks(db: Database, ids: string[]): Promise<void> {
 }
 
 /**
- * Removes seeded posts with their files, reviews, client responses, reminders, notifications and
- * audit entries (test cleanup only).
+ * Removes the approval requests holding the given items, whole: their items, the responses those
+ * items recorded on tasks and posts, their notifications and audit entries (test cleanup only).
+ */
+async function removeRequests(db: Database, itemFilter: SQL): Promise<void> {
+  const requests = (
+    await db.selectDistinct({ id: approvalItems.requestId }).from(approvalItems).where(itemFilter)
+  ).map((row) => row.id);
+  if (requests.length === 0) return;
+  const inRequests = inArray(approvalItems.requestId, requests);
+  const items = (
+    await db.select({ id: approvalItems.id }).from(approvalItems).where(inRequests)
+  ).map((row) => row.id);
+  // Approval items and responses point at each other: the items let go first, as withdrawn.
+  await db
+    .update(approvalItems)
+    .set({
+      status: 'withdrawn',
+      withdrawnReason: 'revoked',
+      responseId: null,
+      postResponseId: null,
+    })
+    .where(
+      and(
+        inRequests,
+        or(isNotNull(approvalItems.responseId), isNotNull(approvalItems.postResponseId)),
+      ),
+    );
+  await db.delete(taskClientResponses).where(inArray(taskClientResponses.approvalItemId, items));
+  await removePostResponses(db, inArray(postClientResponses.approvalItemId, items));
+  await db.delete(approvalItems).where(inRequests);
+  await db.delete(notifications).where(inArray(notifications.subjectId, requests));
+  await db.delete(auditEntries).where(inArray(auditEntries.entityId, requests));
+  await db.delete(approvalRequests).where(inArray(approvalRequests.id, requests));
+}
+
+/** Removes client responses on posts; the task revisions they caused let go of them first. */
+async function removePostResponses(db: Database, filter: SQL): Promise<void> {
+  const responses = (
+    await db.select({ id: postClientResponses.id }).from(postClientResponses).where(filter)
+  ).map((row) => row.id);
+  if (responses.length === 0) return;
+  await db
+    .update(taskRevisions)
+    .set({ postResponseId: null })
+    .where(inArray(taskRevisions.postResponseId, responses));
+  await db.delete(postClientResponses).where(inArray(postClientResponses.id, responses));
+}
+
+/**
+ * Removes seeded posts with their files, reviews, client responses, approval requests,
+ * reminders, notifications and audit entries, and unlinks their tasks (test cleanup only).
  */
 export async function removePosts(db: Database, ids: string[]): Promise<void> {
   if (ids.length === 0) return;
   await removeFileItems(db, inArray(fileItems.postId, ids));
   await db.delete(auditEntries).where(inArray(auditEntries.entityId, ids));
+  await db
+    .update(tasks)
+    .set({ postId: null, postLinkedAt: null })
+    .where(inArray(tasks.postId, ids));
   // Posts point at their cleared review, and responses at reviews.
   await db.update(contentPosts).set({ clearedReviewId: null }).where(inArray(contentPosts.id, ids));
-  await db.delete(postClientResponses).where(inArray(postClientResponses.postId, ids));
+  await removeRequests(db, inArray(approvalItems.postId, ids));
+  await removePostResponses(db, inArray(postClientResponses.postId, ids));
   await db.delete(postReviews).where(inArray(postReviews.postId, ids));
   await db.delete(notificationReminders).where(inArray(notificationReminders.subjectId, ids));
   await db.delete(notifications).where(inArray(notifications.subjectId, ids));

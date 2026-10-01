@@ -53,6 +53,7 @@ import { FileVersions } from '../files/index.js';
 import type { Notice } from '../notifications/index.js';
 import { EngagementDirectory } from '../projects/index.js';
 import { ClientReviewHooks } from './client-review-hooks.js';
+import { PostTaskHooks, unlinkRemovedTask } from './post-task-hooks.js';
 import {
   accessColumns,
   actorOf,
@@ -114,6 +115,7 @@ export class TasksService {
     private readonly files: FileVersions,
     private readonly reviews: TaskReviews,
     private readonly reviewHooks: ClientReviewHooks,
+    private readonly postHooks: PostTaskHooks,
   ) {}
 
   private get directories() {
@@ -156,6 +158,9 @@ export class TasksService {
     }
     if (query.overLimit !== undefined) {
       filters.push(query.overLimit ? overLimitPendingSql : sql`not ${overLimitPendingSql}`);
+    }
+    if (query.linkedToPost !== undefined) {
+      filters.push(query.linkedToPost ? isNotNull(tasks.postId) : isNull(tasks.postId));
     }
     if (query.dueFrom) filters.push(gte(tasks.dueDate, query.dueFrom));
     if (query.dueTo) filters.push(lte(tasks.dueDate, query.dueTo));
@@ -342,144 +347,157 @@ export class TasksService {
   }
 
   async create(actor: CurrentUserInfo, input: CreateTask): Promise<TaskDetail> {
-    const id = await this.db.transaction(async (tx) => {
-      // Serialized with archiving users: an assignee must stay active (F01 change).
-      if (input.assigneeId) await lockAccessChanges(tx);
-      const client = input.clientId
-        ? await this.clients.summary(input.clientId, tx, { forUpdate: true })
-        : null;
-      if (input.clientId && !client) throw new NotFoundException();
-
-      // Who may create what (actions table).
-      const selfAssigned = input.assigneeId === actor.id && belongsTo(actor, input.department);
-      if (input.assigneeId && !selfAssigned && !hasAssignScope(actor, { ...input, client })) {
-        throw new ForbiddenException();
-      }
-      if (input.type === 'client_request' && !hasClientScope(actor, client)) {
-        throw new ForbiddenException();
-      }
-
-      await this.assertLinks(tx, input, client);
-      if (input.assigneeId) await this.assertAssignee(tx, input.assigneeId, input.department);
-      if (input.dueDate < businessDate()) {
-        throw new CodedException(400, 'INVALID_DATES', 'The due date is in the past');
-      }
-      if (
-        input.checklist.length > TASK_LIMITS.checklist ||
-        input.links.length > TASK_LIMITS.links
-      ) {
-        throw new CodedException(409, 'LIMIT_REACHED', 'Too many checklist items or links');
-      }
-      const dependsOn = await assertValidDependencies(
-        tx,
-        { id: null, clientId: input.clientId },
-        input.dependsOn,
-      );
-      const request =
-        input.type === 'client_request'
-          ? {
-              requestedByContactId: input.requestedByContactId ?? null,
-              requestedOn: input.requestedOn ?? businessDate(),
-              requestScope: input.requestScope ?? ('in_scope' as const),
-            }
-          : { requestedByContactId: null, requestedOn: null, requestScope: null };
-      if (request.requestedOn && request.requestedOn > businessDate()) {
-        throw new CodedException(400, 'INVALID_DATES', 'The request date is in the future');
-      }
-      if (client && request.requestedByContactId) {
-        await this.assertContact(tx, client.id, request.requestedByContactId);
-      }
-
-      const values = {
-        title: input.title,
-        brief: input.brief ?? null,
-        type: input.type,
-        department: input.department,
-        assigneeId: input.assigneeId,
-        priority: input.priority,
-        dueDate: input.dueDate,
-        dueTime: input.dueTime ?? null,
-        clientId: input.clientId,
-        projectId: input.projectId,
-        milestoneId: input.milestoneId,
-        retainerCycleId: input.retainerCycleId,
-        cycleLineId: input.cycleLineId,
-        needsClientApproval: input.needsClientApproval,
-        revisionLimit: input.revisionLimit,
-        ...request,
-      };
-      const [created] = await tx
-        .insert(tasks)
-        .values({ ...values, createdById: actor.id })
-        .returning({ id: tasks.id });
-      if (!created) throw new Error('Task insert returned no row');
-
-      let extraWorkItemId: string | null = null;
-      if (request.requestScope === 'out_of_scope') {
-        extraWorkItemId = await this.createRequestExtraWork(tx, actor, { ...values, ...request });
-        await tx.update(tasks).set({ extraWorkItemId }).where(eq(tasks.id, created.id));
-      }
-      if (input.checklist.length > 0) {
-        await tx.insert(taskChecklistItems).values(
-          input.checklist.map((text, index) => ({
-            taskId: created.id,
-            text,
-            position: index + 1,
-          })),
-        );
-      }
-      if (input.links.length > 0) {
-        await tx.insert(taskLinks).values(
-          input.links.map((link) => ({
-            taskId: created.id,
-            url: link.url,
-            label: link.label ?? null,
-            addedById: actor.id,
-          })),
-        );
-      }
-      if (dependsOn.length > 0) {
-        await tx.insert(taskDependencies).values(
-          dependsOn.map((dependency) => ({
-            taskId: created.id,
-            dependsOnId: dependency.id,
-            createdById: actor.id,
-          })),
-        );
-      }
-      await recordAudit(tx, {
-        actor: actorOf(actor),
-        action: 'task.created',
-        entityType: 'task',
-        entityId: created.id,
-        after: {
-          ...values,
-          ...(extraWorkItemId && { extraWorkItemId }),
-          ...(dependsOn.length > 0 && { dependsOn }),
-          ...(input.checklist.length > 0 && { checklist: input.checklist }),
-          // Links may carry share tokens: the audit keeps the label and the site only.
-          ...(input.links.length > 0 && {
-            links: input.links.map((link) => ({
-              label: link.label ?? null,
-              site: new URL(link.url).host,
-            })),
-          }),
-        },
-      });
-      const task = await this.notices.load(tx, created.id);
-      await this.notices.send(tx, [
-        input.assigneeId
-          ? this.notices.notice(task, 'task_assigned', [input.assigneeId], actor.id)
-          : this.notices.notice(
-              task,
-              'task_requested',
-              await this.notices.managers(tx, input.department),
-              actor.id,
-            ),
-      ]);
-      return created.id;
-    });
+    const id = await this.db.transaction((tx) => this.createIn(tx, actor, input));
     return this.detail(actor, id);
+  }
+
+  /**
+   * Creates the task in the caller's transaction and returns its id. `postId` links it from the
+   * start to the post it was requested from (F08 rule 9, through `PostTasks`).
+   */
+  async createIn(
+    tx: Transaction,
+    actor: CurrentUserInfo,
+    input: CreateTask,
+    postId: string | null = null,
+  ): Promise<string> {
+    // Serialized with archiving users: an assignee must stay active (F01 change).
+    if (input.assigneeId) await lockAccessChanges(tx);
+    const client = input.clientId
+      ? await this.clients.summary(input.clientId, tx, { forUpdate: true })
+      : null;
+    if (input.clientId && !client) throw new NotFoundException();
+
+    // Who may create what (actions table).
+    const selfAssigned = input.assigneeId === actor.id && belongsTo(actor, input.department);
+    if (input.assigneeId && !selfAssigned && !hasAssignScope(actor, { ...input, client })) {
+      throw new ForbiddenException();
+    }
+    if (input.type === 'client_request' && !hasClientScope(actor, client)) {
+      throw new ForbiddenException();
+    }
+
+    await this.assertLinks(tx, input, client);
+    if (input.assigneeId) await this.assertAssignee(tx, input.assigneeId, input.department);
+    if (input.dueDate < businessDate()) {
+      throw new CodedException(400, 'INVALID_DATES', 'The due date is in the past');
+    }
+    if (input.checklist.length > TASK_LIMITS.checklist || input.links.length > TASK_LIMITS.links) {
+      throw new CodedException(409, 'LIMIT_REACHED', 'Too many checklist items or links');
+    }
+    const dependsOn = await assertValidDependencies(
+      tx,
+      { id: null, clientId: input.clientId },
+      input.dependsOn,
+    );
+    const request =
+      input.type === 'client_request'
+        ? {
+            requestedByContactId: input.requestedByContactId ?? null,
+            requestedOn: input.requestedOn ?? businessDate(),
+            requestScope: input.requestScope ?? ('in_scope' as const),
+          }
+        : { requestedByContactId: null, requestedOn: null, requestScope: null };
+    if (request.requestedOn && request.requestedOn > businessDate()) {
+      throw new CodedException(400, 'INVALID_DATES', 'The request date is in the future');
+    }
+    if (client && request.requestedByContactId) {
+      await this.assertContact(tx, client.id, request.requestedByContactId);
+    }
+
+    const values = {
+      title: input.title,
+      brief: input.brief ?? null,
+      type: input.type,
+      department: input.department,
+      assigneeId: input.assigneeId,
+      priority: input.priority,
+      dueDate: input.dueDate,
+      dueTime: input.dueTime ?? null,
+      clientId: input.clientId,
+      projectId: input.projectId,
+      milestoneId: input.milestoneId,
+      retainerCycleId: input.retainerCycleId,
+      cycleLineId: input.cycleLineId,
+      needsClientApproval: input.needsClientApproval,
+      revisionLimit: input.revisionLimit,
+      ...request,
+    };
+    const [created] = await tx
+      .insert(tasks)
+      .values({
+        ...values,
+        createdById: actor.id,
+        ...(postId && { postId, postLinkedAt: new Date() }),
+      })
+      .returning({ id: tasks.id });
+    if (!created) throw new Error('Task insert returned no row');
+
+    let extraWorkItemId: string | null = null;
+    if (request.requestScope === 'out_of_scope') {
+      extraWorkItemId = await this.createRequestExtraWork(tx, actor, { ...values, ...request });
+      await tx.update(tasks).set({ extraWorkItemId }).where(eq(tasks.id, created.id));
+    }
+    if (input.checklist.length > 0) {
+      await tx.insert(taskChecklistItems).values(
+        input.checklist.map((text, index) => ({
+          taskId: created.id,
+          text,
+          position: index + 1,
+        })),
+      );
+    }
+    if (input.links.length > 0) {
+      await tx.insert(taskLinks).values(
+        input.links.map((link) => ({
+          taskId: created.id,
+          url: link.url,
+          label: link.label ?? null,
+          addedById: actor.id,
+        })),
+      );
+    }
+    if (dependsOn.length > 0) {
+      await tx.insert(taskDependencies).values(
+        dependsOn.map((dependency) => ({
+          taskId: created.id,
+          dependsOnId: dependency.id,
+          createdById: actor.id,
+        })),
+      );
+    }
+    await recordAudit(tx, {
+      actor: actorOf(actor),
+      action: 'task.created',
+      entityType: 'task',
+      entityId: created.id,
+      after: {
+        ...values,
+        ...(postId && { postId }),
+        ...(extraWorkItemId && { extraWorkItemId }),
+        ...(dependsOn.length > 0 && { dependsOn }),
+        ...(input.checklist.length > 0 && { checklist: input.checklist }),
+        // Links may carry share tokens: the audit keeps the label and the site only.
+        ...(input.links.length > 0 && {
+          links: input.links.map((link) => ({
+            label: link.label ?? null,
+            site: new URL(link.url).host,
+          })),
+        }),
+      },
+    });
+    const task = await this.notices.load(tx, created.id);
+    await this.notices.send(tx, [
+      input.assigneeId
+        ? this.notices.notice(task, 'task_assigned', [input.assigneeId], actor.id)
+        : this.notices.notice(
+            task,
+            'task_requested',
+            await this.notices.managers(tx, input.department),
+            actor.id,
+          ),
+    ]);
+    return created.id;
   }
 
   async update(actor: CurrentUserInfo, id: string, input: UpdateTask): Promise<TaskDetail> {
@@ -518,6 +536,21 @@ export class TasksService {
         cycleLineId: input.cycleLineId !== undefined ? input.cycleLineId : task.cycleLineId,
       };
       const linksChange = changedFields(pickLinks(task), links);
+      // F08 rule 7 and edge case 7: a linked task stays with its post's client, and the client
+      // approves the post, never the task.
+      // F08 rule 16: a new cycle line could count the unit beside the post's own line, which
+      // only linking checks.
+      const countsAnew = !!links.cycleLineId && links.cycleLineId !== task.cycleLineId;
+      if (
+        task.postId &&
+        (links.clientId !== task.clientId || input.needsClientApproval || countsAnew)
+      ) {
+        throw new CodedException(
+          409,
+          'LINKED_TO_POST',
+          'The task is linked to a post: unlink it to change its client, its client approval or its cycle line',
+        );
+      }
       let client = task.client;
       if (linksChange) {
         if (taskLinkProblem(links) || (task.type === 'client_request' && !links.clientId)) {
@@ -728,6 +761,8 @@ export class TasksService {
       if (task.status === 'awaiting_client') {
         await this.reviewHooks.left(tx, { taskId: id, actor: actorOf(actor), response: null });
       }
+      // F08 rule 8: an archived task leaves its post.
+      await unlinkRemovedTask(tx, this.postHooks, task, 'archived', actorOf(actor));
       await this.notices.send(tx, [
         this.notices.notice(task, 'task_changed', [task.assigneeId], actor.id, {
           change: 'archived',
@@ -953,6 +988,7 @@ export class TasksService {
         checklist: checklist.get(row.id) ?? { done: 0, total: 0 },
         revisions: { clientCount: revision?.clientCount ?? 0, limit: row.revisionLimit },
         overLimitPending: revision?.overLimitPending ?? false,
+        postId: row.postId,
         readOnly:
           !!row.archivedAt ||
           !!client?.archived ||

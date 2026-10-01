@@ -63,6 +63,7 @@ export const accessColumns = {
   requestedOn: tasks.requestedOn,
   requestScope: tasks.requestScope,
   extraWorkItemId: tasks.extraWorkItemId,
+  postId: tasks.postId,
   createdById: tasks.createdById,
   startedAt: tasks.startedAt,
   archivedAt: tasks.archivedAt,
@@ -93,6 +94,7 @@ export interface TaskRow {
   requestedOn: string | null;
   requestScope: RequestScope | null;
   extraWorkItemId: string | null;
+  postId: string | null;
   createdById: string | null;
   startedAt: Date | null;
   archivedAt: Date | null;
@@ -240,6 +242,16 @@ export const isReadyToSend = (
   !sending.waiting &&
   (!task.client?.isHealthcare || sending.clearedStage === 'medical');
 
+/**
+ * F08 rule 7: an approved task linked to a post is neither delivered by hand nor answered by the
+ * client: the client approves the post, and publishing it delivers the task (`LINKED_TO_POST`).
+ */
+export const isRefusedOnLinkedTask = (
+  task: Pick<TaskRow, 'postId' | 'status'>,
+  to: TaskStatus,
+): boolean =>
+  !!task.postId && task.status === 'approved' && (to === 'delivered' || to === 'revisions');
+
 /** What the UI shows, and the moves it offers; the API checks each action again. */
 export function taskPermissions(
   actor: CurrentUserInfo,
@@ -253,14 +265,16 @@ export function taskPermissions(
   const allowedTransitions =
     readOnly || (closed && inClosedProject(task))
       ? []
-      : allowedTaskTransitions(taskState(task, blocked), rights);
+      : allowedTaskTransitions(taskState(task, blocked), rights).filter(
+          (to) => !isRefusedOnLinkedTask(task, to),
+        );
   return {
     permissions: {
       canEdit: !readOnly && (rights.manage || ownsOpenRequest(rights, task)),
       canAssign: !readOnly && rights.assign,
       canWork: !readOnly && rights.work,
       canReview: !readOnly && rights.manage,
-      canRecordClientResponse: !readOnly && rights.client && !!task.clientId,
+      canRecordClientResponse: !readOnly && rights.client && !!task.clientId && !task.postId,
       canDecideRevision: !readOnly && rights.client,
       canMedicalReview:
         !readOnly && task.reviewStage === 'medical' && mayMedicalReview(actor, task),

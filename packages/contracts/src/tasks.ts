@@ -574,6 +574,8 @@ export const taskSchema = z
     revisions: z.object({ clientCount: z.number().int().min(0), limit: z.number().int().min(0) }),
     /** An over-limit client revision waits for the account manager's decision (rule 10). */
     overLimitPending: z.boolean(),
+    /** The post this task produces media for (F08): the client approves the post, not the task. */
+    postId: z.uuid().nullable(),
   })
   .meta({ id: 'Task' });
 
@@ -695,6 +697,14 @@ export const taskClientResponseSchema = z
 
 export type TaskClientResponse = z.infer<typeof taskClientResponseSchema>;
 
+/** The approval request holding the pending item of a task or a post (F09 rule 8). */
+export const pendingApprovalSchema = z.object({
+  requestId: z.uuid(),
+  state: approvalRequestStateSchema,
+  issuedAt: z.iso.datetime(),
+  expiresAt: z.iso.datetime(),
+});
+
 export const taskPermissionsSchema = z
   .object({
     canEdit: z.boolean(),
@@ -757,14 +767,7 @@ export const taskDetailSchema = taskSchema
     /** Oldest first. */
     clientResponses: z.array(taskClientResponseSchema),
     /** The approval request holding the task's pending item. */
-    pendingApproval: z
-      .object({
-        requestId: z.uuid(),
-        state: approvalRequestStateSchema,
-        issuedAt: z.iso.datetime(),
-        expiresAt: z.iso.datetime(),
-      })
-      .nullable(),
+    pendingApproval: pendingApprovalSchema.nullable(),
     /** Null for a task the system created (an automatic template run, F07). */
     createdBy: personSchema.nullable(),
     createdAt: z.iso.datetime(),
@@ -806,6 +809,8 @@ export const taskListQuerySchema = pageQuerySchema.extend({
   overdue: queryBooleanSchema.optional(),
   blocked: queryBooleanSchema.optional(),
   overLimit: queryBooleanSchema.optional(),
+  /** `true`: tasks linked to a post (F08); `false`: the others. */
+  linkedToPost: queryBooleanSchema.optional(),
   dueFrom: calendarDateSchema.optional(),
   dueTo: calendarDateSchema.optional(),
   createdBy: z.literal('me').optional(),

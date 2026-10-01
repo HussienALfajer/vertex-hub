@@ -29,7 +29,7 @@ import {
   responseChannelEnum,
   reviewOutcomeEnum,
   reviewStageEnum,
-} from './tasks.js';
+} from './reviews.js';
 
 /*
  * The content calendar (F08, ADR 0021), owned by the api `content` module. `publish_date` is a

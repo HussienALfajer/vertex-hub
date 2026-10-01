@@ -14,8 +14,10 @@ import {
   type ApprovalRequestDetail,
   type ApprovalRequestListQuery,
   type ApprovalRequestPage,
+  type ApprovalWithdrawnReason,
   approvalRequestState,
   type ClientApprovals,
+  type ClientDecision,
   type CreateApprovalRequest,
   fileTypeOf,
   type IssuedApprovalRequest,
@@ -32,14 +34,17 @@ import { CodedException } from '../../core/errors/index.js';
 import { type AuditActor, recordAudit } from '../audit/index.js';
 import { type CurrentUserInfo, UserDirectory } from '../auth/index.js';
 import { ClientDirectory, type ClientSummary } from '../clients/index.js';
-import { FileVersions } from '../files/index.js';
+import { PostApprovals, PostReviewHooks } from '../content/index.js';
+import { FileVersions, type SentVersion } from '../files/index.js';
+import { ClientReviewHooks, type PendingApproval, TaskApprovals } from '../tasks/index.js';
 import {
-  type ClientReviewExit,
-  ClientReviewHooks,
-  type PendingApproval,
-  TaskApprovals,
-} from '../tasks/index.js';
-import { closeItem, issueLink, lockRequest, type RequestRow, stateSql } from './approval-items.js';
+  closeItem,
+  issueLink,
+  lockRequest,
+  type RequestRow,
+  shownPost,
+  stateSql,
+} from './approval-items.js';
 
 type Executor = Database | Transaction;
 
@@ -49,10 +54,32 @@ const actorOf = (user: CurrentUserInfo): AuditActor => ({ id: user.id, name: use
 const holdsAll = (actor: CurrentUserInfo) =>
   permissionScopes(actor.access, 'tasks.manage').includes('all');
 
+/** The item column that holds what an item sends: a task or a post. */
+type SubjectColumn = typeof approvalItems.taskId | typeof approvalItems.postId;
+
+/** A task or a post leaving `awaiting_client` by a path other than a response through its link. */
+interface ClientExit {
+  actor: AuditActor | null;
+  /** The response recorded by hand that closes the pending item; null otherwise. */
+  response: { id: string; decision: ClientDecision } | null;
+}
+
+/** A snapshot version as the agency sees it on a request. */
+const toVersion = (version: SentVersion) => ({
+  id: version.id,
+  fileItemId: version.fileItemId,
+  name: version.name,
+  number: version.number,
+  kind: version.kind,
+  type: fileTypeOf(version.kind, version.mimeType),
+  previewStatus: version.previewStatus,
+});
+
 /**
- * Approval requests (spec F09 rules 8–12 and 17, ADR 0020): ready tasks of one client bundled
- * into a link for a contact with final-approval authority. Tells `tasks` about pending items and
- * hears when a task leaves `awaiting_client`, through its `ClientReviewHooks`.
+ * Approval requests (spec F09 rules 8–12 and 17, ADR 0020; F08 rules 20–25, ADR 0021): ready
+ * tasks and posts of one client bundled into a link for a contact with final-approval authority.
+ * Tells `tasks` and `content` about pending items and hears when a task or a post leaves
+ * `awaiting_client`, through their `ClientReviewHooks` and `PostReviewHooks`.
  */
 @Injectable()
 export class ApprovalsService implements OnModuleInit {
@@ -64,20 +91,38 @@ export class ApprovalsService implements OnModuleInit {
     private readonly files: FileVersions,
     private readonly tasks: TaskApprovals,
     private readonly reviewHooks: ClientReviewHooks,
+    private readonly posts: PostApprovals,
+    private readonly postHooks: PostReviewHooks,
   ) {}
 
   onModuleInit(): void {
     this.reviewHooks.register({
-      pending: (taskIds, executor) => this.pending(taskIds, executor),
-      waitingSql: (column) => waitingSql(column),
-      left: (tx, exit) => this.taskLeft(tx, exit),
+      pending: (taskIds, executor) => this.pending(approvalItems.taskId, taskIds, executor),
+      waitingSql: (column) => waitingSql(column, approvalItems.taskId),
+      left: (tx, exit) => this.left(tx, approvalItems.taskId, exit.taskId, exit, 'task_moved'),
+    });
+    this.postHooks.register({
+      pending: (postIds, executor) => this.pending(approvalItems.postId, postIds, executor),
+      waitingSql: (column) => waitingSql(column, approvalItems.postId),
+      left: (tx, exit) => this.left(tx, approvalItems.postId, exit.postId, exit, 'post_moved'),
     });
   }
 
-  /** Ready tasks (rule 8) under the actor's client scope, grouped by client, by name. */
+  /**
+   * Ready tasks (rule 8) and posts (F08 rule 20) under the actor's client scope, grouped by
+   * client, by name.
+   */
   async ready(actor: CurrentUserInfo, query: ApprovalReadyQuery): Promise<ApprovalReady> {
-    const tasks = await this.tasks.ready(actor, query.clientId);
-    const clientIds = [...new Set(tasks.flatMap((task) => (task.client ? [task.client.id] : [])))];
+    const [tasks, posts] = await Promise.all([
+      this.tasks.ready(actor, query.clientId),
+      this.posts.ready(actor, query),
+    ]);
+    const clientIds = [
+      ...new Set([
+        ...tasks.flatMap((task) => (task.client ? [task.client.id] : [])),
+        ...posts.map((post) => post.client.id),
+      ]),
+    ];
     const [clients, approvers] = await Promise.all([
       this.clients.summaries(clientIds),
       this.clients.approvers(clientIds),
@@ -93,6 +138,7 @@ export class ApprovalsService implements OnModuleInit {
             .filter((contact) => contact.clientId === id)
             .map(({ id: contactId, name, phone }) => ({ id: contactId, name, phone })),
           tasks: tasks.filter((task) => task.client?.id === id),
+          posts: posts.filter((post) => post.client.id === id),
         },
       ];
     });
@@ -121,11 +167,24 @@ export class ApprovalsService implements OnModuleInit {
   ): Promise<ClientApprovals> {
     const client = await this.clients.summary(clientId);
     if (!client || (client.archived && !holdsAll(actor))) throw new NotFoundException();
-    const [requests, responses] = await Promise.all([
+    // Responses on tasks and on posts are one list: each side gives its newest up to this page.
+    const upTo = { page: 1, pageSize: query.page * query.pageSize };
+    const [requests, onTasks, onPosts] = await Promise.all([
       this.page(actor, query, new Date(), [eq(approvalRequests.clientId, clientId)]),
-      this.tasks.clientResponses(clientId, query),
+      this.tasks.clientResponses(clientId, upTo),
+      this.posts.clientResponses(clientId, upTo),
     ]);
-    return { requests, responses };
+    return {
+      requests,
+      responses: {
+        items: [...onTasks.items, ...onPosts.items]
+          .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+          .slice((query.page - 1) * query.pageSize, upTo.pageSize),
+        total: onTasks.total + onPosts.total,
+        page: query.page,
+        pageSize: query.pageSize,
+      },
+    };
   }
 
   async detail(actor: CurrentUserInfo, id: string): Promise<ApprovalRequestDetail> {
@@ -149,14 +208,21 @@ export class ApprovalsService implements OnModuleInit {
       this.clients.contacts([request.contactId]),
     ]);
     if (!summary) throw new NotFoundException();
-    const [snapshots, titles, responses] = await Promise.all([
-      this.tasks.snapshots(items.map((item) => item.reviewId)),
-      this.tasks.titles(items.map((item) => item.taskId)),
-      this.tasks.responses(items.flatMap((item) => (item.responseId ? [item.responseId] : []))),
-    ]);
+    const ids = (key: 'taskId' | 'postId' | 'reviewId' | 'postReviewId') =>
+      items.flatMap((item) => item[key] ?? []);
+    const [snapshots, titles, responses, postSnapshots, postTitles, postResponses] =
+      await Promise.all([
+        this.tasks.snapshots(ids('reviewId')),
+        this.tasks.titles(ids('taskId')),
+        this.tasks.responses(items.flatMap((item) => item.responseId ?? [])),
+        this.posts.snapshots(ids('postReviewId')),
+        this.posts.titles(ids('postId')),
+        this.posts.responses(items.flatMap((item) => item.postResponseId ?? [])),
+      ]);
     const versions = await this.files.sent(
-      [...snapshots.values()].flatMap((snapshot) => snapshot.versionIds),
+      [...snapshots.values(), ...postSnapshots.values()].flatMap((snapshot) => snapshot.versionIds),
     );
+    const sent = (versionIds: string[]) => versionIds.flatMap((id) => versions.get(id) ?? []);
     const { items: counts, ...basics } = summary;
     const scoped = this.tasks.hasClientScope(actor, client);
     const live = summary.state === 'open' || summary.state === 'expired';
@@ -165,28 +231,34 @@ export class ApprovalsService implements OnModuleInit {
       counts,
       message: request.message,
       items: items.map((item): ApprovalItem => {
-        const snapshot = snapshots.get(item.reviewId);
-        const response = item.responseId ? responses.get(item.responseId) : undefined;
+        const snapshot = item.reviewId ? snapshots.get(item.reviewId) : undefined;
+        const postSnapshot = item.postReviewId ? postSnapshots.get(item.postReviewId) : undefined;
+        const response = item.postId
+          ? postResponses.get(item.postResponseId ?? '')
+          : responses.get(item.responseId ?? '');
         return {
           id: item.id,
           position: item.position,
+          kind: item.postId ? 'post' : 'task',
           title: item.title,
-          task: { id: item.taskId, title: titles.get(item.taskId) ?? '' },
+          task: item.taskId ? { id: item.taskId, title: titles.get(item.taskId) ?? '' } : null,
+          post:
+            item.postId && postSnapshot
+              ? {
+                  id: item.postId,
+                  title: postTitles.get(item.postId) ?? '',
+                  ...shownPost(postSnapshot),
+                }
+              : null,
           status: item.status,
           withdrawnReason: item.withdrawnReason,
           closedAt: item.closedAt?.toISOString() ?? null,
-          versions: (snapshot?.versionIds ?? [])
-            .flatMap((versionId) => versions.get(versionId) ?? [])
-            .sort((a, b) => a.name.localeCompare(b.name, 'ar') || a.number - b.number)
-            .map((version) => ({
-              id: version.id,
-              fileItemId: version.fileItemId,
-              name: version.name,
-              number: version.number,
-              kind: version.kind,
-              type: fileTypeOf(version.kind, version.mimeType),
-              previewStatus: version.previewStatus,
-            })),
+          // A post's media keeps the display order of its snapshot (F08 rule 5).
+          versions: item.postId
+            ? sent(postSnapshot?.versionIds ?? []).map(toVersion)
+            : sent(snapshot?.versionIds ?? [])
+                .sort((a, b) => a.name.localeCompare(b.name, 'ar') || a.number - b.number)
+                .map(toVersion),
           text: snapshot?.clientText ?? null,
           response: response
             ? {
@@ -207,8 +279,9 @@ export class ApprovalsService implements OnModuleInit {
   }
 
   /**
-   * Rule 9: a link for 1–20 ready tasks of one client. A task whose pending item waits in an
-   * expired request is sent again, and that item withdrawn (rule 8). The link is returned once.
+   * Rule 9 and F08 rule 21: a link for 1–60 ready tasks and posts of one client, in the order
+   * given. A task or a post whose pending item waits in an expired request is sent again, and
+   * that item withdrawn (rule 8). The link is returned once.
    */
   async create(
     actor: CurrentUserInfo,
@@ -218,16 +291,26 @@ export class ApprovalsService implements OnModuleInit {
       throw new CodedException(
         409,
         'LIMIT_REACHED',
-        `A request holds at most ${APPROVAL_LIMITS.items} tasks`,
+        `A request holds at most ${APPROVAL_LIMITS.items} tasks and posts`,
       );
     }
     const link = issueLink();
     const id = await this.db.transaction(async (tx) => {
       const client = await this.scopedClient(tx, actor, input.clientId);
       await this.assertApprover(tx, client, input.contactId);
-      const taskIds = input.items.map((item) => item.taskId);
-      const sendable = await this.tasks.sendable(tx, client, taskIds);
-      await this.withdrawExpired(tx, actorOf(actor), taskIds);
+      const taskIds = input.items.flatMap((item) => ('taskId' in item ? [item.taskId] : []));
+      const postIds = input.items.flatMap((item) => ('postId' in item ? [item.postId] : []));
+      // Posts are locked before tasks.
+      const posts = new Map(
+        (await this.posts.sendable(tx, client, postIds)).map((post) => [post.id, post]),
+      );
+      const tasks = new Map(
+        (taskIds.length > 0 ? await this.tasks.sendable(tx, client, taskIds) : []).map((task) => [
+          task.id,
+          task,
+        ]),
+      );
+      await this.withdrawExpired(tx, actorOf(actor), taskIds, postIds);
       const [request] = await tx
         .insert(approvalRequests)
         .values({
@@ -242,13 +325,18 @@ export class ApprovalsService implements OnModuleInit {
         .returning({ id: approvalRequests.id });
       if (!request) throw new Error('Approval request insert returned no row');
       await tx.insert(approvalItems).values(
-        sendable.map((task, index) => ({
-          requestId: request.id,
-          taskId: task.id,
-          position: index + 1,
-          title: input.items[index]?.title ?? task.title.slice(0, 160),
-          reviewId: task.reviewId,
-        })),
+        input.items.map((item, index) => {
+          const sent = 'taskId' in item ? tasks.get(item.taskId) : posts.get(item.postId);
+          if (!sent) throw new Error('A sendable item was not returned');
+          return {
+            requestId: request.id,
+            position: index + 1,
+            title: item.title ?? sent.title.slice(0, 160),
+            ...('taskId' in item
+              ? { taskId: sent.id, reviewId: sent.reviewId }
+              : { postId: sent.id, postReviewId: sent.reviewId }),
+          };
+        }),
       );
       await recordAudit(tx, {
         actor: actorOf(actor),
@@ -259,6 +347,7 @@ export class ApprovalsService implements OnModuleInit {
           clientId: client.id,
           contactId: input.contactId,
           taskIds,
+          ...(postIds.length > 0 && { postIds }),
           expiresAt: link.expiresAt.toISOString(),
         },
       });
@@ -295,7 +384,10 @@ export class ApprovalsService implements OnModuleInit {
     return { ...(await this.detail(actor, id)), link: this.linkOf(link.token) };
   }
 
-  /** Rule 12: the link stops working and its pending items are withdrawn; the tasks stay ready. */
+  /**
+   * Rule 12: the link stops working and its pending items are withdrawn; the tasks and posts
+   * stay ready.
+   */
   async revoke(actor: CurrentUserInfo, id: string): Promise<ApprovalRequestDetail> {
     await this.db.transaction(async (tx) => {
       await this.liveRequest(tx, actor, id, { clientArchived: 'allow' });
@@ -308,13 +400,18 @@ export class ApprovalsService implements OnModuleInit {
         .update(approvalItems)
         .set({ status: 'withdrawn', withdrawnReason: 'revoked', closedAt: now })
         .where(and(eq(approvalItems.requestId, id), eq(approvalItems.status, 'pending')))
-        .returning({ taskId: approvalItems.taskId });
+        .returning({ taskId: approvalItems.taskId, postId: approvalItems.postId });
+      const postIds = withdrawn.flatMap((item) => item.postId ?? []);
       await recordAudit(tx, {
         actor: actorOf(actor),
         action: 'approval_request.revoked',
         entityType: 'approval_request',
         entityId: id,
-        after: { revoked: true, taskIds: withdrawn.map((item) => item.taskId) },
+        after: {
+          revoked: true,
+          taskIds: withdrawn.flatMap((item) => item.taskId ?? []),
+          ...(postIds.length > 0 && { postIds }),
+        },
       });
     });
     return this.detail(actor, id);
@@ -382,16 +479,21 @@ export class ApprovalsService implements OnModuleInit {
   }
 
   /**
-   * Rule 8, for tasks the caller locked: a pending item in an open request refuses the task
-   * (`TASK_NOT_READY`); one in an expired request is withdrawn (`resent`).
+   * Rule 8, for tasks and posts the caller locked: a pending item in an open request refuses the
+   * task or the post (`TASK_NOT_READY`, `POST_NOT_READY`); one in an expired request is withdrawn
+   * (`resent`).
    */
   private async withdrawExpired(
     tx: Transaction,
     actor: AuditActor,
     taskIds: string[],
+    postIds: string[],
   ): Promise<void> {
     const pendingOf = and(
-      inArray(approvalItems.taskId, taskIds),
+      or(
+        taskIds.length > 0 ? inArray(approvalItems.taskId, taskIds) : undefined,
+        postIds.length > 0 ? inArray(approvalItems.postId, postIds) : undefined,
+      ),
       eq(approvalItems.status, 'pending'),
     );
     const held = await tx
@@ -415,27 +517,35 @@ export class ApprovalsService implements OnModuleInit {
     const items = await tx.select().from(approvalItems).where(pendingOf).orderBy(approvalItems.id);
     for (const item of items) {
       if (states.get(item.requestId) !== 'expired') {
-        throw new CodedException(409, 'TASK_NOT_READY', 'A task already waits on a link', {
-          taskId: item.taskId,
-        });
+        throw item.postId
+          ? new CodedException(409, 'POST_NOT_READY', 'A post already waits on a link', {
+              postId: item.postId,
+            })
+          : new CodedException(409, 'TASK_NOT_READY', 'A task already waits on a link', {
+              taskId: item.taskId,
+            });
       }
       await closeItem(tx, item, { withdrawn: 'resent' }, actor);
     }
   }
 
-  /** The pending item of each task that has one, for `tasks` (`ClientReviewHooks`). */
+  /**
+   * The pending item of each task or post that has one, for `tasks` (`ClientReviewHooks`) and
+   * `content` (`PostReviewHooks`).
+   */
   private async pending(
-    taskIds: string[],
+    subject: SubjectColumn,
+    ids: string[],
     executor: Executor,
   ): Promise<Map<string, PendingApproval>> {
     const rows = await executor
-      .select({ itemId: approvalItems.id, taskId: approvalItems.taskId, request: approvalRequests })
+      .select({ itemId: approvalItems.id, subjectId: subject, request: approvalRequests })
       .from(approvalItems)
       .innerJoin(approvalRequests, eq(approvalRequests.id, approvalItems.requestId))
-      .where(and(inArray(approvalItems.taskId, taskIds), eq(approvalItems.status, 'pending')));
+      .where(and(inArray(subject, ids), eq(approvalItems.status, 'pending')));
     return new Map(
-      rows.map(({ itemId, taskId, request }) => [
-        taskId,
+      rows.map(({ itemId, subjectId, request }) => [
+        subjectId as string,
         {
           itemId,
           requestId: request.id,
@@ -448,14 +558,18 @@ export class ApprovalsService implements OnModuleInit {
   }
 
   /**
-   * Rules 16 and 17: a task left `awaiting_client` in `tx`. Its pending item closes with the
-   * response recorded by hand, or is withdrawn (`task_moved`).
+   * Rules 16 and 17, and F08 rules 24 and 25: a task or a post left `awaiting_client` in `tx`.
+   * Its pending item closes with the response recorded by hand, or is withdrawn (`task_moved`,
+   * `post_moved`).
    */
-  private async taskLeft(tx: Transaction, exit: ClientReviewExit): Promise<void> {
-    const pendingOf = and(
-      eq(approvalItems.taskId, exit.taskId),
-      eq(approvalItems.status, 'pending'),
-    );
+  private async left(
+    tx: Transaction,
+    subject: SubjectColumn,
+    id: string,
+    exit: ClientExit,
+    moved: ApprovalWithdrawnReason,
+  ): Promise<void> {
+    const pendingOf = and(eq(subject, id), eq(approvalItems.status, 'pending'));
     const [held] = await tx
       .select({ requestId: approvalItems.requestId })
       .from(approvalItems)
@@ -469,7 +583,7 @@ export class ApprovalsService implements OnModuleInit {
       item,
       exit.response
         ? { decision: exit.response.decision, responseId: exit.response.id, via: 'manual' }
-        : { withdrawn: 'task_moved' },
+        : { withdrawn: moved },
       exit.actor,
     );
   }
@@ -555,12 +669,13 @@ const qualified = (column: PgColumn) =>
   sql`${sql.identifier(getTableName(column.table))}.${sql.identifier(column.name)}`;
 
 /**
- * SQL: `column` holds a task whose pending item is in a request still open (rule 8). Every column
- * is qualified, because the subquery joins two tables inside another table's select.
+ * SQL: `column` holds a task or a post (the `subject` column of the items) whose pending item is
+ * in a request still open (rule 8). Every column is qualified, because the subquery joins two
+ * tables inside another table's select.
  */
-function waitingSql(column: PgColumn): SQL {
+function waitingSql(column: PgColumn, subject: SubjectColumn): SQL {
   const q = qualified;
-  return sql`${q(column)} in (select ${q(approvalItems.taskId)} from ${approvalItems}
+  return sql`${q(column)} in (select ${q(subject)} from ${approvalItems}
     inner join ${approvalRequests} on ${q(approvalRequests.id)} = ${q(approvalItems.requestId)}
     where ${q(approvalItems.status)} = 'pending'
       and ${q(approvalRequests.revokedAt)} is null

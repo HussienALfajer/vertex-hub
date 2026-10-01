@@ -8,15 +8,26 @@ import {
 import { approvalItems, approvalRequests, type Transaction } from '@vertex-hub/db';
 import { and, eq, gt, isNotNull, isNull, lte, type SQL, sql } from 'drizzle-orm';
 import { type AuditActor, recordAudit } from '../audit/index.js';
+import type { PostSnapshot } from '../content/index.js';
 
 /*
- * What every path that changes an approval request shares (spec F09 rules 8–17): the link's
- * token, the state as SQL, and closing an item. Lock order everywhere: tasks, then the request,
- * then its items.
+ * What every path that changes an approval request shares (spec F09 rules 8–17, F08 rules
+ * 20–25): the link's token, the state as SQL, and closing an item. Lock order everywhere: posts,
+ * then tasks, then the request, then its items.
  */
 
 export type RequestRow = typeof approvalRequests.$inferSelect;
 export type ItemRow = typeof approvalItems.$inferSelect;
+
+/** The post of a snapshot as an item shows it beside the versions (F08 rule 27). */
+export const shownPost = (snapshot: PostSnapshot) => ({
+  type: snapshot.type,
+  platforms: snapshot.platforms,
+  publishDate: snapshot.publishDate,
+  publishTime: snapshot.publishTime,
+  caption: snapshot.caption,
+  hashtags: snapshot.hashtags,
+});
 
 /** SHA-256 of a token: all that is stored of a link (ADR 0002). */
 export const hashToken = (token: string) => createHash('sha256').update(token).digest('hex');
@@ -68,7 +79,7 @@ export type ItemOutcome =
  */
 export async function closeItem(
   tx: Transaction,
-  item: Pick<ItemRow, 'id' | 'requestId' | 'taskId'>,
+  item: Pick<ItemRow, 'id' | 'requestId' | 'taskId' | 'postId'>,
   outcome: ItemOutcome,
   actor: AuditActor | null,
   actorName?: string,
@@ -79,7 +90,14 @@ export async function closeItem(
     .update(approvalItems)
     .set(
       decided
-        ? { status: outcome.decision, responseId: outcome.responseId, closedAt }
+        ? {
+            status: outcome.decision,
+            // The response of a post item is a post response (F08 rule 22).
+            ...(item.postId
+              ? { postResponseId: outcome.responseId }
+              : { responseId: outcome.responseId }),
+            closedAt,
+          }
         : { status: 'withdrawn', withdrawnReason: outcome.withdrawn, closedAt },
     )
     .where(eq(approvalItems.id, item.id));
@@ -91,7 +109,7 @@ export async function closeItem(
     entityId: item.requestId,
     after: {
       itemId: item.id,
-      taskId: item.taskId,
+      ...(item.postId ? { postId: item.postId } : { taskId: item.taskId }),
       ...(decided
         ? { decision: outcome.decision, via: outcome.via }
         : { reason: outcome.withdrawn }),

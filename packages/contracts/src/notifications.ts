@@ -38,6 +38,8 @@ export const NOTIFICATION_TYPES = [
   'post_awaiting_client',
   'post_assigned',
   'post_approved',
+  'post_task_ready',
+  'post_task_unlinked',
   'task_due_soon',
   'task_overdue',
   'task_overdue_escalated',
@@ -95,6 +97,8 @@ export const NOTIFICATION_CATALOG: Record<
   post_awaiting_client: { category: 'tasks', subject: 'post', mutable: false },
   post_assigned: { category: 'tasks', subject: 'post', mutable: true },
   post_approved: { category: 'tasks', subject: 'post', mutable: false },
+  post_task_ready: { category: 'tasks', subject: 'post', mutable: true },
+  post_task_unlinked: { category: 'tasks', subject: 'post', mutable: false },
   approval_responded: { category: 'tasks', subject: 'approval_request', mutable: false },
   approval_no_response: { category: 'reminders', subject: 'approval_request', mutable: false },
   approval_expired: { category: 'reminders', subject: 'approval_request', mutable: false },
@@ -174,6 +178,14 @@ export const REVIEW_SOURCES = ['internal', 'client', 'medical'] as const;
 
 const reviewSourceSchema = z.enum(REVIEW_SOURCES);
 
+/**
+ * Why a task left its post without being unlinked by hand (F08 rule 8); `reopened`: a delivered
+ * task of a published post went back to work (edge case 9).
+ */
+export const POST_TASK_UNLINK_REASONS = ['cancelled', 'archived', 'reopened'] as const;
+
+export type PostTaskUnlinkReason = (typeof POST_TASK_UNLINK_REASONS)[number];
+
 /** An approval request as it was when the notification was sent (F09). */
 const approvalData = z.object({ client: nameSchema, contact: nameSchema });
 
@@ -201,6 +213,13 @@ export const NOTIFICATION_DATA_SCHEMAS = {
   post_awaiting_client: postData,
   post_assigned: postData,
   post_approved: postData.extend({ source: reviewSourceSchema }),
+  /** A linked task was approved by its department: its final files are the post's media. */
+  post_task_ready: postData.extend({ taskTitle: nameSchema }),
+  /** A linked task was cancelled or archived, which unlinks it (F08 rule 8). */
+  post_task_unlinked: postData.extend({
+    taskTitle: nameSchema,
+    reason: z.enum(POST_TASK_UNLINK_REASONS),
+  }),
   /** Merged per request like `task_commented`: the latest decision, `count` decisions. */
   approval_responded: approvalData.extend({ decision: z.enum(CLIENT_DECISIONS) }),
   approval_no_response: approvalData,

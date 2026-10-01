@@ -177,8 +177,10 @@ describe('approval links (F09 rules 13–15, 20–23)', () => {
       items: [
         {
           id: expect.any(String),
+          kind: 'task',
           title: 'منشور الافتتاح',
           text: task.clientText,
+          post: null,
           files: [],
           status: 'pending',
           note: null,

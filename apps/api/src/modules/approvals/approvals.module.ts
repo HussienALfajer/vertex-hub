@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/index.js';
 import { ClientsModule } from '../clients/index.js';
+import { ContentModule } from '../content/index.js';
 import { FilesModule } from '../files/index.js';
 import { NotificationsModule } from '../notifications/index.js';
 import { TasksModule } from '../tasks/index.js';
@@ -15,13 +16,21 @@ import { PublicApprovalsService } from './public-approvals.service.js';
 /**
  * Client approval links (F09, ADR 0020). Owns `approval_requests` and `approval_items`. Reads
  * and moves tasks through `tasks`' `TaskApprovals` and registers into its `ClientReviewHooks`
- * (pending items, and tasks leaving `awaiting_client`); reads snapshot versions and serves them
+ * (pending items, and tasks leaving `awaiting_client`); does the same for posts (F08, ADR 0021)
+ * through `content`'s `PostApprovals` and `PostReviewHooks`; reads snapshot versions and serves them
  * to the holder of a link through `files`' `FileVersions`; reads clients and contacts through
  * `ClientDirectory` and users through `UserDirectory`; notifies through `notifications`. Works
  * the `approvals.reminders` job. Nothing imports it.
  */
 @Module({
-  imports: [AuthModule, ClientsModule, FilesModule, NotificationsModule, TasksModule],
+  imports: [
+    AuthModule,
+    ClientsModule,
+    FilesModule,
+    NotificationsModule,
+    TasksModule,
+    ContentModule,
+  ],
   controllers: [ApprovalsController, ClientApprovalsController, PublicApprovalsController],
   providers: [ApprovalsService, PublicApprovalsService, ApprovalReminders, ApprovalNotices],
 })

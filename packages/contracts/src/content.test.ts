@@ -5,8 +5,9 @@ import {
   canMakePostMove,
   contentCalendarQuerySchema,
   createPostSchema,
+  createPostTaskSchema,
+  isClientReturn,
   isPostOverdue,
-  POST_PLATFORMS,
   POST_STATUSES,
   type PostRights,
   type PostState,
@@ -14,8 +15,13 @@ import {
   postMove,
   postMoveNeeds,
   postStatusChangeSchema,
+  postTaskDepartment,
+  postTaskDueDate,
+  postTaskTitle,
+  returnPostTaskSchema,
   updatePostSchema,
 } from './content.js';
+import { POST_PLATFORMS } from './post-values.js';
 
 const CLIENT = '0198f0c2-0000-7000-8000-000000000001';
 
@@ -227,5 +233,53 @@ describe('isPostOverdue', () => {
     expect(isPostOverdue({ status: 'approved', publishDate: '2026-10-10' }, now)).toBe(false);
     expect(isPostOverdue({ status: 'published', publishDate: '2026-10-01' }, now)).toBe(false);
     expect(isPostOverdue({ status: 'in_production', publishDate: '2026-10-01' }, now)).toBe(false);
+  });
+});
+
+describe('tasks requested from a post (rule 9)', () => {
+  it('titles the task after the type and the post, within a task title', () => {
+    expect(postTaskTitle('reel', 'افتتاح الفرع')).toBe('ريل: افتتاح الفرع');
+    expect(postTaskTitle('carousel', 'x'.repeat(160))).toHaveLength(160);
+  });
+
+  it('sends a reel to Photography and the rest to Design', () => {
+    expect(postTaskDepartment('reel')).toBe('photography');
+    expect(postTaskDepartment('post')).toBe('design');
+    expect(postTaskDepartment('story')).toBe('design');
+    expect(postTaskDepartment('carousel')).toBe('design');
+  });
+
+  it('is due two work days before the publish date, never before today', () => {
+    expect(postTaskDueDate('2026-10-14', '2026-10-01')).toBe('2026-10-12');
+    // Sunday: Saturday and Thursday are the two work days before it.
+    expect(postTaskDueDate('2026-10-11', '2026-10-01')).toBe('2026-10-08');
+    expect(postTaskDueDate('2026-10-11', '2026-10-10')).toBe('2026-10-10');
+    expect(postTaskDueDate('2026-10-05', '2026-10-06')).toBe('2026-10-06');
+  });
+
+  it('needs a department only, and no line unless given', () => {
+    expect(createPostTaskSchema.parse({ department: 'design' })).toEqual({
+      department: 'design',
+      cycleLineId: null,
+    });
+    expect(createPostTaskSchema.safeParse({}).success).toBe(false);
+    expect(createPostTaskSchema.safeParse({ department: 'design', title: ' ' }).success).toBe(
+      false,
+    );
+  });
+});
+
+describe('sending a linked task back (rule 12)', () => {
+  it('needs a note of 1–2000 characters', () => {
+    expect(returnPostTaskSchema.parse({ note: '  كبّروا الشعار ' }).note).toBe('كبّروا الشعار');
+    expect(returnPostTaskSchema.safeParse({ note: '  ' }).success).toBe(false);
+    expect(returnPostTaskSchema.safeParse({ note: 'x'.repeat(2001) }).success).toBe(false);
+  });
+
+  it('is a client revision only right after the client asked for changes', () => {
+    expect(isClientReturn({ kind: 'response', changesRequested: true })).toBe(true);
+    expect(isClientReturn({ kind: 'response', changesRequested: false })).toBe(false);
+    expect(isClientReturn({ kind: 'review', changesRequested: true })).toBe(false);
+    expect(isClientReturn(null)).toBe(false);
   });
 });

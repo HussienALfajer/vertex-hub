@@ -39,10 +39,12 @@ import { FileVersions } from '../files/index.js';
 import type { Notice } from '../notifications/index.js';
 import { EngagementDirectory } from '../projects/index.js';
 import { ClientReviewHooks } from './client-review-hooks.js';
+import { PostTaskHooks, unlinkRemovedTask } from './post-task-hooks.js';
 import {
   actorOf,
   assertTaskWritable,
   inClosedProject,
+  isRefusedOnLinkedTask,
   readableTask,
   type TaskAccess,
   taskRights,
@@ -90,6 +92,7 @@ export class TaskWorkflowService {
     private readonly reviews: TaskReviews,
     private readonly approvals: TaskApprovals,
     private readonly reviewHooks: ClientReviewHooks,
+    private readonly postHooks: PostTaskHooks,
   ) {}
 
   private get directories() {
@@ -141,6 +144,14 @@ export class TaskWorkflowService {
         }
       }
       if (!canMakeTaskMove(taskState(task, blocked), move, rights)) throw new ForbiddenException();
+      // F08 rule 7: the client approves the post, and publishing it delivers the task.
+      if (isRefusedOnLinkedTask(task, change.status)) {
+        throw new CodedException(
+          409,
+          'LINKED_TO_POST',
+          'The task is linked to a post: it is delivered and answered through the post',
+        );
+      }
       const overridden = blocked;
       const note = change.note ?? null;
       if (taskMoveNeedsNote(move) && !note) {
@@ -274,6 +285,22 @@ export class TaskWorkflowService {
       } else if (task.status === 'awaiting_client') {
         // F09 rule 17: withdrawn or cancelled, the task is no longer with the client.
         await this.reviewHooks.left(tx, { taskId: id, actor: actorOf(actor), response: null });
+      }
+      // F08 rules 7 and 8: the post hears that its task is approved; a cancelled task leaves it.
+      if (move === 'approve' && task.postId) {
+        await this.postHooks.approved(tx, {
+          postId: task.postId,
+          task: { id, title: task.title },
+          actor: actorOf(actor),
+        });
+      }
+      if (move === 'cancel') {
+        await unlinkRemovedTask(tx, this.postHooks, task, 'cancelled', actorOf(actor));
+      }
+      // F08 edge case 9: work reopened after its post was published is plain F06 work again,
+      // delivered by hand when it is done.
+      if (move === 'reopen_client' || move === 'reopen_internal') {
+        await unlinkRemovedTask(tx, this.postHooks, task, 'reopened', actorOf(actor));
       }
       const overLimit = !!revision?.overLimit;
       await this.notices.send(

@@ -157,6 +157,8 @@ export async function seedPostCast(db: Database, client: Api) {
 
   return {
     ...cast,
+    /** The F06 helpers the post ones below take the names of. */
+    task: { move: cast.move, moveOk: cast.moveOk, detail: cast.detail },
     medicalReviewer,
     createPost,
     move,

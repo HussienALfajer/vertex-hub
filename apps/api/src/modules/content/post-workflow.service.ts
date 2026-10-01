@@ -24,6 +24,7 @@ import { type AuditActor, recordAudit } from '../audit/index.js';
 import { type CurrentUserInfo, lockAccessChanges, UserDirectory } from '../auth/index.js';
 import { ClientDirectory, ClientFlagHooks, type HealthcareChange } from '../clients/index.js';
 import type { Notice } from '../notifications/index.js';
+import { PostTasks } from '../tasks/index.js';
 import { assertLinksMatch, ContentService } from './content.service.js';
 import {
   actorOf,
@@ -34,6 +35,7 @@ import {
   readablePost,
 } from './post-access.js';
 import { PostNotices } from './post-notices.js';
+import { type PostReviewExit, PostReviewHooks } from './post-review-hooks.js';
 import { PostReviews } from './post-reviews.js';
 
 /** Client responses (rule 24): recorded against the snapshot, with the contact who answered. */
@@ -47,8 +49,10 @@ const afterReview = (post: Pick<PostAccess, 'needsClientApproval'>): PostStatus 
   post.needsClientApproval ? 'awaiting_client' : 'approved';
 
 /**
- * The post workflow (spec F08, "Post status" and rules 1, 10–15, 17–19, 24, 26): status moves,
- * the review snapshots they write, the medical stage and healthcare flag changes.
+ * The post workflow (spec F08, "Post status" and rules 1, 10–15, 17–19, 24–26): status moves,
+ * the review snapshots they write, the medical stage and healthcare flag changes. Publishing
+ * delivers the linked tasks, cancelling gives them back, and a post leaving the client takes its
+ * pending approval item with it. Lock order: the post, its tasks, the request, its items.
  */
 @Injectable()
 export class PostWorkflowService implements OnModuleInit {
@@ -60,6 +64,8 @@ export class PostWorkflowService implements OnModuleInit {
     private readonly reviews: PostReviews,
     private readonly notices: PostNotices,
     private readonly flagHooks: ClientFlagHooks,
+    private readonly tasks: PostTasks,
+    private readonly reviewHooks: PostReviewHooks,
   ) {}
 
   onModuleInit(): void {
@@ -79,7 +85,7 @@ export class PostWorkflowService implements OnModuleInit {
       const post = await readablePost(tx, this.clients, actor, id, { forUpdate: true });
       assertPostWritable(post);
       const content = await this.reviews.content(tx, post);
-      const state = postState(post, content.versionIds.length > 0);
+      const state = postState(post, content.hasWork);
       const move = this.moveOf(post, change, postReopenTarget(state));
       if (!canMakePostMove(state, move, postRights(actor, post.client))) {
         throw new ForbiddenException();
@@ -114,6 +120,8 @@ export class PostWorkflowService implements OnModuleInit {
       if (move === 'submit' && content.versionIds.length === 0 && !post.caption) {
         throw new CodedException(409, 'NOTHING_TO_APPROVE', 'Add a caption or media first');
       }
+      // Rule 10: the media of a linked task is its approved work.
+      if (move === 'submit') await this.tasks.assertApproved(tx, id);
       if (move === 'schedule' && !post.publishTime) {
         throw new CodedException(409, 'PUBLISH_TIME_REQUIRED', 'Set the publish time first');
       }
@@ -149,6 +157,7 @@ export class PostWorkflowService implements OnModuleInit {
         await this.reviews.recordReturn(tx, id, post.reviewStage, reviewer, note);
       }
       // Rule 24: a response answers the snapshot that was sent.
+      let response: PostReviewExit['response'] = null;
       if (responds && change.contactId) {
         const answered = await this.reviews.clearedPass(tx, post);
         // Rule 13: a healthcare post is answered only once a medical pass cleared it.
@@ -160,15 +169,22 @@ export class PostWorkflowService implements OnModuleInit {
           );
         }
         const decision = move === 'client_approved' ? 'approved' : 'changes_requested';
-        await tx.insert(postClientResponses).values({
-          postId: id,
-          decision,
-          channel: 'manual',
-          contactId: change.contactId,
-          note,
-          reviewId: answered.id,
-          recordedById: actor.id,
-        });
+        const pending = (await this.reviewHooks.pending([id], tx)).get(id);
+        const [created] = await tx
+          .insert(postClientResponses)
+          .values({
+            postId: id,
+            decision,
+            channel: 'manual',
+            contactId: change.contactId,
+            note,
+            reviewId: answered.id,
+            approvalItemId: pending?.itemId ?? null,
+            recordedById: actor.id,
+          })
+          .returning({ id: postClientResponses.id });
+        if (!created) throw new Error('Client response insert returned no row');
+        response = { id: created.id, decision };
         await recordAudit(tx, {
           actor: reviewer,
           action: 'post.client_response_recorded',
@@ -218,6 +234,25 @@ export class PostWorkflowService implements OnModuleInit {
         ...(change.contactId && { contactId: change.contactId }),
         ...(move === 'publish' && { publishedAt: publishedAt.toISOString() }),
       });
+      // Rule 18: publishing delivers the linked tasks, so the unit counts now.
+      if (move === 'publish') await this.tasks.deliver(tx, id, reviewer);
+      // Rule 19: a cancelled post gives its tasks back for another post.
+      if (move === 'cancel') {
+        for (const task of await this.tasks.unlinkAll(tx, id, reviewer)) {
+          await recordAudit(tx, {
+            actor: reviewer,
+            action: 'post.task_unlinked',
+            entityType: 'post',
+            entityId: id,
+            after: { taskId: task.id, title: task.title, reason: 'post_cancelled' },
+          });
+        }
+      }
+      // Rules 24 and 25: the pending item closes with the response recorded by hand, or is
+      // withdrawn when the post leaves the client another way (withdraw, cancel).
+      if (post.status === 'awaiting_client') {
+        await this.reviewHooks.left(tx, { postId: id, actor: reviewer, response });
+      }
       await this.notices.send(
         tx,
         medical
@@ -286,8 +321,8 @@ export class PostWorkflowService implements OnModuleInit {
 
   /**
    * Rule 26, in the transaction that changes the flag. Turned off: posts in the medical stage
-   * move on with their internal pass. Turned on: posts waiting for the client go back to the
-   * medical stage.
+   * move on with their internal pass. Turned on: posts waiting for the client without a pending
+   * approval item go back to the medical stage; sent ones stay sent.
    */
   private async healthcareChanged(tx: Transaction, change: HealthcareChange): Promise<void> {
     const affected = await tx
@@ -308,7 +343,14 @@ export class PostWorkflowService implements OnModuleInit {
     if (affected.length === 0) return;
     const client = await this.clients.summary(change.clientId, tx);
     if (!client) return;
+    const pending = change.isHealthcare
+      ? await this.reviewHooks.pending(
+          affected.map((row) => row.id),
+          tx,
+        )
+      : new Map();
     for (const row of affected) {
+      if (pending.has(row.id)) continue;
       const post: PostAccess = { ...row, client };
       if (change.isHealthcare) {
         await tx

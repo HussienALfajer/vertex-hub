@@ -1732,6 +1732,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/content/posts/{id}/linkable-tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ContentController_linkableTasks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/content/posts/{id}/tasks/{taskId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["ContentController_linkTask"];
+        post?: never;
+        delete: operations["ContentController_unlinkTask"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/content/posts/{id}/tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ContentController_createTask"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/content/posts/{id}/tasks/{taskId}/return": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ContentController_returnTask"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/content/posts/{id}/archive": {
         parameters: {
             query?: never;
@@ -1886,6 +1950,22 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["PublicApprovalsController_respond"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/public/approvals/{token}/approve-all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PublicApprovalsController_approveAll"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2107,7 +2187,7 @@ export interface components {
         /** @enum {string} */
         AuditEntityType: "user" | "department" | "client" | "client_contact" | "client_platform_account" | "client_note" | "project" | "project_milestone" | "retainer" | "retainer_cycle" | "extra_work" | "task" | "task_checklist_item" | "task_link" | "task_comment" | "template" | "template_run" | "file_item" | "approval_request" | "post";
         /** @enum {string} */
-        AuditAction: "user.created" | "user.updated" | "user.roles_changed" | "user.departments_changed" | "user.archived" | "user.restored" | "user.link_issued" | "user.password_set" | "user.password_changed" | "user.two_factor_enabled" | "user.two_factor_disabled" | "user.two_factor_reset" | "user.profile_updated" | "department.updated" | "client.created" | "client.updated" | "client.status_changed" | "client.account_manager_changed" | "client.healthcare_changed" | "client.archived" | "client.restored" | "client.brand_kit_updated" | "client_contact.created" | "client_contact.updated" | "client_contact.archived" | "client_platform_account.created" | "client_platform_account.updated" | "client_platform_account.archived" | "client_note.created" | "client_note.updated" | "client_note.archived" | "project.created" | "project.updated" | "project.project_manager_changed" | "project.status_changed" | "project.money_updated" | "project.archived" | "project.restored" | "project_milestone.created" | "project_milestone.updated" | "project_milestone.reordered" | "project_milestone.completed" | "project_milestone.reopened" | "project_milestone.archived" | "retainer.created" | "retainer.updated" | "retainer.status_changed" | "retainer.deliverables_updated" | "retainer.money_updated" | "retainer.archived" | "retainer.restored" | "retainer_cycle.created" | "retainer_cycle.closed" | "retainer_cycle.line_updated" | "retainer_cycle.line_added" | "retainer_cycle.adjusted" | "extra_work.created" | "extra_work.updated" | "extra_work.billing_changed" | "extra_work.archived" | "task.created" | "task.updated" | "task.assigned" | "task.department_changed" | "task.status_changed" | "task.dependencies_updated" | "task.archived" | "task.restored" | "task.revision_decided" | "task.request_scope_changed" | "task.extra_work_moved" | "task.reviewed" | "task.client_text_updated" | "task.client_response_recorded" | "task_checklist_item.created" | "task_checklist_item.updated" | "task_checklist_item.reordered" | "task_checklist_item.archived" | "task_link.created" | "task_link.archived" | "task_comment.created" | "task_comment.updated" | "task_comment.archived" | "template.created" | "template.updated" | "template.assignees_updated" | "template.archived" | "template.restored" | "template_run.created" | "retainer.template_changed" | "file_item.created" | "file_item.renamed" | "file_item.confidential_changed" | "file_item.archived" | "file_item.restored" | "file_version.created" | "file_version.archived" | "file_version.restored" | "file_version.final_set" | "file_version.final_cleared" | "approval_request.created" | "approval_request.link_reissued" | "approval_request.revoked" | "approval_item.responded" | "approval_item.withdrawn" | "post.created" | "post.updated" | "post.status_changed" | "post.reviewed" | "post.client_response_recorded" | "post.duplicated" | "post.archived" | "post.restored";
+        AuditAction: "user.created" | "user.updated" | "user.roles_changed" | "user.departments_changed" | "user.archived" | "user.restored" | "user.link_issued" | "user.password_set" | "user.password_changed" | "user.two_factor_enabled" | "user.two_factor_disabled" | "user.two_factor_reset" | "user.profile_updated" | "department.updated" | "client.created" | "client.updated" | "client.status_changed" | "client.account_manager_changed" | "client.healthcare_changed" | "client.archived" | "client.restored" | "client.brand_kit_updated" | "client_contact.created" | "client_contact.updated" | "client_contact.archived" | "client_platform_account.created" | "client_platform_account.updated" | "client_platform_account.archived" | "client_note.created" | "client_note.updated" | "client_note.archived" | "project.created" | "project.updated" | "project.project_manager_changed" | "project.status_changed" | "project.money_updated" | "project.archived" | "project.restored" | "project_milestone.created" | "project_milestone.updated" | "project_milestone.reordered" | "project_milestone.completed" | "project_milestone.reopened" | "project_milestone.archived" | "retainer.created" | "retainer.updated" | "retainer.status_changed" | "retainer.deliverables_updated" | "retainer.money_updated" | "retainer.archived" | "retainer.restored" | "retainer_cycle.created" | "retainer_cycle.closed" | "retainer_cycle.line_updated" | "retainer_cycle.line_added" | "retainer_cycle.adjusted" | "extra_work.created" | "extra_work.updated" | "extra_work.billing_changed" | "extra_work.archived" | "task.created" | "task.updated" | "task.assigned" | "task.department_changed" | "task.status_changed" | "task.dependencies_updated" | "task.archived" | "task.restored" | "task.revision_decided" | "task.request_scope_changed" | "task.extra_work_moved" | "task.reviewed" | "task.client_text_updated" | "task.client_response_recorded" | "task_checklist_item.created" | "task_checklist_item.updated" | "task_checklist_item.reordered" | "task_checklist_item.archived" | "task_link.created" | "task_link.archived" | "task_comment.created" | "task_comment.updated" | "task_comment.archived" | "template.created" | "template.updated" | "template.assignees_updated" | "template.archived" | "template.restored" | "template_run.created" | "retainer.template_changed" | "file_item.created" | "file_item.renamed" | "file_item.confidential_changed" | "file_item.archived" | "file_item.restored" | "file_version.created" | "file_version.archived" | "file_version.restored" | "file_version.final_set" | "file_version.final_cleared" | "approval_request.created" | "approval_request.link_reissued" | "approval_request.revoked" | "approval_item.responded" | "approval_item.withdrawn" | "post.created" | "post.updated" | "post.status_changed" | "post.reviewed" | "post.client_response_recorded" | "post.task_linked" | "post.task_unlinked" | "post.task_returned" | "post.duplicated" | "post.archived" | "post.restored";
         /** @description Audit entries, newest first */
         AuditPage: {
             items: components["schemas"]["AuditEntry"][];
@@ -3042,6 +3122,70 @@ export interface components {
             /** Format: date-time */
             updatedAt: string;
             /** @enum {string} */
+            type: "post_task_ready";
+            data: {
+                post: {
+                    title: string;
+                    client: string;
+                    /** Format: date */
+                    publishDate: string;
+                    publishTime: string | null;
+                };
+                taskTitle: string;
+            };
+        } | {
+            /** Format: uuid */
+            id: string;
+            actor: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            subject: {
+                type: components["schemas"]["NotificationSubjectType"];
+                /** Format: uuid */
+                id: string;
+            };
+            count: number;
+            read: boolean;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @enum {string} */
+            type: "post_task_unlinked";
+            data: {
+                post: {
+                    title: string;
+                    client: string;
+                    /** Format: date */
+                    publishDate: string;
+                    publishTime: string | null;
+                };
+                taskTitle: string;
+                /** @enum {string} */
+                reason: "cancelled" | "archived" | "reopened";
+            };
+        } | {
+            /** Format: uuid */
+            id: string;
+            actor: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            subject: {
+                type: components["schemas"]["NotificationSubjectType"];
+                /** Format: uuid */
+                id: string;
+            };
+            count: number;
+            read: boolean;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @enum {string} */
             type: "task_due_soon";
             data: {
                 task: {
@@ -3274,7 +3418,7 @@ export interface components {
             }[];
         };
         /** @enum {string} */
-        NotificationType: "task_assigned" | "task_mentioned" | "task_returned" | "task_review_requested" | "task_medical_review_requested" | "task_awaiting_client" | "task_over_limit" | "approval_responded" | "approval_no_response" | "approval_expired" | "task_changed" | "task_commented" | "task_file_added" | "task_requested" | "tasks_generated" | "task_approved" | "task_opened" | "request_finished" | "post_returned" | "post_review_requested" | "post_medical_review_requested" | "post_awaiting_client" | "post_assigned" | "post_approved" | "task_due_soon" | "task_overdue" | "task_overdue_escalated" | "post_publish_today" | "post_publish_overdue" | "client_account_manager_assigned" | "project_manager_assigned" | "retainer_renewal_due";
+        NotificationType: "task_assigned" | "task_mentioned" | "task_returned" | "task_review_requested" | "task_medical_review_requested" | "task_awaiting_client" | "task_over_limit" | "approval_responded" | "approval_no_response" | "approval_expired" | "task_changed" | "task_commented" | "task_file_added" | "task_requested" | "tasks_generated" | "task_approved" | "task_opened" | "request_finished" | "post_returned" | "post_review_requested" | "post_medical_review_requested" | "post_awaiting_client" | "post_assigned" | "post_approved" | "post_task_ready" | "post_task_unlinked" | "task_due_soon" | "task_overdue" | "task_overdue_escalated" | "post_publish_today" | "post_publish_overdue" | "client_account_manager_assigned" | "project_manager_assigned" | "retainer_renewal_due";
         UpdateNotificationSettings: {
             mutedTypes: components["schemas"]["NotificationType"][];
         };
@@ -4255,6 +4399,8 @@ export interface components {
                 limit: number;
             };
             overLimitPending: boolean;
+            /** Format: uuid */
+            postId: string | null;
         };
         /** @enum {string} */
         TaskType: "work" | "client_request";
@@ -4368,6 +4514,8 @@ export interface components {
                 limit: number;
             };
             overLimitPending: boolean;
+            /** Format: uuid */
+            postId: string | null;
             brief: string | null;
             needsClientApproval: boolean;
             clientRequest: {
@@ -4853,7 +5001,8 @@ export interface components {
             hashtags: string | null;
             notes: string | null;
             needsClientApproval: boolean;
-            media: components["schemas"]["ApprovalVersion"][];
+            media: components["schemas"]["PostMedia"][];
+            linkedTasks: components["schemas"]["PostTask"][];
             cycleLine: {
                 /** Format: uuid */
                 id: string;
@@ -4869,6 +5018,15 @@ export interface components {
             clearedReview: components["schemas"]["PostReview"] | null;
             reviewHistory: components["schemas"]["PostReview"][];
             clientResponses: components["schemas"]["PostClientResponse"][];
+            pendingApproval: {
+                /** Format: uuid */
+                requestId: string;
+                state: components["schemas"]["ApprovalRequestState"];
+                /** Format: date-time */
+                issuedAt: string;
+                /** Format: date-time */
+                expiresAt: string;
+            } | null;
             /** Format: date-time */
             scheduledAt: string | null;
             /** Format: date-time */
@@ -4897,7 +5055,7 @@ export interface components {
             permissions: components["schemas"]["PostPermissions"];
             allowedTransitions: components["schemas"]["PostStatus"][];
         };
-        ApprovalVersion: {
+        PostMedia: {
             /** Format: uuid */
             id: string;
             /** Format: uuid */
@@ -4907,6 +5065,30 @@ export interface components {
             kind: components["schemas"]["FileVersionKind"];
             type: components["schemas"]["FileType"];
             previewStatus: components["schemas"]["FilePreviewStatus"];
+            task: {
+                /** Format: uuid */
+                id: string;
+                title: string;
+            } | null;
+        };
+        PostTask: {
+            /** Format: uuid */
+            id: string;
+            title: string;
+            department: components["schemas"]["DepartmentCode"];
+            assignee: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                archived: boolean;
+            } | null;
+            status: components["schemas"]["TaskStatus"];
+            cycleLine: {
+                /** Format: uuid */
+                id: string;
+                kind: components["schemas"]["DeliverableKind"];
+                label: string | null;
+            } | null;
         };
         PostReview: {
             /** Format: uuid */
@@ -5000,7 +5182,94 @@ export interface components {
             /** Format: date */
             publishDate?: string;
         };
-        /** @description Tasks ready to send, grouped by client, by name */
+        /** @description Open unlinked tasks of the client, the publish cycle first, then by due date */
+        LinkableTaskList: {
+            items: components["schemas"]["LinkableTask"][];
+        };
+        LinkableTask: {
+            /** Format: uuid */
+            id: string;
+            title: string;
+            type: components["schemas"]["TaskType"];
+            department: components["schemas"]["DepartmentCode"];
+            assignee: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                archived: boolean;
+                inDepartment: boolean;
+            } | null;
+            status: components["schemas"]["TaskStatus"];
+            reviewStage: components["schemas"]["ReviewStage"] | null;
+            priority: components["schemas"]["TaskPriority"];
+            /** Format: date */
+            dueDate: string;
+            dueTime: string | null;
+            overdue: boolean;
+            blocked: boolean;
+            client: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            project: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            milestone: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            retainer: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            cycle: {
+                /** Format: uuid */
+                id: string;
+                /** Format: date */
+                periodStart: string;
+                /** Format: date */
+                periodEnd: string;
+            } | null;
+            cycleLine: {
+                /** Format: uuid */
+                id: string;
+                kind: components["schemas"]["DeliverableKind"];
+                label: string | null;
+            } | null;
+            checklist: {
+                done: number;
+                total: number;
+            };
+            revisions: {
+                clientCount: number;
+                limit: number;
+            };
+            overLimitPending: boolean;
+            /** Format: uuid */
+            postId: string | null;
+            inPublishCycle: boolean;
+        };
+        CreatePostTask: {
+            department: components["schemas"]["DepartmentCode"];
+            title?: string;
+            brief?: string | null;
+            /** Format: date */
+            dueDate?: string;
+            /**
+             * Format: uuid
+             * @default null
+             */
+            cycleLineId: string | null;
+        };
+        ReturnPostTask: {
+            note: string;
+        };
+        /** @description Tasks and posts ready to send, grouped by client, by name */
         ApprovalReady: {
             clients: components["schemas"]["ReadyClient"][];
         };
@@ -5018,6 +5287,7 @@ export interface components {
                 phone: string | null;
             }[];
             tasks: components["schemas"]["ReadyTask"][];
+            posts: components["schemas"]["ReadyPost"][];
         };
         ReadyTask: {
             /** Format: uuid */
@@ -5083,9 +5353,44 @@ export interface components {
                 limit: number;
             };
             overLimitPending: boolean;
+            /** Format: uuid */
+            postId: string | null;
             snapshot: {
                 files: number;
                 hasText: boolean;
+            };
+        };
+        ReadyPost: {
+            /** Format: uuid */
+            id: string;
+            client: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            };
+            title: string;
+            type: components["schemas"]["PostType"];
+            platforms: components["schemas"]["PostPlatform"][];
+            /** Format: date */
+            publishDate: string;
+            publishTime: string | null;
+            status: components["schemas"]["PostStatus"];
+            reviewStage: components["schemas"]["ReviewStage"] | null;
+            responsible: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                archived: boolean;
+            };
+            /** Format: uuid */
+            thumbnailVersionId: string | null;
+            linkedTaskCount: number;
+            overdue: boolean;
+            snapshot: {
+                files: number;
+                caption: string | null;
+                /** Format: uuid */
+                thumbnailVersionId: string | null;
             };
         };
         /** @description Approval requests, newest first */
@@ -5176,12 +5481,25 @@ export interface components {
             /** Format: uuid */
             id: string;
             position: number;
+            kind: components["schemas"]["ApprovalItemKind"];
             title: string;
             task: {
                 /** Format: uuid */
                 id: string;
                 title: string;
-            };
+            } | null;
+            post: {
+                type: components["schemas"]["PostType"];
+                platforms: components["schemas"]["PostPlatform"][];
+                /** Format: date */
+                publishDate: string;
+                publishTime: string | null;
+                caption: string | null;
+                hashtags: string | null;
+                /** Format: uuid */
+                id: string;
+                title: string;
+            } | null;
             status: components["schemas"]["ApprovalItemStatus"];
             withdrawnReason: components["schemas"]["ApprovalWithdrawnReason"] | null;
             /** Format: date-time */
@@ -5197,20 +5515,37 @@ export interface components {
             } | null;
         };
         /** @enum {string} */
+        ApprovalItemKind: "task" | "post";
+        /** @enum {string} */
         ApprovalItemStatus: "pending" | "approved" | "changes_requested" | "withdrawn";
         /** @enum {string} */
-        ApprovalWithdrawnReason: "revoked" | "resent" | "task_moved";
+        ApprovalWithdrawnReason: "revoked" | "resent" | "task_moved" | "post_moved";
+        ApprovalVersion: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            fileItemId: string;
+            name: string;
+            number: number;
+            kind: components["schemas"]["FileVersionKind"];
+            type: components["schemas"]["FileType"];
+            previewStatus: components["schemas"]["FilePreviewStatus"];
+        };
         CreateApprovalRequest: {
             /** Format: uuid */
             clientId: string;
             /** Format: uuid */
             contactId: string;
             message?: string | null;
-            items: {
+            items: ({
                 /** Format: uuid */
                 taskId: string;
                 title?: string;
-            }[];
+            } | {
+                /** Format: uuid */
+                postId: string;
+                title?: string;
+            })[];
         };
         IssuedApprovalRequest: {
             /** Format: uuid */
@@ -5286,11 +5621,17 @@ export interface components {
             } | null;
             /** Format: date-time */
             createdAt: string;
+            kind: components["schemas"]["ApprovalItemKind"];
             task: {
                 /** Format: uuid */
                 id: string;
                 title: string;
-            };
+            } | null;
+            post: {
+                /** Format: uuid */
+                id: string;
+                title: string;
+            } | null;
         };
         PublicApproval: {
             clientName: string;
@@ -5304,8 +5645,18 @@ export interface components {
         PublicApprovalItem: {
             /** Format: uuid */
             id: string;
+            kind: components["schemas"]["ApprovalItemKind"];
             title: string;
             text: string | null;
+            post: {
+                type: components["schemas"]["PostType"];
+                platforms: components["schemas"]["PostPlatform"][];
+                /** Format: date */
+                publishDate: string;
+                publishTime: string | null;
+                caption: string | null;
+                hashtags: string | null;
+            } | null;
             files: components["schemas"]["PublicApprovalFile"][];
             status: components["schemas"]["ApprovalItemStatus"];
             note: string | null;
@@ -5329,6 +5680,12 @@ export interface components {
         PublicApprovalResponse: {
             decision: components["schemas"]["ClientDecision"];
             note?: string | null;
+        };
+        PublicApproveAll: {
+            note?: string | null;
+        };
+        PublicApprovalItems: {
+            items: components["schemas"]["PublicApprovalItem"][];
         };
         /** @enum {string} */
         TemplateKind: "project" | "retainer_cycle";
@@ -8493,6 +8850,7 @@ export interface operations {
                 overdue?: "true" | "false";
                 blocked?: "true" | "false";
                 overLimit?: "true" | "false";
+                linkedToPost?: "true" | "false";
                 dueFrom?: string;
                 dueTo?: string;
                 createdBy?: "me";
@@ -9020,6 +9378,7 @@ export interface operations {
                 platform?: components["schemas"]["PostPlatform"];
                 type?: components["schemas"]["PostType"];
                 responsible?: string | "me";
+                reviewStage?: components["schemas"]["ReviewStage"];
                 from: string;
                 to: string;
             };
@@ -9070,6 +9429,7 @@ export interface operations {
                 platform?: components["schemas"]["PostPlatform"];
                 type?: components["schemas"]["PostType"];
                 responsible?: string | "me";
+                reviewStage?: components["schemas"]["ReviewStage"];
                 from?: string;
                 to?: string;
                 q?: string;
@@ -9170,7 +9530,7 @@ export interface operations {
                     "application/json": components["schemas"]["PostDetail"];
                 };
             };
-            /** @description `POST_LOCKED`, `POST_ARCHIVED`, `INVALID_TRANSITION`, `CYCLE_CLOSED` */
+            /** @description `POST_LOCKED`, `POST_ARCHIVED`, `INVALID_TRANSITION`, `CYCLE_CLOSED`, `POST_COUNTED_BY_TASK` */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -9203,7 +9563,7 @@ export interface operations {
                     "application/json": components["schemas"]["PostDetail"];
                 };
             };
-            /** @description `INVALID_TRANSITION`, `NOTHING_TO_APPROVE`, `REVIEW_CONTENT_CHANGED`, `PUBLISH_TIME_REQUIRED`, `POST_ARCHIVED` */
+            /** @description `INVALID_TRANSITION`, `NOTHING_TO_APPROVE`, `POST_TASKS_NOT_READY`, `REVIEW_CONTENT_CHANGED`, `PUBLISH_TIME_REQUIRED`, `POST_ARCHIVED` */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -9278,6 +9638,158 @@ export interface operations {
             };
         };
     };
+    ContentController_linkableTasks: {
+        parameters: {
+            query?: {
+                q?: string;
+                department?: components["schemas"]["DepartmentCode"];
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The open unlinked tasks of the client the post may link (edit scope), at most 50: those of the retainer cycle of its publish date first */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LinkableTaskList"];
+                };
+            };
+        };
+    };
+    ContentController_linkTask: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                taskId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The post with the task linked (edit scope): the client approves the post, never the task; an idea starts production */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PostDetail"];
+                };
+            };
+            /** @description `POST_LOCKED`, `POST_ARCHIVED`, `TASK_ALREADY_LINKED`, `TASK_NOT_LINKABLE`, `LIMIT_REACHED`, `POST_COUNTED_BY_TASK` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ContentController_unlinkTask: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                taskId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The post without the task (edit scope), which is free for another post */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PostDetail"];
+                };
+            };
+            /** @description `POST_LOCKED`, `POST_ARCHIVED` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ContentController_createTask: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreatePostTask"];
+            };
+        };
+        responses: {
+            /** @description The post with a new task requested in the department’s queue and linked to it (edit scope) */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PostDetail"];
+                };
+            };
+            /** @description `POST_LOCKED`, `POST_ARCHIVED`, `LIMIT_REACHED`, `CYCLE_CLOSED`, `POST_COUNTED_BY_TASK`, `CLIENT_ENDED` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ContentController_returnTask: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                taskId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReturnPostTask"];
+            };
+        };
+        responses: {
+            /** @description The post with the approved task sent back for changes (edit scope): a client revision after the client asked for changes, an internal one otherwise */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PostDetail"];
+                };
+            };
+            /** @description `INVALID_TRANSITION`, `ALREADY_RETURNED`, `POST_ARCHIVED` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     ContentController_archive: {
         parameters: {
             query?: never;
@@ -9324,6 +9836,7 @@ export interface operations {
         parameters: {
             query?: {
                 clientId?: string;
+                month?: string;
             };
             header?: never;
             path?: never;
@@ -9331,7 +9844,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Tasks ready to send under the caller’s client scope, grouped by client */
+            /** @description Tasks and posts ready to send under the caller’s client scope, grouped by client; `month` keeps the posts of one publish month */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -9390,7 +9903,7 @@ export interface operations {
                     "application/json": components["schemas"]["IssuedApprovalRequest"];
                 };
             };
-            /** @description `CLIENT_ARCHIVED`, `CONTACT_NOT_APPROVER`, `TASK_NOT_READY`, `MEDICAL_REVIEW_REQUIRED`, `LIMIT_REACHED` */
+            /** @description `CLIENT_ARCHIVED`, `CONTACT_NOT_APPROVER`, `TASK_NOT_READY`, `POST_NOT_READY`, `MEDICAL_REVIEW_REQUIRED`, `LIMIT_REACHED` */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -9468,7 +9981,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description The revoked request: its pending items are withdrawn, the tasks ready again */
+            /** @description The revoked request: its pending items are withdrawn, the tasks and posts ready again */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -9598,6 +10111,50 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description `APPROVAL_LINK_EXPIRED` */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    PublicApprovalsController_approveAll: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PublicApproveAll"];
+            };
+        };
+        responses: {
+            /** @description The post items that were pending, now approved, each with the same optional note; task items are never included */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicApprovalItems"];
+                };
+            };
+            /** @description `APPROVAL_LINK_INVALID`: unknown or revoked link, or its client or contact changed */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
             };
             /** @description `APPROVAL_LINK_EXPIRED` */
             410: {

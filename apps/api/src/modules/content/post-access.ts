@@ -105,23 +105,31 @@ export const mayMedicalReview = (actor: CurrentUserInfo, post: PostAccess) =>
   hasPermission(actor.access, 'approvals.review_medical') && post.responsibleId !== actor.id;
 
 /**
- * Rule 20: `awaiting_client`, not archived, and for a healthcare client cleared by a medical
- * pass.
+ * Waiting for the client's answer on a snapshot they may be shown: `awaiting_client`, not
+ * archived, and for a healthcare client cleared by a medical pass (rules 20 and 24).
  */
-export const isReadyToSend = (post: PostAccess, clearedStage: ReviewStage | null) =>
+export const isWithClient = (post: PostAccess, clearedStage: ReviewStage | null) =>
   post.status === 'awaiting_client' &&
   !post.archivedAt &&
   (!post.client.isHealthcare || clearedStage === 'medical');
+
+/** How a post stands with the client: its cleared review, and whether an open link holds it. */
+export interface PostSending {
+  /** An expired link does not hold the post back (rule 20). */
+  waiting: boolean;
+  clearedStage: ReviewStage | null;
+}
 
 /** What the UI shows, and the moves it offers; the API checks each action again. */
 export function postPermissions(
   actor: CurrentUserInfo,
   post: PostAccess,
   hasWork: boolean,
-  clearedStage: ReviewStage | null,
+  sending: PostSending,
 ): { permissions: PostPermissions; allowedTransitions: PostStatus[] } {
   const rights = postRights(actor, post.client);
   const readOnly = isReadOnly(post);
+  const withClient = !readOnly && rights.client && isWithClient(post, sending.clearedStage);
   const canEdit = !readOnly && rights.edit && post.status !== 'cancelled';
   return {
     permissions: {
@@ -130,8 +138,8 @@ export function postPermissions(
       canReview: !readOnly && rights.review,
       canMedicalReview:
         !readOnly && post.reviewStage === 'medical' && mayMedicalReview(actor, post),
-      canSendForApproval: !readOnly && rights.client && isReadyToSend(post, clearedStage),
-      canRecordResponse: !readOnly && rights.client && isReadyToSend(post, clearedStage),
+      canSendForApproval: withClient && !sending.waiting,
+      canRecordResponse: withClient,
       canArchive: holdsAll(actor, 'content.review'),
     },
     allowedTransitions: readOnly ? [] : allowedPostTransitions(postState(post, hasWork), rights),

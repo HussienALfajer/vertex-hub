@@ -303,6 +303,24 @@ Details the implementation settled (PR 1, `feat/f08-content-api`):
 - **Cycle line counts:** `projects`' `WorkProgress` takes extra cycle line sources (`registerCycleLines`) beside the tasks source; a post counted directly adds to the line's `tasks` total and, once published, to its delivered count.
 - **A responsible person** must be a non-archived user; reopening a cancelled post whose responsible person was archived since answers `INVALID_RESPONSIBLE`.
 
+Details the implementation settled (PR 2, `feat/f08-content-links-api`):
+- **Link time.** `tasks` gains `post_linked_at` beside `post_id` (set and cleared together, check constraint), so rule 5's "tasks by link time" has something to sort by. A check constraint also keeps a linked task with a client and without its own client approval.
+- **Shared enums.** `review_stage`, `review_outcome`, `client_decision` and `response_channel` moved to `packages/db/src/schema/reviews.ts` (no migration): `tasks.ts` and `content.ts` now refer to each other's tables. The contract lists of post types and platforms moved to `post-values.ts` for the same reason (`approvals.ts` shows them, `content.ts` imports `approvals.ts`).
+- **Linking** a task already linked to the same post changes nothing (the `PUT` is idempotent). A task of another client answers `TASK_NOT_LINKABLE`. Linking and requesting write `post.task_linked`; the automatic start of production writes `post.status_changed` with reason `task_linked`.
+- **Unlinking by cancel or archive** (rule 8) restores the task's client approval like a manual unlink, writes `post.task_unlinked` with reason `cancelled` or `archived`, and the notification carries the task title and the reason. A cancelled post writes it with reason `post_cancelled`.
+- **A requested task** (rule 9) is created through F06's own create, so its rules hold: an ended client takes no new task (`CLIENT_ENDED`), a past due date answers `INVALID_DATES`. The brief is the post's notes and caption, cut to 5000 characters.
+- **Send back** (rule 12): the task is a client revision only while the latest review or client response of the post is the client asking for changes; a second send-back of the same task for the same response answers `ALREADY_RETURNED`, also when the first one was fixed and approved again.
+- **Linkable tasks** come at most 50, the publish cycle first (the cycle whose period holds the post's publish date), then by due date, each with `inPublishCycle`.
+- **Medical queue.** The post list and calendar take a `reviewStage` filter (`medical` lists the queue of screen 6).
+- **Ready posts** carry what their snapshot would send: file count, caption and a thumbnail version. `month` on `GET /api/approvals/ready` filters posts only.
+- **Approval items** carry `kind` with `task` or `post` (the other is null); a post item's versions keep the display order of its snapshot. On the client page, task items come first by position, then post items in publish order; a withdrawn post item shows no snapshot.
+- **Rule 7 also refuses** giving a linked task a new cycle line (`LINKED_TO_POST`): only linking checks rule 16, so unlink, set the line and link again.
+- **Edge case 9:** reopening a delivered linked task (F06) unlinks it from its published post (`post.task_unlinked`, reason `reopened`), so it is delivered by hand again when done.
+- **Post files on the client page** carry no name (rule 27: no internal titles of files).
+- **Approve all** answers with the post items it decided; an item answered or withdrawn meanwhile is skipped.
+- **A client's approval history** merges the responses on tasks and on posts into one list, newest first, each entry with `kind`.
+- **A sent post of a client that becomes healthcare** stays with the client (rule 26); if its link is then revoked or expires it is not ready again without a medical pass (`MEDICAL_REVIEW_REQUIRED`): withdraw it for re-review.
+
 ## Acceptance
 - Owner check in the browser (content writer W and manager CM of Content Management, designer D and Design manager M, the client's account manager A, a Medical Consultation member R; a client C with an active retainer whose cycle has lines design 4 and reel 1 and generated tasks, with a final-approval contact with a phone; a healthcare client H):
   1. As W, open C's Content tab and create three posts for this month (a post, a carousel, a reel) with captions, platforms and dates; they show on the month and week views and on `/content`.

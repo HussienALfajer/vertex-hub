@@ -141,6 +141,13 @@
       "when": 1790863482422,
       "tag": "0019_perpetual_skaar",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1790869643235,
+      "tag": "0020_handy_oracle",
+      "breakpoints": true
     }
   ]
 }
