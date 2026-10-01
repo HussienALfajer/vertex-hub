@@ -5,6 +5,7 @@ import {
   allowedTaskTransitions,
   BOARD_LIMITS,
   BOARD_STATUSES,
+  type BrandFileKind,
   type BrandKit,
   type ClientDetailResponse,
   type ClientResponse,
@@ -32,6 +33,8 @@ import {
   type ExtraWorkBilling,
   type ExtraWorkBillingChange,
   type FileItem,
+  type FileOwnerType,
+  type FileRole,
   type FileUpload,
   type FileVersion,
   fileTypeOf,
@@ -396,6 +399,47 @@ export const auditSeed: AuditEntry[] = [
         { kind: 'design', label: null, monthlyQuantity: 12 },
         { kind: 'reel', label: null, monthlyQuantity: 4 },
       ],
+    },
+  },
+  {
+    id: id(511),
+    occurredAt: '2026-09-25T11:00:00.000Z',
+    actorId: id(3),
+    actorName: 'ليان الأحمد',
+    action: 'file_version.created',
+    entityType: 'file_item',
+    entityId: id(1301),
+    before: null,
+    after: {
+      ownerType: 'task',
+      ownerId: id(1001),
+      clientId: id(601),
+      role: 'deliverable',
+      number: 2,
+      kind: 'upload',
+      sizeBytes: 2_726_297,
+      note: 'ألوان الهوية الجديدة وصورة الطبق الموسمي.',
+    },
+  },
+  {
+    id: id(512),
+    occurredAt: '2026-09-25T11:10:00.000Z',
+    actorId: id(1),
+    actorName: 'سارة الخطيب',
+    action: 'file_item.created',
+    entityType: 'file_item',
+    entityId: id(1310),
+    before: null,
+    after: {
+      ownerType: 'client',
+      ownerId: id(601),
+      clientId: id(601),
+      role: 'brand',
+      name: 'شعار الياسمين',
+      brandKind: 'logo',
+      number: 1,
+      kind: 'upload',
+      sizeBytes: 298_000,
     },
   },
 ];
@@ -2832,7 +2876,7 @@ function taskRoutes({ users, clients, projects, retainers, tasks, me }: TaskStat
     return { id: item.id, title };
   };
   let next = 1500;
-  const taskFiles = taskFileRoutes({ users, tasks, me, rights });
+  const taskFiles = fileRoutes({ users, clients, projects, retainers, tasks, me, rights });
 
   const matches = (task: TaskRecord, q: URLSearchParams) => {
     const statuses = q.getAll('status');
@@ -2874,7 +2918,7 @@ function taskRoutes({ users, clients, projects, retainers, tasks, me }: TaskStat
     const path = url.pathname;
     const body = <T>() => request.postDataJSON() as T;
 
-    // Files (F10) of tasks.
+    // Files (F10).
     const filed = taskFiles.handle(route, method, url, request);
     if (filed) return filed;
 
@@ -3268,16 +3312,18 @@ interface TemplateRecord {
 
 type StepSeed = Partial<TemplateStep> & Pick<TemplateStep, 'title' | 'department'>;
 
-/** Steps numbered in order; `after` lists step numbers, as in the spec's seed tables. */
 // Files (F10)
 
 type FileVersionRecord = Omit<FileVersion, 'canRemove' | 'type'>;
 
 interface FileRecord {
   id: string;
-  taskId: string;
-  role: 'deliverable' | 'reference';
+  ownerType: FileOwnerType;
+  ownerId: string;
+  role: FileRole;
   name: string;
+  brandKind: BrandFileKind | null;
+  confidential: boolean;
   createdById: string;
   createdAt: string;
   archivedAt: string | null;
@@ -3335,29 +3381,45 @@ const linkVersion = (
   note,
 });
 
-/** Deliverables and references on the autumn menu task, and a delivered task with its final. */
-export function taskFilesSeed(): FileRecord[] {
+/**
+ * Deliverables and references on the autumn menu task, a delivered task with its final, and
+ * Jasmine's brand files and documents (one confidential), with a project and a retainer document.
+ */
+export function filesSeed(): FileRecord[] {
   const layan = { id: id(3), name: 'ليان الأحمد' };
   const sara = { id: id(1), name: 'سارة الخطيب' };
   const png = (name: string, sizeBytes: number) => ({ name, mimeType: 'image/png', sizeBytes });
+  const pdf = (name: string, sizeBytes: number) => ({
+    name,
+    mimeType: 'application/pdf',
+    sizeBytes,
+  });
   const file = (
     n: number,
-    taskId: string,
-    role: FileRecord['role'],
+    owner: { type: FileOwnerType; id: string },
+    role: FileRole,
     name: string,
     versions: FileVersionRecord[],
+    fields: Partial<FileRecord> = {},
   ): FileRecord => ({
     id: id(n),
-    taskId,
+    ownerType: owner.type,
+    ownerId: owner.id,
     role,
     name,
+    brandKind: null,
+    confidential: false,
     createdById: versions.at(-1)?.uploadedBy.id ?? layan.id,
     createdAt: versions.at(-1)?.createdAt ?? '2026-10-06T08:00:00.000Z',
     archivedAt: null,
     versions,
+    ...fields,
   });
+  const autumnMenu = { type: 'task', id: id(1001) } as const;
+  const octoberCover = { type: 'task', id: id(1007) } as const;
+  const jasmine = { type: 'client', id: id(601) } as const;
   return [
-    file(1301, id(1001), 'deliverable', 'غلاف المنيو', [
+    file(1301, autumnMenu, 'deliverable', 'غلاف المنيو', [
       uploadVersion(
         1351,
         2,
@@ -3370,7 +3432,7 @@ export function taskFilesSeed(): FileRecord[] {
       ),
       uploadVersion(1352, 1, png('menu-cover.png', 2_516_582), layan, '2026-10-07T09:10:00.000Z'),
     ]),
-    file(1302, id(1001), 'deliverable', 'فيديو المنيو', [
+    file(1302, autumnMenu, 'deliverable', 'فيديو المنيو', [
       linkVersion(
         1353,
         1,
@@ -3382,7 +3444,7 @@ export function taskFilesSeed(): FileRecord[] {
         '2026-10-08T13:00:00.000Z',
       ),
     ]),
-    file(1303, id(1001), 'reference', 'صور الأطباق', [
+    file(1303, autumnMenu, 'reference', 'صور الأطباق', [
       uploadVersion(
         1354,
         1,
@@ -3391,16 +3453,10 @@ export function taskFilesSeed(): FileRecord[] {
         '2026-10-05T10:00:00.000Z',
       ),
     ]),
-    file(1304, id(1001), 'reference', 'دليل الهوية', [
-      uploadVersion(
-        1355,
-        1,
-        { name: 'brand-guide.pdf', mimeType: 'application/pdf', sizeBytes: 1_153_434 },
-        sara,
-        '2026-10-05T10:05:00.000Z',
-      ),
+    file(1304, autumnMenu, 'reference', 'دليل الهوية', [
+      uploadVersion(1355, 1, pdf('brand-guide.pdf', 1_153_434), sara, '2026-10-05T10:05:00.000Z'),
     ]),
-    file(1305, id(1007), 'deliverable', 'غلاف أكتوبر', [
+    file(1305, octoberCover, 'deliverable', 'غلاف أكتوبر', [
       uploadVersion(
         1356,
         2,
@@ -3420,6 +3476,63 @@ export function taskFilesSeed(): FileRecord[] {
         layan,
         '2026-10-02T12:00:00.000Z',
       ),
+    ]),
+    file(1306, octoberCover, 'deliverable', 'فيديو أكتوبر', [
+      {
+        ...linkVersion(
+          1358,
+          1,
+          { url: 'https://drive.google.com/file/d/october-reel', label: 'ريل أكتوبر' },
+          layan,
+          '2026-10-03T13:00:00.000Z',
+        ),
+        isFinal: true,
+        finalSource: 'auto',
+        finalMarkedAt: '2026-10-04T09:00:00.000Z',
+      },
+    ]),
+    file(
+      1310,
+      jasmine,
+      'brand',
+      'شعار الياسمين',
+      [
+        uploadVersion(
+          1360,
+          2,
+          png('jasmine-logo-2026.png', 312_000),
+          sara,
+          '2026-09-20T09:00:00.000Z',
+          { note: 'الشعار بعد تحديث الهوية.' },
+        ),
+        uploadVersion(1361, 1, png('jasmine-logo.png', 298_000), sara, '2025-03-01T09:00:00.000Z'),
+      ],
+      { brandKind: 'logo' },
+    ),
+    file(
+      1311,
+      jasmine,
+      'brand',
+      'دليل الهوية 2026',
+      [uploadVersion(1362, 1, pdf('brand-book.pdf', 8_600_000), sara, '2026-09-21T09:00:00.000Z')],
+      { brandKind: 'guidelines' },
+    ),
+    file(
+      1320,
+      jasmine,
+      'document',
+      'عقد الخدمات 2026',
+      [uploadVersion(1370, 1, pdf('contract-2026.pdf', 640_000), sara, '2026-02-25T09:00:00.000Z')],
+      { confidential: true },
+    ),
+    file(1321, jasmine, 'document', 'عرض السعر', [
+      uploadVersion(1371, 1, pdf('quote.pdf', 210_000), layan, '2026-02-10T09:00:00.000Z'),
+    ]),
+    file(1322, { type: 'project', id: id(801) }, 'document', 'محضر انطلاق المشروع', [
+      uploadVersion(1372, 1, pdf('kickoff.pdf', 180_000), layan, '2026-09-02T09:00:00.000Z'),
+    ]),
+    file(1323, { type: 'retainer', id: id(901) }, 'document', 'ملحق العقد الشهري', [
+      uploadVersion(1373, 1, pdf('annex.pdf', 150_000), sara, '2026-03-01T09:00:00.000Z'),
     ]),
   ];
 }
@@ -3442,18 +3555,39 @@ const MOCK_PDF = [
   '%%EOF',
 ].join('\n');
 
+/** The files disk in the usage line (rule 19). */
+const MOCK_FREE_BYTES = 150 * 1024 ** 3;
+
 type FileSourceBody = { uploadId: string } | { url: string; label?: string | null };
 
-interface TaskFileState {
+interface FileState {
   users: UserResponse[];
+  clients: ClientRecord[];
+  projects: ProjectRecord[];
+  retainers: RetainerRecord[];
   tasks: TaskRecord[];
   me: () => MeResponse;
   rights: (task: TaskRecord) => TaskRights;
 }
 
-/** The files API (F10) for task owners, with the owner rights of the task mock. */
-function taskFileRoutes({ users, tasks, me, rights }: TaskFileState) {
-  const files = taskFilesSeed();
+/** An owner as the API's registered policy answers it (spec F10, "F10 actions"). */
+interface OwnerAccess {
+  clientId: string | null;
+  label: string;
+  /** Task workers and manage scope. */
+  addDeliverable: boolean;
+  manage: boolean;
+  /** Brand files and documents. */
+  manageDocuments: boolean;
+  confidentialReader: boolean;
+  scopeAll: boolean;
+  writable: boolean;
+  task?: TaskRecord;
+}
+
+/** The files API (F10), with the owner rights of the task, client, project and retainer mocks. */
+function fileRoutes({ users, clients, projects, retainers, tasks, me, rights }: FileState) {
+  const files = filesSeed();
   const uploads = new Map<string, { name: string; mimeType: string; sizeBytes: number }>();
   let next = 1400;
   const now = () => TASKS_NOW.toISOString();
@@ -3461,58 +3595,114 @@ function taskFileRoutes({ users, tasks, me, rights }: TaskFileState) {
     id: userId,
     name: users.find((u) => u.id === userId)?.name ?? '',
   });
-  const holdsAll = () =>
-    me().permissions.some((g) => g.permission === 'tasks.manage' && g.scopes.includes('all'));
-  const taskOf = (record: FileRecord) => tasks.find((t) => t.id === record.taskId) as TaskRecord;
+  const holds = (permission: string, scope: string) =>
+    me().permissions.some((g) => g.permission === permission && g.scopes.includes(scope as never));
+  const own = (clientId: string | null) =>
+    clients.find((c) => c.id === clientId)?.accountManagerId === me().user.id;
+  const covers = (permission: string, clientId: string | null) =>
+    holds(permission, 'all') || (holds(permission, 'own_clients') && own(clientId));
+  // Rule 15: the client's managers and Finance read its confidential documents.
+  const reader = (clientId: string | null) =>
+    covers('clients.manage', clientId) || covers('invoices.read', clientId);
 
-  // Rules 5–8 and the actions table, as the API's task policy answers them.
-  const ownerRights = (task: TaskRecord) => {
-    const r = rights(task);
+  const access = (type: FileOwnerType, ownerId: string): OwnerAccess | undefined => {
+    if (type === 'task') {
+      const task = tasks.find((t) => t.id === ownerId);
+      if (!task) return undefined;
+      const r = rights(task);
+      return {
+        clientId: task.clientId,
+        label: task.title,
+        addDeliverable: r.work || r.manage,
+        manage: r.manage,
+        manageDocuments: false,
+        confidentialReader: false,
+        scopeAll: holds('tasks.manage', 'all'),
+        writable: !task.archived && task.status !== 'delivered' && task.status !== 'cancelled',
+        task,
+      };
+    }
+    if (type === 'client') {
+      const client = clients.find((c) => c.id === ownerId);
+      if (!client) return undefined;
+      return {
+        clientId: client.id,
+        label: client.tradeName,
+        addDeliverable: false,
+        manage: false,
+        manageDocuments: covers('clients.manage', client.id),
+        confidentialReader: reader(client.id),
+        scopeAll: holds('clients.manage', 'all'),
+        writable: !client.archived,
+      };
+    }
+    const project = type === 'project' ? projects.find((p) => p.id === ownerId) : undefined;
+    const retainer = type === 'retainer' ? retainers.find((r) => r.id === ownerId) : undefined;
+    const owner = project ?? retainer;
+    if (!owner) return undefined;
     return {
-      addDeliverable: r.work || r.manage,
-      manage: r.manage,
-      scopeAll: holdsAll(),
-      writable: !task.archived && task.status !== 'delivered' && task.status !== 'cancelled',
+      clientId: owner.clientId,
+      label: owner.name,
+      addDeliverable: false,
+      manage: false,
+      manageDocuments:
+        covers('projects.manage', owner.clientId) || project?.projectManagerId === me().user.id,
+      confidentialReader: reader(owner.clientId),
+      scopeAll: holds('projects.manage', 'all'),
+      writable: !owner.archived,
     };
   };
-  const itemOf = (record: FileRecord): FileItem => {
-    const task = taskOf(record);
-    const o = ownerRights(task);
+  const accessOf = (record: FileRecord) => access(record.ownerType, record.ownerId) as OwnerAccess;
+  /** Confidential documents do not exist for anyone but their client's readers. */
+  const visible = (record: FileRecord) =>
+    !record.confidential || accessOf(record).confidentialReader;
+
+  // Rules 5–8 and the actions table, as the API's owner policies answer them.
+  // Removed versions come only to scope-all holders who asked for them (`includeArchived`).
+  const itemOf = (record: FileRecord, withRemoved = false): FileItem => {
+    const o = accessOf(record);
     const meId = me().user.id;
     const live = o.writable && !record.archivedAt;
     const deliverable = record.role === 'deliverable';
+    const onTask = record.ownerType === 'task';
+    const changes = onTask ? deliverable && o.addDeliverable : o.manageDocuments;
     return {
       id: record.id,
-      ownerType: 'task',
-      ownerId: task.id,
-      clientId: task.clientId,
+      ownerType: record.ownerType,
+      ownerId: record.ownerId,
+      clientId: o.clientId,
       role: record.role,
       name: record.name,
-      brandKind: null,
-      confidential: false,
+      brandKind: record.brandKind,
+      confidential: record.confidential,
       createdBy: person(record.createdById),
       createdAt: record.createdAt,
       updatedAt: record.createdAt,
       archivedAt: record.archivedAt,
       versions: record.versions
-        .filter((v) => o.scopeAll || !v.archivedAt)
+        .filter((v) => (withRemoved && o.scopeAll) || !v.archivedAt)
         .map((v) => ({
           ...v,
           type: fileTypeOf(v.kind, v.mimeType),
-          canRemove: deliverable && (o.manage || (o.addDeliverable && v.uploadedBy.id === meId)),
+          canRemove: onTask
+            ? deliverable && (o.manage || (o.addDeliverable && v.uploadedBy.id === meId))
+            : o.manageDocuments,
         })),
       permissions: {
-        canAddVersion: live && deliverable && o.addDeliverable,
-        canRename: live && deliverable && o.addDeliverable,
-        canRemove:
-          live && (o.manage || (record.createdById === meId && (!deliverable || o.addDeliverable))),
+        canAddVersion: live && changes,
+        canRename: live && changes,
+        canRemove: onTask
+          ? live &&
+            (o.manage || (record.createdById === meId && (!deliverable || o.addDeliverable)))
+          : live && o.manageDocuments,
         canSetFinal:
           deliverable &&
           !record.archivedAt &&
-          !task.archived &&
-          task.status !== 'cancelled' &&
+          !o.task?.archived &&
+          o.task?.status !== 'cancelled' &&
           o.manage,
-        canSetConfidential: false,
+        canSetConfidential:
+          live && record.role === 'document' && o.manageDocuments && o.confidentialReader,
         canRestore: o.scopeAll && o.writable,
       },
     };
@@ -3520,7 +3710,7 @@ function taskFileRoutes({ users, tasks, me, rights }: TaskFileState) {
   const findVersion = (versionId: string) => {
     for (const record of files) {
       const version = record.versions.find((v) => v.id === versionId);
-      if (version) return { record, version };
+      if (version && visible(record)) return { record, version };
     }
     return undefined;
   };
@@ -3545,6 +3735,19 @@ function taskFileRoutes({ users, tasks, me, rights }: TaskFileState) {
     uploads.delete(source.uploadId);
     return { ...uploadVersion(next++, number, upload, uploader, now()), note };
   };
+  const page = <T>(items: T[], url: URL) => {
+    const pageNumber = Number(url.searchParams.get('page') ?? 1);
+    const pageSize = Number(url.searchParams.get('pageSize') ?? 50);
+    return {
+      items: items.slice((pageNumber - 1) * pageSize, pageNumber * pageSize),
+      total: items.length,
+      page: pageNumber,
+      pageSize,
+    };
+  };
+  const clientFiles = (clientId: string) => files.filter((f) => accessOf(f).clientId === clientId);
+  const bytes = (records: FileRecord[]) =>
+    records.flatMap((f) => f.versions).reduce((sum, v) => sum + (v.sizeBytes ?? 0), 0);
 
   const handle = (
     route: Route,
@@ -3555,6 +3758,7 @@ function taskFileRoutes({ users, tasks, me, rights }: TaskFileState) {
     const path = url.pathname;
     if (!path.startsWith('/api/files/')) return undefined;
     const body = <T>() => request.postDataJSON() as T;
+    const q = url.searchParams;
 
     if (path === '/api/files/uploads' && method === 'POST') {
       // Multipart: the file name is in the part's header, as UTF-8 bytes.
@@ -3579,52 +3783,72 @@ function taskFileRoutes({ users, tasks, me, rights }: TaskFileState) {
       return json(route, upload, 201);
     }
     if (path === '/api/files/items' && method === 'GET') {
-      const task = tasks.find((t) => t.id === url.searchParams.get('ownerId'));
-      if (!task || url.searchParams.get('ownerType') !== 'task') return fail(route, 404, null);
-      const o = ownerRights(task);
-      const withRemoved = url.searchParams.get('includeArchived') === 'true' && o.scopeAll;
+      const type = q.get('ownerType') as FileOwnerType;
+      const ownerId = q.get('ownerId') ?? '';
+      const o = access(type, ownerId);
+      if (!o) return fail(route, 404, null);
+      const withRemoved = q.get('includeArchived') === 'true' && o.scopeAll;
       const items = files
-        .filter((f) => f.taskId === task.id && (withRemoved || !f.archivedAt))
+        .filter(
+          (f) =>
+            f.ownerType === type &&
+            f.ownerId === ownerId &&
+            (!q.get('role') || f.role === q.get('role')) &&
+            (withRemoved || !f.archivedAt) &&
+            visible(f),
+        )
         .reverse()
-        .map(itemOf);
+        .map((f) => itemOf(f, withRemoved));
       return json(route, {
         items,
         rights: {
           canAddDeliverable: o.writable && o.addDeliverable,
-          canAddReference: o.writable,
-          canManageDocuments: false,
-          canSetConfidential: false,
+          canAddReference: o.writable && type === 'task',
+          canManageDocuments: o.writable && o.manageDocuments,
+          canSetConfidential: o.writable && o.manageDocuments && o.confidentialReader,
           canSeeRemoved: o.scopeAll,
         },
       });
     }
     if (path === '/api/files/items' && method === 'POST') {
       const input = body<{
+        ownerType: FileOwnerType;
         ownerId: string;
-        role: FileRecord['role'];
+        role: FileRole;
         name?: string;
+        brandKind?: BrandFileKind;
+        confidential?: boolean;
         note?: string | null;
         source: FileSourceBody;
       }>();
-      const task = tasks.find((t) => t.id === input.ownerId);
-      if (!task) return fail(route, 404, null);
-      const o = ownerRights(task);
+      const o = access(input.ownerType, input.ownerId);
+      if (!o) return fail(route, 404, null);
       if (input.role === 'deliverable' && !o.addDeliverable) return fail(route, 403, null);
-      if (!o.writable) return fail(route, 409, 'TASK_CLOSED');
+      if ((input.role === 'brand' || input.role === 'document') && !o.manageDocuments) {
+        return fail(route, 403, null);
+      }
+      if (input.confidential && !o.confidentialReader) {
+        return fail(route, 403, 'NOT_CONFIDENTIAL_READER');
+      }
+      if (!o.writable) return fail(route, 409, o.task ? 'TASK_CLOSED' : 'CLIENT_ARCHIVED');
       const version = versionFrom(input.source, 1, input.note ?? null);
       if (!version) return fail(route, 400, 'UPLOAD_NOT_FOUND');
       const name =
         input.name ??
         (version.originalName?.replace(/\.[^.]+$/, '') || version.linkLabel || 'File');
       const taken = files.some(
-        (f) => f.taskId === task.id && f.role === input.role && !f.archivedAt && f.name === name,
+        (f) =>
+          f.ownerId === input.ownerId && f.role === input.role && !f.archivedAt && f.name === name,
       );
-      if (taken && input.role === 'deliverable') return fail(route, 409, 'FILE_NAME_TAKEN');
+      if (taken && input.role !== 'reference') return fail(route, 409, 'FILE_NAME_TAKEN');
       const record: FileRecord = {
         id: id(next++),
-        taskId: task.id,
+        ownerType: input.ownerType,
+        ownerId: input.ownerId,
         role: input.role,
         name,
+        brandKind: input.brandKind ?? null,
+        confidential: input.confidential ?? false,
         createdById: me().user.id,
         createdAt: now(),
         archivedAt: null,
@@ -3633,9 +3857,75 @@ function taskFileRoutes({ users, tasks, me, rights }: TaskFileState) {
       files.push(record);
       return json(route, itemOf(record), 201);
     }
+    if (path === '/api/files/library' && method === 'GET') {
+      const clientId = q.get('clientId');
+      const search = q.get('q');
+      const entries = files
+        .filter((f) => {
+          const task = accessOf(f).task;
+          return (
+            f.role === 'deliverable' &&
+            !f.archivedAt &&
+            task?.clientId === clientId &&
+            !task?.archived &&
+            task?.status !== 'cancelled'
+          );
+        })
+        .flatMap((f) =>
+          f.versions
+            .filter((v) => v.isFinal && !v.archivedAt)
+            .map((v) => ({ record: f, version: v, task: accessOf(f).task as TaskRecord })),
+        )
+        .filter(
+          ({ record, version, task }) =>
+            (!q.get('type') || fileTypeOf(version.kind, version.mimeType) === q.get('type')) &&
+            (!q.get('month') || version.finalMarkedAt?.startsWith(q.get('month') as string)) &&
+            (!search || record.name.includes(search) || task.title.includes(search)),
+        )
+        .sort((a, b) =>
+          (b.version.finalMarkedAt ?? '').localeCompare(a.version.finalMarkedAt ?? ''),
+        )
+        .map(({ record, version, task }) => ({
+          itemId: record.id,
+          itemName: record.name,
+          task: { id: task.id, title: task.title },
+          version: {
+            ...version,
+            type: fileTypeOf(version.kind, version.mimeType),
+            canRemove: false,
+          },
+        }));
+      return json(route, page(entries, url));
+    }
+    if (path === '/api/files/documents' && method === 'GET') {
+      const clientId = q.get('clientId');
+      const documents = files
+        .filter(
+          (f) =>
+            f.role === 'document' &&
+            !f.archivedAt &&
+            accessOf(f).clientId === clientId &&
+            visible(f),
+        )
+        .reverse()
+        .map((f) => ({
+          ...itemOf(f),
+          owner: { type: f.ownerType, id: f.ownerId, label: accessOf(f).label },
+        }));
+      return json(route, page(documents, url));
+    }
+    if (path === '/api/files/usage' && method === 'GET') {
+      if (!holds('clients.manage', 'all')) return fail(route, 403, null);
+      const clientId = q.get('clientId');
+      return json(route, {
+        clientBytes: clientId ? bytes(clientFiles(clientId)) : null,
+        totalBytes: bytes(files),
+        freeBytes: MOCK_FREE_BYTES,
+      });
+    }
     const itemMatch = path.match(/^\/api\/files\/items\/([^/]+)(?:\/(.+))?$/);
     if (itemMatch) {
-      const record = files.find((f) => f.id === itemMatch[1]);
+      const record = files.find((f) => f.id === itemMatch[1] && visible(f));
       if (!record) return fail(route, 404, null);
       const action = itemMatch[2];
       if (action === 'versions') {
@@ -3655,7 +3945,14 @@ function taskFileRoutes({ users, tasks, me, rights }: TaskFileState) {
         return json(route, itemOf(record));
       }
       if (!action && method === 'PATCH') {
-        record.name = body<{ name?: string }>().name ?? record.name;
+        const input = body<{ name?: string; confidential?: boolean }>();
+        if (input.confidential !== undefined) {
+          if (!accessOf(record).confidentialReader) {
+            return fail(route, 403, 'NOT_CONFIDENTIAL_READER');
+          }
+          record.confidential = input.confidential;
+        }
+        record.name = input.name ?? record.name;
         return json(route, itemOf(record));
       }
     }
@@ -3687,7 +3984,7 @@ function taskFileRoutes({ users, tasks, me, rights }: TaskFileState) {
         return json(route, itemOf(record));
       }
       if (action === 'final') {
-        const task = taskOf(record);
+        const task = accessOf(record).task as TaskRecord;
         const { final } = body<{ final: boolean }>();
         if (final && task.status !== 'approved' && task.status !== 'delivered') {
           return fail(route, 409, 'TASK_NOT_APPROVED');
@@ -3706,8 +4003,8 @@ function taskFileRoutes({ users, tasks, me, rights }: TaskFileState) {
     return undefined;
   };
 
-  const count = (taskId: string, role: FileRecord['role']) =>
-    files.filter((f) => f.taskId === taskId && f.role === role && !f.archivedAt).length;
+  const count = (taskId: string, role: FileRole) =>
+    files.filter((f) => f.ownerId === taskId && f.role === role && !f.archivedAt).length;
   return {
     handle,
     counts: (taskId: string) => ({
@@ -3716,6 +4013,8 @@ function taskFileRoutes({ users, tasks, me, rights }: TaskFileState) {
     }),
   };
 }
+
+/** Steps numbered in order; `after` lists step numbers, as in the spec's seed tables. */
 function templateSteps(first: number, steps: (StepSeed & { after?: number[] })[]): TemplateStep[] {
   return steps.map(({ after = [], ...step }, i) => ({
     id: id(first + i),

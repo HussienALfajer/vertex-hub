@@ -1,4 +1,10 @@
-import { type QueryKey, queryOptions, useMutation, useQueryClient } from '@tanstack/react-query';
+import {
+  keepPreviousData,
+  type QueryKey,
+  queryOptions,
+  useMutation,
+  useQueryClient,
+} from '@tanstack/react-query';
 import type {
   CreateFileItemInput,
   CreateFileVersion,
@@ -14,9 +20,16 @@ import { tasksKeys } from '../tasks/tasks.queries';
 /** The items endpoint's query string as the API reads it: flags are `'true'` or `'false'`. */
 export type FileItemsFilters = paths['/api/files/items']['get']['parameters']['query'];
 
+export type FileLibraryFilters = paths['/api/files/library']['get']['parameters']['query'];
+
+export type ClientDocumentsFilters = paths['/api/files/documents']['get']['parameters']['query'];
+
 export const filesKeys = {
   all: ['files'] as const,
   items: (filters: FileItemsFilters) => ['files', 'items', filters] as const,
+  library: (filters: FileLibraryFilters) => ['files', 'library', filters] as const,
+  documents: (filters: ClientDocumentsFilters) => ['files', 'documents', filters] as const,
+  usage: (clientId: string) => ['files', 'usage', clientId] as const,
 };
 
 const PREVIEW_POLL_MS = 3000;
@@ -32,6 +45,29 @@ export const fileItemsQuery = (filters: FileItemsFilters) =>
       )
         ? PREVIEW_POLL_MS
         : false,
+  });
+
+/** A client's final deliverables (rule 13). */
+export const fileLibraryQuery = (filters: FileLibraryFilters) =>
+  queryOptions({
+    queryKey: filesKeys.library(filters),
+    queryFn: () => call(api.GET('/api/files/library', { params: { query: filters } })),
+    placeholderData: keepPreviousData,
+  });
+
+/** The documents of a client, its projects and retainers (rule 14). */
+export const clientDocumentsQuery = (filters: ClientDocumentsFilters) =>
+  queryOptions({
+    queryKey: filesKeys.documents(filters),
+    queryFn: () => call(api.GET('/api/files/documents', { params: { query: filters } })),
+    placeholderData: keepPreviousData,
+  });
+
+/** Storage used by a client and in total, with the free space (rule 19; scope all only). */
+export const fileUsageQuery = (clientId: string) =>
+  queryOptions({
+    queryKey: filesKeys.usage(clientId),
+    queryFn: () => call(api.GET('/api/files/usage', { params: { query: { clientId } } })),
   });
 
 /** What files are attached to: a task, a client, a project or a retainer. */

@@ -377,7 +377,11 @@ describe('files (F10)', () => {
             eq(auditEntries.action, 'file_item.archived'),
           ),
         );
-      expect(entry?.after).toMatchObject({ ownerType: 'task', ownerId: task.id });
+      expect(entry?.after).toMatchObject({
+        ownerType: 'task',
+        ownerId: task.id,
+        role: 'reference',
+      });
     });
 
     it('attaches an upload once, only by its uploader (UPLOAD_NOT_FOUND)', async () => {

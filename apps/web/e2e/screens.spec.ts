@@ -506,6 +506,33 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await screenshot(page, testInfo, `file-upload-${colorScheme}`);
     });
 
+    test('client files, brand files and documents', async ({ page }, testInfo) => {
+      await page.setViewportSize({ width: 1280, height: 1600 });
+      await page.clock.setFixedTime(new Date(`${PROJECTS_TODAY}T09:00:00+03:00`));
+      await mockApi(page, { signedIn: true, me: manager });
+      await page.goto(`/clients/${seedIds.jasmine}?tab=files`);
+      await expect(page.getByText(/ملفات هذا العميل/)).toBeVisible();
+      await expect(page.getByText('عقد الخدمات 2026')).toBeVisible();
+      await page.waitForFunction(() => [...document.images].every((image) => image.complete));
+      await screenshot(page, testInfo, `client-files-${colorScheme}`);
+
+      // The uploaded files sit under the kit: the whole tab in one shot.
+      await page.setViewportSize({ width: 1280, height: 2000 });
+      await page.getByRole('tab', { name: ar.clients.profile.tabs.brandKit }).click();
+      await expect(page.getByText('شعار الياسمين', { exact: true })).toBeVisible();
+      await page.waitForFunction(() => [...document.images].every((image) => image.complete));
+      await screenshot(page, testInfo, `client-brand-files-${colorScheme}`);
+
+      await page.setViewportSize({ width: 1280, height: 1000 });
+      await page.goto(`/projects/${seedIds.identityProject}?tab=documents`);
+      await expect(page.getByText('محضر انطلاق المشروع', { exact: true })).toBeVisible();
+      await screenshot(page, testInfo, `project-documents-${colorScheme}`);
+
+      await page.goto(`/retainers/${seedIds.socialRetainer}?tab=documents`);
+      await expect(page.getByText('ملحق العقد الشهري', { exact: true })).toBeVisible();
+      await screenshot(page, testInfo, `retainer-documents-${colorScheme}`);
+    });
+
     test('task board', async ({ page }, testInfo) => {
       await page.setViewportSize({ width: 1600, height: 1000 });
       await page.clock.setFixedTime(new Date(`${PROJECTS_TODAY}T09:00:00+03:00`));

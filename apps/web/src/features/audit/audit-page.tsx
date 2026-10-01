@@ -7,6 +7,7 @@ import {
   type AuditEntityType,
   type AuditEntry,
   CLIENT_STATUSES,
+  type FileOwnerType,
   PROJECT_STATUSES,
   RETAINER_STATUSES,
 } from '@vertex-hub/contracts';
@@ -442,7 +443,15 @@ const actionTone = (action: AuditAction) => {
   return 'neutral';
 };
 
-const LINK_FIELDS = new Set(['clientId', 'projectId', 'retainerId', 'lineId']);
+const LINK_FIELDS = new Set([
+  'clientId',
+  'projectId',
+  'retainerId',
+  'lineId',
+  'ownerType',
+  'ownerId',
+  'role',
+]);
 
 function AuditRow({ entry, names }: { entry: AuditEntry; names: EntityNames }) {
   const { t } = useTranslation();
@@ -648,6 +657,13 @@ const KNOWN_FIELDS = [
   'trigger',
   'taskCount',
   'milestonesCreated',
+  'brandKind',
+  'confidential',
+  'number',
+  'sizeBytes',
+  'host',
+  'source',
+  'previousFinal',
 ] as const;
 
 function fieldLabel(t: TFunction, field: string): string {
@@ -658,6 +674,7 @@ function fieldLabel(t: TFunction, field: string): string {
 /** The client a client, contact, platform account or note entry belongs to. */
 function clientIdOf(entry: AuditEntry): string | undefined {
   if (entry.entityType === 'client') return entry.entityId;
+  if (entry.entityType === 'file_item') return fileOwnerOf(entry, 'client');
   const clientId = entry.after?.clientId ?? entry.before?.clientId;
   return typeof clientId === 'string' ? clientId : undefined;
 }
@@ -667,17 +684,31 @@ const CLIENT_TAB: Partial<Record<AuditEntityType, 'platforms' | 'communication'>
   client_note: 'communication',
 };
 
+/** The client tab an entry's change shows on: brand files and documents have their own. */
+function clientTabOf(entry: AuditEntry) {
+  if (entry.entityType !== 'file_item') return CLIENT_TAB[entry.entityType];
+  return entry.after?.role === 'brand' ? 'brand-kit' : 'files';
+}
+
+/** The owner of a file entry when it is of `type` (F10 entries carry the owner's type and id). */
+function fileOwnerOf(entry: AuditEntry, type: FileOwnerType): string | undefined {
+  const ownerId = entry.after?.ownerId;
+  return entry.after?.ownerType === type && typeof ownerId === 'string' ? ownerId : undefined;
+}
+
 /** The retainer a retainer, cycle or extra work entry belongs to. */
 function retainerIdOf(entry: AuditEntry): string | undefined {
   if (entry.entityType === 'retainer') return entry.entityId;
+  if (entry.entityType === 'file_item') return fileOwnerOf(entry, 'retainer');
   if (entry.entityType !== 'retainer_cycle' && entry.entityType !== 'extra_work') return;
   const retainerId = entry.after?.retainerId ?? entry.before?.retainerId;
   return typeof retainerId === 'string' ? retainerId : undefined;
 }
 
 /** The retainer tab an entry's change shows on. */
-function retainerTabOf(entry: AuditEntry): 'history' | 'extra-work' | undefined {
+function retainerTabOf(entry: AuditEntry): 'history' | 'extra-work' | 'documents' | undefined {
   if (entry.entityType === 'extra_work') return 'extra-work';
+  if (entry.entityType === 'file_item') return 'documents';
   if (entry.action === 'retainer_cycle.closed') return 'history';
   return undefined;
 }
@@ -687,6 +718,7 @@ const TASK_PARTS: AuditEntityType[] = ['task_checklist_item', 'task_link', 'task
 /** The task a task, checklist item, link or comment entry belongs to. */
 function taskIdOf(entry: AuditEntry): string | undefined {
   if (entry.entityType === 'task') return entry.entityId;
+  if (entry.entityType === 'file_item') return fileOwnerOf(entry, 'task');
   if (!TASK_PARTS.includes(entry.entityType)) return;
   const taskId = entry.after?.taskId ?? entry.before?.taskId;
   return typeof taskId === 'string' ? taskId : undefined;
@@ -695,9 +727,23 @@ function taskIdOf(entry: AuditEntry): string | undefined {
 /** The project a project, milestone or extra work entry belongs to. */
 function projectIdOf(entry: AuditEntry): string | undefined {
   if (entry.entityType === 'project') return entry.entityId;
+  if (entry.entityType === 'file_item') return fileOwnerOf(entry, 'project');
   if (entry.entityType !== 'project_milestone' && entry.entityType !== 'extra_work') return;
   const projectId = entry.after?.projectId ?? entry.before?.projectId;
   return typeof projectId === 'string' ? projectId : undefined;
+}
+
+/** The project tab an entry's change shows on. */
+function projectTabOf(entry: AuditEntry): 'extra-work' | 'documents' | undefined {
+  if (entry.entityType === 'extra_work') return 'extra-work';
+  if (entry.entityType === 'file_item') return 'documents';
+  return undefined;
+}
+
+/** A file entry names its file when the entry carries the name, next to its owner. */
+function withFileName(t: TFunction, entry: AuditEntry, owner: string): string {
+  const name = entry.entityType === 'file_item' ? entry.after?.name : undefined;
+  return typeof name === 'string' ? t('audit.fileOfOwner', { file: name, owner }) : owner;
 }
 
 const linkClass = 'font-medium hover:underline';
@@ -729,7 +775,7 @@ function EntityLink({ entry, names }: { entry: AuditEntry; names: EntityNames })
     const title = entry.entityType === 'task' ? (entry.after?.title ?? entry.before?.title) : null;
     return (
       <Link to="/tasks/$taskId" params={{ taskId }} className={linkClass}>
-        {typeof title === 'string' ? title : t('audit.openTask')}
+        {withFileName(t, entry, typeof title === 'string' ? title : t('audit.openTask'))}
       </Link>
     );
   }
@@ -741,12 +787,12 @@ function EntityLink({ entry, names }: { entry: AuditEntry; names: EntityNames })
       <Link
         to="/projects/$projectId"
         params={{ projectId }}
-        search={{ tab: entry.entityType === 'extra_work' ? 'extra-work' : undefined }}
+        search={{ tab: projectTabOf(entry) }}
         className={linkClass}
       >
         {entry.entityType === 'project_milestone' && typeof milestoneName === 'string'
           ? t('audit.milestoneOfProject', { milestone: milestoneName, project: projectName })
-          : projectName}
+          : withFileName(t, entry, projectName)}
       </Link>
     );
   }
@@ -763,7 +809,7 @@ function EntityLink({ entry, names }: { entry: AuditEntry; names: EntityNames })
       >
         {entry.entityType === 'retainer_cycle' && typeof month === 'string'
           ? t('audit.cycleOfRetainer', { month: formatMonth(month), retainer: retainerName })
-          : retainerName}
+          : withFileName(t, entry, retainerName)}
       </Link>
     );
   }
@@ -776,12 +822,12 @@ function EntityLink({ entry, names }: { entry: AuditEntry; names: EntityNames })
     <Link
       to="/clients/$clientId"
       params={{ clientId }}
-      search={{ tab: CLIENT_TAB[entry.entityType] }}
+      search={{ tab: clientTabOf(entry) }}
       className={linkClass}
     >
       {entry.entityType === 'client_contact' && typeof contactName === 'string'
         ? t('audit.contactOfClient', { contact: contactName, client: clientName })
-        : clientName}
+        : withFileName(t, entry, clientName)}
     </Link>
   );
 }

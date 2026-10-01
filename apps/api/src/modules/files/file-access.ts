@@ -49,11 +49,15 @@ export function ownerValues(owner: FileOwner) {
 export const ownerIdOf = (item: ItemRow): string =>
   (item.taskId ?? item.projectId ?? item.retainerId ?? item.clientId) as string;
 
-/** What an audit entry carries so the audit screen links it to its owner. */
+/**
+ * What an audit entry carries so the audit screen links it to its owner, and to the tab that
+ * shows the item (brand files and documents of a client live on different tabs).
+ */
 export const auditRefs = (item: ItemRow) => ({
   ownerType: item.ownerType,
   ownerId: ownerIdOf(item),
   clientId: item.clientId,
+  role: item.role,
 });
 
 /** Rule 5: a delivered or cancelled task is read-only for files. */
