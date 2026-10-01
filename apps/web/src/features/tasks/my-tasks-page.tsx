@@ -19,6 +19,8 @@ import {
   type LucideIcon,
   PlusIcon,
   SendIcon,
+  SendToBackIcon,
+  StethoscopeIcon,
   SunIcon,
   UserRoundSearchIcon,
 } from 'lucide-react';
@@ -26,6 +28,7 @@ import { useTranslation } from 'react-i18next';
 import { LoadError } from '../../components/load-error';
 import { useMe } from '../../lib/auth';
 import { formatNumber } from '../../lib/format';
+import { approvalReadyQuery } from '../approvals/approvals.queries';
 import { managedDepartments } from './task-access';
 import type { TaskListSearch } from './task-list-page';
 import { TaskRows } from './task-rows';
@@ -38,10 +41,14 @@ interface Section {
   icon: LucideIcon;
   /** The list requests behind the section; several are merged (waiting on others). */
   filters: TaskListFilters[];
+  /** The tasks come from the approvals module instead: those ready to send (F09 rule 8). */
+  ready?: boolean;
   /** Drops tasks a request cannot leave out (requested by me: not assigned to me). */
   keep?: (task: Task) => boolean;
   /** The same tasks in the full list, when its filters can express them. */
   listSearch?: TaskListSearch;
+  /** The same tasks on the Approvals page, which is where they are acted on. */
+  onApprovals?: boolean;
   /** Needs attention first: shown in the danger tone. */
   alert?: boolean;
   /** The tasks belong to other people, so rows name their assignee. */
@@ -96,6 +103,16 @@ function sectionsFor(meId: string, managed: string[]): Section[] {
       filters: [{ reviewer: 'me', status: ['internal_review'] }],
       listSearch: { reviewer: 'me', status: ['internal_review'] },
     },
+    {
+      key: 'medicalReview',
+      icon: StethoscopeIcon,
+      others: true,
+      filters: [{ reviewStage: 'medical', status: ['internal_review'] }],
+      // Rule 4: never the reviewer's own task.
+      keep: (task) => task.assignee?.id !== meId,
+      onApprovals: true,
+    },
+    { key: 'readyToSend', icon: SendToBackIcon, others: true, filters: [], ready: true },
     {
       key: 'unassignedInMyDepartments',
       icon: InboxIcon,
@@ -247,11 +264,17 @@ function TaskSection({ section, count }: { section: Section; count: number }) {
       taskListQuery({ ...filters, pageSize: section.keep ? 100 : SECTION_SIZE }),
     ),
   });
-  const pending = lists.some((list) => list.isPending);
-  const failed = lists.find((list) => list.isError);
+  const ready = useQuery({ ...approvalReadyQuery, enabled: section.ready === true });
+  const sources = section.ready ? [ready] : lists;
+  const pending = sources.some((source) => source.isPending);
+  const failed = sources.find((source) => source.isError);
   // Merged requests can hold the same task twice (blocked and awaiting the client).
   const byId = new Map<string, Task>();
   for (const list of lists) for (const task of list.data?.items ?? []) byId.set(task.id, task);
+  // A disabled query still answers from the cache: only the ready section reads it.
+  for (const { tasks: sendable } of section.ready ? (ready.data?.clients ?? []) : []) {
+    for (const task of sendable) byId.set(task.id, task);
+  }
   const tasks = [...byId.values()]
     .filter(section.keep ?? (() => true))
     .sort((a, b) => a.dueDate.localeCompare(b.dueDate))
@@ -279,6 +302,12 @@ function TaskSection({ section, count }: { section: Section; count: number }) {
         <Badge tone={section.alert ? 'danger' : 'neutral'} className="tabular-nums">
           {formatNumber(count)}
         </Badge>
+        {section.onApprovals && (
+          <Button variant="ghost" size="sm" className="ms-auto" render={<Link to="/approvals" />}>
+            {t('tasks.my.openApprovals')}
+            <ArrowLeftIcon className="ltr:-scale-x-100" />
+          </Button>
+        )}
         {section.listSearch && count > tasks.length && (
           <Button
             variant="ghost"

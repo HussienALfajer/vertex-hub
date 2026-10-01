@@ -17,6 +17,7 @@ import { Route as AppIndexRouteImport } from './routes/_app/index'
 import { Route as AppAccountRouteImport } from './routes/_app/account'
 import { Route as AppAuditRouteImport } from './routes/_app/audit'
 import { Route as AppDesignSystemRouteImport } from './routes/_app/design-system'
+import { Route as AppApprovalsIndexRouteImport } from './routes/_app/approvals/index'
 import { Route as AppClientsIndexRouteImport } from './routes/_app/clients/index'
 import { Route as AppClientsClientIdRouteImport } from './routes/_app/clients/$clientId'
 import { Route as AppClientsNewRouteImport } from './routes/_app/clients/new'
@@ -80,6 +81,11 @@ const AppAuditRoute = AppAuditRouteImport.update({
 const AppDesignSystemRoute = AppDesignSystemRouteImport.update({
   id: '/design-system',
   path: '/design-system',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppApprovalsIndexRoute = AppApprovalsIndexRouteImport.update({
+  id: '/approvals/',
+  path: '/approvals/',
   getParentRoute: () => AppRoute,
 } as any)
 const AppClientsIndexRoute = AppClientsIndexRouteImport.update({
@@ -235,6 +241,7 @@ export interface FileRoutesByFullPath {
   '/team/new': typeof AppTeamNewRoute
   '/templates/$templateId': typeof AppTemplatesTemplateIdRoute
   '/templates/new': typeof AppTemplatesNewRoute
+  '/approvals/': typeof AppApprovalsIndexRoute
   '/clients/': typeof AppClientsIndexRoute
   '/departments/': typeof AppDepartmentsIndexRoute
   '/notifications/': typeof AppNotificationsIndexRoute
@@ -269,6 +276,7 @@ export interface FileRoutesByTo {
   '/team/new': typeof AppTeamNewRoute
   '/templates/$templateId': typeof AppTemplatesTemplateIdRoute
   '/templates/new': typeof AppTemplatesNewRoute
+  '/approvals': typeof AppApprovalsIndexRoute
   '/clients': typeof AppClientsIndexRoute
   '/departments': typeof AppDepartmentsIndexRoute
   '/notifications': typeof AppNotificationsIndexRoute
@@ -305,6 +313,7 @@ export interface FileRoutesById {
   '/_app/team/new': typeof AppTeamNewRoute
   '/_app/templates/$templateId': typeof AppTemplatesTemplateIdRoute
   '/_app/templates/new': typeof AppTemplatesNewRoute
+  '/_app/approvals/': typeof AppApprovalsIndexRoute
   '/_app/clients/': typeof AppClientsIndexRoute
   '/_app/departments/': typeof AppDepartmentsIndexRoute
   '/_app/notifications/': typeof AppNotificationsIndexRoute
@@ -341,6 +350,7 @@ export interface FileRouteTypes {
     | '/team/new'
     | '/templates/$templateId'
     | '/templates/new'
+    | '/approvals/'
     | '/clients/'
     | '/departments/'
     | '/notifications/'
@@ -375,6 +385,7 @@ export interface FileRouteTypes {
     | '/team/new'
     | '/templates/$templateId'
     | '/templates/new'
+    | '/approvals'
     | '/clients'
     | '/departments'
     | '/notifications'
@@ -410,6 +421,7 @@ export interface FileRouteTypes {
     | '/_app/team/new'
     | '/_app/templates/$templateId'
     | '/_app/templates/new'
+    | '/_app/approvals/'
     | '/_app/clients/'
     | '/_app/departments/'
     | '/_app/notifications/'
@@ -483,6 +495,13 @@ declare module '@tanstack/react-router' {
       path: '/design-system'
       fullPath: '/design-system'
       preLoaderRoute: typeof AppDesignSystemRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/approvals/': {
+      id: '/_app/approvals/'
+      path: '/approvals'
+      fullPath: '/approvals/'
+      preLoaderRoute: typeof AppApprovalsIndexRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/clients/': {
@@ -685,6 +704,7 @@ interface AppRouteChildren {
   AppTeamNewRoute: typeof AppTeamNewRoute
   AppTemplatesTemplateIdRoute: typeof AppTemplatesTemplateIdRoute
   AppTemplatesNewRoute: typeof AppTemplatesNewRoute
+  AppApprovalsIndexRoute: typeof AppApprovalsIndexRoute
   AppClientsIndexRoute: typeof AppClientsIndexRoute
   AppDepartmentsIndexRoute: typeof AppDepartmentsIndexRoute
   AppNotificationsIndexRoute: typeof AppNotificationsIndexRoute
@@ -717,6 +737,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppTeamNewRoute: AppTeamNewRoute,
   AppTemplatesTemplateIdRoute: AppTemplatesTemplateIdRoute,
   AppTemplatesNewRoute: AppTemplatesNewRoute,
+  AppApprovalsIndexRoute: AppApprovalsIndexRoute,
   AppClientsIndexRoute: AppClientsIndexRoute,
   AppDepartmentsIndexRoute: AppDepartmentsIndexRoute,
   AppNotificationsIndexRoute: AppNotificationsIndexRoute,

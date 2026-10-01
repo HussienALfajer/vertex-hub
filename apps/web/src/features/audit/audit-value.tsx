@@ -1,6 +1,8 @@
 import {
+  APPROVAL_WITHDRAWN_REASONS,
   type AuditEntityType,
   BRAND_FILE_KINDS,
+  CLIENT_DECISIONS,
   CLIENT_PLATFORMS,
   CLIENT_STATUSES,
   CYCLE_STATUSES,
@@ -15,7 +17,10 @@ import {
   PLATFORM_ACCESS_STATES,
   PROJECT_STATUSES,
   REQUEST_SCOPES,
+  RESPONSE_CHANNELS,
   RETAINER_STATUSES,
+  REVIEW_OUTCOMES,
+  REVIEW_STAGES,
   REVISION_DECISIONS,
   REVISION_SOURCES,
   ROLES,
@@ -45,6 +50,9 @@ const LTR_FIELDS = new Set(['email', 'phone', 'url', 'contactId', 'host']);
 
 /** Money fields hold minor units (ADR 0006); the currency is a field of its own. */
 const isMoneyField = (field: string) => field.endsWith('Minor');
+
+/** Why a healthcare flag change moved a task between the medical stage and the client (F09). */
+const HEALTHCARE_REASONS = ['healthcare_on', 'healthcare_off'] as const;
 
 /** Translates a value from one of the contract's fixed lists, or returns undefined. */
 function enumLabel(
@@ -81,6 +89,24 @@ function enumLabel(
     if (source) return t(`tasks.revisionSources.${source}`);
     const decision = field === 'decision' ? find(REVISION_DECISIONS) : undefined;
     if (decision) return t(`tasks.revisions.decisions.${decision}`);
+    // A manual response is recorded on the task; a link response also on its request (F09).
+    const channel = field === 'channel' ? find(RESPONSE_CHANNELS) : undefined;
+    if (channel) return t(`tasks.responses.channels.${channel}`);
+    const reason = field === 'reason' ? find(HEALTHCARE_REASONS) : undefined;
+    if (reason) return t(`audit.reasons.${reason}`);
+  }
+  if (entityType === 'task' || entityType === 'approval_request') {
+    const stage = field === 'stage' || field === 'reviewStage' ? find(REVIEW_STAGES) : undefined;
+    if (stage) return t(`tasks.reviews.stages.${stage}`);
+    const outcome = field === 'outcome' ? find(REVIEW_OUTCOMES) : undefined;
+    if (outcome) return t(`tasks.reviews.outcomes.${outcome}`);
+    const response = field === 'decision' ? find(CLIENT_DECISIONS) : undefined;
+    if (response) return t(`tasks.responses.decisions.${response}`);
+    if (field === 'via' && value === 'approval_link') return t('audit.via.approval_link');
+  }
+  if (entityType === 'approval_request' && field === 'reason') {
+    const withdrawn = find(APPROVAL_WITHDRAWN_REASONS);
+    if (withdrawn) return t(`audit.reasons.${withdrawn}`);
   }
   if (field === 'billingStatus') {
     const billing = find(EXTRA_WORK_BILLING);
@@ -175,7 +201,7 @@ export function AuditValue({
   if (field === 'month' && typeof value === 'string') {
     return <span>{formatMonth(value)}</span>;
   }
-  if (field === 'occurredAt' && typeof value === 'string') {
+  if ((field === 'occurredAt' || field === 'expiresAt') && typeof value === 'string') {
     return <span className="tabular-nums">{formatDateTime(value)}</span>;
   }
   if (entityType === 'file_item' && typeof value === 'number') {
@@ -223,6 +249,15 @@ function ListItem({
         <span className="tabular-nums" dir="ltr">
           {line.count}
         </span>
+      </Badge>
+    );
+  }
+  // A version of a review snapshot or of a client response (F09): its file and number.
+  const name = text(item, 'name');
+  if (name && typeof item.number === 'number') {
+    return (
+      <Badge tone="outline" dir="auto">
+        {t('audit.versionOf', { name, number: item.number })}
       </Badge>
     );
   }

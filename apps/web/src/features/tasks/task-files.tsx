@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
-import type { FileItem, TaskDetail } from '@vertex-hub/contracts';
-import { Button, cn, Skeleton, Switch, toast } from '@vertex-hub/ui';
+import type { FileItem, FileVersion, TaskDetail } from '@vertex-hub/contracts';
+import { Badge, Button, cn, Skeleton, Switch, toast } from '@vertex-hub/ui';
 import { ArchiveRestoreIcon, LockIcon, PlusIcon, XIcon } from 'lucide-react';
 import { type ReactNode, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -12,10 +12,13 @@ import { type FileItemActions, FileItemCard, OpenButton } from '../files/file-it
 import { FileThumbnail, latestVersion, RemovedBadge } from '../files/file-parts';
 import { type FileOwnerRef, fileItemsQuery, useRestoreFileItem } from '../files/files.queries';
 import { TaskSection } from './task-parts';
+import { reviewSnapshot } from './task-review';
 
 /*
  * The task's Files section (spec F10, screen 2): deliverables with their version chains and the
- * final marker, and references. The API's `rights` and `permissions` decide every action.
+ * final marker, and references. The API's `rights` and `permissions` decide every action. While
+ * the work is with the medical reviewer or the client, each deliverable says which version went
+ * and which were added after the review (F09 rule 2, edge case 3).
  */
 
 /** Rule 5: a delivered or cancelled task keeps its files as they are. */
@@ -42,6 +45,23 @@ export function TaskFilesSection({ task }: { task: TaskDetail }) {
   const references = files.data?.items.filter((item) => item.role === 'reference') ?? [];
   // Rule 10: the final marker is set by hand on an approved or delivered task.
   const finalMarkable = task.status === 'approved' || task.status === 'delivered';
+  const snapshot = reviewSnapshot(task);
+  const versionMark = (item: FileItem) => (version: FileVersion) => {
+    if (!snapshot) return null;
+    const reviewed = snapshot.review.versions.find((sent) => sent.fileItemId === item.id);
+    if (reviewed?.id === version.id) {
+      return (
+        <Badge tone="info">
+          {snapshot.at === 'client'
+            ? t('tasks.files.sentToClient')
+            : t('tasks.files.inMedicalReview')}
+        </Badge>
+      );
+    }
+    return !reviewed || version.number > reviewed.number ? (
+      <Badge tone="warning">{t('tasks.files.addedAfterReview')}</Badge>
+    ) : null;
+  };
 
   return (
     <TaskSection
@@ -93,6 +113,7 @@ export function TaskFilesSection({ task }: { task: TaskDetail }) {
                     item={item}
                     actions={actions}
                     finalMarkable={finalMarkable}
+                    versionMark={versionMark(item)}
                   />
                 ))}
               </ul>

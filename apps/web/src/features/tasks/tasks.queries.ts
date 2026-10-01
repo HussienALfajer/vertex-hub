@@ -10,7 +10,9 @@ import type {
   CreateTask,
   CreateTaskChecklistItem,
   CreateTaskLink,
+  MedicalReview,
   RevisionDecisionInput,
+  TaskClientTextInput,
   TaskCommentInput,
   TaskDependenciesInput,
   TaskStatusChange,
@@ -104,7 +106,8 @@ export const taskWorkloadQuery = (filters: TaskWorkloadFilters) =>
 /**
  * A mutation on task data, refreshing `refreshes` also on failure: a 403 after the task changed
  * hands (edge case 15) reloads the page without the lost actions. By default the whole `tasks`
- * cache, and projects, retainers and monthly templates, which show task counts (F05, F07).
+ * cache, and projects, retainers and monthly templates, which show task counts (F05, F07), and
+ * approvals, which list the tasks ready to send (F09).
  * Parts that change no count refresh less: the checklist only task views (its progress shows in
  * lists), links and comments only their task.
  */
@@ -115,6 +118,7 @@ function useTasksMutation<Input, Output>(
     ['projects'],
     ['retainers'],
     ['templates', 'retainer'],
+    ['approvals'],
   ],
 ) {
   const queryClient = useQueryClient();
@@ -162,6 +166,19 @@ export const useDecideRevision = (id: string) =>
         body: input,
       }),
     ),
+  );
+
+/** The medical reviewer's answer on a task in the medical stage (F09 rules 4 and 5). */
+export const useMedicalReview = (id: string) =>
+  useTasksMutation((input: MedicalReview) =>
+    call(api.POST('/api/tasks/{id}/medical-review', { ...path(id), body: input })),
+  );
+
+export const useSetClientText = (id: string) =>
+  useTasksMutation(
+    (input: TaskClientTextInput) =>
+      call(api.PUT('/api/tasks/{id}/client-text', { ...path(id), body: input })),
+    [tasksKeys.detail(id)],
   );
 
 export const useArchiveTask = (id: string) =>

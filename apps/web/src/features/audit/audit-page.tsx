@@ -664,6 +664,17 @@ const KNOWN_FIELDS = [
   'host',
   'source',
   'previousFinal',
+  'stage',
+  'reviewStage',
+  'outcome',
+  'versions',
+  'hasText',
+  'length',
+  'via',
+  'itemId',
+  'taskIds',
+  'expiresAt',
+  'revoked',
 ] as const;
 
 function fieldLabel(t: TFunction, field: string): string {

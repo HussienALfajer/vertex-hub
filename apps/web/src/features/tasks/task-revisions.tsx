@@ -38,9 +38,11 @@ import { formatDateTime, formatNumber } from '../../lib/format';
 import { TaskSection } from './task-parts';
 import { useDecideRevision } from './tasks.queries';
 
+const REVISION_TONES = { client: 'warning', internal: 'neutral', medical: 'info' } as const;
+
 /**
- * Every return to revisions (rule 9): internal returns are shown but never counted; client
- * revisions are numbered against the limit, and one over it waits for a decision (rule 10).
+ * Every return to revisions (rule 9): internal and medical returns are shown but never counted;
+ * client revisions are numbered against the limit, and one over it waits for a decision (rule 10).
  */
 export function RevisionsSection({ task }: { task: TaskDetail }) {
   const { t } = useTranslation();
@@ -69,10 +71,10 @@ export function RevisionsSection({ task }: { task: TaskDetail }) {
               className="flex flex-col gap-2 rounded-md border border-border p-3 text-sm"
             >
               <div className="flex flex-wrap items-center gap-2">
-                <Badge tone={revision.source === 'client' ? 'warning' : 'neutral'}>
+                <Badge tone={REVISION_TONES[revision.source]}>
                   {revision.source === 'client'
                     ? t('tasks.revisions.client', { number: formatNumber(revision.number ?? 0) })
-                    : t('tasks.revisions.internal')}
+                    : t(`tasks.revisions.${revision.source}`)}
                 </Badge>
                 {revision.overLimit && (
                   <Badge tone="danger">

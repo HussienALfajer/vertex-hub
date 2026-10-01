@@ -126,6 +126,7 @@ export function FileItemCard({
   actions,
   finalMarkable = false,
   meta,
+  versionMark,
 }: {
   item: FileItem;
   actions: FileItemActions;
@@ -133,6 +134,8 @@ export function FileItemCard({
   finalMarkable?: boolean;
   /** A line under the name: where a document belongs. */
   meta?: ReactNode;
+  /** A badge next to a version's number: where it stands in the task's review (F09). */
+  versionMark?: (version: FileVersion) => ReactNode;
 }) {
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
@@ -169,9 +172,10 @@ export function FileItemCard({
               {item.name}
             </span>
             <VersionBadge number={latest.number} />
+            {versionMark?.(latest)}
             {final &&
               (final.id === latest.id ? (
-                <FinalBadge />
+                <FinalBadge source={final.finalSource} />
               ) : (
                 <Badge tone="success">{t('files.finalIs', { number: final.number })}</Badge>
               ))}
@@ -235,6 +239,7 @@ export function FileItemCard({
               liveCount={live.length}
               actions={actions}
               finalMarkable={finalMarkable}
+              mark={versionMark?.(version)}
               onPreview={() => previewAt(version)}
             />
           ))}
@@ -300,6 +305,7 @@ function VersionRow({
   liveCount,
   actions,
   finalMarkable,
+  mark,
   onPreview,
 }: {
   item: FileItem;
@@ -307,6 +313,7 @@ function VersionRow({
   liveCount: number;
   actions: FileItemActions;
   finalMarkable: boolean;
+  mark: ReactNode;
   onPreview: () => void;
 }) {
   const { t } = useTranslation();
@@ -329,8 +336,9 @@ function VersionRow({
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <div className="flex flex-wrap items-center gap-2">
           <VersionBadge number={version.number} />
-          {version.isFinal && <FinalBadge />}
-          {version.isFinal && (
+          {!removed && mark}
+          {version.isFinal && <FinalBadge source={version.finalSource} />}
+          {version.isFinal && version.finalSource !== 'client' && (
             <span className="text-xs text-muted-foreground">
               {version.finalSource === 'auto'
                 ? t('files.finalAuto')
