@@ -17,6 +17,7 @@ import { Route as AppIndexRouteImport } from './routes/_app/index'
 import { Route as AppAccountRouteImport } from './routes/_app/account'
 import { Route as AppAuditRouteImport } from './routes/_app/audit'
 import { Route as AppDesignSystemRouteImport } from './routes/_app/design-system'
+import { Route as ATokenRouteImport } from './routes/a.$token'
 import { Route as AppApprovalsIndexRouteImport } from './routes/_app/approvals/index'
 import { Route as AppClientsIndexRouteImport } from './routes/_app/clients/index'
 import { Route as AppClientsClientIdRouteImport } from './routes/_app/clients/$clientId'
@@ -43,6 +44,7 @@ import { Route as AppTeamNewRouteImport } from './routes/_app/team/new'
 import { Route as AppTemplatesIndexRouteImport } from './routes/_app/templates/index'
 import { Route as AppTemplatesTemplateIdRouteImport } from './routes/_app/templates/$templateId'
 import { Route as AppTemplatesNewRouteImport } from './routes/_app/templates/new'
+import { Route as AppApprovalsRequestsRequestIdRouteImport } from './routes/_app/approvals/requests/$requestId'
 
 const AppRoute = AppRouteImport.update({
   id: '/_app',
@@ -82,6 +84,11 @@ const AppDesignSystemRoute = AppDesignSystemRouteImport.update({
   id: '/design-system',
   path: '/design-system',
   getParentRoute: () => AppRoute,
+} as any)
+const ATokenRoute = ATokenRouteImport.update({
+  id: '/a/$token',
+  path: '/a/$token',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AppApprovalsIndexRoute = AppApprovalsIndexRouteImport.update({
   id: '/approvals/',
@@ -215,6 +222,12 @@ const AppTemplatesNewRoute = AppTemplatesNewRouteImport.update({
   path: '/templates/new',
   getParentRoute: () => AppRoute,
 } as any)
+const AppApprovalsRequestsRequestIdRoute =
+  AppApprovalsRequestsRequestIdRouteImport.update({
+    id: '/approvals/requests/$requestId',
+    path: '/approvals/requests/$requestId',
+    getParentRoute: () => AppRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
@@ -224,6 +237,7 @@ export interface FileRoutesByFullPath {
   '/account': typeof AppAccountRoute
   '/audit': typeof AppAuditRoute
   '/design-system': typeof AppDesignSystemRoute
+  '/a/$token': typeof ATokenRoute
   '/clients/$clientId': typeof AppClientsClientIdRoute
   '/clients/new': typeof AppClientsNewRoute
   '/departments/$departmentId': typeof AppDepartmentsDepartmentIdRoute
@@ -250,6 +264,7 @@ export interface FileRoutesByFullPath {
   '/tasks/': typeof AppTasksIndexRoute
   '/team/': typeof AppTeamIndexRoute
   '/templates/': typeof AppTemplatesIndexRoute
+  '/approvals/requests/$requestId': typeof AppApprovalsRequestsRequestIdRoute
 }
 export interface FileRoutesByTo {
   '/activate': typeof ActivateRoute
@@ -258,6 +273,7 @@ export interface FileRoutesByTo {
   '/account': typeof AppAccountRoute
   '/audit': typeof AppAuditRoute
   '/design-system': typeof AppDesignSystemRoute
+  '/a/$token': typeof ATokenRoute
   '/': typeof AppIndexRoute
   '/clients/$clientId': typeof AppClientsClientIdRoute
   '/clients/new': typeof AppClientsNewRoute
@@ -285,6 +301,7 @@ export interface FileRoutesByTo {
   '/tasks': typeof AppTasksIndexRoute
   '/team': typeof AppTeamIndexRoute
   '/templates': typeof AppTemplatesIndexRoute
+  '/approvals/requests/$requestId': typeof AppApprovalsRequestsRequestIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -295,6 +312,7 @@ export interface FileRoutesById {
   '/_app/account': typeof AppAccountRoute
   '/_app/audit': typeof AppAuditRoute
   '/_app/design-system': typeof AppDesignSystemRoute
+  '/a/$token': typeof ATokenRoute
   '/_app/': typeof AppIndexRoute
   '/_app/clients/$clientId': typeof AppClientsClientIdRoute
   '/_app/clients/new': typeof AppClientsNewRoute
@@ -322,6 +340,7 @@ export interface FileRoutesById {
   '/_app/tasks/': typeof AppTasksIndexRoute
   '/_app/team/': typeof AppTeamIndexRoute
   '/_app/templates/': typeof AppTemplatesIndexRoute
+  '/_app/approvals/requests/$requestId': typeof AppApprovalsRequestsRequestIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -333,6 +352,7 @@ export interface FileRouteTypes {
     | '/account'
     | '/audit'
     | '/design-system'
+    | '/a/$token'
     | '/clients/$clientId'
     | '/clients/new'
     | '/departments/$departmentId'
@@ -359,6 +379,7 @@ export interface FileRouteTypes {
     | '/tasks/'
     | '/team/'
     | '/templates/'
+    | '/approvals/requests/$requestId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/activate'
@@ -367,6 +388,7 @@ export interface FileRouteTypes {
     | '/account'
     | '/audit'
     | '/design-system'
+    | '/a/$token'
     | '/'
     | '/clients/$clientId'
     | '/clients/new'
@@ -394,6 +416,7 @@ export interface FileRouteTypes {
     | '/tasks'
     | '/team'
     | '/templates'
+    | '/approvals/requests/$requestId'
   id:
     | '__root__'
     | '/_app'
@@ -403,6 +426,7 @@ export interface FileRouteTypes {
     | '/_app/account'
     | '/_app/audit'
     | '/_app/design-system'
+    | '/a/$token'
     | '/_app/'
     | '/_app/clients/$clientId'
     | '/_app/clients/new'
@@ -430,6 +454,7 @@ export interface FileRouteTypes {
     | '/_app/tasks/'
     | '/_app/team/'
     | '/_app/templates/'
+    | '/_app/approvals/requests/$requestId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -437,6 +462,7 @@ export interface RootRouteChildren {
   ActivateRoute: typeof ActivateRoute
   LoginRoute: typeof LoginRoute
   SetupTwoFactorRoute: typeof SetupTwoFactorRoute
+  ATokenRoute: typeof ATokenRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -496,6 +522,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/design-system'
       preLoaderRoute: typeof AppDesignSystemRouteImport
       parentRoute: typeof AppRoute
+    }
+    '/a/$token': {
+      id: '/a/$token'
+      path: '/a/$token'
+      fullPath: '/a/$token'
+      preLoaderRoute: typeof ATokenRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/_app/approvals/': {
       id: '/_app/approvals/'
@@ -679,6 +712,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppTemplatesNewRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/approvals/requests/$requestId': {
+      id: '/_app/approvals/requests/$requestId'
+      path: '/approvals/requests/$requestId'
+      fullPath: '/approvals/requests/$requestId'
+      preLoaderRoute: typeof AppApprovalsRequestsRequestIdRouteImport
+      parentRoute: typeof AppRoute
+    }
   }
 }
 
@@ -713,6 +753,7 @@ interface AppRouteChildren {
   AppTasksIndexRoute: typeof AppTasksIndexRoute
   AppTeamIndexRoute: typeof AppTeamIndexRoute
   AppTemplatesIndexRoute: typeof AppTemplatesIndexRoute
+  AppApprovalsRequestsRequestIdRoute: typeof AppApprovalsRequestsRequestIdRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
@@ -746,6 +787,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppTasksIndexRoute: AppTasksIndexRoute,
   AppTeamIndexRoute: AppTeamIndexRoute,
   AppTemplatesIndexRoute: AppTemplatesIndexRoute,
+  AppApprovalsRequestsRequestIdRoute: AppApprovalsRequestsRequestIdRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
@@ -755,6 +797,7 @@ const rootRouteChildren: RootRouteChildren = {
   ActivateRoute: ActivateRoute,
   LoginRoute: LoginRoute,
   SetupTwoFactorRoute: SetupTwoFactorRoute,
+  ATokenRoute: ATokenRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

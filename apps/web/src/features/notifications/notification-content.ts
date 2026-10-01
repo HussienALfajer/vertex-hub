@@ -24,8 +24,7 @@ export function notificationLink(notification: Notification): ToOptions {
     case 'retainer':
       return { to: '/retainers/$retainerId', params: { retainerId: subject.id } };
     case 'approval_request':
-      // The request page arrives with the Approvals screens (F09); until then, the list.
-      return { to: '/notifications' };
+      return { to: '/approvals/requests/$requestId', params: { requestId: subject.id } };
     default:
       return { to: '/tasks/$taskId', params: { taskId: subject.id } };
   }

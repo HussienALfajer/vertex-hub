@@ -53,6 +53,7 @@ import {
   RepeatIcon,
   ShareIcon,
   ShieldAlertIcon,
+  StampIcon,
   TagIcon,
   UserPlusIcon,
   UsersRoundIcon,
@@ -66,6 +67,7 @@ import { isMissing, LoadError } from '../../components/load-error';
 import { canAll, useMe } from '../../lib/auth';
 import { errorMessage } from '../../lib/errors';
 import { formatNumber } from '../../lib/format';
+import { ClientApprovalsTab } from '../approvals/client-approvals-tab';
 import { ClientFilesTab } from '../files/client-files-tab';
 import { type FileLibrarySearch, parseFileLibrarySearch } from '../files/library-search';
 import { ClientProjectsTab } from '../projects/client-projects-tab';
@@ -96,6 +98,7 @@ const CLIENT_TABS = [
   'retainers',
   'tasks',
   'files',
+  'approvals',
   'brand-kit',
   'platforms',
   'communication',
@@ -236,6 +239,10 @@ function Profile({
             <FolderOpenIcon />
             {t('clients.profile.tabs.files')}
           </TabsTrigger>
+          <TabsTrigger value="approvals">
+            <StampIcon />
+            {t('clients.profile.tabs.approvals')}
+          </TabsTrigger>
           <TabsTrigger value="brand-kit">
             <PaletteIcon />
             {t('clients.profile.tabs.brandKit')}
@@ -269,6 +276,9 @@ function Profile({
         </TabsContent>
         <TabsContent value="files">
           <ClientFilesTab client={client} search={search} onSearchChange={setFileSearch} />
+        </TabsContent>
+        <TabsContent value="approvals">
+          <ClientApprovalsTab client={client} />
         </TabsContent>
         <TabsContent value="brand-kit">
           <BrandKitTab client={client} editable={editable} />
