@@ -44,6 +44,7 @@ import {
   Textarea,
   toast,
 } from '@vertex-hub/ui';
+import type { TFunction } from 'i18next';
 import {
   ArchiveIcon,
   BanIcon,
@@ -59,6 +60,7 @@ import {
   PlayIcon,
   RotateCcwIcon,
   SendIcon,
+  StethoscopeIcon,
   UndoIcon,
   UserRoundCogIcon,
 } from 'lucide-react';
@@ -84,6 +86,7 @@ import {
   useDepartmentMembers,
   useDepartments,
 } from './task-form';
+import { type MedicalDecision, MedicalReviewDialog } from './task-review';
 import { useArchiveTask, useChangeTaskStatus, useUpdateTask } from './tasks.queries';
 
 /** Icons that point along the reading direction, so they mirror in RTL (brand §6). */
@@ -136,15 +139,28 @@ export const moveInput = (task: TaskDetail, target: Target): TaskStatusChange =>
   ...(PASS_MOVES.includes(target.move) && { contentToken: task.contentToken }),
 });
 
+/** What a finished move says: a healthcare client's pass waits for the medical review first. */
+export const moveDone = (t: TFunction, move: TaskMove, task: Pick<TaskDetail, 'reviewStage'>) =>
+  move === 'send_to_client' && task.reviewStage === 'medical'
+    ? t('tasks.moves.done.to_medical')
+    : t(`tasks.moves.done.${move}`);
+
 export interface Target {
   to: TaskStatus;
   move: TaskMove;
 }
 
-/** A move asks for input first: a note, who answered, or a reason to start a blocked task. */
+/**
+ * A move asks for input first: a note, who answered, or a reason to start a blocked task.
+ * Withdrawing from the client is confirmed, with an optional note (F09 rule 6): it also takes
+ * the task out of the client's approval link.
+ */
 export function needsDialog(task: TaskDetail, { move }: Target): boolean {
   return (
-    taskMoveNeedsNote(move) || CLIENT_MOVES.includes(move) || (move === 'start' && task.blocked)
+    taskMoveNeedsNote(move) ||
+    CLIENT_MOVES.includes(move) ||
+    move === 'withdraw' ||
+    (move === 'start' && task.blocked)
   );
 }
 
@@ -165,12 +181,13 @@ export function TaskActions({ task }: { task: TaskDetail }) {
   const { t } = useTranslation();
   const change = useChangeTaskStatus(task.id);
   const [dialog, setDialog] = useState<Target | 'edit' | 'reassign' | 'archive' | null>(null);
+  const [medical, setMedical] = useState<MedicalDecision | null>(null);
   if (task.readOnly) return null;
 
   const targets = targetsOf(task);
   const moves = targets.filter((target) => target.move !== 'cancel');
   const cancel = targets.find((target) => target.move === 'cancel');
-  const { canEdit, canAssign, canArchive } = task.permissions;
+  const { canEdit, canAssign, canArchive, canMedicalReview } = task.permissions;
   const menu = canEdit || canAssign || canArchive || cancel;
 
   async function run(target: Target) {
@@ -179,8 +196,8 @@ export function TaskActions({ task }: { task: TaskDetail }) {
       return;
     }
     try {
-      await change.mutateAsync(moveInput(task, target));
-      toast.add({ title: t(`tasks.moves.done.${target.move}`), type: 'success' });
+      const moved = await change.mutateAsync(moveInput(task, target));
+      toast.add({ title: moveDone(t, target.move, moved), type: 'success' });
     } catch (error) {
       toast.add({ title: errorMessage(t, error), type: 'error' });
     }
@@ -188,6 +205,18 @@ export function TaskActions({ task }: { task: TaskDetail }) {
 
   return (
     <div className="flex shrink-0 flex-wrap items-center gap-2">
+      {canMedicalReview && (
+        <>
+          <Button onClick={() => setMedical('approve')}>
+            <StethoscopeIcon />
+            {t('tasks.medical.approve')}
+          </Button>
+          <Button variant="outline" onClick={() => setMedical('return')}>
+            <UndoIcon className="rtl:-scale-x-100" />
+            {t('tasks.medical.return')}
+          </Button>
+        </>
+      )}
       {moves.map((target) => {
         const Icon = MOVE_ICONS[target.move];
         return (
@@ -243,6 +272,9 @@ export function TaskActions({ task }: { task: TaskDetail }) {
       {typeof dialog === 'object' && dialog !== null && (
         <MoveDialog task={task} target={dialog} onClose={() => setDialog(null)} />
       )}
+      {medical && (
+        <MedicalReviewDialog task={task} decision={medical} onClose={() => setMedical(null)} />
+      )}
       {dialog === 'edit' && <EditTaskDialog task={task} onClose={() => setDialog(null)} />}
       {dialog === 'reassign' && <ReassignDialog task={task} onClose={() => setDialog(null)} />}
       <ArchiveDialog task={task} open={dialog === 'archive'} onClose={() => setDialog(null)} />
@@ -270,13 +302,23 @@ export function MoveDialog({
   const { move } = target;
   const override = move === 'start' && task.blocked;
   const needsNote = taskMoveNeedsNote(move);
+  const optionalNote = move === 'withdraw';
   const asksContact = CLIENT_MOVES.includes(move) && !!task.client;
   const needsContact = RESPONSE_MOVES.includes(move);
   const client = useQuery({ ...clientQuery(task.client?.id ?? ''), enabled: asksContact });
-  const contacts = client.data?.contacts ?? [];
+  // Rule 16: any contact may have answered; those with final approval are suggested first.
+  const contacts = [...(client.data?.contacts ?? [])].sort(
+    (a, b) => Number(b.hasFinalApproval) - Number(a.hasFinalApproval),
+  );
   const contactItems = [
     { value: 'none', label: t('tasks.form.noContact') },
-    ...contacts.map((contact) => ({ value: contact.id, label: contact.name })),
+    ...contacts.map((contact) => ({
+      value: contact.id,
+      label:
+        needsContact && contact.hasFinalApproval
+          ? t('tasks.move.finalApprover', { name: contact.name })
+          : contact.name,
+    })),
   ];
 
   const form = useForm<TaskStatusChangeInput, unknown, TaskStatusChange>({
@@ -315,13 +357,13 @@ export function MoveDialog({
       return;
     }
     try {
-      await change.mutateAsync({
+      const moved = await change.mutateAsync({
         ...values,
-        note: needsNote ? values.note : undefined,
+        note: needsNote || optionalNote ? values.note || undefined : undefined,
         reason: override ? values.reason : undefined,
         contactId: asksContact ? values.contactId : undefined,
       });
-      toast.add({ title: t(`tasks.moves.done.${move}`), type: 'success' });
+      toast.add({ title: moveDone(t, move, moved), type: 'success' });
       onClose();
     } catch (error) {
       setFailure(errorMessage(t, error));
@@ -361,6 +403,13 @@ export function MoveDialog({
               <FieldError match={!!noteError}>
                 {fieldError(noteError, t(`tasks.move.errors.${noteKind}`))}
               </FieldError>
+            </Field>
+          )}
+          {optionalNote && (
+            <Field invalid={!!noteError}>
+              <FieldLabel htmlFor={ids.note}>{t('tasks.move.optionalNote')}</FieldLabel>
+              <Textarea id={ids.note} rows={2} {...form.register('note')} />
+              <FieldError match={!!noteError}>{t('tasks.move.errors.changes')}</FieldError>
             </Field>
           )}
           {asksContact && (

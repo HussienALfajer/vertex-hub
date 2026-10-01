@@ -41,6 +41,7 @@ import {
   MIRRORED_ICONS,
   MOVE_ICONS,
   MoveDialog,
+  moveDone,
   moveInput,
   needsDialog,
   type Target,
@@ -49,6 +50,7 @@ import {
 import {
   BlockedBadge,
   formatDue,
+  MedicalBadge,
   OverLimitBadge,
   PriorityBadge,
   TaskOverdueBadge,
@@ -217,8 +219,8 @@ function Board({ board, search }: { board: TaskBoard; search: TaskBoardSearch })
       return;
     }
     try {
-      await move.mutateAsync({ id: task.id, ...moveInput(task, target) });
-      toast.add({ title: t(`tasks.moves.done.${target.move}`), type: 'success' });
+      const moved = await move.mutateAsync({ id: task.id, ...moveInput(task, target) });
+      toast.add({ title: moveDone(t, target.move, moved), type: 'success' });
     } catch (error) {
       toast.add({ title: errorMessage(t, error), type: 'error' });
     }
@@ -397,6 +399,7 @@ function BoardCard({
       </div>
       <div className="flex flex-wrap items-center gap-1.5">
         <PriorityBadge priority={task.priority} />
+        {task.reviewStage === 'medical' && <MedicalBadge />}
         {task.blocked && <BlockedBadge />}
         {task.overLimitPending && <OverLimitBadge />}
       </div>

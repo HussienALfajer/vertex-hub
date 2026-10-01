@@ -293,6 +293,13 @@ Details the implementation settled (PR 2, `feat/f09-approvals-api`):
 - **Public file content in production** goes through its own internal location, `/_public_files/`, so that the bytes carry `Referrer-Policy: no-referrer`; rate-limited requests answer 429.
 - **Deploy:** the `/a/` location lists its headers instead of including the server's standard set (which carries another `Referrer-Policy`), so it sends no `Permissions-Policy`; the CSP moved to its own snippet, `deploy/nginx/vertexhub-csp.conf`, shared by both.
 
+Details the implementation settled (PR 3, `feat/f09-review-web`):
+- **Approvals page:** only the Medical review tab exists until PR 4, so the page and its navigation link show to holders of `approvals.review_medical` only; others are sent to My tasks.
+- **Medical queue:** the task list item carries no "entered the stage" time, so the tab lists the tasks by `updatedAt`, oldest first, and shows the due date instead of "waiting since". A reviewer's own task is listed and marked: another member reviews it.
+- **Marks in the Files section** apply while the work is with the medical reviewer ("in medical review") or the client ("sent to client"), where "added after review" matters (edge case 3). After the client approves, the final badge says "approved by the client".
+- **The Client approval panel** (pending link, "Create approval link") comes with PR 4; PR 3 shows the review history and the client responses as their own sections, each only when it has entries.
+- **A healthcare pass** answers the toast "waiting for the medical review" instead of "sent to the client", on the task page and the board.
+
 ## Open questions
 - None block F09. The owner decided every question of the interview on 2026-10-01, including F02's open point (edge case 8: healthcare flag changes, rules 18–19).
 - Q5 (email provider) still gates sending links and reminders by email (Phase 4).

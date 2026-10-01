@@ -69,12 +69,13 @@ export function VersionBadge({ number }: { number: number }) {
   );
 }
 
-export function FinalBadge() {
+/** The final version; one the client approved says so (F09 rule 13). */
+export function FinalBadge({ source }: { source?: FileVersion['finalSource'] }) {
   const { t } = useTranslation();
   return (
     <Badge tone="success">
       <CircleCheckIcon aria-hidden="true" />
-      {t('files.final')}
+      {source === 'client' ? t('files.finalByClient') : t('files.final')}
     </Badge>
   );
 }

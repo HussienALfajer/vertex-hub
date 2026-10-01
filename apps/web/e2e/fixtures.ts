@@ -1,5 +1,6 @@
 import type { Page, Route, TestInfo } from '@playwright/test';
 import {
+  type ApprovalReady,
   type AuditEntry,
   addDays,
   allowedTaskTransitions,
@@ -48,6 +49,7 @@ import {
   isTaskOpen,
   isTaskOverdue,
   lastOfMonth,
+  type MedicalReview,
   type MeResponse,
   type Milestone,
   type MilestoneStatus,
@@ -73,6 +75,7 @@ import {
   type RetainerStatus,
   type RetainerStatusChange,
   type RetainerTemplate,
+  type ReviewStage,
   type RevisionDecision,
   type RevisionDecisionInput,
   type RevisionSource,
@@ -84,10 +87,12 @@ import {
   TASK_PRIORITIES,
   type Task,
   type TaskBoard,
+  type TaskClientResponse,
   type TaskComment,
   type TaskDependenciesInput,
   type TaskDetail,
   type TaskPriority,
+  type TaskReview,
   type TaskRights,
   type TaskStatus,
   type TaskStatusChange,
@@ -158,6 +163,7 @@ const marketing = seeded('marketing');
 const design = seeded('design');
 const photography = seeded('photography');
 const content = seeded('content_management');
+const medical = seeded('medical_consultation');
 
 export const manager: MeResponse = {
   user: { id: id(1), name: 'سارة الخطيب', email: 'sara@vertex.example', image: null },
@@ -205,6 +211,18 @@ export const employeeMe: MeResponse = {
   permissions: grantedPermissions({
     roles: ['employee'],
     departments: [{ code: 'photography', isManager: false }],
+  }),
+  twoFactor: { enabled: false, required: false },
+};
+
+/** Dr. Hiba: a member of Medical Consultation, who reviews healthcare clients' content (F09). */
+export const medicalReviewerMe: MeResponse = {
+  user: { id: id(8), name: 'د. هبة النجار', email: 'hiba@vertex.example', image: null },
+  roles: ['employee'],
+  departments: [{ ...medical, isPrimary: true, isManager: false }],
+  permissions: grantedPermissions({
+    roles: ['employee'],
+    departments: [{ code: 'medical_consultation', isManager: false }],
   }),
   twoFactor: { enabled: false, required: false },
 };
@@ -281,6 +299,9 @@ export function teamSeed(): UserResponse[] {
       title: 'مصمم',
       skills: ['Photoshop'],
       status: 'archived',
+    }),
+    member(8, 'د. هبة النجار', 'hiba@vertex.example', [{ d: medical, primary: true }], {
+      title: 'استشارية طبية',
     }),
   ];
 }
@@ -440,6 +461,39 @@ export const auditSeed: AuditEntry[] = [
       number: 1,
       kind: 'upload',
       sizeBytes: 298_000,
+    },
+  },
+  {
+    id: id(513),
+    occurredAt: '2026-09-24T10:00:00.000Z',
+    actorId: id(8),
+    actorName: 'د. هبة النجار',
+    action: 'task.reviewed',
+    entityType: 'task',
+    entityId: id(1008),
+    before: null,
+    after: {
+      stage: 'medical',
+      outcome: 'passed',
+      versions: [{ name: 'منشور التوعية', number: 1 }],
+      hasText: true,
+    },
+  },
+  {
+    id: id(514),
+    occurredAt: '2026-09-24T09:00:00.000Z',
+    actorId: null,
+    actorName: 'د. رامي حسن',
+    action: 'task.client_response_recorded',
+    entityType: 'task',
+    entityId: id(1008),
+    before: null,
+    after: {
+      decision: 'changes_requested',
+      channel: 'link',
+      via: 'approval_link',
+      note: 'غيّروا صورة الغلاف.',
+      versions: [{ name: 'منشور التوعية', number: 1 }],
     },
   },
 ];
@@ -2346,6 +2400,13 @@ interface TaskRecord {
   department: DepartmentCode;
   assigneeId: string | null;
   status: TaskStatus;
+  /** The stage of internal review; null in every other status (F09). */
+  reviewStage: ReviewStage | null;
+  clientText: string | null;
+  /** Passes and returns, oldest first. */
+  reviews: TaskReview[];
+  clearedReviewId: string | null;
+  responses: TaskClientResponse[];
   priority: TaskPriority;
   dueDate: string;
   dueTime: string | null;
@@ -2397,6 +2458,11 @@ function taskRecord(
     department: 'design',
     assigneeId: null,
     status: 'new',
+    reviewStage: fields.status === 'internal_review' ? 'internal' : null,
+    clientText: null,
+    reviews: [],
+    clearedReviewId: null,
+    responses: [],
     priority: 'normal',
     dueDate: '2026-10-14',
     dueTime: null,
@@ -2625,6 +2691,80 @@ export function tasksSeed(): TaskRecord[] {
       startedAt: '2026-10-01T08:00:00.000Z',
       deliveredAt: '2026-10-05T12:00:00.000Z',
     }),
+    // A healthcare client's task past internal review, waiting for the medical review (F09).
+    taskRecord(1008, {
+      title: 'منشور التوعية بصحة الأسنان',
+      brief: 'منشور توعوي عن تنظيف الأسنان اليومي لصفحة العيادة.',
+      department: 'content_management',
+      assigneeId: id(5),
+      status: 'internal_review',
+      reviewStage: 'medical',
+      dueDate: '2026-10-15',
+      clientId: id(602),
+      needsClientApproval: true,
+      createdById: id(1),
+      startedAt: '2026-10-06T08:00:00.000Z',
+      clientText:
+        'ابتسامتك تبدأ بدقيقتين: نظّف أسنانك مرتين يوميًا.\nاحجز فحصك الدوري في عيادة الشفاء.',
+      reviews: [
+        {
+          id: id(1451),
+          stage: 'internal',
+          outcome: 'returned',
+          note: 'اختصر النص في سطرين.',
+          reviewer: { id: id(1), name: 'سارة الخطيب' },
+          versions: [],
+          clientText: null,
+          createdAt: '2026-10-07T10:00:00.000Z',
+        },
+        {
+          id: id(1452),
+          stage: 'internal',
+          outcome: 'passed',
+          note: null,
+          reviewer: { id: id(1), name: 'سارة الخطيب' },
+          versions: [{ id: id(1381), fileItemId: id(1330), name: 'منشور التوعية', number: 1 }],
+          clientText:
+            'ابتسامتك تبدأ بدقيقتين: نظّف أسنانك مرتين يوميًا.\nاحجز فحصك الدوري في عيادة الشفاء.',
+          createdAt: '2026-10-08T09:00:00.000Z',
+        },
+      ],
+      revisions: [
+        {
+          ...clientRevision(1305, 0, 'اختصر النص في سطرين.', false, '2026-10-07T10:00:00.000Z'),
+          source: 'internal',
+          number: null,
+          contactId: null,
+          authorId: id(1),
+        },
+      ],
+    }),
+    // The medical reviewer's own task: another member reviews it (rule 4).
+    taskRecord(1009, {
+      title: 'مقال عن تبييض الأسنان',
+      department: 'medical_consultation',
+      assigneeId: id(8),
+      status: 'internal_review',
+      reviewStage: 'medical',
+      dueDate: '2026-10-16',
+      clientId: id(602),
+      needsClientApproval: true,
+      createdById: id(1),
+      startedAt: '2026-10-06T08:00:00.000Z',
+      clientText: 'التبييض الآمن يبدأ بفحص عند طبيبك.',
+      reviews: [
+        {
+          id: id(1453),
+          stage: 'internal',
+          outcome: 'passed',
+          note: null,
+          reviewer: { id: id(1), name: 'سارة الخطيب' },
+          versions: [],
+          clientText: 'التبييض الآمن يبدأ بفحص عند طبيبك.',
+          createdAt: '2026-10-08T12:00:00.000Z',
+        },
+      ],
+    }),
   ];
 }
 
@@ -2694,9 +2834,37 @@ function taskRoutes({ users, clients, projects, retainers, tasks, me }: TaskStat
       creator: holds('tasks.request', 'all') && task.createdById === me().user.id,
     };
   };
-  /** The mock has no healthcare clients yet: internal review is always the internal stage. */
-  const reviewStage = (task: TaskRecord) =>
-    task.status === 'internal_review' ? ('internal' as const) : null;
+  const reviewStage = (task: TaskRecord) => task.reviewStage;
+  const cleared = (task: TaskRecord) =>
+    task.reviews.find((review) => review.id === task.clearedReviewId) ?? null;
+  /** Rule 8: sent by internal review, and by the medical review for a healthcare client. */
+  const readyToSend = (task: TaskRecord) =>
+    !task.archived &&
+    task.status === 'awaiting_client' &&
+    rights(task).client &&
+    (!clientOf(task)?.isHealthcare || cleared(task)?.stage === 'medical');
+  /** Rule 2: a pass keeps the latest version of each deliverable and the text for the client. */
+  const recordReview = (
+    task: TaskRecord,
+    stage: ReviewStage,
+    outcome: TaskReview['outcome'],
+    note: string | null,
+    snapshot?: Pick<TaskReview, 'versions' | 'clientText'>,
+  ): TaskReview => {
+    const passed = outcome === 'passed';
+    const review: TaskReview = {
+      id: id(next++),
+      stage,
+      outcome,
+      note,
+      reviewer: person(me().user.id),
+      versions: passed ? (snapshot?.versions ?? taskFiles.snapshot(task.id)) : [],
+      clientText: passed ? (snapshot ? snapshot.clientText : task.clientText) : null,
+      createdAt: TASKS_NOW.toISOString(),
+    };
+    task.reviews.push(review);
+    return review;
+  };
   const allowed = (task: TaskRecord) =>
     task.archived
       ? []
@@ -2722,11 +2890,15 @@ function taskRoutes({ users, clients, projects, retainers, tasks, me }: TaskStat
       canReview: live && r.manage,
       canRecordClientResponse: live && r.client,
       canDecideRevision: live && r.client,
-      canMedicalReview: false,
+      canMedicalReview:
+        live &&
+        task.reviewStage === 'medical' &&
+        holds('approvals.review_medical', 'all') &&
+        task.assigneeId !== me().user.id,
       canWithdrawFromClient:
         task.status === 'awaiting_client' && allowed(task).includes('internal_review'),
       canEditClientText: live && OPEN_TASK.includes(task.status) && (r.work || r.manage),
-      canSendForApproval: live && r.client && task.status === 'awaiting_client',
+      canSendForApproval: readyToSend(task),
       canCancel: allowed(task).includes('cancelled'),
       canReopen: live && r.manage,
       canArchive: holds('tasks.manage', 'all'),
@@ -2788,11 +2960,11 @@ function taskRoutes({ users, clients, projects, retainers, tasks, me }: TaskStat
     ...summary(task),
     brief: task.brief,
     needsClientApproval: task.needsClientApproval,
-    clientText: null,
+    clientText: task.clientText,
     contentToken: MOCK_CONTENT_TOKEN,
-    clearedReview: null,
-    reviewHistory: [],
-    clientResponses: [],
+    clearedReview: cleared(task),
+    reviewHistory: task.reviews,
+    clientResponses: task.responses,
     pendingApproval: null,
     clientRequest: task.request
       ? {
@@ -2926,7 +3098,8 @@ function taskRoutes({ users, clients, projects, retainers, tasks, me }: TaskStat
       (!q.get('dueFrom') || task.dueDate >= (q.get('dueFrom') as string)) &&
       (!q.get('dueTo') || task.dueDate <= (q.get('dueTo') as string)) &&
       (q.get('createdBy') !== 'me' || task.createdById === meId) &&
-      (q.get('reviewer') !== 'me' || (r.manage && task.status === 'internal_review'))
+      (q.get('reviewer') !== 'me' || (r.manage && task.status === 'internal_review')) &&
+      (!q.get('reviewStage') || task.reviewStage === q.get('reviewStage'))
     );
   };
   // Like the database enum: low first.
@@ -2955,8 +3128,13 @@ function taskRoutes({ users, clients, projects, retainers, tasks, me }: TaskStat
         later: count(mine, (t) => t.dueDate > weekEnd),
         waiting: count(mine, (t) => blocked(t) || t.status === 'awaiting_client'),
         toReview: count(open, (t) => t.status === 'internal_review' && rights(t).manage),
-        medicalReview: null,
-        readyToSend: null,
+        medicalReview: holds('approvals.review_medical', 'all')
+          ? count(open, (t) => t.reviewStage === 'medical' && t.assigneeId !== meId)
+          : null,
+        readyToSend:
+          holds('tasks.manage', 'all') || holds('tasks.manage', 'own_clients')
+            ? count(open, readyToSend)
+            : null,
         requestedByMe: count(open, (t) => t.createdById === meId && t.assigneeId !== meId),
         unassignedInMyDepartments:
           managed().length === 0
@@ -3044,6 +3222,34 @@ function taskRoutes({ users, clients, projects, retainers, tasks, me }: TaskStat
       }));
       tasks.push(created);
       return json(route, detail(created), 201);
+    }
+
+    // Tasks ready to send, by client (F09 rule 8).
+    if (path === '/api/approvals/ready') {
+      const sendable = tasks.filter(readyToSend);
+      const ready: ApprovalReady = {
+        clients: clients
+          .filter((c) => sendable.some((t) => t.clientId === c.id))
+          .sort((a, b) => a.tradeName.localeCompare(b.tradeName, 'ar'))
+          .map((c) => ({
+            client: { id: c.id, name: c.tradeName },
+            isHealthcare: c.isHealthcare,
+            contacts: c.contacts
+              .filter((contact) => !contact.archived && contact.hasFinalApproval)
+              .map((contact) => ({ id: contact.id, name: contact.name, phone: contact.phone })),
+            tasks: sendable
+              .filter((t) => t.clientId === c.id)
+              .sort((a, b) => a.dueDate.localeCompare(b.dueDate))
+              .map((t) => ({
+                ...summary(t),
+                snapshot: {
+                  files: cleared(t)?.versions.length ?? 0,
+                  hasText: !!cleared(t)?.clientText,
+                },
+              })),
+          })),
+      };
+      return json(route, ready);
     }
 
     // The board's and workload's departments: the filter, else managed, else own (spec F06).
@@ -3194,7 +3400,73 @@ function taskRoutes({ users, clients, projects, retainers, tasks, me }: TaskStat
         task.cancelledAt = null;
         task.cancelReason = null;
       }
-      task.status = change.status;
+      // F09: passes keep a snapshot, and a healthcare client's pass leads to the medical stage.
+      let toMedical = false;
+      if (move === 'send_to_client' || move === 'approve') {
+        const pass = recordReview(task, 'internal', 'passed', null);
+        toMedical = move === 'send_to_client' && clientOf(task)?.isHealthcare === true;
+        if (!toMedical) task.clearedReviewId = pass.id;
+      }
+      if (move === 'return') {
+        recordReview(task, task.reviewStage ?? 'internal', 'returned', change.note ?? '');
+      }
+      const responder = contactOf(task, change.contactId ?? null);
+      if ((move === 'client_approved' || move === 'client_changes') && responder) {
+        task.responses.push({
+          id: id(next++),
+          decision: move === 'client_approved' ? 'approved' : 'changes_requested',
+          channel: 'manual',
+          contact: responder,
+          note: change.note ?? null,
+          versions: cleared(task)?.versions ?? [],
+          recordedBy: person(me().user.id),
+          createdAt: TASKS_NOW.toISOString(),
+        });
+      }
+      task.status = toMedical ? 'internal_review' : change.status;
+      task.reviewStage =
+        task.status === 'internal_review' ? (toMedical ? 'medical' : 'internal') : null;
+      return answer();
+    }
+    if (part === 'medical-review') {
+      if (task.reviewStage !== 'medical') return fail(route, 409, 'INVALID_TRANSITION');
+      if (!holds('approvals.review_medical', 'all')) return fail(route, 403, null);
+      if (task.assigneeId === me().user.id) return fail(route, 403, 'SELF_REVIEW');
+      const input = body<MedicalReview>();
+      if (input.decision === 'approve') {
+        // Rule 2: the medical pass copies the snapshot of the internal pass.
+        const internal = [...task.reviews].reverse().find((r) => r.outcome === 'passed');
+        const pass = recordReview(task, 'medical', 'passed', input.note ?? null, {
+          versions: internal?.versions ?? [],
+          clientText: internal?.clientText ?? null,
+        });
+        task.clearedReviewId = pass.id;
+        task.status = 'awaiting_client';
+      } else {
+        recordReview(task, 'medical', 'returned', input.note ?? '');
+        task.revisions.push({
+          id: id(next++),
+          source: 'medical',
+          number: null,
+          note: input.note ?? '',
+          contactId: null,
+          overLimit: false,
+          decision: null,
+          decisionNote: null,
+          extraWork: null,
+          decidedById: null,
+          decidedAt: null,
+          authorId: me().user.id,
+          createdAt: TASKS_NOW.toISOString(),
+        });
+        task.status = 'revisions';
+      }
+      task.reviewStage = null;
+      return answer();
+    }
+    if (part === 'client-text' && method === 'PUT') {
+      if (!can.canEditClientText) return fail(route, 403, null);
+      task.clientText = body<{ clientText: string | null }>().clientText?.trim() || null;
       return answer();
     }
     if (part === 'dependencies' && method === 'PUT') {
@@ -3511,6 +3783,24 @@ export function filesSeed(): FileRecord[] {
         finalSource: 'auto',
         finalMarkedAt: '2026-10-04T09:00:00.000Z',
       },
+    ]),
+    // The awareness post: v1 passed internal review, v2 was added after it (F09 edge case 3).
+    file(1330, { type: 'task', id: id(1008) }, 'deliverable', 'منشور التوعية', [
+      uploadVersion(
+        1382,
+        2,
+        png('dental-post-v2.png', 1_310_720),
+        { id: id(5), name: 'نور السيد' },
+        '2026-10-09T08:00:00.000Z',
+        { note: 'صورة أوضح للفرشاة.' },
+      ),
+      uploadVersion(
+        1381,
+        1,
+        png('dental-post.png', 1_258_291),
+        { id: id(5), name: 'نور السيد' },
+        '2026-10-07T12:00:00.000Z',
+      ),
     ]),
     file(
       1310,
@@ -4032,6 +4322,16 @@ function fileRoutes({ users, clients, projects, retainers, tasks, me, rights }: 
       deliverables: count(taskId, 'deliverable'),
       references: count(taskId, 'reference'),
     }),
+    /** The latest version of each deliverable: what a review pass approves (F09 rule 2). */
+    snapshot: (taskId: string) =>
+      files
+        .filter((f) => f.ownerId === taskId && f.role === 'deliverable' && !f.archivedAt)
+        .flatMap((f) => {
+          const latest = f.versions.find((v) => !v.archivedAt);
+          return latest
+            ? [{ id: latest.id, fileItemId: f.id, name: f.name, number: latest.number }]
+            : [];
+        }),
   };
 }
 
@@ -5006,6 +5306,8 @@ export const seedIds = {
   dishShoot: id(1002),
   openingPosts: id(1003),
   clinicLogo: id(1006),
+  dentalPost: id(1008),
+  whiteningArticle: id(1009),
   octoberCover: id(1007),
   websiteTemplate: id(2000),
   monthlyTemplate: id(2100),

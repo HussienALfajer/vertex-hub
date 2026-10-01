@@ -7,6 +7,7 @@ import {
   BlockedBadge,
   ChecklistCount,
   formatDue,
+  MedicalBadge,
   OverLimitBadge,
   PriorityBadge,
   TaskOverdueBadge,
@@ -67,6 +68,7 @@ export function TaskRows({ tasks, showAssignee }: { tasks: Task[]; showAssignee?
                   <span className="text-sm text-muted-foreground">{t('tasks.unassigned')}</span>
                 ))}
               <TaskStatusBadge status={task.status} />
+              {task.reviewStage === 'medical' && <MedicalBadge />}
               <PriorityBadge priority={task.priority} />
               {task.blocked && <BlockedBadge />}
               {task.overLimitPending && <OverLimitBadge />}

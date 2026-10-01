@@ -10,6 +10,7 @@ import {
   HistoryIcon,
   LockIcon,
   ReceiptTextIcon,
+  StethoscopeIcon,
 } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -34,6 +35,7 @@ import {
 import { CommentsSection } from './task-comments';
 import { TaskFilesSection } from './task-files';
 import { ChecklistSection, DependenciesSection, LinksSection, TaskSection } from './task-parts';
+import { ClientResponsesSection, ClientTextSection, ReviewHistorySection } from './task-review';
 import { RevisionsSection } from './task-revisions';
 import { taskQuery, useRestoreTask } from './tasks.queries';
 
@@ -71,8 +73,11 @@ function TaskView({ task }: { task: TaskDetail }) {
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
         <div className="flex min-w-0 flex-col gap-6">
           <BriefSection task={task} />
+          {(task.client || task.clientText) && <ClientTextSection task={task} />}
           <TaskFilesSection task={task} />
           <ChecklistSection task={task} />
+          <ReviewHistorySection task={task} />
+          <ClientResponsesSection task={task} />
           <RevisionsSection task={task} />
           <CommentsSection task={task} />
         </div>
@@ -140,7 +145,7 @@ function TaskHero({ task }: { task: TaskDetail }) {
             <h1 className="text-2xl font-bold">{task.title}</h1>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <TaskStatusBadge status={task.status} />
+            <TaskStatusBadge status={task.status} stage={task.reviewStage} />
             <PriorityBadge priority={task.priority} />
             {task.type === 'client_request' && (
               <Badge tone="gold">{t('tasks.types.client_request')}</Badge>
@@ -196,9 +201,10 @@ function Fact({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-/** Cancelled, archived and read-only tasks say so above everything else. */
+/** Cancelled, archived, read-only and medical-stage tasks say so above everything else. */
 function Banners({ task }: { task: TaskDetail }) {
   const { t } = useTranslation();
+  const me = useMe();
   if (task.archivedAt) return <ArchivedCallout task={task} />;
   if (task.readOnly) {
     return (
@@ -206,6 +212,18 @@ function Banners({ task }: { task: TaskDetail }) {
         icon={<LockIcon />}
         title={t('tasks.page.readOnlyTitle')}
         description={t('tasks.page.readOnlyBody')}
+      />
+    );
+  }
+  if (task.reviewStage === 'medical') {
+    // Rule 4: a medical reviewer never reviews their own task.
+    const own = can(me, 'approvals.review_medical') && task.assignee?.id === me.user.id;
+    return (
+      <Callout
+        tone="info"
+        icon={<StethoscopeIcon />}
+        title={t('tasks.page.medicalTitle')}
+        description={own ? t('tasks.page.medicalOwnBody') : t('tasks.page.medicalBody')}
       />
     );
   }

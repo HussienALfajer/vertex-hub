@@ -4,6 +4,7 @@ import {
   employeeMe,
   financeWithoutTwoFactor,
   manager,
+  medicalReviewerMe,
   mockApi,
   notificationFor,
   PROJECTS_TODAY,
@@ -504,6 +505,58 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await expect(dialog.getByRole('progressbar')).toBeVisible();
       await expect(dialog.getByRole('alert')).toHaveText(ar.errors.FILE_TYPE_BLOCKED);
       await screenshot(page, testInfo, `file-upload-${colorScheme}`);
+    });
+
+    test('approvals and the task in the medical stage', async ({ page }, testInfo) => {
+      await page.setViewportSize({ width: 1280, height: 900 });
+      await page.clock.setFixedTime(new Date(`${PROJECTS_TODAY}T09:00:00+03:00`));
+      await mockApi(page, { signedIn: true, me: medicalReviewerMe });
+      await page.goto('/approvals');
+      await expect(page.getByRole('link', { name: 'منشور التوعية بصحة الأسنان' })).toBeVisible();
+      await screenshot(page, testInfo, `approvals-medical-${colorScheme}`);
+
+      await page.goto('/tasks');
+      await expect(
+        page.getByRole('region', { name: ar.tasks.my.sections.medicalReview }),
+      ).toBeVisible();
+      await screenshot(page, testInfo, `my-tasks-medical-${colorScheme}`);
+
+      // Text for the client, the reviewed version and the one added after, review history.
+      await page.setViewportSize({ width: 1280, height: 2000 });
+      await page.goto(`/tasks/${seedIds.dentalPost}`);
+      await expect(page.getByRole('button', { name: ar.tasks.medical.approve })).toBeVisible();
+      await page.getByRole('button', { name: ar.files.versions_two }).click();
+      await expect(page.getByText(ar.tasks.files.inMedicalReview)).toBeVisible();
+      await page.waitForFunction(() => [...document.images].every((image) => image.complete));
+      await screenshot(page, testInfo, `task-medical-${colorScheme}`);
+
+      await page.setViewportSize({ width: 1280, height: 900 });
+      await page.getByRole('button', { name: ar.tasks.medical.approve }).click();
+      await expect(page.getByRole('dialog').getByText(ar.tasks.medical.snapshot)).toBeVisible();
+      await screenshot(page, testInfo, `task-medical-approve-${colorScheme}`);
+    });
+
+    test('task sent to the client and the client-response dialog', async ({ page }, testInfo) => {
+      await page.setViewportSize({ width: 1280, height: 2200 });
+      await page.clock.setFixedTime(new Date(`${PROJECTS_TODAY}T09:00:00+03:00`));
+      await mockApi(page, { signedIn: true, me: accountManagerMe });
+      await page.goto(`/tasks/${seedIds.autumnMenu}`);
+      await page.getByRole('button', { name: ar.tasks.moves.submit, exact: true }).click();
+      await page.getByRole('button', { name: ar.tasks.moves.send_to_client, exact: true }).click();
+      await expect(page.getByText(ar.tasks.files.sentToClient)).toHaveCount(2);
+      await page.waitForFunction(() => [...document.images].every((image) => image.complete));
+      await screenshot(page, testInfo, `task-sent-${colorScheme}`);
+
+      // Recording the response by hand asks who answered (F09 rule 16).
+      await page.setViewportSize({ width: 1280, height: 900 });
+      await page.getByRole('button', { name: ar.tasks.moves.client_changes, exact: true }).click();
+      const dialog = page.getByRole('dialog');
+      await dialog.getByRole('textbox').first().fill('كبّروا اسم المطعم على الغلاف.');
+      await dialog.getByRole('button', { name: ar.tasks.moves.client_changes }).click();
+      await expect(dialog.getByText(ar.tasks.move.errors.contact)).toBeVisible();
+      await dialog.getByRole('combobox', { name: ar.tasks.move.responder }).click();
+      await expect(page.getByRole('option').nth(1)).toBeVisible();
+      await screenshot(page, testInfo, `task-client-response-${colorScheme}`);
     });
 
     test('client files, brand files and documents', async ({ page }, testInfo) => {

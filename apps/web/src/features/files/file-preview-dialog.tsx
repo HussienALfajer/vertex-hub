@@ -60,7 +60,7 @@ export function FilePreviewDialog({
             {entry.name}
           </DialogTitle>
           <VersionBadge number={version.number} />
-          {version.isFinal && <FinalBadge />}
+          {version.isFinal && <FinalBadge source={version.finalSource} />}
         </div>
         <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-lg bg-muted">
           <PreviewBody entry={entry} />

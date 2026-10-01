@@ -4,6 +4,8 @@ import {
   DEPARTMENT_CODES,
   type DepartmentCode,
   OPEN_TASK_STATUSES,
+  REVIEW_STAGES,
+  type ReviewStage,
   TASK_PRIORITIES,
   TASK_SORTS,
   TASK_STATUSES,
@@ -51,6 +53,7 @@ import {
   MessageSquareWarningIcon,
   SearchIcon,
   SendIcon,
+  StethoscopeIcon,
 } from 'lucide-react';
 import { useCallback, useId } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -79,6 +82,7 @@ import {
   BlockedBadge,
   ChecklistCount,
   formatDue,
+  MedicalBadge,
   NotInDepartmentBadge,
   OverLimitBadge,
   PriorityBadge,
@@ -111,6 +115,8 @@ export interface TaskListSearch {
   overLimit?: true;
   createdBy?: 'me';
   reviewer?: 'me';
+  /** Tasks in this stage of internal review (F09). */
+  reviewStage?: ReviewStage;
   dueFrom?: string;
   dueTo?: string;
   archived?: true;
@@ -147,6 +153,7 @@ export function parseTaskListSearch(search: Record<string, unknown>): TaskListSe
     overLimit: flagParam(search.overLimit),
     createdBy: search.createdBy === 'me' ? 'me' : undefined,
     reviewer: search.reviewer === 'me' ? 'me' : undefined,
+    reviewStage: oneOfParam(REVIEW_STAGES, search.reviewStage),
     dueFrom: dayParam(search.dueFrom),
     dueTo: dayParam(search.dueTo),
     archived: flagParam(search.archived),
@@ -179,6 +186,7 @@ function filtersOf(search: TaskListSearch, archived: boolean): TaskListFilters {
     overLimit: flag(search.overLimit),
     createdBy: search.createdBy,
     reviewer: search.reviewer,
+    reviewStage: search.reviewStage,
     dueFrom: search.dueFrom,
     dueTo: search.dueTo,
     archived: archived ? 'true' : undefined,
@@ -538,6 +546,17 @@ function Filters({
           {t('tasks.filters.toReview')}
         </Button>
         <Button
+          variant={search.reviewStage === 'medical' ? 'secondary' : 'outline'}
+          size="sm"
+          aria-pressed={search.reviewStage === 'medical'}
+          onClick={() =>
+            onChange({ reviewStage: search.reviewStage === 'medical' ? undefined : 'medical' })
+          }
+        >
+          <StethoscopeIcon />
+          {t('tasks.filters.medicalReview')}
+        </Button>
+        <Button
           variant={search.createdBy ? 'secondary' : 'outline'}
           size="sm"
           aria-pressed={search.createdBy === 'me'}
@@ -685,6 +704,7 @@ function TasksTable({
               <TableCell>
                 <span className="flex flex-wrap items-center gap-1.5">
                   <TaskStatusBadge status={task.status} />
+                  {task.reviewStage === 'medical' && <MedicalBadge />}
                   {task.blocked && <BlockedBadge />}
                   {task.overLimitPending && <OverLimitBadge />}
                   {archived && <TaskArchivedBadge />}

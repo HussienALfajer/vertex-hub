@@ -31,12 +31,14 @@ import {
   MoonIcon,
   RepeatIcon,
   ScrollTextIcon,
+  StampIcon,
   SunIcon,
   SwatchBookIcon,
   UsersIcon,
 } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { approvalTabsFor } from '../features/approvals/approvals-page';
 import { NotificationBell } from '../features/notifications/notification-bell';
 import { managesTeams } from '../features/tasks/task-access';
 import { authClient, can, leaveSession, useMe } from '../lib/auth';
@@ -48,6 +50,7 @@ interface NavItem {
   label:
     | 'nav.clients'
     | 'nav.tasks'
+    | 'nav.approvals'
     | 'nav.projects'
     | 'nav.retainers'
     | 'nav.templates'
@@ -85,6 +88,13 @@ const navItems: NavItem[] = [
       { to: '/tasks/board', label: 'nav.taskBoard', show: managesTeams },
       { to: '/tasks/workload', label: 'nav.workload' },
     ],
+  },
+  // The queues of F09: listed for those with one to act on (screen 1).
+  {
+    to: '/approvals',
+    label: 'nav.approvals',
+    icon: StampIcon,
+    show: (me) => approvalTabsFor(me).length > 0,
   },
   { to: '/clients', label: 'nav.clients', icon: BriefcaseBusinessIcon, permission: 'clients.read' },
   { to: '/projects', label: 'nav.projects', icon: FolderKanbanIcon, permission: 'projects.read' },

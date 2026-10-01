@@ -1,4 +1,4 @@
-import type { Task, TaskPriority, TaskStatus } from '@vertex-hub/contracts';
+import type { ReviewStage, Task, TaskPriority, TaskStatus } from '@vertex-hub/contracts';
 import { Badge, cn, StatusBadge } from '@vertex-hub/ui';
 import {
   ArchiveIcon,
@@ -11,14 +11,24 @@ import {
   HourglassIcon,
   ListChecksIcon,
   MessageSquareWarningIcon,
+  StethoscopeIcon,
   UserRoundXIcon,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { formatCalendarDate, formatNumber, formatTimeOfDay } from '../../lib/format';
 import { lineName } from '../retainers/retainer-badges';
 
-/** A workflow status in its brand color; cancelled tasks are struck from the workflow. */
-export function TaskStatusBadge({ status }: { status: TaskStatus }) {
+/**
+ * A workflow status in its brand color; cancelled tasks are struck from the workflow. With the
+ * `stage`, internal review names its medical stage (F09 rule 4).
+ */
+export function TaskStatusBadge({
+  status,
+  stage,
+}: {
+  status: TaskStatus;
+  stage?: ReviewStage | null;
+}) {
   const { t } = useTranslation();
   if (status === 'cancelled') {
     return (
@@ -28,7 +38,22 @@ export function TaskStatusBadge({ status }: { status: TaskStatus }) {
       </Badge>
     );
   }
-  return <StatusBadge status={status}>{t(`tasks.statuses.${status}`)}</StatusBadge>;
+  return (
+    <StatusBadge status={status}>
+      {stage === 'medical' ? t('tasks.medicalStatus') : t(`tasks.statuses.${status}`)}
+    </StatusBadge>
+  );
+}
+
+/** In the medical stage of internal review: waiting for Medical Consultation (F09 rule 4). */
+export function MedicalBadge() {
+  const { t } = useTranslation();
+  return (
+    <Badge tone="info">
+      <StethoscopeIcon aria-hidden="true" />
+      {t('tasks.medicalBadge')}
+    </Badge>
+  );
 }
 
 const PRIORITY = {
