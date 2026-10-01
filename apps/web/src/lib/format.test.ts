@@ -13,6 +13,8 @@ import {
   formatNumber,
   formatRelativeTime,
   formatTimeOfDay,
+  formatWeekday,
+  formatWeekdayDate,
   fromBusinessDateTimeInput,
   toBusinessDateTimeInput,
 } from './format';
@@ -62,6 +64,17 @@ describe('formatting', () => {
     const formatted = formatCalendarDate('2026-10-01');
     expect(formatted).not.toMatch(ARABIC_INDIC_DIGITS);
     expect(formatted).toMatch(/^1 .+ 2026$/);
+  });
+
+  it('names the weekday of a calendar day, and the day without its year', () => {
+    // 3 October 2026 is a Saturday, the first day of the work week (ADR 0016).
+    expect(formatWeekday('2026-10-03')).toBe('السبت');
+    expect(formatWeekday('2026-10-09')).toBe('الجمعة');
+    const formatted = formatWeekdayDate('2026-10-03');
+    expect(formatted).not.toMatch(ARABIC_INDIC_DIGITS);
+    expect(formatted).toContain('السبت');
+    expect(formatted).toContain('3');
+    expect(formatted).not.toContain('2026');
   });
 
   it('formats a month from its first day without moving it to the month before', () => {

@@ -95,6 +95,8 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await page.goto('/design-system');
       await expect(page.getByRole('heading', { level: 1 })).toHaveText(ar.designSystem.title);
       await screenshot(page, testInfo, `design-system-${colorScheme}`);
+      await page.getByRole('heading', { name: ar.designSystem.calendar }).scrollIntoViewIfNeeded();
+      await screenshot(page, testInfo, `design-system-calendar-${colorScheme}`);
 
       await page.getByRole('button', { name: ar.designSystem.openMenu }).click();
       await expect(page.getByRole('menuitem', { name: ar.designSystem.menuEdit })).toBeVisible();
@@ -820,6 +822,135 @@ for (const colorScheme of ['light', 'dark'] as const) {
         designs.getByRole('button', { name: ar.templates.lines.generateMissing_two }),
       ).toBeVisible();
       await screenshot(page, testInfo, `retainer-month-template-${colorScheme}`);
+    });
+
+    test('content calendar: month, week and the phone agenda', async ({ page }, testInfo) => {
+      await page.setViewportSize({ width: 1440, height: 1500 });
+      await page.clock.setFixedTime(new Date(`${PROJECTS_TODAY}T09:00:00+03:00`));
+      await mockApi(page, { signedIn: true, content: true });
+      await page.goto('/content');
+      await expect(page.getByRole('link', { name: /كاروسيل أطباق الخريف/ })).toBeVisible();
+      // The fifth post of the day hides behind "+1".
+      await expect(page.getByRole('button', { name: /اعرض 1 أخرى/ })).toBeVisible();
+      await screenshot(page, testInfo, `content-month-${colorScheme}`);
+
+      await page.getByRole('button', { name: /اعرض 1 أخرى/ }).click();
+      await expect(page.getByRole('dialog').getByRole('link')).toHaveCount(5);
+      await screenshot(page, testInfo, `content-day-list-${colorScheme}`);
+      await page.keyboard.press('Escape');
+
+      await page.setViewportSize({ width: 1440, height: 1100 });
+      await page.getByRole('button', { name: ar.content.calendar.views.week }).click();
+      await expect(page).toHaveURL(/view=week/);
+      await expect(page.getByRole('link', { name: /ريل كواليس المطبخ/ })).toBeVisible();
+      await screenshot(page, testInfo, `content-week-${colorScheme}`);
+
+      await page.setViewportSize({ width: 390, height: 1400 });
+      await page.goto('/content');
+      await expect(page.getByRole('link', { name: 'كاروسيل أطباق الخريف' })).toBeVisible();
+      await screenshot(page, testInfo, `content-agenda-phone-${colorScheme}`);
+    });
+
+    test('my posts', async ({ page }, testInfo) => {
+      await page.setViewportSize({ width: 1280, height: 1100 });
+      await page.clock.setFixedTime(new Date(`${PROJECTS_TODAY}T09:00:00+03:00`));
+      await mockApi(page, { signedIn: true, content: true });
+      await page.goto('/content?tab=mine');
+      await expect(
+        page.getByRole('region', { name: ar.content.my.sections.overdue }).getByRole('link'),
+      ).toHaveText('ستوري عرض الغداء');
+      await expect(
+        page.getByRole('region', { name: ar.content.my.sections.toReview }),
+      ).toBeVisible();
+      await screenshot(page, testInfo, `my-posts-${colorScheme}`);
+    });
+
+    test('client content tab and the new post dialog', async ({ page }, testInfo) => {
+      await page.setViewportSize({ width: 1440, height: 1700 });
+      await page.clock.setFixedTime(new Date(`${PROJECTS_TODAY}T09:00:00+03:00`));
+      await mockApi(page, { signedIn: true, me: accountManagerMe, content: true });
+      await page.goto(`/clients/${seedIds.jasmine}?tab=content`);
+      await expect(page.getByRole('link', { name: /شكر لضيوف الافتتاح/ })).toBeVisible();
+      await expect(page.getByText(/^منشورات تشرين/)).toBeVisible();
+      await screenshot(page, testInfo, `client-content-${colorScheme}`);
+
+      await page.setViewportSize({ width: 1280, height: 1300 });
+      await page.getByRole('button', { name: ar.content.actions.new }).first().click();
+      const dialog = page.getByRole('dialog');
+      await dialog.getByLabel(ar.content.form.title).fill('عرض الفطور الشامي');
+      await dialog.getByRole('checkbox', { name: /إنستغرام/ }).click();
+      await dialog
+        .getByRole('textbox', { name: new RegExp(`^${ar.content.form.caption}`) })
+        .fill('فطور شامي كامل كل جمعة.');
+      await screenshot(page, testInfo, `new-post-${colorScheme}`);
+    });
+
+    test('post page: in production, linking a task, approved, medical stage, published', async ({
+      page,
+    }, testInfo) => {
+      await page.setViewportSize({ width: 1280, height: 1700 });
+      await page.clock.setFixedTime(new Date(`${PROJECTS_TODAY}T09:00:00+03:00`));
+      const api = await mockApi(page, { signedIn: true, me: accountManagerMe, content: true });
+      await page.goto(`/content/posts/${seedIds.openingPost}`);
+      await expect(page.getByRole('heading', { level: 1 })).toHaveText('عرض افتتاح الفرع الثاني');
+      await expect(
+        page.getByRole('link', { name: 'تصميم عرض الافتتاح', exact: true }),
+      ).toBeVisible();
+      await screenshot(page, testInfo, `post-in-production-${colorScheme}`);
+
+      await page.setViewportSize({ width: 1280, height: 1000 });
+      await page.getByRole('button', { name: ar.content.tasks.link }).click();
+      const dialog = page.getByRole('dialog');
+      await expect(dialog.getByText('تصميم قائمة المشروبات')).toBeVisible();
+      await screenshot(page, testInfo, `link-task-${colorScheme}`);
+      await dialog.getByRole('tab', { name: ar.content.link.tabs.request }).click();
+      await dialog.getByRole('combobox', { name: ar.content.link.cycleLine }).click();
+      await page.getByRole('option', { name: /تقرير شهري/ }).click();
+      await screenshot(page, testInfo, `request-post-task-${colorScheme}`);
+      await page.keyboard.press('Escape');
+
+      // With the client: the account manager records the answer given by phone (rule 24).
+      await page.setViewportSize({ width: 1280, height: 1300 });
+      await page.goto(`/content/posts/${seedIds.weekendOffer}`);
+      await page.getByRole('button', { name: ar.content.moves.client_changes }).click();
+      await expect(page.getByRole('dialog')).toBeVisible();
+      await screenshot(page, testInfo, `post-awaiting-client-${colorScheme}`);
+      await page.keyboard.press('Escape');
+
+      await page.goto(`/content/posts/${seedIds.followersContest}`);
+      await expect(page.getByText('أجّل العميل المسابقة إلى الشهر القادم.')).toBeVisible();
+      await screenshot(page, testInfo, `post-cancelled-${colorScheme}`);
+
+      api.signInAs(manager);
+      await page.setViewportSize({ width: 1280, height: 1500 });
+      await page.goto(`/content/posts/${seedIds.autumnCarousel}`);
+      await expect(page.getByRole('button', { name: ar.content.moves.publish })).toBeVisible();
+      await expect(page.getByText('يقطين مشوي', { exact: true })).toBeVisible();
+      await screenshot(page, testInfo, `post-approved-${colorScheme}`);
+      await page.getByRole('button', { name: ar.content.moves.publish }).click();
+      await expect(page.getByRole('dialog')).toBeVisible();
+      await screenshot(page, testInfo, `publish-post-${colorScheme}`);
+      await page.keyboard.press('Escape');
+
+      api.signInAs(medicalReviewerMe);
+      await page.setViewportSize({ width: 1280, height: 1200 });
+      await page.goto(`/content/posts/${seedIds.dentalTips}`);
+      await expect(page.getByRole('button', { name: ar.tasks.medical.approve })).toBeVisible();
+      await screenshot(page, testInfo, `post-medical-${colorScheme}`);
+
+      await page.goto(`/content/posts/${seedIds.coffeeDay}`);
+      await expect(page.getByRole('link', { name: /instagram\.com/ })).toBeVisible();
+      await screenshot(page, testInfo, `post-published-${colorScheme}`);
+    });
+
+    test('task page with the Post line', async ({ page }, testInfo) => {
+      await page.setViewportSize({ width: 1280, height: 1300 });
+      await page.clock.setFixedTime(new Date(`${PROJECTS_TODAY}T09:00:00+03:00`));
+      await mockApi(page, { signedIn: true, me: accountManagerMe, content: true });
+      await page.goto(`/tasks/${seedIds.openingDesign}`);
+      await expect(page.getByRole('link', { name: 'عرض افتتاح الفرع الثاني' })).toBeVisible();
+      await expect(page.getByText(ar.content.taskPost.hint)).toBeVisible();
+      await screenshot(page, testInfo, `task-post-line-${colorScheme}`);
     });
   });
 }
