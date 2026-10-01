@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { CLIENT_DECISIONS } from './approvals.js';
 import { calendarDateSchema, timeOfDaySchema } from './dates.js';
 import { departmentCodeSchema } from './departments.js';
 import { pageQuerySchema, pageSchema, queryBooleanSchema } from './lists.js';
@@ -17,8 +18,12 @@ export const NOTIFICATION_TYPES = [
   'task_mentioned',
   'task_returned',
   'task_review_requested',
+  'task_medical_review_requested',
   'task_awaiting_client',
   'task_over_limit',
+  'approval_responded',
+  'approval_no_response',
+  'approval_expired',
   'task_changed',
   'task_commented',
   'task_file_added',
@@ -54,6 +59,7 @@ export const NOTIFICATION_SUBJECTS = [
   'project',
   'retainer',
   'template_run',
+  'approval_request',
 ] as const;
 
 export const notificationSubjectTypeSchema = z
@@ -71,8 +77,12 @@ export const NOTIFICATION_CATALOG: Record<
   task_mentioned: { category: 'tasks', subject: 'task', mutable: true },
   task_returned: { category: 'tasks', subject: 'task', mutable: false },
   task_review_requested: { category: 'tasks', subject: 'task', mutable: false },
+  task_medical_review_requested: { category: 'tasks', subject: 'task', mutable: false },
   task_awaiting_client: { category: 'tasks', subject: 'task', mutable: false },
   task_over_limit: { category: 'tasks', subject: 'task', mutable: false },
+  approval_responded: { category: 'tasks', subject: 'approval_request', mutable: false },
+  approval_no_response: { category: 'reminders', subject: 'approval_request', mutable: false },
+  approval_expired: { category: 'reminders', subject: 'approval_request', mutable: false },
   task_changed: { category: 'tasks', subject: 'task', mutable: true },
   task_commented: { category: 'tasks', subject: 'task', mutable: true },
   task_file_added: { category: 'tasks', subject: 'task', mutable: true },
@@ -143,17 +153,25 @@ const dueSchema = z.object({ dueDate: calendarDateSchema, dueTime: timeOfDaySche
 
 export const TASK_CHANGES = ['due', 'cancelled', 'archived', 'taken_away'] as const;
 
-export const REVIEW_SOURCES = ['internal', 'client'] as const;
+export const REVIEW_SOURCES = ['internal', 'client', 'medical'] as const;
 
 const reviewSourceSchema = z.enum(REVIEW_SOURCES);
+
+/** An approval request as it was when the notification was sent (F09). */
+const approvalData = z.object({ client: nameSchema, contact: nameSchema });
 
 export const NOTIFICATION_DATA_SCHEMAS = {
   task_assigned: taskData,
   task_mentioned: commentData,
   task_returned: taskData.extend({ source: reviewSourceSchema }),
   task_review_requested: taskData,
+  task_medical_review_requested: taskData,
   task_awaiting_client: taskData,
   task_over_limit: taskData,
+  /** Merged per request like `task_commented`: the latest decision, `count` decisions. */
+  approval_responded: approvalData.extend({ decision: z.enum(CLIENT_DECISIONS) }),
+  approval_no_response: approvalData,
+  approval_expired: approvalData,
   task_changed: taskData.extend({
     change: z.enum(TASK_CHANGES),
     /** For `due`: the due date before and after the change. */
@@ -209,7 +227,7 @@ const notificationBaseSchema = z.object({
   /** Null for the daily job and automatic runs. */
   actor: z.object({ id: z.uuid(), name: z.string() }).nullable(),
   subject: z.object({ type: notificationSubjectTypeSchema, id: z.uuid() }),
-  /** Merged `task_commented` and `task_file_added` notifications count their items (rule 5); otherwise 1. */
+  /** Merged `task_commented`, `task_file_added` and `approval_responded` notifications count their items (rule 5); otherwise 1. */
   count: z.number().int().min(1),
   read: z.boolean(),
   createdAt: z.iso.datetime(),

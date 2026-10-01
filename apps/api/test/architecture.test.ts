@@ -203,11 +203,24 @@ describe('module boundaries', () => {
     expect(offenders).toEqual([]);
   });
 
+  it('keeps tasks independent of approvals, and clients of tasks (ADR 0020)', () => {
+    const forbidden: Record<string, string> = { tasks: 'approvals', clients: 'tasks' };
+    const offenders = imports
+      .filter(({ specifier }) => specifier.startsWith('.'))
+      .filter(({ file, specifier }) => {
+        const from = moduleOf(file);
+        return !!from && moduleOf(resolve(dirname(file), specifier)) === forbidden[from];
+      })
+      .map(({ file, specifier }) => `${display(file)} -> ${specifier}`);
+    expect(offenders).toEqual([]);
+  });
+
   /**
    * Which API module owns the tables of each schema file in packages/db (null: no API module
    * does). A new schema file must be added here, which forces the ownership decision.
    */
   const TABLE_OWNERS: Record<string, string | null> = {
+    approvals: 'approvals',
     audit: 'audit',
     auth: 'auth',
     clients: 'clients',

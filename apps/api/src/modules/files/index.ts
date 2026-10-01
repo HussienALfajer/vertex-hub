@@ -7,5 +7,5 @@ export {
   type FileOwnerRights,
   isConfidentialReader,
 } from './file-owner-registry.js';
-export { FileVersions } from './file-versions.js';
+export { FileVersions, type VersionRef } from './file-versions.js';
 export { FilesModule } from './files.module.js';

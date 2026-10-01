@@ -74,6 +74,9 @@ export const AUDIT_ACTIONS = [
   'task.revision_decided',
   'task.request_scope_changed',
   'task.extra_work_moved',
+  'task.reviewed',
+  'task.client_text_updated',
+  'task.client_response_recorded',
   'task_checklist_item.created',
   'task_checklist_item.updated',
   'task_checklist_item.reordered',
@@ -100,6 +103,11 @@ export const AUDIT_ACTIONS = [
   'file_version.restored',
   'file_version.final_set',
   'file_version.final_cleared',
+  'approval_request.created',
+  'approval_request.link_reissued',
+  'approval_request.revoked',
+  'approval_item.responded',
+  'approval_item.withdrawn',
 ] as const;
 
 export const auditActionSchema = z.enum(AUDIT_ACTIONS).meta({ id: 'AuditAction' });
@@ -125,6 +133,7 @@ export const AUDIT_ENTITY_TYPES = [
   'template',
   'template_run',
   'file_item',
+  'approval_request',
 ] as const;
 
 export const auditEntityTypeSchema = z.enum(AUDIT_ENTITY_TYPES).meta({ id: 'AuditEntityType' });

@@ -41,6 +41,7 @@ import {
   MIRRORED_ICONS,
   MOVE_ICONS,
   MoveDialog,
+  moveInput,
   needsDialog,
   type Target,
   targetsOf,
@@ -216,7 +217,7 @@ function Board({ board, search }: { board: TaskBoard; search: TaskBoardSearch })
       return;
     }
     try {
-      await move.mutateAsync({ id: task.id, status: target.to, overrideDependencies: false });
+      await move.mutateAsync({ id: task.id, ...moveInput(task, target) });
       toast.add({ title: t(`tasks.moves.done.${target.move}`), type: 'success' });
     } catch (error) {
       toast.add({ title: errorMessage(t, error), type: 'error' });

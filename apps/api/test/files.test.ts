@@ -672,15 +672,20 @@ describe('files (F10)', () => {
       expect(posterAgain?.versions.filter((v) => v.isFinal)).toHaveLength(1);
     });
 
-    it('marks the latest version when the client approval is recorded', async () => {
-      const task = await cast.taskAt('awaiting_client');
+    it('marks the version the client approved, not one added after the review (F09 rule 13)', async () => {
+      const task = await cast.taskAt('internal_review');
       const poster = await addFile(cast.designer.cookie, deliverableOf(task.id));
+      await cast.moveOk(task.id, cast.designManager.cookie, { status: 'awaiting_client' });
+      expect((await addVersion(cast.designer.cookie, poster.id, 'after the review')).status).toBe(
+        200,
+      );
       await cast.moveOk(task.id, cast.am.cookie, { status: 'approved' });
       const list = await listItems(cast.am.cookie, 'task', task.id);
-      expect(list.items.find((i) => i.id === poster.id)?.versions[0]).toMatchObject({
-        isFinal: true,
-        finalSource: 'auto',
-      });
+      const versions = list.items.find((i) => i.id === poster.id)?.versions ?? [];
+      expect(versions.map((v) => [v.number, v.isFinal, v.finalSource])).toEqual([
+        [2, false, null],
+        [1, true, 'client'],
+      ]);
     });
   });
 

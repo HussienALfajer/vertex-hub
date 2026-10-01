@@ -76,6 +76,20 @@ export function assertWritable(owner: FileOwner): void {
   }
 }
 
+/** F09 edge case 4: a version sent to medical review or to the client stays until withdrawn. */
+export const isVersionSent = (owner: FileOwner, versionId: string) =>
+  !!owner.task?.sentVersionIds.includes(versionId);
+
+export function assertNotSent(owner: FileOwner, versionIds: readonly string[]): void {
+  if (versionIds.some((id) => isVersionSent(owner, id))) {
+    throw new CodedException(
+      409,
+      'VERSION_SENT',
+      'The version is with the reviewer or the client: withdraw the task for re-review first',
+    );
+  }
+}
+
 /** Rule 15 and "Who reads": confidential items for their readers, removed ones for scope all. */
 export const canSee = (owner: FileOwner, item: ItemRow) =>
   (!item.confidential || owner.rights.confidentialReader) &&

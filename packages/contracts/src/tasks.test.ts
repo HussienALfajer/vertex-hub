@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   allowedTaskTransitions,
   BOARD_STATUSES,
+  CLIENT_TEXT_MAX,
   canMakeTaskMove,
   commentExcerpt,
   createsDependencyCycle,
@@ -9,13 +10,16 @@ import {
   createTaskSchema,
   isTaskBlocked,
   isTaskOverdue,
+  medicalReviewSchema,
   mentionedUserIds,
+  reviewContentToken,
   revisionDecisionInputSchema,
   revisionSourceOf,
   TASK_STATUSES,
   type TaskRights,
   type TaskState,
   taskBoardQuerySchema,
+  taskClientTextInputSchema,
   taskCommentInputSchema,
   taskDependenciesInputSchema,
   taskLinkProblem,
@@ -180,6 +184,7 @@ describe('taskMove', () => {
     expect(taskMove('delivered', 'revisions')).toBe('reopen_client');
     expect(taskMove('delivered', 'in_progress')).toBe('reopen_internal');
     expect(taskMove('cancelled', 'new')).toBe('reopen');
+    expect(taskMove('awaiting_client', 'internal_review')).toBe('withdraw');
     expect(taskMove('revisions', 'cancelled')).toBe('cancel');
     expect(taskMove('new', 'approved')).toBeNull();
     expect(taskMove('new', 'internal_review')).toBeNull();
@@ -192,6 +197,8 @@ describe('taskMove', () => {
     expect(taskMoveNeedsNote('return')).toBe(true);
     expect(taskMoveNeedsNote('cancel')).toBe(true);
     expect(taskMoveNeedsNote('start')).toBe(false);
+    expect(taskMoveNeedsNote('withdraw')).toBe(false);
+    expect(revisionSourceOf('withdraw')).toBeNull();
     expect(revisionSourceOf('return')).toBe('internal');
     expect(revisionSourceOf('client_changes')).toBe('client');
     expect(revisionSourceOf('reopen_client')).toBe('client');
@@ -213,6 +220,7 @@ describe('allowedTaskTransitions', () => {
   const accountManager: TaskRights = { ...none, manage: true, assign: true, client: true };
   const state = (overrides: Partial<TaskState>): TaskState => ({
     status: 'new',
+    reviewStage: null,
     assigneeId: ids.user,
     hasClient: true,
     needsClientApproval: true,
@@ -267,8 +275,13 @@ describe('allowedTaskTransitions', () => {
 
   it('leaves the client response to client scope', () => {
     const waiting = state({ status: 'awaiting_client' });
-    expect(allowedTaskTransitions(waiting, departmentManager)).toEqual(['cancelled']);
+    // Manage scope may withdraw it for re-review (F09 rule 6), never answer for the client.
+    expect(allowedTaskTransitions(waiting, departmentManager)).toEqual([
+      'internal_review',
+      'cancelled',
+    ]);
     expect(allowedTaskTransitions(waiting, accountManager)).toEqual([
+      'internal_review',
       'revisions',
       'approved',
       'cancelled',
@@ -306,6 +319,34 @@ describe('allowedTaskTransitions', () => {
     expect(
       canMakeTaskMove(state({ status: 'in_progress', assigneeId: null }), 'cancel', creator),
     ).toBe(false);
+  });
+
+  it('leaves the medical stage to the medical reviewers: manage scope returns or cancels (F09 rule 4)', () => {
+    const internal = state({ status: 'internal_review', reviewStage: 'internal' });
+    const medical = state({ status: 'internal_review', reviewStage: 'medical' });
+    expect(allowedTaskTransitions(internal, departmentManager)).toEqual([
+      'awaiting_client',
+      'revisions',
+      'cancelled',
+    ]);
+    expect(allowedTaskTransitions(medical, departmentManager)).toEqual(['revisions', 'cancelled']);
+    expect(canMakeTaskMove(medical, 'send_to_client', departmentManager)).toBe(false);
+    expect(
+      canMakeTaskMove({ ...medical, needsClientApproval: false }, 'approve', departmentManager),
+    ).toBe(false);
+    expect(allowedTaskTransitions(medical, assignee)).toEqual([]);
+  });
+
+  it('withdraws a sent task for re-review by manage scope (F09 rule 6)', () => {
+    const sent = state({ status: 'awaiting_client' });
+    expect(allowedTaskTransitions(sent, projectManager)).toEqual(['internal_review', 'cancelled']);
+    expect(allowedTaskTransitions(sent, accountManager)).toEqual([
+      'internal_review',
+      'revisions',
+      'approved',
+      'cancelled',
+    ]);
+    expect(allowedTaskTransitions(sent, assignee)).toEqual([]);
   });
 
   it('gives nothing without rights', () => {
@@ -406,6 +447,62 @@ describe('taskStatusChangeSchema', () => {
     expect(
       taskStatusChangeSchema.safeParse({ status: 'revisions', note: 'x'.repeat(2001) }).success,
     ).toBe(false);
+  });
+});
+
+describe('review inputs (F09)', () => {
+  it('needs a note to return from medical review, not to approve', () => {
+    expect(medicalReviewSchema.safeParse({ decision: 'approve' }).success).toBe(true);
+    expect(medicalReviewSchema.safeParse({ decision: 'return' }).success).toBe(false);
+    expect(medicalReviewSchema.safeParse({ decision: 'return', note: '  ' }).success).toBe(false);
+    expect(medicalReviewSchema.parse({ decision: 'return', note: ' الجرعة خاطئة ' }).note).toBe(
+      'الجرعة خاطئة',
+    );
+    expect(
+      medicalReviewSchema.safeParse({ decision: 'return', note: 'x'.repeat(2001) }).success,
+    ).toBe(false);
+    expect(medicalReviewSchema.safeParse({ decision: 'reject', note: 'x' }).success).toBe(false);
+  });
+
+  it('keeps the text for the client to 10 000 characters, with its line breaks', () => {
+    expect(taskClientTextInputSchema.parse({ clientText: 'سطر\nسطر' }).clientText).toBe('سطر\nسطر');
+    expect(taskClientTextInputSchema.parse({ clientText: '   ' }).clientText).toBeNull();
+    expect(taskClientTextInputSchema.parse({ clientText: null }).clientText).toBeNull();
+    expect(
+      taskClientTextInputSchema.safeParse({ clientText: 'x'.repeat(CLIENT_TEXT_MAX) }).success,
+    ).toBe(true);
+    expect(
+      taskClientTextInputSchema.safeParse({ clientText: 'x'.repeat(CLIENT_TEXT_MAX + 1) }).success,
+    ).toBe(false);
+  });
+
+  it('carries the content token and the contact on a status change', () => {
+    const change = taskStatusChangeSchema.parse({
+      status: 'awaiting_client',
+      contentToken: 'abc',
+      contactId: ids.client,
+    });
+    expect(change.contentToken).toBe('abc');
+    expect(change.contactId).toBe(ids.client);
+  });
+});
+
+describe('reviewContentToken (F09 rule 1)', () => {
+  const [a, b] = [ids.user, ids.client];
+
+  it('is the same for the same versions, in any order, and the same text', () => {
+    expect(reviewContentToken([a, b], 'نص')).toBe(reviewContentToken([b, a], 'نص'));
+    expect(reviewContentToken([], null)).toBe(reviewContentToken([], ''));
+    expect(reviewContentToken([a], 'نص')).toMatch(/^[0-9a-f]{16}$/);
+  });
+
+  it('changes with a new version, a removed deliverable or an edited text', () => {
+    const token = reviewContentToken([a], 'نص');
+    expect(reviewContentToken([b], 'نص')).not.toBe(token);
+    expect(reviewContentToken([a, b], 'نص')).not.toBe(token);
+    expect(reviewContentToken([], 'نص')).not.toBe(token);
+    expect(reviewContentToken([a], 'نص.')).not.toBe(token);
+    expect(reviewContentToken([a], null)).not.toBe(token);
   });
 });
 

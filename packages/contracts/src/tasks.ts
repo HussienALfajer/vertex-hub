@@ -1,5 +1,10 @@
 import { z } from 'zod';
 import {
+  approvalRequestStateSchema,
+  clientDecisionSchema,
+  responseChannelSchema,
+} from './approvals.js';
+import {
   businessDate,
   businessInstant,
   type CalendarDate,
@@ -23,7 +28,8 @@ import { WORKFLOW_STATUSES } from './workflow.js';
 
 /*
  * The task engine (spec F06, ADR 0016): one workflow for every department, requests between
- * departments, dependencies and client revisions counted against a limit.
+ * departments, dependencies and client revisions counted against a limit. Review snapshots, the
+ * medical review stage and client responses are spec F09 (ADR 0020).
  */
 
 export const TASK_TYPES = ['work', 'client_request'] as const;
@@ -70,7 +76,8 @@ export const requestScopeSchema = z.enum(REQUEST_SCOPES).meta({ id: 'RequestScop
 
 export type RequestScope = z.infer<typeof requestScopeSchema>;
 
-export const REVISION_SOURCES = ['internal', 'client'] as const;
+/** `medical`: a return by the medical reviewer (F09 rule 5); never counted, like `internal`. */
+export const REVISION_SOURCES = ['internal', 'client', 'medical'] as const;
 
 export const revisionSourceSchema = z.enum(REVISION_SOURCES).meta({ id: 'RevisionSource' });
 
@@ -81,6 +88,22 @@ export const REVISION_DECISIONS = ['free', 'extra_work'] as const;
 export const revisionDecisionSchema = z.enum(REVISION_DECISIONS).meta({ id: 'RevisionDecision' });
 
 export type RevisionDecision = z.infer<typeof revisionDecisionSchema>;
+
+/** The stages of `internal_review` (F09, ADR 0020): `medical` only for healthcare clients. */
+export const REVIEW_STAGES = ['internal', 'medical'] as const;
+
+export const reviewStageSchema = z.enum(REVIEW_STAGES).meta({ id: 'ReviewStage' });
+
+export type ReviewStage = z.infer<typeof reviewStageSchema>;
+
+export const REVIEW_OUTCOMES = ['passed', 'returned'] as const;
+
+export const reviewOutcomeSchema = z.enum(REVIEW_OUTCOMES).meta({ id: 'ReviewOutcome' });
+
+export type ReviewOutcome = z.infer<typeof reviewOutcomeSchema>;
+
+/** The text the client reads and approves with the files (F09 rule 7). */
+export const CLIENT_TEXT_MAX = 10_000;
 
 /** Limits of what one task holds (spec F06); the API answers `LIMIT_REACHED` past them. */
 export const TASK_LIMITS = {
@@ -103,6 +126,7 @@ export type TaskMove =
   | 'approve'
   | 'client_approved'
   | 'client_changes'
+  | 'withdraw'
   | 'resume'
   | 'resubmit'
   | 'deliver'
@@ -130,6 +154,8 @@ export function taskMove(from: TaskStatus, to: TaskStatus): TaskMove | null {
     case 'awaiting_client>revisions':
     case 'approved>revisions':
       return 'client_changes';
+    case 'awaiting_client>internal_review':
+      return 'withdraw';
     case 'revisions>in_progress':
       return 'resume';
     case 'revisions>internal_review':
@@ -190,13 +216,19 @@ export type TaskRights = {
 /** The parts of a task the workflow looks at. */
 export type TaskState = {
   status: TaskStatus;
+  /** The stage of `internal_review`; null in every other status. */
+  reviewStage: ReviewStage | null;
   assigneeId: string | null;
   hasClient: boolean;
   needsClientApproval: boolean;
   blocked: boolean;
 };
 
-/** Whether the caller may make this move on the task (rules 1, 2, 3, 8, 13; archived excluded). */
+/**
+ * Whether the caller may make this move on the task (rules 1, 2, 3, 8, 13; archived excluded).
+ * In the medical stage (F09 rule 4) manage scope may only return or cancel: the pass belongs to
+ * the medical reviewers, through their own route.
+ */
 export function canMakeTaskMove(task: TaskState, move: TaskMove, rights: TaskRights): boolean {
   switch (move) {
     case 'start':
@@ -209,9 +241,11 @@ export function canMakeTaskMove(task: TaskState, move: TaskMove, rights: TaskRig
     case 'return':
       return rights.manage;
     case 'send_to_client':
-      return rights.manage && task.needsClientApproval;
+      return rights.manage && task.needsClientApproval && task.reviewStage !== 'medical';
     case 'approve':
-      return rights.manage && !task.needsClientApproval;
+      return rights.manage && !task.needsClientApproval && task.reviewStage !== 'medical';
+    case 'withdraw':
+      return rights.manage;
     case 'client_approved':
     case 'client_changes':
     case 'reopen_client':
@@ -416,7 +450,9 @@ export type UpdateTaskInput = z.input<typeof updateTaskSchema>;
 /**
  * A move to `status`. `note` is required by the moves of `taskMoveNeedsNote` (what must change,
  * or the reason); `revisionSource` may confirm a reopen from delivered (`client` → revisions,
- * `internal` → in progress); `contactId` names who answered for the client.
+ * `internal` → in progress); `contactId` names who answered for the client and is required when
+ * recording a client response (F09 rule 16); `contentToken` is the one the reviewer was shown and
+ * is required by an internal pass (F09 rule 1).
  */
 export const taskStatusChangeSchema = z
   .object({
@@ -424,6 +460,7 @@ export const taskStatusChangeSchema = z
     note: optionalText(2000).optional(),
     revisionSource: revisionSourceSchema.optional(),
     contactId: z.uuid().nullable().optional(),
+    contentToken: z.string().max(64).optional(),
     overrideDependencies: z.boolean().default(false),
     reason: optionalText(500).optional(),
   })
@@ -440,6 +477,49 @@ export const taskStatusChangeSchema = z
 export type TaskStatusChange = z.infer<typeof taskStatusChangeSchema>;
 
 export type TaskStatusChangeInput = z.input<typeof taskStatusChangeSchema>;
+
+export const MEDICAL_DECISIONS = ['approve', 'return'] as const;
+
+/** The medical reviewer's answer on a task in the medical stage (F09 rules 4 and 5). */
+export const medicalReviewSchema = z
+  .object({
+    decision: z.enum(MEDICAL_DECISIONS),
+    note: optionalText(2000).optional(),
+  })
+  .refine((review) => review.decision !== 'return' || !!review.note, {
+    message: 'A return needs a note',
+    path: ['note'],
+  })
+  .meta({ id: 'MedicalReview' });
+
+export type MedicalReview = z.infer<typeof medicalReviewSchema>;
+
+export type MedicalReviewInput = z.input<typeof medicalReviewSchema>;
+
+/** Plain text with line breaks; blank clears it. */
+export const taskClientTextInputSchema = z
+  .object({ clientText: optionalText(CLIENT_TEXT_MAX) })
+  .meta({ id: 'TaskClientTextInput' });
+
+export type TaskClientTextInput = z.infer<typeof taskClientTextInputSchema>;
+
+/**
+ * F09 rule 1: a token of what a review looks at, the latest version of each deliverable and the
+ * text for the client. It only tells whether the content changed, so a plain 64-bit FNV-1a hash
+ * is enough.
+ */
+export function reviewContentToken(
+  versionIds: readonly string[],
+  clientText: string | null,
+): string {
+  const content = JSON.stringify([[...versionIds].sort(), clientText ?? '']);
+  let hash = 0xcbf29ce484222325n;
+  for (let index = 0; index < content.length; index++) {
+    hash ^= BigInt(content.charCodeAt(index));
+    hash = (hash * 0x100000001b3n) & 0xffffffffffffffffn;
+  }
+  return hash.toString(16).padStart(16, '0');
+}
 
 /** Every dependency of the task at once; at most `TASK_LIMITS.dependencies`. */
 export const taskDependenciesInputSchema = z
@@ -473,6 +553,8 @@ export const taskSchema = z
     /** `inDepartment` is false after the assignee left the department (edge case 4). */
     assignee: archivablePersonSchema.extend({ inDepartment: z.boolean() }).nullable(),
     status: taskStatusSchema,
+    /** The stage of `internal_review` (F09); null in every other status. */
+    reviewStage: reviewStageSchema.nullable(),
     priority: taskPrioritySchema,
     dueDate: calendarDateSchema,
     dueTime: timeOfDaySchema.nullable(),
@@ -563,6 +645,55 @@ export const taskRevisionSchema = z
 
 export type TaskRevision = z.infer<typeof taskRevisionSchema>;
 
+/** A file version of a review snapshot, with its file's current name. */
+export const reviewVersionSchema = z
+  .object({
+    id: z.uuid(),
+    fileItemId: z.uuid(),
+    name: z.string(),
+    number: z.number().int().min(1),
+  })
+  .meta({ id: 'ReviewVersion' });
+
+export type ReviewVersion = z.infer<typeof reviewVersionSchema>;
+
+/** A pass or a return of a review; a pass carries the snapshot it approved (F09 rule 2). */
+export const taskReviewSchema = z
+  .object({
+    id: z.uuid(),
+    stage: reviewStageSchema,
+    outcome: reviewOutcomeSchema,
+    note: z.string().nullable(),
+    /** Null for the system pass when a client stops being healthcare (F09 rule 18). */
+    reviewer: personSchema.nullable(),
+    /** Passes only: one version per deliverable. */
+    versions: z.array(reviewVersionSchema),
+    /** Passes only: the text for the client as it was approved. */
+    clientText: z.string().nullable(),
+    createdAt: z.iso.datetime(),
+  })
+  .meta({ id: 'TaskReview' });
+
+export type TaskReview = z.infer<typeof taskReviewSchema>;
+
+/** The client's answer on a snapshot, from an approval link or recorded by hand. */
+export const taskClientResponseSchema = z
+  .object({
+    id: z.uuid(),
+    decision: clientDecisionSchema,
+    channel: responseChannelSchema,
+    contact: archivablePersonSchema,
+    note: z.string().nullable(),
+    /** The versions answered: the snapshot's. */
+    versions: z.array(reviewVersionSchema),
+    /** Manual responses only. */
+    recordedBy: personSchema.nullable(),
+    createdAt: z.iso.datetime(),
+  })
+  .meta({ id: 'TaskClientResponse' });
+
+export type TaskClientResponse = z.infer<typeof taskClientResponseSchema>;
+
 export const taskPermissionsSchema = z
   .object({
     canEdit: z.boolean(),
@@ -571,6 +702,12 @@ export const taskPermissionsSchema = z
     canReview: z.boolean(),
     canRecordClientResponse: z.boolean(),
     canDecideRevision: z.boolean(),
+    /** A medical reviewer other than the assignee, on a task in the medical stage. */
+    canMedicalReview: z.boolean(),
+    canWithdrawFromClient: z.boolean(),
+    canEditClientText: z.boolean(),
+    /** Client scope on a task ready to send (F09 rule 8). */
+    canSendForApproval: z.boolean(),
     canCancel: z.boolean(),
     canReopen: z.boolean(),
     canArchive: z.boolean(),
@@ -608,6 +745,25 @@ export const taskDetailSchema = taskSchema
     }),
     /** Oldest first. */
     revisionHistory: z.array(taskRevisionSchema),
+    /** What the client reads and approves with the files (F09 rule 7). */
+    clientText: z.string().nullable(),
+    /** Of the latest version of each deliverable and the text for the client (F09 rule 1). */
+    contentToken: z.string(),
+    /** The pass that put the task in `awaiting_client` or `approved`: what was sent. */
+    clearedReview: taskReviewSchema.nullable(),
+    /** Oldest first. */
+    reviewHistory: z.array(taskReviewSchema),
+    /** Oldest first. */
+    clientResponses: z.array(taskClientResponseSchema),
+    /** The approval request holding the task's pending item. */
+    pendingApproval: z
+      .object({
+        requestId: z.uuid(),
+        state: approvalRequestStateSchema,
+        issuedAt: z.iso.datetime(),
+        expiresAt: z.iso.datetime(),
+      })
+      .nullable(),
     /** Null for a task the system created (an automatic template run, F07). */
     createdBy: personSchema.nullable(),
     createdAt: z.iso.datetime(),
@@ -654,6 +810,8 @@ export const taskListQuerySchema = pageQuerySchema.extend({
   createdBy: z.literal('me').optional(),
   /** `me`: tasks the caller may review (manage scope), for My tasks' "to review". */
   reviewer: z.literal('me').optional(),
+  /** Tasks in this stage of internal review (F09). */
+  reviewStage: reviewStageSchema.optional(),
   /** `true` lists archived tasks only; needs `tasks.manage` with scope all. */
   archived: queryBooleanSchema.default(false),
   sort: z.enum(TASK_SORTS).default('dueDate'),
@@ -860,6 +1018,10 @@ export const myTaskSummarySchema = z
     waiting: z.number().int().min(0),
     /** In internal review, under the caller's manage scope. */
     toReview: z.number().int().min(0),
+    /** In the medical stage and not the caller's own; null without `approvals.review_medical`. */
+    medicalReview: z.number().int().min(0).nullable(),
+    /** Ready to send to the client (F09 rule 8) under the caller's client scope; null without it. */
+    readyToSend: z.number().int().min(0).nullable(),
     /** Open tasks the caller created for someone else or for a department queue. */
     requestedByMe: z.number().int().min(0),
     /** Open unassigned tasks in the departments the caller manages; null for non-managers. */

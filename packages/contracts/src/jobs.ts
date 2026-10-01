@@ -22,6 +22,16 @@ export const NOTIFICATIONS_DAILY_JOB = {
   tz: BUSINESS_TIME_ZONE,
 } as const;
 
+/**
+ * F09 rules 24 and 25 (A04): the 48-hour "no response" notice and the "link expired" notice of
+ * approval requests, every hour.
+ */
+export const APPROVALS_REMINDERS_JOB = {
+  queue: 'approvals.reminders',
+  cron: '15 * * * *',
+  tz: BUSINESS_TIME_ZONE,
+} as const;
+
 /** F10 rule 18: renders the thumbnail and preview of an image upload; queued on attach. */
 export const FILES_PREVIEW_JOB = { queue: 'files.preview', retryLimit: 3 } as const;
 

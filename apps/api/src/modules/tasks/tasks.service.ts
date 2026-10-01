@@ -52,6 +52,7 @@ import { ClientDirectory, type ClientSummary } from '../clients/index.js';
 import { FileVersions } from '../files/index.js';
 import type { Notice } from '../notifications/index.js';
 import { EngagementDirectory } from '../projects/index.js';
+import { ClientReviewHooks } from './client-review-hooks.js';
 import {
   accessColumns,
   actorOf,
@@ -78,7 +79,8 @@ import {
   lockDependencyGraph,
 } from './task-dependencies.js';
 import { blocksDependents, type NoticeTask, TaskNotices, toTimeOfDay } from './task-notices.js';
-import { overdueSql, overLimitPendingSql } from './task-sql.js';
+import { TaskReviews } from './task-reviews.js';
+import { clearedByMedicalSql, overdueSql, overLimitPendingSql } from './task-sql.js';
 
 type Executor = Database | Transaction;
 
@@ -110,6 +112,8 @@ export class TasksService {
     private readonly engagements: EngagementDirectory,
     private readonly notices: TaskNotices,
     private readonly files: FileVersions,
+    private readonly reviews: TaskReviews,
+    private readonly reviewHooks: ClientReviewHooks,
   ) {}
 
   private get directories() {
@@ -157,6 +161,7 @@ export class TasksService {
     if (query.dueTo) filters.push(lte(tasks.dueDate, query.dueTo));
     if (query.createdBy === 'me') filters.push(eq(tasks.createdById, actor.id));
     if (query.reviewer === 'me') filters.push(this.manageScopeSql(actor));
+    if (query.reviewStage) filters.push(eq(tasks.reviewStage, query.reviewStage));
     const where = and(...filters);
 
     const sortColumn = {
@@ -187,38 +192,51 @@ export class TasksService {
   async detail(actor: CurrentUserInfo, id: string): Promise<TaskDetail> {
     const task = await readableTask(this.db, this.directories, actor, id);
     const now = new Date();
-    const [[item], dependencies, dependents, checklist, links, revisions, extras, fileCounts] =
-      await Promise.all([
-        this.present([task], this.db, now),
-        dependenciesOf(id, this.db),
-        dependentsOf(id, this.db),
-        this.db
-          .select()
-          .from(taskChecklistItems)
-          .where(and(eq(taskChecklistItems.taskId, id), isNull(taskChecklistItems.archivedAt)))
-          .orderBy(asc(taskChecklistItems.position)),
-        this.db
-          .select()
-          .from(taskLinks)
-          .where(and(eq(taskLinks.taskId, id), isNull(taskLinks.archivedAt)))
-          .orderBy(asc(taskLinks.createdAt), asc(taskLinks.id)),
-        this.db
-          .select()
-          .from(taskRevisions)
-          .where(eq(taskRevisions.taskId, id))
-          .orderBy(asc(taskRevisions.createdAt), asc(taskRevisions.id)),
-        this.db
-          .select({
-            createdAt: tasks.createdAt,
-            updatedAt: tasks.updatedAt,
-            deliveredAt: tasks.deliveredAt,
-            cancelledAt: tasks.cancelledAt,
-            cancelReason: tasks.cancelReason,
-          })
-          .from(tasks)
-          .where(eq(tasks.id, id)),
-        this.files.taskFileCounts(id, this.db),
-      ]);
+    const [
+      [item],
+      dependencies,
+      dependents,
+      checklist,
+      links,
+      revisions,
+      extras,
+      fileCounts,
+      review,
+      pending,
+    ] = await Promise.all([
+      this.present([task], this.db, now),
+      dependenciesOf(id, this.db),
+      dependentsOf(id, this.db),
+      this.db
+        .select()
+        .from(taskChecklistItems)
+        .where(and(eq(taskChecklistItems.taskId, id), isNull(taskChecklistItems.archivedAt)))
+        .orderBy(asc(taskChecklistItems.position)),
+      this.db
+        .select()
+        .from(taskLinks)
+        .where(and(eq(taskLinks.taskId, id), isNull(taskLinks.archivedAt)))
+        .orderBy(asc(taskLinks.createdAt), asc(taskLinks.id)),
+      this.db
+        .select()
+        .from(taskRevisions)
+        .where(eq(taskRevisions.taskId, id))
+        .orderBy(asc(taskRevisions.createdAt), asc(taskRevisions.id)),
+      this.db
+        .select({
+          createdAt: tasks.createdAt,
+          updatedAt: tasks.updatedAt,
+          deliveredAt: tasks.deliveredAt,
+          cancelledAt: tasks.cancelledAt,
+          cancelReason: tasks.cancelReason,
+        })
+        .from(tasks)
+        .where(eq(tasks.id, id)),
+      this.files.taskFileCounts(id, this.db),
+      this.reviews.detail(task),
+      this.reviewHooks.pending([id], this.db),
+    ]);
+    const pendingApproval = pending.get(id) ?? null;
     const row = extras[0];
     if (!item || !row) throw new NotFoundException();
     const [people, contacts, extraWork] = await Promise.all([
@@ -278,6 +296,13 @@ export class TasksService {
         createdAt: l.createdAt.toISOString(),
       })),
       fileCounts,
+      ...review,
+      pendingApproval: pendingApproval && {
+        requestId: pendingApproval.requestId,
+        state: pendingApproval.state,
+        issuedAt: pendingApproval.issuedAt.toISOString(),
+        expiresAt: pendingApproval.expiresAt.toISOString(),
+      },
       revisionHistory: revisions.map((r) => {
         const extra = r.extraWorkItemId ? extraWork.get(r.extraWorkItemId) : undefined;
         return {
@@ -305,7 +330,11 @@ export class TasksService {
       cancelReason: row.cancelReason,
       archivedAt: task.archivedAt?.toISOString() ?? null,
       readOnly: item.readOnly,
-      ...taskPermissions(actor, task, item.blocked),
+      ...taskPermissions(actor, task, item.blocked, {
+        // An expired link does not hold the task back (F09 rule 8).
+        waiting: pendingApproval?.state === 'open',
+        clearedStage: review.clearedReview?.stage ?? null,
+      }),
     };
   }
 
@@ -516,6 +545,22 @@ export class TasksService {
           'Record the client response before turning client approval off',
         );
       }
+      // F09 rule 4: the medical stage exists for the client's approval.
+      if (task.reviewStage === 'medical' && !needsClientApproval) {
+        throw new CodedException(
+          409,
+          'INVALID_TRANSITION',
+          'Client approval stays on during the medical review',
+        );
+      }
+      // F09 rule 17: a task with a pending approval item stays with its client.
+      if (links.clientId !== task.clientId && (await this.reviewHooks.pending([id], tx)).has(id)) {
+        throw new CodedException(
+          409,
+          'SENT_TO_CLIENT',
+          'The task is in an approval link: withdraw it or revoke the link first',
+        );
+      }
 
       // Rule 6: the assignee belongs to the department; moving keeps them only if they do.
       let assigneeId = input.assigneeId !== undefined ? input.assigneeId : task.assigneeId;
@@ -676,6 +721,10 @@ export class TasksService {
       }
       await tx.update(tasks).set({ archivedAt: new Date() }).where(eq(tasks.id, id));
       await this.auditArchive(tx, actor, 'task.archived', id, true);
+      // F09 rule 17: an archived task is no longer with the client.
+      if (task.status === 'awaiting_client') {
+        await this.reviewHooks.left(tx, { taskId: id, actor: actorOf(actor), response: null });
+      }
       await this.notices.send(tx, [
         this.notices.notice(task, 'task_changed', [task.assigneeId], actor.id, {
           change: 'archived',
@@ -783,6 +832,30 @@ export class TasksService {
   }
 
   /**
+   * SQL over a row of `tasks`: under the actor's client scope (`tasks.manage` under `all`, or
+   * `own_clients` on the task's client); null when the actor has no client scope at all.
+   */
+  clientScopeSql(actor: CurrentUserInfo): SQL | null {
+    const scopes = permissionScopes(actor.access, 'tasks.manage');
+    if (scopes.includes('all')) return sql`true`;
+    if (scopes.includes('own_clients')) return this.clients.managedBy(tasks.clientId, actor.id);
+    return null;
+  }
+
+  /**
+   * SQL over a row of `tasks`: ready to send to the client (F09 rule 8): awaiting the client,
+   * without a pending item in an open request, and for a healthcare client cleared by a medical
+   * pass.
+   */
+  readyToSendSql(): SQL {
+    return and(
+      eq(tasks.status, 'awaiting_client'),
+      sql`not ${this.reviewHooks.waitingSql(tasks.id)}`,
+      or(sql`not ${this.clients.isHealthcare(tasks.clientId)}`, clearedByMedicalSql),
+    ) as SQL;
+  }
+
+  /**
    * SQL over a row of `tasks`: under the actor's manage scope (`tasks.manage` under any scope), so
    * they may review it.
    */
@@ -860,6 +933,7 @@ export class TasksService {
               }
             : null,
         status: row.status,
+        reviewStage: row.reviewStage,
         priority: row.priority,
         dueDate: row.dueDate,
         dueTime,

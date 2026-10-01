@@ -27,9 +27,11 @@ import {
   retainers,
   retainerTemplates,
   taskChecklistItems,
+  taskClientResponses,
   taskComments,
   taskDependencies,
   taskLinks,
+  taskReviews,
   taskRevisions,
   tasks,
   templateRuns,
@@ -275,6 +277,10 @@ export async function removeTasks(db: Database, ids: string[]): Promise<void> {
   await db.delete(taskChecklistItems).where(inArray(taskChecklistItems.taskId, ids));
   await db.delete(taskLinks).where(inArray(taskLinks.taskId, ids));
   await db.delete(taskComments).where(inArray(taskComments.taskId, ids));
+  // F09: responses and reviews point at revisions, and tasks at their cleared review.
+  await db.update(tasks).set({ clearedReviewId: null }).where(inArray(tasks.id, ids));
+  await db.delete(taskClientResponses).where(inArray(taskClientResponses.taskId, ids));
+  await db.delete(taskReviews).where(inArray(taskReviews.taskId, ids));
   await db.delete(taskRevisions).where(inArray(taskRevisions.taskId, ids));
   await db.delete(notificationReminders).where(inArray(notificationReminders.subjectId, ids));
   await db.delete(tasks).where(inArray(tasks.id, ids));

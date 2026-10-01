@@ -10,15 +10,23 @@ async function onTasksToday(page: Page) {
   await page.clock.setFixedTime(new Date(`${PROJECTS_TODAY}T09:00:00+03:00`));
 }
 
-/** Clicks a workflow move in the task header, then confirms its dialog when it opens one. */
-async function move(page: Page, name: string, note?: string) {
+/**
+ * Clicks a workflow move in the task header, then confirms its dialog when it opens one. A
+ * client response names the contact who answered (F09).
+ */
+async function move(page: Page, name: string, note?: string, responder?: string) {
   await page.getByRole('button', { name, exact: true }).first().click();
-  if (note !== undefined) {
-    const dialog = page.getByRole('dialog');
-    await dialog.getByRole('textbox').first().fill(note);
-    await dialog.getByRole('button', { name, exact: true }).click();
+  if (note === undefined && responder === undefined) return;
+  const dialog = page.getByRole('dialog');
+  if (note !== undefined) await dialog.getByRole('textbox').first().fill(note);
+  if (responder !== undefined) {
+    await dialog.getByRole('combobox', { name: ar.tasks.move.responder }).click();
+    await page.getByRole('option', { name: responder }).click();
   }
+  await dialog.getByRole('button', { name, exact: true }).click();
 }
+
+const RESPONDER = 'هالة الشامي';
 
 async function expectStatus(page: Page, status: keyof typeof ar.tasks.statuses) {
   const hero = page.locator('section').first();
@@ -107,10 +115,10 @@ test('request → assign → work → internal return → client changes over th
   await expectStatus(page, 'awaiting_client');
 
   // The account manager records changes twice: the second is over the limit of 1.
-  await move(page, ar.tasks.moves.client_changes, 'غيّر الخلفية');
+  await move(page, ar.tasks.moves.client_changes, 'غيّر الخلفية', RESPONDER);
   await move(page, ar.tasks.moves.resubmit);
   await move(page, ar.tasks.moves.send_to_client);
-  await move(page, ar.tasks.moves.client_changes, 'أضف رقم الهاتف');
+  await move(page, ar.tasks.moves.client_changes, 'أضف رقم الهاتف', RESPONDER);
   await expect(page.getByText(ar.tasks.overLimitPending).first()).toBeVisible();
   await page.getByRole('button', { name: ar.tasks.revisions.decide }).click();
   await page.getByRole('dialog').getByRole('button', { name: ar.tasks.revisions.decide }).click();
@@ -120,11 +128,7 @@ test('request → assign → work → internal return → client changes over th
   // The client approves: the waiting task is no longer blocked. Then the banner is delivered.
   await move(page, ar.tasks.moves.resubmit);
   await move(page, ar.tasks.moves.send_to_client);
-  await page.getByRole('button', { name: ar.tasks.moves.client_approved, exact: true }).click();
-  await page
-    .getByRole('dialog')
-    .getByRole('button', { name: ar.tasks.moves.client_approved, exact: true })
-    .click();
+  await move(page, ar.tasks.moves.client_approved, undefined, RESPONDER);
   await expectStatus(page, 'approved');
   await page.goto(publishUrl);
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('نشر البانر');

@@ -246,6 +246,25 @@ describe('department capabilities', () => {
     expect(permissionScopes(member, 'approvals.review_medical')).toEqual(['all']);
   });
 
+  it('keeps medical review to Medical Consultation and the General Manager (F09)', () => {
+    const primary = access(['employee'], [{ code: 'medical_consultation', isManager: false }]);
+    expect(permissionScopes(primary, 'approvals.review_medical')).toEqual(['all']);
+    expect(permissionScopes(access(['general_manager']), 'approvals.review_medical')).toEqual([
+      'all',
+    ]);
+    expect(hasPermission(access(['employee', 'account_manager']), 'approvals.review_medical')).toBe(
+      false,
+    );
+    expect(
+      hasPermission(
+        access(['employee', 'department_manager'], [design]),
+        'approvals.review_medical',
+      ),
+    ).toBe(false);
+    // Internal review is `tasks.manage`: the old `approvals.review` is gone.
+    expect(PERMISSIONS).not.toContain('approvals.review');
+  });
+
   it('unions department and role scopes for the same permission', () => {
     const marketer = access(
       ['employee', 'account_manager'],

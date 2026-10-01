@@ -2639,6 +2639,9 @@ interface TaskState {
 
 const OPEN_TASK: TaskStatus[] = [...OPEN_TASK_STATUSES];
 
+/** The token every mocked task carries: the mock never changes content between load and pass. */
+const MOCK_CONTENT_TOKEN = '0000000000000000';
+
 /** The tasks API (F06) over the in-memory records, with its scopes and workflow rules. */
 function taskRoutes({ users, clients, projects, retainers, tasks, me }: TaskState) {
   const holds = (permission: string, scope: string) =>
@@ -2691,12 +2694,16 @@ function taskRoutes({ users, clients, projects, retainers, tasks, me }: TaskStat
       creator: holds('tasks.request', 'all') && task.createdById === me().user.id,
     };
   };
+  /** The mock has no healthcare clients yet: internal review is always the internal stage. */
+  const reviewStage = (task: TaskRecord) =>
+    task.status === 'internal_review' ? ('internal' as const) : null;
   const allowed = (task: TaskRecord) =>
     task.archived
       ? []
       : allowedTaskTransitions(
           {
             status: task.status,
+            reviewStage: reviewStage(task),
             assigneeId: task.assigneeId,
             hasClient: !!task.clientId,
             needsClientApproval: task.needsClientApproval,
@@ -2715,6 +2722,11 @@ function taskRoutes({ users, clients, projects, retainers, tasks, me }: TaskStat
       canReview: live && r.manage,
       canRecordClientResponse: live && r.client,
       canDecideRevision: live && r.client,
+      canMedicalReview: false,
+      canWithdrawFromClient:
+        task.status === 'awaiting_client' && allowed(task).includes('internal_review'),
+      canEditClientText: live && OPEN_TASK.includes(task.status) && (r.work || r.manage),
+      canSendForApproval: live && r.client && task.status === 'awaiting_client',
       canCancel: allowed(task).includes('cancelled'),
       canReopen: live && r.manage,
       canArchive: holds('tasks.manage', 'all'),
@@ -2743,6 +2755,7 @@ function taskRoutes({ users, clients, projects, retainers, tasks, me }: TaskStat
           }
         : null,
       status: task.status,
+      reviewStage: reviewStage(task),
       priority: task.priority,
       dueDate: task.dueDate,
       dueTime: task.dueTime,
@@ -2775,6 +2788,12 @@ function taskRoutes({ users, clients, projects, retainers, tasks, me }: TaskStat
     ...summary(task),
     brief: task.brief,
     needsClientApproval: task.needsClientApproval,
+    clientText: null,
+    contentToken: MOCK_CONTENT_TOKEN,
+    clearedReview: null,
+    reviewHistory: [],
+    clientResponses: [],
+    pendingApproval: null,
     clientRequest: task.request
       ? {
           contact: contactOf(task, task.request.contactId),
@@ -2936,6 +2955,8 @@ function taskRoutes({ users, clients, projects, retainers, tasks, me }: TaskStat
         later: count(mine, (t) => t.dueDate > weekEnd),
         waiting: count(mine, (t) => blocked(t) || t.status === 'awaiting_client'),
         toReview: count(open, (t) => t.status === 'internal_review' && rights(t).manage),
+        medicalReview: null,
+        readyToSend: null,
         requestedByMe: count(open, (t) => t.createdById === meId && t.assigneeId !== meId),
         unassignedInMyDepartments:
           managed().length === 0

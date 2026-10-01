@@ -184,6 +184,8 @@ describe('task views: board, workload, My tasks', () => {
       later: 2,
       waiting: 1,
       toReview: 0,
+      medicalReview: null,
+      readyToSend: null,
       requestedByMe: 1,
       unassignedInMyDepartments: null,
     });

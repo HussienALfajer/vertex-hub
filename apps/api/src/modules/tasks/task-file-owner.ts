@@ -6,13 +6,15 @@ import { ClientDirectory } from '../clients/index.js';
 import { type FileOwner, FileOwnerRegistry } from '../files/index.js';
 import { EngagementDirectory } from '../projects/index.js';
 import { holdsAll, isReadOnly, readableTask, taskRights } from './task-access.js';
+import { TaskReviews } from './task-reviews.js';
 
 type Executor = Database | Transaction;
 
 /**
  * The `task` owner policy of the files module (spec F10, "Changes to earlier features"): task
  * files follow the task's read rules, workers and manage scope add deliverables, every reader
- * adds references, and manage scope removes and marks final.
+ * adds references, and manage scope removes and marks final. Versions under medical review or
+ * with the client are locked (spec F09, edge case 4).
  */
 @Injectable()
 export class TaskFileOwner implements OnModuleInit {
@@ -20,6 +22,7 @@ export class TaskFileOwner implements OnModuleInit {
     private readonly registry: FileOwnerRegistry,
     private readonly clients: ClientDirectory,
     private readonly engagements: EngagementDirectory,
+    private readonly reviews: TaskReviews,
   ) {}
 
   onModuleInit(): void {
@@ -59,6 +62,7 @@ export class TaskFileOwner implements OnModuleInit {
           client: task.client?.name ?? null,
           project: task.project?.name ?? null,
         },
+        sentVersionIds: await this.reviews.sentVersionIds(executor, task),
       },
       rights: {
         addDeliverable: rights.work || rights.manage,

@@ -1,5 +1,9 @@
 import {
+  CLIENT_DECISIONS,
   REQUEST_SCOPES,
+  RESPONSE_CHANNELS,
+  REVIEW_OUTCOMES,
+  REVIEW_STAGES,
   REVISION_DECISIONS,
   REVISION_SOURCES,
   TASK_PRIORITIES,
@@ -8,6 +12,7 @@ import {
 } from '@vertex-hub/contracts';
 import { sql } from 'drizzle-orm';
 import {
+  type AnyPgColumn,
   boolean,
   check,
   date,
@@ -21,6 +26,7 @@ import {
   timestamp,
   uuid,
 } from 'drizzle-orm/pg-core';
+import { approvalItems } from './approvals.js';
 import { departmentCodeEnum, users } from './auth.js';
 import { clientContacts, clients } from './clients.js';
 import { archivedAt, id, timestamps } from './columns.js';
@@ -30,7 +36,7 @@ import { extraWorkItems, retainerCycleLines, retainerCycles } from './retainers.
 /*
  * Tasks of every department (F06, ADR 0016), owned by the api `tasks` module. Dates without a
  * time are calendar days in Asia/Damascus, read and written as `YYYY-MM-DD`; `due_time` is a time
- * of day there.
+ * of day there. Review stages, review snapshots and client responses are F09 (ADR 0020).
  */
 
 export const taskTypeEnum = pgEnum('task_type', TASK_TYPES);
@@ -45,6 +51,14 @@ export const revisionSourceEnum = pgEnum('revision_source', REVISION_SOURCES);
 
 export const revisionDecisionEnum = pgEnum('revision_decision', REVISION_DECISIONS);
 
+export const reviewStageEnum = pgEnum('review_stage', REVIEW_STAGES);
+
+export const reviewOutcomeEnum = pgEnum('review_outcome', REVIEW_OUTCOMES);
+
+export const clientDecisionEnum = pgEnum('client_decision', CLIENT_DECISIONS);
+
+export const responseChannelEnum = pgEnum('response_channel', RESPONSE_CHANNELS);
+
 export const tasks = pgTable(
   'tasks',
   {
@@ -56,6 +70,8 @@ export const tasks = pgTable(
     /** Null while the task waits in its department's unassigned queue. */
     assigneeId: uuid('assignee_id').references(() => users.id),
     status: taskStatusEnum('status').notNull().default('new'),
+    /** The stage of `internal_review` (F09 rule 4); null in every other status. */
+    reviewStage: reviewStageEnum('review_stage'),
     priority: taskPriorityEnum('priority').notNull().default('normal'),
     dueDate: date('due_date', { mode: 'string' }).notNull(),
     dueTime: time('due_time'),
@@ -65,6 +81,10 @@ export const tasks = pgTable(
     retainerCycleId: uuid('retainer_cycle_id').references(() => retainerCycles.id),
     cycleLineId: uuid('cycle_line_id').references(() => retainerCycleLines.id),
     needsClientApproval: boolean('needs_client_approval').notNull(),
+    /** What the client reads and approves with the files (F09 rule 7). */
+    clientText: text('client_text'),
+    /** The pass that put the task in `awaiting_client` or `approved`; kept afterwards. */
+    clearedReviewId: uuid('cleared_review_id').references((): AnyPgColumn => taskReviews.id),
     revisionLimit: integer('revision_limit').notNull().default(2),
     requestedByContactId: uuid('requested_by_contact_id').references(() => clientContacts.id),
     requestedOn: date('requested_on', { mode: 'string' }),
@@ -93,6 +113,12 @@ export const tasks = pgTable(
     index('tasks_requested_by_contact_id_idx').on(table.requestedByContactId),
     index('tasks_extra_work_item_id_idx').on(table.extraWorkItemId),
     index('tasks_created_by_id_idx').on(table.createdById),
+    index('tasks_cleared_review_id_idx').on(table.clearedReviewId),
+    check(
+      'tasks_review_stage_check',
+      sql`(${table.status} = 'internal_review') = (${table.reviewStage} is not null)`,
+    ),
+    check('tasks_client_text_check', sql`char_length(${table.clientText}) between 1 and 10000`),
     check(
       'tasks_engagement_check',
       sql`(${table.projectId} is null or ${table.retainerCycleId} is null)
@@ -250,5 +276,96 @@ export const taskComments = pgTable(
   (table) => [
     index('task_comments_task_id_idx').on(table.taskId, table.createdAt),
     index('task_comments_author_id_idx').on(table.authorId),
+  ],
+);
+
+/**
+ * Every pass and return of a review (F09 rule 2); append-only. A pass holds the snapshot it
+ * approved: one version per deliverable and the text for the client.
+ */
+export const taskReviews = pgTable(
+  'task_reviews',
+  {
+    id: id(),
+    taskId: uuid('task_id')
+      .notNull()
+      .references(() => tasks.id),
+    stage: reviewStageEnum('stage').notNull(),
+    outcome: reviewOutcomeEnum('outcome').notNull(),
+    note: text('note'),
+    /** Null only for the system pass when a client stops being healthcare (F09 rule 18). */
+    reviewerId: uuid('reviewer_id').references(() => users.id),
+    /** Ids of `file_versions`, owned by the files module; empty for a return. */
+    versionIds: uuid('version_ids').array().notNull().default(sql`'{}'::uuid[]`),
+    clientText: text('client_text'),
+    /** Returns only: the revision it wrote. */
+    revisionId: uuid('revision_id').references(() => taskRevisions.id),
+    ...timestamps(),
+  },
+  (table) => [
+    index('task_reviews_task_id_idx').on(table.taskId, table.createdAt),
+    index('task_reviews_reviewer_id_idx').on(table.reviewerId),
+    index('task_reviews_revision_id_idx').on(table.revisionId),
+    check(
+      'task_reviews_outcome_check',
+      sql`case when ${table.outcome} = 'returned'
+        then ${table.note} is not null and ${table.revisionId} is not null
+          and ${table.versionIds} = '{}' and ${table.clientText} is null
+        else ${table.revisionId} is null end`,
+    ),
+  ],
+);
+
+/**
+ * The client's answers (F09 rules 13–16), from an approval link or recorded by hand, each
+ * against the snapshot it answered; append-only.
+ */
+export const taskClientResponses = pgTable(
+  'task_client_responses',
+  {
+    id: id(),
+    taskId: uuid('task_id')
+      .notNull()
+      .references(() => tasks.id),
+    decision: clientDecisionEnum('decision').notNull(),
+    channel: responseChannelEnum('channel').notNull(),
+    contactId: uuid('contact_id')
+      .notNull()
+      .references(() => clientContacts.id),
+    note: text('note'),
+    reviewId: uuid('review_id')
+      .notNull()
+      .references(() => taskReviews.id),
+    /** The pending item it closed: always for `link`, when there was one for `manual`. */
+    approvalItemId: uuid('approval_item_id').references((): AnyPgColumn => approvalItems.id),
+    /** Requested changes only: the client revision it wrote. */
+    revisionId: uuid('revision_id').references(() => taskRevisions.id),
+    /** Manual responses only. */
+    recordedById: uuid('recorded_by_id').references(() => users.id),
+    /** Link responses only, kept as evidence. */
+    ip: text('ip'),
+    userAgent: text('user_agent'),
+    ...timestamps(),
+  },
+  (table) => [
+    index('task_client_responses_task_id_idx').on(table.taskId, table.createdAt),
+    index('task_client_responses_contact_id_idx').on(table.contactId),
+    index('task_client_responses_review_id_idx').on(table.reviewId),
+    index('task_client_responses_approval_item_id_idx').on(table.approvalItemId),
+    index('task_client_responses_revision_id_idx').on(table.revisionId),
+    index('task_client_responses_recorded_by_id_idx').on(table.recordedById),
+    check(
+      'task_client_responses_channel_check',
+      sql`case when ${table.channel} = 'manual'
+        then ${table.recordedById} is not null and ${table.ip} is null and ${table.userAgent} is null
+        else ${table.recordedById} is null and ${table.approvalItemId} is not null end`,
+    ),
+    check(
+      'task_client_responses_decision_check',
+      sql`case when ${table.decision} = 'changes_requested'
+        then ${table.note} is not null and ${table.revisionId} is not null
+        else ${table.revisionId} is null end`,
+    ),
+    check('task_client_responses_user_agent_check', sql`char_length(${table.userAgent}) <= 500`),
   ],
 );

@@ -49,6 +49,7 @@ import {
   BanIcon,
   CheckCheckIcon,
   CircleCheckBigIcon,
+  CornerUpLeftIcon,
   EllipsisIcon,
   EyeIcon,
   type LucideIcon,
@@ -86,7 +87,11 @@ import {
 import { useArchiveTask, useChangeTaskStatus, useUpdateTask } from './tasks.queries';
 
 /** Icons that point along the reading direction, so they mirror in RTL (brand §6). */
-export const MIRRORED_ICONS: ReadonlySet<LucideIcon> = new Set([SendIcon, UndoIcon]);
+export const MIRRORED_ICONS: ReadonlySet<LucideIcon> = new Set([
+  SendIcon,
+  UndoIcon,
+  CornerUpLeftIcon,
+]);
 
 export const MOVE_ICONS: Record<TaskMove, LucideIcon> = {
   start: PlayIcon,
@@ -96,6 +101,7 @@ export const MOVE_ICONS: Record<TaskMove, LucideIcon> = {
   approve: CircleCheckBigIcon,
   client_approved: CheckCheckIcon,
   client_changes: MessageSquareReplyIcon,
+  withdraw: CornerUpLeftIcon,
   resume: PlayIcon,
   resubmit: SendIcon,
   deliver: PackageCheckIcon,
@@ -106,10 +112,29 @@ export const MOVE_ICONS: Record<TaskMove, LucideIcon> = {
 };
 
 /** Moves that send work back rather than forward: shown as secondary buttons. */
-const BACKWARD: TaskMove[] = ['return', 'client_changes', 'reopen_client', 'reopen_internal'];
+const BACKWARD: TaskMove[] = [
+  'return',
+  'client_changes',
+  'withdraw',
+  'reopen_client',
+  'reopen_internal',
+];
 
 /** Moves that record who answered for the client. */
 const CLIENT_MOVES: TaskMove[] = ['client_approved', 'client_changes', 'reopen_client'];
+
+/** Client responses (F09 rule 16): the contact who answered is required. */
+const RESPONSE_MOVES: TaskMove[] = ['client_approved', 'client_changes'];
+
+/** Internal passes (F09 rule 1): they send the content token the reviewer was shown. */
+const PASS_MOVES: TaskMove[] = ['send_to_client', 'approve'];
+
+/** What a move without a dialog sends. */
+export const moveInput = (task: TaskDetail, target: Target): TaskStatusChange => ({
+  status: target.to,
+  overrideDependencies: false,
+  ...(PASS_MOVES.includes(target.move) && { contentToken: task.contentToken }),
+});
 
 export interface Target {
   to: TaskStatus;
@@ -154,7 +179,7 @@ export function TaskActions({ task }: { task: TaskDetail }) {
       return;
     }
     try {
-      await change.mutateAsync({ status: target.to, overrideDependencies: false });
+      await change.mutateAsync(moveInput(task, target));
       toast.add({ title: t(`tasks.moves.done.${target.move}`), type: 'success' });
     } catch (error) {
       toast.add({ title: errorMessage(t, error), type: 'error' });
@@ -246,12 +271,14 @@ export function MoveDialog({
   const override = move === 'start' && task.blocked;
   const needsNote = taskMoveNeedsNote(move);
   const asksContact = CLIENT_MOVES.includes(move) && !!task.client;
+  const needsContact = RESPONSE_MOVES.includes(move);
   const client = useQuery({ ...clientQuery(task.client?.id ?? ''), enabled: asksContact });
   const contacts = client.data?.contacts ?? [];
   const contactItems = [
     { value: 'none', label: t('tasks.form.noContact') },
     ...contacts.map((contact) => ({ value: contact.id, label: contact.name })),
   ];
+
   const form = useForm<TaskStatusChangeInput, unknown, TaskStatusChange>({
     resolver: standardSchemaResolver(taskStatusChangeSchema),
     defaultValues: {
@@ -265,6 +292,7 @@ export function MoveDialog({
     },
   });
   const noteError = form.formState.errors.note;
+  const contactError = form.formState.errors.contactId;
   const reasonError = form.formState.errors.reason;
   const waiting = task.dependencies.filter(
     (dependency) =>
@@ -280,6 +308,10 @@ export function MoveDialog({
     setFailure(null);
     if (needsNote && !values.note) {
       form.setError('note', { type: SCREEN_ERROR, message: t(`tasks.move.errors.${noteKind}`) });
+      return;
+    }
+    if (needsContact && !values.contactId) {
+      form.setError('contactId', { type: SCREEN_ERROR, message: t('tasks.move.errors.contact') });
       return;
     }
     try {
@@ -332,16 +364,17 @@ export function MoveDialog({
             </Field>
           )}
           {asksContact && (
-            <Field>
+            <Field invalid={!!contactError}>
               <FieldLabel id={ids.contact} render={<span />}>
-                {t('tasks.move.contact')}
+                {t(needsContact ? 'tasks.move.responder' : 'tasks.move.contact')}
               </FieldLabel>
               <Select
                 items={contactItems}
                 value={form.watch('contactId') ?? 'none'}
-                onValueChange={(next) =>
-                  form.setValue('contactId', !next || next === 'none' ? null : next)
-                }
+                onValueChange={(next) => {
+                  form.setValue('contactId', !next || next === 'none' ? null : next);
+                  form.clearErrors('contactId');
+                }}
               >
                 <SelectTrigger aria-labelledby={ids.contact}>
                   <SelectValue />
@@ -354,6 +387,10 @@ export function MoveDialog({
                   ))}
                 </SelectContent>
               </Select>
+              {needsContact && client.isSuccess && contacts.length === 0 && (
+                <FieldDescription>{t('tasks.move.noContacts')}</FieldDescription>
+              )}
+              <FieldError match={!!contactError}>{t('tasks.move.errors.contact')}</FieldError>
             </Field>
           )}
           {override && (

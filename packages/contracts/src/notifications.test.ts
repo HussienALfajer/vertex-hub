@@ -75,17 +75,36 @@ describe('first match per recipient (rule 2)', () => {
     expect(NOTIFICATION_TYPES[at + 1]).toBe('task_file_added');
   });
 
-  it('follows the spec order for the first eight types', () => {
-    expect(NOTIFICATION_TYPES.slice(0, 8)).toEqual([
+  it('follows the spec order for the first twelve types (F14, F09)', () => {
+    expect(NOTIFICATION_TYPES.slice(0, 12)).toEqual([
       'task_assigned',
       'task_mentioned',
       'task_returned',
       'task_review_requested',
+      'task_medical_review_requested',
       'task_awaiting_client',
       'task_over_limit',
+      'approval_responded',
+      'approval_no_response',
+      'approval_expired',
       'task_changed',
       'task_commented',
     ]);
+  });
+
+  it('never lets a user mute the approval types, which open their request (F09)', () => {
+    for (const type of [
+      'approval_responded',
+      'approval_no_response',
+      'approval_expired',
+    ] as const) {
+      expect(isMutableNotificationType(type)).toBe(false);
+      expect(NOTIFICATION_CATALOG[type].subject).toBe('approval_request');
+    }
+    expect(NOTIFICATION_CATALOG.approval_responded.category).toBe('tasks');
+    expect(NOTIFICATION_CATALOG.approval_no_response.category).toBe('reminders');
+    expect(NOTIFICATION_CATALOG.approval_expired.category).toBe('reminders');
+    expect(isMutableNotificationType('task_medical_review_requested')).toBe(false);
   });
 });
 

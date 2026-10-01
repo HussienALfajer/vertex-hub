@@ -312,9 +312,22 @@
     "FILE_NAME_TAKEN": "يوجد ملف بهذا الاسم هنا.",
     "VERSION_FINAL": "هذا الإصدار نهائي. ألغِ العلامة النهائية أولًا.",
     "LAST_VERSION": "هذا آخر إصدار. أزل الملف كله بدلًا منه.",
-    "TASK_CLOSED": "المهمة مسلّمة أو ملغاة. أعد فتحها لتغيير ملفاتها.",
+    "TASK_CLOSED": "المهمة مسلّمة أو ملغاة. أعد فتحها لتغيير ملفاتها أو نصها.",
     "TASK_NOT_APPROVED": "تُحدَّد العلامة النهائية بعد اعتماد المهمة.",
-    "NOT_CONFIDENTIAL_READER": "لا يمكنك تغيير سرية هذا المستند."
+    "NOT_CONFIDENTIAL_READER": "لا يمكنك تغيير سرية هذا المستند.",
+    "REVIEW_CONTENT_CHANGED": "تغيّرت الملفات أو النص منذ فتحت المهمة. راجع المحتوى الحالي ثم أعد المحاولة.",
+    "NOTHING_TO_APPROVE": "لا يوجد ما يعتمده العميل. أضف ملف تسليم أو نصًا للعميل أولًا.",
+    "SELF_REVIEW": "لا يراجع المنفّذ مهمته طبيًا. يراجعها عضو آخر من الاستشارات الطبية.",
+    "MEDICAL_REVIEW_REQUIRED": "هذه المهمة لعميل رعاية صحية ولم تمرّ بالمراجعة الطبية. اسحبها لإعادة المراجعة أولًا.",
+    "TASK_NOT_READY": "إحدى المهام ليست جاهزة للإرسال إلى العميل. حدّث الصفحة واختر من المهام الجاهزة.",
+    "CONTACT_NOT_APPROVER": "جهة الاتصال لا تملك صلاحية الاعتماد النهائي لدى هذا العميل.",
+    "REQUEST_CLOSED": "هذا الطلب مكتمل أو ملغى، ولا يمكن تغيير رابطه.",
+    "SENT_TO_CLIENT": "المهمة ضمن رابط اعتماد مرسل للعميل. اسحبها أو ألغِ الرابط قبل تغيير عميلها.",
+    "ITEM_ALREADY_DECIDED": "سُجّل القرار على هذا العمل من قبل، ولا يمكن تغييره.",
+    "ITEM_WITHDRAWN": "سحبت الوكالة هذا العمل من الرابط.",
+    "APPROVAL_LINK_INVALID": "هذا الرابط غير صالح.",
+    "APPROVAL_LINK_EXPIRED": "انتهت صلاحية هذا الرابط. اطلب رابطًا جديدًا من مدير حسابك.",
+    "VERSION_SENT": "هذا الإصدار لدى المراجع الطبي أو العميل. اسحب المهمة لإعادة المراجعة قبل إزالته."
   },
   "users": {
     "title": "الفريق",
@@ -627,7 +640,8 @@
       "task_comment": "تعليق على مهمة",
       "template": "قالب عمل",
       "template_run": "توليد من قالب",
-      "file_item": "ملف"
+      "file_item": "ملف",
+      "approval_request": "طلب اعتماد"
     },
     "actions": {
       "user": {
@@ -724,7 +738,10 @@
         "restored": "استعاد مهمة",
         "revision_decided": "قرّر في تعديل فوق الحد",
         "request_scope_changed": "غيّر نطاق طلب العميل",
-        "extra_work_moved": "نقل العمل الإضافي للطلب إلى ارتباط آخر"
+        "extra_work_moved": "نقل العمل الإضافي للطلب إلى ارتباط آخر",
+        "reviewed": "راجع المهمة",
+        "client_text_updated": "عدّل نص العميل",
+        "client_response_recorded": "سجّل رد العميل"
       },
       "template": {
         "created": "أنشأ قالبًا",
@@ -764,6 +781,15 @@
         "restored": "استعاد إصدارًا",
         "final_set": "حدّد الإصدار النهائي",
         "final_cleared": "ألغى العلامة النهائية"
+      },
+      "approval_request": {
+        "created": "أنشأ رابط اعتماد",
+        "link_reissued": "أصدر رابط اعتماد جديدًا",
+        "revoked": "ألغى رابط اعتماد"
+      },
+      "approval_item": {
+        "responded": "ردّ العميل على عمل",
+        "withdrawn": "سُحب عمل من رابط اعتماد"
       }
     },
     "fields": {
@@ -884,7 +910,13 @@
       "sizeBytes": "الحجم",
       "host": "موقع الرابط",
       "source": "طريقة التحديد",
-      "previousFinal": "النهائي السابق"
+      "previousFinal": "النهائي السابق",
+      "stage": "مرحلة المراجعة",
+      "reviewStage": "مرحلة المراجعة",
+      "outcome": "نتيجة المراجعة",
+      "versions": "الإصدارات",
+      "hasText": "مع نص للعميل",
+      "length": "عدد الأحرف"
     },
     "kinds": {
       "activation": "تفعيل",
@@ -935,7 +967,8 @@
     },
     "revisionSources": {
       "internal": "داخلي",
-      "client": "من العميل"
+      "client": "من العميل",
+      "medical": "مراجعة طبية"
     },
     "actions": {
       "new": "مهمة جديدة",
@@ -975,8 +1008,10 @@
         "reopen_client": "أُعيد فتح المهمة بطلب العميل",
         "reopen_internal": "أُعيد فتح المهمة",
         "cancel": "أُلغيت المهمة",
-        "reopen": "أُعيد فتح المهمة"
-      }
+        "reopen": "أُعيد فتح المهمة",
+        "withdraw": "سُحبت المهمة لإعادة المراجعة"
+      },
+      "withdraw": "اسحب لإعادة المراجعة"
     },
     "move": {
       "start": {
@@ -1001,7 +1036,7 @@
       },
       "client_approved": {
         "title": "اعتماد العميل لـ«{{title}}»",
-        "body": "سجّل من اعتمد العمل من طرف العميل إن عرفته."
+        "body": "سجّل من اعتمد العمل من طرف العميل. تصبح الإصدارات التي أُرسلت له نهائية."
       },
       "client_changes": {
         "title": "طلب تعديلات على «{{title}}»",
@@ -1043,8 +1078,15 @@
       "overrideReason": "سبب البدء رغم الانتظار",
       "errors": {
         "changes": "اكتب ما المطلوب تعديله (حتى 2000 حرف).",
-        "reason": "اكتب السبب (حتى 500 حرف)."
-      }
+        "reason": "اكتب السبب (حتى 500 حرف).",
+        "contact": "اختر جهة الاتصال التي ردّت."
+      },
+      "withdraw": {
+        "title": "اسحب «{{title}}» لإعادة المراجعة",
+        "body": "تعود المهمة إلى المراجعة الداخلية ليُراجَع ما أُضيف بعد إرسالها ثم تُرسل من جديد."
+      },
+      "responder": "من ردّ من طرف العميل",
+      "noContacts": "لا جهات اتصال لهذا العميل. أضف جهة اتصال من ملف العميل أولًا."
     },
     "my": {
       "title": "مهامي",
@@ -1061,7 +1103,9 @@
         "waiting": "بانتظار الآخرين",
         "toReview": "للمراجعة",
         "unassignedInMyDepartments": "بلا منفّذ في أقسامي",
-        "requestedByMe": "طلبتُها"
+        "requestedByMe": "طلبتُها",
+        "medicalReview": "للمراجعة الطبية",
+        "readyToSend": "جاهزة للإرسال إلى العميل"
       }
     },
     "list": {
@@ -2765,7 +2809,8 @@
     },
     "finalSources": {
       "auto": "تلقائيًا عند الاعتماد",
-      "manual": "يدويًا"
+      "manual": "يدويًا",
+      "client": "باعتماد العميل"
     },
     "usage": "ملفات هذا العميل {{client}} · كل الملفات {{total}} · المتاح {{free}}",
     "brand": {
@@ -2876,14 +2921,19 @@
       "task_overdue_escalated": "تصعيد مهمة متأخرة",
       "client_account_manager_assigned": "تعييني مدير حساب عميل",
       "project_manager_assigned": "تعييني مدير مشروع",
-      "retainer_renewal_due": "موعد تجديد عقد شهري"
+      "retainer_renewal_due": "موعد تجديد عقد شهري",
+      "task_medical_review_requested": "طلب مراجعة طبية",
+      "approval_responded": "رد العميل على رابط اعتماد",
+      "approval_no_response": "رابط اعتماد بلا رد منذ 48 ساعة",
+      "approval_expired": "انتهاء صلاحية رابط اعتماد"
     },
     "text": {
       "task_assigned": "أُسندت إليك «{{task}}» بواسطة {{actor}}",
       "task_mentioned": "أُشير إليك في تعليق على «{{task}}» بواسطة {{actor}}",
       "task_returned": {
         "internal": "أُعيدت إليك «{{task}}» للتعديل بواسطة {{actor}}",
-        "client": "العميل طلب تعديلات على «{{task}}»"
+        "client": "العميل طلب تعديلات على «{{task}}»",
+        "medical": "أُعيدت إليك «{{task}}» للتعديل بعد المراجعة الطبية بواسطة {{actor}}"
       },
       "task_review_requested": "أُرسلت «{{task}}» للمراجعة الداخلية بواسطة {{actor}}",
       "task_awaiting_client": "«{{task}}» جاهزة للإرسال إلى العميل",
@@ -2924,7 +2974,8 @@
       "tasks_generated_queued_other": "{{n}} مهمة من قالب «{{template}}» تنتظر الإسناد في {{department}}",
       "task_approved": {
         "internal": "اعتُمدت «{{task}}» بواسطة {{actor}}",
-        "client": "العميل اعتمد «{{task}}»"
+        "client": "العميل اعتمد «{{task}}»",
+        "medical": "اجتازت «{{task}}» المراجعة الطبية بواسطة {{actor}}"
       },
       "task_opened": "«{{task}}» جاهزة للبدء: انتهت المهام التي تسبقها",
       "request_finished": {
@@ -2945,7 +2996,20 @@
       "retainer_renewal_due_few": "يتجدد عقد «{{retainer}}» بعد {{n}} أيام",
       "retainer_renewal_due_many": "يتجدد عقد «{{retainer}}» بعد {{n}} يومًا",
       "retainer_renewal_due_other": "يتجدد عقد «{{retainer}}» بعد {{n}} يوم",
-      "retainer_renewal_reached": "حلّ موعد تجديد عقد «{{retainer}}»"
+      "retainer_renewal_reached": "حلّ موعد تجديد عقد «{{retainer}}»",
+      "task_medical_review_requested": "«{{task}}» تنتظر المراجعة الطبية",
+      "approval_responded": {
+        "approved": "اعتمد {{contact}} عملًا أرسلته إلى «{{client}}»",
+        "changes_requested": "طلب {{contact}} تعديلات على عمل أرسلته إلى «{{client}}»"
+      },
+      "approval_responded_merged_zero": "ردود جديدة من {{contact}} على رابط «{{client}}»",
+      "approval_responded_merged_one": "رد جديد من {{contact}} على رابط «{{client}}»",
+      "approval_responded_merged_two": "ردّان جديدان من {{contact}} على رابط «{{client}}»",
+      "approval_responded_merged_few": "{{n}} ردود جديدة من {{contact}} على رابط «{{client}}»",
+      "approval_responded_merged_many": "{{n}} ردًا جديدًا من {{contact}} على رابط «{{client}}»",
+      "approval_responded_merged_other": "{{n}} رد جديد من {{contact}} على رابط «{{client}}»",
+      "approval_no_response": "لم يردّ {{contact}} على رابط «{{client}}» منذ 48 ساعة",
+      "approval_expired": "انتهت صلاحية رابط «{{client}}» قبل أن يردّ {{contact}} على كل الأعمال"
     },
     "dueAt": "{{date}}، {{time}}"
   }

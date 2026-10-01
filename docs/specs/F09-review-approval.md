@@ -267,6 +267,19 @@ What roles see differently: everyone reads requests, responses and review histor
 13. **Healthcare flag toggled twice quickly:** each change applies rules 18–19 to the state at that moment, each audited.
 14. **Expired link with all items decided:** shows "expired"; the decisions stay on the request page.
 
+## Implementation notes
+Details the implementation settled (PR 1, `feat/f09-review-api`):
+- **Content token (rule 1)** is required on both internal passes (send to client, and approve without the client): a pass without it answers 400. It is a 64-bit hash that only detects change, not a secret.
+- **Tasks from before F09:** the migration sets `review_stage = internal` on tasks in internal review, and gives every task in `awaiting_client` or `approved` a system pass (no reviewer) holding its latest deliverable versions and no text, as its `cleared_review_id`, so client responses have a snapshot to answer. For a healthcare client such a task is not ready to send (rule 8): withdraw it for re-review.
+- **Rule 18** writes no new review row: the task's `cleared_review_id` is its internal pass. A null `reviewer_id` is only the system pass of the migration above.
+- **Rules 17 and 19:** turning the healthcare flag on leaves tasks with a pending item as they are (rule 19); it does not withdraw their items.
+- **A return by manage scope during the medical stage** is an `internal` revision; its review row keeps stage `medical`, where it happened.
+- **Edge case 4** also refuses removing the whole file of a sent version (`VERSION_SENT`), not only the version.
+- **Manual responses (rule 16)** on `awaiting_client → approved`, `awaiting_client → revisions` and `approved → revisions` require `contactId` (400 without, `UNKNOWN_CONTACT` when it is not a live contact of the client). Reopening a delivered task by the client's request (F06) stays as it was: no response record, contact optional.
+- **`canSendForApproval` and `readyToSend`** treat a pending item in an expired request as not blocking (rule 8); `pendingApproval` still shows it.
+- **`tasks_review_stage_check`** ships in the same release as the column (owner decision, 2026-10-01): no deployed release writes tasks yet (the Phase 1 deploy is postponed), so there is no earlier release to keep compatible. A release rolled back past this one could not move tasks into or out of internal review.
+- `GET /api/clients/:id/approvals` gets its response schema with the `approvals` module (PR 2).
+
 ## Open questions
 - None block F09. The owner decided every question of the interview on 2026-10-01, including F02's open point (edge case 8: healthcare flag changes, rules 18–19).
 - Q5 (email provider) still gates sending links and reminders by email (Phase 4).

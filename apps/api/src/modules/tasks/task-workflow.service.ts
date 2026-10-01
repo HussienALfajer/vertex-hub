@@ -29,7 +29,7 @@ import {
   taskRevisions,
   tasks,
 } from '@vertex-hub/db';
-import { and, count, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { DATABASE } from '../../core/database/database.module.js';
 import { CodedException } from '../../core/errors/index.js';
 import { recordAudit } from '../audit/index.js';
@@ -38,6 +38,7 @@ import { ClientDirectory } from '../clients/index.js';
 import { FileVersions } from '../files/index.js';
 import type { Notice } from '../notifications/index.js';
 import { EngagementDirectory } from '../projects/index.js';
+import { ClientReviewHooks } from './client-review-hooks.js';
 import {
   actorOf,
   assertTaskWritable,
@@ -45,7 +46,9 @@ import {
   readableTask,
   type TaskAccess,
   taskRights,
+  taskState,
 } from './task-access.js';
+import { TaskApprovals } from './task-approvals.js';
 import {
   assertValidDependencies,
   dependenciesOf,
@@ -53,10 +56,17 @@ import {
   lockDependencyGraph,
 } from './task-dependencies.js';
 import { blocksDependents, requesterOf, TaskNotices } from './task-notices.js';
+import { TaskReviews } from './task-reviews.js';
 import { TasksService } from './tasks.service.js';
 
 /** Moves where the client answers, and so a contact may be named. */
 const CLIENT_MOVES: readonly TaskMove[] = ['client_approved', 'client_changes', 'reopen_client'];
+
+/** Client responses (F09 rule 16): recorded against the snapshot, with the contact who answered. */
+const RESPONSE_MOVES: readonly TaskMove[] = ['client_approved', 'client_changes'];
+
+/** Internal passes (F09 rules 1 and 2): they write a snapshot of the content they were shown. */
+const PASS_MOVES: readonly TaskMove[] = ['send_to_client', 'approve'];
 
 /** Moves that turn a delivered or cancelled task back into open work. */
 const REOPEN_MOVES: readonly TaskMove[] = ['reopen', 'reopen_client', 'reopen_internal'];
@@ -64,7 +74,8 @@ const REOPEN_TARGETS: readonly TaskStatus[] = ['new', 'in_progress', 'revisions'
 
 /**
  * The task workflow (spec F06, "Task status" and rules 1–5, 9–14): status moves, over-limit
- * revision decisions and dependencies.
+ * revision decisions and dependencies. Internal passes write review snapshots, a healthcare pass
+ * leads to the medical stage, and client responses are recorded against the snapshot (spec F09).
  */
 @Injectable()
 export class TaskWorkflowService {
@@ -76,6 +87,9 @@ export class TaskWorkflowService {
     private readonly notices: TaskNotices,
     private readonly users: UserDirectory,
     private readonly files: FileVersions,
+    private readonly reviews: TaskReviews,
+    private readonly approvals: TaskApprovals,
+    private readonly reviewHooks: ClientReviewHooks,
   ) {}
 
   private get directories() {
@@ -126,13 +140,16 @@ export class TaskWorkflowService {
           );
         }
       }
-      if (!canMakeTaskMove(this.state(task, blocked), move, rights)) throw new ForbiddenException();
+      if (!canMakeTaskMove(taskState(task, blocked), move, rights)) throw new ForbiddenException();
       const overridden = blocked;
       const note = change.note ?? null;
       if (taskMoveNeedsNote(move) && !note) {
         throw new BadRequestException('This move needs a note');
       }
       const contactId = change.contactId ?? null;
+      if (RESPONSE_MOVES.includes(move) && !contactId) {
+        throw new BadRequestException('A client response names the contact who answered');
+      }
       if (contactId) {
         if (!CLIENT_MOVES.includes(move)) {
           throw new BadRequestException('A contact is named only for client responses');
@@ -146,12 +163,52 @@ export class TaskWorkflowService {
         }
       }
 
-      const to = change.status;
+      // F09 rules 1–4: a pass is refused when the content changed since the reviewer loaded it,
+      // writes the snapshot, and for a healthcare client leads to the medical stage.
+      const medical = move === 'send_to_client' && !!task.client?.isHealthcare;
+      const to = medical ? 'internal_review' : change.status;
+      let clearedReviewId: string | null = null;
+      if (PASS_MOVES.includes(move)) {
+        if (!change.contentToken) {
+          throw new BadRequestException('A pass sends the content token it reviewed');
+        }
+        const content = await this.reviews.content(tx, task);
+        if (content.token !== change.contentToken) {
+          throw new CodedException(
+            409,
+            'REVIEW_CONTENT_CHANGED',
+            'The files or the text changed since the review was loaded',
+          );
+        }
+        if (move === 'send_to_client' && content.versionIds.length === 0 && !content.clientText) {
+          throw new CodedException(
+            409,
+            'NOTHING_TO_APPROVE',
+            'Add a deliverable or a text for the client first',
+          );
+        }
+        const reviewId = await this.reviews.recordPass(
+          tx,
+          id,
+          'internal',
+          actorOf(actor),
+          content,
+          note,
+        );
+        if (!medical) clearedReviewId = reviewId;
+      }
+      // Rule 16: a response answers the snapshot that was sent.
+      const answered = RESPONSE_MOVES.includes(move)
+        ? await this.reviews.clearedPass(tx, task)
+        : null;
+
       const now = new Date();
       await tx
         .update(tasks)
         .set({
           status: to,
+          reviewStage: medical ? 'medical' : to === 'internal_review' ? 'internal' : null,
+          ...(clearedReviewId && { clearedReviewId }),
           ...(to === 'in_progress' && !task.startedAt && { startedAt: now }),
           ...(move === 'deliver' && { deliveredAt: now }),
           ...((move === 'reopen_client' || move === 'reopen_internal') && { deliveredAt: null }),
@@ -160,7 +217,21 @@ export class TaskWorkflowService {
         })
         .where(eq(tasks.id, id));
 
-      const revision = await this.recordRevision(tx, actor, task, move, note, contactId);
+      const source = revisionSourceOf(move);
+      const revision =
+        source && note
+          ? await this.reviews.recordRevision(tx, task, source, note, contactId, actor.id)
+          : null;
+      if (move === 'return' && revision && task.reviewStage) {
+        await this.reviews.recordReturn(
+          tx,
+          id,
+          task.reviewStage,
+          actorOf(actor),
+          revision.note,
+          revision.id,
+        );
+      }
       // Edge case 10: a cancelled out-of-scope request withdraws its unbilled extra work.
       const withdrawn = move === 'cancel' && (await this.withdrawRequestExtraWork(tx, actor, task));
 
@@ -171,10 +242,12 @@ export class TaskWorkflowService {
         entityId: id,
         before: {
           status: task.status,
+          ...(task.reviewStage === 'medical' && { reviewStage: 'medical' }),
           ...(withdrawn && { extraWorkItemId: task.extraWorkItemId }),
         },
         after: {
           status: to,
+          ...(medical && { reviewStage: 'medical' }),
           ...(withdrawn && { extraWorkItemId: null }),
           ...(note && { note }),
           ...(contactId && { contactId }),
@@ -186,10 +259,29 @@ export class TaskWorkflowService {
           ...(overridden && { overrideReason: change.reason }),
         },
       });
-      // F10 rule 9: approval marks the latest version of each deliverable final.
-      if (to === 'approved') await this.files.markLatestFinal(tx, id, actorOf(actor));
+      // F10 rule 9: an approval without the client marks the latest version of each deliverable
+      // final; a client approval marks the snapshot it answered (F09 rule 13).
+      if (move === 'approve') await this.files.markLatestFinal(tx, id, actorOf(actor));
+      if (answered && contactId) {
+        await this.approvals.recordManual(tx, {
+          task,
+          decision: move === 'client_approved' ? 'approved' : 'changes_requested',
+          note,
+          contactId,
+          revisionId: revision?.id ?? null,
+          recordedBy: actor,
+        });
+      } else if (task.status === 'awaiting_client') {
+        // F09 rule 17: withdrawn or cancelled, the task is no longer with the client.
+        await this.reviewHooks.left(tx, { taskId: id, actor: actorOf(actor), response: null });
+      }
       const overLimit = !!revision?.overLimit;
-      await this.notices.send(tx, await this.moveNotices(tx, actor, task, move, overLimit));
+      await this.notices.send(
+        tx,
+        medical
+          ? [await this.reviews.medicalRequested(tx, task, actor.id)]
+          : await this.moveNotices(tx, actor, task, move, overLimit),
+      );
     });
     return this.tasks.detail(actor, id);
   }
@@ -389,54 +481,14 @@ export class TaskWorkflowService {
     // The client step follows the approval flag; client moves need a client.
     if (move === 'send_to_client' && !task.needsClientApproval) throw invalid();
     if (move === 'approve' && task.needsClientApproval) throw invalid();
+    // F09 rule 4: in the medical stage the pass belongs to the medical reviewers.
+    if (PASS_MOVES.includes(move) && task.reviewStage === 'medical') throw invalid();
     if (CLIENT_MOVES.includes(move) && !task.clientId) throw invalid();
     // `revisionSource` may confirm a reopen from delivered; it must match the target.
     if (change.revisionSource && change.revisionSource !== (revisionSourceOf(move) ?? 'internal')) {
       throw invalid();
     }
     return move;
-  }
-
-  private state(task: TaskAccess, blocked: boolean) {
-    return {
-      status: task.status,
-      assigneeId: task.assigneeId,
-      hasClient: !!task.clientId,
-      needsClientApproval: task.needsClientApproval,
-      blocked,
-    };
-  }
-
-  /** Rules 9 and 10: every move to revisions is recorded; client ones count against the limit. */
-  private async recordRevision(
-    tx: Transaction,
-    actor: CurrentUserInfo,
-    task: TaskAccess,
-    move: TaskMove,
-    note: string | null,
-    contactId: string | null,
-  ) {
-    const source = revisionSourceOf(move);
-    if (!source || !note) return null;
-    let number: number | null = null;
-    if (source === 'client') {
-      const [counted] = await tx
-        .select({ value: count() })
-        .from(taskRevisions)
-        .where(and(eq(taskRevisions.taskId, task.id), eq(taskRevisions.source, 'client')));
-      number = (counted?.value ?? 0) + 1;
-    }
-    const values = {
-      taskId: task.id,
-      source,
-      number,
-      note,
-      contactId,
-      overLimit: number !== null && number > task.revisionLimit,
-      authorId: actor.id,
-    };
-    await tx.insert(taskRevisions).values(values);
-    return values;
   }
 
   /** Edge case 10: returns whether an unbilled item was withdrawn and unlinked. */

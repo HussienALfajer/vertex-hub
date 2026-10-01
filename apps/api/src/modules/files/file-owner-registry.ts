@@ -46,6 +46,11 @@ export interface FileOwner {
     status: TaskStatus;
     assigneeId: string | null;
     snapshot: NotificationData<'task_file_added'>['task'];
+    /**
+     * Versions of the snapshot under medical review or with the client (F09 edge case 4): they
+     * are not removed until the task is withdrawn for re-review (`VERSION_SENT`).
+     */
+    sentVersionIds: readonly string[];
   } | null;
   rights: FileOwnerRights;
 }
