@@ -148,6 +148,13 @@
       "when": 1790869643235,
       "tag": "0020_handy_oracle",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1790888374885,
+      "tag": "0021_abandoned_tarot",
+      "breakpoints": true
     }
   ]
 }

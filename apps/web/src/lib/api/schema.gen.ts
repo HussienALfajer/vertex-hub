@@ -1828,6 +1828,166 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/calendar/conflicts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CalendarController_conflicts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/shoots": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ShootsController_list"];
+        put?: never;
+        post: operations["ShootsController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/shoots/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ShootsController_detail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["ShootsController_update"];
+        trace?: never;
+    };
+    "/api/shoots/{id}/shots": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["ShootsController_saveShots"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/shoots/{id}/shots/{shotId}/done": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ShootsController_tick"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/shoots/{id}/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ShootsController_close"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/shoots/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ShootsController_cancel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/shoots/{id}/reopen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ShootsController_reopen"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/shoots/{id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ShootsController_archive"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/shoots/{id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ShootsController_restore"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/approvals/ready": {
         parameters: {
             query?: never;
@@ -2185,9 +2345,9 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         /** @enum {string} */
-        AuditEntityType: "user" | "department" | "client" | "client_contact" | "client_platform_account" | "client_note" | "project" | "project_milestone" | "retainer" | "retainer_cycle" | "extra_work" | "task" | "task_checklist_item" | "task_link" | "task_comment" | "template" | "template_run" | "file_item" | "approval_request" | "post";
+        AuditEntityType: "user" | "department" | "client" | "client_contact" | "client_platform_account" | "client_note" | "project" | "project_milestone" | "retainer" | "retainer_cycle" | "extra_work" | "task" | "task_checklist_item" | "task_link" | "task_comment" | "template" | "template_run" | "file_item" | "approval_request" | "post" | "shoot" | "meeting";
         /** @enum {string} */
-        AuditAction: "user.created" | "user.updated" | "user.roles_changed" | "user.departments_changed" | "user.archived" | "user.restored" | "user.link_issued" | "user.password_set" | "user.password_changed" | "user.two_factor_enabled" | "user.two_factor_disabled" | "user.two_factor_reset" | "user.profile_updated" | "department.updated" | "client.created" | "client.updated" | "client.status_changed" | "client.account_manager_changed" | "client.healthcare_changed" | "client.archived" | "client.restored" | "client.brand_kit_updated" | "client_contact.created" | "client_contact.updated" | "client_contact.archived" | "client_platform_account.created" | "client_platform_account.updated" | "client_platform_account.archived" | "client_note.created" | "client_note.updated" | "client_note.archived" | "project.created" | "project.updated" | "project.project_manager_changed" | "project.status_changed" | "project.money_updated" | "project.archived" | "project.restored" | "project_milestone.created" | "project_milestone.updated" | "project_milestone.reordered" | "project_milestone.completed" | "project_milestone.reopened" | "project_milestone.archived" | "retainer.created" | "retainer.updated" | "retainer.status_changed" | "retainer.deliverables_updated" | "retainer.money_updated" | "retainer.archived" | "retainer.restored" | "retainer_cycle.created" | "retainer_cycle.closed" | "retainer_cycle.line_updated" | "retainer_cycle.line_added" | "retainer_cycle.adjusted" | "extra_work.created" | "extra_work.updated" | "extra_work.billing_changed" | "extra_work.archived" | "task.created" | "task.updated" | "task.assigned" | "task.department_changed" | "task.status_changed" | "task.dependencies_updated" | "task.archived" | "task.restored" | "task.revision_decided" | "task.request_scope_changed" | "task.extra_work_moved" | "task.reviewed" | "task.client_text_updated" | "task.client_response_recorded" | "task_checklist_item.created" | "task_checklist_item.updated" | "task_checklist_item.reordered" | "task_checklist_item.archived" | "task_link.created" | "task_link.archived" | "task_comment.created" | "task_comment.updated" | "task_comment.archived" | "template.created" | "template.updated" | "template.assignees_updated" | "template.archived" | "template.restored" | "template_run.created" | "retainer.template_changed" | "file_item.created" | "file_item.renamed" | "file_item.confidential_changed" | "file_item.archived" | "file_item.restored" | "file_version.created" | "file_version.archived" | "file_version.restored" | "file_version.final_set" | "file_version.final_cleared" | "approval_request.created" | "approval_request.link_reissued" | "approval_request.revoked" | "approval_item.responded" | "approval_item.withdrawn" | "post.created" | "post.updated" | "post.status_changed" | "post.reviewed" | "post.client_response_recorded" | "post.task_linked" | "post.task_unlinked" | "post.task_returned" | "post.duplicated" | "post.archived" | "post.restored";
+        AuditAction: "user.created" | "user.updated" | "user.roles_changed" | "user.departments_changed" | "user.archived" | "user.restored" | "user.link_issued" | "user.password_set" | "user.password_changed" | "user.two_factor_enabled" | "user.two_factor_disabled" | "user.two_factor_reset" | "user.profile_updated" | "department.updated" | "client.created" | "client.updated" | "client.status_changed" | "client.account_manager_changed" | "client.healthcare_changed" | "client.archived" | "client.restored" | "client.brand_kit_updated" | "client_contact.created" | "client_contact.updated" | "client_contact.archived" | "client_platform_account.created" | "client_platform_account.updated" | "client_platform_account.archived" | "client_note.created" | "client_note.updated" | "client_note.archived" | "project.created" | "project.updated" | "project.project_manager_changed" | "project.status_changed" | "project.money_updated" | "project.archived" | "project.restored" | "project_milestone.created" | "project_milestone.updated" | "project_milestone.reordered" | "project_milestone.completed" | "project_milestone.reopened" | "project_milestone.archived" | "retainer.created" | "retainer.updated" | "retainer.status_changed" | "retainer.deliverables_updated" | "retainer.money_updated" | "retainer.archived" | "retainer.restored" | "retainer_cycle.created" | "retainer_cycle.closed" | "retainer_cycle.line_updated" | "retainer_cycle.line_added" | "retainer_cycle.adjusted" | "extra_work.created" | "extra_work.updated" | "extra_work.billing_changed" | "extra_work.archived" | "task.created" | "task.updated" | "task.assigned" | "task.department_changed" | "task.status_changed" | "task.dependencies_updated" | "task.archived" | "task.restored" | "task.revision_decided" | "task.request_scope_changed" | "task.extra_work_moved" | "task.reviewed" | "task.client_text_updated" | "task.client_response_recorded" | "task_checklist_item.created" | "task_checklist_item.updated" | "task_checklist_item.reordered" | "task_checklist_item.archived" | "task_link.created" | "task_link.archived" | "task_comment.created" | "task_comment.updated" | "task_comment.archived" | "template.created" | "template.updated" | "template.assignees_updated" | "template.archived" | "template.restored" | "template_run.created" | "retainer.template_changed" | "file_item.created" | "file_item.renamed" | "file_item.confidential_changed" | "file_item.archived" | "file_item.restored" | "file_version.created" | "file_version.archived" | "file_version.restored" | "file_version.final_set" | "file_version.final_cleared" | "approval_request.created" | "approval_request.link_reissued" | "approval_request.revoked" | "approval_item.responded" | "approval_item.withdrawn" | "post.created" | "post.updated" | "post.status_changed" | "post.reviewed" | "post.client_response_recorded" | "post.task_linked" | "post.task_unlinked" | "post.task_returned" | "post.duplicated" | "post.archived" | "post.restored" | "shoot.created" | "shoot.updated" | "shoot.shots_changed" | "shoot.shot_ticked" | "shoot.shot_unticked" | "shoot.completed" | "shoot.cancelled" | "shoot.reopened" | "shoot.archived" | "shoot.restored" | "meeting.created" | "meeting.updated" | "meeting.cancelled" | "meeting.archived" | "meeting.restored";
         /** @description Audit entries, newest first */
         AuditPage: {
             items: components["schemas"]["AuditEntry"][];
@@ -2250,7 +2410,7 @@ export interface components {
             scopes: components["schemas"]["PermissionScope"][];
         };
         /** @enum {string} */
-        Permission: "users.read" | "users.manage" | "clients.read" | "clients.manage" | "clients.log" | "leads.read" | "leads.manage" | "catalog.read" | "catalog.manage" | "quotes.read" | "quotes.manage" | "quotes.approve_discount" | "projects.read" | "projects.manage" | "tasks.read" | "tasks.request" | "tasks.work" | "tasks.manage" | "templates.read" | "templates.manage" | "content.read" | "content.manage" | "content.review" | "approvals.review_medical" | "shoots.read" | "shoots.manage" | "campaigns.read" | "campaigns.manage" | "invoices.read" | "invoices.manage" | "payments.manage" | "reports.read" | "reports.finance" | "audit.read";
+        Permission: "users.read" | "users.manage" | "clients.read" | "clients.manage" | "clients.log" | "leads.read" | "leads.manage" | "catalog.read" | "catalog.manage" | "quotes.read" | "quotes.manage" | "quotes.approve_discount" | "projects.read" | "projects.manage" | "tasks.read" | "tasks.request" | "tasks.work" | "tasks.manage" | "templates.read" | "templates.manage" | "content.read" | "content.manage" | "content.review" | "approvals.review_medical" | "calendar.read" | "shoots.manage" | "meetings.manage" | "campaigns.read" | "campaigns.manage" | "invoices.read" | "invoices.manage" | "payments.manage" | "reports.read" | "reports.finance" | "audit.read";
         /** @enum {string} */
         PermissionScope: "all" | "department" | "own_clients" | "assigned";
         UpdateOwnProfile: {
@@ -2376,7 +2536,7 @@ export interface components {
             details?: unknown;
         };
         /** @enum {string} */
-        NotificationCategory: "tasks" | "reminders" | "clients_projects";
+        NotificationCategory: "tasks" | "reminders" | "calendar" | "clients_projects";
         /** @description Newest `updatedAt` first */
         NotificationPage: {
             items: components["schemas"]["Notification"][];
@@ -3186,6 +3346,201 @@ export interface components {
             /** Format: date-time */
             updatedAt: string;
             /** @enum {string} */
+            type: "shoot_booked";
+            data: {
+                shoot: {
+                    title: string;
+                    client: string | null;
+                    /** Format: date-time */
+                    startsAt: string;
+                    /** Format: date-time */
+                    endsAt: string;
+                    location: string;
+                };
+            };
+        } | {
+            /** Format: uuid */
+            id: string;
+            actor: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            subject: {
+                type: components["schemas"]["NotificationSubjectType"];
+                /** Format: uuid */
+                id: string;
+            };
+            count: number;
+            read: boolean;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @enum {string} */
+            type: "shoot_dropped";
+            data: {
+                shoot: {
+                    title: string;
+                    client: string | null;
+                    /** Format: date-time */
+                    startsAt: string;
+                    /** Format: date-time */
+                    endsAt: string;
+                    location: string;
+                };
+                /** @enum {string} */
+                cause: "cancelled" | "removed";
+            };
+        } | {
+            /** Format: uuid */
+            id: string;
+            actor: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            subject: {
+                type: components["schemas"]["NotificationSubjectType"];
+                /** Format: uuid */
+                id: string;
+            };
+            count: number;
+            read: boolean;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @enum {string} */
+            type: "shoot_changed";
+            data: {
+                shoot: {
+                    title: string;
+                    client: string | null;
+                    /** Format: date-time */
+                    startsAt: string;
+                    /** Format: date-time */
+                    endsAt: string;
+                    location: string;
+                };
+                changes: ("time" | "location" | "lead")[];
+            };
+        } | {
+            /** Format: uuid */
+            id: string;
+            actor: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            subject: {
+                type: components["schemas"]["NotificationSubjectType"];
+                /** Format: uuid */
+                id: string;
+            };
+            count: number;
+            read: boolean;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @enum {string} */
+            type: "meeting_invited";
+            data: {
+                meeting: {
+                    title: string;
+                    client: string | null;
+                    /** Format: date-time */
+                    startsAt: string;
+                    /** Format: date-time */
+                    endsAt: string;
+                };
+            };
+        } | {
+            /** Format: uuid */
+            id: string;
+            actor: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            subject: {
+                type: components["schemas"]["NotificationSubjectType"];
+                /** Format: uuid */
+                id: string;
+            };
+            count: number;
+            read: boolean;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @enum {string} */
+            type: "meeting_dropped";
+            data: {
+                meeting: {
+                    title: string;
+                    client: string | null;
+                    /** Format: date-time */
+                    startsAt: string;
+                    /** Format: date-time */
+                    endsAt: string;
+                };
+                /** @enum {string} */
+                cause: "cancelled" | "removed";
+            };
+        } | {
+            /** Format: uuid */
+            id: string;
+            actor: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            subject: {
+                type: components["schemas"]["NotificationSubjectType"];
+                /** Format: uuid */
+                id: string;
+            };
+            count: number;
+            read: boolean;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @enum {string} */
+            type: "meeting_changed";
+            data: {
+                meeting: {
+                    title: string;
+                    client: string | null;
+                    /** Format: date-time */
+                    startsAt: string;
+                    /** Format: date-time */
+                    endsAt: string;
+                };
+                changes: ("time" | "place" | "link")[];
+            };
+        } | {
+            /** Format: uuid */
+            id: string;
+            actor: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            subject: {
+                type: components["schemas"]["NotificationSubjectType"];
+                /** Format: uuid */
+                id: string;
+            };
+            count: number;
+            read: boolean;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @enum {string} */
             type: "task_due_soon";
             data: {
                 task: {
@@ -3343,6 +3698,101 @@ export interface components {
             /** Format: date-time */
             updatedAt: string;
             /** @enum {string} */
+            type: "shoot_upcoming";
+            data: {
+                shoot: {
+                    title: string;
+                    client: string | null;
+                    /** Format: date-time */
+                    startsAt: string;
+                    /** Format: date-time */
+                    endsAt: string;
+                    location: string;
+                };
+            };
+        } | {
+            /** Format: uuid */
+            id: string;
+            actor: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            subject: {
+                type: components["schemas"]["NotificationSubjectType"];
+                /** Format: uuid */
+                id: string;
+            };
+            count: number;
+            read: boolean;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @enum {string} */
+            type: "shoot_not_closed";
+            data: {
+                shoot: {
+                    title: string;
+                    client: string | null;
+                    /** Format: date-time */
+                    startsAt: string;
+                    /** Format: date-time */
+                    endsAt: string;
+                    location: string;
+                };
+            };
+        } | {
+            /** Format: uuid */
+            id: string;
+            actor: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            subject: {
+                type: components["schemas"]["NotificationSubjectType"];
+                /** Format: uuid */
+                id: string;
+            };
+            count: number;
+            read: boolean;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @enum {string} */
+            type: "meeting_upcoming";
+            data: {
+                meeting: {
+                    title: string;
+                    client: string | null;
+                    /** Format: date-time */
+                    startsAt: string;
+                    /** Format: date-time */
+                    endsAt: string;
+                };
+            };
+        } | {
+            /** Format: uuid */
+            id: string;
+            actor: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            subject: {
+                type: components["schemas"]["NotificationSubjectType"];
+                /** Format: uuid */
+                id: string;
+            };
+            count: number;
+            read: boolean;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @enum {string} */
             type: "client_account_manager_assigned";
             data: {
                 client: string;
@@ -3402,7 +3852,7 @@ export interface components {
             };
         };
         /** @enum {string} */
-        NotificationSubjectType: "task" | "client" | "project" | "retainer" | "template_run" | "approval_request" | "post";
+        NotificationSubjectType: "task" | "client" | "project" | "retainer" | "template_run" | "approval_request" | "post" | "shoot" | "meeting";
         NotificationUnreadCount: {
             count: number;
         };
@@ -3418,7 +3868,7 @@ export interface components {
             }[];
         };
         /** @enum {string} */
-        NotificationType: "task_assigned" | "task_mentioned" | "task_returned" | "task_review_requested" | "task_medical_review_requested" | "task_awaiting_client" | "task_over_limit" | "approval_responded" | "approval_no_response" | "approval_expired" | "task_changed" | "task_commented" | "task_file_added" | "task_requested" | "tasks_generated" | "task_approved" | "task_opened" | "request_finished" | "post_returned" | "post_review_requested" | "post_medical_review_requested" | "post_awaiting_client" | "post_assigned" | "post_approved" | "post_task_ready" | "post_task_unlinked" | "task_due_soon" | "task_overdue" | "task_overdue_escalated" | "post_publish_today" | "post_publish_overdue" | "client_account_manager_assigned" | "project_manager_assigned" | "retainer_renewal_due";
+        NotificationType: "task_assigned" | "task_mentioned" | "task_returned" | "task_review_requested" | "task_medical_review_requested" | "task_awaiting_client" | "task_over_limit" | "approval_responded" | "approval_no_response" | "approval_expired" | "task_changed" | "task_commented" | "task_file_added" | "task_requested" | "tasks_generated" | "task_approved" | "task_opened" | "request_finished" | "post_returned" | "post_review_requested" | "post_medical_review_requested" | "post_awaiting_client" | "post_assigned" | "post_approved" | "post_task_ready" | "post_task_unlinked" | "shoot_booked" | "shoot_dropped" | "shoot_changed" | "meeting_invited" | "meeting_dropped" | "meeting_changed" | "task_due_soon" | "task_overdue" | "task_overdue_escalated" | "post_publish_today" | "post_publish_overdue" | "shoot_upcoming" | "shoot_not_closed" | "meeting_upcoming" | "client_account_manager_assigned" | "project_manager_assigned" | "retainer_renewal_due";
         UpdateNotificationSettings: {
             mutedTypes: components["schemas"]["NotificationType"][];
         };
@@ -5268,6 +5718,286 @@ export interface components {
         };
         ReturnPostTask: {
             note: string;
+        };
+        /** @description By user, then start time */
+        ConflictList: {
+            items: components["schemas"]["ScheduleConflict"][];
+        };
+        ScheduleConflict: {
+            user: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            };
+            kind: components["schemas"]["CalendarItemKind"];
+            /** Format: uuid */
+            id: string;
+            title: string;
+            /** Format: date-time */
+            startsAt: string;
+            /** Format: date-time */
+            endsAt: string;
+        };
+        /** @enum {string} */
+        CalendarItemKind: "shoot" | "meeting";
+        /** @enum {string} */
+        ShootStatus: "scheduled" | "completed" | "cancelled";
+        /** @description Shoots by start time, latest first */
+        ShootPage: {
+            items: components["schemas"]["Shoot"][];
+            total: number;
+            page: number;
+            pageSize: number;
+        };
+        Shoot: {
+            /** Format: uuid */
+            id: string;
+            title: string;
+            type: components["schemas"]["ShootType"];
+            status: components["schemas"]["ShootStatus"];
+            client: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                archived: boolean;
+            } | null;
+            /** Format: date-time */
+            startsAt: string;
+            /** Format: date-time */
+            endsAt: string;
+            location: string;
+            lead: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                archived: boolean;
+            };
+            crewCount: number;
+            conflict: boolean;
+            /** Format: date-time */
+            archivedAt: string | null;
+        };
+        /** @enum {string} */
+        ShootType: "product" | "video" | "event" | "people" | "other";
+        CreateShoot: {
+            title: string;
+            type: components["schemas"]["ShootType"];
+            /** Format: date-time */
+            startsAt: string;
+            /** Format: date-time */
+            endsAt: string;
+            location: string;
+            /** @default null */
+            mapUrl: string | null;
+            brief?: string | null;
+            crew: components["schemas"]["CrewMemberInput"][];
+            externalCrew?: components["schemas"]["ExternalCrewMember"][];
+            /** @default false */
+            acceptConflicts: boolean;
+            shots?: components["schemas"]["ShotInput"][];
+            /** Format: uuid */
+            taskId?: string;
+            newTask?: components["schemas"]["ShootTaskLinks"];
+            /** Format: uuid */
+            clientId?: string | null;
+        };
+        CrewMemberInput: {
+            /** Format: uuid */
+            userId: string;
+            role: components["schemas"]["CrewRole"];
+            /** @default false */
+            isLead: boolean;
+        };
+        /** @enum {string} */
+        CrewRole: "photographer" | "videographer" | "assistant" | "director" | "other";
+        ExternalCrewMember: {
+            name: string;
+            role: components["schemas"]["CrewRole"];
+            phone?: string | null;
+        };
+        ShotInput: {
+            /** Format: uuid */
+            id?: string;
+            text: string;
+            note?: string | null;
+        };
+        ShootTaskLinks: {
+            /**
+             * Format: uuid
+             * @default null
+             */
+            projectId: string | null;
+            /**
+             * Format: uuid
+             * @default null
+             */
+            milestoneId: string | null;
+            /**
+             * Format: uuid
+             * @default null
+             */
+            retainerCycleId: string | null;
+            /**
+             * Format: uuid
+             * @default null
+             */
+            cycleLineId: string | null;
+        };
+        ShootDetail: {
+            /** Format: uuid */
+            id: string;
+            title: string;
+            type: components["schemas"]["ShootType"];
+            status: components["schemas"]["ShootStatus"];
+            client: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                archived: boolean;
+            } | null;
+            /** Format: date-time */
+            startsAt: string;
+            /** Format: date-time */
+            endsAt: string;
+            location: string;
+            lead: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                archived: boolean;
+            };
+            crewCount: number;
+            conflict: boolean;
+            /** Format: date-time */
+            archivedAt: string | null;
+            mapUrl: string | null;
+            brief: string | null;
+            crew: components["schemas"]["CrewMember"][];
+            externalCrew: {
+                name: string;
+                role: components["schemas"]["CrewRole"];
+                phone: string | null;
+            }[];
+            shots: components["schemas"]["Shot"][];
+            task: {
+                /** Format: uuid */
+                id: string;
+                title: string;
+                department: components["schemas"]["DepartmentCode"];
+                status: components["schemas"]["TaskStatus"];
+                dependentCount: number;
+            };
+            editingTask: {
+                /** Format: uuid */
+                id: string;
+                title: string;
+                department: components["schemas"]["DepartmentCode"];
+                status: components["schemas"]["TaskStatus"];
+            } | null;
+            conflicts: components["schemas"]["ScheduleConflict"][];
+            closeNote: string | null;
+            rawFilesUrl: string | null;
+            /** Format: date-time */
+            completedAt: string | null;
+            completedBy: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            /** Format: date-time */
+            cancelledAt: string | null;
+            cancelReason: string | null;
+            createdBy: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            };
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            permissions: components["schemas"]["ShootPermissions"];
+        };
+        CrewMember: {
+            user: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                archived: boolean;
+            };
+            role: components["schemas"]["CrewRole"];
+            isLead: boolean;
+        };
+        Shot: {
+            /** Format: uuid */
+            id: string;
+            position: number;
+            text: string;
+            note: string | null;
+            /** Format: date-time */
+            doneAt: string | null;
+            doneBy: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+        };
+        /** @description What the caller may do, for the UI */
+        ShootPermissions: {
+            canEdit: boolean;
+            canTick: boolean;
+            canClose: boolean;
+            canCancel: boolean;
+            canReopen: boolean;
+            canArchive: boolean;
+        };
+        UpdateShoot: {
+            title?: string;
+            type?: components["schemas"]["ShootType"];
+            /** Format: date-time */
+            startsAt?: string;
+            /** Format: date-time */
+            endsAt?: string;
+            location?: string;
+            mapUrl?: string | null;
+            brief?: string | null;
+            crew?: components["schemas"]["CrewMemberInput"][];
+            externalCrew?: components["schemas"]["ExternalCrewMember"][];
+            /** @default false */
+            acceptConflicts: boolean;
+        };
+        ShotListInput: {
+            shots: components["schemas"]["ShotInput"][];
+        };
+        ShotDoneInput: {
+            done: boolean;
+        };
+        CloseShoot: {
+            note?: string | null;
+            /** @default null */
+            rawFilesUrl: string | null;
+            editingTask: components["schemas"]["EditingTaskInput"] | null;
+        };
+        EditingTaskInput: {
+            title: string;
+            department: components["schemas"]["DepartmentCode"];
+            /**
+             * Format: uuid
+             * @default null
+             */
+            assigneeId: string | null;
+            /** Format: date */
+            dueDate: string;
+            needsClientApproval: boolean;
+        };
+        CancelShoot: {
+            reason: string;
+            /** @default false */
+            cancelTask: boolean;
+        };
+        ReopenShoot: {
+            /** @default false */
+            acceptConflicts: boolean;
         };
         /** @description Tasks and posts ready to send, grouped by client, by name */
         ApprovalReady: {
@@ -9829,6 +10559,373 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["PostDetail"];
                 };
+            };
+        };
+    };
+    CalendarController_conflicts: {
+        parameters: {
+            query: {
+                userIds: string | string[];
+                startsAt: string;
+                endsAt: string;
+                excludeShootId?: string;
+                excludeMeetingId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The scheduled shoots and meetings of the users that overlap the time, by user then start */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConflictList"];
+                };
+            };
+        };
+    };
+    ShootsController_list: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+                status?: components["schemas"]["ShootStatus"] | components["schemas"]["ShootStatus"][];
+                from?: string;
+                to?: string;
+                clientId?: string;
+                userId?: string | "me";
+                taskId?: string;
+                q?: string;
+                archived?: "true" | "false";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Shoots, latest start first; `archived` needs `shoots.manage` over all shoots */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShootPage"];
+                };
+            };
+        };
+    };
+    ShootsController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateShoot"];
+            };
+        };
+        responses: {
+            /** @description The booked shoot (shoot scope on the client; no client needs scope all) */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShootDetail"];
+                };
+            };
+            /** @description `TASK_NOT_BOOKABLE`, `SCHEDULE_CONFLICT` (details: the conflicts), `CLIENT_ARCHIVED`, F06 link errors */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ShootsController_detail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A shoot with its crew, shot list, tasks and what the caller may do */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShootDetail"];
+                };
+            };
+        };
+    };
+    ShootsController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateShoot"];
+            };
+        };
+        responses: {
+            /** @description The edited shoot */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShootDetail"];
+                };
+            };
+            /** @description `SHOOT_NOT_SCHEDULED`, `SHOOT_ARCHIVED`, `SCHEDULE_CONFLICT` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ShootsController_saveShots: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ShotListInput"];
+            };
+        };
+        responses: {
+            /** @description The shoot with its new shot list; kept items keep their ticks */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShootDetail"];
+                };
+            };
+            /** @description `SHOOT_NOT_SCHEDULED`, `SHOOT_ARCHIVED` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ShootsController_tick: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                shotId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ShotDoneInput"];
+            };
+        };
+        responses: {
+            /** @description The shot, ticked or unticked (team crew or shoot scope) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Shot"];
+                };
+            };
+            /** @description `SHOOT_NOT_SCHEDULED`, `SHOOT_ARCHIVED` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ShootsController_close: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CloseShoot"];
+            };
+        };
+        responses: {
+            /** @description The completed shoot (shoot scope or its lead); its task is delivered and the editing task created */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShootDetail"];
+                };
+            };
+            /** @description `SHOOT_NOT_SCHEDULED`, `SHOOT_NOT_STARTED` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ShootsController_cancel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CancelShoot"];
+            };
+        };
+        responses: {
+            /** @description The cancelled shoot */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShootDetail"];
+                };
+            };
+            /** @description `SHOOT_NOT_SCHEDULED`, `SHOOT_ARCHIVED` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ShootsController_reopen: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReopenShoot"];
+            };
+        };
+        responses: {
+            /** @description The shoot, scheduled again */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShootDetail"];
+                };
+            };
+            /** @description `SHOOT_NOT_CANCELLED`, `TASK_NOT_BOOKABLE`, `SCHEDULE_CONFLICT` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ShootsController_archive: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The archived shoot (`shoots.manage` over all shoots) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShootDetail"];
+                };
+            };
+            /** @description `SHOOT_ARCHIVED` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ShootsController_restore: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The restored shoot (`shoots.manage` over all shoots) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShootDetail"];
+                };
+            };
+            /** @description `SHOOT_NOT_ARCHIVED`, `TASK_NOT_BOOKABLE` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

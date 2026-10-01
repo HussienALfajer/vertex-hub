@@ -178,7 +178,7 @@ describe('module boundaries', () => {
   });
 
   it('keeps notifications independent of the modules that emit them (ADR 0018)', () => {
-    const emitters = ['tasks', 'clients', 'projects', 'templates', 'content'];
+    const emitters = ['tasks', 'clients', 'projects', 'templates', 'content', 'calendar'];
     const offenders = imports
       .filter(
         ({ file, specifier }) => moduleOf(file) === 'notifications' && specifier.startsWith('.'),
@@ -232,6 +232,22 @@ describe('module boundaries', () => {
     expect(offenders).toEqual([]);
   });
 
+  it('keeps tasks, clients, projects and auth independent of calendar (ADR 0022)', () => {
+    const independent = ['tasks', 'clients', 'projects', 'auth'];
+    const offenders = imports
+      .filter(({ specifier }) => specifier.startsWith('.'))
+      .filter(({ file, specifier }) => {
+        const from = moduleOf(file);
+        return (
+          !!from &&
+          independent.includes(from) &&
+          moduleOf(resolve(dirname(file), specifier)) === 'calendar'
+        );
+      })
+      .map(({ file, specifier }) => `${display(file)} -> ${specifier}`);
+    expect(offenders).toEqual([]);
+  });
+
   /**
    * Which API module owns the tables of each schema file in packages/db (null: no API module
    * does). A new schema file must be added here, which forces the ownership decision.
@@ -240,6 +256,7 @@ describe('module boundaries', () => {
     approvals: 'approvals',
     audit: 'audit',
     auth: 'auth',
+    calendar: 'calendar',
     clients: 'clients',
     content: 'content',
     files: 'files',

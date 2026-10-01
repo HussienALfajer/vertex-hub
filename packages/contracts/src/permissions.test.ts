@@ -256,6 +256,57 @@ describe('content (F08)', () => {
   });
 });
 
+describe('calendar, shoots and meetings (F11)', () => {
+  const photographer = access(['employee'], [{ code: 'photography', isManager: false }]);
+  const photographyManager = access(
+    ['employee', 'department_manager'],
+    [{ code: 'photography', isManager: true }],
+  );
+  const operationsManager = access(
+    ['employee', 'department_manager'],
+    [{ code: 'internal_operations', isManager: true }],
+  );
+  const designManager = access(
+    ['employee', 'department_manager'],
+    [{ code: 'design', isManager: true }],
+  );
+  const accountManager = access(['employee', 'account_manager']);
+
+  it('lets every user read the whole calendar', () => {
+    expect(permissionScopes(access(['employee']), 'calendar.read')).toEqual(['all']);
+    for (const role of ['department_manager', 'account_manager', 'finance'] as const) {
+      expect(PERMISSION_MAP[role]['calendar.read'], role).toBeUndefined();
+    }
+  });
+
+  it('lets Photography members, their manager and the Operations manager manage every shoot', () => {
+    for (const user of [photographer, photographyManager, operationsManager]) {
+      expect(permissionScopes(user, 'shoots.manage')).toEqual(['all']);
+    }
+  });
+
+  it('lets account managers manage the shoots and meetings of their own clients', () => {
+    expect(permissionScopes(accountManager, 'shoots.manage')).toEqual(['own_clients']);
+    expect(permissionScopes(accountManager, 'meetings.manage')).toEqual([
+      'own_clients',
+      'assigned',
+    ]);
+  });
+
+  it('gives other departments and their managers no shoot management', () => {
+    expect(PERMISSION_MAP.department_manager['shoots.manage']).toBeUndefined();
+    for (const user of [access(['employee']), designManager]) {
+      expect(hasPermission(user, 'shoots.manage')).toBe(false);
+    }
+  });
+
+  it('lets every user manage the meetings they organize, and the Operations manager all', () => {
+    expect(permissionScopes(access(['employee']), 'meetings.manage')).toEqual(['assigned']);
+    expect(permissionScopes(photographyManager, 'meetings.manage')).toEqual(['assigned']);
+    expect(permissionScopes(operationsManager, 'meetings.manage')).toEqual(['all', 'assigned']);
+  });
+});
+
 describe('department capabilities', () => {
   it('only names known departments', () => {
     expect(Object.keys(DEPARTMENT_CAPABILITIES).sort()).toEqual([
@@ -264,6 +315,7 @@ describe('department capabilities', () => {
       'internal_operations',
       'marketing',
       'medical_consultation',
+      'photography',
     ]);
   });
 

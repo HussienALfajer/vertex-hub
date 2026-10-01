@@ -119,6 +119,21 @@ export const AUDIT_ACTIONS = [
   'post.duplicated',
   'post.archived',
   'post.restored',
+  'shoot.created',
+  'shoot.updated',
+  'shoot.shots_changed',
+  'shoot.shot_ticked',
+  'shoot.shot_unticked',
+  'shoot.completed',
+  'shoot.cancelled',
+  'shoot.reopened',
+  'shoot.archived',
+  'shoot.restored',
+  'meeting.created',
+  'meeting.updated',
+  'meeting.cancelled',
+  'meeting.archived',
+  'meeting.restored',
 ] as const;
 
 export const auditActionSchema = z.enum(AUDIT_ACTIONS).meta({ id: 'AuditAction' });
@@ -146,6 +161,8 @@ export const AUDIT_ENTITY_TYPES = [
   'file_item',
   'approval_request',
   'post',
+  'shoot',
+  'meeting',
 ] as const;
 
 export const auditEntityTypeSchema = z.enum(AUDIT_ENTITY_TYPES).meta({ id: 'AuditEntityType' });

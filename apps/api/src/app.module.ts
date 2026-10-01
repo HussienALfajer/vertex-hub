@@ -14,6 +14,7 @@ import { JobsModule } from './core/jobs/index.js';
 import { ApprovalsModule } from './modules/approvals/index.js';
 import { AuditModule } from './modules/audit/index.js';
 import { AuthModule } from './modules/auth/index.js';
+import { CalendarModule } from './modules/calendar/index.js';
 import { ClientsModule } from './modules/clients/index.js';
 import { ContentModule } from './modules/content/index.js';
 import { FilesModule } from './modules/files/index.js';
@@ -48,6 +49,7 @@ import { TemplatesModule } from './modules/templates/index.js';
     ProjectsModule,
     TasksModule,
     ContentModule,
+    CalendarModule,
     ApprovalsModule,
     TemplatesModule,
     HealthModule,

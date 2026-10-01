@@ -40,11 +40,20 @@ export const NOTIFICATION_TYPES = [
   'post_approved',
   'post_task_ready',
   'post_task_unlinked',
+  'shoot_booked',
+  'shoot_dropped',
+  'shoot_changed',
+  'meeting_invited',
+  'meeting_dropped',
+  'meeting_changed',
   'task_due_soon',
   'task_overdue',
   'task_overdue_escalated',
   'post_publish_today',
   'post_publish_overdue',
+  'shoot_upcoming',
+  'shoot_not_closed',
+  'meeting_upcoming',
   'client_account_manager_assigned',
   'project_manager_assigned',
   'retainer_renewal_due',
@@ -54,7 +63,12 @@ export const notificationTypeSchema = z.enum(NOTIFICATION_TYPES).meta({ id: 'Not
 
 export type NotificationType = z.infer<typeof notificationTypeSchema>;
 
-export const NOTIFICATION_CATEGORIES = ['tasks', 'reminders', 'clients_projects'] as const;
+export const NOTIFICATION_CATEGORIES = [
+  'tasks',
+  'reminders',
+  'calendar',
+  'clients_projects',
+] as const;
 
 export const notificationCategorySchema = z
   .enum(NOTIFICATION_CATEGORIES)
@@ -71,6 +85,8 @@ export const NOTIFICATION_SUBJECTS = [
   'template_run',
   'approval_request',
   'post',
+  'shoot',
+  'meeting',
 ] as const;
 
 export const notificationSubjectTypeSchema = z
@@ -99,6 +115,15 @@ export const NOTIFICATION_CATALOG: Record<
   post_approved: { category: 'tasks', subject: 'post', mutable: false },
   post_task_ready: { category: 'tasks', subject: 'post', mutable: true },
   post_task_unlinked: { category: 'tasks', subject: 'post', mutable: false },
+  shoot_booked: { category: 'calendar', subject: 'shoot', mutable: true },
+  shoot_dropped: { category: 'calendar', subject: 'shoot', mutable: true },
+  shoot_changed: { category: 'calendar', subject: 'shoot', mutable: true },
+  shoot_upcoming: { category: 'calendar', subject: 'shoot', mutable: true },
+  shoot_not_closed: { category: 'calendar', subject: 'shoot', mutable: false },
+  meeting_invited: { category: 'calendar', subject: 'meeting', mutable: true },
+  meeting_dropped: { category: 'calendar', subject: 'meeting', mutable: true },
+  meeting_changed: { category: 'calendar', subject: 'meeting', mutable: true },
+  meeting_upcoming: { category: 'calendar', subject: 'meeting', mutable: true },
   approval_responded: { category: 'tasks', subject: 'approval_request', mutable: false },
   approval_no_response: { category: 'reminders', subject: 'approval_request', mutable: false },
   approval_expired: { category: 'reminders', subject: 'approval_request', mutable: false },
@@ -199,6 +224,36 @@ const postData = z.object({
   }),
 });
 
+/** A shoot as it was when the notification was sent (F11). */
+const shootData = z.object({
+  shoot: z.object({
+    title: nameSchema,
+    client: nameSchema.nullable(),
+    startsAt: z.iso.datetime(),
+    endsAt: z.iso.datetime(),
+    location: z.string(),
+  }),
+});
+
+/** A meeting as it was when the notification was sent (F11). */
+const meetingData = z.object({
+  meeting: z.object({
+    title: nameSchema,
+    client: nameSchema.nullable(),
+    startsAt: z.iso.datetime(),
+    endsAt: z.iso.datetime(),
+  }),
+});
+
+/** What changed on a scheduled shoot that its crew is told about. */
+export const SHOOT_CHANGES = ['time', 'location', 'lead'] as const;
+
+/** What changed on a meeting that its people are told about. */
+export const MEETING_CHANGES = ['time', 'place', 'link'] as const;
+
+/** Why someone left a shoot or a meeting. */
+export const CALENDAR_DROP_CAUSES = ['cancelled', 'removed'] as const;
+
 export const NOTIFICATION_DATA_SCHEMAS = {
   task_assigned: taskData,
   task_mentioned: commentData,
@@ -220,6 +275,15 @@ export const NOTIFICATION_DATA_SCHEMAS = {
     taskTitle: nameSchema,
     reason: z.enum(POST_TASK_UNLINK_REASONS),
   }),
+  shoot_booked: shootData,
+  shoot_dropped: shootData.extend({ cause: z.enum(CALENDAR_DROP_CAUSES) }),
+  shoot_changed: shootData.extend({ changes: z.array(z.enum(SHOOT_CHANGES)).min(1) }),
+  shoot_upcoming: shootData,
+  shoot_not_closed: shootData,
+  meeting_invited: meetingData,
+  meeting_dropped: meetingData.extend({ cause: z.enum(CALENDAR_DROP_CAUSES) }),
+  meeting_changed: meetingData.extend({ changes: z.array(z.enum(MEETING_CHANGES)).min(1) }),
+  meeting_upcoming: meetingData,
   /** Merged per request like `task_commented`: the latest decision, `count` decisions. */
   approval_responded: approvalData.extend({ decision: z.enum(CLIENT_DECISIONS) }),
   approval_no_response: approvalData,
@@ -386,6 +450,9 @@ export const NOTIFICATION_REMINDER_KINDS = [
   'renewal_reached',
   'post_publish_today',
   'post_publish_overdue',
+  'shoot_upcoming',
+  'shoot_not_closed',
+  'meeting_upcoming',
 ] as const;
 
 export type NotificationReminderKind = (typeof NOTIFICATION_REMINDER_KINDS)[number];

@@ -47,6 +47,10 @@ const NOT_BUSINESS_RECORDS: Record<string, string> = {
   notification_settings: 'Personal mute settings, one row per user (F14)',
   notification_reminders: 'Idempotency keys of the daily job, insert-only (F14 rule 8)',
   file_uploads: 'Temporary: deleted when attached or purged after 24 hours (F10)',
+  shoot_crew: 'Link table; a crew member is added or removed, never archived (F11)',
+  shoot_shots: "Part of its shoot's shot list; removed with the list edit, never archived (F11)",
+  meeting_attendees: 'Link table; an attendee is added or removed, never archived (F11)',
+  meeting_contacts: 'Link table; a contact is added or removed, never archived (F11)',
 };
 
 /** Tables keyed by a natural value instead of a UUIDv7 `id`. Every entry needs a reason. */

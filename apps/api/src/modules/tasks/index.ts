@@ -15,6 +15,12 @@ export {
   PostTasks,
 } from './post-tasks.js';
 export {
+  type EditingTaskDraft,
+  type ShootTask,
+  type ShootTaskLinks,
+  ShootTasks,
+} from './shoot-tasks.js';
+export {
   type LinkResponse,
   type ResponseSummary,
   type ReviewSnapshot,
@@ -22,4 +28,5 @@ export {
   TaskApprovals,
 } from './task-approvals.js';
 export { type TaskDraft, TaskGenerator } from './task-generator.js';
+export { type TaskGuard, TaskGuards } from './task-guards.js';
 export { TasksModule } from './tasks.module.js';

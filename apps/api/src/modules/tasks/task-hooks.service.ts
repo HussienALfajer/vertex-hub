@@ -9,7 +9,23 @@ import { ResponsibilityRegistry } from '../auth/index.js';
 import { EngagementDirectory, WorkProgress } from '../projects/index.js';
 import { ClientReviewHooks } from './client-review-hooks.js';
 import { PostTaskHooks, unlinkRemovedTask } from './post-task-hooks.js';
+import { TaskGuards } from './task-guards.js';
 import { blocksDependents, TaskNotices } from './task-notices.js';
+
+/** What cancelling needs of an open task, read under its lock. */
+export type CancelledTask = Pick<
+  typeof tasks.$inferSelect,
+  'id' | 'title' | 'status' | 'extraWorkItemId' | 'postId'
+>;
+
+/** The columns of `CancelledTask`. */
+export const cancelledColumns = {
+  id: tasks.id,
+  title: tasks.title,
+  status: tasks.status,
+  extraWorkItemId: tasks.extraWorkItemId,
+  postId: tasks.postId,
+};
 
 /**
  * What tasks feed into other modules (spec F06, "Links F06 fills in F05" and "Changes to F01"):
@@ -25,6 +41,7 @@ export class TaskHooksService implements OnModuleInit {
     private readonly notices: TaskNotices,
     private readonly reviewHooks: ClientReviewHooks,
     private readonly postHooks: PostTaskHooks,
+    private readonly guards: TaskGuards,
   ) {}
 
   onModuleInit(): void {
@@ -104,18 +121,31 @@ export class TaskHooksService implements OnModuleInit {
     actor: AuditActor,
   ): Promise<void> {
     const open = await tx
-      .select({
-        id: tasks.id,
-        title: tasks.title,
-        status: tasks.status,
-        extraWorkItemId: tasks.extraWorkItemId,
-        postId: tasks.postId,
-      })
+      .select(cancelledColumns)
       .from(tasks)
       .where(this.openTaskFilter(projectId))
       // By id, the order every task lock set follows, so a concurrent move cannot deadlock.
       .orderBy(asc(tasks.id))
       .for('update');
+    // F11 edge case 7: a task a scheduled shoot holds keeps the project open.
+    await this.guards.assertFree(
+      tx,
+      open.map((task) => task.id),
+    );
+    await this.cancelLocked(tx, open, reason, actor, { projectId });
+  }
+
+  /**
+   * Cancels open tasks the caller locked, with the reason and `context` (what cancelled them) in
+   * each audit entry: unbilled extra work withdrawn, client review left, post unlinked, notices.
+   */
+  async cancelLocked(
+    tx: Transaction,
+    open: CancelledTask[],
+    reason: string,
+    actor: AuditActor,
+    context: Record<string, string>,
+  ): Promise<void> {
     if (open.length === 0) return;
     await tx
       .update(tasks)
@@ -152,7 +182,7 @@ export class TaskHooksService implements OnModuleInit {
         after: {
           status: 'cancelled',
           note: reason,
-          projectId,
+          ...context,
           ...(withdrawn && { extraWorkItemId: null }),
         },
       });

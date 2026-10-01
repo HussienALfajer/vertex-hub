@@ -13,11 +13,19 @@ describe('notification catalog', () => {
     const mutable = NOTIFICATION_TYPES.filter(isMutableNotificationType);
     expect(mutable.sort()).toEqual(
       [
+        'meeting_changed',
+        'meeting_dropped',
+        'meeting_invited',
+        'meeting_upcoming',
         'post_assigned',
         'post_publish_today',
         'post_task_ready',
         'request_finished',
         'retainer_renewal_due',
+        'shoot_booked',
+        'shoot_changed',
+        'shoot_dropped',
+        'shoot_upcoming',
         'task_approved',
         'task_changed',
         'task_commented',
@@ -33,6 +41,7 @@ describe('notification catalog', () => {
     const all = [
       ...notificationTypesOf('tasks'),
       ...notificationTypesOf('reminders'),
+      ...notificationTypesOf('calendar'),
       ...notificationTypesOf('clients_projects'),
     ];
     expect(all.sort()).toEqual([...NOTIFICATION_TYPES].sort());

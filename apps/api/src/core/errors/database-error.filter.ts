@@ -15,6 +15,7 @@ const UNIQUE_CODES: Record<string, ErrorCode> = {
   work_templates_name_idx: 'TEMPLATE_NAME_TAKEN',
   template_runs_one_full_run_idx: 'ALREADY_GENERATED',
   file_items_name_unique: 'FILE_NAME_TAKEN',
+  shoots_task_active_unique: 'TASK_NOT_BOOKABLE',
 };
 
 /** PostgreSQL codes of a write that lost a race: unique violation, deadlock, serialization. */
