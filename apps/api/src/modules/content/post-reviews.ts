@@ -1,9 +1,10 @@
 import { Inject, Injectable } from '@nestjs/common';
 import {
-  type ApprovalVersion,
   fileTypeOf,
+  isClientReturn,
   type PostClientResponse,
   type PostDetail,
+  type PostMedia as PostMediaVersion,
   type PostReview,
   postContentToken,
   type ReviewStage,
@@ -17,7 +18,9 @@ import { type AuditActor, recordAudit } from '../audit/index.js';
 import { UserDirectory } from '../auth/index.js';
 import { ClientDirectory } from '../clients/index.js';
 import { FileVersions } from '../files/index.js';
+import type { LinkedTask } from '../tasks/index.js';
 import type { PostAccess, PostRow } from './post-access.js';
+import { PostMedia } from './post-media.js';
 import { toTimeOfDay } from './post-notices.js';
 
 type Executor = Database | Transaction;
@@ -26,9 +29,13 @@ type ReviewRow = typeof postReviews.$inferSelect;
 
 /** What a review looks at (rule 11): the media, the caption and the hashtags. */
 export interface PostContent {
-  media: ApprovalVersion[];
+  media: PostMediaVersion[];
   versionIds: string[];
   token: string;
+  /** The tasks linked to the post, by link time. */
+  tasks: LinkedTask[];
+  /** It has linked tasks or media: where reopening a cancelled post goes (rule 19). */
+  hasWork: boolean;
 }
 
 /** What a pass stores: the media in display order and the post as the client is shown it. */
@@ -51,6 +58,7 @@ export class PostReviews {
     private readonly files: FileVersions,
     private readonly users: UserDirectory,
     private readonly clients: ClientDirectory,
+    private readonly media: PostMedia,
   ) {}
 
   /** Rules 5 and 11: the media of the post now, in display order, with the content token. */
@@ -58,9 +66,13 @@ export class PostReviews {
     executor: Executor,
     post: Pick<PostRow, 'id' | 'caption' | 'hashtags'>,
   ): Promise<PostContent> {
-    const versions = (await this.files.postMedia([post.id], executor)).get(post.id) ?? [];
+    const work = (await this.media.of([post.id], executor)).get(post.id);
+    const versions = work?.media ?? [];
+    const tasks = work?.tasks ?? [];
     const versionIds = versions.map((version) => version.id);
     return {
+      tasks,
+      hasWork: versions.length > 0 || tasks.length > 0,
       media: versions.map((version) => ({
         id: version.id,
         fileItemId: version.fileItemId,
@@ -69,6 +81,7 @@ export class PostReviews {
         kind: version.kind,
         type: fileTypeOf(version.kind, version.mimeType),
         previewStatus: version.previewStatus,
+        task: version.task,
       })),
       versionIds,
       token: postContentToken(versionIds, post.caption, post.hashtags),
@@ -189,6 +202,36 @@ export class PostReviews {
       .from(postReviews)
       .where(eq(postReviews.id, post.clearedReviewId));
     return pass?.stage ?? null;
+  }
+
+  /**
+   * Rule 12: the client response that sent the post back, while nothing was reviewed or answered
+   * since; null when the post came back another way.
+   */
+  async returningResponse(
+    executor: Executor,
+    postId: string,
+  ): Promise<{ id: string; contactId: string } | null> {
+    const [[review], [response]] = await Promise.all([
+      executor
+        .select({ createdAt: postReviews.createdAt })
+        .from(postReviews)
+        .where(eq(postReviews.postId, postId))
+        .orderBy(desc(postReviews.createdAt), desc(postReviews.id))
+        .limit(1),
+      executor
+        .select()
+        .from(postClientResponses)
+        .where(eq(postClientResponses.postId, postId))
+        .orderBy(desc(postClientResponses.createdAt), desc(postClientResponses.id))
+        .limit(1),
+    ]);
+    if (!response) return null;
+    const reviewedSince = !!review && review.createdAt > response.createdAt;
+    const latest = reviewedSince
+      ? { kind: 'review' as const, changesRequested: false }
+      : { kind: 'response' as const, changesRequested: response.decision === 'changes_requested' };
+    return isClientReturn(latest) ? { id: response.id, contactId: response.contactId } : null;
   }
 
   /** The reviews and client responses of a post, oldest first, for its page. */

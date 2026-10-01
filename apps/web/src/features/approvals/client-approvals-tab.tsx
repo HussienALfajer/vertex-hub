@@ -92,13 +92,20 @@ function ResponseRow({ response }: { response: ClientResponseEntry }) {
   return (
     <li className="flex flex-col gap-2 rounded-lg border border-border bg-surface p-4 text-sm">
       <div className="flex flex-wrap items-center gap-2">
-        <Link
-          to="/tasks/$taskId"
-          params={{ taskId: response.task.id }}
-          className="font-medium hover:underline"
-        >
-          {response.task.title}
-        </Link>
+        {response.task ? (
+          <Link
+            to="/tasks/$taskId"
+            params={{ taskId: response.task.id }}
+            className="font-medium hover:underline"
+          >
+            {response.task.title}
+          </Link>
+        ) : (
+          // A response on a post: its page arrives with the F08 screens.
+          <span className="font-medium" dir="auto">
+            {response.post?.title}
+          </span>
+        )}
         <Badge tone={response.decision === 'approved' ? 'success' : 'warning'}>
           {t(`tasks.responses.decisions.${response.decision}`)}
         </Badge>

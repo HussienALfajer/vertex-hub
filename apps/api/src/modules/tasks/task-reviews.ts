@@ -150,6 +150,8 @@ export class TaskReviews {
     contactId: string | null,
     /** Null for changes the client asked for through an approval link. */
     authorId: string | null,
+    /** F08 rule 12: the client response on the task's post that caused a client revision. */
+    postResponseId: string | null = null,
   ) {
     let number: number | null = null;
     if (source === 'client') {
@@ -167,6 +169,7 @@ export class TaskReviews {
       contactId: source === 'client' ? contactId : null,
       overLimit: number !== null && number > task.revisionLimit,
       authorId,
+      postResponseId,
     };
     const [revision] = await tx
       .insert(taskRevisions)

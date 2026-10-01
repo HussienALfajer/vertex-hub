@@ -15,6 +15,7 @@ describe('notification catalog', () => {
       [
         'post_assigned',
         'post_publish_today',
+        'post_task_ready',
         'request_finished',
         'retainer_renewal_due',
         'task_approved',

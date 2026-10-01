@@ -133,6 +133,22 @@ export function notificationText(
         }),
         context: notification.data.post.client,
       };
+    case 'post_task_ready':
+      return {
+        text: t('notifications.text.post_task_ready', {
+          task: notification.data.taskTitle,
+          post: notification.data.post.title,
+        }),
+        context: notification.data.post.client,
+      };
+    case 'post_task_unlinked':
+      return {
+        text: t(`notifications.text.post_task_unlinked.${notification.data.reason}`, {
+          task: notification.data.taskTitle,
+          post: notification.data.post.title,
+        }),
+        context: notification.data.post.client,
+      };
     case 'post_assigned':
     case 'post_review_requested':
     case 'post_medical_review_requested':

@@ -9,7 +9,7 @@ Everything a new module, permission, error or screen must be connected to. Tests
 - [ ] Every schema the API exposes has `.meta({ id })`; list responses use `pageSchema(item)` from `lists.ts` with their own id.
 - [ ] Permissions: the `<module>.*` entries in `PERMISSIONS` and their grants in `PERMISSION_MAP` (`permissions.ts`) match the spec's "Roles and access" table; a grant with a new scope gets a case in `permissions.test.ts`.
 - [ ] New error codes added to `ERROR_CODES` (`errors.ts`).
-- [ ] New error codes, audit actions, audit entity types and responsibility types get their `ar.json` keys in the **same PR**, even an API-only one: the web app's translation keys are typed, so `web` typecheck fails without them (then regenerate the API client, see bridge).
+- [ ] New error codes, audit actions, audit entity types, responsibility types, notification types (their settings label and their text, rendered in `features/notifications/notification-content.ts`) and other translated value lists (approval withdrawn reasons) get their `ar.json` keys in the **same PR**, even an API-only one: the web app's translation keys are typed, so `web` typecheck fails without them (then regenerate the API client, see bridge).
 - [ ] New audit actions (`<entity>.<verb>`) and entity types added to `AUDIT_ACTIONS` and `AUDIT_ENTITY_TYPES` (`audit.ts`).
 - [ ] Fixed value lists (statuses, kinds) are `as const` arrays with a `z.enum`, reused by the db enum.
 
@@ -34,6 +34,7 @@ Everything a new module, permission, error or screen must be connected to. Tests
 
 ### bridge
 - [ ] `apps/web/src/lib/api/openapi.json` and `schema.gen.ts` regenerated and committed **(CI: OpenAPI drift)**.
+- [ ] A changed response shape of an earlier feature: its screens and the mocks in `apps/web/e2e/fixtures.ts` are adapted in the same PR, so `web` typecheck and E2E stay green.
 
 ### web (`apps/web/src/`)
 - [ ] `features/<module>/<module>.queries.ts`: a `<module>Keys` object whose keys start with the module name; mutations invalidate every query the change affects (other modules' lists, `['me']` when access changes).

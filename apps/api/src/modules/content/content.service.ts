@@ -40,6 +40,7 @@ import {
   isNull,
   lt,
   lte,
+  or,
   type SQL,
   sql,
 } from 'drizzle-orm';
@@ -48,8 +49,8 @@ import { CodedException } from '../../core/errors/index.js';
 import { changedFields, recordAudit } from '../audit/index.js';
 import { type CurrentUserInfo, lockAccessChanges, UserDirectory } from '../auth/index.js';
 import { ClientDirectory, type ClientSummary } from '../clients/index.js';
-import { FileVersions } from '../files/index.js';
 import { EngagementDirectory } from '../projects/index.js';
+import { countedTwice, PostTasks } from '../tasks/index.js';
 import {
   actorOf,
   assertPostWritable,
@@ -61,7 +62,9 @@ import {
   postRights,
   readablePost,
 } from './post-access.js';
+import { PostMedia } from './post-media.js';
 import { PostNotices, toTimeOfDay } from './post-notices.js';
+import { PostReviewHooks } from './post-review-hooks.js';
 import { PostReviews } from './post-reviews.js';
 
 type Executor = Database | Transaction;
@@ -73,6 +76,11 @@ const TO_PUBLISH: PostStatus[] = ['approved', 'scheduled'];
 
 const countWhere = (condition: SQL) =>
   sql<number>`count(*) filter (where ${condition})`.mapWith(Number);
+
+/** The pass that cleared the post for the client is a medical one (rule 20). */
+const clearedByMedicalSql = sql<boolean>`exists (
+  select 1 from ${postReviews} as p
+  where p.id = "content_posts"."cleared_review_id" and p.stage = 'medical')`;
 
 /**
  * SQL over a row of `content_posts`: the latest review or client response sent the post back
@@ -105,9 +113,11 @@ export class ContentService {
     private readonly users: UserDirectory,
     private readonly clients: ClientDirectory,
     private readonly engagements: EngagementDirectory,
-    private readonly files: FileVersions,
+    private readonly media: PostMedia,
+    private readonly tasks: PostTasks,
     private readonly reviews: PostReviews,
     private readonly notices: PostNotices,
+    private readonly reviewHooks: PostReviewHooks,
   ) {}
 
   async calendar(actor: CurrentUserInfo, query: ContentCalendarQuery): Promise<ContentCalendar> {
@@ -189,21 +199,29 @@ export class ContentService {
   async detail(actor: CurrentUserInfo, id: string): Promise<PostDetail> {
     const post = await readablePost(this.db, this.clients, actor, id);
     const now = new Date();
-    const [[item], content, review, clearedStage, people, responsibleAccess, cycleLine] =
+    const [[item], content, review, clearedStage, responsibleAccess, cycleLine, pending] =
       await Promise.all([
         this.present([post], now),
         this.reviews.content(this.db, post),
         this.reviews.detail(post),
         this.reviews.clearedStage(this.db, post),
-        this.users.summaries([
-          post.createdById,
-          ...(post.publishedById ? [post.publishedById] : []),
-        ]),
         this.users.access(post.responsibleId),
         this.cycleLineOf(post),
+        this.reviewHooks.pending([id], this.db),
       ]);
     if (!item) throw new Error(`Post ${id} was not presented`);
+    const [people, taskLines] = await Promise.all([
+      this.users.summaries([
+        post.createdById,
+        ...(post.publishedById ? [post.publishedById] : []),
+        ...content.tasks.flatMap((task) => (task.assigneeId ? [task.assigneeId] : [])),
+      ]),
+      this.engagements.cycleLines(
+        content.tasks.flatMap((task) => (task.cycleLineId ? [task.cycleLineId] : [])),
+      ),
+    ]);
     const person = (userId: string) => ({ id: userId, name: people.get(userId)?.name ?? '' });
+    const pendingApproval = pending.get(id) ?? null;
     return {
       ...item,
       client: { id: post.client.id, name: post.client.name, healthcare: post.client.isHealthcare },
@@ -222,9 +240,26 @@ export class ContentService {
       notes: post.notes,
       needsClientApproval: post.needsClientApproval,
       media: content.media,
+      linkedTasks: content.tasks.map((task) => {
+        const line = task.cycleLineId ? taskLines.get(task.cycleLineId) : undefined;
+        return {
+          id: task.id,
+          title: task.title,
+          department: task.department,
+          assignee: task.assigneeId ? (people.get(task.assigneeId) ?? null) : null,
+          status: task.status,
+          cycleLine: line ? { id: line.id, kind: line.kind, label: line.label } : null,
+        };
+      }),
       cycleLine,
       contentToken: content.token,
       ...review,
+      pendingApproval: pendingApproval && {
+        requestId: pendingApproval.requestId,
+        state: pendingApproval.state,
+        issuedAt: pendingApproval.issuedAt.toISOString(),
+        expiresAt: pendingApproval.expiresAt.toISOString(),
+      },
       scheduledAt: post.scheduledAt?.toISOString() ?? null,
       publishedAt: post.publishedAt?.toISOString() ?? null,
       publishedBy: post.publishedById ? person(post.publishedById) : null,
@@ -236,7 +271,10 @@ export class ContentService {
       updatedAt: post.updatedAt.toISOString(),
       archivedAt: post.archivedAt?.toISOString() ?? null,
       readOnly: !!post.archivedAt || post.client.archived,
-      ...postPermissions(actor, post, content.media.length > 0, clearedStage),
+      ...postPermissions(actor, post, content.hasWork, {
+        waiting: pendingApproval?.state === 'open',
+        clearedStage,
+      }),
     };
   }
 
@@ -329,6 +367,9 @@ export class ContentService {
       }
       if (diff.after.cycleLineId) {
         await this.assertCycleLine(tx, post.clientId, diff.after.cycleLineId);
+        // Rule 16: a unit counts once, through a linked task's line or the post's own.
+        const linked = (await this.tasks.linked([id], tx)).get(id) ?? [];
+        if (linked.some((task) => task.cycleLineId)) throw countedTwice();
       }
       if (diff.after.publishedAt && new Date(diff.after.publishedAt) > new Date()) {
         throw new CodedException(400, 'INVALID_DATES', 'The publish time is in the future');
@@ -441,12 +482,29 @@ export class ContentService {
         entityId: id,
         after: { title: post.title, clientId: post.clientId },
       });
+      // Rule 25: an archived post is no longer with the client.
+      if (archived && post.status === 'awaiting_client') {
+        await this.reviewHooks.left(tx, { postId: id, actor: actorOf(actor), response: null });
+      }
     });
   }
 
   /** SQL over a row of `content_posts`: shown in calendars and counts (rule 2). */
   visibleSql(): SQL {
     return and(isNull(contentPosts.archivedAt), this.clients.isLive(contentPosts.clientId)) as SQL;
+  }
+
+  /**
+   * SQL over a row of `content_posts`: ready to send to the client (rule 20): awaiting the
+   * client, without a pending item in an open request, and for a healthcare client cleared by a
+   * medical pass.
+   */
+  readyToSendSql(): SQL {
+    return and(
+      eq(contentPosts.status, 'awaiting_client'),
+      sql`not ${this.reviewHooks.waitingSql(contentPosts.id)}`,
+      or(sql`not ${this.clients.isHealthcare(contentPosts.clientId)}`, clearedByMedicalSql),
+    ) as SQL;
   }
 
   /**
@@ -488,7 +546,7 @@ export class ContentService {
   /** The filters the calendar and the list share. */
   private filters(
     actor: CurrentUserInfo,
-    query: Pick<PostListQuery, 'clientId' | 'platform' | 'type' | 'responsible'>,
+    query: Pick<PostListQuery, 'clientId' | 'platform' | 'type' | 'responsible' | 'reviewStage'>,
   ): (SQL | undefined)[] {
     return [
       holdsAll(actor, 'content.read') ? undefined : sql`false`,
@@ -498,11 +556,12 @@ export class ContentService {
       query.responsible
         ? eq(contentPosts.responsibleId, query.responsible === 'me' ? actor.id : query.responsible)
         : undefined,
+      query.reviewStage ? eq(contentPosts.reviewStage, query.reviewStage) : undefined,
     ];
   }
 
   /** By publish date, then time (posts without one last). */
-  private publishOrder() {
+  publishOrder() {
     return [
       asc(contentPosts.publishDate),
       sql`${contentPosts.publishTime} asc nulls last`,
@@ -510,11 +569,12 @@ export class ContentService {
     ];
   }
 
-  private async present(rows: PostRow[], now: Date): Promise<Post[]> {
-    const [clients, people, media] = await Promise.all([
+  /** List items for post rows, with their people, media and linked tasks. */
+  async present(rows: PostRow[], now: Date): Promise<Post[]> {
+    const [clients, people, work] = await Promise.all([
       this.clients.summaries(rows.map((row) => row.clientId)),
       this.users.summaries(rows.map((row) => row.responsibleId)),
-      this.files.postMedia(rows.map((row) => row.id)),
+      this.media.of(rows.map((row) => row.id)),
     ]);
     return rows.map((row) => ({
       id: row.id,
@@ -532,9 +592,8 @@ export class ContentService {
         archived: true,
       },
       thumbnailVersionId:
-        media.get(row.id)?.find((version) => version.previewStatus === 'ready')?.id ?? null,
-      // Linked tasks arrive with `PostTasks` (F08 rules 6–9).
-      linkedTaskCount: 0,
+        work.get(row.id)?.media.find((version) => version.previewStatus === 'ready')?.id ?? null,
+      linkedTaskCount: work.get(row.id)?.tasks.length ?? 0,
       overdue: isPostOverdue(row, now),
     }));
   }

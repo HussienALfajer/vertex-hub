@@ -103,6 +103,16 @@ export function nthWorkDay(start: CalendarDate, n: number): CalendarDate {
   return date;
 }
 
+/** The work day `n` work days before `date`. */
+export function workDaysBefore(date: CalendarDate, n: number): CalendarDate {
+  let day = date;
+  for (let count = 0; count < n; ) {
+    day = addDays(day, -1);
+    if (isWorkDay(day)) count += 1;
+  }
+  return day;
+}
+
 /** The work days in `[from, to]`, in order; empty when `to` is before `from`. */
 export function workDaysBetween(from: CalendarDate, to: CalendarDate): CalendarDate[] {
   const days: CalendarDate[] = [];

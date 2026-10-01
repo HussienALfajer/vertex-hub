@@ -8,6 +8,7 @@ import { type AuditActor, recordAudit } from '../audit/index.js';
 import { ResponsibilityRegistry } from '../auth/index.js';
 import { EngagementDirectory, WorkProgress } from '../projects/index.js';
 import { ClientReviewHooks } from './client-review-hooks.js';
+import { PostTaskHooks, unlinkRemovedTask } from './post-task-hooks.js';
 import { blocksDependents, TaskNotices } from './task-notices.js';
 
 /**
@@ -23,6 +24,7 @@ export class TaskHooksService implements OnModuleInit {
     private readonly engagements: EngagementDirectory,
     private readonly notices: TaskNotices,
     private readonly reviewHooks: ClientReviewHooks,
+    private readonly postHooks: PostTaskHooks,
   ) {}
 
   onModuleInit(): void {
@@ -102,7 +104,13 @@ export class TaskHooksService implements OnModuleInit {
     actor: AuditActor,
   ): Promise<void> {
     const open = await tx
-      .select({ id: tasks.id, status: tasks.status, extraWorkItemId: tasks.extraWorkItemId })
+      .select({
+        id: tasks.id,
+        title: tasks.title,
+        status: tasks.status,
+        extraWorkItemId: tasks.extraWorkItemId,
+        postId: tasks.postId,
+      })
       .from(tasks)
       .where(this.openTaskFilter(projectId))
       // By id, the order every task lock set follows, so a concurrent move cannot deadlock.
@@ -152,6 +160,8 @@ export class TaskHooksService implements OnModuleInit {
       if (task.status === 'awaiting_client') {
         await this.reviewHooks.left(tx, { taskId: task.id, actor, response: null });
       }
+      // F08 rule 8: a cancelled task leaves its post.
+      await unlinkRemovedTask(tx, this.postHooks, task, 'cancelled', actor);
       const cancelled = await this.notices.load(tx, task.id);
       await this.notices.send(tx, this.notices.cancelled(cancelled, actor.id));
     }

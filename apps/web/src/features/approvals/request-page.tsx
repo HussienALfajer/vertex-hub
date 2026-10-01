@@ -266,13 +266,16 @@ function ItemCard({ item }: { item: ApprovalItem }) {
           <h2 className="text-base font-bold" dir="auto">
             {item.title}
           </h2>
-          <Link
-            to="/tasks/$taskId"
-            params={{ taskId: item.task.id }}
-            className="w-fit text-sm text-muted-foreground hover:text-foreground hover:underline"
-          >
-            {t('approvals.requestPage.task', { title: item.task.title })}
-          </Link>
+          {/* A post item shows its title only: its page arrives with the F08 screens. */}
+          {item.task && (
+            <Link
+              to="/tasks/$taskId"
+              params={{ taskId: item.task.id }}
+              className="w-fit text-sm text-muted-foreground hover:text-foreground hover:underline"
+            >
+              {t('approvals.requestPage.task', { title: item.task.title })}
+            </Link>
+          )}
         </div>
         <ItemStatusBadge status={item.status} />
       </div>

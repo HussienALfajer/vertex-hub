@@ -12,6 +12,7 @@ const ids = {
   contact: '0199a000-0000-7000-8000-000000000002',
   task: '0199a000-0000-7000-8000-000000000003',
   other: '0199a000-0000-7000-8000-000000000004',
+  post: '0199a000-0000-7000-8000-000000000005',
 };
 
 describe('approvalRequestState', () => {
@@ -83,11 +84,24 @@ describe('createApprovalRequestSchema', () => {
     ).toBe(false);
   });
 
-  it('leaves the limit of tasks in one request to the API (LIMIT_REACHED)', () => {
+  it('mixes tasks and posts, each once, and an item is one or the other (F08 rule 21)', () => {
+    const mixed = createApprovalRequestSchema.parse({
+      ...input,
+      items: [{ taskId: ids.task }, { postId: ids.post, title: ' منشور العيد ' }],
+    });
+    expect(mixed.items).toEqual([{ taskId: ids.task }, { postId: ids.post, title: 'منشور العيد' }]);
+    const refused = (items: unknown[]) =>
+      createApprovalRequestSchema.safeParse({ ...input, items }).success;
+    expect(refused([{ postId: ids.post }, { postId: ids.post }])).toBe(false);
+    expect(refused([{ taskId: ids.task, postId: ids.post }])).toBe(false);
+    expect(refused([{ title: 'بلا مهمة' }])).toBe(false);
+  });
+
+  it('leaves the limit of items in one request to the API (LIMIT_REACHED)', () => {
     const items = Array.from({ length: APPROVAL_LIMITS.items + 1 }, (_, index) => ({
       taskId: `0199a000-0000-7000-8000-${String(index).padStart(12, '0')}`,
     }));
-    expect(APPROVAL_LIMITS.items).toBe(20);
+    expect(APPROVAL_LIMITS.items).toBe(60);
     expect(createApprovalRequestSchema.safeParse({ ...input, items }).success).toBe(true);
   });
 });

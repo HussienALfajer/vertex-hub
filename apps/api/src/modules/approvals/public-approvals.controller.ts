@@ -28,9 +28,13 @@ import {
   errorResponseSchema,
   type PublicApproval,
   type PublicApprovalItem,
+  type PublicApprovalItems,
+  type PublicApproveAll,
   type PublicResponse,
   publicApprovalItemSchema,
+  publicApprovalItemsSchema,
   publicApprovalSchema,
+  publicApproveAllSchema,
   publicResponseSchema,
 } from '@vertex-hub/contracts';
 import { PublicApprovalsService } from './public-approvals.service.js';
@@ -98,6 +102,25 @@ export class PublicApprovalsController {
     @Req() request: IncomingMessage,
   ): Promise<PublicApprovalItem> {
     return this.approvals.respond(token, itemId, input, {
+      ip: addressOf(request),
+      userAgent: request.headers['user-agent'] ?? null,
+    });
+  }
+
+  @Post('approve-all')
+  @HttpCode(200)
+  @SerializeOptions({ schema: publicApprovalItemsSchema })
+  @ApiOkResponse({
+    description:
+      'The post items that were pending, now approved, each with the same optional note; task items are never included',
+    standardSchema: publicApprovalItemsSchema,
+  })
+  approveAll(
+    @Param('token') token: string,
+    @Body({ schema: publicApproveAllSchema }) input: PublicApproveAll,
+    @Req() request: IncomingMessage,
+  ): Promise<PublicApprovalItems> {
+    return this.approvals.approveAll(token, input, {
       ip: addressOf(request),
       userAgent: request.headers['user-agent'] ?? null,
     });

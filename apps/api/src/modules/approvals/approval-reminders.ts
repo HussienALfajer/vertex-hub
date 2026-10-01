@@ -5,6 +5,7 @@ import { and, eq, gte, inArray, isNull, lte } from 'drizzle-orm';
 import { DATABASE } from '../../core/database/database.module.js';
 import { JobQueue, runEach } from '../../core/jobs/index.js';
 import { ClientDirectory } from '../clients/index.js';
+import { PostApprovals } from '../content/index.js';
 import { TaskApprovals } from '../tasks/index.js';
 import { type RequestRow, stateSql } from './approval-items.js';
 import { ApprovalNotices } from './approval-notices.js';
@@ -23,6 +24,7 @@ export class ApprovalReminders implements OnModuleInit {
     @Inject(DATABASE) private readonly db: Database,
     private readonly clients: ClientDirectory,
     private readonly tasks: TaskApprovals,
+    private readonly posts: PostApprovals,
     private readonly notices: ApprovalNotices,
     private readonly jobs: JobQueue,
   ) {}
@@ -78,7 +80,10 @@ export class ApprovalReminders implements OnModuleInit {
   /** Rule 24: the client decided an item through this link since it was issued. */
   private async answeredByLink(request: RequestRow): Promise<boolean> {
     const decided = await this.db
-      .select({ responseId: approvalItems.responseId })
+      .select({
+        responseId: approvalItems.responseId,
+        postResponseId: approvalItems.postResponseId,
+      })
       .from(approvalItems)
       .where(
         and(
@@ -87,10 +92,15 @@ export class ApprovalReminders implements OnModuleInit {
           gte(approvalItems.closedAt, request.linkIssuedAt),
         ),
       );
-    const responses = await this.tasks.responses(
-      decided.flatMap((item) => (item.responseId ? [item.responseId] : [])),
+    const [onTasks, onPosts] = await Promise.all([
+      this.tasks.responses(decided.flatMap((item) => (item.responseId ? [item.responseId] : []))),
+      this.posts.responses(
+        decided.flatMap((item) => (item.postResponseId ? [item.postResponseId] : [])),
+      ),
+    ]);
+    return [...onTasks.values(), ...onPosts.values()].some(
+      (response) => response.channel === 'link',
     );
-    return [...responses.values()].some((response) => response.channel === 'link');
   }
 
   /** Marks the notice sent and sends it, unless the request changed since it was read. */
