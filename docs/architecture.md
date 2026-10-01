@@ -56,7 +56,7 @@ vertex-hub/
 
 ## API modules
 
-`auth` · `clients` · `leads` · `catalog` · `quotes` · `projects` · `tasks` · `templates` · `content` · `approvals` · `files` · `shoots` · `campaigns` · `billing` · `notifications` · `reports` · `audit`
+`auth` · `clients` · `leads` · `catalog` · `quotes` · `projects` · `tasks` · `templates` · `content` · `approvals` · `files` · `calendar` · `campaigns` · `billing` · `notifications` · `reports` · `audit`
 
 Rules (module anatomy, naming and the tests that enforce them: ADR 0013):
 - A module owns its tables. Other modules call its exported service; they never query its tables.
