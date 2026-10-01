@@ -1,5 +1,6 @@
 import {
   type AuditEntityType,
+  BRAND_FILE_KINDS,
   CLIENT_PLATFORMS,
   CLIENT_STATUSES,
   CYCLE_STATUSES,
@@ -7,6 +8,8 @@ import {
   DEPARTMENT_CODES,
   type DepartmentCode,
   EXTRA_WORK_BILLING,
+  FILE_FINAL_SOURCES,
+  FILE_VERSION_KINDS,
   MILESTONE_STATUSES,
   NOTE_CHANNELS,
   PLATFORM_ACCESS_STATES,
@@ -25,7 +28,7 @@ import {
 import { Badge, ColorSwatch } from '@vertex-hub/ui';
 import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
-import { formatDateTime, formatMonth, formatNumber } from '../../lib/format';
+import { formatDateTime, formatFileSize, formatMonth, formatNumber } from '../../lib/format';
 import { formatAmount } from '../../lib/money';
 import { useDepartmentNames } from '../projects/project-badges';
 import { lineName } from '../retainers/retainer-badges';
@@ -38,7 +41,7 @@ const text = (item: Item, key: string) =>
   typeof item[key] === 'string' ? (item[key] as string) : undefined;
 
 /** Fields whose values are codes, links or numbers: read left to right. */
-const LTR_FIELDS = new Set(['email', 'phone', 'url', 'contactId']);
+const LTR_FIELDS = new Set(['email', 'phone', 'url', 'contactId', 'host']);
 
 /** Money fields hold minor units (ADR 0006); the currency is a field of its own. */
 const isMoneyField = (field: string) => field.endsWith('Minor');
@@ -107,6 +110,14 @@ function enumLabel(
     const kind = find(TEMPLATE_KINDS);
     if (kind) return t(`templates.kinds.${kind}`);
   }
+  if (entityType === 'file_item') {
+    const kind = field === 'kind' ? find(FILE_VERSION_KINDS) : undefined;
+    if (kind) return t(`files.versionKinds.${kind}`);
+    const brandKind = field === 'brandKind' ? find(BRAND_FILE_KINDS) : undefined;
+    if (brandKind) return t(`clients.brandKit.fileKinds.${brandKind}`);
+    const source = field === 'source' ? find(FILE_FINAL_SOURCES) : undefined;
+    if (source) return t(`files.finalSources.${source}`);
+  }
   if (field === 'kind' && (value === 'activation' || value === 'reset')) {
     return t(`audit.kinds.${value}`);
   }
@@ -166,6 +177,16 @@ export function AuditValue({
   }
   if (field === 'occurredAt' && typeof value === 'string') {
     return <span className="tabular-nums">{formatDateTime(value)}</span>;
+  }
+  if (entityType === 'file_item' && typeof value === 'number') {
+    if (field === 'number' || field === 'previousFinal') {
+      return (
+        <span dir="ltr" className="tabular-nums">
+          {t('files.versionNumber', { number: value })}
+        </span>
+      );
+    }
+    if (field === 'sizeBytes') return <span>{formatFileSize(value)}</span>;
   }
   const shown = String(value);
   return LTR_FIELDS.has(field) ? (

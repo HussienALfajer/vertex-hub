@@ -1,5 +1,7 @@
 import { standardSchemaResolver } from '@hookform/resolvers/standard-schema';
 import {
+  BRAND_FILE_KINDS,
+  type BrandFileKind,
   FILE_NOTE_MAX,
   type FileItem,
   type FileRole,
@@ -9,6 +11,7 @@ import {
 } from '@vertex-hub/contracts';
 import {
   Button,
+  Checkbox,
   Dialog,
   DialogClose,
   DialogContent,
@@ -20,17 +23,27 @@ import {
   FieldError,
   FieldLabel,
   Input,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
   Textarea,
   toast,
 } from '@vertex-hub/ui';
 import { useCallback, useId, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
+import { ConfirmDialog } from '../../components/confirm-dialog';
 import { FormAlert } from '../../components/form-alert';
 import { errorMessage } from '../../lib/errors';
+import type { FileItemActions, Removing } from './file-item-card';
+import { FilePreviewDialog, type PreviewEntry } from './file-preview-dialog';
 import {
   type FileOwnerRef,
   useAddFileVersion,
+  useArchiveFileItem,
+  useArchiveFileVersion,
   useCreateFileItem,
   useUpdateFileItem,
 } from './files.queries';
@@ -55,9 +68,47 @@ function NoteField({ value, onChange }: { value: string; onChange: (value: strin
   );
 }
 
+/** The brand kit's kind of a brand file (the F02 kinds). */
+function BrandKindField({
+  value,
+  onChange,
+}: {
+  value: BrandFileKind;
+  onChange: (value: BrandFileKind) => void;
+}) {
+  const { t } = useTranslation();
+  const id = useId();
+  const kinds = BRAND_FILE_KINDS.map((kind) => ({
+    value: kind,
+    label: t(`clients.brandKit.fileKinds.${kind}`),
+  }));
+  return (
+    <Field>
+      <FieldLabel htmlFor={id}>{t('files.brandKind')}</FieldLabel>
+      <Select
+        items={kinds}
+        value={value}
+        onValueChange={(next) => next && onChange(next as BrandFileKind)}
+      >
+        <SelectTrigger id={id}>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {kinds.map((kind) => (
+            <SelectItem key={kind.value} value={kind.value}>
+              {kind.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </Field>
+  );
+}
+
 /**
  * Adds new items of one role: one item per file, or one from a link. Closes once everything the
- * user added is attached.
+ * user added is attached. Brand files take a kind; documents may be flagged confidential by a
+ * confidential reader (rule 15).
  */
 export function AddFilesDialog({
   owner,
@@ -66,6 +117,7 @@ export function AddFilesDialog({
   description,
   withNote,
   allowLink,
+  withConfidential,
   onClose,
 }: {
   owner: FileOwnerRef;
@@ -74,13 +126,24 @@ export function AddFilesDialog({
   description: string;
   withNote?: boolean;
   allowLink?: boolean;
+  withConfidential?: boolean;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
+  const confidentialId = useId();
   const create = useCreateFileItem(owner);
   const [note, setNote] = useState('');
+  const [brandKind, setBrandKind] = useState<BrandFileKind>('logo');
+  const [confidential, setConfidential] = useState(false);
   const onAttach = (source: FileSource, name?: string) =>
-    create.mutateAsync({ role: fileRole, source, name, note: note.trim() || undefined });
+    create.mutateAsync({
+      role: fileRole,
+      source,
+      name,
+      note: note.trim() || undefined,
+      ...(fileRole === 'brand' && { brandKind }),
+      ...(fileRole === 'document' && { confidential }),
+    });
   const onDone = useCallback(() => {
     toast.add({ title: t('files.added'), type: 'success' });
     onClose();
@@ -92,7 +155,26 @@ export function AddFilesDialog({
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
+        {fileRole === 'brand' && <BrandKindField value={brandKind} onChange={setBrandKind} />}
         {withNote && <NoteField value={note} onChange={setNote} />}
+        {withConfidential && (
+          <label
+            htmlFor={confidentialId}
+            className="flex cursor-pointer items-start gap-3 text-sm font-medium"
+          >
+            <Checkbox
+              id={confidentialId}
+              checked={confidential}
+              onCheckedChange={(value) => setConfidential(value)}
+            />
+            <span className="flex flex-col gap-0.5">
+              {t('files.confidentialChoice')}
+              <span className="font-normal text-muted-foreground">
+                {t('files.confidentialHint')}
+              </span>
+            </span>
+          </label>
+        )}
         <UploadControl onAttach={onAttach} onDone={onDone} multiple allowLink={allowLink} />
       </DialogContent>
     </Dialog>
@@ -187,4 +269,83 @@ export function RenameFileDialog({
       </DialogContent>
     </Dialog>
   );
+}
+
+type Preview = { entries: PreviewEntry[]; index: number } | null;
+
+/**
+ * The dialogs behind a list of file items (new version, rename, remove, preview) and the
+ * actions its cards call. `allowLink`: new versions may be links.
+ */
+export function useFileItemActions(owner: FileOwnerRef, { allowLink }: { allowLink: boolean }) {
+  const { t } = useTranslation();
+  const [versioning, setVersioning] = useState<FileItem | null>(null);
+  const [renaming, setRenaming] = useState<FileItem | null>(null);
+  const [removing, setRemoving] = useState<Removing>(null);
+  const [preview, setPreview] = useState<Preview>(null);
+  const archiveItem = useArchiveFileItem(owner);
+  const archiveVersion = useArchiveFileVersion(owner);
+  const update = useUpdateFileItem(owner);
+
+  const actions: FileItemActions = {
+    owner,
+    onPreview: (entries, index) => setPreview({ entries, index }),
+    onNewVersion: setVersioning,
+    onRename: setRenaming,
+    onRemove: setRemoving,
+    onSetConfidential: (item, confidential) =>
+      update
+        .mutateAsync({ itemId: item.id, confidential })
+        .then(() =>
+          toast.add({
+            title: confidential ? t('files.madeConfidential') : t('files.madeNotConfidential'),
+            type: 'success',
+          }),
+        )
+        .catch((error) => toast.add({ title: errorMessage(t, error), type: 'error' })),
+  };
+
+  const dialogs = (
+    <>
+      {versioning && (
+        <NewVersionDialog
+          owner={owner}
+          item={versioning}
+          allowLink={allowLink}
+          onClose={() => setVersioning(null)}
+        />
+      )}
+      {renaming && (
+        <RenameFileDialog owner={owner} item={renaming} onClose={() => setRenaming(null)} />
+      )}
+      {preview && (
+        <FilePreviewDialog
+          entries={preview.entries}
+          index={preview.index}
+          onIndexChange={(index) => setPreview({ ...preview, index })}
+          onClose={() => setPreview(null)}
+        />
+      )}
+      <ConfirmDialog
+        open={removing !== null}
+        onClose={() => setRemoving(null)}
+        title={t(
+          removing?.kind === 'version' ? 'files.removeVersionTitle' : 'files.removeItemTitle',
+        )}
+        body={t(removing?.kind === 'version' ? 'files.removeVersionBody' : 'files.removeItemBody', {
+          label: removing?.label ?? '',
+        })}
+        action={t('files.removeAction')}
+        destructive
+        pending={archiveItem.isPending || archiveVersion.isPending}
+        onConfirm={async () => {
+          if (removing?.kind === 'item') await archiveItem.mutateAsync(removing.id);
+          if (removing?.kind === 'version') await archiveVersion.mutateAsync(removing.id);
+          toast.add({ title: t('files.removedDone'), type: 'success' });
+        }}
+      />
+    </>
+  );
+
+  return { actions, dialogs };
 }

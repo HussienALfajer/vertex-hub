@@ -28,6 +28,7 @@ import {
   ArrowRightIcon,
   BanIcon,
   CircleCheckBigIcon,
+  FileTextIcon,
   ListTodoIcon,
   MilestoneIcon,
   ReceiptTextIcon,
@@ -39,6 +40,7 @@ import { isMissing, LoadError } from '../../components/load-error';
 import { formatCalendarDate, formatDateTime, formatNumber } from '../../lib/format';
 import { formatMoney } from '../../lib/money';
 import { idParam } from '../../lib/search-params';
+import { OwnerDocumentsTab } from '../files/owner-documents-tab';
 import { ProjectTasksTab } from '../tasks/project-tasks-tab';
 import { ExtraWorkTab } from './extra-work-tab';
 import { MilestonesTab } from './milestones-tab';
@@ -53,7 +55,7 @@ import {
 import { projectQuery, useRestoreProject } from './projects.queries';
 import { scheduleOf } from './schedule';
 
-const PROJECT_TABS = ['milestones', 'tasks', 'extra-work'] as const;
+const PROJECT_TABS = ['milestones', 'tasks', 'extra-work', 'documents'] as const;
 
 type ProjectTab = (typeof PROJECT_TABS)[number];
 
@@ -159,6 +161,10 @@ function ProjectView({
             <ReceiptTextIcon />
             {t('projects.page.tabs.extraWork')}
           </TabsTrigger>
+          <TabsTrigger value="documents">
+            <FileTextIcon />
+            {t('files.documents.title')}
+          </TabsTrigger>
         </TabsList>
         <TabsContent value="milestones">
           <MilestonesTab project={project} editable={editable} />
@@ -189,6 +195,9 @@ function ProjectView({
                 : null,
             }}
           />
+        </TabsContent>
+        <TabsContent value="documents">
+          <OwnerDocumentsTab owner={{ type: 'project', id: project.id }} />
         </TabsContent>
       </Tabs>
     </>

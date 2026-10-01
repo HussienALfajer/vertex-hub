@@ -45,6 +45,7 @@ import {
   ChevronDownIcon,
   EllipsisIcon,
   FolderKanbanIcon,
+  FolderOpenIcon,
   ListTodoIcon,
   MessagesSquareIcon,
   PaletteIcon,
@@ -56,7 +57,7 @@ import {
   UserPlusIcon,
   UsersRoundIcon,
 } from 'lucide-react';
-import { type ReactNode, useState } from 'react';
+import { type ReactNode, useCallback, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '../../components/confirm-dialog';
@@ -65,6 +66,8 @@ import { isMissing, LoadError } from '../../components/load-error';
 import { canAll, useMe } from '../../lib/auth';
 import { errorMessage } from '../../lib/errors';
 import { formatNumber } from '../../lib/format';
+import { ClientFilesTab } from '../files/client-files-tab';
+import { type FileLibrarySearch, parseFileLibrarySearch } from '../files/library-search';
 import { ClientProjectsTab } from '../projects/client-projects-tab';
 import { ClientRetainersTab, EndedClientWorkCallout } from '../retainers/client-retainers-tab';
 import { ClientTasksTab } from '../tasks/client-tasks-tab';
@@ -92,6 +95,7 @@ const CLIENT_TABS = [
   'projects',
   'retainers',
   'tasks',
+  'files',
   'brand-kit',
   'platforms',
   'communication',
@@ -99,13 +103,16 @@ const CLIENT_TABS = [
 
 type ClientTab = (typeof CLIENT_TABS)[number];
 
-export interface ClientProfileSearch {
+export interface ClientProfileSearch extends FileLibrarySearch {
   /** Unset means the first tab. */
   tab?: ClientTab;
 }
 
 export function parseClientProfileSearch(search: Record<string, unknown>): ClientProfileSearch {
-  return { tab: CLIENT_TABS.find((tab) => tab !== 'contacts' && tab === search.tab) };
+  return {
+    tab: CLIENT_TABS.find((tab) => tab !== 'contacts' && tab === search.tab),
+    ...parseFileLibrarySearch(search),
+  };
 }
 
 export function ClientProfilePage({
@@ -137,13 +144,21 @@ export function ClientProfilePage({
           error={client.error}
         />
       ) : (
-        <Profile client={client.data} tab={search.tab ?? 'contacts'} />
+        <Profile client={client.data} tab={search.tab ?? 'contacts'} search={search} />
       )}
     </>
   );
 }
 
-function Profile({ client, tab }: { client: ClientDetailResponse; tab: ClientTab }) {
+function Profile({
+  client,
+  tab,
+  search,
+}: {
+  client: ClientDetailResponse;
+  tab: ClientTab;
+  search: ClientProfileSearch;
+}) {
   const { t } = useTranslation();
   const me = useMe();
   const navigate = useNavigate({ from: '/clients/$clientId' });
@@ -158,6 +173,11 @@ function Profile({ client, tab }: { client: ClientDetailResponse; tab: ClientTab
       search: (previous) => ({ ...previous, tab: next === 'contacts' ? undefined : next }),
       replace: true,
     });
+  const setFileSearch = useCallback(
+    (next: FileLibrarySearch) =>
+      navigate({ search: (previous) => ({ ...previous, ...next }), replace: true }),
+    [navigate],
+  );
 
   return (
     <>
@@ -212,6 +232,10 @@ function Profile({ client, tab }: { client: ClientDetailResponse; tab: ClientTab
             <ListTodoIcon />
             {t('clients.profile.tabs.tasks')}
           </TabsTrigger>
+          <TabsTrigger value="files">
+            <FolderOpenIcon />
+            {t('clients.profile.tabs.files')}
+          </TabsTrigger>
           <TabsTrigger value="brand-kit">
             <PaletteIcon />
             {t('clients.profile.tabs.brandKit')}
@@ -242,6 +266,9 @@ function Profile({ client, tab }: { client: ClientDetailResponse; tab: ClientTab
         </TabsContent>
         <TabsContent value="tasks">
           <ClientTasksTab client={client} />
+        </TabsContent>
+        <TabsContent value="files">
+          <ClientFilesTab client={client} search={search} onSearchChange={setFileSearch} />
         </TabsContent>
         <TabsContent value="brand-kit">
           <BrandKitTab client={client} editable={editable} />

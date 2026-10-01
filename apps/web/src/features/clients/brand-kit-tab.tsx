@@ -28,6 +28,7 @@ import { useTranslation } from 'react-i18next';
 import { TabHeader } from '../../components/tab-header';
 import { useCopy } from '../../lib/clipboard';
 import { formatLink, formatLinkHost } from '../../lib/format';
+import { BrandFilesCard } from '../files/brand-files-card';
 import { BrandKitForm } from './brand-kit-form';
 
 const isEmpty = (kit: BrandKit) =>
@@ -73,6 +74,7 @@ export function BrandKitTab({
           description={t('clients.brandKit.emptyHint')}
           action={editButton}
         />
+        <BrandFilesCard clientId={client.id} />
       </>
     );
   }
@@ -174,6 +176,8 @@ export function BrandKitTab({
             </div>
           )}
         </KitCard>
+
+        <BrandFilesCard clientId={client.id} />
       </div>
     </>
   );

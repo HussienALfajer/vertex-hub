@@ -19,6 +19,7 @@ import {
   ArrowRightIcon,
   CalendarDaysIcon,
   CircleStopIcon,
+  FileTextIcon,
   HistoryIcon,
   ReceiptTextIcon,
   TriangleAlertIcon,
@@ -29,6 +30,7 @@ import { ConfirmDialog } from '../../components/confirm-dialog';
 import { isMissing, LoadError } from '../../components/load-error';
 import { formatCalendarDate, formatMonth, formatNumber } from '../../lib/format';
 import { formatMoney } from '../../lib/money';
+import { OwnerDocumentsTab } from '../files/owner-documents-tab';
 import { ExtraWorkTab } from '../projects/extra-work-tab';
 import { ArchivedBadge, DepartmentChips, PersonName } from '../projects/project-badges';
 import { ThisMonthTab } from './cycle-tab';
@@ -37,7 +39,7 @@ import { RetainerActions } from './retainer-actions';
 import { BehindBadge, DeliveryRate, RenewalBadge, RetainerStatusBadge } from './retainer-badges';
 import { retainerQuery, useRestoreRetainer } from './retainers.queries';
 
-const RETAINER_TABS = ['this-month', 'history', 'extra-work'] as const;
+const RETAINER_TABS = ['this-month', 'history', 'extra-work', 'documents'] as const;
 
 type RetainerTab = (typeof RETAINER_TABS)[number];
 
@@ -115,6 +117,10 @@ function RetainerView({ retainer, tab }: { retainer: RetainerDetail; tab: Retain
             <ReceiptTextIcon />
             {t('projects.page.tabs.extraWork')}
           </TabsTrigger>
+          <TabsTrigger value="documents">
+            <FileTextIcon />
+            {t('files.documents.title')}
+          </TabsTrigger>
         </TabsList>
         <TabsContent value="this-month">
           <ThisMonthTab retainer={retainer} />
@@ -135,6 +141,9 @@ function RetainerView({ retainer, tab }: { retainer: RetainerDetail; tab: Retain
               editCurrency: permissions.canEditMoney ? (retainer.money?.currency ?? null) : null,
             }}
           />
+        </TabsContent>
+        <TabsContent value="documents">
+          <OwnerDocumentsTab owner={{ type: 'retainer', id: retainer.id }} />
         </TabsContent>
       </Tabs>
     </>

@@ -877,7 +877,14 @@
       "done": "منجز",
       "site": "الموقع",
       "body": "النص",
-      "mentionedUserIds": "الإشارات"
+      "mentionedUserIds": "الإشارات",
+      "brandKind": "نوع ملف الهوية",
+      "confidential": "سري",
+      "number": "الإصدار",
+      "sizeBytes": "الحجم",
+      "host": "موقع الرابط",
+      "source": "طريقة التحديد",
+      "previousFinal": "النهائي السابق"
     },
     "kinds": {
       "activation": "تفعيل",
@@ -889,7 +896,8 @@
     "milestoneOfProject": "{{milestone}} · {{project}}",
     "openRetainer": "افتح العقد الشهري",
     "cycleOfRetainer": "دورة {{month}} من {{retainer}}",
-    "openTask": "افتح المهمة"
+    "openTask": "افتح المهمة",
+    "fileOfOwner": "{{file}} في {{owner}}"
   },
   "tasks": {
     "internal": "مهمة داخلية",
@@ -1490,7 +1498,8 @@
         "communication": "التواصل",
         "projects": "المشاريع",
         "retainers": "العقود الشهرية",
-        "tasks": "المهام المفتوحة"
+        "tasks": "المهام المفتوحة",
+        "files": "الملفات"
       },
       "confirm": {
         "archiveTitle": "أرشفة {{name}}؟",
@@ -1553,8 +1562,8 @@
       "fonts": "الخطوط",
       "toneOfVoice": "نبرة الصوت",
       "forbiddenWords": "كلمات ممنوعة",
-      "files": "الملفات",
-      "filesHint": "روابط خارجية (Drive أو Dropbox) إلى أن يتاح رفع الملفات.",
+      "files": "روابط الملفات",
+      "filesHint": "روابط خارجية (Drive أو Dropbox). الملفات المرفوعة في الأسفل.",
       "references": "مراجع",
       "liked": "أعجبتهم",
       "disliked": "لم تعجبهم",
@@ -2741,6 +2750,65 @@
       "errors": {
         "url": "اكتب رابطًا يبدأ بـ https://"
       }
+    },
+    "confidential": "سري",
+    "makeConfidential": "اجعله سريًا",
+    "makeNotConfidential": "ألغِ السرية",
+    "madeConfidential": "صار المستند سريًا",
+    "madeNotConfidential": "لم يعد المستند سريًا",
+    "confidentialChoice": "مستند سري",
+    "confidentialHint": "يراه فقط المدير العام ومدير العمليات ومدير حساب العميل والمالية. لا يعرف غيرهم بوجوده.",
+    "brandKind": "النوع",
+    "versionKinds": {
+      "upload": "ملف مرفوع",
+      "link": "رابط"
+    },
+    "finalSources": {
+      "auto": "تلقائيًا عند الاعتماد",
+      "manual": "يدويًا"
+    },
+    "usage": "ملفات هذا العميل {{client}} · كل الملفات {{total}} · المتاح {{free}}",
+    "brand": {
+      "title": "الملفات المرفوعة",
+      "hint": "الشعار والخطوط ودليل الهوية كملفات. استبدال الشعار يضيف إصدارًا جديدًا.",
+      "upload": "ارفع ملفًا",
+      "uploadTitle": "ارفع ملفات الهوية",
+      "uploadBody": "اختر نوع الملفات، ثم ارفعها أو أضف رابطًا.",
+      "empty": "لا ملفات مرفوعة بعد.",
+      "loadError": "تعذّر تحميل ملفات الهوية."
+    },
+    "library": {
+      "title": "الملفات النهائية",
+      "hint": "الإصدار النهائي من كل مخرج في مهام هذا العميل.",
+      "loadError": "تعذّر تحميل الملفات النهائية.",
+      "emptyTitle": "لا ملفات نهائية بعد",
+      "emptyHint": "تظهر هنا عند اعتماد المهام.",
+      "noMatchTitle": "لا ملفات مطابقة",
+      "noMatchHint": "غيّر النوع أو الشهر أو كلمة البحث.",
+      "search": "ابحث باسم الملف أو المهمة",
+      "type": "النوع",
+      "month": "الشهر",
+      "allTypes": "كل الأنواع",
+      "allMonths": "كل الأشهر",
+      "finalOn": "نهائي منذ {{date}}"
+    },
+    "documents": {
+      "title": "المستندات",
+      "hint": {
+        "client": "مستندات العميل ومشاريعه وعقوده الشهرية: عقود، عروض، تسليمات.",
+        "project": "مستندات المشروع: العقد، العرض، محضر التسليم.",
+        "retainer": "مستندات العقد الشهري: العقد وملحقاته."
+      },
+      "upload": "ارفع مستندًا",
+      "uploadTitle": "ارفع مستندات",
+      "uploadBody": "كل ملف يصير مستندًا بإصداره الأول. للملفات الكبيرة أضف رابطًا.",
+      "emptyTitle": "لا مستندات بعد",
+      "emptyHint": "ارفع العقد أو العرض ليبقى في مكان واحد.",
+      "loadError": "تعذّر تحميل المستندات.",
+      "ofClient": "مستند العميل",
+      "ofProject": "مشروع: {{name}}",
+      "ofRetainer": "عقد شهري: {{name}}",
+      "removed": "مستندات مُزالة"
     }
   },
   "notifications": {
