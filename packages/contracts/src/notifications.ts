@@ -32,9 +32,17 @@ export const NOTIFICATION_TYPES = [
   'task_approved',
   'task_opened',
   'request_finished',
+  'post_returned',
+  'post_review_requested',
+  'post_medical_review_requested',
+  'post_awaiting_client',
+  'post_assigned',
+  'post_approved',
   'task_due_soon',
   'task_overdue',
   'task_overdue_escalated',
+  'post_publish_today',
+  'post_publish_overdue',
   'client_account_manager_assigned',
   'project_manager_assigned',
   'retainer_renewal_due',
@@ -60,6 +68,7 @@ export const NOTIFICATION_SUBJECTS = [
   'retainer',
   'template_run',
   'approval_request',
+  'post',
 ] as const;
 
 export const notificationSubjectTypeSchema = z
@@ -80,6 +89,12 @@ export const NOTIFICATION_CATALOG: Record<
   task_medical_review_requested: { category: 'tasks', subject: 'task', mutable: false },
   task_awaiting_client: { category: 'tasks', subject: 'task', mutable: false },
   task_over_limit: { category: 'tasks', subject: 'task', mutable: false },
+  post_returned: { category: 'tasks', subject: 'post', mutable: false },
+  post_review_requested: { category: 'tasks', subject: 'post', mutable: false },
+  post_medical_review_requested: { category: 'tasks', subject: 'post', mutable: false },
+  post_awaiting_client: { category: 'tasks', subject: 'post', mutable: false },
+  post_assigned: { category: 'tasks', subject: 'post', mutable: true },
+  post_approved: { category: 'tasks', subject: 'post', mutable: false },
   approval_responded: { category: 'tasks', subject: 'approval_request', mutable: false },
   approval_no_response: { category: 'reminders', subject: 'approval_request', mutable: false },
   approval_expired: { category: 'reminders', subject: 'approval_request', mutable: false },
@@ -94,6 +109,8 @@ export const NOTIFICATION_CATALOG: Record<
   task_due_soon: { category: 'reminders', subject: 'task', mutable: true },
   task_overdue: { category: 'reminders', subject: 'task', mutable: false },
   task_overdue_escalated: { category: 'reminders', subject: 'task', mutable: false },
+  post_publish_today: { category: 'reminders', subject: 'post', mutable: true },
+  post_publish_overdue: { category: 'reminders', subject: 'post', mutable: false },
   client_account_manager_assigned: {
     category: 'clients_projects',
     subject: 'client',
@@ -160,6 +177,16 @@ const reviewSourceSchema = z.enum(REVIEW_SOURCES);
 /** An approval request as it was when the notification was sent (F09). */
 const approvalData = z.object({ client: nameSchema, contact: nameSchema });
 
+/** The post as it was when the notification was sent (F08). */
+const postData = z.object({
+  post: z.object({
+    title: nameSchema,
+    client: nameSchema,
+    publishDate: calendarDateSchema,
+    publishTime: timeOfDaySchema.nullable(),
+  }),
+});
+
 export const NOTIFICATION_DATA_SCHEMAS = {
   task_assigned: taskData,
   task_mentioned: commentData,
@@ -168,6 +195,12 @@ export const NOTIFICATION_DATA_SCHEMAS = {
   task_medical_review_requested: taskData,
   task_awaiting_client: taskData,
   task_over_limit: taskData,
+  post_returned: postData.extend({ source: reviewSourceSchema }),
+  post_review_requested: postData,
+  post_medical_review_requested: postData,
+  post_awaiting_client: postData,
+  post_assigned: postData,
+  post_approved: postData.extend({ source: reviewSourceSchema }),
   /** Merged per request like `task_commented`: the latest decision, `count` decisions. */
   approval_responded: approvalData.extend({ decision: z.enum(CLIENT_DECISIONS) }),
   approval_no_response: approvalData,
@@ -200,6 +233,8 @@ export const NOTIFICATION_DATA_SCHEMAS = {
   task_overdue_escalated: taskData.extend(dueSchema.shape).extend({
     assignee: nameSchema.nullable(),
   }),
+  post_publish_today: postData,
+  post_publish_overdue: postData,
   client_account_manager_assigned: z.object({ client: nameSchema }),
   project_manager_assigned: z.object({ project: nameSchema, client: nameSchema }),
   retainer_renewal_due: z.object({
@@ -330,6 +365,8 @@ export const NOTIFICATION_REMINDER_KINDS = [
   'overdue_escalated',
   'renewal_due',
   'renewal_reached',
+  'post_publish_today',
+  'post_publish_overdue',
 ] as const;
 
 export type NotificationReminderKind = (typeof NOTIFICATION_REMINDER_KINDS)[number];

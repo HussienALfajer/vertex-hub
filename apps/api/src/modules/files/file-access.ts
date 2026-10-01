@@ -29,6 +29,7 @@ const OWNER_COLUMNS = {
   client: fileItems.clientId,
   project: fileItems.projectId,
   retainer: fileItems.retainerId,
+  post: fileItems.postId,
 } as const;
 
 /** The items of one owner. `client_id` is set on every item of a client, so the type filters too. */
@@ -42,12 +43,13 @@ export function ownerValues(owner: FileOwner) {
     taskId: owner.type === 'task' ? owner.id : null,
     projectId: owner.type === 'project' ? owner.id : null,
     retainerId: owner.type === 'retainer' ? owner.id : null,
+    postId: owner.type === 'post' ? owner.id : null,
     clientId: owner.clientId,
   };
 }
 
 export const ownerIdOf = (item: ItemRow): string =>
-  (item.taskId ?? item.projectId ?? item.retainerId ?? item.clientId) as string;
+  (item.taskId ?? item.projectId ?? item.retainerId ?? item.postId ?? item.clientId) as string;
 
 /**
  * What an audit entry carries so the audit screen links it to its owner, and to the tab that
@@ -64,15 +66,23 @@ export const auditRefs = (item: ItemRow) => ({
 export const isTaskClosed = (owner: FileOwner) =>
   owner.task?.status === 'delivered' || owner.task?.status === 'cancelled';
 
-export const isWritable = (owner: FileOwner) => !owner.archivedCode && !isTaskClosed(owner);
+export const isWritable = (owner: FileOwner) =>
+  !owner.archivedCode && !isTaskClosed(owner) && !owner.post?.locked;
 
-/** Rules 5 and 6. Called after the rights check, so a caller without rights learns nothing. */
+/** Rules 5 and 6, and F08 rule 3. Called after the rights check, so a caller without rights learns nothing. */
 export function assertWritable(owner: FileOwner): void {
   if (owner.archivedCode) {
     throw new CodedException(409, owner.archivedCode, 'The owner of these files is archived');
   }
   if (isTaskClosed(owner)) {
     throw new CodedException(409, 'TASK_CLOSED', 'Reopen the task to change its files');
+  }
+  if (owner.post?.locked) {
+    throw new CodedException(
+      409,
+      'POST_LOCKED',
+      'Return the post to production to change its files',
+    );
   }
 }
 
@@ -144,7 +154,8 @@ export const canSetConfidential = (owner: FileOwner) =>
 export function ownerRights(owner: FileOwner): FileOwnerRightsResponse {
   const writable = isWritable(owner);
   return {
-    canAddDeliverable: writable && owner.type === 'task' && owner.rights.addDeliverable,
+    canAddDeliverable:
+      writable && (owner.type === 'task' || owner.type === 'post') && owner.rights.addDeliverable,
     canAddReference: writable && owner.type === 'task' && owner.rights.addReference,
     canManageDocuments: writable && owner.rights.manageDocuments,
     canSetConfidential: writable && canSetConfidential(owner),
@@ -164,6 +175,7 @@ function itemPermissions(
     canRemove: live && canRemoveItem(actor, owner, item),
     canSetFinal:
       item.role === 'deliverable' &&
+      owner.type === 'task' &&
       !item.archivedAt &&
       !owner.archivedCode &&
       owner.task?.status !== 'cancelled' &&

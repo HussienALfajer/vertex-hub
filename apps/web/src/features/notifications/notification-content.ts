@@ -25,6 +25,9 @@ export function notificationLink(notification: Notification): ToOptions {
       return { to: '/retainers/$retainerId', params: { retainerId: subject.id } };
     case 'approval_request':
       return { to: '/approvals/requests/$requestId', params: { requestId: subject.id } };
+    case 'post':
+      // The post page arrives with the F08 screens.
+      return { to: '/notifications' };
     default:
       return { to: '/tasks/$taskId', params: { taskId: subject.id } };
   }
@@ -121,6 +124,31 @@ export function notificationText(
         }),
         context: null,
       };
+    case 'post_returned':
+    case 'post_approved':
+      return {
+        text: t(`notifications.text.${notification.type}.${notification.data.source}`, {
+          actor,
+          post: notification.data.post.title,
+        }),
+        context: notification.data.post.client,
+      };
+    case 'post_assigned':
+    case 'post_review_requested':
+    case 'post_medical_review_requested':
+    case 'post_awaiting_client':
+    case 'post_publish_today':
+    case 'post_publish_overdue': {
+      const { post } = notification.data;
+      return {
+        text: t(`notifications.text.${notification.type}`, {
+          actor,
+          post: post.title,
+          date: formatPublish(t, post),
+        }),
+        context: post.client,
+      };
+    }
     default: {
       const { task } = notification.data;
       return {
@@ -129,6 +157,13 @@ export function notificationText(
       };
     }
   }
+}
+
+function formatPublish(
+  t: TFunction,
+  post: { publishDate: string; publishTime: string | null },
+): string {
+  return formatDue(t, { dueDate: post.publishDate, dueTime: post.publishTime });
 }
 
 type TaskNotification = Exclude<
@@ -141,7 +176,8 @@ type TaskNotification = Exclude<
       | 'retainer_renewal_due'
       | 'approval_responded'
       | 'approval_no_response'
-      | 'approval_expired';
+      | 'approval_expired'
+      | `post_${string}`;
   }
 >;
 

@@ -178,7 +178,7 @@ describe('module boundaries', () => {
   });
 
   it('keeps notifications independent of the modules that emit them (ADR 0018)', () => {
-    const emitters = ['tasks', 'clients', 'projects', 'templates'];
+    const emitters = ['tasks', 'clients', 'projects', 'templates', 'content'];
     const offenders = imports
       .filter(
         ({ file, specifier }) => moduleOf(file) === 'notifications' && specifier.startsWith('.'),
@@ -192,7 +192,7 @@ describe('module boundaries', () => {
   });
 
   it('keeps files independent of the modules that own files (ADR 0019)', () => {
-    const owners = ['tasks', 'clients', 'projects'];
+    const owners = ['tasks', 'clients', 'projects', 'content'];
     const offenders = imports
       .filter(({ file, specifier }) => moduleOf(file) === 'files' && specifier.startsWith('.'))
       .filter(({ file, specifier }) => {
@@ -215,6 +215,22 @@ describe('module boundaries', () => {
     expect(offenders).toEqual([]);
   });
 
+  it('keeps clients and projects independent of content, and content of approvals (ADR 0021)', () => {
+    const forbidden: Record<string, string> = {
+      clients: 'content',
+      projects: 'content',
+      content: 'approvals',
+    };
+    const offenders = imports
+      .filter(({ specifier }) => specifier.startsWith('.'))
+      .filter(({ file, specifier }) => {
+        const from = moduleOf(file);
+        return !!from && moduleOf(resolve(dirname(file), specifier)) === forbidden[from];
+      })
+      .map(({ file, specifier }) => `${display(file)} -> ${specifier}`);
+    expect(offenders).toEqual([]);
+  });
+
   /**
    * Which API module owns the tables of each schema file in packages/db (null: no API module
    * does). A new schema file must be added here, which forces the ownership decision.
@@ -224,6 +240,7 @@ describe('module boundaries', () => {
     audit: 'audit',
     auth: 'auth',
     clients: 'clients',
+    content: 'content',
     files: 'files',
     notifications: 'notifications',
     projects: 'projects',

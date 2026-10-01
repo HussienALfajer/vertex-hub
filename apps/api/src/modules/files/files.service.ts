@@ -18,6 +18,7 @@ import {
   type FileRole,
   type FileSource,
   isPreviewableMimeType,
+  POST_LIMITS,
   type SetFinal,
   type UpdateFileItem,
 } from '@vertex-hub/contracts';
@@ -394,8 +395,9 @@ export class FilesService {
   async setFinal(actor: CurrentUserInfo, versionId: string, input: SetFinal): Promise<FileItem> {
     const itemId = await this.db.transaction(async (tx) => {
       const { item, owner, version } = await this.loadVersion(tx, actor, versionId);
-      if (item.role !== 'deliverable') {
-        throw new CodedException(400, 'NOT_DELIVERABLE', 'Only deliverables are marked final');
+      // Post files carry no final marker (F08): the linked tasks' versions do.
+      if (item.role !== 'deliverable' || owner.type === 'post') {
+        throw new CodedException(400, 'NOT_DELIVERABLE', 'Only task deliverables are marked final');
       }
       if (item.archivedAt || version.archivedAt) throw new NotFoundException();
       if (!owner.rights.manageTask) throw new ForbiddenException();
@@ -542,7 +544,9 @@ export class FilesService {
           isNull(fileItems.archivedAt),
         ),
       );
-    if ((live?.count ?? 0) >= FILE_LIMITS[role]) throw limitReached();
+    // A post holds fewer files than a task (F08 edge case 14).
+    const limit = owner.type === 'post' ? POST_LIMITS.files : FILE_LIMITS[role];
+    if ((live?.count ?? 0) >= limit) throw limitReached();
   }
 
   /** Names are unique per owner and role among live items, regardless of case (data table). */
@@ -627,7 +631,7 @@ export class FilesService {
 }
 
 /** The owner id of an item row, in SQL. */
-const ownerIdSql = sql<string>`coalesce(${fileItems.taskId}, ${fileItems.projectId}, ${fileItems.retainerId}, ${fileItems.clientId})`;
+const ownerIdSql = sql<string>`coalesce(${fileItems.taskId}, ${fileItems.projectId}, ${fileItems.retainerId}, ${fileItems.postId}, ${fileItems.clientId})`;
 
 export const NOT_FINAL = {
   isFinal: false,

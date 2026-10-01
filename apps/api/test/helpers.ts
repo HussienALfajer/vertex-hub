@@ -9,6 +9,7 @@ import {
   clientNotes,
   clientPlatformAccounts,
   clients,
+  contentPosts,
   type Database,
   departmentMembers,
   departments,
@@ -20,6 +21,8 @@ import {
   notificationReminders,
   notificationSettings,
   notifications,
+  postClientResponses,
+  postReviews,
   projectMilestones,
   projects,
   retainerCycleAdjustments,
@@ -158,6 +161,15 @@ export async function removeUsers(db: Database, ids: string[]): Promise<void> {
         .where(or(inArray(tasks.createdById, ids), inArray(tasks.assigneeId, ids)))
     ).map((row) => row.id),
   );
+  await removePosts(
+    db,
+    (
+      await db
+        .select({ id: contentPosts.id })
+        .from(contentPosts)
+        .where(or(inArray(contentPosts.createdById, ids), inArray(contentPosts.responsibleId, ids)))
+    ).map((row) => row.id),
+  );
   const comments = (
     await db
       .select({ id: taskComments.id })
@@ -212,6 +224,15 @@ export async function removeClients(db: Database, ids: string[]): Promise<void> 
     (await db.select({ id: tasks.id }).from(tasks).where(inArray(tasks.clientId, ids))).map(
       (row) => row.id,
     ),
+  );
+  await removePosts(
+    db,
+    (
+      await db
+        .select({ id: contentPosts.id })
+        .from(contentPosts)
+        .where(inArray(contentPosts.clientId, ids))
+    ).map((row) => row.id),
   );
   const clientProjects = await db
     .select({ id: projects.id })
@@ -303,6 +324,23 @@ export async function removeTasks(db: Database, ids: string[]): Promise<void> {
   await db.delete(taskRevisions).where(inArray(taskRevisions.taskId, ids));
   await db.delete(notificationReminders).where(inArray(notificationReminders.subjectId, ids));
   await db.delete(tasks).where(inArray(tasks.id, ids));
+}
+
+/**
+ * Removes seeded posts with their files, reviews, client responses, reminders, notifications and
+ * audit entries (test cleanup only).
+ */
+export async function removePosts(db: Database, ids: string[]): Promise<void> {
+  if (ids.length === 0) return;
+  await removeFileItems(db, inArray(fileItems.postId, ids));
+  await db.delete(auditEntries).where(inArray(auditEntries.entityId, ids));
+  // Posts point at their cleared review, and responses at reviews.
+  await db.update(contentPosts).set({ clearedReviewId: null }).where(inArray(contentPosts.id, ids));
+  await db.delete(postClientResponses).where(inArray(postClientResponses.postId, ids));
+  await db.delete(postReviews).where(inArray(postReviews.postId, ids));
+  await db.delete(notificationReminders).where(inArray(notificationReminders.subjectId, ids));
+  await db.delete(notifications).where(inArray(notifications.subjectId, ids));
+  await db.delete(contentPosts).where(inArray(contentPosts.id, ids));
 }
 
 /** Removes file items with their versions and audit entries; content stays on disk (test cleanup only). */

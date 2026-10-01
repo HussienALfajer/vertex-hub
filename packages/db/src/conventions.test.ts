@@ -32,6 +32,8 @@ const NOT_BUSINESS_RECORDS: Record<string, string> = {
   task_revisions: 'Append-only; never archived, an over-limit decision is set once (F06 rule 10)',
   task_reviews: 'Append-only review history with its snapshots; never edited or archived (F09)',
   task_client_responses: 'Append-only; a client decision is final and never archived (F09)',
+  post_reviews: 'Append-only review history with its snapshots; never edited or archived (F08)',
+  post_client_responses: 'Append-only; a client decision is final and never archived (F08)',
   approval_requests: 'Revoked, never archived (F09, ADR 0020)',
   approval_items: 'Part of its request; decided or withdrawn, never archived (F09)',
   work_template_stages: 'Part of its template document; replaced when the template is saved (F07)',

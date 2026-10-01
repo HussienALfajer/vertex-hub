@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import type { DepartmentCode } from '@vertex-hub/contracts';
+import type { DepartmentCode, UserAccess } from '@vertex-hub/contracts';
 import {
   type Database,
   departmentMembers,
@@ -11,6 +11,7 @@ import {
 } from '@vertex-hub/db';
 import { and, eq, gt, inArray, isNull } from 'drizzle-orm';
 import { DATABASE } from '../../core/database/database.module.js';
+import { resolveAccess } from './resolve-access.js';
 
 export interface UserSummary {
   id: string;
@@ -55,6 +56,14 @@ export class UserDirectory {
       .from(users)
       .where(and(eq(users.id, userId), isNull(users.archivedAt)));
     return row ? { ...row, archived: false } : null;
+  }
+
+  /** The roles and department positions of a non-archived user, as the guard resolves them. */
+  async access(
+    userId: string,
+    executor: Database | Transaction = this.db,
+  ): Promise<UserAccess | null> {
+    return (await resolveAccess(executor, userId))?.access ?? null;
   }
 
   /** A non-archived user who holds the Account Manager role; an invited user qualifies. */

@@ -13,6 +13,8 @@ describe('notification catalog', () => {
     const mutable = NOTIFICATION_TYPES.filter(isMutableNotificationType);
     expect(mutable.sort()).toEqual(
       [
+        'post_assigned',
+        'post_publish_today',
         'request_finished',
         'retainer_renewal_due',
         'task_approved',

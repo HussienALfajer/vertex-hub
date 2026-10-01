@@ -207,9 +207,59 @@ describe('templates (F07)', () => {
   });
 });
 
+describe('content (F08)', () => {
+  const writer = access(['employee'], [{ code: 'content_management', isManager: false }]);
+  const contentManager = access(
+    ['employee', 'department_manager'],
+    [{ code: 'content_management', isManager: true }],
+  );
+  const operationsManager = access(
+    ['employee', 'department_manager'],
+    [{ code: 'internal_operations', isManager: true }],
+  );
+  const designManager = access(
+    ['employee', 'department_manager'],
+    [{ code: 'design', isManager: true }],
+  );
+
+  it('lets every user read every calendar and post', () => {
+    expect(permissionScopes(access(['employee']), 'content.read')).toEqual(['all']);
+    for (const role of ['department_manager', 'account_manager', 'finance'] as const) {
+      expect(PERMISSION_MAP[role]['content.read'], role).toBeUndefined();
+    }
+  });
+
+  it('lets Content Management members edit every post, and only their manager review', () => {
+    expect(permissionScopes(writer, 'content.manage')).toEqual(['all']);
+    expect(hasPermission(writer, 'content.review')).toBe(false);
+    expect(permissionScopes(contentManager, 'content.manage')).toEqual(['all']);
+    expect(permissionScopes(contentManager, 'content.review')).toEqual(['all']);
+  });
+
+  it('lets account managers edit and review the posts of their own clients', () => {
+    const accountManager = access(['employee', 'account_manager']);
+    expect(permissionScopes(accountManager, 'content.manage')).toEqual(['own_clients']);
+    expect(permissionScopes(accountManager, 'content.review')).toEqual(['own_clients']);
+  });
+
+  it('gives the Operations manager both over all posts', () => {
+    expect(permissionScopes(operationsManager, 'content.manage')).toEqual(['all']);
+    expect(permissionScopes(operationsManager, 'content.review')).toEqual(['all']);
+  });
+
+  it('gives other departments and their managers nothing but reading', () => {
+    expect(PERMISSION_MAP.department_manager['content.manage']).toBeUndefined();
+    for (const user of [access(['employee']), designManager]) {
+      expect(hasPermission(user, 'content.manage')).toBe(false);
+      expect(hasPermission(user, 'content.review')).toBe(false);
+    }
+  });
+});
+
 describe('department capabilities', () => {
   it('only names known departments', () => {
     expect(Object.keys(DEPARTMENT_CAPABILITIES).sort()).toEqual([
+      'content_management',
       'general_communication',
       'internal_operations',
       'marketing',

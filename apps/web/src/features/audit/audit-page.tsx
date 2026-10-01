@@ -675,6 +675,16 @@ const KNOWN_FIELDS = [
   'taskIds',
   'expiresAt',
   'revoked',
+  'platforms',
+  'publishDate',
+  'publishTime',
+  'responsibleId',
+  'captionLength',
+  'hashtagsLength',
+  'hasCaption',
+  'publishedAt',
+  'publishedLinks',
+  'fromPostId',
 ] as const;
 
 function fieldLabel(t: TFunction, field: string): string {
