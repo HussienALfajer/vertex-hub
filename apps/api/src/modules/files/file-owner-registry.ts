@@ -13,11 +13,11 @@ type Executor = Database | Transaction;
 
 /** What the actor may do with the files of one owner (spec F10, "F10 actions"). */
 export interface FileOwnerRights {
-  /** Task workers and manage scope: add, version and rename deliverables. */
+  /** Task workers and manage scope, or a post's edit scope: add, version and rename deliverables. */
   addDeliverable: boolean;
   /** Every reader of a task. */
   addReference: boolean;
-  /** A task's manage scope: remove anyone's files, set and clear the final marker. */
+  /** A task's manage scope or a post's edit scope: remove anyone's files; on tasks, the final marker. */
   manageTask: boolean;
   /** Brand files and documents of this owner. */
   manageDocuments: boolean;
@@ -34,12 +34,12 @@ export interface FileOwner {
   clientId: string | null;
   /** The client's trade name, for download names; null for an internal task. */
   clientName: string | null;
-  /** Task title, client, project or retainer name. */
+  /** Task or post title, client, project or retainer name. */
   label: string;
   /** The owner or a record above it is archived: every change answers this code. */
   archivedCode: Extract<
     ErrorCode,
-    'TASK_ARCHIVED' | 'CLIENT_ARCHIVED' | 'PROJECT_ARCHIVED' | 'RETAINER_ARCHIVED'
+    'TASK_ARCHIVED' | 'CLIENT_ARCHIVED' | 'PROJECT_ARCHIVED' | 'RETAINER_ARCHIVED' | 'POST_ARCHIVED'
   > | null;
   /** For tasks: the status (rule 5) and what the `task_file_added` notification needs. */
   task: {
@@ -52,6 +52,8 @@ export interface FileOwner {
      */
     sentVersionIds: readonly string[];
   } | null;
+  /** For posts (F08): files change only while the content is unlocked (`POST_LOCKED`). */
+  post?: { locked: boolean };
   rights: FileOwnerRights;
 }
 

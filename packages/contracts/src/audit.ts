@@ -108,6 +108,14 @@ export const AUDIT_ACTIONS = [
   'approval_request.revoked',
   'approval_item.responded',
   'approval_item.withdrawn',
+  'post.created',
+  'post.updated',
+  'post.status_changed',
+  'post.reviewed',
+  'post.client_response_recorded',
+  'post.duplicated',
+  'post.archived',
+  'post.restored',
 ] as const;
 
 export const auditActionSchema = z.enum(AUDIT_ACTIONS).meta({ id: 'AuditAction' });
@@ -134,6 +142,7 @@ export const AUDIT_ENTITY_TYPES = [
   'template_run',
   'file_item',
   'approval_request',
+  'post',
 ] as const;
 
 export const auditEntityTypeSchema = z.enum(AUDIT_ENTITY_TYPES).meta({ id: 'AuditEntityType' });

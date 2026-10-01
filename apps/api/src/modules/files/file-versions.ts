@@ -207,6 +207,47 @@ export class FileVersions {
     return rows.map((row) => row.id);
   }
 
+  /**
+   * F08 rule 5: the latest live version of each live file of the posts, files by creation.
+   */
+  async postMedia(
+    postIds: readonly string[],
+    executor: Executor = this.db,
+  ): Promise<Map<string, SentVersion[]>> {
+    const media = new Map<string, SentVersion[]>();
+    if (postIds.length === 0) return media;
+    const rows = await executor
+      .selectDistinctOn([fileVersions.fileItemId], {
+        postId: fileItems.postId,
+        id: fileVersions.id,
+        fileItemId: fileVersions.fileItemId,
+        name: fileItems.name,
+        number: fileVersions.number,
+        kind: fileVersions.kind,
+        mimeType: fileVersions.mimeType,
+        sizeBytes: fileVersions.sizeBytes,
+        previewStatus: fileVersions.previewStatus,
+        url: fileVersions.url,
+        linkLabel: fileVersions.linkLabel,
+      })
+      .from(fileVersions)
+      .innerJoin(fileItems, eq(fileItems.id, fileVersions.fileItemId))
+      .where(
+        and(
+          inArray(fileItems.postId, [...postIds]),
+          isNull(fileItems.archivedAt),
+          isNull(fileVersions.archivedAt),
+        ),
+      )
+      // Item ids are UUIDv7, so their order is the order of creation.
+      .orderBy(fileVersions.fileItemId, desc(fileVersions.number));
+    for (const { postId, ...version } of rows) {
+      if (!postId) continue;
+      media.set(postId, [...(media.get(postId) ?? []), { ...version, removed: false }]);
+    }
+    return media;
+  }
+
   /** Versions by id, removed or not, with their file's current name. */
   async versionRefs(
     ids: readonly string[],

@@ -24,6 +24,7 @@ import {
 import { users } from './auth.js';
 import { clients } from './clients.js';
 import { archivedAt, id, timestamps } from './columns.js';
+import { contentPosts } from './content.js';
 import { projects } from './projects.js';
 import { retainers } from './retainers.js';
 import { tasks } from './tasks.js';
@@ -53,6 +54,7 @@ export const fileItems = pgTable(
     taskId: uuid('task_id').references(() => tasks.id),
     projectId: uuid('project_id').references(() => projects.id),
     retainerId: uuid('retainer_id').references(() => retainers.id),
+    postId: uuid('post_id').references(() => contentPosts.id),
     /** The owner's client; the owner itself for `client`; null for a task without a client. */
     clientId: uuid('client_id').references(() => clients.id),
     role: fileRoleEnum('role').notNull(),
@@ -69,6 +71,7 @@ export const fileItems = pgTable(
     index('file_items_task_id_idx').on(table.taskId),
     index('file_items_project_id_idx').on(table.projectId),
     index('file_items_retainer_id_idx').on(table.retainerId),
+    index('file_items_post_id_idx').on(table.postId),
     index('file_items_client_id_idx').on(table.clientId, table.role),
     index('file_items_created_by_id_idx').on(table.createdById),
     /** Names are unique per owner and role among live items, except references. */
@@ -76,22 +79,25 @@ export const fileItems = pgTable(
       .on(
         table.ownerType,
         table.role,
-        sql`coalesce(${table.taskId}, ${table.projectId}, ${table.retainerId}, ${table.clientId})`,
+        sql`coalesce(${table.taskId}, ${table.projectId}, ${table.retainerId}, ${table.postId}, ${table.clientId})`,
         sql`lower(${table.name})`,
       )
       .where(sql`${table.archivedAt} is null and ${table.role} <> 'reference'`),
+    // `post` is compared as text: the enum value is added in the same migration (F08).
     check(
       'file_items_owner_check',
-      sql`(${table.ownerType} = 'task' and ${table.taskId} is not null and ${table.projectId} is null and ${table.retainerId} is null)
-        or (${table.ownerType} = 'client' and ${table.clientId} is not null and ${table.taskId} is null and ${table.projectId} is null and ${table.retainerId} is null)
-        or (${table.ownerType} = 'project' and ${table.projectId} is not null and ${table.clientId} is not null and ${table.taskId} is null and ${table.retainerId} is null)
-        or (${table.ownerType} = 'retainer' and ${table.retainerId} is not null and ${table.clientId} is not null and ${table.taskId} is null and ${table.projectId} is null)`,
+      sql`(${table.ownerType} = 'task' and ${table.taskId} is not null and ${table.projectId} is null and ${table.retainerId} is null and ${table.postId} is null)
+        or (${table.ownerType} = 'client' and ${table.clientId} is not null and ${table.taskId} is null and ${table.projectId} is null and ${table.retainerId} is null and ${table.postId} is null)
+        or (${table.ownerType} = 'project' and ${table.projectId} is not null and ${table.clientId} is not null and ${table.taskId} is null and ${table.retainerId} is null and ${table.postId} is null)
+        or (${table.ownerType} = 'retainer' and ${table.retainerId} is not null and ${table.clientId} is not null and ${table.taskId} is null and ${table.projectId} is null and ${table.postId} is null)
+        or (${table.ownerType}::text = 'post' and ${table.postId} is not null and ${table.clientId} is not null and ${table.taskId} is null and ${table.projectId} is null and ${table.retainerId} is null)`,
     ),
     check(
       'file_items_role_check',
       sql`(${table.ownerType} = 'task' and ${table.role} in ('deliverable', 'reference'))
         or (${table.ownerType} = 'client' and ${table.role} in ('brand', 'document'))
-        or (${table.ownerType} in ('project', 'retainer') and ${table.role} = 'document')`,
+        or (${table.ownerType} in ('project', 'retainer') and ${table.role} = 'document')
+        or (${table.ownerType}::text = 'post' and ${table.role} = 'deliverable')`,
     ),
     check(
       'file_items_brand_kind_check',

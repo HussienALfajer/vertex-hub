@@ -15,6 +15,7 @@ import { ApprovalsModule } from './modules/approvals/index.js';
 import { AuditModule } from './modules/audit/index.js';
 import { AuthModule } from './modules/auth/index.js';
 import { ClientsModule } from './modules/clients/index.js';
+import { ContentModule } from './modules/content/index.js';
 import { FilesModule } from './modules/files/index.js';
 import { HealthModule } from './modules/health/index.js';
 import { NotificationsModule } from './modules/notifications/index.js';
@@ -46,6 +47,7 @@ import { TemplatesModule } from './modules/templates/index.js';
     ClientsModule,
     ProjectsModule,
     TasksModule,
+    ContentModule,
     ApprovalsModule,
     TemplatesModule,
     HealthModule,

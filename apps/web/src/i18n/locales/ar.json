@@ -328,7 +328,11 @@
     "ITEM_WITHDRAWN": "سحبت الوكالة هذا العمل من الرابط.",
     "APPROVAL_LINK_INVALID": "هذا الرابط غير صالح.",
     "APPROVAL_LINK_EXPIRED": "انتهت صلاحية هذا الرابط. اطلب رابطًا جديدًا من مدير حسابك.",
-    "VERSION_SENT": "هذا الإصدار لدى المراجع الطبي أو العميل. اسحب المهمة لإعادة المراجعة قبل إزالته."
+    "VERSION_SENT": "هذا الإصدار لدى المراجع الطبي أو العميل. اسحب المهمة لإعادة المراجعة قبل إزالته.",
+    "POST_LOCKED": "محتوى المنشور مقفل في حالته الحالية. أعده إلى الإنتاج لتعديل النص أو الوسائط.",
+    "POST_ARCHIVED": "المنشور مؤرشف أو عميله مؤرشف، ولا يمكن تعديله.",
+    "INVALID_RESPONSIBLE": "المسؤول المختار لا يملك صلاحية تعديل محتوى هذا العميل.",
+    "PUBLISH_TIME_REQUIRED": "حدّد وقت النشر قبل وضع علامة «مجدول»."
   },
   "users": {
     "title": "الفريق",
@@ -475,6 +479,7 @@
       "project_manager_of_project": "إدارة المشروع {{name}}",
       "openProject": "افتح المشروع",
       "assignee_of_open_tasks": "تنفيذ المهمة المفتوحة {{name}}",
+      "responsible_for_open_posts": "مسؤولية المنشور المفتوح {{name}}",
       "openTask": "افتح المهمة"
     },
     "managerBadge": "مدير القسم"
@@ -642,7 +647,8 @@
       "template": "قالب عمل",
       "template_run": "توليد من قالب",
       "file_item": "ملف",
-      "approval_request": "طلب اعتماد"
+      "approval_request": "طلب اعتماد",
+      "post": "منشور"
     },
     "actions": {
       "user": {
@@ -791,6 +797,16 @@
       "approval_item": {
         "responded": "ردّ العميل على عمل",
         "withdrawn": "سُحب عمل من رابط اعتماد"
+      },
+      "post": {
+        "created": "أنشأ منشورًا",
+        "updated": "عدّل منشورًا",
+        "status_changed": "غيّر حالة منشور",
+        "reviewed": "راجع منشورًا",
+        "client_response_recorded": "سجّل رد العميل على منشور",
+        "duplicated": "كرّر منشورًا",
+        "archived": "أرشف منشورًا",
+        "restored": "استعاد منشورًا"
       }
     },
     "fields": {
@@ -922,7 +938,17 @@
       "itemId": "العمل في الرابط",
       "taskIds": "المهام",
       "expiresAt": "ينتهي الرابط",
-      "revoked": "ملغى"
+      "revoked": "ملغى",
+      "platforms": "المنصات",
+      "publishDate": "تاريخ النشر",
+      "publishTime": "وقت النشر",
+      "responsibleId": "المسؤول",
+      "captionLength": "عدد أحرف النص",
+      "hashtagsLength": "عدد أحرف الوسوم",
+      "hasCaption": "مع نص",
+      "publishedAt": "نُشر في",
+      "publishedLinks": "روابط المنشور",
+      "fromPostId": "المنشور الأصلي"
     },
     "kinds": {
       "activation": "تفعيل",
@@ -3036,7 +3062,15 @@
       "task_medical_review_requested": "طلب مراجعة طبية",
       "approval_responded": "رد العميل على رابط اعتماد",
       "approval_no_response": "رابط اعتماد بلا رد منذ 48 ساعة",
-      "approval_expired": "انتهاء صلاحية رابط اعتماد"
+      "approval_expired": "انتهاء صلاحية رابط اعتماد",
+      "post_assigned": "منشور أصبحت مسؤولًا عنه",
+      "post_review_requested": "طلب مراجعة منشور",
+      "post_medical_review_requested": "طلب مراجعة طبية لمنشور",
+      "post_returned": "منشور أُعيد إليّ للتعديل",
+      "post_awaiting_client": "منشور جاهز للإرسال إلى العميل",
+      "post_approved": "اعتماد منشوري",
+      "post_publish_today": "منشور موعد نشره اليوم",
+      "post_publish_overdue": "منشور فات موعد نشره"
     },
     "text": {
       "task_assigned": "أُسندت إليك «{{task}}» بواسطة {{actor}}",
@@ -3120,6 +3154,22 @@
       "approval_responded_merged_many": "{{n}} ردًا جديدًا من {{contact}} على رابط «{{client}}»",
       "approval_responded_merged_other": "{{n}} رد جديد من {{contact}} على رابط «{{client}}»",
       "approval_no_response": "لم يردّ {{contact}} على رابط «{{client}}» منذ 48 ساعة",
+      "post_assigned": "أصبحت مسؤولًا عن المنشور «{{post}}» بواسطة {{actor}}",
+      "post_review_requested": "أُرسل المنشور «{{post}}» للمراجعة بواسطة {{actor}}",
+      "post_medical_review_requested": "المنشور «{{post}}» ينتظر المراجعة الطبية",
+      "post_returned": {
+        "internal": "أُعيد إليك المنشور «{{post}}» للتعديل بواسطة {{actor}}",
+        "client": "العميل طلب تعديلات على المنشور «{{post}}»",
+        "medical": "أُعيد إليك المنشور «{{post}}» للتعديل بعد المراجعة الطبية بواسطة {{actor}}"
+      },
+      "post_awaiting_client": "المنشور «{{post}}» جاهز للإرسال إلى العميل",
+      "post_approved": {
+        "internal": "اعتُمد المنشور «{{post}}» بواسطة {{actor}}",
+        "client": "اعتمد العميل المنشور «{{post}}»",
+        "medical": "اعتُمد المنشور «{{post}}» بعد المراجعة الطبية بواسطة {{actor}}"
+      },
+      "post_publish_today": "موعد نشر المنشور «{{post}}» في {{date}}",
+      "post_publish_overdue": "فات موعد نشر المنشور «{{post}}» منذ {{date}}",
       "approval_expired": "انتهت صلاحية رابط «{{client}}» قبل أن يردّ {{contact}} على كل الأعمال"
     },
     "dueAt": "{{date}}، {{time}}"

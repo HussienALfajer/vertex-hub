@@ -26,6 +26,12 @@ export interface WorkProgressSource {
 
 type Executor = Database | Transaction;
 
+/** Counts per retainer cycle line from a module other than `tasks` (F08: posts counted directly). */
+export type CycleLineCounts = (
+  ids: string[],
+  executor?: Executor,
+) => Promise<Map<string, TaskCounts>>;
+
 export const NO_TASKS: TaskCounts = { total: 0, delivered: 0, open: 0 };
 
 /**
@@ -35,9 +41,15 @@ export const NO_TASKS: TaskCounts = { total: 0, delivered: 0, open: 0 };
 @Injectable()
 export class WorkProgress {
   private source: WorkProgressSource | undefined;
+  private readonly lineCounts: CycleLineCounts[] = [];
 
   register(source: WorkProgressSource): void {
     this.source = source;
+  }
+
+  /** Adds to the cycle line counts of the tasks source (F08 rule 16). */
+  registerCycleLines(counts: CycleLineCounts): void {
+    this.lineCounts.push(counts);
   }
 
   async projects(ids: string[], executor?: Executor): Promise<Map<string, TaskCounts>> {
@@ -49,7 +61,20 @@ export class WorkProgress {
   }
 
   async cycleLines(ids: string[], executor?: Executor): Promise<Map<string, TaskCounts>> {
-    return ids.length && this.source ? this.source.cycleLines(ids, executor) : new Map();
+    if (ids.length === 0) return new Map();
+    const totals = new Map(this.source ? await this.source.cycleLines(ids, executor) : []);
+    // One query at a time: inside a transaction the executor is a single connection.
+    for (const counts of this.lineCounts) {
+      for (const [id, added] of await counts(ids, executor)) {
+        const current = totals.get(id) ?? NO_TASKS;
+        totals.set(id, {
+          total: current.total + added.total,
+          delivered: current.delivered + added.delivered,
+          open: current.open + added.open,
+        });
+      }
+    }
+    return totals;
   }
 
   async openTasks(tx: Transaction, projectId: string): Promise<{ id: string; name: string }[]> {

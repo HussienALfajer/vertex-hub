@@ -104,6 +104,10 @@ export const ERROR_CODES = [
   'APPROVAL_LINK_INVALID',
   'APPROVAL_LINK_EXPIRED',
   'VERSION_SENT',
+  'POST_LOCKED',
+  'POST_ARCHIVED',
+  'INVALID_RESPONSIBLE',
+  'PUBLISH_TIME_REQUIRED',
 ] as const;
 
 export const errorCodeSchema = z.enum(ERROR_CODES).meta({ id: 'ErrorCode' });
@@ -127,7 +131,7 @@ export const errorResponseSchema = z
 export type ErrorResponse = z.infer<typeof errorResponseSchema>;
 
 /**
- * Something a user is responsible for, which blocks archiving them (F01 rule 9, F05 rule 4, F06) or
+ * Something a user is responsible for, which blocks archiving them (F01 rule 9, F05 rule 4, F06, F08 rule 28) or
  * removing their Account Manager role (F02 rule 8).
  */
 export const responsibilitySchema = z
@@ -137,6 +141,7 @@ export const responsibilitySchema = z
       'account_manager_of_client',
       'project_manager_of_project',
       'assignee_of_open_tasks',
+      'responsible_for_open_posts',
     ]),
     id: z.uuid(),
     name: z.string(),

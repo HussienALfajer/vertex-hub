@@ -292,6 +292,17 @@ What roles see differently: everyone reads; edit-scope users get the editing and
 - Not asked, chosen as the simplest reading and easy to change before implementation: "Approve all" on the client page (rule 23); the request limit raised to 60 items; "mark scheduled" needs a publish time (rule 17); published is final (edge case 9).
 - Q5 (email provider) still gates sending links and reminders by email (Phase 4).
 
+## Implementation notes
+Details the implementation settled (PR 1, `feat/f08-content-api`):
+- **Overdue** (card flag, My posts, the daily job) means the same everywhere: `approved` or `scheduled` with a publish date before today.
+- **`post_review_requested`** goes to the managers of Content Management and Internal Operations and the client's account manager; General Managers are not notified of every submission, as with `task_review_requested`.
+- **Calendar counts** ignore the `status` filter, so every status keeps its number while one is selected.
+- **An internal pass** is asked for with `to: awaiting_client` (the post needs the client) or `to: approved` (it does not); for a healthcare client either one leads to the medical stage.
+- **"Returned to me"** lists `in_production` posts whose latest review or client response sent them back; a post reopened with "Reopen content" is not one.
+- **Post files** are locked with `POST_LOCKED` in every status but `idea` and `in_production`, which also covers the snapshot versions under medical review or with the client (`VERSION_SENT` is never reached on a post).
+- **Cycle line counts:** `projects`' `WorkProgress` takes extra cycle line sources (`registerCycleLines`) beside the tasks source; a post counted directly adds to the line's `tasks` total and, once published, to its delivered count.
+- **A responsible person** must be a non-archived user; reopening a cancelled post whose responsible person was archived since answers `INVALID_RESPONSIBLE`.
+
 ## Acceptance
 - Owner check in the browser (content writer W and manager CM of Content Management, designer D and Design manager M, the client's account manager A, a Medical Consultation member R; a client C with an active retainer whose cycle has lines design 4 and reel 1 and generated tasks, with a final-approval contact with a phone; a healthcare client H):
   1. As W, open C's Content tab and create three posts for this month (a post, a carousel, a reel) with captions, platforms and dates; they show on the month and week views and on `/content`.
