@@ -321,6 +321,21 @@ Details the implementation settled (PR 2, `feat/f08-content-links-api`):
 - **A client's approval history** merges the responses on tasks and on posts into one list, newest first, each entry with `kind`.
 - **A sent post of a client that becomes healthcare** stays with the client (rule 26); if its link is then revoked or expires it is not ready again without a medical pass (`MEDICAL_REVIEW_REQUIRED`): withdraw it for re-review.
 
+Details the implementation settled (PR 3, `feat/f08-content-web`):
+- **Client Content tab.** It is a tab of the client profile like the others, at `/clients/$clientId?tab=content`; its calendar state (view, month, filters) is kept in the page, while `/content` keeps it in the URL.
+- **Empty period.** A period without posts shows "No posts in this period" in place of the grid; the arrows and "Today" stay.
+- **Month counts** on the client tab are those of the calendar month of the day shown, whatever the calendar's filters and also in the week view.
+- **Post card.** A card shows the thumbnail when the post has media, the type icon otherwise; the client's name is left out on the client tab.
+- **Editing on the post page** is two dialogs: the text (type, caption, hashtags; `idea` and `in_production`) and "date and details" (title, date, time, platforms, responsible, client approval, counting line, notes; any open status). "Reopen content" and "Cancel" sit in the header's menu with Duplicate and Archive.
+- **Review marks.** Content is locked whenever a snapshot is with the medical reviewer or the client (PR 1 note on post files), so "changed after review" and "added after review" can never apply to a post; the media of the snapshot is marked "in medical review" or "sent to client".
+- **Responsible options** in the forms: the members of Content Management, the client's account manager, the user and the current responsible person; the API decides (`INVALID_RESPONSIBLE`).
+- **Counting line options** (the post's own line, and the line of a requested task): the lines of the current open cycle of each of the client's retainers, as the retainer list gives them; a line of an earlier open cycle stays chosen once set (edge case 4).
+- **Over-commitment warning** (rule 9) shows when the chosen line's tasks are not fewer than its committed units.
+- **Linked task page.** "Deliver" and the client response on an approved task are hidden for a linked task; the edit dialog still offers client approval, which the API refuses (`LINKED_TO_POST`).
+- **A task linked to an archived post** says on its page that the post is archived or no longer available; the post is hidden from everyone but scope-all reviewers, and the task stays linked until the post is restored (the API does not unlink on archive).
+- **Shared error texts** (`NOTHING_TO_APPROVE`, `REVIEW_CONTENT_CHANGED`, `MEDICAL_REVIEW_REQUIRED`, `SELF_REVIEW`) are worded for tasks and posts alike.
+- **Client approval panel** of the post page, "Send month for approval" and the post items of Approvals arrive with PR 4.
+
 ## Acceptance
 - Owner check in the browser (content writer W and manager CM of Content Management, designer D and Design manager M, the client's account manager A, a Medical Consultation member R; a client C with an active retainer whose cycle has lines design 4 and reel 1 and generated tasks, with a final-approval contact with a phone; a healthcare client H):
   1. As W, open C's Content tab and create three posts for this month (a post, a carousel, a reel) with captions, platforms and dates; they show on the month and week views and on `/content`.

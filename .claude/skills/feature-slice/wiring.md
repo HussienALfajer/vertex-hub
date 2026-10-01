@@ -39,6 +39,7 @@ Everything a new module, permission, error or screen must be connected to. Tests
 ### web (`apps/web/src/`)
 - [ ] `features/<module>/<module>.queries.ts`: a `<module>Keys` object whose keys start with the module name; mutations invalidate every query the change affects (other modules' lists, `['me']` when access changes).
 - [ ] Thin routes under `routes/_app/<path>/`: `validateSearch` for URL filters, `beforeLoad` redirect for pages the user may not use (cosmetic; the API enforces).
+- [ ] A new route file is unknown to TypeScript until the router plugin regenerates `routeTree.gen.ts`: run `pnpm turbo run build --filter=@vertex-hub/web` once before `web` typecheck, and commit the regenerated file.
 - [ ] Navigation item in `components/app-shell.tsx` (`navItems` with its `permission`, and the `label` union type) and its `nav.<key>` string.
 - [ ] `i18n/locales/ar.json`: the `<module>` namespace, `errors.<CODE>` for each new error code, and `audit.entityTypes`, `audit.actions` and `audit.fields` entries for new audit values.
 - [ ] Every page: loading (`Skeleton`), empty (`EmptyState`), error (`LoadError`); forms show server errors with `FormAlert` and `errorMessage()`.

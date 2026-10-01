@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router';
 import {
+  addDays,
   CLIENT_PLATFORMS,
   CLIENT_STATUSES,
   type ClientStatus,
@@ -19,6 +20,8 @@ import {
   Autocomplete,
   Avatar,
   Button,
+  CalendarDay,
+  CalendarGrid,
   Callout,
   Card,
   CardHeader,
@@ -94,7 +97,7 @@ import {
 } from 'lucide-react';
 import { type ReactNode, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { formatNumber } from '../../lib/format';
+import { formatNumber, formatWeekday, formatWeekdayDate } from '../../lib/format';
 
 export const Route = createFileRoute('/_app/design-system')({
   component: DesignSystemPage,
@@ -113,6 +116,9 @@ const swatches = [
 ] as const;
 
 const departments = ['design', 'content', 'video'] as const;
+
+/** Two weeks from a Saturday, across a month boundary. */
+const calendarDays = Array.from({ length: 14 }, (_, index) => addDays('2026-09-26', index));
 
 const sampleRows: {
   task: 'logo' | 'reel' | 'calendar';
@@ -259,6 +265,28 @@ function DesignSystemPage() {
             </StatusBadge>
           ))}
         </div>
+      </Section>
+
+      <Section title={t('designSystem.calendar')}>
+        <CalendarGrid weekdays={calendarDays.slice(0, 7).map((day) => formatWeekday(day))}>
+          {calendarDays.map((day) => (
+            <CalendarDay
+              key={day}
+              day={formatNumber(Number(day.slice(8)))}
+              label={formatWeekdayDate(day)}
+              today={day === '2026-10-06'}
+              outside={day < '2026-10-01'}
+              className="min-h-20"
+            >
+              {day === '2026-10-06' && (
+                <StatusBadge status="internal_review">{t('workflow.internal_review')}</StatusBadge>
+              )}
+              {day === '2026-10-08' && (
+                <StatusBadge status="approved">{t('workflow.approved')}</StatusBadge>
+              )}
+            </CalendarDay>
+          ))}
+        </CalendarGrid>
       </Section>
 
       <Section title={t('designSystem.table')}>

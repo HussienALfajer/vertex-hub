@@ -9,6 +9,7 @@ import {
   type ApprovalWithdrawnReason,
   type AuditEntry,
   addDays,
+  allowedPostTransitions,
   allowedTaskTransitions,
   approvalRequestState,
   BOARD_LIMITS,
@@ -20,11 +21,14 @@ import {
   type ClientResponse,
   type ClientStatus,
   type Contact,
+  type ContentCalendar,
   type CreateApprovalRequest,
   type CreateCycleAdjustment,
   type CreateCycleLine,
   type CreateExtraWork,
   type CreateMilestone,
+  type CreatePost,
+  type CreatePostTask,
   type CreateProject,
   type CreateRetainer,
   type CreateTaskInput,
@@ -38,6 +42,7 @@ import {
   type DepartmentCode,
   type DepartmentDetailResponse,
   type DepartmentResponse,
+  type DuplicatePost,
   type ErrorCode,
   type ExtraWork,
   type ExtraWorkBilling,
@@ -54,16 +59,20 @@ import {
   type IssuedApprovalRequest,
   isInlineMimeType,
   isLineBehind,
+  isPostContentEditable,
+  isPostOverdue,
   isProjectClosed,
   isTaskBlocked,
   isTaskFinished,
   isTaskOpen,
   isTaskOverdue,
+  type LinkableTask,
   lastOfMonth,
   type MedicalReview,
   type MeResponse,
   type Milestone,
   type MilestoneStatus,
+  type MyContentSummary,
   type MyTaskSummary,
   mentionedUserIds,
   NOTIFICATION_CATALOG,
@@ -74,6 +83,20 @@ import {
   type NotificationType,
   OPEN_TASK_STATUSES,
   type PlatformAccount,
+  POST_LIMITS,
+  POST_STATUSES,
+  type Post,
+  type PostClientResponse,
+  type PostDetail,
+  type PostMedia,
+  type PostPlatform,
+  type PostReview,
+  type PostRights,
+  type PostStatus,
+  type PostStatusChange,
+  type PostTask,
+  type PostType,
+  type PostView,
   type Project,
   type ProjectDetail,
   type ProjectStatus,
@@ -81,7 +104,11 @@ import {
   type PublicApproval,
   type PublicApprovalItem,
   type PublicResponse,
+  type PublishedLink,
   planTemplateRun,
+  postMove,
+  postTaskDueDate,
+  postTaskTitle,
   type RequestScope,
   type Retainer,
   type RetainerDeliverables,
@@ -124,6 +151,7 @@ import {
   templateRunInputSchema,
   type UpdateCycleLine,
   type UpdateExtraWork,
+  type UpdatePost,
   type UpdateTaskInput,
   type UserResponse,
   updateTemplateSchema,
@@ -757,6 +785,8 @@ interface MockOptions {
   notifications?: NotificationRecord[];
   /** Adds work with the client and its approval requests (`approvalsSeed`, F09). */
   approvals?: boolean;
+  /** Adds the content plan: posts, their linked tasks and files (`contentSeed`, F08). */
+  content?: boolean;
 }
 
 const json = (route: Route, body: unknown, status = 200) => route.fulfill({ status, json: body });
@@ -795,14 +825,16 @@ export async function mockApi(page: Page, options: MockOptions): Promise<MockedA
   const retainers = retainersSeed();
   const retainersApi = retainerRoutes({ users, clients, retainers, me: () => me });
   const sent = options.approvals ? approvalsSeed() : { tasks: [], files: [], requests: [] };
-  const tasks = [...tasksSeed(), ...sent.tasks];
+  const planned = options.content ? contentSeed() : { posts: [], tasks: [], files: [] };
+  const tasks = [...tasksSeed(), ...sent.tasks, ...planned.tasks];
   const tasksApi = taskRoutes({
     users,
     clients,
     projects,
     retainers,
     tasks,
-    files: sent.files,
+    posts: planned.posts,
+    files: [...sent.files, ...planned.files],
     requests: sent.requests,
     me: () => me,
   });
@@ -2480,6 +2512,8 @@ interface TaskRecord {
   links: { id: string; url: string; label: string | null; addedById: string; archived: boolean }[];
   revisions: TaskRevisionRecord[];
   comments: TaskCommentRecord[];
+  /** The post the task produces media for (F08). */
+  postId: string | null;
 }
 
 /** "Now" for the task mocks: the seeded today, morning in Asia/Damascus. */
@@ -2525,6 +2559,7 @@ function taskRecord(
     links: [],
     revisions: [],
     comments: [],
+    postId: null,
     ...fields,
   };
 }
@@ -3112,6 +3147,7 @@ interface TaskState {
   projects: ProjectRecord[];
   retainers: RetainerRecord[];
   tasks: TaskRecord[];
+  posts: PostRecord[];
   /** Files beyond the seeded ones, and the approval requests (`approvalsSeed`). */
   files: FileRecord[];
   requests: ApprovalRequestRecord[];
@@ -3130,6 +3166,7 @@ function taskRoutes({
   projects,
   retainers,
   tasks,
+  posts,
   files,
   requests,
   me,
@@ -3297,7 +3334,7 @@ function taskRoutes({
       checklist: { done: items.filter((item) => item.doneAt).length, total: items.length },
       revisions: { clientCount: clientCount(task), limit: task.revisionLimit },
       overLimitPending: task.revisions.some((r) => r.overLimit && r.decision === null),
-      postId: null,
+      postId: task.postId,
     };
   };
   const dependencyOf = (task: TaskRecord) => ({
@@ -3425,9 +3462,20 @@ function taskRoutes({
     projects,
     retainers,
     tasks,
+    posts,
     files: [...filesSeed(), ...files],
     me,
     rights,
+  });
+  const contentApi = contentRoutes({
+    users,
+    clients,
+    retainers,
+    tasks,
+    posts,
+    me,
+    taskSummary: summary,
+    media: taskFiles.media,
   });
 
   // Approval requests (F09): the links sent to clients, and what they answered.
@@ -3663,6 +3711,10 @@ function taskRoutes({
     // Files (F10).
     const filed = taskFiles.handle(route, method, url, request);
     if (filed) return filed;
+
+    // Content (F08).
+    const posted = contentApi(route, method, url, request);
+    if (posted) return posted;
 
     if (path === '/api/me/tasks/summary') {
       const meId = me().user.id;
@@ -4333,6 +4385,820 @@ function taskRoutes({
   };
 }
 
+// Content (F08)
+
+interface PostRecord {
+  id: string;
+  clientId: string;
+  title: string;
+  type: PostType;
+  platforms: PostPlatform[];
+  caption: string | null;
+  hashtags: string | null;
+  notes: string | null;
+  publishDate: string;
+  publishTime: string | null;
+  status: PostStatus;
+  /** The stage of internal review; null in every other status. */
+  reviewStage: ReviewStage | null;
+  needsClientApproval: boolean;
+  responsibleId: string;
+  cycleLineId: string | null;
+  /** Passes and returns, oldest first. */
+  reviews: PostReview[];
+  clearedReviewId: string | null;
+  responses: PostClientResponse[];
+  scheduledAt: string | null;
+  publishedAt: string | null;
+  publishedById: string | null;
+  publishedLinks: PublishedLink[];
+  cancelledAt: string | null;
+  cancelReason: string | null;
+  createdById: string;
+  createdAt: string;
+  archived: boolean;
+}
+
+function postRecord(
+  n: number,
+  fields: Partial<PostRecord> & Pick<PostRecord, 'title'>,
+): PostRecord {
+  return {
+    id: id(n),
+    clientId: id(601),
+    type: 'post',
+    platforms: ['instagram'],
+    caption: null,
+    hashtags: null,
+    notes: null,
+    publishDate: '2026-10-12',
+    publishTime: null,
+    status: 'idea',
+    reviewStage: fields.status === 'internal_review' ? 'internal' : null,
+    needsClientApproval: true,
+    responsibleId: id(3),
+    cycleLineId: null,
+    reviews: [],
+    clearedReviewId: null,
+    responses: [],
+    scheduledAt: null,
+    publishedAt: null,
+    publishedById: null,
+    publishedLinks: [],
+    cancelledAt: null,
+    cancelReason: null,
+    createdById: id(3),
+    createdAt: '2026-10-05T08:00:00.000Z',
+    archived: false,
+    ...fields,
+  };
+}
+
+/**
+ * Jasmine's October content plan, one post of each status, with the design tasks that produce
+ * their media, and a post of the healthcare client waiting in the medical stage.
+ */
+export function contentSeed(): { posts: PostRecord[]; tasks: TaskRecord[]; files: FileRecord[] } {
+  const jasmine = id(601);
+  const layan = { id: id(3), name: 'ليان الأحمد' };
+  const sara = { id: id(1), name: 'سارة الخطيب' };
+  const png = (name: string) => ({ name, mimeType: 'image/png', sizeBytes: 2_400_000 });
+  const final = {
+    isFinal: true,
+    finalSource: 'auto' as const,
+    finalMarkedAt: '2026-10-08T10:00:00.000Z',
+  };
+  const deliverableFile = (
+    n: number,
+    owner: { type: FileOwnerType; id: string },
+    name: string,
+    version: FileVersionRecord,
+  ): FileRecord => ({
+    id: id(n),
+    ownerType: owner.type,
+    ownerId: owner.id,
+    role: 'deliverable',
+    name,
+    brandKind: null,
+    confidential: false,
+    createdById: layan.id,
+    createdAt: version.createdAt,
+    archivedAt: null,
+    versions: [version],
+  });
+  const retainerLink = {
+    clientId: jasmine,
+    retainerId: id(901),
+    cycleId: id(921),
+    cycleLineId: id(931),
+  };
+  const pass = (n: number, caption: string, versions: PostReview['versions'] = []): PostReview => ({
+    id: id(n),
+    stage: 'internal',
+    outcome: 'passed',
+    note: null,
+    reviewer: sara,
+    versions,
+    caption,
+    hashtags: '#مطعم_الياسمين',
+    type: 'post',
+    platforms: ['instagram'],
+    publishDate: '2026-10-12',
+    publishTime: null,
+    createdAt: '2026-10-08T11:00:00.000Z',
+  });
+  const autumnCaption = 'أطباق الخريف وصلت: يقطين مشوي، شوربة عدس بالليمون، وكنافة بالقشطة.';
+  return {
+    posts: [
+      postRecord(1601, {
+        title: 'عرض افتتاح الفرع الثاني',
+        platforms: ['instagram', 'facebook'],
+        caption: 'نفتح أبواب فرعنا الثاني يوم الجمعة. أول مئة ضيف على حسابنا في الحلويات.',
+        hashtags: '#مطعم_الياسمين #افتتاح',
+        notes: 'نركّز على صورة الواجهة الجديدة. العرض يسري ثلاثة أيام.',
+        publishTime: '18:00',
+        status: 'in_production',
+      }),
+      postRecord(1602, {
+        title: 'ريل كواليس المطبخ',
+        type: 'reel',
+        platforms: ['instagram', 'tiktok'],
+        publishDate: '2026-10-14',
+        publishTime: '20:00',
+      }),
+      postRecord(1603, {
+        title: 'كاروسيل أطباق الخريف',
+        type: 'carousel',
+        platforms: ['instagram', 'facebook'],
+        caption: autumnCaption,
+        hashtags: '#مطعم_الياسمين #خريف',
+        publishDate: PROJECTS_TODAY,
+        publishTime: '19:00',
+        status: 'approved',
+        needsClientApproval: false,
+        responsibleId: sara.id,
+        reviews: [pass(1671, autumnCaption)],
+        clearedReviewId: id(1671),
+      }),
+      postRecord(1604, {
+        title: 'ستوري عرض الغداء',
+        type: 'story',
+        caption: 'غداء العمل بسعر خاص من الأحد إلى الخميس.',
+        publishDate: '2026-10-08',
+        publishTime: '12:00',
+        status: 'scheduled',
+        needsClientApproval: false,
+        responsibleId: sara.id,
+        reviews: [pass(1672, 'غداء العمل بسعر خاص من الأحد إلى الخميس.')],
+        clearedReviewId: id(1672),
+        scheduledAt: '2026-10-07T09:30:00.000Z',
+      }),
+      postRecord(1605, {
+        title: 'يوم القهوة العالمي',
+        caption: 'فنجان قهوتك علينا اليوم.',
+        publishDate: '2026-10-01',
+        publishTime: '10:00',
+        status: 'published',
+        reviews: [pass(1673, 'فنجان قهوتك علينا اليوم.')],
+        clearedReviewId: id(1673),
+        publishedAt: '2026-10-01T07:05:00.000Z',
+        publishedById: layan.id,
+        publishedLinks: [{ platform: 'instagram', url: 'https://www.instagram.com/p/coffee-day' }],
+      }),
+      postRecord(1606, {
+        title: 'مسابقة المتابعين',
+        publishDate: '2026-10-15',
+        status: 'cancelled',
+        cancelledAt: '2026-10-06T09:00:00.000Z',
+        cancelReason: 'أجّل العميل المسابقة إلى الشهر القادم.',
+      }),
+      postRecord(1607, {
+        title: 'قائمة المشروبات الساخنة',
+        caption: 'سحلب، شوكولا ساخنة، وزهورات شامية.',
+        publishTime: '16:00',
+        status: 'internal_review',
+      }),
+      postRecord(1608, {
+        title: 'عرض نهاية الأسبوع',
+        platforms: ['instagram', 'facebook', 'x'],
+        caption: 'عشاء لشخصين بسعر خاص يومي الجمعة والسبت.',
+        publishTime: '13:00',
+        status: 'awaiting_client',
+        reviews: [pass(1674, 'عشاء لشخصين بسعر خاص يومي الجمعة والسبت.')],
+        clearedReviewId: id(1674),
+      }),
+      postRecord(1609, { title: 'تهنئة بداية الأسبوع', publishTime: '09:00' }),
+      postRecord(1610, {
+        title: 'شكر لضيوف الافتتاح',
+        caption: 'شكرًا لكل من شاركنا الافتتاح.',
+        status: 'in_production',
+        responsibleId: sara.id,
+        reviews: [
+          {
+            ...pass(1675, ''),
+            outcome: 'returned',
+            note: 'اذكروا عدد الضيوف وأضيفوا صورة من الافتتاح.',
+            reviewer: layan,
+            caption: null,
+            hashtags: null,
+            type: null,
+            platforms: [],
+            publishDate: null,
+          },
+        ],
+      }),
+      postRecord(1611, {
+        clientId: id(602),
+        title: 'نصائح العناية بالأسنان',
+        caption: 'ثلاث عادات يومية تحمي أسنانك.',
+        publishDate: '2026-10-13',
+        status: 'internal_review',
+        reviewStage: 'medical',
+        responsibleId: sara.id,
+        createdById: sara.id,
+        reviews: [pass(1676, 'ثلاث عادات يومية تحمي أسنانك.')],
+      }),
+      postRecord(1612, { title: 'حملة تشرين الثاني', publishDate: '2026-11-02' }),
+    ],
+    tasks: [
+      taskRecord(1621, {
+        title: 'تصميم عرض الافتتاح',
+        assigneeId: layan.id,
+        status: 'approved',
+        ...retainerLink,
+        postId: id(1601),
+      }),
+      taskRecord(1622, {
+        title: 'تصميم قائمة المشروبات',
+        assigneeId: layan.id,
+        status: 'approved',
+        ...retainerLink,
+      }),
+    ],
+    files: [
+      deliverableFile(
+        1631,
+        { type: 'task', id: id(1621) },
+        'تصميم عرض الافتتاح',
+        uploadVersion(1641, 1, png('opening-offer.png'), layan, '2026-10-08T09:00:00.000Z', final),
+      ),
+      deliverableFile(
+        1632,
+        { type: 'task', id: id(1622) },
+        'قائمة المشروبات',
+        uploadVersion(1642, 1, png('hot-drinks.png'), layan, '2026-10-08T09:30:00.000Z', final),
+      ),
+      deliverableFile(
+        1633,
+        { type: 'post', id: id(1603) },
+        'يقطين مشوي',
+        uploadVersion(1643, 1, png('pumpkin.png'), sara, '2026-10-07T08:00:00.000Z'),
+      ),
+      deliverableFile(
+        1634,
+        { type: 'post', id: id(1603) },
+        'شوربة العدس',
+        uploadVersion(1644, 1, png('lentil-soup.png'), sara, '2026-10-07T08:05:00.000Z'),
+      ),
+    ],
+  };
+}
+
+type PostMediaRecord = Omit<PostMedia, 'task'> & { taskId: string | null };
+
+interface ContentState {
+  users: UserResponse[];
+  clients: ClientRecord[];
+  retainers: RetainerRecord[];
+  tasks: TaskRecord[];
+  posts: PostRecord[];
+  me: () => MeResponse;
+  /** A task as the task mocks list it. */
+  taskSummary: (task: TaskRecord) => Task;
+  /** Rule 5: the post's own files, then the finals of its linked tasks. */
+  media: (postId: string, taskIds: string[]) => PostMediaRecord[];
+}
+
+/** The content API (F08) over the in-memory posts, with its scopes and workflow rules. */
+function contentRoutes({
+  users,
+  clients,
+  retainers,
+  tasks,
+  posts,
+  me,
+  taskSummary,
+  media,
+}: ContentState) {
+  let next = 1700;
+  const now = () => TASKS_NOW.toISOString();
+  const holds = (permission: string, scope: string) =>
+    me().permissions.some((g) => g.permission === permission && g.scopes.includes(scope as never));
+  const person = (userId: string) => ({
+    id: userId,
+    name: users.find((u) => u.id === userId)?.name ?? '',
+  });
+  const archivable = (userId: string) => ({
+    ...person(userId),
+    archived: users.find((u) => u.id === userId)?.status === 'archived',
+  });
+  const clientOf = (post: PostRecord) => clients.find((c) => c.id === post.clientId);
+  const covers = (permission: string, post: PostRecord) =>
+    holds(permission, 'all') ||
+    (holds(permission, 'own_clients') && clientOf(post)?.accountManagerId === me().user.id);
+  // Mirrors the API's scopes (spec F08, "Scopes on posts").
+  const rights = (post: PostRecord): PostRights => ({
+    edit: covers('content.manage', post),
+    review: covers('content.review', post),
+    client: covers('tasks.manage', post),
+  });
+  const linked = (post: PostRecord) =>
+    tasks.filter((t) => t.postId === post.id && !t.archived && t.status !== 'cancelled');
+  const mediaOf = (post: PostRecord) =>
+    media(
+      post.id,
+      linked(post).map((t) => t.id),
+    );
+  const overdue = (post: PostRecord) => isPostOverdue(post, TASKS_NOW);
+  const readOnly = (post: PostRecord) => post.archived || !!clientOf(post)?.archived;
+  const lineOf = (lineId: string | null) => {
+    for (const retainer of retainers) {
+      for (const cycle of retainer.cycles) {
+        const line = cycle.lines.find((l) => l.id === lineId);
+        if (line) return { retainer, cycle, line };
+      }
+    }
+    return undefined;
+  };
+
+  const summary = (post: PostRecord): Post => ({
+    id: post.id,
+    client: { id: post.clientId, name: clientOf(post)?.tradeName ?? '' },
+    title: post.title,
+    type: post.type,
+    platforms: post.platforms,
+    publishDate: post.publishDate,
+    publishTime: post.publishTime,
+    status: post.status,
+    reviewStage: post.reviewStage,
+    responsible: archivable(post.responsibleId),
+    thumbnailVersionId: mediaOf(post).find((m) => m.previewStatus === 'ready')?.id ?? null,
+    linkedTaskCount: linked(post).length,
+    overdue: overdue(post),
+  });
+  const allowed = (post: PostRecord) =>
+    readOnly(post)
+      ? []
+      : allowedPostTransitions(
+          {
+            status: post.status,
+            reviewStage: post.reviewStage,
+            needsClientApproval: post.needsClientApproval,
+            hasWork: linked(post).length > 0 || mediaOf(post).length > 0,
+          },
+          rights(post),
+        );
+  const detail = (post: PostRecord): PostDetail => {
+    const r = rights(post);
+    const live = !readOnly(post);
+    const counted = lineOf(post.cycleLineId);
+    return {
+      ...summary(post),
+      client: {
+        id: post.clientId,
+        name: clientOf(post)?.tradeName ?? '',
+        healthcare: clientOf(post)?.isHealthcare ?? false,
+      },
+      responsible: { ...archivable(post.responsibleId), inScope: true },
+      caption: post.caption,
+      hashtags: post.hashtags,
+      notes: post.notes,
+      needsClientApproval: post.needsClientApproval,
+      media: mediaOf(post).map(({ taskId, ...version }) => {
+        const task = tasks.find((t) => t.id === taskId);
+        return { ...version, task: task ? { id: task.id, title: task.title } : null };
+      }),
+      linkedTasks: linked(post).map((task): PostTask => {
+        const listed = taskSummary(task);
+        return {
+          id: task.id,
+          title: task.title,
+          department: task.department,
+          assignee: listed.assignee,
+          status: task.status,
+          cycleLine: listed.cycleLine,
+        };
+      }),
+      cycleLine: counted
+        ? {
+            id: counted.line.id,
+            kind: counted.line.kind,
+            label: counted.line.label,
+            retainer: { id: counted.retainer.id, name: counted.retainer.name },
+          }
+        : null,
+      contentToken: MOCK_CONTENT_TOKEN,
+      clearedReview: post.reviews.find((review) => review.id === post.clearedReviewId) ?? null,
+      reviewHistory: post.reviews,
+      clientResponses: post.responses,
+      // Post items of approval requests arrive with the F08 approvals screens.
+      pendingApproval: null,
+      scheduledAt: post.scheduledAt,
+      publishedAt: post.publishedAt,
+      publishedBy: post.publishedById ? person(post.publishedById) : null,
+      publishedLinks: post.publishedLinks,
+      cancelledAt: post.cancelledAt,
+      cancelReason: post.cancelReason,
+      createdBy: person(post.createdById),
+      createdAt: post.createdAt,
+      updatedAt: post.createdAt,
+      archivedAt: post.archived ? now() : null,
+      readOnly: !live,
+      permissions: {
+        canEdit: live && r.edit,
+        canEditContent: live && r.edit && isPostContentEditable(post.status),
+        canReview: live && r.review,
+        canMedicalReview:
+          live &&
+          post.reviewStage === 'medical' &&
+          holds('approvals.review_medical', 'all') &&
+          post.responsibleId !== me().user.id,
+        canSendForApproval: false,
+        canRecordResponse: live && r.client && post.status === 'awaiting_client',
+        canArchive: holds('content.review', 'all'),
+      },
+      allowedTransitions: allowed(post),
+    };
+  };
+
+  /** Rule 11: a pass keeps the media, caption and hashtags it approved. */
+  const recordReview = (
+    post: PostRecord,
+    stage: ReviewStage,
+    outcome: PostReview['outcome'],
+    note: string | null,
+  ): PostReview => {
+    const passed = outcome === 'passed';
+    const review: PostReview = {
+      id: id(next++),
+      stage,
+      outcome,
+      note,
+      reviewer: person(me().user.id),
+      versions: passed
+        ? mediaOf(post).map((m) => ({
+            id: m.id,
+            fileItemId: m.fileItemId,
+            name: m.name,
+            number: m.number,
+          }))
+        : [],
+      caption: passed ? post.caption : null,
+      hashtags: passed ? post.hashtags : null,
+      type: passed ? post.type : null,
+      platforms: passed ? post.platforms : [],
+      publishDate: passed ? post.publishDate : null,
+      publishTime: passed ? post.publishTime : null,
+      createdAt: now(),
+    };
+    post.reviews.push(review);
+    return review;
+  };
+  /** Rule 8: an unlinked task takes its own client approval back until it is approved. */
+  const unlink = (task: TaskRecord) => {
+    task.postId = null;
+    if (task.status !== 'approved') task.needsClientApproval = true;
+  };
+  const matches = (post: PostRecord, q: URLSearchParams) => {
+    const statuses = q.getAll('status');
+    const responsible = q.get('responsible');
+    return (
+      (!q.get('clientId') || post.clientId === q.get('clientId')) &&
+      (statuses.length === 0 || statuses.includes(post.status)) &&
+      (!q.get('platform') || post.platforms.includes(q.get('platform') as PostPlatform)) &&
+      (!q.get('type') || post.type === q.get('type')) &&
+      (!responsible ||
+        post.responsibleId === (responsible === 'me' ? me().user.id : responsible)) &&
+      (!q.get('reviewStage') || post.reviewStage === q.get('reviewStage'))
+    );
+  };
+  const byPublish = (a: PostRecord, b: PostRecord) =>
+    `${a.publishDate}${a.publishTime ?? ''}`.localeCompare(
+      `${b.publishDate}${b.publishTime ?? ''}`,
+    );
+  /** "Returned to me": in production, sent back by its latest review. */
+  const returned = (post: PostRecord) =>
+    post.status === 'in_production' && post.reviews.at(-1)?.outcome === 'returned';
+  const inView: Record<PostView, (post: PostRecord) => boolean> = {
+    publish_today: (post) =>
+      post.responsibleId === me().user.id &&
+      (post.status === 'approved' || post.status === 'scheduled') &&
+      post.publishDate === PROJECTS_TODAY,
+    overdue: (post) => post.responsibleId === me().user.id && overdue(post),
+    returned: (post) => post.responsibleId === me().user.id && returned(post),
+    to_review: (post) =>
+      post.status === 'internal_review' && post.reviewStage === 'internal' && rights(post).review,
+  };
+  const live = () => posts.filter((post) => !post.archived && !clientOf(post)?.archived);
+
+  // Answers a content request, or returns undefined to let the other mocks try.
+  return (route: Route, method: string, url: URL, request: Request): Promise<void> | undefined => {
+    const path = url.pathname;
+    const q = url.searchParams;
+    const body = <T>() => request.postDataJSON() as T;
+
+    if (path === '/api/me/content/summary') {
+      const count = (view: PostView) => live().filter(inView[view]).length;
+      const reviewer = holds('content.review', 'all') || holds('content.review', 'own_clients');
+      const summaryBody: MyContentSummary = {
+        publishToday: count('publish_today'),
+        overdue: count('overdue'),
+        returned: count('returned'),
+        toReview: reviewer ? count('to_review') : null,
+      };
+      return json(route, summaryBody);
+    }
+    if (!path.startsWith('/api/content/')) return undefined;
+
+    if (path === '/api/content/calendar') {
+      const from = q.get('from') ?? '';
+      const to = q.get('to') ?? '';
+      const inRange = live().filter((post) => post.publishDate >= from && post.publishDate <= to);
+      // The counts ignore the status filter, so every status keeps its number.
+      const unfiltered = new URLSearchParams(q);
+      unfiltered.delete('status');
+      const calendar: ContentCalendar = {
+        from,
+        to,
+        posts: inRange
+          .filter((post) => matches(post, q))
+          .sort(byPublish)
+          .map(summary),
+        counts: Object.fromEntries(
+          POST_STATUSES.map((status) => [
+            status,
+            inRange.filter((post) => post.status === status && matches(post, unfiltered)).length,
+          ]),
+        ) as ContentCalendar['counts'],
+      };
+      return json(route, calendar);
+    }
+    if (path === '/api/content/posts' && method === 'GET') {
+      const view = q.get('view') as PostView | null;
+      const items = live()
+        .filter((post) => matches(post, q) && (!view || inView[view](post)))
+        .sort(byPublish)
+        .map(summary);
+      return json(route, { items, total: items.length, page: 1, pageSize: 25 });
+    }
+    if (path === '/api/content/posts' && method === 'POST') {
+      const input = body<CreatePost>();
+      const client = clients.find((c) => c.id === input.clientId);
+      if (!client) return fail(route, 404, null);
+      const post = postRecord(next++, {
+        clientId: input.clientId,
+        title: input.title,
+        type: input.type,
+        platforms: input.platforms,
+        caption: input.caption ?? null,
+        hashtags: input.hashtags ?? null,
+        notes: input.notes ?? null,
+        publishDate: input.publishDate,
+        publishTime: input.publishTime ?? null,
+        needsClientApproval: input.needsClientApproval,
+        responsibleId: input.responsibleId ?? me().user.id,
+        cycleLineId: input.cycleLineId,
+        createdById: me().user.id,
+        createdAt: now(),
+      });
+      if (!rights(post).edit) return fail(route, 403, null);
+      if (client.status === 'ended') return fail(route, 409, 'CLIENT_ENDED');
+      if (post.publishDate < PROJECTS_TODAY) return fail(route, 400, 'INVALID_DATES');
+      posts.push(post);
+      return json(route, detail(post), 201);
+    }
+
+    const match = path.match(/^\/api\/content\/posts\/([^/]+)(?:\/(.+))?$/);
+    const post = posts.find((p) => p.id === match?.[1]);
+    if (!match || !post) return fail(route, 404, null);
+    const action = match[2];
+    const r = rights(post);
+
+    if (!action && method === 'GET') return json(route, detail(post));
+    if (action !== 'restore' && readOnly(post)) return fail(route, 409, 'POST_ARCHIVED');
+    if (!action && method === 'PATCH') {
+      if (!r.edit) return fail(route, 403, null);
+      const input = body<UpdatePost>();
+      const content = input.caption !== undefined || input.hashtags !== undefined || input.type;
+      if (content && !isPostContentEditable(post.status)) return fail(route, 409, 'POST_LOCKED');
+      if (input.cycleLineId && linked(post).some((t) => t.cycleLineId)) {
+        return fail(route, 409, 'POST_COUNTED_BY_TASK');
+      }
+      Object.assign(post, input);
+      return json(route, detail(post));
+    }
+    if (action === 'status') {
+      const input = body<PostStatusChange>();
+      const move = postMove(post.status, input.to);
+      if (!move || !allowed(post).includes(input.to)) {
+        return fail(route, 409, 'INVALID_TRANSITION');
+      }
+      const tasksReady = linked(post).every((t) => t.status === 'approved');
+      const stage = post.reviewStage;
+      post.reviewStage = null;
+      switch (move) {
+        case 'submit':
+          if (!post.caption && mediaOf(post).length === 0) {
+            return fail(route, 409, 'NOTHING_TO_APPROVE');
+          }
+          if (!tasksReady) return fail(route, 409, 'POST_TASKS_NOT_READY');
+          post.reviewStage = 'internal';
+          break;
+        case 'send_to_client':
+        case 'approve': {
+          const review = recordReview(post, 'internal', 'passed', null);
+          // Rule 13: a healthcare client's post waits for the medical review first.
+          if (clientOf(post)?.isHealthcare) {
+            post.reviewStage = 'medical';
+            return json(route, detail(post));
+          }
+          post.clearedReviewId = review.id;
+          break;
+        }
+        case 'return':
+          recordReview(post, stage ?? 'internal', 'returned', input.note ?? null);
+          break;
+        case 'withdraw':
+          post.reviewStage = 'internal';
+          break;
+        case 'client_approved':
+        case 'client_changes': {
+          const contact = clientOf(post)?.contacts.find((c) => c.id === input.contactId);
+          if (!contact) return fail(route, 400, 'UNKNOWN_CONTACT');
+          post.responses.push({
+            id: id(next++),
+            decision: move === 'client_approved' ? 'approved' : 'changes_requested',
+            channel: 'manual',
+            contact: { id: contact.id, name: contact.name, archived: contact.archived },
+            note: input.note ?? null,
+            versions:
+              post.reviews.find((review) => review.id === post.clearedReviewId)?.versions ?? [],
+            recordedBy: person(me().user.id),
+            createdAt: now(),
+          });
+          break;
+        }
+        case 'schedule':
+          if (!post.publishTime) return fail(route, 409, 'PUBLISH_TIME_REQUIRED');
+          post.scheduledAt = now();
+          break;
+        case 'unschedule':
+          post.scheduledAt = null;
+          break;
+        case 'publish':
+          if (!tasksReady) return fail(route, 409, 'POST_TASKS_NOT_READY');
+          post.publishedAt = input.publishedAt ?? now();
+          post.publishedById = me().user.id;
+          post.publishedLinks = input.publishedLinks ?? [];
+          // Rule 18: publishing delivers the linked tasks.
+          for (const task of linked(post)) {
+            task.status = 'delivered';
+            task.deliveredAt = now();
+          }
+          break;
+        case 'cancel':
+          post.cancelledAt = now();
+          post.cancelReason = input.reason ?? null;
+          // Rule 19: the linked tasks are kept for another post.
+          for (const task of linked(post)) unlink(task);
+          break;
+        case 'reopen':
+          post.cancelledAt = null;
+          post.cancelReason = null;
+          break;
+        case 'start':
+        case 'reopen_content':
+          break;
+      }
+      post.status = input.to;
+      return json(route, detail(post));
+    }
+    if (action === 'medical-review') {
+      const input = body<MedicalReview>();
+      if (post.reviewStage !== 'medical') return fail(route, 409, 'INVALID_TRANSITION');
+      if (!holds('approvals.review_medical', 'all')) return fail(route, 403, null);
+      if (post.responsibleId === me().user.id) return fail(route, 403, 'SELF_REVIEW');
+      post.reviewStage = null;
+      if (input.decision === 'return') {
+        recordReview(post, 'medical', 'returned', input.note ?? null);
+        post.status = 'in_production';
+        return json(route, detail(post));
+      }
+      const review = recordReview(post, 'medical', 'passed', input.note ?? null);
+      post.clearedReviewId = review.id;
+      post.status = post.needsClientApproval ? 'awaiting_client' : 'approved';
+      return json(route, detail(post));
+    }
+    if (action === 'duplicate') {
+      if (!r.edit) return fail(route, 403, null);
+      const copy = postRecord(next++, {
+        clientId: post.clientId,
+        title: post.title,
+        type: post.type,
+        platforms: post.platforms,
+        caption: post.caption,
+        hashtags: post.hashtags,
+        notes: post.notes,
+        publishDate: body<DuplicatePost>().publishDate ?? post.publishDate,
+        publishTime: post.publishTime,
+        needsClientApproval: post.needsClientApproval,
+        responsibleId: me().user.id,
+        createdById: me().user.id,
+        createdAt: now(),
+      });
+      posts.push(copy);
+      return json(route, detail(copy), 201);
+    }
+    if (action === 'archive' || action === 'restore') {
+      if (!holds('content.review', 'all')) return fail(route, 403, null);
+      post.archived = action === 'archive';
+      return action === 'archive' ? route.fulfill({ status: 204 }) : json(route, detail(post));
+    }
+
+    // Linked tasks (rules 6–9, 12).
+    if (!r.edit) return fail(route, 403, null);
+    if (action === 'linkable-tasks') {
+      const search = q.get('q');
+      const cycle = retainers
+        .filter((retainer) => retainer.clientId === post.clientId)
+        .flatMap((retainer) => retainer.cycles)
+        .find((c) => c.periodStart <= post.publishDate && post.publishDate <= c.periodEnd);
+      const items = tasks
+        .filter(
+          (t) =>
+            !t.archived &&
+            t.clientId === post.clientId &&
+            !t.postId &&
+            t.status !== 'delivered' &&
+            t.status !== 'cancelled' &&
+            t.status !== 'awaiting_client' &&
+            t.reviewStage !== 'medical' &&
+            (!search || t.title.includes(search)) &&
+            (!q.get('department') || t.department === q.get('department')),
+        )
+        .map((t): LinkableTask => ({ ...taskSummary(t), inPublishCycle: t.cycleId === cycle?.id }))
+        .sort((a, b) => Number(b.inPublishCycle) - Number(a.inPublishCycle));
+      return json(route, { items: items.slice(0, POST_LIMITS.linkableTasks) });
+    }
+    if (action === 'tasks' && method === 'POST') {
+      if (!isPostContentEditable(post.status)) return fail(route, 409, 'POST_LOCKED');
+      const input = body<CreatePostTask>();
+      tasks.push(
+        taskRecord(next++, {
+          title: input.title ?? postTaskTitle(post.type, post.title),
+          brief: input.brief ?? post.notes,
+          department: input.department,
+          dueDate: input.dueDate ?? postTaskDueDate(post.publishDate, PROJECTS_TODAY),
+          clientId: post.clientId,
+          cycleLineId: input.cycleLineId,
+          createdById: me().user.id,
+          createdAt: now(),
+          postId: post.id,
+        }),
+      );
+      if (post.status === 'idea') post.status = 'in_production';
+      return json(route, detail(post), 201);
+    }
+    const taskMatch = action?.match(/^tasks\/([^/]+)(\/return)?$/);
+    const task = tasks.find((t) => t.id === taskMatch?.[1]);
+    if (!taskMatch || !task) return fail(route, 404, null);
+    if (taskMatch[2]) {
+      // Rule 12: only an approved task of a post in production goes back.
+      if (post.status !== 'in_production' || task.status !== 'approved') {
+        return fail(route, 409, 'INVALID_TRANSITION');
+      }
+      task.status = 'revisions';
+      return json(route, detail(post));
+    }
+    if (!isPostContentEditable(post.status)) return fail(route, 409, 'POST_LOCKED');
+    if (method === 'PUT') {
+      if (task.postId && task.postId !== post.id) return fail(route, 409, 'TASK_ALREADY_LINKED');
+      if (task.clientId !== post.clientId) return fail(route, 409, 'TASK_NOT_LINKABLE');
+      if (linked(post).length >= POST_LIMITS.tasks) return fail(route, 409, 'LIMIT_REACHED');
+      if (post.cycleLineId && task.cycleLineId) return fail(route, 409, 'POST_COUNTED_BY_TASK');
+      task.postId = post.id;
+      task.needsClientApproval = false;
+      if (post.status === 'idea') post.status = 'in_production';
+      return json(route, detail(post));
+    }
+    if (method === 'DELETE') {
+      unlink(task);
+      return json(route, detail(post));
+    }
+    return fail(route, 404, null);
+  };
+}
+
 // Work templates (F07).
 
 interface TemplateRecord {
@@ -4622,6 +5488,7 @@ interface FileState {
   projects: ProjectRecord[];
   retainers: RetainerRecord[];
   tasks: TaskRecord[];
+  posts: PostRecord[];
   files: FileRecord[];
   me: () => MeResponse;
   rights: (task: TaskRecord) => TaskRights;
@@ -4640,10 +5507,21 @@ interface OwnerAccess {
   scopeAll: boolean;
   writable: boolean;
   task?: TaskRecord;
+  post?: PostRecord;
 }
 
-/** The files API (F10), with the owner rights of the task, client, project and retainer mocks. */
-function fileRoutes({ users, clients, projects, retainers, tasks, files, me, rights }: FileState) {
+/** The files API (F10), with the owner rights of the task, client, project, retainer and post mocks. */
+function fileRoutes({
+  users,
+  clients,
+  projects,
+  retainers,
+  tasks,
+  posts,
+  files,
+  me,
+  rights,
+}: FileState) {
   const uploads = new Map<string, { name: string; mimeType: string; sizeBytes: number }>();
   let next = 1400;
   const now = () => TASKS_NOW.toISOString();
@@ -4676,6 +5554,23 @@ function fileRoutes({ users, clients, projects, retainers, tasks, files, me, rig
         scopeAll: holds('tasks.manage', 'all'),
         writable: !task.archived && task.status !== 'delivered' && task.status !== 'cancelled',
         task,
+      };
+    }
+    if (type === 'post') {
+      // F08: edit scope adds, versions and removes while the post is an idea or in production.
+      const post = posts.find((p) => p.id === ownerId);
+      if (!post) return undefined;
+      const edits = covers('content.manage', post.clientId);
+      return {
+        clientId: post.clientId,
+        label: post.title,
+        addDeliverable: edits,
+        manage: edits,
+        manageDocuments: false,
+        confidentialReader: false,
+        scopeAll: holds('content.review', 'all'),
+        writable: !post.archived && isPostContentEditable(post.status),
+        post,
       };
     }
     if (type === 'client') {
@@ -4720,7 +5615,8 @@ function fileRoutes({ users, clients, projects, retainers, tasks, files, me, rig
     const meId = me().user.id;
     const live = o.writable && !record.archivedAt;
     const deliverable = record.role === 'deliverable';
-    const onTask = record.ownerType === 'task';
+    // Tasks and posts hold work files; clients, projects and retainers hold documents.
+    const onTask = record.ownerType === 'task' || record.ownerType === 'post';
     const changes = onTask ? deliverable && o.addDeliverable : o.manageDocuments;
     return {
       id: record.id,
@@ -4752,6 +5648,7 @@ function fileRoutes({ users, clients, projects, retainers, tasks, files, me, rig
             (o.manage || (record.createdById === meId && (!deliverable || o.addDeliverable)))
           : live && o.manageDocuments,
         canSetFinal:
+          record.ownerType === 'task' &&
           deliverable &&
           !record.archivedAt &&
           !o.task?.archived &&
@@ -4905,7 +5802,13 @@ function fileRoutes({ users, clients, projects, retainers, tasks, files, me, rig
       if (input.confidential && !o.confidentialReader) {
         return fail(route, 403, 'NOT_CONFIDENTIAL_READER');
       }
-      if (!o.writable) return fail(route, 409, o.task ? 'TASK_CLOSED' : 'CLIENT_ARCHIVED');
+      if (!o.writable) {
+        return fail(
+          route,
+          409,
+          o.task ? 'TASK_CLOSED' : o.post ? 'POST_LOCKED' : 'CLIENT_ARCHIVED',
+        );
+      }
       const version = versionFrom(input.source, 1, input.note ?? null);
       if (!version) return fail(route, 400, 'UPLOAD_NOT_FOUND');
       const name =
@@ -5090,6 +5993,40 @@ function fileRoutes({ users, clients, projects, retainers, tasks, files, me, rig
             ? [{ id: latest.id, fileItemId: f.id, name: f.name, number: latest.number }]
             : [];
         }),
+    /** F08 rule 5: the latest version of each file of the post, then its linked tasks' finals. */
+    media: (postId: string, taskIds: string[]) => {
+      const shape = (f: FileRecord, v: FileVersionRecord, taskId: string | null) => ({
+        id: v.id,
+        fileItemId: f.id,
+        name: f.name,
+        number: v.number,
+        kind: v.kind,
+        type: fileTypeOf(v.kind, v.mimeType),
+        previewStatus: v.previewStatus,
+        taskId,
+      });
+      const own = files
+        .filter((f) => f.ownerType === 'post' && f.ownerId === postId && !f.archivedAt)
+        .flatMap((f) => {
+          const latest = f.versions.find((v) => !v.archivedAt);
+          return latest ? [shape(f, latest, null)] : [];
+        });
+      const produced = taskIds.flatMap((taskId) =>
+        files
+          .filter(
+            (f) =>
+              f.ownerType === 'task' &&
+              f.ownerId === taskId &&
+              f.role === 'deliverable' &&
+              !f.archivedAt,
+          )
+          .flatMap((f) => {
+            const final = f.versions.find((v) => v.isFinal && !v.archivedAt);
+            return final ? [shape(f, final, taskId)] : [];
+          }),
+      );
+      return [...own, ...produced];
+    },
     /** A snapshot version as the request page shows it (F09). */
     sent: (versionId: string): ApprovalItem['versions'][number] | undefined => {
       const found = anyVersion(versionId);
@@ -6129,6 +7066,17 @@ export const seedIds = {
   openRequest: id(1481),
   expiredRequest: id(1482),
   octoberCover: id(1007),
+  // With `MockOptions.content`.
+  openingPost: id(1601),
+  kitchenReel: id(1602),
+  autumnCarousel: id(1603),
+  coffeeDay: id(1605),
+  followersContest: id(1606),
+  hotDrinksPost: id(1607),
+  weekendOffer: id(1608),
+  dentalTips: id(1611),
+  openingDesign: id(1621),
+  drinksDesign: id(1622),
   websiteTemplate: id(2000),
   monthlyTemplate: id(2100),
 };

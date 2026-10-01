@@ -6,6 +6,7 @@ export * from './components/autocomplete';
 export * from './components/avatar';
 export * from './components/badge';
 export * from './components/button';
+export * from './components/calendar-grid';
 export * from './components/callout';
 export * from './components/card';
 export * from './components/checkbox';

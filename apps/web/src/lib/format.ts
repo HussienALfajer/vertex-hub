@@ -109,6 +109,23 @@ export function formatMonth(day: string): string {
   }).format(new Date(`${day}T00:00:00Z`));
 }
 
+/** The weekday of a calendar day (`YYYY-MM-DD`), e.g. "السبت". */
+export function formatWeekday(day: string, style: 'long' | 'short' = 'long'): string {
+  return new Intl.DateTimeFormat(APP_LOCALE, { weekday: style, timeZone: 'UTC' }).format(
+    new Date(`${day}T00:00:00Z`),
+  );
+}
+
+/** A calendar day with its weekday, without the year, e.g. "السبت، 3 تشرين الأول". */
+export function formatWeekdayDate(day: string): string {
+  return new Intl.DateTimeFormat(APP_LOCALE, {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    timeZone: 'UTC',
+  }).format(new Date(`${day}T00:00:00Z`));
+}
+
 /** The calendar day of an instant in the business timezone, as `YYYY-MM-DD` (for grouping). */
 export function businessDay(value: Date | string): string {
   return toBusinessDateTimeInput(value).slice(0, 10);

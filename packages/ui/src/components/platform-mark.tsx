@@ -32,6 +32,7 @@ const platformMarkVariants = cva(
   {
     variants: {
       size: {
+        xs: 'size-5 rounded-sm [&_svg]:size-3',
         sm: 'size-7 [&_svg]:size-3.5',
         md: 'size-9 [&_svg]:size-4.5',
         lg: 'size-11 [&_svg]:size-5',

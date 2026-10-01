@@ -164,11 +164,20 @@ export function needsDialog(task: TaskDetail, { move }: Target): boolean {
   );
 }
 
+/**
+ * A task linked to a post is approved by the client with the post and delivered when the post is
+ * published (F08 rule 7): delivering by hand and recording a client response are refused
+ * (`LINKED_TO_POST`).
+ */
+const refusedWhenLinked = (task: TaskDetail, move: TaskMove): boolean =>
+  task.postId !== null &&
+  (move === 'deliver' || (move === 'client_changes' && task.status === 'approved'));
+
 /** The workflow moves the caller may make now, from the server's `allowedTransitions`. */
 export function targetsOf(task: TaskDetail): Target[] {
   return task.allowedTransitions.flatMap((to) => {
     const move = taskMove(task.status, to);
-    return move ? [{ to, move }] : [];
+    return move && !refusedWhenLinked(task, move) ? [{ to, move }] : [];
   });
 }
 

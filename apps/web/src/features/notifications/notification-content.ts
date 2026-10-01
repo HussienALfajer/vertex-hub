@@ -26,8 +26,7 @@ export function notificationLink(notification: Notification): ToOptions {
     case 'approval_request':
       return { to: '/approvals/requests/$requestId', params: { requestId: subject.id } };
     case 'post':
-      // The post page arrives with the F08 screens.
-      return { to: '/notifications' };
+      return { to: '/content/posts/$postId', params: { postId: subject.id } };
     default:
       return { to: '/tasks/$taskId', params: { taskId: subject.id } };
   }

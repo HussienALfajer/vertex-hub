@@ -36,6 +36,7 @@ import {
   ArrowRightIcon,
   BriefcaseBusinessIcon,
   Building2Icon,
+  CalendarDaysIcon,
   EllipsisIcon,
   FolderKanbanIcon,
   KeyRoundIcon,
@@ -494,6 +495,8 @@ function ArchiveDialog({
                       <BriefcaseBusinessIcon className="size-4 text-muted-foreground" />
                     ) : item.type === 'assignee_of_open_tasks' ? (
                       <ListTodoIcon className="size-4 text-muted-foreground" />
+                    ) : item.type === 'responsible_for_open_posts' ? (
+                      <CalendarDaysIcon className="size-4 text-muted-foreground" />
                     ) : (
                       <FolderKanbanIcon className="size-4 text-muted-foreground" />
                     )}
@@ -532,6 +535,14 @@ function ArchiveDialog({
                       render={<Link to="/tasks/$taskId" params={{ taskId: item.id }} />}
                     >
                       {t('users.responsibilities.openTask')}
+                    </Button>
+                  ) : item.type === 'responsible_for_open_posts' ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      render={<Link to="/content/posts/$postId" params={{ postId: item.id }} />}
+                    >
+                      {t('users.responsibilities.openPost')}
                     </Button>
                   ) : null}
                 </li>

@@ -41,6 +41,7 @@ import {
   ArchiveIcon,
   ArchiveRestoreIcon,
   ArrowRightIcon,
+  CalendarDaysIcon,
   CheckIcon,
   ChevronDownIcon,
   EllipsisIcon,
@@ -68,6 +69,7 @@ import { canAll, useMe } from '../../lib/auth';
 import { errorMessage } from '../../lib/errors';
 import { formatNumber } from '../../lib/format';
 import { ClientApprovalsTab } from '../approvals/client-approvals-tab';
+import { ClientContentTab } from '../content/client-content-tab';
 import { ClientFilesTab } from '../files/client-files-tab';
 import { type FileLibrarySearch, parseFileLibrarySearch } from '../files/library-search';
 import { ClientProjectsTab } from '../projects/client-projects-tab';
@@ -97,6 +99,7 @@ const CLIENT_TABS = [
   'projects',
   'retainers',
   'tasks',
+  'content',
   'files',
   'approvals',
   'brand-kit',
@@ -235,6 +238,10 @@ function Profile({
             <ListTodoIcon />
             {t('clients.profile.tabs.tasks')}
           </TabsTrigger>
+          <TabsTrigger value="content">
+            <CalendarDaysIcon />
+            {t('clients.profile.tabs.content')}
+          </TabsTrigger>
           <TabsTrigger value="files">
             <FolderOpenIcon />
             {t('clients.profile.tabs.files')}
@@ -273,6 +280,9 @@ function Profile({
         </TabsContent>
         <TabsContent value="tasks">
           <ClientTasksTab client={client} />
+        </TabsContent>
+        <TabsContent value="content">
+          <ClientContentTab client={client} />
         </TabsContent>
         <TabsContent value="files">
           <ClientFilesTab client={client} search={search} onSearchChange={setFileSearch} />
