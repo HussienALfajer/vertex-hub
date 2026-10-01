@@ -228,9 +228,13 @@ test('scope-all users see the usage line, remove and restore a document', async 
   await expect(v1.getByText(ar.files.removed, { exact: true })).toBeHidden();
   await showRemoved.click();
 
-  // The whole document.
-  await quote.getByRole('button', { name: 'إجراءات عرض السعر' }).click();
-  await page.getByRole('menuitem', { name: ar.files.remove }).click();
+  // The whole document. The refetches after the restore re-render the card, which can close a
+  // menu opened meanwhile: open it again until the confirmation shows.
+  await expect(async () => {
+    await quote.getByRole('button', { name: 'إجراءات عرض السعر' }).click();
+    await page.getByRole('menuitem', { name: ar.files.remove }).click({ timeout: 2_000 });
+    await expect(page.getByRole('alertdialog')).toBeVisible({ timeout: 2_000 });
+  }).toPass();
   await page.getByRole('alertdialog').getByRole('button', { name: ar.files.removeAction }).click();
   // Earlier toasts may still show.
   await expect(page.getByText(ar.files.removedDone).last()).toBeVisible();
