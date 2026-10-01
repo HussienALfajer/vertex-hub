@@ -22,6 +22,7 @@ import { Route as AppApprovalsIndexRouteImport } from './routes/_app/approvals/i
 import { Route as AppClientsIndexRouteImport } from './routes/_app/clients/index'
 import { Route as AppClientsClientIdRouteImport } from './routes/_app/clients/$clientId'
 import { Route as AppClientsNewRouteImport } from './routes/_app/clients/new'
+import { Route as AppContentIndexRouteImport } from './routes/_app/content/index'
 import { Route as AppDepartmentsIndexRouteImport } from './routes/_app/departments/index'
 import { Route as AppDepartmentsDepartmentIdRouteImport } from './routes/_app/departments/$departmentId'
 import { Route as AppNotificationsIndexRouteImport } from './routes/_app/notifications/index'
@@ -45,6 +46,7 @@ import { Route as AppTemplatesIndexRouteImport } from './routes/_app/templates/i
 import { Route as AppTemplatesTemplateIdRouteImport } from './routes/_app/templates/$templateId'
 import { Route as AppTemplatesNewRouteImport } from './routes/_app/templates/new'
 import { Route as AppApprovalsRequestsRequestIdRouteImport } from './routes/_app/approvals/requests/$requestId'
+import { Route as AppContentPostsPostIdRouteImport } from './routes/_app/content/posts/$postId'
 
 const AppRoute = AppRouteImport.update({
   id: '/_app',
@@ -108,6 +110,11 @@ const AppClientsClientIdRoute = AppClientsClientIdRouteImport.update({
 const AppClientsNewRoute = AppClientsNewRouteImport.update({
   id: '/clients/new',
   path: '/clients/new',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppContentIndexRoute = AppContentIndexRouteImport.update({
+  id: '/content/',
+  path: '/content/',
   getParentRoute: () => AppRoute,
 } as any)
 const AppDepartmentsIndexRoute = AppDepartmentsIndexRouteImport.update({
@@ -228,6 +235,11 @@ const AppApprovalsRequestsRequestIdRoute =
     path: '/approvals/requests/$requestId',
     getParentRoute: () => AppRoute,
   } as any)
+const AppContentPostsPostIdRoute = AppContentPostsPostIdRouteImport.update({
+  id: '/content/posts/$postId',
+  path: '/content/posts/$postId',
+  getParentRoute: () => AppRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
@@ -257,6 +269,7 @@ export interface FileRoutesByFullPath {
   '/templates/new': typeof AppTemplatesNewRoute
   '/approvals/': typeof AppApprovalsIndexRoute
   '/clients/': typeof AppClientsIndexRoute
+  '/content/': typeof AppContentIndexRoute
   '/departments/': typeof AppDepartmentsIndexRoute
   '/notifications/': typeof AppNotificationsIndexRoute
   '/projects/': typeof AppProjectsIndexRoute
@@ -265,6 +278,7 @@ export interface FileRoutesByFullPath {
   '/team/': typeof AppTeamIndexRoute
   '/templates/': typeof AppTemplatesIndexRoute
   '/approvals/requests/$requestId': typeof AppApprovalsRequestsRequestIdRoute
+  '/content/posts/$postId': typeof AppContentPostsPostIdRoute
 }
 export interface FileRoutesByTo {
   '/activate': typeof ActivateRoute
@@ -294,6 +308,7 @@ export interface FileRoutesByTo {
   '/templates/new': typeof AppTemplatesNewRoute
   '/approvals': typeof AppApprovalsIndexRoute
   '/clients': typeof AppClientsIndexRoute
+  '/content': typeof AppContentIndexRoute
   '/departments': typeof AppDepartmentsIndexRoute
   '/notifications': typeof AppNotificationsIndexRoute
   '/projects': typeof AppProjectsIndexRoute
@@ -302,6 +317,7 @@ export interface FileRoutesByTo {
   '/team': typeof AppTeamIndexRoute
   '/templates': typeof AppTemplatesIndexRoute
   '/approvals/requests/$requestId': typeof AppApprovalsRequestsRequestIdRoute
+  '/content/posts/$postId': typeof AppContentPostsPostIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -333,6 +349,7 @@ export interface FileRoutesById {
   '/_app/templates/new': typeof AppTemplatesNewRoute
   '/_app/approvals/': typeof AppApprovalsIndexRoute
   '/_app/clients/': typeof AppClientsIndexRoute
+  '/_app/content/': typeof AppContentIndexRoute
   '/_app/departments/': typeof AppDepartmentsIndexRoute
   '/_app/notifications/': typeof AppNotificationsIndexRoute
   '/_app/projects/': typeof AppProjectsIndexRoute
@@ -341,6 +358,7 @@ export interface FileRoutesById {
   '/_app/team/': typeof AppTeamIndexRoute
   '/_app/templates/': typeof AppTemplatesIndexRoute
   '/_app/approvals/requests/$requestId': typeof AppApprovalsRequestsRequestIdRoute
+  '/_app/content/posts/$postId': typeof AppContentPostsPostIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -372,6 +390,7 @@ export interface FileRouteTypes {
     | '/templates/new'
     | '/approvals/'
     | '/clients/'
+    | '/content/'
     | '/departments/'
     | '/notifications/'
     | '/projects/'
@@ -380,6 +399,7 @@ export interface FileRouteTypes {
     | '/team/'
     | '/templates/'
     | '/approvals/requests/$requestId'
+    | '/content/posts/$postId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/activate'
@@ -409,6 +429,7 @@ export interface FileRouteTypes {
     | '/templates/new'
     | '/approvals'
     | '/clients'
+    | '/content'
     | '/departments'
     | '/notifications'
     | '/projects'
@@ -417,6 +438,7 @@ export interface FileRouteTypes {
     | '/team'
     | '/templates'
     | '/approvals/requests/$requestId'
+    | '/content/posts/$postId'
   id:
     | '__root__'
     | '/_app'
@@ -447,6 +469,7 @@ export interface FileRouteTypes {
     | '/_app/templates/new'
     | '/_app/approvals/'
     | '/_app/clients/'
+    | '/_app/content/'
     | '/_app/departments/'
     | '/_app/notifications/'
     | '/_app/projects/'
@@ -455,6 +478,7 @@ export interface FileRouteTypes {
     | '/_app/team/'
     | '/_app/templates/'
     | '/_app/approvals/requests/$requestId'
+    | '/_app/content/posts/$postId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -556,6 +580,13 @@ declare module '@tanstack/react-router' {
       path: '/clients/new'
       fullPath: '/clients/new'
       preLoaderRoute: typeof AppClientsNewRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/content/': {
+      id: '/_app/content/'
+      path: '/content'
+      fullPath: '/content/'
+      preLoaderRoute: typeof AppContentIndexRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/departments/': {
@@ -719,6 +750,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppApprovalsRequestsRequestIdRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/content/posts/$postId': {
+      id: '/_app/content/posts/$postId'
+      path: '/content/posts/$postId'
+      fullPath: '/content/posts/$postId'
+      preLoaderRoute: typeof AppContentPostsPostIdRouteImport
+      parentRoute: typeof AppRoute
+    }
   }
 }
 
@@ -746,6 +784,7 @@ interface AppRouteChildren {
   AppTemplatesNewRoute: typeof AppTemplatesNewRoute
   AppApprovalsIndexRoute: typeof AppApprovalsIndexRoute
   AppClientsIndexRoute: typeof AppClientsIndexRoute
+  AppContentIndexRoute: typeof AppContentIndexRoute
   AppDepartmentsIndexRoute: typeof AppDepartmentsIndexRoute
   AppNotificationsIndexRoute: typeof AppNotificationsIndexRoute
   AppProjectsIndexRoute: typeof AppProjectsIndexRoute
@@ -754,6 +793,7 @@ interface AppRouteChildren {
   AppTeamIndexRoute: typeof AppTeamIndexRoute
   AppTemplatesIndexRoute: typeof AppTemplatesIndexRoute
   AppApprovalsRequestsRequestIdRoute: typeof AppApprovalsRequestsRequestIdRoute
+  AppContentPostsPostIdRoute: typeof AppContentPostsPostIdRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
@@ -780,6 +820,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppTemplatesNewRoute: AppTemplatesNewRoute,
   AppApprovalsIndexRoute: AppApprovalsIndexRoute,
   AppClientsIndexRoute: AppClientsIndexRoute,
+  AppContentIndexRoute: AppContentIndexRoute,
   AppDepartmentsIndexRoute: AppDepartmentsIndexRoute,
   AppNotificationsIndexRoute: AppNotificationsIndexRoute,
   AppProjectsIndexRoute: AppProjectsIndexRoute,
@@ -788,6 +829,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppTeamIndexRoute: AppTeamIndexRoute,
   AppTemplatesIndexRoute: AppTemplatesIndexRoute,
   AppApprovalsRequestsRequestIdRoute: AppApprovalsRequestsRequestIdRoute,
+  AppContentPostsPostIdRoute: AppContentPostsPostIdRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)

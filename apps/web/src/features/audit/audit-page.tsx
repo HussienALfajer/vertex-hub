@@ -745,6 +745,13 @@ function taskIdOf(entry: AuditEntry): string | undefined {
   return typeof taskId === 'string' ? taskId : undefined;
 }
 
+/** The post a post entry or one of its files belongs to. */
+function postIdOf(entry: AuditEntry): string | undefined {
+  if (entry.entityType === 'post') return entry.entityId;
+  if (entry.entityType === 'file_item') return fileOwnerOf(entry, 'post');
+  return undefined;
+}
+
 /** The project a project, milestone or extra work entry belongs to. */
 function projectIdOf(entry: AuditEntry): string | undefined {
   if (entry.entityType === 'project') return entry.entityId;
@@ -797,6 +804,15 @@ function EntityLink({ entry, names }: { entry: AuditEntry; names: EntityNames })
     return (
       <Link to="/tasks/$taskId" params={{ taskId }} className={linkClass}>
         {withFileName(t, entry, typeof title === 'string' ? title : t('audit.openTask'))}
+      </Link>
+    );
+  }
+  const postId = postIdOf(entry);
+  if (postId) {
+    const title = entry.entityType === 'post' ? (entry.after?.title ?? entry.before?.title) : null;
+    return (
+      <Link to="/content/posts/$postId" params={{ postId }} className={linkClass}>
+        {withFileName(t, entry, typeof title === 'string' ? title : t('audit.openPost'))}
       </Link>
     );
   }

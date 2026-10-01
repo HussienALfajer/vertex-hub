@@ -19,6 +19,7 @@ import { isMissing, LoadError } from '../../components/load-error';
 import { can, useMe } from '../../lib/auth';
 import { formatCalendarDate, formatDateTime, formatNumber } from '../../lib/format';
 import { ClientApprovalSection } from '../approvals/task-approval-panel';
+import { TaskPostSection } from '../content/task-post-section';
 import { PersonName, useDepartmentNames } from '../projects/project-badges';
 import { lineName } from '../retainers/retainer-badges';
 import { TaskTemplateOrigin } from '../templates/template-runs';
@@ -83,6 +84,7 @@ function TaskView({ task }: { task: TaskDetail }) {
           <CommentsSection task={task} />
         </div>
         <div className="flex min-w-0 flex-col gap-6">
+          {task.postId && <TaskPostSection postId={task.postId} />}
           <ClientApprovalSection task={task} />
           <DetailsSection task={task} />
           <DependenciesSection task={task} />

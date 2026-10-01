@@ -20,6 +20,7 @@ import {
 import {
   BriefcaseBusinessIcon,
   Building2Icon,
+  CalendarDaysIcon,
   ChevronDownIcon,
   CircleUserIcon,
   FolderKanbanIcon,
@@ -51,6 +52,7 @@ interface NavItem {
     | 'nav.clients'
     | 'nav.tasks'
     | 'nav.approvals'
+    | 'nav.content'
     | 'nav.projects'
     | 'nav.retainers'
     | 'nav.templates'
@@ -96,6 +98,7 @@ const navItems: NavItem[] = [
     icon: StampIcon,
     show: hasApprovalQueue,
   },
+  { to: '/content', label: 'nav.content', icon: CalendarDaysIcon, permission: 'content.read' },
   { to: '/clients', label: 'nav.clients', icon: BriefcaseBusinessIcon, permission: 'clients.read' },
   { to: '/projects', label: 'nav.projects', icon: FolderKanbanIcon, permission: 'projects.read' },
   { to: '/retainers', label: 'nav.retainers', icon: RepeatIcon, permission: 'projects.read' },

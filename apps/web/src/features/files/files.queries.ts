@@ -70,7 +70,7 @@ export const fileUsageQuery = (clientId: string) =>
     queryFn: () => call(api.GET('/api/files/usage', { params: { query: { clientId } } })),
   });
 
-/** What files are attached to: a task, a client, a project or a retainer. */
+/** What files are attached to: a task, a client, a project, a retainer or a post. */
 export interface FileOwnerRef {
   type: FileOwnerType;
   id: string;
@@ -146,7 +146,7 @@ export function uploadFile(
 /**
  * A change to an owner's files, refreshing also on failure: a 403 or 409 after the owner changed
  * (edge case 14) reloads the section with its current actions. A task's page also shows its file
- * counts.
+ * counts, a post's page its media.
  */
 function useFilesMutation<Input, Output>(
   owner: FileOwnerRef,
@@ -155,6 +155,8 @@ function useFilesMutation<Input, Output>(
   const queryClient = useQueryClient();
   const refreshes: QueryKey[] = [filesKeys.all];
   if (owner.type === 'task') refreshes.push(tasksKeys.detail(owner.id));
+  // A post's files are its media and part of its content token (F08 rules 5 and 11).
+  if (owner.type === 'post') refreshes.push(['content']);
   return useMutation({
     mutationFn,
     onSettled: () =>

@@ -107,7 +107,8 @@ export const taskWorkloadQuery = (filters: TaskWorkloadFilters) =>
  * A mutation on task data, refreshing `refreshes` also on failure: a 403 after the task changed
  * hands (edge case 15) reloads the page without the lost actions. By default the whole `tasks`
  * cache, and projects, retainers and monthly templates, which show task counts (F05, F07), and
- * approvals, which list the tasks ready to send (F09).
+ * approvals, which list the tasks ready to send (F09), and content: a post shows its linked tasks
+ * and their final files (F08).
  * Parts that change no count refresh less: the checklist only task views (its progress shows in
  * lists), links and comments only their task.
  */
@@ -119,6 +120,7 @@ function useTasksMutation<Input, Output>(
     ['retainers'],
     ['templates', 'retainer'],
     ['approvals'],
+    ['content'],
   ],
 ) {
   const queryClient = useQueryClient();
