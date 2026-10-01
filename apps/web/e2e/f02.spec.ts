@@ -8,8 +8,11 @@ test('create a client, then add a contact with final approval', async ({ page })
   await mockApi(page, { signedIn: true });
   await page.goto('/clients');
   await page.getByRole('link', { name: ar.clients.newClient }).click();
+  // The form is filled once it is on screen: until then the list is, and its search box and
+  // sector filter answer to the same labels as the form's fields.
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(ar.clients.new.title);
 
-  await page.getByLabel(ar.clients.form.tradeName).fill('مخبز السنابل');
+  await page.getByLabel(ar.clients.form.tradeName, { exact: true }).fill('مخبز السنابل');
   await page.getByLabel(ar.clients.form.sector, { exact: true }).fill('مخابز');
   const manager = page.getByRole('combobox', { name: ar.clients.form.accountManager });
   await manager.click();

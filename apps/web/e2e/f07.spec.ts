@@ -39,7 +39,10 @@ test('create a project template, edit it, archive and restore it', async ({ page
   await expect(page.getByRole('link', { name: 'دورة السوشيال ميديا الشهرية' })).toBeVisible();
 
   await page.getByRole('link', { name: ar.templates.newTemplate }).click();
-  await page.getByLabel(ar.templates.form.name).fill('شعار سريع');
+  // The form is filled once it is on screen: until then the list is, and its search box's label
+  // contains the name field's.
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(ar.templates.new.title);
+  await page.getByLabel(ar.templates.form.name, { exact: true }).fill('شعار سريع');
   await page.getByRole('button', { name: ar.templates.addStage }).click();
   await page.getByLabel(fill(ar.templates.stageName, { position: '1' })).fill('التصميم');
   const addToStage = fill(ar.templates.addStepTo, { stage: 'التصميم' });
@@ -78,7 +81,7 @@ test('create a project template, edit it, archive and restore it', async ({ page
   );
 
   // Edit and save the whole document again.
-  await page.getByLabel(ar.templates.form.name).fill('شعار سريع للمطاعم');
+  await page.getByLabel(ar.templates.form.name, { exact: true }).fill('شعار سريع للمطاعم');
   await expect(page.getByText(ar.templates.unsaved)).toBeVisible();
   await page.getByRole('button', { name: ar.templates.save }).click();
   await expect(page.getByText(ar.templates.saved)).toBeVisible();
