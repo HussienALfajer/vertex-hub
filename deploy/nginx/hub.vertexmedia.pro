@@ -64,6 +64,17 @@ server {
         include snippets/vertexhub-proxy.conf;
     }
 
+    # Approval links (F09, ADR 0020): the client page's API takes no session, only the link's
+    # token, so it gets its own per-address limit. Its file content goes through /_files/ below.
+    location /api/public/ {
+        limit_req zone=vhapproval burst=30 nodelay;
+        limit_req_status 429;
+        # The path holds the link's token, which is never logged: the access log masks it.
+        access_log /var/log/nginx/hub.vertexmedia.pro.access.log vhpublic;
+        proxy_pass http://127.0.0.1:3050;
+        include snippets/vertexhub-proxy.conf;
+    }
+
     # Notifications stream (F14, ADR 0018): Server-Sent Events pass through unbuffered, and the
     # read timeout outlasts the stream's 15-minute lifetime. The proxy snippet is not included
     # because it sets its own read timeout; its headers are repeated here. Streams count against
@@ -120,6 +131,20 @@ server {
         access_log off;
     }
 
+    # The same files for the holder of an approval link (F09 rule 23): the public content routes
+    # redirect here, so their responses never send a referrer (the page address holds the token).
+    location /_public_files/ {
+        internal;
+        alias /srv/hub.vertexmedia.pro/shared/files/;
+        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header X-Frame-Options "SAMEORIGIN" always;
+        add_header Content-Security-Policy "frame-ancestors 'self'" always;
+        add_header Referrer-Policy "no-referrer" always;
+        add_header X-Robots-Tag "noindex, nofollow" always;
+        access_log off;
+    }
+
     # The API documentation is disabled in production; don't forward probes for it.
     location ^~ /api/docs { return 404; }
 
@@ -139,6 +164,22 @@ server {
         include snippets/vertexhub-headers.conf;
         add_header Cache-Control "public, max-age=2592000" always;
         access_log off;
+    }
+
+    # The client page of an approval link (F09 rule 23): the SPA, but the address holds the
+    # link's token, so it is never sent as a referrer. The headers are listed here instead of
+    # including the standard set, which carries its own Referrer-Policy.
+    location /a/ {
+        try_files /index.html =404;
+        # The path is the token: not logged.
+        access_log off;
+        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header X-Frame-Options "DENY" always;
+        add_header Referrer-Policy "no-referrer" always;
+        add_header X-Robots-Tag "noindex, nofollow" always;
+        include snippets/vertexhub-csp.conf;
+        add_header Cache-Control "no-cache" always;
     }
 
     # Dotfiles and source maps are never served.

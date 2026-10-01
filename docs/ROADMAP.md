@@ -33,7 +33,7 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done. Feature IDs
 ## Phase 2 — Production and client
 Build order (owner, 2026-09-30): F10 → F09 → F08 → F11. F09 approves exact file versions from F10; F08 attaches files and sends month plans for approval through F09.
 - [x] F10 Files and versions (spec: `docs/specs/F10-files-versions.md`, ADR 0019): files API, storage, previews and purge jobs, deploy configuration (PR 1); upload control, preview dialog, task Files section (PR 2); client Files tab (library, documents, usage), brand kit uploaded files, project and retainer Documents tabs, file entries in the audit log (PR 3); owner acceptance passed
-- [~] F09 Internal review and client approval (incl. medical review) (spec: `docs/specs/F09-review-approval.md`, ADR 0020; includes A04, A05, A13): contracts, schema, review snapshots, medical review stage, text for the client, manual client responses and healthcare flag hooks in the tasks API (PR 1)
+- [~] F09 Internal review and client approval (incl. medical review) (spec: `docs/specs/F09-review-approval.md`, ADR 0020; includes A04, A05, A13): contracts, schema, review snapshots, medical review stage, text for the client, manual client responses and healthcare flag hooks in the tasks API (PR 1); approval requests and links, the public client page API, the hourly reminders job and the nginx rules (PR 2); web screens remain (PR 3, PR 4)
 - [ ] F08 Content calendar
 - [ ] F11 Unified calendar and shoots
 - [ ] Automations A04, A05, A06, A09, A13 (A02 task part moved to F07)

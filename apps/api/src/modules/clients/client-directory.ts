@@ -11,6 +11,13 @@ export interface ContactSummary {
   archived: boolean;
 }
 
+/** A contact as an approval request needs it (F09). */
+export interface ContactDetail extends ContactSummary {
+  clientId: string;
+  phone: string | null;
+  hasFinalApproval: boolean;
+}
+
 export interface ClientSummary {
   id: string;
   name: string;
@@ -95,6 +102,35 @@ export class ClientDirectory {
     );
   }
 
+  /** Contacts by id, archived or not, with their client, phone and approval authority. */
+  async contacts(ids: string[], executor: Database | Transaction = this.db) {
+    const unique = [...new Set(ids)];
+    if (unique.length === 0) return new Map<string, ContactDetail>();
+    const rows = await executor
+      .select(contactColumns)
+      .from(clientContacts)
+      .where(inArray(clientContacts.id, unique));
+    return new Map(rows.map((row) => [row.id, toContact(row)]));
+  }
+
+  /** The non-archived contacts with final-approval authority of the clients, by name (F02 rule 9). */
+  async approvers(clientIds: string[]): Promise<ContactDetail[]> {
+    const unique = [...new Set(clientIds)];
+    if (unique.length === 0) return [];
+    const rows = await this.db
+      .select(contactColumns)
+      .from(clientContacts)
+      .where(
+        and(
+          inArray(clientContacts.clientId, unique),
+          clientContacts.hasFinalApproval,
+          isNull(clientContacts.archivedAt),
+        ),
+      )
+      .orderBy(clientContacts.name, clientContacts.id);
+    return rows.map(toContact);
+  }
+
   /** `column` holds a non-archived client (F05 rule G2). */
   isLive(column: PgColumn): SQL {
     return sql`${qualified(column)} in (select ${clients.id} from ${clients}
@@ -125,6 +161,27 @@ export class ClientDirectory {
       where ${clients.tradeName} ilike ${`%${escapeLike(search)}%`})`;
   }
 }
+
+const contactColumns = {
+  id: clientContacts.id,
+  clientId: clientContacts.clientId,
+  name: clientContacts.name,
+  phone: clientContacts.phone,
+  hasFinalApproval: clientContacts.hasFinalApproval,
+  archivedAt: clientContacts.archivedAt,
+};
+
+const toContact = ({
+  archivedAt,
+  ...row
+}: {
+  id: string;
+  clientId: string;
+  name: string;
+  phone: string | null;
+  hasFinalApproval: boolean;
+  archivedAt: Date | null;
+}): ContactDetail => ({ ...row, archived: !!archivedAt });
 
 const summaryColumns = {
   id: clients.id,

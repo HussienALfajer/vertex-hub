@@ -125,6 +125,7 @@ for zone in 'zone=general:' 'zone=perip:'; do
   nginx -T 2>/dev/null | grep -q "$zone" ||
     { echo "the nginx ${zone%:} zone the site uses is not defined" >&2; exit 1; }
 done
+install -m 644 "$src/deploy/nginx/vertexhub-csp.conf" /etc/nginx/snippets/vertexhub-csp.conf
 install -m 644 "$src/deploy/nginx/vertexhub-headers.conf" /etc/nginx/snippets/vertexhub-headers.conf
 install -m 644 "$src/deploy/nginx/vertexhub-proxy.conf" /etc/nginx/snippets/vertexhub-proxy.conf
 install -m 644 "$src/deploy/nginx/vertexhub-limits.conf" /etc/nginx/conf.d/vertexhub-limits.conf

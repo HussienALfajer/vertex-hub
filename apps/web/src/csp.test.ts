@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const headers = readFileSync(
-  new URL('../../../deploy/nginx/vertexhub-headers.conf', import.meta.url),
+  new URL('../../../deploy/nginx/vertexhub-csp.conf', import.meta.url),
   'utf8',
 );
 

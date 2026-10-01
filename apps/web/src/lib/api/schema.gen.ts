@@ -1620,6 +1620,182 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/approvals/ready": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ApprovalsController_ready"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/approvals/requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ApprovalsController_list"];
+        put?: never;
+        post: operations["ApprovalsController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/approvals/requests/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ApprovalsController_detail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/approvals/requests/{id}/reissue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ApprovalsController_reissue"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/approvals/requests/{id}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ApprovalsController_revoke"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/clients/{id}/approvals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ClientApprovalsController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/public/approvals/{token}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PublicApprovalsController_page"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/public/approvals/{token}/items/{itemId}/response": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PublicApprovalsController_respond"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/public/approvals/{token}/versions/{versionId}/content": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PublicApprovalsController_content"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/public/approvals/{token}/versions/{versionId}/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PublicApprovalsController_preview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/public/approvals/{token}/versions/{versionId}/thumbnail": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PublicApprovalsController_thumbnail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/templates": {
         parameters: {
             query?: never;
@@ -3937,7 +4113,7 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
-            };
+            } | null;
             /** Format: date-time */
             createdAt: string;
         };
@@ -4176,6 +4352,347 @@ export interface components {
         };
         TaskCommentInput: {
             body: string;
+        };
+        /** @description Tasks ready to send, grouped by client, by name */
+        ApprovalReady: {
+            clients: components["schemas"]["ReadyClient"][];
+        };
+        ReadyClient: {
+            client: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            };
+            isHealthcare: boolean;
+            contacts: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                phone: string | null;
+            }[];
+            tasks: components["schemas"]["ReadyTask"][];
+        };
+        ReadyTask: {
+            /** Format: uuid */
+            id: string;
+            title: string;
+            type: components["schemas"]["TaskType"];
+            department: components["schemas"]["DepartmentCode"];
+            assignee: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                archived: boolean;
+                inDepartment: boolean;
+            } | null;
+            status: components["schemas"]["TaskStatus"];
+            reviewStage: components["schemas"]["ReviewStage"] | null;
+            priority: components["schemas"]["TaskPriority"];
+            /** Format: date */
+            dueDate: string;
+            dueTime: string | null;
+            overdue: boolean;
+            blocked: boolean;
+            client: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            project: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            milestone: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            retainer: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            cycle: {
+                /** Format: uuid */
+                id: string;
+                /** Format: date */
+                periodStart: string;
+                /** Format: date */
+                periodEnd: string;
+            } | null;
+            cycleLine: {
+                /** Format: uuid */
+                id: string;
+                kind: components["schemas"]["DeliverableKind"];
+                label: string | null;
+            } | null;
+            checklist: {
+                done: number;
+                total: number;
+            };
+            revisions: {
+                clientCount: number;
+                limit: number;
+            };
+            overLimitPending: boolean;
+            snapshot: {
+                files: number;
+                hasText: boolean;
+            };
+        };
+        /** @description Approval requests, newest first */
+        ApprovalRequestPage: {
+            items: components["schemas"]["ApprovalRequest"][];
+            total: number;
+            page: number;
+            pageSize: number;
+        };
+        ApprovalRequest: {
+            /** Format: uuid */
+            id: string;
+            client: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            };
+            contact: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                archived: boolean;
+            };
+            state: components["schemas"]["ApprovalRequestState"];
+            items: {
+                total: number;
+                approved: number;
+                changesRequested: number;
+                pending: number;
+            };
+            /** Format: date-time */
+            issuedAt: string;
+            /** Format: date-time */
+            expiresAt: string;
+            /** Format: date-time */
+            remindedAt: string | null;
+            createdBy: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            };
+            /** Format: date-time */
+            createdAt: string;
+        };
+        ApprovalRequestDetail: {
+            /** Format: uuid */
+            id: string;
+            client: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            };
+            contact: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                archived: boolean;
+            };
+            state: components["schemas"]["ApprovalRequestState"];
+            /** Format: date-time */
+            issuedAt: string;
+            /** Format: date-time */
+            expiresAt: string;
+            /** Format: date-time */
+            remindedAt: string | null;
+            createdBy: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            };
+            /** Format: date-time */
+            createdAt: string;
+            counts: {
+                total: number;
+                approved: number;
+                changesRequested: number;
+                pending: number;
+            };
+            message: string | null;
+            items: components["schemas"]["ApprovalItem"][];
+            contactPhone: string | null;
+            permissions: {
+                canReissue: boolean;
+                canRevoke: boolean;
+            };
+        };
+        ApprovalItem: {
+            /** Format: uuid */
+            id: string;
+            position: number;
+            title: string;
+            task: {
+                /** Format: uuid */
+                id: string;
+                title: string;
+            };
+            status: components["schemas"]["ApprovalItemStatus"];
+            withdrawnReason: components["schemas"]["ApprovalWithdrawnReason"] | null;
+            /** Format: date-time */
+            closedAt: string | null;
+            versions: components["schemas"]["ApprovalVersion"][];
+            text: string | null;
+            response: {
+                decision: components["schemas"]["ClientDecision"];
+                channel: components["schemas"]["ResponseChannel"];
+                note: string | null;
+                /** Format: date-time */
+                createdAt: string;
+            } | null;
+        };
+        /** @enum {string} */
+        ApprovalItemStatus: "pending" | "approved" | "changes_requested" | "withdrawn";
+        /** @enum {string} */
+        ApprovalWithdrawnReason: "revoked" | "resent" | "task_moved";
+        ApprovalVersion: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            fileItemId: string;
+            name: string;
+            number: number;
+            kind: components["schemas"]["FileVersionKind"];
+            type: components["schemas"]["FileType"];
+            previewStatus: components["schemas"]["FilePreviewStatus"];
+        };
+        CreateApprovalRequest: {
+            /** Format: uuid */
+            clientId: string;
+            /** Format: uuid */
+            contactId: string;
+            message?: string | null;
+            items: {
+                /** Format: uuid */
+                taskId: string;
+                title?: string;
+            }[];
+        };
+        IssuedApprovalRequest: {
+            /** Format: uuid */
+            id: string;
+            client: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            };
+            contact: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                archived: boolean;
+            };
+            state: components["schemas"]["ApprovalRequestState"];
+            /** Format: date-time */
+            issuedAt: string;
+            /** Format: date-time */
+            expiresAt: string;
+            /** Format: date-time */
+            remindedAt: string | null;
+            createdBy: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            };
+            /** Format: date-time */
+            createdAt: string;
+            counts: {
+                total: number;
+                approved: number;
+                changesRequested: number;
+                pending: number;
+            };
+            message: string | null;
+            items: components["schemas"]["ApprovalItem"][];
+            contactPhone: string | null;
+            permissions: {
+                canReissue: boolean;
+                canRevoke: boolean;
+            };
+            link: string;
+        };
+        ClientApprovals: {
+            requests: components["schemas"]["ApprovalRequestPage"];
+            responses: components["schemas"]["ClientResponsePage"];
+        };
+        /** @description Client responses, newest first */
+        ClientResponsePage: {
+            items: components["schemas"]["ClientResponseEntry"][];
+            total: number;
+            page: number;
+            pageSize: number;
+        };
+        ClientResponseEntry: {
+            /** Format: uuid */
+            id: string;
+            decision: components["schemas"]["ClientDecision"];
+            channel: components["schemas"]["ResponseChannel"];
+            contact: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                archived: boolean;
+            };
+            note: string | null;
+            versions: components["schemas"]["ReviewVersion"][];
+            recordedBy: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            /** Format: date-time */
+            createdAt: string;
+            task: {
+                /** Format: uuid */
+                id: string;
+                title: string;
+            };
+        };
+        PublicApproval: {
+            clientName: string;
+            contactName: string;
+            accountManagerName: string;
+            message: string | null;
+            /** Format: date-time */
+            expiresAt: string;
+            items: components["schemas"]["PublicApprovalItem"][];
+        };
+        PublicApprovalItem: {
+            /** Format: uuid */
+            id: string;
+            title: string;
+            text: string | null;
+            files: components["schemas"]["PublicApprovalFile"][];
+            status: components["schemas"]["ApprovalItemStatus"];
+            note: string | null;
+            /** Format: date-time */
+            decidedAt: string | null;
+            recordedByAgency: boolean;
+        };
+        PublicApprovalFile: {
+            /** Format: uuid */
+            versionId: string;
+            kind: components["schemas"]["FileVersionKind"];
+            name: string;
+            type: components["schemas"]["FileType"];
+            sizeBytes: number | null;
+            /** @enum {string} */
+            display: "inline" | "download" | "link";
+            previewAvailable: boolean;
+            linkUrl: string | null;
+            linkLabel: string | null;
+        };
+        PublicApprovalResponse: {
+            decision: components["schemas"]["ClientDecision"];
+            note?: string | null;
         };
         /** @enum {string} */
         TemplateKind: "project" | "retainer_cycle";
@@ -7856,6 +8373,413 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    ApprovalsController_ready: {
+        parameters: {
+            query?: {
+                clientId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tasks ready to send under the caller’s client scope, grouped by client */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApprovalReady"];
+                };
+            };
+        };
+    };
+    ApprovalsController_list: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+                clientId?: string;
+                state?: components["schemas"]["ApprovalRequestState"] | components["schemas"]["ApprovalRequestState"][];
+                createdBy?: "me";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Approval requests, newest first; open and expired unless `state` says otherwise */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApprovalRequestPage"];
+                };
+            };
+        };
+    };
+    ApprovalsController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateApprovalRequest"];
+            };
+        };
+        responses: {
+            /** @description The new request with its link, shown only now */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IssuedApprovalRequest"];
+                };
+            };
+            /** @description `CLIENT_ARCHIVED`, `CONTACT_NOT_APPROVER`, `TASK_NOT_READY`, `MEDICAL_REVIEW_REQUIRED`, `LIMIT_REACHED` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ApprovalsController_detail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A request with its items and the snapshots they sent */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApprovalRequestDetail"];
+                };
+            };
+            /** @description No such request */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ApprovalsController_reissue: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The request with a new link valid 7 days, shown only now; the old one stops */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IssuedApprovalRequest"];
+                };
+            };
+            /** @description `REQUEST_CLOSED`, `CONTACT_NOT_APPROVER`, `CLIENT_ARCHIVED` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ApprovalsController_revoke: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The revoked request: its pending items are withdrawn, the tasks ready again */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApprovalRequestDetail"];
+                };
+            };
+            /** @description `REQUEST_CLOSED` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ClientApprovalsController_list: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The client’s approval requests and its responses, both newest first */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClientApprovals"];
+                };
+            };
+            /** @description No such client */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PublicApprovalsController_page: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description What the holder of the link sees */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicApproval"];
+                };
+            };
+            /** @description `APPROVAL_LINK_INVALID`: unknown or revoked link, or its client or contact changed */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `APPROVAL_LINK_EXPIRED` */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    PublicApprovalsController_respond: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+                itemId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PublicApprovalResponse"];
+            };
+        };
+        responses: {
+            /** @description The item with the decision, which is final */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicApprovalItem"];
+                };
+            };
+            /** @description `APPROVAL_LINK_INVALID`: unknown or revoked link, or its client or contact changed */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `ITEM_ALREADY_DECIDED`, `ITEM_WITHDRAWN` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `APPROVAL_LINK_EXPIRED` */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    PublicApprovalsController_content: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+                versionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The bytes of a snapshot version; a download only for other types */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `APPROVAL_LINK_INVALID`: unknown or revoked link, or its client or contact changed */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `APPROVAL_LINK_EXPIRED` */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    PublicApprovalsController_preview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+                versionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A 1600 px WebP preview of a snapshot image */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `APPROVAL_LINK_INVALID`: unknown or revoked link, or its client or contact changed */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `APPROVAL_LINK_EXPIRED` */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    PublicApprovalsController_thumbnail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+                versionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A 400 px WebP thumbnail of a snapshot image */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `APPROVAL_LINK_INVALID`: unknown or revoked link, or its client or contact changed */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `APPROVAL_LINK_EXPIRED` */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
             };
         };
     };

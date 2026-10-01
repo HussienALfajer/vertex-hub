@@ -18,7 +18,7 @@ Server work needs the owner's explicit approval in the current conversation (AGE
 | Madani font files | `/srv/hub.vertexmedia.pro/fonts/madani/` (ADR 0011; empty until Q11). The web build loads them only when they are there, so copy them in, then deploy again |
 | App logs | `/var/log/hub.vertexmedia.pro/{api,worker}.{out,err}.log` (14 days) |
 | nginx logs | `/var/log/nginx/hub.vertexmedia.pro.{access,error}.log` |
-| nginx site | `/etc/nginx/sites-available/hub.vertexmedia.pro` + `snippets/vertexhub-*.conf` + `conf.d/vertexhub-limits.conf` |
+| nginx site | `/etc/nginx/sites-available/hub.vertexmedia.pro` + `snippets/vertexhub-*.conf` (headers, CSP, proxy) + `conf.d/vertexhub-limits.conf` |
 | Database | PostgreSQL 17, role and database `vertex_hub`, `CONNECT` revoked from `PUBLIC` |
 | Daily backups | `/var/backups/hub.vertexmedia.pro/` (700, root), 03:35, 14 days |
 | Health check | `vertexhub-health.timer`, every 2 minutes, restarts with a 10-minute cooldown |
@@ -122,5 +122,6 @@ ssh vertex "systemctl enable --now vertexhub-health.timer"
 
 - nginx, systemd, logrotate or scripts: change `deploy/`, merge, then re-run `provision.sh`.
 - F10 (files): the first deploy that contains it needs `provision.sh` re-run first, for the files directory, `FILES_ROOT` in `shared/.env`, the upload route and the internal files location in nginx. The API refuses to start in production without an absolute `FILES_ROOT`.
-- The inline theme script in `apps/web/index.html`: its hash is in the CSP in `deploy/nginx/vertexhub-headers.conf`, and `apps/web/src/csp.test.ts` fails until both match.
+- F09 (approval links): the first deploy that contains it needs `provision.sh` re-run first, for the `vhapproval` rate limit (60 requests a minute per address, burst 30) on `/api/public/`, the `/a/` location of the client page (`Referrer-Policy: no-referrer`, `noindex`, not logged), the internal `/_public_files/` location, the access log format that masks link tokens and the CSP snippet both header sets include. The worker schedules the hourly `approvals.reminders` job on its next start.
+- The inline theme script in `apps/web/index.html`: its hash is in the CSP in `deploy/nginx/vertexhub-csp.conf`, and `apps/web/src/csp.test.ts` fails until both match.
 - Secrets: edit `shared/.env` on the server as `vertexhub`, then `pm2 reload all --update-env`. Rotating `BETTER_AUTH_SECRET` signs everyone out.

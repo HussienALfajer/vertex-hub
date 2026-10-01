@@ -1,4 +1,6 @@
 // Public surface of the files module. Code outside this folder imports from here only.
+
+export type { PreviewSize } from './file-content.service.js';
 export {
   type ClientOwner,
   type FileOwner,
@@ -7,5 +9,5 @@ export {
   type FileOwnerRights,
   isConfidentialReader,
 } from './file-owner-registry.js';
-export { FileVersions, type VersionRef } from './file-versions.js';
+export { FileVersions, type SentVersion, type VersionRef } from './file-versions.js';
 export { FilesModule } from './files.module.js';

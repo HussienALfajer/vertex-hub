@@ -2,6 +2,8 @@ import { createHmac, randomUUID } from 'node:crypto';
 import type { AssignableRole, DepartmentCode } from '@vertex-hub/contracts';
 import {
   accounts,
+  approvalItems,
+  approvalRequests,
   auditEntries,
   clientContacts,
   clientNotes,
@@ -46,7 +48,7 @@ import {
   workTemplates,
 } from '@vertex-hub/db';
 import { hashPassword } from 'better-auth/crypto';
-import { eq, inArray, like, or, type SQL } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull, like, or, type SQL } from 'drizzle-orm';
 
 /*
  * Shared helpers for API integration tests: seed users straight into the test database, sign in
@@ -279,7 +281,24 @@ export async function removeTasks(db: Database, ids: string[]): Promise<void> {
   await db.delete(taskComments).where(inArray(taskComments.taskId, ids));
   // F09: responses and reviews point at revisions, and tasks at their cleared review.
   await db.update(tasks).set({ clearedReviewId: null }).where(inArray(tasks.id, ids));
+  const requests = (
+    await db
+      .selectDistinct({ id: approvalItems.requestId })
+      .from(approvalItems)
+      .where(inArray(approvalItems.taskId, ids))
+  ).map((row) => row.id);
+  // Approval items and responses point at each other: the items let go first, as withdrawn.
+  await db
+    .update(approvalItems)
+    .set({ status: 'withdrawn', withdrawnReason: 'task_moved', responseId: null })
+    .where(and(inArray(approvalItems.taskId, ids), isNotNull(approvalItems.responseId)));
   await db.delete(taskClientResponses).where(inArray(taskClientResponses.taskId, ids));
+  if (requests.length > 0) {
+    await db.delete(approvalItems).where(inArray(approvalItems.requestId, requests));
+    await db.delete(notifications).where(inArray(notifications.subjectId, requests));
+    await db.delete(auditEntries).where(inArray(auditEntries.entityId, requests));
+    await db.delete(approvalRequests).where(inArray(approvalRequests.id, requests));
+  }
   await db.delete(taskReviews).where(inArray(taskReviews.taskId, ids));
   await db.delete(taskRevisions).where(inArray(taskRevisions.taskId, ids));
   await db.delete(notificationReminders).where(inArray(notificationReminders.subjectId, ids));

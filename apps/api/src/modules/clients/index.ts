@@ -1,6 +1,11 @@
 // Public surface of the clients module. Code outside this folder imports from here only.
 
-export { ClientDirectory, type ClientSummary, type ContactSummary } from './client-directory.js';
+export {
+  ClientDirectory,
+  type ClientSummary,
+  type ContactDetail,
+  type ContactSummary,
+} from './client-directory.js';
 export {
   type ClientFlagHook,
   ClientFlagHooks,

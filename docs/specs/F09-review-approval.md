@@ -278,7 +278,20 @@ Details the implementation settled (PR 1, `feat/f09-review-api`):
 - **Manual responses (rule 16)** on `awaiting_client → approved`, `awaiting_client → revisions` and `approved → revisions` require `contactId` (400 without, `UNKNOWN_CONTACT` when it is not a live contact of the client). Reopening a delivered task by the client's request (F06) stays as it was: no response record, contact optional.
 - **`canSendForApproval` and `readyToSend`** treat a pending item in an expired request as not blocking (rule 8); `pendingApproval` still shows it.
 - **`tasks_review_stage_check`** ships in the same release as the column (owner decision, 2026-10-01): no deployed release writes tasks yet (the Phase 1 deploy is postponed), so there is no earlier release to keep compatible. A release rolled back past this one could not move tasks into or out of internal review.
-- `GET /api/clients/:id/approvals` gets its response schema with the `approvals` module (PR 2).
+
+Details the implementation settled (PR 2, `feat/f09-approvals-api`):
+- **`GET /api/clients/:id/approvals`** answers `{ requests, responses }`: two pages (the request list in every state, and the client's responses with their task), both for the `page` and `pageSize` of the query. An archived client answers 404 except to scope-all holders of `tasks.manage`, like its requests in the list and detail (edge case 7).
+- **`GET /api/approvals/ready`** is not paged: clients by name, each with its ready tasks by due date. Its schemas and the client history's live in `packages/contracts/src/approval-views.ts`, because `tasks.ts` imports `approvals.ts`.
+- **Status codes:** `CONTACT_NOT_APPROVER`, `TASK_NOT_READY`, `MEDICAL_REVIEW_REQUIRED`, `LIMIT_REACHED`, `REQUEST_CLOSED`, `ITEM_ALREADY_DECIDED` and `ITEM_WITHDRAWN` answer 409; `TASK_NOT_READY` and `MEDICAL_REVIEW_REQUIRED` name the task in `details.taskId`. An unknown client or request answers 404, a caller without client scope 403, before any of them.
+- **Rule 8, resending:** when the last pending item of an expired request is withdrawn as `resent`, the request has no pending item left and becomes `completed`.
+- **Rule 12** writes one `approval_request.revoked` entry with the task ids of the withdrawn items; `approval_item.withdrawn` entries are written for `resent` and `task_moved`.
+- **Withdrawn items on the client page** show their title and "withdrawn by the agency" only: neither text nor files, and the public content routes refuse their versions. A version or file removed after the decision is left out of the page.
+- **Link responses** are written with no actor and the contact's name on `task.status_changed`, `task.client_response_recorded` and `approval_item.responded`; the `file_version.final_set` entries of a link approval have no actor and no name (the system). The client revision of a link response has no author (`task_revisions.author_id` is nullable); the task page shows the contact instead.
+- **Rule 24** counts only decisions made through the link since it was issued; a response recorded by hand does not stop the reminder while other items wait. Requests of an archived client get neither notice.
+- **Lock order** of every path: tasks, then the request, then its items.
+- **The token in logs:** the API log masks the token in the URL of the public routes (`core/http/redact-link-token.ts`); nginx masks it in the access log of `/api/public/` and does not log `/a/`. nginx's error log still writes the request line of a request it rejects (a rate-limit hit), token included.
+- **Public file content in production** goes through its own internal location, `/_public_files/`, so that the bytes carry `Referrer-Policy: no-referrer`; rate-limited requests answer 429.
+- **Deploy:** the `/a/` location lists its headers instead of including the server's standard set (which carries another `Referrer-Policy`), so it sends no `Permissions-Policy`; the CSP moved to its own snippet, `deploy/nginx/vertexhub-csp.conf`, shared by both.
 
 ## Open questions
 - None block F09. The owner decided every question of the interview on 2026-10-01, including F02's open point (edge case 8: healthcare flag changes, rules 18–19).

@@ -22,6 +22,12 @@ import { FileUploadsService } from './file-uploads.service.js';
 /** nginx's internal location that serves `FILES_ROOT` (deploy/nginx). */
 const ACCEL_PREFIX = '/_files/';
 
+/**
+ * The same files for the holder of an approval link (F09 rule 23): its own internal location,
+ * because the location sets the headers of the response, and these never send a referrer.
+ */
+const PUBLIC_ACCEL_PREFIX = '/_public_files/';
+
 /** Long sides of the rendered previews (rule 18). */
 const THUMBNAIL_PX = 400;
 const PREVIEW_PX = 1600;
@@ -102,6 +108,47 @@ export class FileContentService implements OnModuleInit {
     response.setHeader('Content-Disposition', 'inline');
     response.setHeader('Cache-Control', cacheControl(confidential));
     await this.send(previewKey(version.storageKey, size), request, response);
+  }
+
+  /**
+   * F09 rule 22: a version an approval link shows, once the `approvals` module checked the link
+   * and that the version is in one of its snapshots. Never cached; a download only for the types
+   * a browser cannot show.
+   */
+  async sent(
+    versionId: string,
+    part: 'content' | PreviewSize,
+    request: IncomingMessage,
+    response: ServerResponse,
+  ): Promise<void> {
+    const [row] = await this.db
+      .select({ version: fileVersions, item: fileItems })
+      .from(fileVersions)
+      .innerJoin(fileItems, eq(fileItems.id, fileVersions.fileItemId))
+      .where(eq(fileVersions.id, versionId));
+    const version = row?.version;
+    if (!row || !version?.storageKey || !version.mimeType) throw new NotFoundException();
+    if (version.archivedAt || row.item.archivedAt) throw new NotFoundException();
+    if (part !== 'content' && version.previewStatus !== 'ready') throw new NotFoundException();
+    const inline = part !== 'content' || isInlineMimeType(version.mimeType);
+    response.setHeader('X-Content-Type-Options', 'nosniff');
+    response.setHeader(
+      'Content-Type',
+      part !== 'content' ? 'image/webp' : inline ? version.mimeType : 'application/octet-stream',
+    );
+    response.setHeader(
+      'Content-Disposition',
+      part !== 'content'
+        ? 'inline'
+        : contentDisposition(inline, downloadName(null, row.item.name, version)),
+    );
+    response.setHeader('Cache-Control', 'no-store');
+    await this.send(
+      part === 'content' ? version.storageKey : previewKey(version.storageKey, part),
+      request,
+      response,
+      PUBLIC_ACCEL_PREFIX,
+    );
   }
 
   /**
@@ -195,11 +242,12 @@ export class FileContentService implements OnModuleInit {
     key: string,
     request: IncomingMessage,
     response: ServerResponse,
+    accelPrefix: string = ACCEL_PREFIX,
   ): Promise<void> {
     const size = await this.storage.size(key);
     if (size === null) throw new NotFoundException();
     if (this.env.FILES_X_ACCEL) {
-      response.setHeader('X-Accel-Redirect', `${ACCEL_PREFIX}${key}`);
+      response.setHeader('X-Accel-Redirect', `${accelPrefix}${key}`);
       response.statusCode = 200;
       response.end();
       return;

@@ -127,6 +127,13 @@
       "when": 1790815575308,
       "tag": "0017_cooing_living_mummy",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1790818677544,
+      "tag": "0018_stiff_giant_girl",
+      "breakpoints": true
     }
   ]
 }

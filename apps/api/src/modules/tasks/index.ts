@@ -5,6 +5,12 @@ export {
   type ClientReviewSource,
   type PendingApproval,
 } from './client-review-hooks.js';
-export { TaskApprovals } from './task-approvals.js';
+export {
+  type LinkResponse,
+  type ResponseSummary,
+  type ReviewSnapshot,
+  type SendableTask,
+  TaskApprovals,
+} from './task-approvals.js';
 export { type TaskDraft, TaskGenerator } from './task-generator.js';
 export { TasksModule } from './tasks.module.js';
