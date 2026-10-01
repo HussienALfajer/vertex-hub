@@ -281,7 +281,7 @@ export class PostTasks {
         cycleLineId: draft.cycleLineId,
         needsClientApproval: false,
       }),
-      post.id,
+      { postId: post.id },
     );
     const [task] = (await tx.select(linkedColumns).from(tasks).where(eq(tasks.id, id))).flatMap(
       toLinked,

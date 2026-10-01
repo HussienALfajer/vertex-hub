@@ -154,7 +154,7 @@ A meeting has no "done" state: it is past once `ends_at` has passed.
 
 ### Booking and the shoot task
 1. **Booking.** A shoot is booked either from an existing task (`taskId`) or with a new shoot task (`newTask`), never both (`VALIDATION_FAILED`).
-2. **Bookable tasks.** An existing task is bookable when it is in Photography, open (not `delivered` or `cancelled`), not archived and not the task of another non-archived, non-cancelled shoot (`TASK_NOT_BOOKABLE`). The shoot takes the task's client; a booking of a task without a client is an internal shoot (scope all).
+2. **Bookable tasks.** An existing task is bookable when it is in Photography, open (not `delivered` or `cancelled`), not archived, not linked to a post (F08 delivers such a task by publishing its post) and not the task of another non-archived, non-cancelled shoot (`TASK_NOT_BOOKABLE`). The shoot takes the task's client; a booking of a task without a client is an internal shoot (scope all).
 3. **New shoot task.** Created through `ShootTasks` in the same transaction: title "Shoot: <shoot title>" (localized at render through the stored title), department Photography, `needs_client_approval` false, client = the shoot's client, and the links the booker picks (project and optional milestone, or retainer cycle and optional cycle line, F06 rules apply: `UNKNOWN_*`, closed cycle refused). The assignee is the lead when the lead is a member of Photography, else none (the department queue). It is created by the system on the booker's behalf (no `tasks.request` scope check on the assignee), with an audit entry and the F06 assignment or request notification.
 4. **One task, one active shoot.** The shoot task's due date is kept equal to the shoot's day: set at booking and on every time change (an audited task change by the same actor). Its other fields stay editable on the task page.
 5. **Conflicts.** For each team crew member, a **conflict** is another non-archived `scheduled` shoot where they are team crew, or a non-archived `scheduled` meeting they organize or attend, whose `[starts_at, ends_at)` overlaps. Booking, editing the time or crew, and reopening return `409 SCHEDULE_CONFLICT` with the conflicts (user, item kind, id, title, times) unless the request carries `acceptConflicts: true` (owner decision: a warning, never a block). The same rule applies to a meeting's organizer and attendees. External crew and archived users are never checked.
@@ -228,7 +228,7 @@ Every screen: Arabic RTL, logical CSS, strings through i18next, design-system co
 
 | Type | When | To | Mutable |
 |---|---|---|---|
-| `shoot_booked` | Booked, or added to the crew later | the team crew added | yes |
+| `shoot_booked` | Booked, reopened, or added to the crew later | the team crew added | yes |
 | `shoot_changed` | Time, location or lead changed while scheduled | the team crew | yes |
 | `shoot_dropped` | Shoot cancelled, or removed from the crew | the crew affected (`cause`: `cancelled` or `removed`) | yes |
 | `shoot_upcoming` | Daily job: the last work day before the shoot's day | the team crew | yes |

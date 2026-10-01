@@ -17,6 +17,9 @@ import {
   fileItems,
   fileUploads,
   fileVersions,
+  meetingAttendees,
+  meetingContacts,
+  meetings,
   newId,
   notificationReminders,
   notificationSettings,
@@ -31,6 +34,9 @@ import {
   retainerDeliverables,
   retainers,
   retainerTemplates,
+  shootCrew,
+  shootShots,
+  shoots,
   taskChecklistItems,
   taskClientResponses,
   taskComments,
@@ -152,6 +158,36 @@ export async function removeUsers(db: Database, ids: string[]): Promise<void> {
     ) as SQL,
   );
   await db.delete(fileUploads).where(inArray(fileUploads.userId, ids));
+  await removeShoots(
+    db,
+    [
+      ...(await db
+        .select({ id: shoots.id })
+        .from(shoots)
+        .where(or(inArray(shoots.createdById, ids), inArray(shoots.completedById, ids)))),
+      ...(await db
+        .select({ id: shootCrew.shootId })
+        .from(shootCrew)
+        .where(inArray(shootCrew.userId, ids))),
+      ...(await db
+        .select({ id: shootShots.shootId })
+        .from(shootShots)
+        .where(inArray(shootShots.doneById, ids))),
+    ].map((row) => row.id),
+  );
+  await removeMeetings(
+    db,
+    [
+      ...(await db
+        .select({ id: meetings.id })
+        .from(meetings)
+        .where(or(inArray(meetings.organizerId, ids), inArray(meetings.createdById, ids)))),
+      ...(await db
+        .select({ id: meetingAttendees.meetingId })
+        .from(meetingAttendees)
+        .where(inArray(meetingAttendees.userId, ids))),
+    ].map((row) => row.id),
+  );
   await removeTasks(
     db,
     (
@@ -193,6 +229,30 @@ export async function removeUsers(db: Database, ids: string[]): Promise<void> {
   await db.delete(users).where(inArray(users.id, ids));
 }
 
+/** Removes shoots with their crew, shots, notifications and audit entries (test cleanup only). */
+export async function removeShoots(db: Database, ids: string[]): Promise<void> {
+  const unique = [...new Set(ids)];
+  if (unique.length === 0) return;
+  await db.delete(auditEntries).where(inArray(auditEntries.entityId, unique));
+  await db.delete(notifications).where(inArray(notifications.subjectId, unique));
+  await db.delete(notificationReminders).where(inArray(notificationReminders.subjectId, unique));
+  await db.delete(shootShots).where(inArray(shootShots.shootId, unique));
+  await db.delete(shootCrew).where(inArray(shootCrew.shootId, unique));
+  await db.delete(shoots).where(inArray(shoots.id, unique));
+}
+
+/** Removes meetings with their attendees, contacts, notifications and audit entries. */
+export async function removeMeetings(db: Database, ids: string[]): Promise<void> {
+  const unique = [...new Set(ids)];
+  if (unique.length === 0) return;
+  await db.delete(auditEntries).where(inArray(auditEntries.entityId, unique));
+  await db.delete(notifications).where(inArray(notifications.subjectId, unique));
+  await db.delete(notificationReminders).where(inArray(notificationReminders.subjectId, unique));
+  await db.delete(meetingAttendees).where(inArray(meetingAttendees.meetingId, unique));
+  await db.delete(meetingContacts).where(inArray(meetingContacts.meetingId, unique));
+  await db.delete(meetings).where(inArray(meetings.id, unique));
+}
+
 /** The domain of every seeded user's email (`uniqueEmail`). */
 export const TEST_EMAIL_DOMAIN = '@test.vertex.local';
 
@@ -219,6 +279,33 @@ export async function removeLeftoverUsers(db: Database): Promise<number> {
 export async function removeClients(db: Database, ids: string[]): Promise<void> {
   if (ids.length === 0) return;
   await removeFileItems(db, inArray(fileItems.clientId, ids));
+  await removeShoots(
+    db,
+    (await db.select({ id: shoots.id }).from(shoots).where(inArray(shoots.clientId, ids))).map(
+      (row) => row.id,
+    ),
+  );
+  const contactIds = (
+    await db
+      .select({ id: clientContacts.id })
+      .from(clientContacts)
+      .where(inArray(clientContacts.clientId, ids))
+  ).map((row) => row.id);
+  await removeMeetings(
+    db,
+    [
+      ...(await db
+        .select({ id: meetings.id })
+        .from(meetings)
+        .where(inArray(meetings.clientId, ids))),
+      ...(contactIds.length > 0
+        ? await db
+            .select({ id: meetingContacts.meetingId })
+            .from(meetingContacts)
+            .where(inArray(meetingContacts.contactId, contactIds))
+        : []),
+    ].map((row) => row.id),
+  );
   await removeTasks(
     db,
     (await db.select({ id: tasks.id }).from(tasks).where(inArray(tasks.clientId, ids))).map(
@@ -277,6 +364,15 @@ export async function removeClients(db: Database, ids: string[]): Promise<void> 
  */
 export async function removeTasks(db: Database, ids: string[]): Promise<void> {
   if (ids.length === 0) return;
+  await removeShoots(
+    db,
+    (
+      await db
+        .select({ id: shoots.id })
+        .from(shoots)
+        .where(or(inArray(shoots.taskId, ids), inArray(shoots.editingTaskId, ids)))
+    ).map((row) => row.id),
+  );
   await removeFileItems(db, inArray(fileItems.taskId, ids));
   const children = [
     ...(await db

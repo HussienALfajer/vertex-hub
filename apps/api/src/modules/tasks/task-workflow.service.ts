@@ -57,6 +57,7 @@ import {
   isBlocked,
   lockDependencyGraph,
 } from './task-dependencies.js';
+import { TaskGuards } from './task-guards.js';
 import { blocksDependents, requesterOf, TaskNotices } from './task-notices.js';
 import { TaskReviews } from './task-reviews.js';
 import { TasksService } from './tasks.service.js';
@@ -93,6 +94,7 @@ export class TaskWorkflowService {
     private readonly approvals: TaskApprovals,
     private readonly reviewHooks: ClientReviewHooks,
     private readonly postHooks: PostTaskHooks,
+    private readonly guards: TaskGuards,
   ) {}
 
   private get directories() {
@@ -152,6 +154,8 @@ export class TaskWorkflowService {
           'The task is linked to a post: it is delivered and answered through the post',
         );
       }
+      // F11 rule 9: a scheduled shoot holds its task.
+      if (move === 'cancel') await this.guards.assertFree(tx, [id]);
       const overridden = blocked;
       const note = change.note ?? null;
       if (taskMoveNeedsNote(move) && !note) {

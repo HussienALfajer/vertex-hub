@@ -115,6 +115,20 @@ export const ERROR_CODES = [
   'TASK_ALREADY_LINKED',
   'TASK_NOT_LINKABLE',
   'ALREADY_RETURNED',
+  'TASK_NOT_BOOKABLE',
+  'TASK_HAS_SHOOT',
+  'LEAD_REQUIRED',
+  'INVALID_CREW',
+  'INVALID_ATTENDEE',
+  'SCHEDULE_CONFLICT',
+  'SHOOT_NOT_SCHEDULED',
+  'SHOOT_NOT_STARTED',
+  'SHOOT_NOT_CANCELLED',
+  'SHOOT_ARCHIVED',
+  'SHOOT_NOT_ARCHIVED',
+  'MEETING_NOT_SCHEDULED',
+  'MEETING_ARCHIVED',
+  'MEETING_NOT_ARCHIVED',
 ] as const;
 
 export const errorCodeSchema = z.enum(ERROR_CODES).meta({ id: 'ErrorCode' });
@@ -130,7 +144,10 @@ export const errorResponseSchema = z
     statusCode: z.number().int().optional(),
     code: z.string().optional(),
     message: z.string(),
-    /** Extra data for some codes, e.g. `responsibilitySchema[]` for `USER_HAS_RESPONSIBILITIES`. */
+    /**
+     * Extra data for some codes: `responsibilitySchema[]` for `USER_HAS_RESPONSIBILITIES`,
+     * `scheduleConflictSchema[]` for `SCHEDULE_CONFLICT`.
+     */
     details: z.unknown().optional(),
   })
   .meta({ id: 'ErrorResponse', description: 'An error; `code` tells errors apart' });
@@ -138,7 +155,7 @@ export const errorResponseSchema = z
 export type ErrorResponse = z.infer<typeof errorResponseSchema>;
 
 /**
- * Something a user is responsible for, which blocks archiving them (F01 rule 9, F05 rule 4, F06, F08 rule 28) or
+ * Something a user is responsible for, which blocks archiving them (F01 rule 9, F05 rule 4, F06, F08 rule 28, F11) or
  * removing their Account Manager role (F02 rule 8).
  */
 export const responsibilitySchema = z
@@ -149,6 +166,8 @@ export const responsibilitySchema = z
       'project_manager_of_project',
       'assignee_of_open_tasks',
       'responsible_for_open_posts',
+      'lead_of_scheduled_shoots',
+      'organizer_of_upcoming_meetings',
     ]),
     id: z.uuid(),
     name: z.string(),

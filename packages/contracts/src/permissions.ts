@@ -31,8 +31,9 @@ export const PERMISSIONS = [
   'content.manage',
   'content.review',
   'approvals.review_medical',
-  'shoots.read',
+  'calendar.read',
   'shoots.manage',
+  'meetings.manage',
   'campaigns.read',
   'campaigns.manage',
   'invoices.read',
@@ -55,7 +56,8 @@ export type Permission = z.infer<typeof permissionSchema>;
  * - `own_clients`: records of clients the user is primary account manager for.
  * - `assigned`: records the user is assigned to or participates in (for projects: the projects the
  *   user is project manager of; for `tasks.work`: the tasks the user is assignee of; for
- *   `tasks.manage`: the tasks of the projects the user is project manager of).
+ *   `tasks.manage`: the tasks of the projects the user is project manager of; for
+ *   `meetings.manage`: the meetings the user organizes).
  */
 export const PERMISSION_SCOPES = ['all', 'department', 'own_clients', 'assigned'] as const;
 
@@ -74,8 +76,6 @@ export const PERMISSION_MAP: Readonly<Record<Role, Grants>> = {
     'catalog.read': 'all',
     'tasks.work': 'department',
     'tasks.manage': 'department',
-    'shoots.read': 'all',
-    'shoots.manage': 'department',
     'reports.read': 'department',
   },
   employee: {
@@ -90,7 +90,8 @@ export const PERMISSION_MAP: Readonly<Record<Role, Grants>> = {
     'tasks.manage': 'assigned',
     'templates.read': 'all',
     'content.read': 'all',
-    'shoots.read': 'all',
+    'calendar.read': 'all',
+    'meetings.manage': 'assigned',
   },
   account_manager: {
     'clients.manage': 'own_clients',
@@ -103,7 +104,8 @@ export const PERMISSION_MAP: Readonly<Record<Role, Grants>> = {
     'tasks.manage': 'own_clients',
     'content.manage': 'own_clients',
     'content.review': 'own_clients',
-    'shoots.read': 'all',
+    'shoots.manage': 'own_clients',
+    'meetings.manage': 'own_clients',
     'campaigns.read': 'own_clients',
     'campaigns.manage': 'own_clients',
     'invoices.read': 'own_clients',
@@ -137,6 +139,8 @@ export const DEPARTMENT_CAPABILITIES: Readonly<
       'tasks.manage': 'all',
       'content.manage': 'all',
       'content.review': 'all',
+      'shoots.manage': 'all',
+      'meetings.manage': 'all',
       'invoices.read': 'all',
       'reports.read': 'all',
     },
@@ -146,6 +150,7 @@ export const DEPARTMENT_CAPABILITIES: Readonly<
     manager: { 'content.review': 'all' },
   },
   medical_consultation: { member: { 'approvals.review_medical': 'all' } },
+  photography: { member: { 'shoots.manage': 'all' } },
   general_communication: { member: { 'leads.read': 'all', 'leads.manage': 'all' } },
   marketing: { member: { 'leads.read': 'all', 'leads.manage': 'all' } },
 };

@@ -79,6 +79,7 @@ import {
   dependentsOf,
   lockDependencyGraph,
 } from './task-dependencies.js';
+import { TaskGuards } from './task-guards.js';
 import { blocksDependents, type NoticeTask, TaskNotices, toTimeOfDay } from './task-notices.js';
 import { TaskReviews } from './task-reviews.js';
 import { clearedByMedicalSql, overdueSql, overLimitPendingSql } from './task-sql.js';
@@ -116,6 +117,7 @@ export class TasksService {
     private readonly reviews: TaskReviews,
     private readonly reviewHooks: ClientReviewHooks,
     private readonly postHooks: PostTaskHooks,
+    private readonly guards: TaskGuards,
   ) {}
 
   private get directories() {
@@ -353,14 +355,18 @@ export class TasksService {
 
   /**
    * Creates the task in the caller's transaction and returns its id. `postId` links it from the
-   * start to the post it was requested from (F08 rule 9, through `PostTasks`).
+   * start to the post it was requested from (F08 rule 9, through `PostTasks`). `onBehalf` creates
+   * it for the system without checking the caller's assign scope: the caller checked who may be
+   * the assignee (F11 rules 3 and 12, through `ShootTasks`). `inheritsLinks` takes the links as
+   * copied from an existing task, so a closed cycle or a done milestone is kept (F11 edge case 6).
    */
   async createIn(
     tx: Transaction,
     actor: CurrentUserInfo,
     input: CreateTask,
-    postId: string | null = null,
+    options: { postId?: string; onBehalf?: boolean; inheritsLinks?: boolean } = {},
   ): Promise<string> {
+    const postId = options.postId ?? null;
     // Serialized with archiving users: an assignee must stay active (F01 change).
     if (input.assigneeId) await lockAccessChanges(tx);
     const client = input.clientId
@@ -370,14 +376,19 @@ export class TasksService {
 
     // Who may create what (actions table).
     const selfAssigned = input.assigneeId === actor.id && belongsTo(actor, input.department);
-    if (input.assigneeId && !selfAssigned && !hasAssignScope(actor, { ...input, client })) {
+    if (
+      input.assigneeId &&
+      !selfAssigned &&
+      !options.onBehalf &&
+      !hasAssignScope(actor, { ...input, client })
+    ) {
       throw new ForbiddenException();
     }
     if (input.type === 'client_request' && !hasClientScope(actor, client)) {
       throw new ForbiddenException();
     }
 
-    await this.assertLinks(tx, input, client);
+    await this.assertLinks(tx, input, client, options.inheritsLinks ? pickLinks(input) : {});
     if (input.assigneeId) await this.assertAssignee(tx, input.assigneeId, input.department);
     if (input.dueDate < businessDate()) {
       throw new CodedException(400, 'INVALID_DATES', 'The due date is in the past');
@@ -515,6 +526,8 @@ export class TasksService {
       const assigneeGiven = input.assigneeId !== undefined && input.assigneeId !== task.assigneeId;
       const departmentGiven = department !== task.department;
       if ((assigneeGiven || departmentGiven) && !rights.assign) throw new ForbiddenException();
+      // F11 rule 9: a scheduled shoot keeps its task in Photography.
+      if (departmentGiven) await this.guards.assertFree(tx, [id]);
       const scopeGiven =
         input.requestScope !== undefined && input.requestScope !== task.requestScope;
       if (scopeGiven && !rights.client) throw new ForbiddenException();
@@ -755,6 +768,8 @@ export class TasksService {
       if (task.archivedAt) {
         throw new CodedException(409, 'TASK_ARCHIVED', 'The task is already archived');
       }
+      // F11 rule 9: a scheduled shoot holds its task.
+      await this.guards.assertFree(tx, [id]);
       await tx.update(tasks).set({ archivedAt: new Date() }).where(eq(tasks.id, id));
       await this.auditArchive(tx, actor, 'task.archived', id, true);
       // F09 rule 17: an archived task is no longer with the client.
@@ -1184,7 +1199,7 @@ export class TasksService {
   }
 }
 
-const pickLinks = (task: TaskAccess): Links => ({
+const pickLinks = (task: Links): Links => ({
   clientId: task.clientId,
   projectId: task.projectId,
   milestoneId: task.milestoneId,

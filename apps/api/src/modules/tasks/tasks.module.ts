@@ -7,11 +7,13 @@ import { ProjectsModule } from '../projects/index.js';
 import { ClientReviewHooks } from './client-review-hooks.js';
 import { PostTaskHooks } from './post-task-hooks.js';
 import { PostTasks } from './post-tasks.js';
+import { ShootTasks } from './shoot-tasks.js';
 import { TaskApprovals } from './task-approvals.js';
 import { TaskCommentsController } from './task-comments.controller.js';
 import { TaskCommentsService } from './task-comments.service.js';
 import { TaskFileOwner } from './task-file-owner.js';
 import { TaskGenerator } from './task-generator.js';
+import { TaskGuards } from './task-guards.js';
 import { TaskHooksService } from './task-hooks.service.js';
 import { TaskNotices } from './task-notices.js';
 import { TaskPartsController } from './task-parts.controller.js';
@@ -38,7 +40,8 @@ import { TasksService } from './tasks.service.js';
  * into `clients`' `ClientFlagHooks` for healthcare flag changes, and exports `TaskApprovals` and
  * the `ClientReviewHooks` registry for the `approvals` module, which it never imports. Owns the
  * link of a task to a post (F08, ADR 0021): exports `PostTasks` and the `PostTaskHooks` registry
- * for the `content` module, which it never imports either.
+ * for the `content` module, which it never imports either. Exports `ShootTasks` and the
+ * `TaskGuards` registry for the `calendar` module (F11, ADR 0022), which it never imports.
  */
 @Module({
   imports: [AuthModule, ClientsModule, ProjectsModule, NotificationsModule, FilesModule],
@@ -67,7 +70,17 @@ import { TasksService } from './tasks.service.js';
     ClientReviewHooks,
     PostTasks,
     PostTaskHooks,
+    ShootTasks,
+    TaskGuards,
   ],
-  exports: [TaskGenerator, TaskApprovals, ClientReviewHooks, PostTasks, PostTaskHooks],
+  exports: [
+    TaskGenerator,
+    TaskApprovals,
+    ClientReviewHooks,
+    PostTasks,
+    PostTaskHooks,
+    ShootTasks,
+    TaskGuards,
+  ],
 })
 export class TasksModule {}

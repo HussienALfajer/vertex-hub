@@ -1,7 +1,13 @@
 import type { ToOptions } from '@tanstack/react-router';
 import type { DepartmentCode, Notification } from '@vertex-hub/contracts';
 import type { TFunction } from 'i18next';
-import { formatCalendarDate, formatNumber, formatTimeOfDay } from '../../lib/format';
+import {
+  formatCalendarDate,
+  formatDateTime,
+  formatList,
+  formatNumber,
+  formatTimeOfDay,
+} from '../../lib/format';
 
 /** What a notification opens (F14 rule 15). */
 export function notificationLink(notification: Notification): ToOptions {
@@ -27,6 +33,10 @@ export function notificationLink(notification: Notification): ToOptions {
       return { to: '/approvals/requests/$requestId', params: { requestId: subject.id } };
     case 'post':
       return { to: '/content/posts/$postId', params: { postId: subject.id } };
+    // The shoot and meeting pages arrive with the F11 screens.
+    case 'shoot':
+    case 'meeting':
+      return { to: '/notifications' };
     default:
       return { to: '/tasks/$taskId', params: { taskId: subject.id } };
   }
@@ -164,6 +174,26 @@ export function notificationText(
         context: post.client,
       };
     }
+    case 'shoot_booked':
+    case 'shoot_upcoming':
+    case 'shoot_not_closed':
+    case 'shoot_dropped':
+    case 'shoot_changed': {
+      const { shoot } = notification.data;
+      const values = { actor, shoot: shoot.title, when: formatDateTime(shoot.startsAt) };
+      return {
+        text: calendarText(t, notification, values),
+        context: context(shoot.client, shoot.location),
+      };
+    }
+    case 'meeting_invited':
+    case 'meeting_upcoming':
+    case 'meeting_dropped':
+    case 'meeting_changed': {
+      const { meeting } = notification.data;
+      const values = { actor, meeting: meeting.title, when: formatDateTime(meeting.startsAt) };
+      return { text: calendarText(t, notification, values), context: meeting.client };
+    }
     default: {
       const { task } = notification.data;
       return {
@@ -181,6 +211,39 @@ function formatPublish(
   return formatDue(t, { dueDate: post.publishDate, dueTime: post.publishTime });
 }
 
+type CalendarNotification = Extract<
+  Notification,
+  { type: `shoot_${string}` | `meeting_${string}` }
+>;
+
+function calendarText(
+  t: TFunction,
+  notification: CalendarNotification,
+  values: { actor: string; when: string; shoot?: string; meeting?: string },
+): string {
+  switch (notification.type) {
+    case 'shoot_dropped':
+    case 'meeting_dropped':
+      return t(`notifications.text.${notification.type}.${notification.data.cause}`, values);
+    case 'shoot_changed':
+      return t('notifications.text.shoot_changed', {
+        ...values,
+        changes: formatList(
+          notification.data.changes.map((change) => t(`notifications.changes.shoot.${change}`)),
+        ),
+      });
+    case 'meeting_changed':
+      return t('notifications.text.meeting_changed', {
+        ...values,
+        changes: formatList(
+          notification.data.changes.map((change) => t(`notifications.changes.meeting.${change}`)),
+        ),
+      });
+    default:
+      return t(`notifications.text.${notification.type}`, values);
+  }
+}
+
 type TaskNotification = Exclude<
   Notification,
   {
@@ -192,7 +255,8 @@ type TaskNotification = Exclude<
       | 'approval_responded'
       | 'approval_no_response'
       | 'approval_expired'
-      | `post_${string}`;
+      | `post_${string}`
+      | CalendarNotification['type'];
   }
 >;
 

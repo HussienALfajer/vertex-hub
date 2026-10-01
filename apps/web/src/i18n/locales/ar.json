@@ -341,7 +341,21 @@
     "LINKED_TO_POST": "المهمة مرتبطة بمنشور: يعتمدها العميل مع المنشور وتُسلَّم عند نشره. فكّ ارتباطها لتغيير ذلك.",
     "TASK_ALREADY_LINKED": "المهمة مرتبطة بمنشور آخر.",
     "TASK_NOT_LINKABLE": "لا يمكن ربط هذه المهمة: ليست لعميل المنشور، أو مُسلَّمة أو ملغاة، أو لدى المراجع الطبي أو العميل.",
-    "ALREADY_RETURNED": "أُعيدت هذه المهمة للتعديل من قبل بسبب رد العميل نفسه."
+    "ALREADY_RETURNED": "أُعيدت هذه المهمة للتعديل من قبل بسبب رد العميل نفسه.",
+    "TASK_NOT_BOOKABLE": "لا يمكن حجز جلسة لهذه المهمة: يجب أن تكون مهمة مفتوحة في قسم التصوير وليس لها جلسة أخرى قائمة.",
+    "TASK_HAS_SHOOT": "لهذه المهمة جلسة تصوير مجدولة. ألغِ الجلسة أولًا.",
+    "LEAD_REQUIRED": "اختر قائدًا واحدًا للطاقم.",
+    "INVALID_CREW": "أحد أفراد الطاقم غير متاح: الحساب مؤرشف أو غير موجود.",
+    "INVALID_ATTENDEE": "أحد الحضور غير متاح: الحساب مؤرشف أو غير موجود.",
+    "SCHEDULE_CONFLICT": "بعض الأشخاص محجوزون في الوقت نفسه. راجع التعارضات ثم أكّد الحفظ.",
+    "SHOOT_NOT_SCHEDULED": "لم تعد هذه الجلسة مجدولة، فلا يمكن تعديلها.",
+    "SHOOT_NOT_STARTED": "لا يمكن إغلاق الجلسة قبل موعد بدئها.",
+    "SHOOT_NOT_CANCELLED": "هذه الجلسة غير ملغاة.",
+    "SHOOT_ARCHIVED": "هذه الجلسة مؤرشفة.",
+    "SHOOT_NOT_ARCHIVED": "هذه الجلسة غير مؤرشفة.",
+    "MEETING_NOT_SCHEDULED": "هذا الاجتماع ملغى، فلا يمكن تعديله.",
+    "MEETING_ARCHIVED": "هذا الاجتماع مؤرشف.",
+    "MEETING_NOT_ARCHIVED": "هذا الاجتماع غير مؤرشف."
   },
   "users": {
     "title": "الفريق",
@@ -489,6 +503,8 @@
       "openProject": "افتح المشروع",
       "assignee_of_open_tasks": "تنفيذ المهمة المفتوحة {{name}}",
       "responsible_for_open_posts": "مسؤولية المنشور المفتوح {{name}}",
+      "lead_of_scheduled_shoots": "قيادة جلسة التصوير المجدولة {{name}}",
+      "organizer_of_upcoming_meetings": "تنظيم الاجتماع القادم {{name}}",
       "openTask": "افتح المهمة",
       "openPost": "افتح المنشور"
     },
@@ -658,7 +674,9 @@
       "template_run": "توليد من قالب",
       "file_item": "ملف",
       "approval_request": "طلب اعتماد",
-      "post": "منشور"
+      "post": "منشور",
+      "shoot": "جلسة تصوير",
+      "meeting": "اجتماع"
     },
     "actions": {
       "user": {
@@ -820,6 +838,25 @@
         "duplicated": "كرّر منشورًا",
         "archived": "أرشف منشورًا",
         "restored": "استعاد منشورًا"
+      },
+      "shoot": {
+        "created": "حجز جلسة تصوير",
+        "updated": "عدّل جلسة تصوير",
+        "shots_changed": "عدّل قائمة اللقطات",
+        "shot_ticked": "أنجز لقطة",
+        "shot_unticked": "ألغى إنجاز لقطة",
+        "completed": "أغلق جلسة تصوير",
+        "cancelled": "ألغى جلسة تصوير",
+        "reopened": "أعاد فتح جلسة تصوير",
+        "archived": "أرشف جلسة تصوير",
+        "restored": "استعاد جلسة تصوير"
+      },
+      "meeting": {
+        "created": "أنشأ اجتماعًا",
+        "updated": "عدّل اجتماعًا",
+        "cancelled": "ألغى اجتماعًا",
+        "archived": "أرشف اجتماعًا",
+        "restored": "استعاد اجتماعًا"
       }
     },
     "fields": {
@@ -3044,6 +3081,7 @@
     "categories": {
       "tasks": "المهام",
       "reminders": "التذكيرات",
+      "calendar": "التقويم",
       "clients_projects": "العملاء والمشاريع"
     },
     "settings": {
@@ -3088,7 +3126,16 @@
       "post_task_ready": "اعتماد مهمة مرتبطة بمنشوري",
       "post_task_unlinked": "فكّ ارتباط مهمة بمنشوري",
       "post_publish_today": "منشور موعد نشره اليوم",
-      "post_publish_overdue": "منشور فات موعد نشره"
+      "post_publish_overdue": "منشور فات موعد نشره",
+      "shoot_booked": "جلسة تصوير حُجزتُ فيها",
+      "shoot_changed": "تغيير موعد أو مكان جلسة تصوير",
+      "shoot_dropped": "إلغاء جلسة تصوير أو إزالتي منها",
+      "shoot_upcoming": "تذكير بجلسة تصوير قادمة",
+      "shoot_not_closed": "جلسة تصوير لم تُغلق بعد موعدها",
+      "meeting_invited": "دعوة إلى اجتماع",
+      "meeting_changed": "تغيير موعد أو مكان اجتماع",
+      "meeting_dropped": "إلغاء اجتماع أو إزالتي منه",
+      "meeting_upcoming": "تذكير باجتماع قادم"
     },
     "text": {
       "task_assigned": "أُسندت إليك «{{task}}» بواسطة {{actor}}",
@@ -3194,7 +3241,34 @@
       },
       "post_publish_today": "موعد نشر المنشور «{{post}}» في {{date}}",
       "post_publish_overdue": "فات موعد نشر المنشور «{{post}}» منذ {{date}}",
-      "approval_expired": "انتهت صلاحية رابط «{{client}}» قبل أن يردّ {{contact}} على كل الأعمال"
+      "approval_expired": "انتهت صلاحية رابط «{{client}}» قبل أن يردّ {{contact}} على كل الأعمال",
+      "shoot_booked": "حجزك {{actor}} في جلسة التصوير «{{shoot}}» في {{when}}",
+      "shoot_changed": "عدّل {{actor}} جلسة التصوير «{{shoot}}» ({{changes}})، وموعدها الآن {{when}}",
+      "shoot_dropped": {
+        "cancelled": "ألغى {{actor}} جلسة التصوير «{{shoot}}» التي كانت في {{when}}",
+        "removed": "أزالك {{actor}} من طاقم جلسة التصوير «{{shoot}}»"
+      },
+      "shoot_upcoming": "تذكير: جلسة التصوير «{{shoot}}» في {{when}}",
+      "shoot_not_closed": "انتهى موعد جلسة التصوير «{{shoot}}» ولم تُغلق بعد",
+      "meeting_invited": "دعاك {{actor}} إلى الاجتماع «{{meeting}}» في {{when}}",
+      "meeting_changed": "عدّل {{actor}} الاجتماع «{{meeting}}» ({{changes}})، وموعده الآن {{when}}",
+      "meeting_dropped": {
+        "cancelled": "ألغى {{actor}} الاجتماع «{{meeting}}» الذي كان في {{when}}",
+        "removed": "أزالك {{actor}} من الاجتماع «{{meeting}}»"
+      },
+      "meeting_upcoming": "تذكير: الاجتماع «{{meeting}}» في {{when}}"
+    },
+    "changes": {
+      "shoot": {
+        "time": "الموعد",
+        "location": "المكان",
+        "lead": "القائد"
+      },
+      "meeting": {
+        "time": "الموعد",
+        "place": "المكان",
+        "link": "رابط الاجتماع"
+      }
     },
     "dueAt": "{{date}}، {{time}}"
   },
