@@ -38,7 +38,7 @@ import {
 } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { approvalTabsFor } from '../features/approvals/approvals-page';
+import { hasApprovalQueue } from '../features/approvals/approvals-page';
 import { NotificationBell } from '../features/notifications/notification-bell';
 import { managesTeams } from '../features/tasks/task-access';
 import { authClient, can, leaveSession, useMe } from '../lib/auth';
@@ -94,7 +94,7 @@ const navItems: NavItem[] = [
     to: '/approvals',
     label: 'nav.approvals',
     icon: StampIcon,
-    show: (me) => approvalTabsFor(me).length > 0,
+    show: hasApprovalQueue,
   },
   { to: '/clients', label: 'nav.clients', icon: BriefcaseBusinessIcon, permission: 'clients.read' },
   { to: '/projects', label: 'nav.projects', icon: FolderKanbanIcon, permission: 'projects.read' },

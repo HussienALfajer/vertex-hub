@@ -1,12 +1,14 @@
 import ar from '../src/i18n/locales/ar.json' with { type: 'json' };
 import {
   accountManagerMe,
+  EXPIRED_LINK_TOKEN,
   employeeMe,
   financeWithoutTwoFactor,
   manager,
   medicalReviewerMe,
   mockApi,
   notificationFor,
+  OPEN_LINK_TOKEN,
   PROJECTS_TODAY,
   screenshot,
   seedIds,
@@ -534,6 +536,93 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await page.getByRole('button', { name: ar.tasks.medical.approve }).click();
       await expect(page.getByRole('dialog').getByText(ar.tasks.medical.snapshot)).toBeVisible();
       await screenshot(page, testInfo, `task-medical-approve-${colorScheme}`);
+    });
+
+    test('approval links: ready, new request, sent, request page, task panel, client tab', async ({
+      page,
+    }, testInfo) => {
+      await page.setViewportSize({ width: 1280, height: 900 });
+      await page.clock.setFixedTime(new Date(`${PROJECTS_TODAY}T09:00:00+03:00`));
+      await mockApi(page, { signedIn: true, approvals: true });
+      const loaded = () =>
+        page.waitForFunction(() => [...document.images].every((image) => image.complete));
+
+      // Ready to send: a client with its ready tasks, and one that cannot be sent anything.
+      await page.goto('/approvals?tab=ready');
+      const jasmine = page.getByRole('region', { name: 'مطعم الياسمين' });
+      await expect(page.getByRole('region', { name: 'عيادة الشفاء' })).toContainText(
+        ar.clients.profile.noApprovalTitle,
+      );
+      await jasmine.getByRole('button', { name: ar.approvals.ready.selectAll }).click();
+      await screenshot(page, testInfo, `approvals-ready-${colorScheme}`);
+
+      // The new request, then the link shown once.
+      await jasmine.getByRole('button', { name: /^أنشئ رابط اعتماد \(2\)$/ }).click();
+      const dialog = page.getByRole('dialog');
+      await dialog.getByLabel(ar.approvals.request.message).fill('أعمال الأسبوع جاهزة لمراجعتكم.');
+      await screenshot(page, testInfo, `approval-request-new-${colorScheme}`);
+      await dialog.getByRole('button', { name: ar.approvals.request.create }).click();
+      await expect(dialog.getByText(ar.approvals.request.issuedTitle)).toBeVisible();
+      await screenshot(page, testInfo, `approval-request-link-${colorScheme}`);
+      await dialog.getByRole('button', { name: ar.approvals.request.done }).click();
+
+      await page.goto('/approvals?tab=sent');
+      await expect(page.getByRole('row')).toHaveCount(3);
+      await screenshot(page, testInfo, `approvals-sent-${colorScheme}`);
+
+      await page.setViewportSize({ width: 1280, height: 1400 });
+      await page.goto(`/approvals/requests/${seedIds.openRequest}`);
+      await expect(page.getByText('ممتاز، انشروه الخميس.')).toBeVisible();
+      await loaded();
+      await screenshot(page, testInfo, `approval-request-${colorScheme}`);
+
+      // The task waiting in the link: the Client approval panel beside its details.
+      await page.goto(`/tasks/${seedIds.autumnReel}`);
+      await expect(
+        page.getByRole('heading', { level: 2, name: ar.tasks.approval.title }),
+      ).toBeVisible();
+      await expect(page.getByText(ar.tasks.files.sentToClient)).toHaveCount(3);
+      await loaded();
+      await screenshot(page, testInfo, `task-client-approval-${colorScheme}`);
+
+      await page.goto(`/clients/${seedIds.jasmine}?tab=approvals`);
+      await expect(page.getByText('غيّروا سعر العرض إلى 45 ألف ليرة.')).toBeVisible();
+      await screenshot(page, testInfo, `client-approvals-${colorScheme}`);
+    });
+
+    test('the client page at phone width: open, deciding, expired and invalid', async ({
+      page,
+    }, testInfo) => {
+      await page.setViewportSize({ width: 390, height: 844 });
+      await page.clock.setFixedTime(new Date(`${PROJECTS_TODAY}T09:00:00+03:00`));
+      // No session: the link is the access.
+      await mockApi(page, { signedIn: false, approvals: true });
+      await page.goto(`/a/${OPEN_LINK_TOKEN}`);
+      await expect(page.getByRole('heading', { level: 1 })).toHaveText('مرحبًا هالة الشامي');
+      await page.waitForFunction(() => [...document.images].every((image) => image.complete));
+      await screenshot(page, testInfo, `client-page-open-${colorScheme}`);
+
+      // Decided items show their result: through the link, and recorded by the account manager.
+      await page.getByText(ar.approvals.public.recordedByAgency).scrollIntoViewIfNeeded();
+      await screenshot(page, testInfo, `client-page-decided-${colorScheme}`);
+
+      await page.getByRole('button', { name: ar.approvals.public.requestChanges }).click();
+      await page
+        .getByRole('dialog')
+        .getByRole('button', { name: ar.approvals.public.sendChanges })
+        .click();
+      await expect(
+        page.getByRole('dialog').getByText(ar.approvals.public.errors.note),
+      ).toBeVisible();
+      await screenshot(page, testInfo, `client-page-changes-${colorScheme}`);
+
+      await page.goto(`/a/${EXPIRED_LINK_TOKEN}`);
+      await expect(page.getByText(ar.approvals.public.expiredTitle)).toBeVisible();
+      await screenshot(page, testInfo, `client-page-expired-${colorScheme}`);
+
+      await page.goto('/a/unknown-token');
+      await expect(page.getByText(ar.approvals.public.invalidTitle)).toBeVisible();
+      await screenshot(page, testInfo, `client-page-invalid-${colorScheme}`);
     });
 
     test('task sent to the client and the client-response dialog', async ({ page }, testInfo) => {

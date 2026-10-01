@@ -1,17 +1,26 @@
 import type { Page, Route, TestInfo } from '@playwright/test';
 import {
+  APPROVAL_LIMITS,
+  type ApprovalItem,
+  type ApprovalItemStatus,
   type ApprovalReady,
+  type ApprovalRequest,
+  type ApprovalRequestDetail,
+  type ApprovalWithdrawnReason,
   type AuditEntry,
   addDays,
   allowedTaskTransitions,
+  approvalRequestState,
   BOARD_LIMITS,
   BOARD_STATUSES,
   type BrandFileKind,
   type BrandKit,
+  type ClientApprovals,
   type ClientDetailResponse,
   type ClientResponse,
   type ClientStatus,
   type Contact,
+  type CreateApprovalRequest,
   type CreateCycleAdjustment,
   type CreateCycleLine,
   type CreateExtraWork,
@@ -42,6 +51,8 @@ import {
   firstOfMonth,
   grantedPermissions,
   type HealthResponse,
+  type IssuedApprovalRequest,
+  isInlineMimeType,
   isLineBehind,
   isProjectClosed,
   isTaskBlocked,
@@ -67,6 +78,9 @@ import {
   type ProjectDetail,
   type ProjectStatus,
   type ProjectStatusChange,
+  type PublicApproval,
+  type PublicApprovalItem,
+  type PublicResponse,
   planTemplateRun,
   type RequestScope,
   type Retainer,
@@ -741,6 +755,8 @@ interface MockOptions {
   streamed?: Notification[];
   /** Replaces the seeded notifications (`[]` for an empty bell). */
   notifications?: NotificationRecord[];
+  /** Adds work with the client and its approval requests (`approvalsSeed`, F09). */
+  approvals?: boolean;
 }
 
 const json = (route: Route, body: unknown, status = 200) => route.fulfill({ status, json: body });
@@ -778,8 +794,18 @@ export async function mockApi(page: Page, options: MockOptions): Promise<MockedA
   const projectsApi = projectRoutes({ users, clients, projects, me: () => me });
   const retainers = retainersSeed();
   const retainersApi = retainerRoutes({ users, clients, retainers, me: () => me });
-  const tasks = tasksSeed();
-  const tasksApi = taskRoutes({ users, clients, projects, retainers, tasks, me: () => me });
+  const sent = options.approvals ? approvalsSeed() : { tasks: [], files: [], requests: [] };
+  const tasks = [...tasksSeed(), ...sent.tasks];
+  const tasksApi = taskRoutes({
+    users,
+    clients,
+    projects,
+    retainers,
+    tasks,
+    files: sent.files,
+    requests: sent.requests,
+    me: () => me,
+  });
   const templates = templatesSeed();
   const templatesApi = templateRoutes({ users, clients, retainers, templates, me: () => me });
   const notificationsApi = notificationRoutes({
@@ -884,6 +910,11 @@ export async function mockApi(page: Page, options: MockOptions): Promise<MockedA
       return token === VALID_LINK_TOKEN
         ? route.fulfill({ status: 204 })
         : fail(route, 400, 'LINK_INVALID');
+    }
+    // The client page (F09): the link's token is the access, with no session.
+    if (path.startsWith('/api/public/')) {
+      const shown = tasksApi(route, method, url, request);
+      if (shown) return shown;
     }
     if (!signedIn) return fail(route, 401, null);
 
@@ -1005,6 +1036,12 @@ export async function mockApi(page: Page, options: MockOptions): Promise<MockedA
         }
       }
       return json(route, departmentDetail(department));
+    }
+
+    // A client's approval history (F09) belongs to the approvals mock, with the tasks.
+    if (/^\/api\/clients\/[^/]+\/approvals$/.test(path)) {
+      const listed = tasksApi(route, method, url, request);
+      if (listed) return listed;
     }
 
     // Clients (F02).
@@ -2379,7 +2416,8 @@ interface TaskRevisionRecord {
   extraWork: { id: string; title: string } | null;
   decidedById: string | null;
   decidedAt: string | null;
-  authorId: string;
+  /** Null for a revision the client asked for through an approval link (F09). */
+  authorId: string | null;
   createdAt: string;
 }
 
@@ -2768,12 +2806,315 @@ export function tasksSeed(): TaskRecord[] {
   ];
 }
 
+interface ApprovalItemRecord {
+  id: string;
+  taskId: string;
+  /** What the client reads instead of the task's title. */
+  title: string;
+  /** The snapshot sent: a pass of the task. */
+  reviewId: string;
+  status: ApprovalItemStatus;
+  withdrawnReason: ApprovalWithdrawnReason | null;
+  closedAt: string | null;
+  /** The task's client response that closed the item. */
+  responseId: string | null;
+}
+
+interface ApprovalRequestRecord {
+  id: string;
+  /** The API stores only its hash; the mock keeps the token to find the request of a link. */
+  token: string;
+  clientId: string;
+  contactId: string;
+  message: string | null;
+  issuedAt: string;
+  expiresAt: string;
+  remindedAt: string | null;
+  revokedAt: string | null;
+  completedAt: string | null;
+  createdById: string;
+  createdAt: string;
+  items: ApprovalItemRecord[];
+}
+
+/** The links of the seeded requests (`MockOptions.approvals`): `/a/<token>`. */
+export const OPEN_LINK_TOKEN = 'open-link-token';
+export const EXPIRED_LINK_TOKEN = 'expired-link-token';
+
+/**
+ * Jasmine's work with the client (F09), added with `MockOptions.approvals`: an open request with
+ * one item waiting, one approved through the link and one answered by hand; an expired request
+ * whose task is ready to send again; a task never sent; and a Shifa task that cannot be sent,
+ * because the client has no contact with final approval.
+ */
+export function approvalsSeed(): {
+  tasks: TaskRecord[];
+  files: FileRecord[];
+  requests: ApprovalRequestRecord[];
+} {
+  const jasmine = id(601);
+  const layan = { id: id(3), name: 'ليان الأحمد' };
+  const sara = { id: id(1), name: 'سارة الخطيب' };
+  const hala = { id: id(611), name: 'هالة الشامي', archived: false };
+  const pass = (
+    n: number,
+    versions: TaskReview['versions'],
+    clientText: string | null,
+    stage: ReviewStage = 'internal',
+  ): TaskReview => ({
+    id: id(n),
+    stage,
+    outcome: 'passed',
+    note: null,
+    reviewer: stage === 'medical' ? { id: id(8), name: 'د. هبة النجار' } : sara,
+    versions,
+    clientText,
+    createdAt: '2026-10-07T08:00:00.000Z',
+  });
+  const sentTask = (
+    n: number,
+    title: string,
+    review: TaskReview,
+    fields: Partial<TaskRecord> = {},
+  ): TaskRecord =>
+    taskRecord(n, {
+      title,
+      assigneeId: id(4),
+      status: 'awaiting_client',
+      dueDate: '2026-10-16',
+      clientId: jasmine,
+      needsClientApproval: true,
+      startedAt: '2026-10-05T08:00:00.000Z',
+      clientText: review.clientText,
+      reviews: [review],
+      clearedReviewId: review.id,
+      ...fields,
+    });
+  const deliverable = (n: number, taskId: string, name: string, version: FileVersionRecord) => ({
+    id: id(n),
+    ownerType: 'task' as const,
+    ownerId: taskId,
+    role: 'deliverable' as const,
+    name,
+    brandKind: null,
+    confidential: false,
+    createdById: layan.id,
+    createdAt: version.createdAt,
+    archivedAt: null,
+    versions: [version],
+  });
+  const png = (name: string) => ({ name, mimeType: 'image/png', sizeBytes: 1_572_864 });
+  const at = '2026-10-06T10:00:00.000Z';
+  const sentVersion = (versionId: number, fileId: number, name: string) => ({
+    id: id(versionId),
+    fileItemId: id(fileId),
+    name,
+    number: 1,
+  });
+  const item = (
+    n: number,
+    taskId: number,
+    title: string,
+    reviewId: number,
+    fields: Partial<ApprovalItemRecord> = {},
+  ): ApprovalItemRecord => ({
+    id: id(n),
+    taskId: id(taskId),
+    title,
+    reviewId: id(reviewId),
+    status: 'pending',
+    withdrawnReason: null,
+    closedAt: null,
+    responseId: null,
+    ...fields,
+  });
+  const answered = '2026-10-09T12:00:00.000Z';
+  return {
+    tasks: [
+      sentTask(
+        1010,
+        'ريل عرض الخريف',
+        pass(
+          1461,
+          [
+            sentVersion(1391, 1340, 'ريل عرض الخريف'),
+            sentVersion(1395, 1344, 'تصميم الطباعة'),
+            sentVersion(1396, 1345, 'ملفات المصدر'),
+          ],
+          'خريف بطعم جديد: جرّب أطباق الموسم في مطعم الياسمين.',
+        ),
+      ),
+      sentTask(
+        1011,
+        'بوست قائمة المشروبات',
+        pass(1462, [sentVersion(1392, 1341, 'بوست المشروبات')], 'مشروبات الخريف الدافئة وصلت.'),
+        {
+          status: 'approved',
+          responses: [
+            {
+              id: id(1471),
+              decision: 'approved',
+              channel: 'link',
+              contact: hala,
+              note: 'ممتاز، انشروه الخميس.',
+              versions: [sentVersion(1392, 1341, 'بوست المشروبات')],
+              recordedBy: null,
+              createdAt: answered,
+            },
+          ],
+        },
+      ),
+      sentTask(
+        1012,
+        'إعلان عرض الغداء',
+        pass(1463, [sentVersion(1393, 1342, 'قائمة عرض الغداء')], null),
+        {
+          status: 'revisions',
+          responses: [
+            {
+              id: id(1472),
+              decision: 'changes_requested',
+              channel: 'manual',
+              contact: hala,
+              note: 'غيّروا سعر العرض إلى 45 ألف ليرة.',
+              versions: [sentVersion(1393, 1342, 'قائمة عرض الغداء')],
+              recordedBy: layan,
+              createdAt: answered,
+            },
+          ],
+          revisions: [clientRevision(1306, 1, 'غيّروا سعر العرض إلى 45 ألف ليرة.', false, answered)],
+        },
+      ),
+      sentTask(1013, 'بنر الموقع', pass(1464, [sentVersion(1394, 1343, 'بنر الموقع')], null), {
+        dueDate: '2026-10-12',
+      }),
+      sentTask(1014, 'ستوري افتتاح الفرع', pass(1465, [], 'نفتتح فرعنا الجديد يوم الجمعة.'), {
+        dueDate: '2026-10-18',
+      }),
+      sentTask(
+        1015,
+        'منشور نصائح العناية اليومية',
+        pass(1466, [], 'ثلاث عادات يومية تحمي أسنانك.', 'medical'),
+        { clientId: id(602), department: 'content_management', assigneeId: id(5) },
+      ),
+    ],
+    files: [
+      deliverable(
+        1340,
+        id(1010),
+        'ريل عرض الخريف',
+        uploadVersion(1391, 1, png('autumn-reel-cover.png'), layan, at),
+      ),
+      deliverable(
+        1341,
+        id(1011),
+        'بوست المشروبات',
+        uploadVersion(1392, 1, png('drinks-post.png'), layan, at, {
+          isFinal: true,
+          finalSource: 'client',
+          finalMarkedAt: answered,
+        }),
+      ),
+      deliverable(
+        1342,
+        id(1012),
+        'قائمة عرض الغداء',
+        uploadVersion(
+          1393,
+          1,
+          { name: 'lunch-offer.pdf', mimeType: 'application/pdf', sizeBytes: 524_288 },
+          layan,
+          at,
+        ),
+      ),
+      deliverable(
+        1343,
+        id(1013),
+        'بنر الموقع',
+        uploadVersion(1394, 1, png('site-banner.png'), layan, at),
+      ),
+      // Rule 22: a TIFF shows its rendered preview; only the archive is offered as a download.
+      deliverable(
+        1344,
+        id(1010),
+        'تصميم الطباعة',
+        uploadVersion(
+          1395,
+          1,
+          { name: 'print-design.tiff', mimeType: 'image/tiff', sizeBytes: 9_437_184 },
+          layan,
+          at,
+        ),
+      ),
+      deliverable(
+        1345,
+        id(1010),
+        'ملفات المصدر',
+        uploadVersion(
+          1396,
+          1,
+          { name: 'source-files.zip', mimeType: 'application/zip', sizeBytes: 31_457_280 },
+          layan,
+          at,
+        ),
+      ),
+    ],
+    requests: [
+      {
+        id: id(1481),
+        token: OPEN_LINK_TOKEN,
+        clientId: jasmine,
+        contactId: hala.id,
+        message: 'أعمال حملة الخريف جاهزة لمراجعتكم.',
+        issuedAt: '2026-10-07T07:00:00.000Z',
+        expiresAt: '2026-10-14T07:00:00.000Z',
+        remindedAt: '2026-10-09T07:15:00.000Z',
+        revokedAt: null,
+        completedAt: null,
+        createdById: layan.id,
+        createdAt: '2026-10-07T07:00:00.000Z',
+        items: [
+          item(1491, 1010, 'ريل عرض الخريف', 1461),
+          item(1492, 1011, 'بوست قائمة المشروبات', 1462, {
+            status: 'approved',
+            closedAt: answered,
+            responseId: id(1471),
+          }),
+          item(1493, 1012, 'إعلان عرض الغداء', 1463, {
+            status: 'changes_requested',
+            closedAt: answered,
+            responseId: id(1472),
+          }),
+        ],
+      },
+      {
+        id: id(1482),
+        token: EXPIRED_LINK_TOKEN,
+        clientId: jasmine,
+        contactId: hala.id,
+        message: null,
+        issuedAt: '2026-09-28T09:00:00.000Z',
+        expiresAt: '2026-10-05T09:00:00.000Z',
+        remindedAt: '2026-09-30T09:15:00.000Z',
+        revokedAt: null,
+        completedAt: null,
+        createdById: sara.id,
+        createdAt: '2026-09-28T09:00:00.000Z',
+        items: [item(1494, 1013, 'بنر الموقع', 1464)],
+      },
+    ],
+  };
+}
+
 interface TaskState {
   users: UserResponse[];
   clients: ClientRecord[];
   projects: ProjectRecord[];
   retainers: RetainerRecord[];
   tasks: TaskRecord[];
+  /** Files beyond the seeded ones, and the approval requests (`approvalsSeed`). */
+  files: FileRecord[];
+  requests: ApprovalRequestRecord[];
   me: () => MeResponse;
 }
 
@@ -2783,7 +3124,16 @@ const OPEN_TASK: TaskStatus[] = [...OPEN_TASK_STATUSES];
 const MOCK_CONTENT_TOKEN = '0000000000000000';
 
 /** The tasks API (F06) over the in-memory records, with its scopes and workflow rules. */
-function taskRoutes({ users, clients, projects, retainers, tasks, me }: TaskState) {
+function taskRoutes({
+  users,
+  clients,
+  projects,
+  retainers,
+  tasks,
+  files,
+  requests,
+  me,
+}: TaskState) {
   const holds = (permission: string, scope: string) =>
     me().permissions.some((g) => g.permission === permission && g.scopes.includes(scope as never));
   const managed = () =>
@@ -2842,7 +3192,8 @@ function taskRoutes({ users, clients, projects, retainers, tasks, me }: TaskStat
     !task.archived &&
     task.status === 'awaiting_client' &&
     rights(task).client &&
-    (!clientOf(task)?.isHealthcare || cleared(task)?.stage === 'medical');
+    (!clientOf(task)?.isHealthcare || cleared(task)?.stage === 'medical') &&
+    !blockingItem(task);
   /** Rule 2: a pass keeps the latest version of each deliverable and the text for the client. */
   const recordReview = (
     task: TaskRecord,
@@ -2965,7 +3316,7 @@ function taskRoutes({ users, clients, projects, retainers, tasks, me }: TaskStat
     clearedReview: cleared(task),
     reviewHistory: task.reviews,
     clientResponses: task.responses,
-    pendingApproval: null,
+    pendingApproval: pendingApproval(task),
     clientRequest: task.request
       ? {
           contact: contactOf(task, task.request.contactId),
@@ -3013,7 +3364,7 @@ function taskRoutes({ users, clients, projects, retainers, tasks, me }: TaskStat
       extraWork: r.extraWork,
       decidedBy: r.decidedById ? person(r.decidedById) : null,
       decidedAt: r.decidedAt,
-      author: person(r.authorId),
+      author: r.authorId ? person(r.authorId) : null,
       createdAt: r.createdAt,
     })),
     createdBy: person(task.createdById),
@@ -3067,7 +3418,201 @@ function taskRoutes({ users, clients, projects, retainers, tasks, me }: TaskStat
     return { id: item.id, title };
   };
   let next = 1500;
-  const taskFiles = fileRoutes({ users, clients, projects, retainers, tasks, me, rights });
+  const taskFiles = fileRoutes({
+    users,
+    clients,
+    projects,
+    retainers,
+    tasks,
+    files: [...filesSeed(), ...files],
+    me,
+    rights,
+  });
+
+  // Approval requests (F09): the links sent to clients, and what they answered.
+  const stateOf = (request: ApprovalRequestRecord) =>
+    approvalRequestState(
+      {
+        revokedAt: request.revokedAt ? new Date(request.revokedAt) : null,
+        completedAt: request.completedAt ? new Date(request.completedAt) : null,
+        expiresAt: new Date(request.expiresAt),
+      },
+      TASKS_NOW,
+    );
+  const pendingItem = (task: TaskRecord) => {
+    for (const request of requests) {
+      const item = request.items.find((i) => i.taskId === task.id && i.status === 'pending');
+      if (item) return { request, item };
+    }
+    return undefined;
+  };
+  /** Rule 8: a pending item in an expired request does not block a new one. */
+  const blockingItem = (task: TaskRecord) => {
+    const pending = pendingItem(task);
+    return pending && stateOf(pending.request) !== 'expired' ? pending : undefined;
+  };
+  const pendingApproval = (task: TaskRecord): TaskDetail['pendingApproval'] => {
+    const pending = pendingItem(task);
+    return pending
+      ? {
+          requestId: pending.request.id,
+          state: stateOf(pending.request),
+          issuedAt: pending.request.issuedAt,
+          expiresAt: pending.request.expiresAt,
+        }
+      : null;
+  };
+  const closeItem = (
+    request: ApprovalRequestRecord,
+    item: ApprovalItemRecord,
+    status: ApprovalItemStatus,
+    withdrawnReason: ApprovalWithdrawnReason | null = null,
+  ) => {
+    item.status = status;
+    item.withdrawnReason = withdrawnReason;
+    item.closedAt = TASKS_NOW.toISOString();
+    if (!request.revokedAt && request.items.every((i) => i.status !== 'pending')) {
+      request.completedAt = TASKS_NOW.toISOString();
+    }
+  };
+  const requestClient = (request: ApprovalRequestRecord) =>
+    clients.find((c) => c.id === request.clientId) as ClientRecord;
+  const requestContact = (request: ApprovalRequestRecord) =>
+    requestClient(request).contacts.find((c) => c.id === request.contactId) as Contact & {
+      archived: boolean;
+    };
+  const clientScope = (clientId: string) =>
+    holds('tasks.manage', 'all') ||
+    (holds('tasks.manage', 'own_clients') &&
+      clients.find((c) => c.id === clientId)?.accountManagerId === me().user.id);
+  const reviewOf = (item: ApprovalItemRecord) =>
+    byId(item.taskId)?.reviews.find((review) => review.id === item.reviewId);
+  const responseOf = (item: ApprovalItemRecord) =>
+    byId(item.taskId)?.responses.find((response) => response.id === item.responseId);
+  const countsOf = (request: ApprovalRequestRecord) => {
+    const count = (status: ApprovalItemStatus) =>
+      request.items.filter((i) => i.status === status).length;
+    return {
+      total: request.items.length,
+      approved: count('approved'),
+      changesRequested: count('changes_requested'),
+      pending: count('pending'),
+    };
+  };
+  const requestOf = (request: ApprovalRequestRecord): ApprovalRequest => {
+    const contact = requestContact(request);
+    return {
+      id: request.id,
+      client: { id: request.clientId, name: requestClient(request).tradeName },
+      contact: { id: contact.id, name: contact.name, archived: contact.archived },
+      state: stateOf(request),
+      items: countsOf(request),
+      issuedAt: request.issuedAt,
+      expiresAt: request.expiresAt,
+      remindedAt: request.remindedAt,
+      createdBy: person(request.createdById),
+      createdAt: request.createdAt,
+    };
+  };
+  const requestDetail = (request: ApprovalRequestRecord): ApprovalRequestDetail => {
+    const { items: counts, ...summaryFields } = requestOf(request);
+    const state = stateOf(request);
+    const scoped = clientScope(request.clientId);
+    return {
+      ...summaryFields,
+      counts,
+      message: request.message,
+      items: request.items.map((item, index): ApprovalItem => {
+        const response = responseOf(item);
+        return {
+          id: item.id,
+          position: index + 1,
+          title: item.title,
+          task: { id: item.taskId, title: byId(item.taskId)?.title ?? '' },
+          status: item.status,
+          withdrawnReason: item.withdrawnReason,
+          closedAt: item.closedAt,
+          versions: (reviewOf(item)?.versions ?? []).flatMap(
+            (version) => taskFiles.sent(version.id) ?? [],
+          ),
+          text: reviewOf(item)?.clientText ?? null,
+          response: response
+            ? {
+                decision: response.decision,
+                channel: response.channel,
+                note: response.note,
+                createdAt: response.createdAt,
+              }
+            : null,
+        };
+      }),
+      contactPhone: requestContact(request).phone,
+      permissions: {
+        canReissue: scoped && (state === 'open' || state === 'expired') && counts.pending > 0,
+        canRevoke: scoped && (state === 'open' || state === 'expired'),
+      },
+    };
+  };
+  /** A new link: only the request knows its token (rule 9). */
+  const issue = (request: ApprovalRequestRecord, origin: string): IssuedApprovalRequest => {
+    request.token = `link-token-${next++}`;
+    request.issuedAt = TASKS_NOW.toISOString();
+    request.expiresAt = new Date(
+      TASKS_NOW.getTime() + APPROVAL_LIMITS.linkDays * 24 * 60 * 60 * 1000,
+    ).toISOString();
+    request.remindedAt = null;
+    return { ...requestDetail(request), link: `${origin}/a/${request.token}` };
+  };
+  const publicItem = (item: ApprovalItemRecord): PublicApprovalItem => {
+    const review = item.status === 'withdrawn' ? undefined : reviewOf(item);
+    const response = responseOf(item);
+    return {
+      id: item.id,
+      title: item.title,
+      text: review?.clientText ?? null,
+      files: (review?.versions ?? []).flatMap((version) => taskFiles.shown(version.id) ?? []),
+      status: item.status,
+      note: response?.note ?? null,
+      decidedAt: response?.createdAt ?? null,
+      recordedByAgency: response?.channel === 'manual',
+    };
+  };
+  /** Rule 20: the request of a link, or why the link does not work. */
+  const requestOfLink = (
+    token: string,
+  ): ApprovalRequestRecord | { status: 404 | 410; code: ErrorCode } => {
+    const request = requests.find((r) => r.token === token);
+    const contact = request && requestContact(request);
+    if (!request || request.revokedAt || contact?.archived || !contact?.hasFinalApproval) {
+      return { status: 404, code: 'APPROVAL_LINK_INVALID' };
+    }
+    if (TASKS_NOW.getTime() >= new Date(request.expiresAt).getTime()) {
+      return { status: 410, code: 'APPROVAL_LINK_EXPIRED' };
+    }
+    return request;
+  };
+  /** Rules 13 and 14: the response moves the task and closes the item, as the client or by hand. */
+  const recordResponse = (
+    task: TaskRecord,
+    decision: TaskClientResponse['decision'],
+    channel: TaskClientResponse['channel'],
+    contact: TaskClientResponse['contact'],
+    note: string | null,
+  ) => {
+    const response: TaskClientResponse = {
+      id: id(next++),
+      decision,
+      channel,
+      contact,
+      note,
+      versions: cleared(task)?.versions ?? [],
+      recordedBy: channel === 'manual' ? person(me().user.id) : null,
+      createdAt: TASKS_NOW.toISOString(),
+    };
+    task.responses.push(response);
+    if (decision === 'approved') taskFiles.markFinal(response.versions.map((v) => v.id));
+    return response;
+  };
 
   const matches = (task: TaskRecord, q: URLSearchParams) => {
     const statuses = q.getAll('status');
@@ -3252,6 +3797,191 @@ function taskRoutes({ users, clients, projects, retainers, tasks, me }: TaskStat
       return json(route, ready);
     }
 
+    // Approval requests (F09).
+    const pageOf = <T>(items: T[]) => {
+      const pageSize = Number(url.searchParams.get('pageSize') ?? 50);
+      const page = Number(url.searchParams.get('page') ?? 1);
+      return {
+        items: items.slice((page - 1) * pageSize, page * pageSize),
+        total: items.length,
+        page,
+        pageSize,
+      };
+    };
+    const newestFirst = [...requests].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    if (path === '/api/approvals/requests' && method === 'GET') {
+      const q = url.searchParams;
+      const states = q.getAll('state').length > 0 ? q.getAll('state') : ['open', 'expired'];
+      return json(
+        route,
+        pageOf(
+          newestFirst
+            .filter(
+              (r) =>
+                states.includes(stateOf(r)) &&
+                (!q.get('clientId') || r.clientId === q.get('clientId')) &&
+                (q.get('createdBy') !== 'me' || r.createdById === me().user.id),
+            )
+            .map(requestOf),
+        ),
+      );
+    }
+    if (path === '/api/approvals/requests' && method === 'POST') {
+      const input = body<CreateApprovalRequest>();
+      const client = clients.find((c) => c.id === input.clientId);
+      if (!client) return fail(route, 404, null);
+      if (!clientScope(client.id)) return fail(route, 403, null);
+      const contact = client.contacts.find((c) => c.id === input.contactId);
+      if (!contact || contact.archived || !contact.hasFinalApproval) {
+        return fail(route, 409, 'CONTACT_NOT_APPROVER');
+      }
+      const sending = input.items.map((entry) => ({ entry, task: byId(entry.taskId) }));
+      for (const { entry, task } of sending) {
+        if (!task || task.clientId !== client.id || !readyToSend(task)) {
+          return fail(route, 409, 'TASK_NOT_READY', { taskId: entry.taskId });
+        }
+      }
+      const created: ApprovalRequestRecord = {
+        id: id(next++),
+        token: '',
+        clientId: client.id,
+        contactId: contact.id,
+        message: input.message ?? null,
+        issuedAt: '',
+        expiresAt: '',
+        remindedAt: null,
+        revokedAt: null,
+        completedAt: null,
+        createdById: me().user.id,
+        createdAt: TASKS_NOW.toISOString(),
+        items: sending.flatMap(({ entry, task }) => {
+          if (!task) return [];
+          // Rule 8: sending a task again withdraws its item in the expired request.
+          const old = pendingItem(task);
+          if (old) closeItem(old.request, old.item, 'withdrawn', 'resent');
+          return [
+            {
+              id: id(next++),
+              taskId: task.id,
+              title: entry.title ?? task.title,
+              reviewId: task.clearedReviewId ?? '',
+              status: 'pending' as const,
+              withdrawnReason: null,
+              closedAt: null,
+              responseId: null,
+            },
+          ];
+        }),
+      };
+      requests.push(created);
+      return json(route, issue(created, url.origin), 201);
+    }
+    const requestMatch = path.match(/^\/api\/approvals\/requests\/([^/]+)(?:\/([^/]+))?$/);
+    if (requestMatch) {
+      const found = requests.find((r) => r.id === requestMatch[1]);
+      if (!found) return fail(route, 404, null);
+      const action = requestMatch[2];
+      if (!action) return json(route, requestDetail(found));
+      if (!clientScope(found.clientId)) return fail(route, 403, null);
+      const state = stateOf(found);
+      if (state === 'revoked' || state === 'completed') return fail(route, 409, 'REQUEST_CLOSED');
+      if (action === 'reissue') return json(route, issue(found, url.origin));
+      if (action === 'revoke') {
+        // Rule 12: what still waits is withdrawn, and the tasks are ready again.
+        found.revokedAt = TASKS_NOW.toISOString();
+        for (const item of found.items) {
+          if (item.status === 'pending') closeItem(found, item, 'withdrawn', 'revoked');
+        }
+        return json(route, requestDetail(found));
+      }
+    }
+    const clientApprovals = path.match(/^\/api\/clients\/([^/]+)\/approvals$/);
+    if (clientApprovals) {
+      const clientId = clientApprovals[1];
+      if (!clients.some((c) => c.id === clientId)) return fail(route, 404, null);
+      const history: ClientApprovals = {
+        requests: pageOf(newestFirst.filter((r) => r.clientId === clientId).map(requestOf)),
+        responses: pageOf(
+          tasks
+            .filter((t) => t.clientId === clientId)
+            .flatMap((t) =>
+              t.responses.map((response) => ({ ...response, task: { id: t.id, title: t.title } })),
+            )
+            .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+        ),
+      };
+      return json(route, history);
+    }
+
+    // The client page (F09 rules 20–23): the link's token is the access.
+    const linkMatch = path.match(/^\/api\/public\/approvals\/([^/]+)(?:\/(.+))?$/);
+    if (linkMatch) {
+      const linked = requestOfLink(decodeURIComponent(linkMatch[1] ?? ''));
+      if ('status' in linked) return fail(route, linked.status, linked.code);
+      const rest = linkMatch[2];
+      if (!rest) {
+        const client = requestClient(linked);
+        const shown: PublicApproval = {
+          clientName: client.tradeName,
+          contactName: requestContact(linked).name,
+          accountManagerName: person(client.accountManagerId).name,
+          message: linked.message,
+          expiresAt: linked.expiresAt,
+          items: linked.items.map(publicItem),
+        };
+        return json(route, shown);
+      }
+      const versionMatch = rest.match(/^versions\/([^/]+)\/(content|preview|thumbnail)$/);
+      if (versionMatch) {
+        const versionId = versionMatch[1] ?? '';
+        const sent = linked.items.some(
+          (item) =>
+            item.status !== 'withdrawn' &&
+            reviewOf(item)?.versions.some((version) => version.id === versionId),
+        );
+        return sent
+          ? taskFiles.serveVersion(route, versionId, versionMatch[2] ?? '')
+          : fail(route, 404, 'APPROVAL_LINK_INVALID');
+      }
+      const responseMatch = rest.match(/^items\/([^/]+)\/response$/);
+      const item = linked.items.find((i) => i.id === responseMatch?.[1]);
+      const task = item && byId(item.taskId);
+      if (!item || !task) return fail(route, 404, null);
+      if (item.status === 'withdrawn') return fail(route, 409, 'ITEM_WITHDRAWN');
+      if (item.status !== 'pending') return fail(route, 409, 'ITEM_ALREADY_DECIDED');
+      const input = body<PublicResponse>();
+      const contact = requestContact(linked);
+      const response = recordResponse(
+        task,
+        input.decision,
+        'link',
+        { id: contact.id, name: contact.name, archived: false },
+        input.note ?? null,
+      );
+      if (input.decision === 'changes_requested') {
+        const number = clientCount(task) + 1;
+        task.revisions.push({
+          id: id(next++),
+          source: 'client',
+          number,
+          note: input.note ?? '',
+          contactId: contact.id,
+          overLimit: number > task.revisionLimit,
+          decision: null,
+          decisionNote: null,
+          extraWork: null,
+          decidedById: null,
+          decidedAt: null,
+          authorId: null,
+          createdAt: TASKS_NOW.toISOString(),
+        });
+      }
+      task.status = input.decision === 'approved' ? 'approved' : 'revisions';
+      item.responseId = response.id;
+      closeItem(linked, item, input.decision);
+      return json(route, publicItem(item));
+    }
+
     // The board's and workload's departments: the filter, else managed, else own (spec F06).
     const viewDepartments = (q: URLSearchParams): DepartmentCode[] => {
       const chosen = q.getAll('department') as DepartmentCode[];
@@ -3411,17 +4141,18 @@ function taskRoutes({ users, clients, projects, retainers, tasks, me }: TaskStat
         recordReview(task, task.reviewStage ?? 'internal', 'returned', change.note ?? '');
       }
       const responder = contactOf(task, change.contactId ?? null);
+      const waiting = task.status === 'awaiting_client' ? pendingItem(task) : undefined;
       if ((move === 'client_approved' || move === 'client_changes') && responder) {
-        task.responses.push({
-          id: id(next++),
-          decision: move === 'client_approved' ? 'approved' : 'changes_requested',
-          channel: 'manual',
-          contact: responder,
-          note: change.note ?? null,
-          versions: cleared(task)?.versions ?? [],
-          recordedBy: person(me().user.id),
-          createdAt: TASKS_NOW.toISOString(),
-        });
+        const decision = move === 'client_approved' ? 'approved' : 'changes_requested';
+        const response = recordResponse(task, decision, 'manual', responder, change.note ?? null);
+        // Rule 16: the response closes the task's pending item.
+        if (waiting) {
+          waiting.item.responseId = response.id;
+          closeItem(waiting.request, waiting.item, decision);
+        }
+      } else if (waiting) {
+        // Rule 17: leaving `awaiting_client` otherwise withdraws it.
+        closeItem(waiting.request, waiting.item, 'withdrawn', 'task_moved');
       }
       task.status = toMedical ? 'internal_review' : change.status;
       task.reviewStage =
@@ -3877,6 +4608,7 @@ interface FileState {
   projects: ProjectRecord[];
   retainers: RetainerRecord[];
   tasks: TaskRecord[];
+  files: FileRecord[];
   me: () => MeResponse;
   rights: (task: TaskRecord) => TaskRights;
 }
@@ -3897,8 +4629,7 @@ interface OwnerAccess {
 }
 
 /** The files API (F10), with the owner rights of the task, client, project and retainer mocks. */
-function fileRoutes({ users, clients, projects, retainers, tasks, me, rights }: FileState) {
-  const files = filesSeed();
+function fileRoutes({ users, clients, projects, retainers, tasks, files, me, rights }: FileState) {
   const uploads = new Map<string, { name: string; mimeType: string; sizeBytes: number }>();
   let next = 1400;
   const now = () => TASKS_NOW.toISOString();
@@ -4059,6 +4790,25 @@ function fileRoutes({ users, clients, projects, retainers, tasks, me, rights }: 
   const clientFiles = (clientId: string) => files.filter((f) => accessOf(f).clientId === clientId);
   const bytes = (records: FileRecord[]) =>
     records.flatMap((f) => f.versions).reduce((sum, v) => sum + (v.sizeBytes ?? 0), 0);
+
+  /** The bytes of a version: a stand-in image, or the PDF for a PDF's content. */
+  const serve = (route: Route, version: FileVersionRecord, part: string) => {
+    if (version.kind === 'link') return fail(route, 404, null);
+    const pdf = part === 'content' && version.mimeType === 'application/pdf';
+    return route.fulfill({
+      status: 200,
+      contentType: pdf ? 'application/pdf' : 'image/svg+xml',
+      body: pdf ? MOCK_PDF : MOCK_IMAGE,
+    });
+  };
+  /** A version whatever the caller may see: approval snapshots are checked by their request. */
+  const anyVersion = (versionId: string) => {
+    for (const record of files) {
+      const version = record.versions.find((v) => v.id === versionId);
+      if (version) return { record, version };
+    }
+    return undefined;
+  };
 
   const handle = (
     route: Route,
@@ -4274,13 +5024,7 @@ function fileRoutes({ users, clients, projects, retainers, tasks, me, rights }: 
       const { record, version } = found;
       const action = versionMatch[2];
       if (action === 'content' || action === 'thumbnail' || action === 'preview') {
-        if (version.kind === 'link') return fail(route, 404, null);
-        const pdf = action === 'content' && version.mimeType === 'application/pdf';
-        return route.fulfill({
-          status: 200,
-          contentType: pdf ? 'application/pdf' : 'image/svg+xml',
-          body: pdf ? MOCK_PDF : MOCK_IMAGE,
-        });
+        return serve(route, version, action);
       }
       if (action === 'archive') {
         if (version.isFinal) return fail(route, 409, 'VERSION_FINAL');
@@ -4332,6 +5076,61 @@ function fileRoutes({ users, clients, projects, retainers, tasks, me, rights }: 
             ? [{ id: latest.id, fileItemId: f.id, name: f.name, number: latest.number }]
             : [];
         }),
+    /** A snapshot version as the request page shows it (F09). */
+    sent: (versionId: string): ApprovalItem['versions'][number] | undefined => {
+      const found = anyVersion(versionId);
+      return found && !found.version.archivedAt
+        ? {
+            id: found.version.id,
+            fileItemId: found.record.id,
+            name: found.record.name,
+            number: found.version.number,
+            kind: found.version.kind,
+            type: fileTypeOf(found.version.kind, found.version.mimeType),
+            previewStatus: found.version.previewStatus,
+          }
+        : undefined;
+    },
+    /** A snapshot version as the client page shows it (F09 rule 22). */
+    shown: (versionId: string): PublicApprovalItem['files'][number] | undefined => {
+      const found = anyVersion(versionId);
+      if (!found || found.version.archivedAt) return undefined;
+      const { record, version } = found;
+      return {
+        versionId: version.id,
+        kind: version.kind,
+        name: record.name,
+        type: fileTypeOf(version.kind, version.mimeType),
+        sizeBytes: version.sizeBytes,
+        display:
+          version.kind === 'link'
+            ? 'link'
+            : isInlineMimeType(version.mimeType)
+              ? 'inline'
+              : 'download',
+        previewAvailable: version.previewStatus === 'ready',
+        linkUrl: version.url,
+        linkLabel: version.linkLabel,
+      };
+    },
+    /** Rule 13: the versions the client approved become their deliverables' finals. */
+    markFinal: (versionIds: string[]) => {
+      for (const record of files) {
+        if (!record.versions.some((v) => versionIds.includes(v.id))) continue;
+        for (const v of record.versions) {
+          const marked = versionIds.includes(v.id);
+          v.isFinal = marked;
+          v.finalSource = marked ? 'client' : null;
+          v.finalMarkedBy = null;
+          v.finalMarkedAt = marked ? now() : null;
+        }
+      }
+    },
+    /** The bytes of a snapshot version for the client page. */
+    serveVersion: (route: Route, versionId: string, part: string) => {
+      const found = anyVersion(versionId);
+      return found ? serve(route, found.version, part) : fail(route, 404, null);
+    },
   };
 }
 
@@ -5308,6 +6107,13 @@ export const seedIds = {
   clinicLogo: id(1006),
   dentalPost: id(1008),
   whiteningArticle: id(1009),
+  // With `MockOptions.approvals`.
+  autumnReel: id(1010),
+  drinksPost: id(1011),
+  siteBanner: id(1013),
+  openingStory: id(1014),
+  openRequest: id(1481),
+  expiredRequest: id(1482),
   octoberCover: id(1007),
   websiteTemplate: id(2000),
   monthlyTemplate: id(2100),

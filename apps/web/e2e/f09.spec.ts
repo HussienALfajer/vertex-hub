@@ -107,7 +107,7 @@ test('a healthcare task passes internal review, is returned and then approved by
   await expect(page.getByRole('button', { name: ar.tasks.medical.approve })).toHaveCount(0);
 });
 
-test('a medical reviewer never reviews their own task, and others have no queue', async ({
+test('a medical reviewer never reviews their own task, and others have no medical queue', async ({
   page,
 }) => {
   await onTasksToday(page);
@@ -117,10 +117,14 @@ test('a medical reviewer never reviews their own task, and others have no queue'
   await expect(page.getByText(ar.tasks.page.medicalOwnBody)).toBeVisible();
   await expect(page.getByRole('button', { name: ar.tasks.medical.approve })).toHaveCount(0);
 
-  // An employee outside Medical Consultation: no link, and the page sends them back.
+  // An employee outside Medical Consultation: no link, and the page shows only what was sent.
   api.signInAs(employeeMe);
-  await page.goto('/approvals');
-  await expect(page).toHaveURL(/\/tasks$/);
+  await page.goto('/approvals?tab=medical');
+  await expect(page.getByRole('tab')).toHaveCount(1);
+  await expect(page.getByRole('tab', { name: ar.approvals.tabs.sent })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
   await expect(
     page
       .getByRole('navigation', { name: ar.nav.label })

@@ -300,6 +300,14 @@ Details the implementation settled (PR 3, `feat/f09-review-web`):
 - **The Client approval panel** (pending link, "Create approval link") comes with PR 4; PR 3 shows the review history and the client responses as their own sections, each only when it has entries.
 - **A healthcare pass** answers the toast "waiting for the medical review" instead of "sent to the client", on the task page and the board.
 
+Details the implementation settled (PR 4, `feat/f09-approvals-web`):
+- **Approvals page:** the Sent tab shows to every user who reads tasks (requests are readable by all), so the page no longer sends anyone away; the navigation link stays with medical reviewers and client-scope users. The Sent filters live in the URL beside the tab.
+- **New request dialog:** the preview shows what the ready list carries: the greeting, the message and the titles as the client will read them, with each task's snapshot summary (file count, has text). The files themselves show on the request page after creation.
+- **Request page:** the snapshot's thumbnails are not clickable; the task link opens the files. "Send reminder on WhatsApp" shows to client scope once the 48-hour notice was sent (`remindedAt`), while the request is open with pending items and the contact has a phone.
+- **Task page:** the Client approval panel sits above Details: the pending link (state, contact, issued, expires, "Open request") and, for a ready task, "Create approval link" (a single-task request). An expired link shows both. The history of client responses stays its own section, as in PR 3.
+- **Client Approvals tab:** one pager moves both lists (the API pages them together); the page is kept in the tab, not in the URL.
+- **Client page:** a PDF opens in the page's viewer with "Open the original" beside it, because phones show no PDF inside a page; a decided item shows its result, time and note; nothing but the agency name shows for an invalid or expired link.
+
 ## Open questions
 - None block F09. The owner decided every question of the interview on 2026-10-01, including F02's open point (edge case 8: healthcare flag changes, rules 18–19).
 - Q5 (email provider) still gates sending links and reminders by email (Phase 4).

@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link, useNavigate } from '@tanstack/react-router';
-import type { MeResponse } from '@vertex-hub/contracts';
+import { APPROVAL_REQUEST_STATES, type MeResponse } from '@vertex-hub/contracts';
 import {
   Avatar,
   Badge,
@@ -18,36 +18,58 @@ import {
   TabsList,
   TabsTrigger,
 } from '@vertex-hub/ui';
-import { StethoscopeIcon } from 'lucide-react';
+import { SendIcon, SendToBackIcon, StethoscopeIcon } from 'lucide-react';
+import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LoadError } from '../../components/load-error';
 import { can, useMe } from '../../lib/auth';
-import { oneOfParam } from '../../lib/search-params';
+import { flagParam, idParam, listParam, oneOfParam, pageParam } from '../../lib/search-params';
 import { useDepartmentNames } from '../projects/project-badges';
 import { formatDue, PriorityBadge, TaskOverdueBadge } from '../tasks/task-badges';
 import { taskListQuery } from '../tasks/tasks.queries';
+import { reviewsMedical, sendsApprovals } from './approval-parts';
+import { ReadyTab } from './ready-tab';
+import { type SentSearch, SentTab } from './sent-tab';
 
 /*
  * The Approvals page (spec F09, screen 1): the work waiting on a review or a client, one tab per
  * queue, each shown only to those who can act on it. The tab is kept in the URL.
  */
 
-const APPROVAL_TABS = ['medical'] as const;
+const APPROVAL_TABS = ['medical', 'ready', 'sent'] as const;
 
 type ApprovalTab = (typeof APPROVAL_TABS)[number];
 
-export interface ApprovalsSearch {
+export interface ApprovalsSearch extends SentSearch {
   /** Unset means the first tab the user may use. */
   tab?: ApprovalTab;
 }
 
 export function parseApprovalsSearch(search: Record<string, unknown>): ApprovalsSearch {
-  return { tab: oneOfParam(APPROVAL_TABS, search.tab) };
+  return {
+    tab: oneOfParam(APPROVAL_TABS, search.tab),
+    state: listParam(APPROVAL_REQUEST_STATES, search.state),
+    clientId: idParam(search.clientId),
+    mine: flagParam(search.mine),
+    page: pageParam(search.page),
+  };
 }
 
-/** The tabs the user can act on. Cosmetic: the API enforces each queue. */
+/** Whether the user has a queue to act on: the page is in their navigation. */
+export const hasApprovalQueue = (me: MeResponse) => reviewsMedical(me) || sendsApprovals(me);
+
+/**
+ * The tabs the user sees: the queues they can act on, and the sent requests, which everyone who
+ * reads tasks may read. Cosmetic: the API enforces each one.
+ */
 export function approvalTabsFor(me: MeResponse): ApprovalTab[] {
-  return APPROVAL_TABS.filter((tab) => tab !== 'medical' || can(me, 'approvals.review_medical'));
+  return APPROVAL_TABS.filter((tab) =>
+    tab === 'medical'
+      ? reviewsMedical(me)
+      : tab === 'ready'
+        ? sendsApprovals(me)
+        : can(me, 'tasks.read'),
+  );
 }
 
 export function ApprovalsPage({ search }: { search: ApprovalsSearch }) {
@@ -56,12 +78,18 @@ export function ApprovalsPage({ search }: { search: ApprovalsSearch }) {
   const navigate = useNavigate({ from: '/approvals/' });
   const tabs = approvalTabsFor(me);
   const tab = search.tab && tabs.includes(search.tab) ? search.tab : tabs[0];
+  const setSent = useCallback(
+    (next: Partial<SentSearch>) =>
+      navigate({ search: (previous) => ({ ...previous, ...next }), replace: true }),
+    [navigate],
+  );
   return (
     <>
       <PageHeader title={t('approvals.title')} description={t('approvals.subtitle')} />
       <Tabs
         value={tab}
         onValueChange={(next: ApprovalTab) =>
+          // The filters belong to the Sent tab: they leave the URL with it.
           navigate({ search: { tab: next === tabs[0] ? undefined : next }, replace: true })
         }
       >
@@ -72,10 +100,34 @@ export function ApprovalsPage({ search }: { search: ApprovalsSearch }) {
               {t('approvals.tabs.medical')}
             </TabsTrigger>
           )}
+          {tabs.includes('ready') && (
+            <TabsTrigger value="ready">
+              <SendToBackIcon />
+              {t('approvals.tabs.ready')}
+            </TabsTrigger>
+          )}
+          {tabs.includes('sent') && (
+            <TabsTrigger value="sent">
+              <SendIcon className="rtl:-scale-x-100" />
+              {t('approvals.tabs.sent')}
+            </TabsTrigger>
+          )}
         </TabsList>
-        <TabsContent value="medical">
-          <MedicalQueue />
-        </TabsContent>
+        {tabs.includes('medical') && (
+          <TabsContent value="medical">
+            <MedicalQueue />
+          </TabsContent>
+        )}
+        {tabs.includes('ready') && (
+          <TabsContent value="ready">
+            <ReadyTab />
+          </TabsContent>
+        )}
+        {tabs.includes('sent') && (
+          <TabsContent value="sent">
+            <SentTab search={search} onChange={setSent} />
+          </TabsContent>
+        )}
       </Tabs>
     </>
   );

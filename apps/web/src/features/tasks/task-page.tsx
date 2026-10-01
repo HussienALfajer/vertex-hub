@@ -18,6 +18,7 @@ import { ConfirmDialog } from '../../components/confirm-dialog';
 import { isMissing, LoadError } from '../../components/load-error';
 import { can, useMe } from '../../lib/auth';
 import { formatCalendarDate, formatDateTime, formatNumber } from '../../lib/format';
+import { ClientApprovalSection } from '../approvals/task-approval-panel';
 import { PersonName, useDepartmentNames } from '../projects/project-badges';
 import { lineName } from '../retainers/retainer-badges';
 import { TaskTemplateOrigin } from '../templates/template-runs';
@@ -82,6 +83,7 @@ function TaskView({ task }: { task: TaskDetail }) {
           <CommentsSection task={task} />
         </div>
         <div className="flex min-w-0 flex-col gap-6">
+          <ClientApprovalSection task={task} />
           <DetailsSection task={task} />
           <DependenciesSection task={task} />
           <LinksSection task={task} />

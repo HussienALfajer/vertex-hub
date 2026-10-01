@@ -31,6 +31,14 @@ export function formatDateTime(value: Date | string): string {
   }).format(new Date(value));
 }
 
+/**
+ * Left-to-right text (a phone number) inside an Arabic sentence that cannot carry `dir="ltr"`, as
+ * in a select option: Unicode isolates keep its "+" in front.
+ */
+export function isolateLtr(text: string): string {
+  return `${String.fromCodePoint(0x2066)}${text}${String.fromCodePoint(0x2069)}`;
+}
+
 /** Names joined as Arabic lists them: "أ وب وج". */
 export function formatList(items: readonly string[]): string {
   return new Intl.ListFormat(APP_LOCALE, { type: 'conjunction' }).format(items);

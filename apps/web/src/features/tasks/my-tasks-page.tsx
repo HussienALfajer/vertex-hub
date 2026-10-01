@@ -47,8 +47,8 @@ interface Section {
   keep?: (task: Task) => boolean;
   /** The same tasks in the full list, when its filters can express them. */
   listSearch?: TaskListSearch;
-  /** The same tasks on the Approvals page, which is where they are acted on. */
-  onApprovals?: boolean;
+  /** The same tasks on a tab of the Approvals page, which is where they are acted on. */
+  approvalsTab?: 'medical' | 'ready';
   /** Needs attention first: shown in the danger tone. */
   alert?: boolean;
   /** The tasks belong to other people, so rows name their assignee. */
@@ -110,9 +110,16 @@ function sectionsFor(meId: string, managed: string[]): Section[] {
       filters: [{ reviewStage: 'medical', status: ['internal_review'] }],
       // Rule 4: never the reviewer's own task.
       keep: (task) => task.assignee?.id !== meId,
-      onApprovals: true,
+      approvalsTab: 'medical',
     },
-    { key: 'readyToSend', icon: SendToBackIcon, others: true, filters: [], ready: true },
+    {
+      key: 'readyToSend',
+      icon: SendToBackIcon,
+      others: true,
+      filters: [],
+      ready: true,
+      approvalsTab: 'ready',
+    },
     {
       key: 'unassignedInMyDepartments',
       icon: InboxIcon,
@@ -264,7 +271,7 @@ function TaskSection({ section, count }: { section: Section; count: number }) {
       taskListQuery({ ...filters, pageSize: section.keep ? 100 : SECTION_SIZE }),
     ),
   });
-  const ready = useQuery({ ...approvalReadyQuery, enabled: section.ready === true });
+  const ready = useQuery({ ...approvalReadyQuery(), enabled: section.ready === true });
   const sources = section.ready ? [ready] : lists;
   const pending = sources.some((source) => source.isPending);
   const failed = sources.find((source) => source.isError);
@@ -302,8 +309,13 @@ function TaskSection({ section, count }: { section: Section; count: number }) {
         <Badge tone={section.alert ? 'danger' : 'neutral'} className="tabular-nums">
           {formatNumber(count)}
         </Badge>
-        {section.onApprovals && (
-          <Button variant="ghost" size="sm" className="ms-auto" render={<Link to="/approvals" />}>
+        {section.approvalsTab && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="ms-auto"
+            render={<Link to="/approvals" search={{ tab: section.approvalsTab }} />}
+          >
             {t('tasks.my.openApprovals')}
             <ArrowLeftIcon className="ltr:-scale-x-100" />
           </Button>
