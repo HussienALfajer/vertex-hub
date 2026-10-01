@@ -17,6 +17,8 @@ export interface ClientSummary {
   status: ClientStatus;
   archived: boolean;
   accountManagerId: string;
+  /** Content for the client passes medical review first (F09 rule 4). */
+  isHealthcare: boolean;
 }
 
 const escapeLike = (value: string) => value.replace(/[\\%_]/g, (char) => `\\${char}`);
@@ -105,6 +107,12 @@ export class ClientDirectory {
       where ${clients.accountManagerId} = ${userId})`;
   }
 
+  /** `column` holds a client flagged healthcare. */
+  isHealthcare(column: PgColumn): SQL {
+    return sql`${qualified(column)} in (select ${clients.id} from ${clients}
+      where ${clients.isHealthcare})`;
+  }
+
   /** The trade name of the client in `column`, lowercased, to sort by. */
   sortName(column: PgColumn): SQL {
     return sql`(select lower(${clients.tradeName}) from ${clients}
@@ -124,6 +132,7 @@ const summaryColumns = {
   status: clients.status,
   archivedAt: clients.archivedAt,
   accountManagerId: clients.accountManagerId,
+  isHealthcare: clients.isHealthcare,
 };
 
 function toSummary(row: {
@@ -132,6 +141,7 @@ function toSummary(row: {
   status: ClientStatus;
   archivedAt: Date | null;
   accountManagerId: string;
+  isHealthcare: boolean;
 }): ClientSummary {
   return {
     id: row.id,
@@ -139,5 +149,6 @@ function toSummary(row: {
     status: row.status,
     archived: !!row.archivedAt,
     accountManagerId: row.accountManagerId,
+    isHealthcare: row.isHealthcare,
   };
 }

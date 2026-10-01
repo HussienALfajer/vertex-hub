@@ -4,6 +4,8 @@ import { ClientsModule } from '../clients/index.js';
 import { FilesModule } from '../files/index.js';
 import { NotificationsModule } from '../notifications/index.js';
 import { ProjectsModule } from '../projects/index.js';
+import { ClientReviewHooks } from './client-review-hooks.js';
+import { TaskApprovals } from './task-approvals.js';
 import { TaskCommentsController } from './task-comments.controller.js';
 import { TaskCommentsService } from './task-comments.service.js';
 import { TaskFileOwner } from './task-file-owner.js';
@@ -13,6 +15,9 @@ import { TaskNotices } from './task-notices.js';
 import { TaskPartsController } from './task-parts.controller.js';
 import { TaskPartsService } from './task-parts.service.js';
 import { TaskReminders } from './task-reminders.js';
+import { TaskReviewsController } from './task-reviews.controller.js';
+import { TaskReviews } from './task-reviews.js';
+import { TaskReviewsService } from './task-reviews.service.js';
 import { TaskViewsController } from './task-views.controller.js';
 import { TaskViewsService } from './task-views.service.js';
 import { TaskWorkflowService } from './task-workflow.service.js';
@@ -27,11 +32,20 @@ import { TasksService } from './tasks.service.js';
  * `TaskGenerator` for the `templates` module (F07). Sends the task notifications and registers
  * the A07/A08 reminders of the daily job through `notifications` (F14). Registers the `task`
  * owner policy in `files` and calls its `FileVersions` on approval and client changes (F10).
+ * Owns the review stage, the review snapshots and the client responses (F09, ADR 0020): registers
+ * into `clients`' `ClientFlagHooks` for healthcare flag changes, and exports `TaskApprovals` and
+ * the `ClientReviewHooks` registry for the `approvals` module, which it never imports.
  */
 @Module({
   imports: [AuthModule, ClientsModule, ProjectsModule, NotificationsModule, FilesModule],
   // The views come first: `tasks/board` and `tasks/workload` must not match `tasks/:id`.
-  controllers: [TaskViewsController, TasksController, TaskPartsController, TaskCommentsController],
+  controllers: [
+    TaskViewsController,
+    TasksController,
+    TaskReviewsController,
+    TaskPartsController,
+    TaskCommentsController,
+  ],
   providers: [
     TasksService,
     TaskWorkflowService,
@@ -43,7 +57,11 @@ import { TasksService } from './tasks.service.js';
     TaskNotices,
     TaskReminders,
     TaskFileOwner,
+    TaskReviews,
+    TaskReviewsService,
+    TaskApprovals,
+    ClientReviewHooks,
   ],
-  exports: [TaskGenerator],
+  exports: [TaskGenerator, TaskApprovals, ClientReviewHooks],
 })
 export class TasksModule {}

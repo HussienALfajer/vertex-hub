@@ -1,0 +1,1 @@
+ALTER TABLE "tasks" ADD CONSTRAINT "tasks_review_stage_check" CHECK (("tasks"."status" = 'internal_review') = ("tasks"."review_stage" is not null));

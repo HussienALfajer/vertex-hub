@@ -1,5 +1,5 @@
 import { businessDate, businessTimeOfDay, OPEN_TASK_STATUSES } from '@vertex-hub/contracts';
-import { taskRevisions, tasks } from '@vertex-hub/db';
+import { taskReviews, taskRevisions, tasks } from '@vertex-hub/db';
 import { type SQL, sql } from 'drizzle-orm';
 
 /*
@@ -25,3 +25,8 @@ export function overdueSql(now: Date): SQL {
 export const overLimitPendingSql = sql<boolean>`exists (
   select 1 from ${taskRevisions} as r
   where r.task_id = "tasks"."id" and r.over_limit and r.decision is null)`;
+
+/** The pass that cleared the task for the client is a medical one (F09 rule 8). */
+export const clearedByMedicalSql = sql<boolean>`exists (
+  select 1 from ${taskReviews} as p
+  where p.id = "tasks"."cleared_review_id" and p.stage = 'medical')`;

@@ -47,7 +47,7 @@ export const filePreviewStatusSchema = z
 export type FilePreviewStatus = z.infer<typeof filePreviewStatusSchema>;
 
 /** F09 adds `client`. */
-export const FILE_FINAL_SOURCES = ['auto', 'manual'] as const;
+export const FILE_FINAL_SOURCES = ['auto', 'manual', 'client'] as const;
 
 export const fileFinalSourceSchema = z.enum(FILE_FINAL_SOURCES).meta({ id: 'FileFinalSource' });
 

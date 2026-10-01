@@ -23,6 +23,9 @@ export function notificationLink(notification: Notification): ToOptions {
       return { to: '/projects/$projectId', params: { projectId: subject.id } };
     case 'retainer':
       return { to: '/retainers/$retainerId', params: { retainerId: subject.id } };
+    case 'approval_request':
+      // The request page arrives with the Approvals screens (F09); until then, the list.
+      return { to: '/notifications' };
     default:
       return { to: '/tasks/$taskId', params: { taskId: subject.id } };
   }
@@ -92,6 +95,33 @@ export function notificationText(
         context: context(data.client, formatCalendarDate(data.renewalDate)),
       };
     }
+    case 'approval_responded': {
+      const { data, count } = notification;
+      return {
+        text:
+          count > 1
+            ? t('notifications.text.approval_responded_merged', {
+                count,
+                n: formatNumber(count),
+                client: data.client,
+                contact: data.contact,
+              })
+            : t(`notifications.text.approval_responded.${data.decision}`, {
+                client: data.client,
+                contact: data.contact,
+              }),
+        context: null,
+      };
+    }
+    case 'approval_no_response':
+    case 'approval_expired':
+      return {
+        text: t(`notifications.text.${notification.type}`, {
+          client: notification.data.client,
+          contact: notification.data.contact,
+        }),
+        context: null,
+      };
     default: {
       const { task } = notification.data;
       return {
@@ -109,7 +139,10 @@ type TaskNotification = Exclude<
       | 'tasks_generated'
       | 'client_account_manager_assigned'
       | 'project_manager_assigned'
-      | 'retainer_renewal_due';
+      | 'retainer_renewal_due'
+      | 'approval_responded'
+      | 'approval_no_response'
+      | 'approval_expired';
   }
 >;
 

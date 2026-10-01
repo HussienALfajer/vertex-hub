@@ -7,6 +7,7 @@ import {
   type Permission,
   permissionScopes,
   type RequestScope,
+  type ReviewStage,
   type TaskPermissions,
   type TaskRights,
   type TaskStatus,
@@ -45,6 +46,7 @@ export const accessColumns = {
   department: tasks.department,
   assigneeId: tasks.assigneeId,
   status: tasks.status,
+  reviewStage: tasks.reviewStage,
   priority: tasks.priority,
   dueDate: tasks.dueDate,
   dueTime: tasks.dueTime,
@@ -54,6 +56,8 @@ export const accessColumns = {
   retainerCycleId: tasks.retainerCycleId,
   cycleLineId: tasks.cycleLineId,
   needsClientApproval: tasks.needsClientApproval,
+  clientText: tasks.clientText,
+  clearedReviewId: tasks.clearedReviewId,
   revisionLimit: tasks.revisionLimit,
   requestedByContactId: tasks.requestedByContactId,
   requestedOn: tasks.requestedOn,
@@ -72,6 +76,7 @@ export interface TaskRow {
   department: DepartmentCode;
   assigneeId: string | null;
   status: TaskStatus;
+  reviewStage: ReviewStage | null;
   priority: 'low' | 'normal' | 'high' | 'urgent';
   dueDate: string;
   dueTime: string | null;
@@ -81,6 +86,8 @@ export interface TaskRow {
   retainerCycleId: string | null;
   cycleLineId: string | null;
   needsClientApproval: boolean;
+  clientText: string | null;
+  clearedReviewId: string | null;
   revisionLimit: number;
   requestedByContactId: string | null;
   requestedOn: string | null;
@@ -206,11 +213,39 @@ export const inClosedProject = (task: TaskAccess) =>
 export const ownsOpenRequest = (rights: TaskRights, task: TaskAccess) =>
   rights.creator && task.status === 'new' && task.assigneeId === null;
 
+/** The workflow's view of a task. */
+export const taskState = (task: TaskAccess, blocked: boolean) => ({
+  status: task.status,
+  reviewStage: task.reviewStage,
+  assigneeId: task.assigneeId,
+  hasClient: !!task.clientId,
+  needsClientApproval: task.needsClientApproval,
+  blocked,
+});
+
+/** F09 rule 4: holders of `approvals.review_medical`, never the task's assignee. */
+export const mayMedicalReview = (actor: CurrentUserInfo, task: TaskAccess) =>
+  hasPermission(actor.access, 'approvals.review_medical') && task.assigneeId !== actor.id;
+
+/**
+ * F09 rule 8: `awaiting_client`, without a pending item in an open request, and for a healthcare
+ * client cleared by a medical pass.
+ */
+export const isReadyToSend = (
+  task: TaskAccess,
+  sending: { waiting: boolean; clearedStage: ReviewStage | null },
+) =>
+  task.status === 'awaiting_client' &&
+  !task.archivedAt &&
+  !sending.waiting &&
+  (!task.client?.isHealthcare || sending.clearedStage === 'medical');
+
 /** What the UI shows, and the moves it offers; the API checks each action again. */
 export function taskPermissions(
   actor: CurrentUserInfo,
   task: TaskAccess,
   blocked: boolean,
+  sending: { waiting: boolean; clearedStage: ReviewStage | null },
 ): { permissions: TaskPermissions; allowedTransitions: TaskStatus[] } {
   const rights = taskRights(actor, task);
   const readOnly = isReadOnly(task);
@@ -218,16 +253,7 @@ export function taskPermissions(
   const allowedTransitions =
     readOnly || (closed && inClosedProject(task))
       ? []
-      : allowedTaskTransitions(
-          {
-            status: task.status,
-            assigneeId: task.assigneeId,
-            hasClient: !!task.clientId,
-            needsClientApproval: task.needsClientApproval,
-            blocked,
-          },
-          rights,
-        );
+      : allowedTaskTransitions(taskState(task, blocked), rights);
   return {
     permissions: {
       canEdit: !readOnly && (rights.manage || ownsOpenRequest(rights, task)),
@@ -236,6 +262,12 @@ export function taskPermissions(
       canReview: !readOnly && rights.manage,
       canRecordClientResponse: !readOnly && rights.client && !!task.clientId,
       canDecideRevision: !readOnly && rights.client,
+      canMedicalReview:
+        !readOnly && task.reviewStage === 'medical' && mayMedicalReview(actor, task),
+      canWithdrawFromClient:
+        task.status === 'awaiting_client' && allowedTransitions.includes('internal_review'),
+      canEditClientText: !readOnly && closed === false && (rights.work || rights.manage),
+      canSendForApproval: !readOnly && rights.client && isReadyToSend(task, sending),
       canCancel: allowedTransitions.includes('cancelled'),
       canReopen: !readOnly && closed && allowedTransitions.length > 0,
       canArchive: holdsAll(actor, 'tasks.manage'),

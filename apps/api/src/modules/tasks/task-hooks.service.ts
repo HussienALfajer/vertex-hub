@@ -7,6 +7,7 @@ import { DATABASE } from '../../core/database/database.module.js';
 import { type AuditActor, recordAudit } from '../audit/index.js';
 import { ResponsibilityRegistry } from '../auth/index.js';
 import { EngagementDirectory, WorkProgress } from '../projects/index.js';
+import { ClientReviewHooks } from './client-review-hooks.js';
 import { blocksDependents, TaskNotices } from './task-notices.js';
 
 /**
@@ -21,6 +22,7 @@ export class TaskHooksService implements OnModuleInit {
     private readonly responsibilities: ResponsibilityRegistry,
     private readonly engagements: EngagementDirectory,
     private readonly notices: TaskNotices,
+    private readonly reviewHooks: ClientReviewHooks,
   ) {}
 
   onModuleInit(): void {
@@ -109,7 +111,12 @@ export class TaskHooksService implements OnModuleInit {
     if (open.length === 0) return;
     await tx
       .update(tasks)
-      .set({ status: 'cancelled', cancelledAt: new Date(), cancelReason: reason })
+      .set({
+        status: 'cancelled',
+        reviewStage: null,
+        cancelledAt: new Date(),
+        cancelReason: reason,
+      })
       .where(
         inArray(
           tasks.id,
@@ -141,6 +148,10 @@ export class TaskHooksService implements OnModuleInit {
           ...(withdrawn && { extraWorkItemId: null }),
         },
       });
+      // F09 rule 17: a cancelled task is no longer with the client.
+      if (task.status === 'awaiting_client') {
+        await this.reviewHooks.left(tx, { taskId: task.id, actor, response: null });
+      }
       const cancelled = await this.notices.load(tx, task.id);
       await this.notices.send(tx, this.notices.cancelled(cancelled, actor.id));
     }

@@ -37,6 +37,7 @@ import { type CurrentUserInfo, UserDirectory } from '../auth/index.js';
 import { NotificationCenter } from '../notifications/index.js';
 import {
   actorOf,
+  assertNotSent,
   assertVisible,
   assertWritable,
   auditRefs,
@@ -289,6 +290,14 @@ export class FilesService {
       if (item.archivedAt) throw new NotFoundException();
       if (!canRemoveItem(actor, owner, item)) throw new ForbiddenException();
       assertWritable(owner);
+      const versions = await tx
+        .select({ id: fileVersions.id })
+        .from(fileVersions)
+        .where(eq(fileVersions.fileItemId, id));
+      assertNotSent(
+        owner,
+        versions.map((version) => version.id),
+      );
       await tx.update(fileItems).set({ archivedAt: new Date() }).where(eq(fileItems.id, id));
       await recordAudit(tx, {
         actor: actorOf(actor),
@@ -323,7 +332,7 @@ export class FilesService {
     return this.detail(actor, id);
   }
 
-  /** Rule 7: never the last live version, never the final one. */
+  /** Rule 7: never the last live version, never the final one, never one that is sent (F09). */
   async archiveVersion(actor: CurrentUserInfo, versionId: string): Promise<FileItem> {
     const itemId = await this.db.transaction(async (tx) => {
       const { item, owner, version } = await this.loadVersion(tx, actor, versionId);
@@ -333,6 +342,7 @@ export class FilesService {
       if (version.isFinal) {
         throw new CodedException(409, 'VERSION_FINAL', 'Clear the final marker first');
       }
+      assertNotSent(owner, [versionId]);
       const [live] = await tx
         .select({ count: count() })
         .from(fileVersions)

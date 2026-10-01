@@ -58,6 +58,7 @@ import {
   readableClient,
   readableClients,
 } from './client-access.js';
+import { ClientFlagHooks } from './client-flag-hooks.js';
 
 type Executor = Database | Transaction;
 
@@ -106,6 +107,7 @@ export class ClientsService implements OnModuleInit {
     private readonly users: UserDirectory,
     private readonly responsibilities: ResponsibilityRegistry,
     private readonly notifications: NotificationCenter,
+    private readonly flagHooks: ClientFlagHooks,
   ) {}
 
   /** A user cannot be archived or lose the Account Manager role while they manage a live client. */
@@ -351,6 +353,14 @@ export class ClientsService implements OnModuleInit {
       await audit('client.status_changed', statusChange);
       await audit('client.account_manager_changed', managerChange);
       await audit('client.healthcare_changed', healthcare);
+      // F09 rules 18 and 19: the change applies to the client's work not yet sent.
+      if (healthcare && input.isHealthcare !== undefined) {
+        await this.flagHooks.healthcareChanged(tx, {
+          clientId: id,
+          isHealthcare: input.isHealthcare,
+          actor: actorOf(actor),
+        });
+      }
       if (managerChange && manager) {
         const tradeName = input.tradeName ?? current.tradeName;
         await this.notifyManager(tx, actor, id, manager.id, tradeName);

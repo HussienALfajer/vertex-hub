@@ -5,6 +5,7 @@ import {
   businessDate,
   DEPARTMENT_CODES,
   type DepartmentCode,
+  hasPermission,
   type MyTaskSummary,
   permissionScopes,
   type TaskBoard,
@@ -150,7 +151,8 @@ export class TaskViewsService {
     const weekEnd = weekOf(today).to;
     const overdue = overdueSql(now);
     const managed = actor.access.departments.filter((d) => d.isManager).map((d) => d.code);
-    const [[mine], [others], [unassigned]] = await Promise.all([
+    const clientScope = this.tasks.clientScopeSql(actor);
+    const [[mine], [others], [unassigned], [medical], [ready]] = await Promise.all([
       this.db
         .select({
           overdue: countWhere(and(eq(tasks.assigneeId, actor.id), overdue) as SQL),
@@ -198,6 +200,25 @@ export class TaskViewsService {
                 inArray(tasks.department, managed),
               ),
             ),
+      // F09: the medical queue, without the caller's own tasks (they cannot review them).
+      hasPermission(actor.access, 'approvals.review_medical')
+        ? this.db
+            .select({ value: count() })
+            .from(tasks)
+            .where(
+              and(
+                this.tasks.visibleSql(),
+                eq(tasks.reviewStage, 'medical'),
+                or(isNull(tasks.assigneeId), ne(tasks.assigneeId, actor.id)),
+              ),
+            )
+        : [null],
+      clientScope
+        ? this.db
+            .select({ value: count() })
+            .from(tasks)
+            .where(and(this.tasks.visibleSql(), this.tasks.readyToSendSql(), clientScope))
+        : [null],
     ]);
     return {
       overdue: mine?.overdue ?? 0,
@@ -206,6 +227,8 @@ export class TaskViewsService {
       later: mine?.later ?? 0,
       waiting: mine?.waiting ?? 0,
       toReview: others?.value ?? 0,
+      medicalReview: medical ? medical.value : null,
+      readyToSend: ready ? ready.value : null,
       requestedByMe: mine?.requestedByMe ?? 0,
       unassignedInMyDepartments: unassigned ? unassigned.value : null,
     };

@@ -2,6 +2,7 @@ import {
   addDays,
   businessDate,
   type CreateTaskInput,
+  contactSchema,
   type TaskDetail,
   type TaskStatus,
   type TaskStatusChangeInput,
@@ -55,8 +56,69 @@ export async function seedTaskCast(db: Database, client: Api) {
   const move = (id: string, cookie: string, change: TaskStatusChangeInput) =>
     client.post(`/api/tasks/${id}/status`, cookie, change);
 
-  /** Moves the task and expects success. */
-  async function moveOk(id: string, cookie: string, change: TaskStatusChangeInput) {
+  const contacts = new Map<string, string>();
+
+  /** A contact of the client with final-approval authority, created once per client. */
+  async function contactOf(clientId: string): Promise<string> {
+    const known = contacts.get(clientId);
+    if (known) return known;
+    const response = await client.post(`/api/clients/${clientId}/contacts`, cast.gm.cookie, {
+      name: `جهة اتصال ${cast.run}`,
+      phone: '+963944000111',
+      hasFinalApproval: true,
+    });
+    if (response.status !== 201) {
+      throw new Error(`Contact creation failed: ${response.status} ${await response.text()}`);
+    }
+    const { id } = contactSchema.parse(await response.json());
+    contacts.set(clientId, id);
+    return id;
+  }
+
+  async function setClientText(id: string, cookie: string, clientText: string | null) {
+    const response = await client.request('PUT', `/api/tasks/${id}/client-text`, {
+      cookie,
+      body: { clientText },
+    });
+    if (response.status !== 200) {
+      throw new Error(`Client text failed: ${response.status} ${await response.text()}`);
+    }
+    return taskDetailSchema.parse(await response.json());
+  }
+
+  /**
+   * What the task page sends with a move (F09): an internal pass carries the content token the
+   * reviewer was shown, and a client response names a contact of the client. A task with nothing
+   * to approve gets a text for the client before it is sent.
+   */
+  async function asThePageSends(
+    id: string,
+    cookie: string,
+    change: TaskStatusChangeInput,
+  ): Promise<TaskStatusChangeInput> {
+    const current = await detail(id, cast.gm.cookie);
+    const from = current.status;
+    if (from === 'internal_review' && ['awaiting_client', 'approved'].includes(change.status)) {
+      if (change.contentToken) return change;
+      const empty = current.fileCounts.deliverables === 0 && !current.clientText;
+      const shown =
+        change.status === 'awaiting_client' && empty
+          ? await setClientText(id, cookie, `نص المنشور ${cast.run}`)
+          : current;
+      return { ...change, contentToken: shown.contentToken };
+    }
+    const answers =
+      (from === 'awaiting_client' && ['approved', 'revisions'].includes(change.status)) ||
+      (from === 'approved' && change.status === 'revisions');
+    if (answers && !change.contactId && current.client) {
+      return { ...change, contactId: await contactOf(current.client.id) };
+    }
+    return change;
+  }
+
+  /** Moves the task as its page would (see `asThePageSends`) and expects success. */
+  async function moveOk(id: string, cookie: string, input: TaskStatusChangeInput) {
+    const change = await asThePageSends(id, cookie, input);
     const response = await move(id, cookie, change);
     if (response.status !== 200) {
       throw new Error(
@@ -112,6 +174,9 @@ export async function seedTaskCast(db: Database, client: Api) {
     createTask,
     move,
     moveOk,
+    asThePageSends,
+    contactOf,
+    setClientText,
     detail,
     taskAt,
   };

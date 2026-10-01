@@ -66,7 +66,7 @@ describe('task status (rules 1, 2, 13, 14)', () => {
     const sent = await cast.moveOk(task.id, cast.designManager.cookie, {
       status: 'awaiting_client',
     });
-    expect(sent.allowedTransitions).toEqual(['cancelled']);
+    expect(sent.allowedTransitions).toEqual(['internal_review', 'cancelled']);
     // The client's answer belongs to client scope.
     expect(
       (await cast.move(task.id, cast.designManager.cookie, { status: 'approved' })).status,

@@ -1444,6 +1444,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/tasks/{id}/medical-review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["TaskReviewsController_medicalReview"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tasks/{id}/client-text": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["TaskReviewsController_setClientText"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/tasks/{id}/checklist": {
         parameters: {
             query?: never;
@@ -1753,9 +1785,9 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         /** @enum {string} */
-        AuditEntityType: "user" | "department" | "client" | "client_contact" | "client_platform_account" | "client_note" | "project" | "project_milestone" | "retainer" | "retainer_cycle" | "extra_work" | "task" | "task_checklist_item" | "task_link" | "task_comment" | "template" | "template_run" | "file_item";
+        AuditEntityType: "user" | "department" | "client" | "client_contact" | "client_platform_account" | "client_note" | "project" | "project_milestone" | "retainer" | "retainer_cycle" | "extra_work" | "task" | "task_checklist_item" | "task_link" | "task_comment" | "template" | "template_run" | "file_item" | "approval_request";
         /** @enum {string} */
-        AuditAction: "user.created" | "user.updated" | "user.roles_changed" | "user.departments_changed" | "user.archived" | "user.restored" | "user.link_issued" | "user.password_set" | "user.password_changed" | "user.two_factor_enabled" | "user.two_factor_disabled" | "user.two_factor_reset" | "user.profile_updated" | "department.updated" | "client.created" | "client.updated" | "client.status_changed" | "client.account_manager_changed" | "client.healthcare_changed" | "client.archived" | "client.restored" | "client.brand_kit_updated" | "client_contact.created" | "client_contact.updated" | "client_contact.archived" | "client_platform_account.created" | "client_platform_account.updated" | "client_platform_account.archived" | "client_note.created" | "client_note.updated" | "client_note.archived" | "project.created" | "project.updated" | "project.project_manager_changed" | "project.status_changed" | "project.money_updated" | "project.archived" | "project.restored" | "project_milestone.created" | "project_milestone.updated" | "project_milestone.reordered" | "project_milestone.completed" | "project_milestone.reopened" | "project_milestone.archived" | "retainer.created" | "retainer.updated" | "retainer.status_changed" | "retainer.deliverables_updated" | "retainer.money_updated" | "retainer.archived" | "retainer.restored" | "retainer_cycle.created" | "retainer_cycle.closed" | "retainer_cycle.line_updated" | "retainer_cycle.line_added" | "retainer_cycle.adjusted" | "extra_work.created" | "extra_work.updated" | "extra_work.billing_changed" | "extra_work.archived" | "task.created" | "task.updated" | "task.assigned" | "task.department_changed" | "task.status_changed" | "task.dependencies_updated" | "task.archived" | "task.restored" | "task.revision_decided" | "task.request_scope_changed" | "task.extra_work_moved" | "task_checklist_item.created" | "task_checklist_item.updated" | "task_checklist_item.reordered" | "task_checklist_item.archived" | "task_link.created" | "task_link.archived" | "task_comment.created" | "task_comment.updated" | "task_comment.archived" | "template.created" | "template.updated" | "template.assignees_updated" | "template.archived" | "template.restored" | "template_run.created" | "retainer.template_changed" | "file_item.created" | "file_item.renamed" | "file_item.confidential_changed" | "file_item.archived" | "file_item.restored" | "file_version.created" | "file_version.archived" | "file_version.restored" | "file_version.final_set" | "file_version.final_cleared";
+        AuditAction: "user.created" | "user.updated" | "user.roles_changed" | "user.departments_changed" | "user.archived" | "user.restored" | "user.link_issued" | "user.password_set" | "user.password_changed" | "user.two_factor_enabled" | "user.two_factor_disabled" | "user.two_factor_reset" | "user.profile_updated" | "department.updated" | "client.created" | "client.updated" | "client.status_changed" | "client.account_manager_changed" | "client.healthcare_changed" | "client.archived" | "client.restored" | "client.brand_kit_updated" | "client_contact.created" | "client_contact.updated" | "client_contact.archived" | "client_platform_account.created" | "client_platform_account.updated" | "client_platform_account.archived" | "client_note.created" | "client_note.updated" | "client_note.archived" | "project.created" | "project.updated" | "project.project_manager_changed" | "project.status_changed" | "project.money_updated" | "project.archived" | "project.restored" | "project_milestone.created" | "project_milestone.updated" | "project_milestone.reordered" | "project_milestone.completed" | "project_milestone.reopened" | "project_milestone.archived" | "retainer.created" | "retainer.updated" | "retainer.status_changed" | "retainer.deliverables_updated" | "retainer.money_updated" | "retainer.archived" | "retainer.restored" | "retainer_cycle.created" | "retainer_cycle.closed" | "retainer_cycle.line_updated" | "retainer_cycle.line_added" | "retainer_cycle.adjusted" | "extra_work.created" | "extra_work.updated" | "extra_work.billing_changed" | "extra_work.archived" | "task.created" | "task.updated" | "task.assigned" | "task.department_changed" | "task.status_changed" | "task.dependencies_updated" | "task.archived" | "task.restored" | "task.revision_decided" | "task.request_scope_changed" | "task.extra_work_moved" | "task.reviewed" | "task.client_text_updated" | "task.client_response_recorded" | "task_checklist_item.created" | "task_checklist_item.updated" | "task_checklist_item.reordered" | "task_checklist_item.archived" | "task_link.created" | "task_link.archived" | "task_comment.created" | "task_comment.updated" | "task_comment.archived" | "template.created" | "template.updated" | "template.assignees_updated" | "template.archived" | "template.restored" | "template_run.created" | "retainer.template_changed" | "file_item.created" | "file_item.renamed" | "file_item.confidential_changed" | "file_item.archived" | "file_item.restored" | "file_version.created" | "file_version.archived" | "file_version.restored" | "file_version.final_set" | "file_version.final_cleared" | "approval_request.created" | "approval_request.link_reissued" | "approval_request.revoked" | "approval_item.responded" | "approval_item.withdrawn";
         /** @description Audit entries, newest first */
         AuditPage: {
             items: components["schemas"]["AuditEntry"][];
@@ -1818,7 +1850,7 @@ export interface components {
             scopes: components["schemas"]["PermissionScope"][];
         };
         /** @enum {string} */
-        Permission: "users.read" | "users.manage" | "clients.read" | "clients.manage" | "clients.log" | "leads.read" | "leads.manage" | "catalog.read" | "catalog.manage" | "quotes.read" | "quotes.manage" | "quotes.approve_discount" | "projects.read" | "projects.manage" | "tasks.read" | "tasks.request" | "tasks.work" | "tasks.manage" | "templates.read" | "templates.manage" | "content.read" | "content.manage" | "approvals.review" | "approvals.review_medical" | "shoots.read" | "shoots.manage" | "campaigns.read" | "campaigns.manage" | "invoices.read" | "invoices.manage" | "payments.manage" | "reports.read" | "reports.finance" | "audit.read";
+        Permission: "users.read" | "users.manage" | "clients.read" | "clients.manage" | "clients.log" | "leads.read" | "leads.manage" | "catalog.read" | "catalog.manage" | "quotes.read" | "quotes.manage" | "quotes.approve_discount" | "projects.read" | "projects.manage" | "tasks.read" | "tasks.request" | "tasks.work" | "tasks.manage" | "templates.read" | "templates.manage" | "content.read" | "content.manage" | "approvals.review_medical" | "shoots.read" | "shoots.manage" | "campaigns.read" | "campaigns.manage" | "invoices.read" | "invoices.manage" | "payments.manage" | "reports.read" | "reports.finance" | "audit.read";
         /** @enum {string} */
         PermissionScope: "all" | "department" | "own_clients" | "assigned";
         UpdateOwnProfile: {
@@ -2040,7 +2072,7 @@ export interface components {
                     project: string | null;
                 };
                 /** @enum {string} */
-                source: "internal" | "client";
+                source: "internal" | "client" | "medical";
             };
         } | {
             /** Format: uuid */
@@ -2063,6 +2095,35 @@ export interface components {
             updatedAt: string;
             /** @enum {string} */
             type: "task_review_requested";
+            data: {
+                task: {
+                    title: string;
+                    department: components["schemas"]["DepartmentCode"];
+                    client: string | null;
+                    project: string | null;
+                };
+            };
+        } | {
+            /** Format: uuid */
+            id: string;
+            actor: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            subject: {
+                type: components["schemas"]["NotificationSubjectType"];
+                /** Format: uuid */
+                id: string;
+            };
+            count: number;
+            read: boolean;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @enum {string} */
+            type: "task_medical_review_requested";
             data: {
                 task: {
                     title: string;
@@ -2128,6 +2189,83 @@ export interface components {
                     client: string | null;
                     project: string | null;
                 };
+            };
+        } | {
+            /** Format: uuid */
+            id: string;
+            actor: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            subject: {
+                type: components["schemas"]["NotificationSubjectType"];
+                /** Format: uuid */
+                id: string;
+            };
+            count: number;
+            read: boolean;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @enum {string} */
+            type: "approval_responded";
+            data: {
+                client: string;
+                contact: string;
+                /** @enum {string} */
+                decision: "approved" | "changes_requested";
+            };
+        } | {
+            /** Format: uuid */
+            id: string;
+            actor: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            subject: {
+                type: components["schemas"]["NotificationSubjectType"];
+                /** Format: uuid */
+                id: string;
+            };
+            count: number;
+            read: boolean;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @enum {string} */
+            type: "approval_no_response";
+            data: {
+                client: string;
+                contact: string;
+            };
+        } | {
+            /** Format: uuid */
+            id: string;
+            actor: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            subject: {
+                type: components["schemas"]["NotificationSubjectType"];
+                /** Format: uuid */
+                id: string;
+            };
+            count: number;
+            read: boolean;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @enum {string} */
+            type: "approval_expired";
+            data: {
+                client: string;
+                contact: string;
             };
         } | {
             /** Format: uuid */
@@ -2318,7 +2456,7 @@ export interface components {
                     project: string | null;
                 };
                 /** @enum {string} */
-                source: "internal" | "client";
+                source: "internal" | "client" | "medical";
             };
         } | {
             /** Format: uuid */
@@ -2556,7 +2694,7 @@ export interface components {
             };
         };
         /** @enum {string} */
-        NotificationSubjectType: "task" | "client" | "project" | "retainer" | "template_run";
+        NotificationSubjectType: "task" | "client" | "project" | "retainer" | "template_run" | "approval_request";
         NotificationUnreadCount: {
             count: number;
         };
@@ -2572,7 +2710,7 @@ export interface components {
             }[];
         };
         /** @enum {string} */
-        NotificationType: "task_assigned" | "task_mentioned" | "task_returned" | "task_review_requested" | "task_awaiting_client" | "task_over_limit" | "task_changed" | "task_commented" | "task_file_added" | "task_requested" | "tasks_generated" | "task_approved" | "task_opened" | "request_finished" | "task_due_soon" | "task_overdue" | "task_overdue_escalated" | "client_account_manager_assigned" | "project_manager_assigned" | "retainer_renewal_due";
+        NotificationType: "task_assigned" | "task_mentioned" | "task_returned" | "task_review_requested" | "task_medical_review_requested" | "task_awaiting_client" | "task_over_limit" | "approval_responded" | "approval_no_response" | "approval_expired" | "task_changed" | "task_commented" | "task_file_added" | "task_requested" | "tasks_generated" | "task_approved" | "task_opened" | "request_finished" | "task_due_soon" | "task_overdue" | "task_overdue_escalated" | "client_account_manager_assigned" | "project_manager_assigned" | "retainer_renewal_due";
         UpdateNotificationSettings: {
             mutedTypes: components["schemas"]["NotificationType"][];
         };
@@ -2663,7 +2801,7 @@ export interface components {
         /** @enum {string} */
         FilePreviewStatus: "pending" | "ready" | "none" | "failed";
         /** @enum {string} */
-        FileFinalSource: "auto" | "manual";
+        FileFinalSource: "auto" | "manual" | "client";
         /** @description What the caller may do, for the UI */
         FileItemPermissions: {
             canAddVersion: boolean;
@@ -3503,6 +3641,7 @@ export interface components {
                 inDepartment: boolean;
             } | null;
             status: components["schemas"]["TaskStatus"];
+            reviewStage: components["schemas"]["ReviewStage"] | null;
             priority: components["schemas"]["TaskPriority"];
             /** Format: date */
             dueDate: string;
@@ -3556,6 +3695,8 @@ export interface components {
         /** @enum {string} */
         TaskType: "work" | "client_request";
         /** @enum {string} */
+        ReviewStage: "internal" | "medical";
+        /** @enum {string} */
         TaskPriority: "low" | "normal" | "high" | "urgent";
         TaskWorkload: {
             week: {
@@ -3588,6 +3729,8 @@ export interface components {
             later: number;
             waiting: number;
             toReview: number;
+            medicalReview: number | null;
+            readyToSend: number | null;
             requestedByMe: number;
             unassignedInMyDepartments: number | null;
         };
@@ -3611,6 +3754,7 @@ export interface components {
                 inDepartment: boolean;
             } | null;
             status: components["schemas"]["TaskStatus"];
+            reviewStage: components["schemas"]["ReviewStage"] | null;
             priority: components["schemas"]["TaskPriority"];
             /** Format: date */
             dueDate: string;
@@ -3688,6 +3832,20 @@ export interface components {
                 references: number;
             };
             revisionHistory: components["schemas"]["TaskRevision"][];
+            clientText: string | null;
+            contentToken: string;
+            clearedReview: components["schemas"]["TaskReview"] | null;
+            reviewHistory: components["schemas"]["TaskReview"][];
+            clientResponses: components["schemas"]["TaskClientResponse"][];
+            pendingApproval: {
+                /** Format: uuid */
+                requestId: string;
+                state: components["schemas"]["ApprovalRequestState"];
+                /** Format: date-time */
+                issuedAt: string;
+                /** Format: date-time */
+                expiresAt: string;
+            } | null;
             createdBy: {
                 /** Format: uuid */
                 id: string;
@@ -3784,9 +3942,62 @@ export interface components {
             createdAt: string;
         };
         /** @enum {string} */
-        RevisionSource: "internal" | "client";
+        RevisionSource: "internal" | "client" | "medical";
         /** @enum {string} */
         RevisionDecision: "free" | "extra_work";
+        TaskReview: {
+            /** Format: uuid */
+            id: string;
+            stage: components["schemas"]["ReviewStage"];
+            outcome: components["schemas"]["ReviewOutcome"];
+            note: string | null;
+            reviewer: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            versions: components["schemas"]["ReviewVersion"][];
+            clientText: string | null;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        /** @enum {string} */
+        ReviewOutcome: "passed" | "returned";
+        ReviewVersion: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            fileItemId: string;
+            name: string;
+            number: number;
+        };
+        TaskClientResponse: {
+            /** Format: uuid */
+            id: string;
+            decision: components["schemas"]["ClientDecision"];
+            channel: components["schemas"]["ResponseChannel"];
+            contact: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                archived: boolean;
+            };
+            note: string | null;
+            versions: components["schemas"]["ReviewVersion"][];
+            recordedBy: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        /** @enum {string} */
+        ClientDecision: "approved" | "changes_requested";
+        /** @enum {string} */
+        ResponseChannel: "link" | "manual";
+        /** @enum {string} */
+        ApprovalRequestState: "open" | "expired" | "completed" | "revoked";
         /** @description What the caller may do, for the UI */
         TaskPermissions: {
             canEdit: boolean;
@@ -3795,6 +4006,10 @@ export interface components {
             canReview: boolean;
             canRecordClientResponse: boolean;
             canDecideRevision: boolean;
+            canMedicalReview: boolean;
+            canWithdrawFromClient: boolean;
+            canEditClientText: boolean;
+            canSendForApproval: boolean;
             canCancel: boolean;
             canReopen: boolean;
             canArchive: boolean;
@@ -3891,6 +4106,7 @@ export interface components {
             revisionSource?: components["schemas"]["RevisionSource"];
             /** Format: uuid */
             contactId?: string | null;
+            contentToken?: string;
             /** @default false */
             overrideDependencies: boolean;
             reason?: string | null;
@@ -3905,6 +4121,14 @@ export interface components {
         RevisionDecisionInput: {
             decision: components["schemas"]["RevisionDecision"];
             note?: string | null;
+        };
+        MedicalReview: {
+            /** @enum {string} */
+            decision: "approve" | "return";
+            note?: string | null;
+        };
+        TaskClientTextInput: {
+            clientText: string | null;
         };
         CreateTaskChecklistItem: {
             text: string;
@@ -7120,6 +7344,7 @@ export interface operations {
                 dueTo?: string;
                 createdBy?: "me";
                 reviewer?: "me";
+                reviewStage?: components["schemas"]["ReviewStage"];
                 archived?: "true" | "false";
                 sort?: "dueDate" | "priority" | "createdAt" | "updatedAt";
                 order?: components["schemas"]["SortOrder"];
@@ -7326,6 +7551,58 @@ export interface operations {
         requestBody?: never;
         responses: {
             /** @description The restored task (scope all only) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskDetail"];
+                };
+            };
+        };
+    };
+    TaskReviewsController_medicalReview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MedicalReview"];
+            };
+        };
+        responses: {
+            /** @description The task after the medical review: sent to the client, or returned with notes; never by its assignee */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskDetail"];
+                };
+            };
+        };
+    };
+    TaskReviewsController_setClientText: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaskClientTextInput"];
+            };
+        };
+        responses: {
+            /** @description The task with its text for the client (task workers and manage scope); a blank text clears it */
             200: {
                 headers: {
                     [name: string]: unknown;
