@@ -30,6 +30,7 @@ import {
   count,
   desc,
   eq,
+  gt,
   gte,
   ilike,
   inArray,
@@ -44,7 +45,12 @@ import {
 import { DATABASE } from '../../core/database/database.module.js';
 import { CodedException } from '../../core/errors/index.js';
 import { changedFields, recordAudit } from '../audit/index.js';
-import { type CurrentUserInfo, lockAccessChanges, UserDirectory } from '../auth/index.js';
+import {
+  type CurrentUserInfo,
+  lockAccessChanges,
+  ResponsibilityRegistry,
+  UserDirectory,
+} from '../auth/index.js';
 import { ClientDirectory, type ClientSummary } from '../clients/index.js';
 import type { Notice } from '../notifications/index.js';
 import { type ShootTask, ShootTasks, TaskGuards } from '../tasks/index.js';
@@ -94,6 +100,7 @@ export class ShootsService implements OnModuleInit {
     private readonly guards: TaskGuards,
     private readonly conflicts: ScheduleConflicts,
     private readonly notices: ShootNotices,
+    private readonly responsibilities: ResponsibilityRegistry,
   ) {}
 
   onModuleInit(): void {
@@ -112,6 +119,27 @@ export class ShootsService implements OnModuleInit {
               ),
             )
         ).map((row) => ({ taskId: row.taskId, title: row.title })),
+    });
+    // Edge case 8: a user cannot be archived while they lead a scheduled shoot that starts in
+    // the future.
+    this.responsibilities.register({
+      find: async (tx, userId) =>
+        (
+          await tx
+            .select({ id: shoots.id, name: shoots.title })
+            .from(shootCrew)
+            .innerJoin(shoots, eq(shoots.id, shootCrew.shootId))
+            .where(
+              and(
+                eq(shootCrew.userId, userId),
+                shootCrew.isLead,
+                eq(shoots.status, 'scheduled'),
+                isNull(shoots.archivedAt),
+                gt(shoots.startsAt, new Date()),
+              ),
+            )
+            .orderBy(asc(shoots.startsAt), asc(shoots.id))
+        ).map((shoot) => ({ type: 'lead_of_scheduled_shoots' as const, ...shoot })),
     });
   }
 
