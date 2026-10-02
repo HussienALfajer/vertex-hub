@@ -261,6 +261,7 @@ describe('module boundaries', () => {
     clients: 'clients',
     content: 'content',
     files: 'files',
+    invoices: 'invoices',
     notifications: 'notifications',
     projects: 'projects',
     quotes: 'quotes',

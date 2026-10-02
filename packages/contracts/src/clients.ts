@@ -240,7 +240,14 @@ export type CreateClient = z.infer<typeof createClientSchema>;
 export type CreateClientInput = z.input<typeof createClientSchema>;
 
 /** `accountManagerId` and `isHealthcare` need `clients.manage` with scope all. */
-export const updateClientSchema = clientFieldsSchema.partial().meta({ id: 'UpdateClient' });
+export const updateClientSchema = clientFieldsSchema
+  .extend({
+    /** Printed on invoices, receipts and statements; the trade name when empty (F13). */
+    billingName: optionalText(160),
+    billingAddress: optionalText(500),
+  })
+  .partial()
+  .meta({ id: 'UpdateClient' });
 
 export type UpdateClient = z.infer<typeof updateClientSchema>;
 
@@ -268,6 +275,8 @@ export const clientDetailResponseSchema = clientResponseSchema
     contacts: z.array(contactSchema),
     /** Non-archived platform accounts, in the order they were added. */
     platformAccounts: z.array(platformAccountSchema),
+    billingName: z.string().nullable(),
+    billingAddress: z.string().nullable(),
     archivedAt: z.iso.datetime().nullable(),
     /** The caller may edit this client (basics, contacts, brand kit, platform accounts). */
     canManage: z.boolean(),

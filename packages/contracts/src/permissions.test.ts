@@ -155,6 +155,38 @@ describe('projects and retainers (F05)', () => {
   });
 });
 
+describe('invoices (F13)', () => {
+  const operationsManager = access(
+    ['employee', 'department_manager'],
+    [{ code: 'internal_operations', isManager: true }],
+  );
+
+  it('lets the Operations manager issue invoices and record payments', () => {
+    expect(permissionScopes(operationsManager, 'invoices.manage')).toEqual(['all']);
+    expect(permissionScopes(operationsManager, 'payments.manage')).toEqual(['all']);
+    const member = access(['employee'], [{ code: 'internal_operations', isManager: false }]);
+    expect(hasPermission(member, 'invoices.manage')).toBe(false);
+    expect(hasPermission(member, 'payments.manage')).toBe(false);
+  });
+
+  it('gives expenses to the invoice managers and to account managers for their clients', () => {
+    expect(permissionScopes(access(['general_manager']), 'expenses.manage')).toEqual(['all']);
+    expect(permissionScopes(access(['finance']), 'expenses.manage')).toEqual(['all']);
+    expect(permissionScopes(operationsManager, 'expenses.manage')).toEqual(['all']);
+    expect(permissionScopes(access(['account_manager']), 'expenses.manage')).toEqual([
+      'own_clients',
+    ]);
+    expect(hasPermission(access(['employee', 'department_manager']), 'expenses.manage')).toBe(
+      false,
+    );
+  });
+
+  it('keeps invoice management off account managers', () => {
+    expect(hasPermission(access(['account_manager']), 'invoices.manage')).toBe(false);
+    expect(hasPermission(access(['account_manager']), 'payments.manage')).toBe(false);
+  });
+});
+
 describe('tasks (F06)', () => {
   const operationsManager = access(
     ['employee', 'department_manager'],

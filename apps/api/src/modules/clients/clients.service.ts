@@ -182,7 +182,13 @@ export class ClientsService implements OnModuleInit {
     const access = await readableClient(this.db, actor, id);
     const [[row], contacts, platformAccounts] = await Promise.all([
       this.db
-        .select({ ...summaryColumns, brandKit: clients.brandKit, archivedAt: clients.archivedAt })
+        .select({
+          ...summaryColumns,
+          brandKit: clients.brandKit,
+          billingName: clients.billingName,
+          billingAddress: clients.billingAddress,
+          archivedAt: clients.archivedAt,
+        })
         .from(clients)
         .where(eq(clients.id, id)),
       this.db
@@ -222,6 +228,8 @@ export class ClientsService implements OnModuleInit {
       brandKit: row.brandKit,
       contacts,
       platformAccounts,
+      billingName: row.billingName,
+      billingAddress: row.billingAddress,
       archivedAt: row.archivedAt?.toISOString() ?? null,
       canManage: !row.archivedAt && covers(actor, 'clients.manage', access),
     };
@@ -279,6 +287,8 @@ export class ClientsService implements OnModuleInit {
         .select({
           tradeName: clients.tradeName,
           sector: clients.sector,
+          billingName: clients.billingName,
+          billingAddress: clients.billingAddress,
           status: clients.status,
           isHealthcare: clients.isHealthcare,
           accountManagerId: clients.accountManagerId,
@@ -320,8 +330,18 @@ export class ClientsService implements OnModuleInit {
       };
 
       const basics = changedFields(
-        { tradeName: current.tradeName, sector: current.sector },
-        { tradeName: input.tradeName, sector: input.sector },
+        {
+          tradeName: current.tradeName,
+          sector: current.sector,
+          billingName: current.billingName,
+          billingAddress: current.billingAddress,
+        },
+        {
+          tradeName: input.tradeName,
+          sector: input.sector,
+          billingName: input.billingName,
+          billingAddress: input.billingAddress,
+        },
       );
       const statusChange = changedFields({ status: current.status }, { status: input.status });
       const healthcare = changedFields(

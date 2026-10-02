@@ -3,6 +3,7 @@ import { AuthModule } from '../auth/index.js';
 import { ClientsModule } from '../clients/index.js';
 import { FilesModule } from '../files/index.js';
 import { NotificationsModule } from '../notifications/index.js';
+import { BillingSources } from './billing-sources.js';
 import { CycleOpenedHooks } from './cycle-opened-hooks.js';
 import { EngagementDirectory } from './engagement-directory.js';
 import { EngagementFactory } from './engagement-factory.js';
@@ -49,11 +50,12 @@ import { WorkProgress } from './work-progress.js';
     WorkProgress,
     EngagementDirectory,
     EngagementFactory,
+    BillingSources,
     CycleOpenedHooks,
     RetainerRenewals,
     RetainerBehindAlerts,
     EngagementFileOwners,
   ],
-  exports: [WorkProgress, EngagementDirectory, EngagementFactory, CycleOpenedHooks],
+  exports: [WorkProgress, EngagementDirectory, EngagementFactory, BillingSources, CycleOpenedHooks],
 })
 export class ProjectsModule {}

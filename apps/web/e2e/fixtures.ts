@@ -1253,6 +1253,8 @@ function clientRoutes({ users, clients, me }: ClientState) {
     brandKit: c.brandKit,
     contacts: c.contacts.filter((x) => !x.archived).map(strip),
     platformAccounts: c.platformAccounts.filter((x) => !x.archived).map(strip),
+    billingName: null,
+    billingAddress: null,
     archivedAt: c.archived ? '2026-09-20T10:00:00.000Z' : null,
     canManage: canManage(c),
   });

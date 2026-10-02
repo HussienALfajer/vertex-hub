@@ -57,6 +57,9 @@ const NOT_BUSINESS_RECORDS: Record<string, string> = {
   quote_lines: 'Part of its quote version; replaced while a draft, frozen once sent (F04)',
   quote_line_items: 'Part of its quote line; replaced while a draft, frozen once sent (F04)',
   quote_installments: 'Part of its quote version; replaced while a draft, frozen once sent (F04)',
+  invoice_settings: 'One settings row, edited in place and audited (F13)',
+  document_numbers: 'Counter of invoice and receipt numbers per kind and year (F13)',
+  invoice_lines: 'Part of its invoice; replaced while a draft, frozen once issued (F13)',
 };
 
 /** Tables keyed by a natural value instead of a UUIDv7 `id`. Every entry needs a reason. */
@@ -66,6 +69,7 @@ const NATURAL_KEYS: Record<string, string> = {
   notification_settings: 'One row per user, keyed by the user (F14)',
   quote_settings: 'A single row, keyed by a constant (F04)',
   quote_numbers: 'One row per year, keyed by the year (F04 rule 2)',
+  invoice_settings: 'A single row, keyed by a constant (F13)',
 };
 
 describe('database conventions', () => {
