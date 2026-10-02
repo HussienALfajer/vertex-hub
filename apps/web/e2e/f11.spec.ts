@@ -20,8 +20,10 @@ async function onToday(page: Page) {
 
 const pick = async (page: Page, combobox: ReturnType<Page['getByRole']>, option: string) => {
   await combobox.click();
-  // The list of the select picked before may still be in the page, hidden: pick a visible option.
-  await page.getByRole('option', { name: option }).filter({ visible: true }).last().click();
+  // The list of the select picked before may still be closing (its options fading out): pick from
+  // the list that is open now, once it has settled.
+  const list = page.locator('[data-slot="select-content"][data-open]:not([data-starting-style])');
+  await list.getByRole('option', { name: option }).click();
 };
 
 test('book a shoot from a task with a conflict warning → tick → close creates the editing task', async ({

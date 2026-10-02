@@ -19,6 +19,9 @@ const UNIQUE_CODES: Record<string, ErrorCode> = {
   catalog_services_name_idx: 'SERVICE_NAME_TAKEN',
   catalog_packages_name_idx: 'PACKAGE_NAME_TAKEN',
   catalog_package_items_service_idx: 'INVALID_PACKAGE_ITEM',
+  invoice_lines_live_milestone_idx: 'ALREADY_INVOICED',
+  invoice_lines_live_retainer_cycle_idx: 'ALREADY_INVOICED',
+  invoice_lines_live_extra_work_item_idx: 'ALREADY_INVOICED',
 };
 
 /** PostgreSQL codes of a write that lost a race: unique violation, deadlock, serialization. */

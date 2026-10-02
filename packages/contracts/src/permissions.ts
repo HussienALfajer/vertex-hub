@@ -39,6 +39,7 @@ export const PERMISSIONS = [
   'invoices.read',
   'invoices.manage',
   'payments.manage',
+  'expenses.manage',
   'reports.read',
   'reports.finance',
   'audit.read',
@@ -109,6 +110,7 @@ export const PERMISSION_MAP: Readonly<Record<Role, Grants>> = {
     'campaigns.read': 'own_clients',
     'campaigns.manage': 'own_clients',
     'invoices.read': 'own_clients',
+    'expenses.manage': 'own_clients',
     'reports.read': 'own_clients',
   },
   finance: {
@@ -117,6 +119,7 @@ export const PERMISSION_MAP: Readonly<Record<Role, Grants>> = {
     'invoices.read': 'all',
     'invoices.manage': 'all',
     'payments.manage': 'all',
+    'expenses.manage': 'all',
     'reports.finance': 'all',
   },
 };
@@ -146,6 +149,9 @@ export const DEPARTMENT_CAPABILITIES: Readonly<
       'shoots.manage': 'all',
       'meetings.manage': 'all',
       'invoices.read': 'all',
+      'invoices.manage': 'all',
+      'payments.manage': 'all',
+      'expenses.manage': 'all',
       'reports.read': 'all',
     },
   },

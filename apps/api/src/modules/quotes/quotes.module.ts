@@ -7,6 +7,7 @@ import { NotificationsModule } from '../notifications/index.js';
 import { ProjectsModule } from '../projects/index.js';
 import { TemplatesModule } from '../templates/index.js';
 import { QuoteAcceptService } from './quote-accept.service.js';
+import { QuoteDirectory } from './quote-directory.js';
 import { QuoteFileOwner } from './quote-file-owner.js';
 import { QuotePdfService } from './quote-pdf.service.js';
 import { QuoteSettingsController } from './quote-settings.controller.js';
@@ -22,7 +23,7 @@ import { QuotesService } from './quotes.service.js';
  * `CatalogDirectory`, reads clients through `ClientDirectory` and notifies through
  * `NotificationCenter`. Recording an acceptance runs A01's engagement part through `projects`'
  * `EngagementFactory` and `templates`' `TemplateRunner`, and keeps the proof through `files`'
- * `GeneratedFiles`.
+ * `GeneratedFiles`. Exports `QuoteDirectory` (company details, quote numbers) to `invoices`.
  */
 @Module({
   imports: [
@@ -42,6 +43,8 @@ import { QuotesService } from './quotes.service.js';
     QuotePdfService,
     QuoteFileOwner,
     QuoteAcceptService,
+    QuoteDirectory,
   ],
+  exports: [QuoteDirectory],
 })
 export class QuotesModule {}

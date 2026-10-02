@@ -1,4 +1,12 @@
 // Public surface of the projects module. Code outside this folder imports from here only.
+export {
+  type BillableWork,
+  type BillingEngagement,
+  type BillingSource,
+  BillingSources,
+  cycleMonthName,
+  sourceKey,
+} from './billing-sources.js';
 export { type CycleOpened, CycleOpenedHooks } from './cycle-opened-hooks.js';
 export {
   type CycleLineLink,

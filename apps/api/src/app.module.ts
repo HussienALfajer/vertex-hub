@@ -20,6 +20,7 @@ import { ClientsModule } from './modules/clients/index.js';
 import { ContentModule } from './modules/content/index.js';
 import { FilesModule } from './modules/files/index.js';
 import { HealthModule } from './modules/health/index.js';
+import { InvoicesModule } from './modules/invoices/index.js';
 import { NotificationsModule } from './modules/notifications/index.js';
 import { ProjectsModule } from './modules/projects/index.js';
 import { QuotesModule } from './modules/quotes/index.js';
@@ -56,6 +57,7 @@ import { TemplatesModule } from './modules/templates/index.js';
     TemplatesModule,
     CatalogModule,
     QuotesModule,
+    InvoicesModule,
     HealthModule,
   ],
   providers: [

@@ -153,6 +153,13 @@ export const ERROR_CODES = [
   'NOTE_REQUIRED',
   'CURRENCY_MISMATCH',
   'QUOTE_EXPIRED',
+  'INVOICE_LOCKED',
+  'STALE_INVOICE',
+  'MIXED_ENGAGEMENTS',
+  'ALREADY_INVOICED',
+  'INVOICE_EMPTY',
+  'RATE_REQUIRED',
+  'INVOICE_HAS_PAYMENTS',
 ] as const;
 
 export const errorCodeSchema = z.enum(ERROR_CODES).meta({ id: 'ErrorCode' });

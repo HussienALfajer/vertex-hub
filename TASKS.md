@@ -1,58 +1,56 @@
-# TASKS — F04 Service catalog and quotes (with the engagement part of A01)
+# TASKS — F13 Invoicing and collection (with the invoice parts of A01, A02 and A10)
 
-Spec: `docs/specs/F04-catalog-quotes.md` · ADRs 0006, 0007, 0008, 0013, 0014, 0015, 0016, 0017, 0018, 0019, 0023 · Six PRs, each leaves `main` green and fully wired.
+Spec: `docs/specs/F13-invoicing-collection.md` · ADRs 0006, 0007, 0008, 0013, 0014, 0015, 0018, 0019, 0022, 0023, 0024 · Seven PRs, each leaves `main` green and fully wired.
 
-## PR 1 — `feat/f04-catalog`: catalog end to end (services, packages)
-- [x] contracts: `catalog.ts` (billing enum, service and package schemas with `.meta({ id })`, inputs, list queries and pages, counted kind rules C4, billing match and 1–20 items), permission map (Operations manager `catalog.read` + `catalog.manage` all, and `quotes.read` + `quotes.manage` all), error codes (`SERVICE_NAME_TAKEN`, `SERVICE_ARCHIVED`, `SERVICE_IN_USE`, `SERVICE_IN_PACKAGE`, `PACKAGE_NAME_TAKEN`, `PACKAGE_ARCHIVED`, `INVALID_PACKAGE_ITEM`, `INVALID_TEMPLATE`), audit actions and entity types (`catalog_service.*`, `catalog_package.*`); unit tests; `ar.json` keys for errors and audit
-- [x] db (`/db-migration`): `catalog_billing` enum, `catalog_services`, `catalog_packages`, `catalog_package_items`; `TABLE_OWNERS`; one additive migration; `db` test, drift
-- [x] api `templates`: export `TemplateDirectory` (names, kinds, archived state)
-- [x] api `catalog` module: services and packages list / detail / create / update / archive / restore (rules C1–C4, `SERVICE_IN_USE` on billing change once used in a package), audit in the transaction (package items carry the service name); `app.module.ts`; unique-index codes in the database error filter; `docs/architecture.md`; spec API table settled (schema names, `*_NOT_ARCHIVED`, error details); `test/catalog.test.ts`; `test/architecture.test.ts`
-- [x] bridge: `pnpm build`, `openapi:export`, `api:generate`; web typecheck
-- [x] web: `features/catalog/` (queries, Services tab table with filters and edit dialog, Packages tab cards with editor dialog, archive / restore, archived filter), route `/catalog`, nav item "Catalog", `ar.json` `catalog` namespace; loading, empty, error states
-- [x] e2e: fixtures, `f04-catalog.spec.ts`, screenshots light + dark (services, packages)
-- [x] wiring checklist, full checks (+ E2E, drift), reviewer (two findings fixed: package items audit order, C1 package names in the UI), owner acceptance (approved), /ship
+## PR 1 — `feat/f13-invoices-api`: settings, manual drafts, issue, void
+- [x] contracts: `money.ts` (rule 30: `exchangeRateSchema`, `convertMinor`, `toUsdMinor`, `invoiceTotal`) with unit tests; `invoices.ts` (statuses, origins, source types, `invoiceStatus` rule 21, `rateIsStale`, settings, create, draft, issue, due date, void, billable items, list query and page with totals, detail with `permissions`, snapshot) with unit tests; permission map (Operations manager `invoices.manage` + `payments.manage` all; new `expenses.manage` for the four holders) with tests; error codes; audit actions and entity types (`invoice_settings`, `invoice`); client `billingName`, `billingAddress`; `ar.json` keys for errors and audit (actions, entity types, fields)
+- [x] db (`/db-migration`): enums `invoice_status`, `invoice_origin`, `document_number_kind`; `invoice_settings` (seeded row, migration 0029), `document_numbers`, `invoices`, `invoice_lines` (partial unique indexes on sources where `holds_source`); `clients.billing_name`, `billing_address`; `TABLE_OWNERS`; conventions exceptions; drift
+- [x] api `clients`: billing fields on `PATCH` and in the detail, `ClientDirectory.billingDetails`
+- [x] api `projects`: `BillingSources` (billable work, source resolution, engagements, extra work `billed` / `unbilled` with F05's audit)
+- [x] api `quotes`: `QuoteDirectory` (company details, quote numbers)
+- [x] api `invoices` module: settings get / patch; list (scopes, filters, totals per currency and in USD), detail with `permissions`; billable items; create (rules 1, 6), whole-draft `PUT` (rule 7, `STALE_INVOICE`, 50 lines), archive (rule 8), issue (rules 9–11, numbering under the counter lock, snapshot), due date (rule 13), void (rule 14); audit; source indexes answer `ALREADY_INVOICED`; `app.module.ts`; `docs/architecture.md`
+- [x] api tests: `test/invoices.test.ts`; `removeInvoices` in test cleanup
+- [x] bridge: build, `openapi:export`, `api:generate`; client detail mock gains the billing fields; web typecheck
+- [x] wiring checklist, full checks (+ drift), reviewer (three findings fixed: USD balance of a void invoice, `canEdit` on an archived client's draft, missing 403 and error-code tests), owner acceptance (approved), /ship
 
-## PR 2 — `feat/f04-quotes-api`: quote settings, drafts, approval, send, versions, expiry
-- [x] contracts: `quotes.ts` (statuses, approval, sections, rejection reasons, settings, draft, detail, list query and page, actions, snapshot), `quoteTotals` (rule 5) with unit tests, error codes, audit actions and entity types (`quote_settings`, `quote`), notification types `quote_approval_requested`, `quote_approval_decided` with subject `quote` (and their `ar.json` keys), job `quotes.daily`
-- [x] db (`/db-migration`): enums, `quote_settings` (seeded row), `quote_numbers`, `quotes`, `quote_lines`, `quote_line_items`, `quote_installments`; `TABLE_OWNERS`; drift
-- [x] api `catalog`: `CatalogDirectory` export (services and packages with items, prices, template ids) for quotes; `CatalogUsage` hook so `SERVICE_IN_USE` also covers services and packages on a quote
-- [x] api `quotes` module: settings get / patch (threshold by `quotes.approve_discount`); create (numbering rule 2 under the counter lock), whole-draft `PUT` with `STALE_QUOTE`, approval request / withdraw / decision, send (rule 6, snapshot frozen, supersede), versions (rule 8), extend, reject, archive; list and detail with scopes and `permissions`; rules 1–11, 14, G1–G3; notifications; daily expiry job (worker schedule, API handler)
-- [x] api tests: `test/quotes.test.ts` (each endpoint 200 / 401 / 403 / out of scope, every error code, numbering per year and under concurrency, expiry idempotent, audit)
-- [x] bridge; web typecheck
-- [x] wiring checklist, full checks (+ drift), reviewer (four findings fixed: missing 403 and out-of-scope tests, decision on an archived client, archived drafts of archived clients listed, untranslated audit link fields), owner acceptance (approved), /ship
+## PR 2 — `feat/f13-invoice-drafts`: automatic drafts and billing locks
+- [ ] api `quotes`: `QuoteAcceptedHooks` run at the end of the accept transaction
+- [ ] api `projects`: `MilestoneDoneHooks`; `BillingLocks` registry; rule 24 `CURRENCY_LOCKED`, rule 25 (`MILESTONE_INVOICED`, `ALREADY_INVOICED`, `BILLED_BY_INVOICE`) with their error codes and `ar.json` keys
+- [ ] api `invoices`: A01, milestone done and A02 drafts (rules 2–5, skip rules); registers the billing locks source
+- [ ] api tests: `test/invoice-drafts.test.ts` (each trigger incl. job, new retainer, resume, reactivate; rollback with the trigger; skip rules; locks); adapted F05 tests
+- [ ] bridge; web typecheck (F05 extra work billing UI no longer offers `billed`)
+- [ ] wiring checklist, full checks, reviewer, owner acceptance, /ship
 
-## PR 3 — `feat/f04-quotes-pdf`: the PDF pipeline
-- [x] contracts: jobs `quotes.pdf`, `quotes.pdf-ready` (payload schemas, storage key), PDF and draft preview state in the detail, `canRenderPdf`, `quotePdfRenderSchema`; F10 owner type `quote`; unit tests
-- [x] db (`/db-migration`): `file_owner_type` gains `quote`, `file_items.quote_id` (checks, name index); `quotes.pdf_status`, `pdf_file_item_id`, `draft_pdf_*`; drift
-- [x] worker: Playwright/Chromium dependency, Arabic RTL brand HTML template (fallback font), `quotes.pdf` handler writing to file storage, idempotent per version / draft hash; worker test with text extraction
-- [x] api: queue on send and on preview, `quotes.pdf-ready` handler attaching once as a `document` of the quote (`GeneratedFiles` in `files`), draft preview replace / discard / outdated, `POST` and `GET /api/quotes/:id/pdf`, file owner policy for `quote` (client documents list for quote readers), `JobQueue` job data, daily re-queue of pending PDFs; `test/quote-pdf.test.ts`
-- [x] bridge: `pnpm build`, `openapi:export`, `api:generate`
-- [x] web: quote documents named in the client Files tab (`files.documents.ofQuote`)
-- [x] `docs/deployment.md`, `deploy.sh` (Chromium download), `provision.sh` (Chromium libraries), CI installs Chromium for the worker test; `docs/architecture.md`, spec details settled
-- [x] wiring checklist, full checks (+ drift, E2E), reviewer (one finding fixed: quote documents read-only so the frozen PDF stays), owner acceptance (approved), /ship
+## PR 3 — `feat/f13-payments-api`: payments, overdue and notifications
+- [ ] contracts: `applyPayment` with unit tests; payment schemas; audit `payment.*`, `invoice.overdue`; notification types `invoice_overdue`, `invoice_paid` with subject `invoice` (and `ar.json` keys); job `invoices.daily`
+- [ ] db (`/db-migration`): `payment_method` enum, `payments`; receipt numbers through `document_numbers`; drift
+- [ ] api: record payment (rules 16–21, row lock, proof upload as an invoice document), void payment (rule 22), `invoice_paid` (rule 23); daily job (overdue, null actor) scheduled by the worker; `invoices-overdue` source of `notifications.daily`
+- [ ] api tests: `test/payments.test.ts` (concurrency, settle tolerance, overpayment, status recompute, job and reminder idempotency)
+- [ ] bridge; web typecheck
+- [ ] wiring checklist, full checks (+ drift), reviewer, owner acceptance, /ship
 
-## PR 4 — `feat/f04-quote-accept-api`: acceptance and A01
-- [x] contracts: `revisionLimit` on retainer deliverables and cycle lines, template run `revisionLimit` (planner override and line limit), accept plan and accept schemas, `mergeDeliverableLines` (A6) and `defaultInstallmentMilestones` (A3) with unit tests, `addMonths`, error codes (`CURRENCY_MISMATCH`, `QUOTE_EXPIRED`), audit `quote.accepted`, notification `quote_accepted`, `canAccept`, detail `project` / `retainer`; `ar.json` keys (errors, audit action and fields, notification type and text)
-- [x] db (`/db-migration`): `revision_limit` on `retainer_deliverables` and `retainer_cycle_lines`, `quotes.project_id` / `retainer_id` foreign keys, `quote_accepted` notification type; migration 0027 (additive); drift
-- [x] api `projects`: `EngagementFactory` (create project with milestones, create retainer with lines, start it after the template link, renew per R10 keeping lines of the same kind and label) inside the caller's transaction; deliverable editor accepts `revisionLimit`; cycles copy it
-- [x] api `templates`: `TemplateRunner` (plan for a new project, apply with the revision override and no task creator, link a monthly template); cycle runs use the line's `revision_limit`
-- [x] api `files`: `GeneratedFiles.attachUpload` for the acceptance proof
-- [x] list filters `projectId`, `retainerId` and detail links to the project and retainer
-- [x] api `quotes`: `GET accept-plan`, `POST accept` (A1–A12 in one transaction, proof upload, A10 archives a newer draft, row lock); `test/quote-accept.test.ts` (rollback, renew from next cycle, revision limits on generated tasks); `docs/architecture.md`, spec details settled
-- [x] bridge; adapt retainer screens and fixtures to `revisionLimit` (the lines editor keeps it on save); web typecheck
-- [x] wiring checklist, full checks (+ E2E, drift), reviewer (four findings fixed: long proof names, template dates from a past start, planning inside the accept transaction, missing error-code tests), owner acceptance (approved), /ship
+## PR 4 — `feat/f13-billing-api`: statements, expenses, billing summaries, calendar
+- [ ] contracts: `statementRows` with unit tests; statement, client / project / retainer billing, expense schemas; audit `project_expense.*`; key date kind `invoice_due`
+- [ ] db (`/db-migration`): `project_expenses`; drift
+- [ ] api: client billing and statement (rule 28), project billing and margin (rule 27), retainer billing, expenses (rule 26), calendar `invoice_due` key dates filtered by invoice access
+- [ ] api tests: `test/project-expenses.test.ts`, statement and billing cases, calendar filtering
+- [ ] bridge; web typecheck
+- [ ] wiring checklist, full checks (+ drift), reviewer, owner acceptance, /ship
 
-## PR 5 — `feat/f04-quotes-web`: quote screens
-- [x] web: the `quote` notification link opens `/quotes/$quoteId` (it opens the home page until this PR)
-- [x] web `features/quotes/`: quote settings page `/catalog/settings`, quote list `/quotes` with filters and "New quote" dialog, builder (sections, pickers, line rows, discounts, installments, term, approval banner, unsaved-changes guard, preview PDF, send confirmation, discard), quote page (read-only quote, PDF state, versions, response, extend, reject, new version, approve / return), client Quotes tab; nav "Quotes"; `ar.json`
-- [x] e2e: fixtures, flow spec, screenshots light + dark (settings, list, builder with the approval notice, quote page sent, client Quotes tab)
-- [x] wiring checklist, full checks (+ E2E), reviewer (four findings fixed: hand prices lost after a currency change, a stale discount on an emptied section, the rejection date floor in UTC, silent catalog and contacts load failures)
-- [x] owner acceptance (approved), /ship
-- [x] follow-up found: the local API test suite is flaky across files (each failing file passes alone); handed to a separate task
+## PR 5 — `feat/f13-invoices-pdf`: invoice, draft, receipt and statement PDFs
+- [ ] contracts: jobs `invoices.pdf`, `invoices.pdf-ready` (kinds `invoice`, `invoice_draft`, `receipt`, `statement`), render payloads
+- [ ] db (`/db-migration`): `file_owner_type` gains `invoice`, `file_items.invoice_id`; PDF state columns if not added earlier; drift
+- [ ] worker: Arabic RTL brand templates for the four kinds, handler idempotent per payload hash; worker test with text extraction
+- [ ] api: queue on issue, due date change, payment and preview; ready handler attaching once; `POST` / `GET` PDF endpoints for invoices, receipts and statements; daily re-queue; statement objects purged after 24 hours; `test/invoice-pdf.test.ts`
+- [ ] bridge; web: invoice documents in the client Files tab
+- [ ] wiring checklist, full checks (+ drift), reviewer, owner acceptance, /ship
 
-## PR 6 — `feat/f04-quote-accept-web`: accept dialog and links
-- [x] web: accept dialog (response, project, retainer, summary, errors kept), "From quote" links on project and retainer pages, revision limit column on the retainer deliverable lines editor; `ar.json`
-- [x] e2e: full flow (build, send, accept, land on the project), screenshots (accept dialog steps, quote page accepted, one rendered PDF page: the worker test shoots the template's print layout)
-- [x] `docs/ROADMAP.md`, spec details settled during implementation
-- [x] wiring checklist, full checks (+ E2E), reviewer (three findings fixed: a template id in the summary, the plan asked again after a successful accept, the quote page not refreshed after `QUOTE_EXPIRED` or `INVALID_TRANSITION`)
-- [x] owner acceptance (approved; Renew keeps defaulting to the package's monthly template), /ship
+## PR 6 — `feat/f13-invoices-web`: invoice screens
+- [ ] web `features/invoices/`: list with tabs and totals, new invoice dialog, editor with billable items picker, issue dialog, invoice page with payments, payment dialog, void and due date dialogs, settings page; routes; nav item; `ar.json` `invoices` namespace; loading, empty, error states
+- [ ] e2e: fixtures, `f13-invoices.spec.ts` (issue a drafted invoice, two payments, paid; role differences), screenshots light + dark
+- [ ] wiring checklist, full checks (+ E2E), reviewer, owner acceptance, /ship
+
+## PR 7 — `feat/f13-billing-web`: client, project, retainer and calendar
+- [ ] web: client Invoices tab with balances and statement, billing fields on Basics; project Billing section (milestones, invoices, expenses, margin); retainer Billing section; `invoice_due` on the calendar
+- [ ] e2e: fixtures, flows, screenshots light + dark (client Invoices tab, project Billing, rendered PDFs)
+- [ ] wiring checklist, full checks (+ E2E), reviewer, owner acceptance (the full spec acceptance), /ship

@@ -12,6 +12,7 @@ export * from './errors.js';
 export * from './extra-work.js';
 export * from './files.js';
 export * from './health.js';
+export * from './invoices.js';
 export * from './jobs.js';
 export * from './lists.js';
 export * from './money.js';

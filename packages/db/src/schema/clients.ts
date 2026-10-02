@@ -54,6 +54,9 @@ export const clients = pgTable(
     isHealthcare: boolean('is_healthcare').notNull().default(false),
     /** Shape `brandKitSchema`; validated on write. */
     brandKit: jsonb('brand_kit').$type<BrandKit>().notNull().default(emptyBrandKit),
+    /** Printed on invoices, receipts and statements (F13); the trade name when null. */
+    billingName: text('billing_name'),
+    billingAddress: text('billing_address'),
     ...timestamps(),
     archivedAt: archivedAt(),
   },

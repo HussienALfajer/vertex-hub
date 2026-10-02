@@ -20,6 +20,8 @@ import {
   fileItems,
   fileUploads,
   fileVersions,
+  invoiceLines,
+  invoices,
   meetingAttendees,
   meetingContacts,
   meetings,
@@ -330,6 +332,7 @@ export async function removeClients(db: Database, ids: string[]): Promise<void> 
         .where(inArray(contentPosts.clientId, ids))
     ).map((row) => row.id),
   );
+  await removeInvoices(db, ids);
   await removeQuotes(db, ids);
   const clientProjects = await db
     .select({ id: projects.id })
@@ -624,6 +627,19 @@ export async function removeTemplates(db: Database, ids: string[]): Promise<void
   await db.delete(workTemplateStages).where(inArray(workTemplateStages.templateId, ids));
   await db.delete(workTemplateAssignees).where(inArray(workTemplateAssignees.templateId, ids));
   await db.delete(workTemplates).where(inArray(workTemplates.id, ids));
+}
+
+/** Removes the invoices of the clients with their lines and audit entries (F13). */
+export async function removeInvoices(db: Database, clientIds: string[]): Promise<void> {
+  if (clientIds.length === 0) return;
+  const ids = (
+    await db.select({ id: invoices.id }).from(invoices).where(inArray(invoices.clientId, clientIds))
+  ).map((row) => row.id);
+  if (ids.length === 0) return;
+  await db.delete(auditEntries).where(inArray(auditEntries.entityId, ids));
+  await db.delete(notifications).where(inArray(notifications.subjectId, ids));
+  await db.delete(invoiceLines).where(inArray(invoiceLines.invoiceId, ids));
+  await db.delete(invoices).where(inArray(invoices.id, ids));
 }
 
 /** Removes the quotes of the clients with their lines, items, installments and audit (F04). */

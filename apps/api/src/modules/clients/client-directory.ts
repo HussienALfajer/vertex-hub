@@ -66,6 +66,22 @@ export class ClientDirectory {
     return new Map(rows.map((row) => [row.id, toSummary(row)]));
   }
 
+  /** What invoices, receipts and statements print for the client (F13): billing name and address. */
+  async billingDetails(
+    id: string,
+    executor: Database | Transaction = this.db,
+  ): Promise<{ name: string; address: string | null } | null> {
+    const [row] = await executor
+      .select({
+        tradeName: clients.tradeName,
+        billingName: clients.billingName,
+        billingAddress: clients.billingAddress,
+      })
+      .from(clients)
+      .where(eq(clients.id, id));
+    return row ? { name: row.billingName || row.tradeName, address: row.billingAddress } : null;
+  }
+
   /** Whether `contactId` is a non-archived contact of the client. */
   async isActiveContact(
     clientId: string,
