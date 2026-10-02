@@ -224,7 +224,9 @@ Settled while building the screens:
 - A calendar card shows the start time only (a month cell has no room for the range); the agenda, the day list and the shoot page show the range.
 - The booking form takes one date with a start and an end time; an end time at or before the start time ends the shoot on the next day. A longer shoot (up to the 72 hours the API allows) is not entered from the form; editing one keeps its times unless the time fields are changed.
 - Team crew members link to their profile (the shoot does not carry their phones); tap-to-call is for external crew.
-- Until the meeting screens ship (PR 4), a meeting on the calendar is shown without a link.
+- A meeting on the calendar opens its page. "New meeting" opens the dialog over the calendar and stays there after saving, so the new entry and its conflict badge show at once.
+- The meeting dialog takes one date with a start and an end time, like the booking form. The organizer field shows on an edit only (the creator organizes a new meeting). The client list offers the clients the user may read; without any, the meeting is internal.
+- The meeting page also carries Archive and Restore for meeting scope `all` (the roles table lists the action), and the audit link for `audit.read`. The online link button shows while the meeting is scheduled.
 
 Every screen: Arabic RTL, logical CSS, strings through i18next, design-system components only; loading skeletons and the shared error state.
 

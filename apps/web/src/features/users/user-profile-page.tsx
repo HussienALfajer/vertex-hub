@@ -49,6 +49,7 @@ import {
   ShieldOffIcon,
   SparklesIcon,
   TriangleAlertIcon,
+  UsersRoundIcon,
   UserXIcon,
 } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
@@ -500,6 +501,8 @@ function ArchiveDialog({
                       <CalendarDaysIcon className="size-4 text-muted-foreground" />
                     ) : item.type === 'lead_of_scheduled_shoots' ? (
                       <CameraIcon className="size-4 text-muted-foreground" />
+                    ) : item.type === 'organizer_of_upcoming_meetings' ? (
+                      <UsersRoundIcon className="size-4 text-muted-foreground" />
                     ) : (
                       <FolderKanbanIcon className="size-4 text-muted-foreground" />
                     )}
@@ -554,6 +557,14 @@ function ArchiveDialog({
                       render={<Link to="/shoots/$shootId" params={{ shootId: item.id }} />}
                     >
                       {t('users.responsibilities.openShoot')}
+                    </Button>
+                  ) : item.type === 'organizer_of_upcoming_meetings' ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      render={<Link to="/meetings/$meetingId" params={{ meetingId: item.id }} />}
+                    >
+                      {t('users.responsibilities.openMeeting')}
                     </Button>
                   ) : null}
                 </li>

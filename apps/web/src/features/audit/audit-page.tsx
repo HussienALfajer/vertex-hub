@@ -702,6 +702,11 @@ const KNOWN_FIELDS = [
   'untickedShots',
   'cancelReason',
   'taskCancelled',
+  'onlineUrl',
+  'agenda',
+  'organizerId',
+  'attendeeIds',
+  'contactIds',
 ] as const;
 
 function fieldLabel(t: TFunction, field: string): string {
@@ -838,6 +843,14 @@ function EntityLink({ entry, names }: { entry: AuditEntry; names: EntityNames })
     return (
       <Link to="/shoots/$shootId" params={{ shootId: entry.entityId }} className={linkClass}>
         {typeof title === 'string' ? title : t('audit.openShoot')}
+      </Link>
+    );
+  }
+  if (entry.entityType === 'meeting') {
+    const title = entry.after?.title ?? entry.before?.title;
+    return (
+      <Link to="/meetings/$meetingId" params={{ meetingId: entry.entityId }} className={linkClass}>
+        {typeof title === 'string' ? title : t('audit.openMeeting')}
       </Link>
     );
   }

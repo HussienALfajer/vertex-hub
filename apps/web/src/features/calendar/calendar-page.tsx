@@ -34,6 +34,7 @@ import {
   ChevronRightIcon,
   FilterXIcon,
   UserRoundIcon,
+  UsersRoundIcon,
 } from 'lucide-react';
 import { useCallback, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -59,6 +60,7 @@ import { FilterSelect } from '../tasks/task-list-page';
 import { userListQuery } from '../users/users.queries';
 import { calendarQuery } from './calendar.queries';
 import { type CalendarEntry, EntryCard, EntryRows, entryKey } from './calendar-parts';
+import { MeetingDialog } from './meeting-dialog';
 
 /** What the company calendar shows, kept in the URL (spec F11, screen 1). */
 export interface CalendarSearch {
@@ -140,6 +142,7 @@ export function CalendarPage({ search }: { search: CalendarSearch }) {
     }),
   );
   const [openDay, setOpenDay] = useState<CalendarDate | null>(null);
+  const [creatingMeeting, setCreatingMeeting] = useState(false);
   const days = daysBetween(range.from, range.to);
   const byDay = calendar.data ? entriesByDay(calendar.data) : new Map<never, never>();
   const entriesOf = (day: CalendarDate): CalendarEntry[] => byDay.get(day) ?? [];
@@ -152,12 +155,20 @@ export function CalendarPage({ search }: { search: CalendarSearch }) {
         title={t('calendar.title')}
         description={t('calendar.subtitle')}
         actions={
-          can(me, 'shoots.manage') && (
-            <Button render={<Link to="/shoots/new" />}>
-              <CameraIcon />
-              {t('calendar.actions.bookShoot')}
-            </Button>
-          )
+          <>
+            {can(me, 'meetings.manage') && (
+              <Button variant="outline" onClick={() => setCreatingMeeting(true)}>
+                <UsersRoundIcon />
+                {t('calendar.actions.newMeeting')}
+              </Button>
+            )}
+            {can(me, 'shoots.manage') && (
+              <Button render={<Link to="/shoots/new" />}>
+                <CameraIcon />
+                {t('calendar.actions.bookShoot')}
+              </Button>
+            )}
+          </>
         }
       />
       <div className="flex flex-col gap-4">
@@ -277,6 +288,7 @@ export function CalendarPage({ search }: { search: CalendarSearch }) {
         )}
       </div>
 
+      {creatingMeeting && <MeetingDialog onClose={() => setCreatingMeeting(false)} />}
       {openDay && (
         <Dialog open onOpenChange={(open) => !open && setOpenDay(null)}>
           <DialogContent closeLabel={t('common.close')} className="max-w-2xl p-0">

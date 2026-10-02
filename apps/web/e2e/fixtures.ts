@@ -17,6 +17,7 @@ import {
   type BrandFileKind,
   type BrandKit,
   type Calendar,
+  type CancelMeeting,
   type CancelShoot,
   type ClientApprovals,
   type ClientDetailResponse,
@@ -30,6 +31,7 @@ import {
   type CreateCycleAdjustment,
   type CreateCycleLine,
   type CreateExtraWork,
+  type CreateMeeting,
   type CreateMilestone,
   type CreatePost,
   type CreatePostTask,
@@ -79,6 +81,7 @@ import {
   lastOfMonth,
   type MedicalReview,
   type Meeting,
+  type MeetingDetail,
   type MeResponse,
   type Milestone,
   type MilestoneStatus,
@@ -170,6 +173,7 @@ import {
   templateRunInputSchema,
   type UpdateCycleLine,
   type UpdateExtraWork,
+  type UpdateMeeting,
   type UpdatePost,
   type UpdateShoot,
   type UpdateTaskInput,
@@ -7413,12 +7417,42 @@ interface MeetingRecord {
   endsAt: string;
   location: string | null;
   onlineUrl: string | null;
+  agenda: string | null;
   organizerId: string;
   attendeeIds: string[];
+  contactIds: string[];
+  cancelledAt: string | null;
+  cancelReason: string | null;
+  createdById: string;
+  createdAt: string;
+  archivedAt: string | null;
 }
 
 /** A Damascus wall time as the API returns it. */
 const at = (day: string, time: string) => new Date(`${day}T${time}:00+03:00`).toISOString();
+
+function meetingRecord(
+  n: number,
+  fields: Partial<MeetingRecord> & Pick<MeetingRecord, 'title' | 'startsAt' | 'endsAt'>,
+): MeetingRecord {
+  return {
+    id: id(n),
+    status: 'scheduled',
+    clientId: null,
+    location: null,
+    onlineUrl: null,
+    agenda: null,
+    organizerId: id(1),
+    attendeeIds: [],
+    contactIds: [],
+    cancelledAt: null,
+    cancelReason: null,
+    createdById: id(1),
+    createdAt: '2026-10-06T08:00:00.000Z',
+    archivedAt: null,
+    ...fields,
+  };
+}
 
 function shootRecord(
   n: number,
@@ -7548,43 +7582,37 @@ export function calendarSeed(): {
       }),
     ],
     meetings: [
-      {
-        id: id(1761),
+      meetingRecord(1761, {
         title: 'خطة محتوى تشرين الثاني',
-        status: 'scheduled',
         clientId: jasmine,
         startsAt: at('2026-10-12', '12:00'),
         endsAt: at('2026-10-12', '13:00'),
         location: 'مكتب فيرتكس، قاعة الاجتماعات',
-        onlineUrl: null,
-        organizerId: id(1),
+        onlineUrl: 'https://meet.google.com/vertex-jasmine',
+        agenda:
+          'مراجعة أداء منشورات تشرين الأول، ثم اعتماد محاور الشهر القادم وعروض افتتاح فرع المالكي.',
         attendeeIds: [id(3)],
-      },
-      {
-        id: id(1762),
+        contactIds: [id(611), id(612)],
+      }),
+      meetingRecord(1762, {
         title: 'المراجعة الأسبوعية',
-        status: 'scheduled',
-        clientId: null,
         startsAt: at('2026-10-11', '09:00'),
         endsAt: at('2026-10-11', '10:00'),
-        location: null,
         onlineUrl: 'https://meet.google.com/vertex-weekly',
         organizerId: id(2),
         attendeeIds: [id(1), id(3)],
-      },
+        createdById: id(2),
+      }),
       // Edge case 9: the client was archived after the meeting was set.
-      {
-        id: id(1763),
+      meetingRecord(1763, {
         title: 'تسليم ملفات الحملة',
-        status: 'scheduled',
         clientId: id(604),
         startsAt: at('2026-10-21', '11:00'),
         endsAt: at('2026-10-21', '11:30'),
         location: 'مكتب فيرتكس',
-        onlineUrl: null,
         organizerId: id(2),
-        attendeeIds: [],
-      },
+        createdById: id(2),
+      }),
     ],
   };
 }
@@ -7664,6 +7692,7 @@ function calendarRoutes({
           (m) =>
             m.id !== exclude &&
             m.status === 'scheduled' &&
+            !m.archivedAt &&
             [m.organizerId, ...m.attendeeIds].includes(userId) &&
             intervalsOverlap(m, time),
         )
@@ -7680,6 +7709,11 @@ function calendarRoutes({
   const shootConflicts = (shoot: ShootRecord) =>
     shoot.status === 'scheduled' && !shoot.archivedAt
       ? conflictsOf(crewIds(shoot), shoot, shoot.id)
+      : [];
+
+  const meetingConflicts = (meeting: MeetingRecord) =>
+    meeting.status === 'scheduled' && !meeting.archivedAt
+      ? conflictsOf([meeting.organizerId, ...meeting.attendeeIds], meeting, meeting.id)
       : [];
 
   const summary = (shoot: ShootRecord): Shoot => ({
@@ -7770,11 +7804,48 @@ function calendarRoutes({
     onlineUrl: meeting.onlineUrl,
     organizer: archivable(meeting.organizerId),
     attendeeCount: meeting.attendeeIds.length,
-    conflict:
-      meeting.status === 'scheduled' &&
-      conflictsOf([meeting.organizerId, ...meeting.attendeeIds], meeting, meeting.id).length > 0,
-    archivedAt: null,
+    conflict: meetingConflicts(meeting).length > 0,
+    archivedAt: meeting.archivedAt,
   });
+  // Mirrors the API's meeting scope (spec F11, "Scopes").
+  const coversMeeting = (meeting: MeetingRecord) =>
+    holds('meetings.manage', 'all') ||
+    (holds('meetings.manage', 'own_clients') &&
+      clients.find((c) => c.id === meeting.clientId)?.accountManagerId === me().user.id) ||
+    (holds('meetings.manage', 'assigned') && meeting.organizerId === me().user.id);
+  const meetingDetail = (meeting: MeetingRecord): MeetingDetail => {
+    const live = meeting.status === 'scheduled' && !meeting.archivedAt;
+    const scope = coversMeeting(meeting);
+    return {
+      ...meetingSummary(meeting),
+      agenda: meeting.agenda,
+      attendees: meeting.attendeeIds.map(archivable),
+      contacts: meeting.contactIds.flatMap((contactId) => {
+        const contact = clients.flatMap((c) => c.contacts).find((c) => c.id === contactId);
+        return contact
+          ? [
+              {
+                id: contact.id,
+                name: contact.name,
+                phone: contact.phone,
+                archived: contact.archived,
+              },
+            ]
+          : [];
+      }),
+      conflicts: meetingConflicts(meeting),
+      cancelledAt: meeting.cancelledAt,
+      cancelReason: meeting.cancelReason,
+      createdBy: person(meeting.createdById),
+      createdAt: meeting.createdAt,
+      updatedAt: meeting.createdAt,
+      permissions: {
+        canEdit: live && scope,
+        canCancel: live && scope,
+        canArchive: holds('meetings.manage', 'all'),
+      },
+    };
+  };
 
   /** Rule 15: due dates of open projects and pending milestones, renewals of running retainers. */
   const keyDates = (from: string, to: string): KeyDate[] => {
@@ -7857,6 +7928,7 @@ function calendarRoutes({
           ? meetings
               .filter(
                 (m) =>
+                  !m.archivedAt &&
                   intervalsOverlap(m, range) &&
                   (!clientId || m.clientId === clientId) &&
                   (!userId || [m.organizerId, ...m.attendeeIds].includes(userId)),
@@ -7879,9 +7951,66 @@ function calendarRoutes({
       const items = conflictsOf(
         q.getAll('userIds'),
         { startsAt: q.get('startsAt') ?? '', endsAt: q.get('endsAt') ?? '' },
-        q.get('excludeShootId') ?? undefined,
+        q.get('excludeShootId') ?? q.get('excludeMeetingId') ?? undefined,
       );
       return json(route, { items });
+    }
+
+    if (path === '/api/meetings' && method === 'POST') {
+      const { acceptConflicts, ...input } = body<CreateMeeting>();
+      // Rule 14: the creator organizes it.
+      const conflicts = conflictsOf([me().user.id, ...input.attendeeIds], input);
+      if (conflicts.length > 0 && !acceptConflicts) {
+        return fail(route, 409, 'SCHEDULE_CONFLICT', conflicts);
+      }
+      const created = meetingRecord(next++, {
+        ...input,
+        organizerId: me().user.id,
+        createdById: me().user.id,
+        createdAt: now(),
+      });
+      meetings.push(created);
+      return json(route, meetingDetail(created), 201);
+    }
+    const meetingMatch = path.match(/^\/api\/meetings\/([^/]+)(?:\/(.+))?$/);
+    if (meetingMatch) {
+      const meeting = meetings.find((m) => m.id === meetingMatch[1]);
+      if (!meeting || (meeting.archivedAt && !holds('meetings.manage', 'all'))) {
+        return fail(route, 404, null);
+      }
+      const action = meetingMatch[2];
+      if (!action && method === 'GET') return json(route, meetingDetail(meeting));
+      if ((action === 'archive' || action === 'restore') && method === 'POST') {
+        if (!holds('meetings.manage', 'all')) return fail(route, 403, null);
+        meeting.archivedAt = action === 'archive' ? now() : null;
+        return json(route, meetingDetail(meeting));
+      }
+      // Editing and cancelling need meeting scope on a scheduled meeting.
+      if (!coversMeeting(meeting)) return fail(route, 403, null);
+      if (meeting.status !== 'scheduled' || meeting.archivedAt) {
+        return fail(route, 409, 'MEETING_NOT_SCHEDULED');
+      }
+      if (!action && method === 'PATCH') {
+        const { acceptConflicts, ...input } = body<UpdateMeeting>();
+        const changed = { ...meeting, ...input };
+        const conflicts = conflictsOf(
+          [changed.organizerId, ...changed.attendeeIds],
+          changed,
+          meeting.id,
+        );
+        if (conflicts.length > 0 && !acceptConflicts) {
+          return fail(route, 409, 'SCHEDULE_CONFLICT', conflicts);
+        }
+        Object.assign(meeting, input);
+        return json(route, meetingDetail(meeting));
+      }
+      if (action === 'cancel' && method === 'POST') {
+        meeting.status = 'cancelled';
+        meeting.cancelledAt = now();
+        meeting.cancelReason = body<CancelMeeting>().reason;
+        return json(route, meetingDetail(meeting));
+      }
+      return undefined;
     }
 
     if (path === '/api/shoots' && method === 'GET') {
@@ -8152,6 +8281,8 @@ export const seedIds = {
   openingDesign: id(1621),
   drinksDesign: id(1622),
   // With `MockOptions.calendar`.
+  contentMeeting: id(1761),
+  weeklyMeeting: id(1762),
   autumnShoot: id(1751),
   clinicShoot: id(1752),
   openingShoot: id(1753),
