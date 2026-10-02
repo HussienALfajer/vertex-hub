@@ -9,7 +9,9 @@ import { HeartbeatJob } from './jobs/heartbeat.job.js';
 import { NotificationsDailyJob } from './jobs/notifications-daily.job.js';
 import { PgBossService } from './jobs/pg-boss.service.js';
 import { QuotesDailyJob } from './jobs/quotes-daily.job.js';
+import { QuotesPdfJob } from './jobs/quotes-pdf.job.js';
 import { RetainerCyclesJob } from './jobs/retainer-cycles.job.js';
+import { PdfRenderer } from './pdf/pdf-renderer.js';
 
 @Module({
   imports: [
@@ -33,6 +35,8 @@ import { RetainerCyclesJob } from './jobs/retainer-cycles.job.js';
     FilesPurgeUploadsJob,
     ApprovalsRemindersJob,
     QuotesDailyJob,
+    PdfRenderer,
+    QuotesPdfJob,
   ],
 })
 export class WorkerModule {}

@@ -65,16 +65,20 @@ import {
   canRead,
   holdsAll,
 } from './quote-access.js';
+import { QuotePdfService } from './quote-pdf.service.js';
 import {
   amounts,
+  draftSnapshot,
   type InstallmentRow,
   type ItemRow,
   identity,
   type LineRow,
   type LineWithItems,
+  NO_DRAFT_PDF,
   type QuoteChildren,
   type QuoteRow,
   quoteChildren,
+  renderHash,
   totalsOf,
 } from './quote-records.js';
 import { QuoteSettingsService } from './quote-settings.service.js';
@@ -103,6 +107,7 @@ export class QuotesService {
     private readonly users: UserDirectory,
     private readonly catalog: CatalogDirectory,
     private readonly settings: QuoteSettingsService,
+    private readonly pdf: QuotePdfService,
     usage: CatalogUsage,
   ) {
     // SERVICE_IN_USE: an item on any quote version keeps its billing.
@@ -410,13 +415,17 @@ export class QuotesService {
 
   /** Discards a draft; its number is never reused (edge case 15). */
   async archive(actor: CurrentUserInfo, id: string): Promise<void> {
-    await this.db.transaction(async (tx) => {
+    const previewKey = await this.db.transaction(async (tx) => {
       const { quote } = await this.lockForChange(tx, actor, id);
       if (quote.archivedAt || quote.status !== 'draft') {
         throw new CodedException(409, 'INVALID_TRANSITION', 'Only a draft is discarded');
       }
       const archivedAt = new Date();
-      await tx.update(quotes).set({ archivedAt }).where(eq(quotes.id, id));
+      // Rule 13: the draft preview goes with the draft.
+      await tx
+        .update(quotes)
+        .set({ archivedAt, ...NO_DRAFT_PDF })
+        .where(eq(quotes.id, id));
       await recordAudit(tx, {
         actor: actorOf(actor),
         action: 'quote.archived',
@@ -425,7 +434,9 @@ export class QuotesService {
         before: { ...identity(quote), archived: false },
         after: { ...identity(quote), archived: true },
       });
+      return quote.draftPdfObjectKey;
     });
+    await this.pdf.discardPreview(previewKey);
   }
 
   /**
@@ -495,6 +506,18 @@ export class QuotesService {
     const isDraft = row.status === 'draft' && !row.archivedAt;
     const editable = manages && isDraft && row.discountApproval !== 'pending';
     const contact = row.contactId ? contacts.get(row.contactId) : undefined;
+    // Rule 13: a preview is outdated once the draft (or what it prints) changed.
+    const previewOutdated =
+      isDraft && row.draftPdfStatus === 'ready' && row.draftPdfHash
+        ? renderHash(
+            draftSnapshot(row, children, {
+              companyDetails: settings.companyDetails,
+              client: client.name,
+              addressee: contact?.name ?? null,
+            }),
+            true,
+          ) !== row.draftPdfHash
+        : false;
     const responseContact = row.responseContactId ? contacts.get(row.responseContactId) : undefined;
     return {
       ...this.toSummary(row, client, children, people, businessDate()),
@@ -570,6 +593,15 @@ export class QuotesService {
       versions: versions
         .filter((version) => !version.archivedAt || version.id === row.id)
         .map((version) => ({ id: version.id, version: version.version, status: version.status })),
+      pdf: row.status !== 'draft' && row.pdfStatus ? { state: row.pdfStatus } : null,
+      draftPdf:
+        isDraft && row.draftPdfStatus
+          ? {
+              state: row.draftPdfStatus,
+              renderedAt: row.draftPdfAt?.toISOString() ?? null,
+              outdated: previewOutdated,
+            }
+          : null,
       permissions: {
         canEdit: editable,
         canRequestApproval:
@@ -586,6 +618,7 @@ export class QuotesService {
         canCreateVersion:
           manages && ['sent', 'expired', 'rejected'].includes(row.status) && newer.length === 0,
         canArchive: manages && isDraft,
+        canRenderPdf: isDraft ? manages : row.status !== 'draft' && row.pdfStatus !== 'ready',
       },
     };
   }

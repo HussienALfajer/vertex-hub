@@ -9407,6 +9407,71 @@
         ]
       }
     },
+    "/api/quotes/{id}/pdf": {
+      "post": {
+        "operationId": "QuotesController_renderPdf",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Queues the draft preview (client scope) or renders a sent version again when its PDF is not ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuotePdfRender"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "quotes"
+        ]
+      },
+      "get": {
+        "operationId": "QuotesController_downloadPdf",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "draft",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "true"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The PDF of the version, or the draft preview with draft=true"
+          },
+          "404": {
+            "description": "No such quote, or its PDF is not ready"
+          }
+        },
+        "tags": [
+          "quotes"
+        ]
+      }
+    },
     "/api/health": {
       "get": {
         "operationId": "HealthController_check",
@@ -16463,7 +16528,8 @@
           "client",
           "project",
           "retainer",
-          "post"
+          "post",
+          "quote"
         ]
       },
       "FileRole": {
@@ -29965,6 +30031,43 @@
               "additionalProperties": false
             }
           },
+          "pdf": {
+            "nullable": true,
+            "type": "object",
+            "properties": {
+              "state": {
+                "$ref": "#/components/schemas/QuotePdfState"
+              }
+            },
+            "required": [
+              "state"
+            ],
+            "additionalProperties": false
+          },
+          "draftPdf": {
+            "nullable": true,
+            "type": "object",
+            "properties": {
+              "state": {
+                "$ref": "#/components/schemas/QuotePdfState"
+              },
+              "renderedAt": {
+                "nullable": true,
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+              },
+              "outdated": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "state",
+              "renderedAt",
+              "outdated"
+            ],
+            "additionalProperties": false
+          },
           "permissions": {
             "$ref": "#/components/schemas/QuotePermissions"
           }
@@ -30006,6 +30109,8 @@
           "discountThresholdPercent",
           "needsDiscountApproval",
           "versions",
+          "pdf",
+          "draftPdf",
           "permissions"
         ],
         "additionalProperties": false
@@ -30264,6 +30369,14 @@
         ],
         "additionalProperties": false
       },
+      "QuotePdfState": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "ready",
+          "failed"
+        ]
+      },
       "QuotePermissions": {
         "type": "object",
         "properties": {
@@ -30293,6 +30406,9 @@
           },
           "canArchive": {
             "type": "boolean"
+          },
+          "canRenderPdf": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -30304,7 +30420,8 @@
           "canExtend",
           "canReject",
           "canCreateVersion",
-          "canArchive"
+          "canArchive",
+          "canRenderPdf"
         ],
         "additionalProperties": false,
         "description": "What the caller may do, for the UI"
@@ -30607,6 +30724,19 @@
           "respondedOn",
           "reason"
         ]
+      },
+      "QuotePdfRender": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "$ref": "#/components/schemas/QuotePdfState"
+          }
+        },
+        "required": [
+          "state"
+        ],
+        "additionalProperties": false,
+        "description": "The PDF state after asking for a render"
       },
       "HealthResponse": {
         "type": "object",

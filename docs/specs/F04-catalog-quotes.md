@@ -125,7 +125,9 @@ Seeded by the migration with the defaults and empty texts.
 | `rejection_reason` | enum `quote_rejection_reason` (`price`, `timing`, `competitor`, `scope`, `no_response`, `other`) | required when rejected; `other` needs a note (owner decision) |
 | `project_id`, `retainer_id` | uuid → `projects.id`, `retainers.id` | set by A01; `retainer_id` is the created or renewed retainer |
 | `snapshot` | jsonb | the frozen render payload of a sent version (rule 12) |
-| `draft_pdf_object_key`, `draft_pdf_at`, `draft_pdf_hash` | text, timestamptz, text | the last draft preview (rule 13) |
+| `pdf_status`, `pdf_file_item_id` | enum `quote_pdf_status` (`pending`, `ready`, `failed`), uuid → `file_items.id` | the PDF of a sent version (rule 12): set `pending` on send, `ready` with the attached document, `failed` after the worker's last retry |
+| `draft_pdf_status`, `draft_pdf_requested_hash` | `quote_pdf_status`, text | the draft preview asked for last and its payload hash (rule 13) |
+| `draft_pdf_object_key`, `draft_pdf_at`, `draft_pdf_hash` | text, timestamptz, text | the last draft preview rendered (rule 13) |
 | `created_by_id` | uuid → `users.id` | from the session |
 | timestamps, `archived_at` | | archived = a discarded draft (only drafts can be archived): hidden, read-only; visible to scope-all holders |
 
@@ -160,7 +162,7 @@ Limits: 50 lines per quote, 20 items per package line. Every child table is repl
 ### Changes to other modules
 - F05 `retainer_deliverables` and `retainer_cycle_lines` gain `revision_limit` (integer 0–20, optional); copied to cycle lines like `kind` and `label`. Editable on the retainer's deliverable lines editor; null means "the template's".
 - F07: a template run accepts an optional `revisionLimit` that replaces every step's revision limit (project runs from A01); cycle runs give tasks generated for a cycle line (repeat steps) the line's `revision_limit` when set.
-- F10: `file_owner_type` gains `quote`; `file_items.quote_id`. The `quotes` module registers the owner policy: readable by quote readers of the client, documents added by client scope, closed when archived. Quote documents are confidential to quote readers.
+- F10: `file_owner_type` gains `quote`; `file_items.quote_id`. The `quotes` module registers the owner policy: readable by quote readers of the client and read-only: the quote attaches the PDF of each sent version itself, and nobody versions, renames, removes or adds quote documents through the file endpoints, so the frozen PDF stays as sent (settled in PR 3). Quote documents are confidential to quote readers.
 
 ## States and rules
 
@@ -192,8 +194,8 @@ Discount approval on a draft: `none | returned ──request──→ pending �
 9. **Expiry:** the daily `quotes.daily` job sets `expired` on every `sent` quote whose `valid_until` is before today. Idempotent.
 10. **Extend:** an `expired` quote returns to `sent` with a new `valid_until` (≥ today, ≤ today + 90 days); prices and PDF are unchanged (owner decision). An expired quote cannot be accepted until extended (`QUOTE_EXPIRED`).
 11. **Reject:** from `sent` or `expired`, with a reason, an optional contact, the response date (≤ today, ≥ the sent day) and a note (required for `other`). Final: a later deal starts with a new version.
-12. **PDF of a sent version:** the API stores the render payload (company details, client, addressee, lines and items, totals, installments, term, notes, terms, dates, number) in `snapshot` and queues `quotes.pdf`; the worker renders it with Chromium from an Arabic RTL HTML template in the brand (fallback font until Q11) and writes the bytes to file storage; a `quotes.pdf-ready` job worked by the API attaches them as a `document` file item of the quote named `<number> v<version>.pdf`. Rendering is idempotent per version; the quote page shows "PDF being prepared" until it exists and offers "Render again" after a failure.
-13. **Draft preview:** "Preview PDF" on a draft queues the same render with a "draft" watermark from the current draft; the result replaces the previous preview (`draft_pdf_*`, old object deleted) and is discarded when the quote is sent or archived. A result whose hash no longer matches the draft is shown as outdated.
+12. **PDF of a sent version:** the API stores the render payload (company details, client, addressee, lines and items, totals, installments, term, notes, terms, dates, number) in `snapshot` and queues `quotes.pdf`; the worker renders it with Chromium from an Arabic RTL HTML template in the brand (fallback font until Q11) and writes the bytes to file storage; a `quotes.pdf-ready` job worked by the API attaches them as a `document` file item of the quote named `<number> v<version>.pdf`. Rendering is idempotent per version; the quote page shows "PDF being prepared" until it exists and offers "Render again" after a failure. The job carries the payload and its SHA-256 (over sorted-key JSON, so the `jsonb` round trip keeps it); the worker writes `objects/quotes/<quote id>/<hash>.pdf` under `FILES_ROOT` once and reports it, and the API attaches it once (system actor in the audit, created by the sender). The daily job queues again the sent versions still `pending`. PDF state changes keep `updated_at` (edge case 1).
+13. **Draft preview:** "Preview PDF" on a draft queues the same render with a "draft" watermark from the current draft; the result replaces the previous preview (`draft_pdf_*`, old object deleted) and is discarded when the quote is sent or archived. A result whose hash no longer matches the draft is shown as outdated. A result for a hash that is no longer the one asked for is deleted; asking again for an unchanged draft whose preview is ready renders nothing.
 14. A quote shows no internal list prices or effective discounts in its PDF; those appear only in the app.
 
 ### Acceptance and A01
@@ -260,8 +262,8 @@ Schemas live in `packages/contracts/src/catalog.ts` and `quotes.ts` (with `quote
 | `POST /api/quotes/:id/archive` | `quotes.manage` | — | 204 | 403, 404, `INVALID_TRANSITION` |
 | `GET /api/quotes/:id/accept-plan` | `quotes.manage` + `projects.manage` | `acceptPlanQuerySchema`: the dialog's current choices | `acceptPlanSchema`: defaults (A2–A6), milestones with installment amounts, deliverable lines, renewable retainers, template warnings | 403, 404, `INVALID_TRANSITION`, `QUOTE_EXPIRED` |
 | `POST /api/quotes/:id/accept` | `quotes.manage` + `projects.manage` | `acceptQuoteSchema`: respondedOn, contactId, note, proofUploadId, project { name, projectManagerId, departments, startDate, dueDate, templateIds[], installmentMilestones[] }, retainer { mode `new` \| `renew`, retainerId, name, departments, startDate, renewalDate, templateId } | `quoteDetailSchema` | 403, 404, `INVALID_TRANSITION`, `QUOTE_EXPIRED`, `INVALID_DATES`, `UNKNOWN_CONTACT`, `UPLOAD_NOT_FOUND`, `TEMPLATE_ARCHIVED`, `CURRENCY_MISMATCH`, `LIMIT_REACHED`, and the F05 codes (`INVALID_PROJECT_MANAGER`, `PROJECT_NAME_TAKEN`, `RETAINER_NAME_TAKEN`, `RETAINER_ENDED`, `CLIENT_ENDED`…) |
-| `POST /api/quotes/:id/pdf` | `quotes.read` (draft preview: `quotes.manage`) | — | `{ state }` | 403, 404 |
-| `GET /api/quotes/:id/pdf` | `quotes.read` | `?draft=true` for the preview | the PDF (through F10 serving for sent versions) | 404 |
+| `POST /api/quotes/:id/pdf` | `quotes.read` (draft preview: `quotes.manage` client scope) | — | `quotePdfRenderSchema`: `{ state }` (`pending`, `ready`) | 403, 404, `INVALID_TRANSITION` (a discarded draft) |
+| `GET /api/quotes/:id/pdf` | `quotes.read` | `?draft=true` for the preview | the PDF, inline, named `<client> - Q-<year>-<number> v<version>.pdf`, never cached (served through F10's storage; the sent version's PDF is also a document of the quote) | 404 (also while not ready) |
 
 Changes to other modules:
 - F05: `retainerDeliverableSchema` and cycle lines gain `revisionLimit`; `EngagementFactory` exported from `projects`.

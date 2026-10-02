@@ -183,6 +183,13 @@
       "when": 1790924293805,
       "tag": "0025_seed_quote_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1790929731423,
+      "tag": "0026_last_vector",
+      "breakpoints": true
     }
   ]
 }

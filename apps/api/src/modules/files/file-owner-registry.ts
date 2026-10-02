@@ -39,7 +39,12 @@ export interface FileOwner {
   /** The owner or a record above it is archived: every change answers this code. */
   archivedCode: Extract<
     ErrorCode,
-    'TASK_ARCHIVED' | 'CLIENT_ARCHIVED' | 'PROJECT_ARCHIVED' | 'RETAINER_ARCHIVED' | 'POST_ARCHIVED'
+    | 'TASK_ARCHIVED'
+    | 'CLIENT_ARCHIVED'
+    | 'PROJECT_ARCHIVED'
+    | 'RETAINER_ARCHIVED'
+    | 'POST_ARCHIVED'
+    | 'QUOTE_LOCKED'
   > | null;
   /** For tasks: the status (rule 5) and what the `task_file_added` notification needs. */
   task: {
@@ -80,9 +85,14 @@ export interface FileOwnerPolicy {
   /**
    * The live owners of this type under a client: non-archived, non-cancelled tasks for the
    * library (rule 13); the client itself, or its non-archived projects and retainers, for the
-   * documents list (rule 14).
+   * documents list (rule 14); the quotes `actor` reads (F04), whose documents are for quote
+   * readers only.
    */
-  ownersOfClient(executor: Executor, clientId: string): Promise<ClientOwner[]>;
+  ownersOfClient(
+    executor: Executor,
+    clientId: string,
+    actor?: CurrentUserInfo,
+  ): Promise<ClientOwner[]>;
 }
 
 /** The owner policies, one per owner type. */
