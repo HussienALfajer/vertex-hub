@@ -43,10 +43,12 @@ Spec: `docs/specs/F04-catalog-quotes.md` · ADRs 0006, 0007, 0008, 0013, 0014, 0
 - [x] wiring checklist, full checks (+ E2E, drift), reviewer (four findings fixed: long proof names, template dates from a past start, planning inside the accept transaction, missing error-code tests), owner acceptance (approved), /ship
 
 ## PR 5 — `feat/f04-quotes-web`: quote screens
-- [ ] web: the `quote` notification link opens `/quotes/$quoteId` (it opens the home page until this PR)
-- [ ] web `features/quotes/`: quote settings page `/catalog/settings`, quote list `/quotes` with filters and "New quote" dialog, builder (sections, pickers, line rows, discounts, installments, term, approval banner, unsaved-changes guard, preview PDF, send confirmation, discard), quote page (read-only quote, PDF state, versions, response, extend, reject, new version, approve / return), client Quotes tab; nav "Quotes"; `ar.json`
-- [ ] e2e: fixtures, flow spec, screenshots light + dark (settings, list, builder with the approval notice, quote page sent, client Quotes tab)
-- [ ] wiring checklist, full checks (+ E2E), reviewer, owner acceptance (steps 2–6, 10, 11), /ship
+- [x] web: the `quote` notification link opens `/quotes/$quoteId` (it opens the home page until this PR)
+- [x] web `features/quotes/`: quote settings page `/catalog/settings`, quote list `/quotes` with filters and "New quote" dialog, builder (sections, pickers, line rows, discounts, installments, term, approval banner, unsaved-changes guard, preview PDF, send confirmation, discard), quote page (read-only quote, PDF state, versions, response, extend, reject, new version, approve / return), client Quotes tab; nav "Quotes"; `ar.json`
+- [x] e2e: fixtures, flow spec, screenshots light + dark (settings, list, builder with the approval notice, quote page sent, client Quotes tab)
+- [x] wiring checklist, full checks (+ E2E), reviewer (four findings fixed: hand prices lost after a currency change, a stale discount on an emptied section, the rejection date floor in UTC, silent catalog and contacts load failures)
+- [x] owner acceptance (approved), /ship
+- [x] follow-up found: the local API test suite is flaky across files (each failing file passes alone); handed to a separate task
 
 ## PR 6 — `feat/f04-quote-accept-web`: accept dialog and links
 - [ ] web: accept dialog (response, project, retainer, summary, errors kept), "From quote" links on project and retainer pages, revision limit column on the retainer deliverable lines editor; `ar.json`

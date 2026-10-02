@@ -366,6 +366,8 @@ export const rejectQuoteSchema = z
 
 export type RejectQuote = z.infer<typeof rejectQuoteSchema>;
 
+export type RejectQuoteInput = z.input<typeof rejectQuoteSchema>;
+
 // Responses
 
 const personSchema = z.object({ id: z.uuid(), name: z.string() });

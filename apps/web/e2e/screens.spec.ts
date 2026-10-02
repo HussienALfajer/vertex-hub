@@ -745,6 +745,56 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await screenshot(page, testInfo, `catalog-package-dialog-${colorScheme}`);
     });
 
+    test('quote settings', async ({ page }, testInfo) => {
+      await page.setViewportSize({ width: 1280, height: 900 });
+      await mockApi(page, { signedIn: true });
+      await page.goto('/catalog/settings');
+      await expect(page.getByLabel(ar.quotes.settings.companyDetails)).toHaveValue(/Vertex Media/);
+      await screenshot(page, testInfo, `quote-settings-${colorScheme}`);
+    });
+
+    test('quote list', async ({ page }, testInfo) => {
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await mockApi(page, { signedIn: true });
+      await page.goto('/quotes');
+      await expect(page.getByRole('link', { name: /هوية وسوشال الياسمين/ })).toBeVisible();
+      await screenshot(page, testInfo, `quotes-list-${colorScheme}`);
+
+      await page.getByRole('button', { name: ar.quotes.new.action }).click();
+      await expect(page.getByRole('dialog')).toBeVisible();
+      await screenshot(page, testInfo, `quote-new-dialog-${colorScheme}`);
+    });
+
+    test('quote builder', async ({ page }, testInfo) => {
+      await page.setViewportSize({ width: 1440, height: 1600 });
+      await mockApi(page, { signedIn: true });
+      // A Shifa draft whose monthly discount crosses the threshold.
+      await page.goto(`/quotes/${seedIds.shifaDraft}`);
+      await expect(page.getByText(ar.quotes.approval.neededTitle)).toBeVisible();
+      await screenshot(page, testInfo, `quote-builder-${colorScheme}`);
+
+      // A draft awaiting the General Manager's decision: read-only with the banner.
+      await page.goto(`/quotes/${seedIds.pendingQuote}`);
+      await expect(page.getByText(ar.quotes.approval.pendingTitle)).toBeVisible();
+      await screenshot(page, testInfo, `quote-builder-pending-${colorScheme}`);
+    });
+
+    test('quote page', async ({ page }, testInfo) => {
+      await page.setViewportSize({ width: 1440, height: 1300 });
+      await mockApi(page, { signedIn: true });
+      await page.goto(`/quotes/${seedIds.sentQuote}`);
+      await expect(page.getByRole('link', { name: ar.quotes.pdf.download })).toBeVisible();
+      await screenshot(page, testInfo, `quote-sent-${colorScheme}`);
+    });
+
+    test('client quotes tab', async ({ page }, testInfo) => {
+      await page.setViewportSize({ width: 1280, height: 900 });
+      await mockApi(page, { signedIn: true });
+      await page.goto(`/clients/${seedIds.jasmine}?tab=quotes`);
+      await expect(page.getByRole('link', { name: /هوية وسوشال الياسمين/ })).toBeVisible();
+      await screenshot(page, testInfo, `client-quotes-${colorScheme}`);
+    });
+
     test('templates list', async ({ page }, testInfo) => {
       await page.setViewportSize({ width: 1280, height: 900 });
       await mockApi(page, { signedIn: true });

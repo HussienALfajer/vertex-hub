@@ -21,6 +21,7 @@ import { Route as ATokenRouteImport } from './routes/a.$token'
 import { Route as AppApprovalsIndexRouteImport } from './routes/_app/approvals/index'
 import { Route as AppCalendarIndexRouteImport } from './routes/_app/calendar/index'
 import { Route as AppCatalogIndexRouteImport } from './routes/_app/catalog/index'
+import { Route as AppCatalogSettingsRouteImport } from './routes/_app/catalog/settings'
 import { Route as AppClientsIndexRouteImport } from './routes/_app/clients/index'
 import { Route as AppClientsClientIdRouteImport } from './routes/_app/clients/$clientId'
 import { Route as AppClientsNewRouteImport } from './routes/_app/clients/new'
@@ -33,6 +34,8 @@ import { Route as AppNotificationsSettingsRouteImport } from './routes/_app/noti
 import { Route as AppProjectsIndexRouteImport } from './routes/_app/projects/index'
 import { Route as AppProjectsProjectIdRouteImport } from './routes/_app/projects/$projectId'
 import { Route as AppProjectsNewRouteImport } from './routes/_app/projects/new'
+import { Route as AppQuotesIndexRouteImport } from './routes/_app/quotes/index'
+import { Route as AppQuotesQuoteIdRouteImport } from './routes/_app/quotes/$quoteId'
 import { Route as AppRetainersIndexRouteImport } from './routes/_app/retainers/index'
 import { Route as AppRetainersRetainerIdRouteImport } from './routes/_app/retainers/$retainerId'
 import { Route as AppRetainersNewRouteImport } from './routes/_app/retainers/new'
@@ -113,6 +116,11 @@ const AppCatalogIndexRoute = AppCatalogIndexRouteImport.update({
   path: '/catalog/',
   getParentRoute: () => AppRoute,
 } as any)
+const AppCatalogSettingsRoute = AppCatalogSettingsRouteImport.update({
+  id: '/catalog/settings',
+  path: '/catalog/settings',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppClientsIndexRoute = AppClientsIndexRouteImport.update({
   id: '/clients/',
   path: '/clients/',
@@ -173,6 +181,16 @@ const AppProjectsProjectIdRoute = AppProjectsProjectIdRouteImport.update({
 const AppProjectsNewRoute = AppProjectsNewRouteImport.update({
   id: '/projects/new',
   path: '/projects/new',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppQuotesIndexRoute = AppQuotesIndexRouteImport.update({
+  id: '/quotes/',
+  path: '/quotes/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppQuotesQuoteIdRoute = AppQuotesQuoteIdRouteImport.update({
+  id: '/quotes/$quoteId',
+  path: '/quotes/$quoteId',
   getParentRoute: () => AppRoute,
 } as any)
 const AppRetainersIndexRoute = AppRetainersIndexRouteImport.update({
@@ -286,6 +304,7 @@ export interface FileRoutesByFullPath {
   '/audit': typeof AppAuditRoute
   '/design-system': typeof AppDesignSystemRoute
   '/a/$token': typeof ATokenRoute
+  '/catalog/settings': typeof AppCatalogSettingsRoute
   '/clients/$clientId': typeof AppClientsClientIdRoute
   '/clients/new': typeof AppClientsNewRoute
   '/departments/$departmentId': typeof AppDepartmentsDepartmentIdRoute
@@ -293,6 +312,7 @@ export interface FileRoutesByFullPath {
   '/notifications/settings': typeof AppNotificationsSettingsRoute
   '/projects/$projectId': typeof AppProjectsProjectIdRoute
   '/projects/new': typeof AppProjectsNewRoute
+  '/quotes/$quoteId': typeof AppQuotesQuoteIdRoute
   '/retainers/$retainerId': typeof AppRetainersRetainerIdRoute
   '/retainers/new': typeof AppRetainersNewRoute
   '/shoots/new': typeof AppShootsNewRoute
@@ -313,6 +333,7 @@ export interface FileRoutesByFullPath {
   '/departments/': typeof AppDepartmentsIndexRoute
   '/notifications/': typeof AppNotificationsIndexRoute
   '/projects/': typeof AppProjectsIndexRoute
+  '/quotes/': typeof AppQuotesIndexRoute
   '/retainers/': typeof AppRetainersIndexRoute
   '/tasks/': typeof AppTasksIndexRoute
   '/team/': typeof AppTeamIndexRoute
@@ -331,6 +352,7 @@ export interface FileRoutesByTo {
   '/design-system': typeof AppDesignSystemRoute
   '/a/$token': typeof ATokenRoute
   '/': typeof AppIndexRoute
+  '/catalog/settings': typeof AppCatalogSettingsRoute
   '/clients/$clientId': typeof AppClientsClientIdRoute
   '/clients/new': typeof AppClientsNewRoute
   '/departments/$departmentId': typeof AppDepartmentsDepartmentIdRoute
@@ -338,6 +360,7 @@ export interface FileRoutesByTo {
   '/notifications/settings': typeof AppNotificationsSettingsRoute
   '/projects/$projectId': typeof AppProjectsProjectIdRoute
   '/projects/new': typeof AppProjectsNewRoute
+  '/quotes/$quoteId': typeof AppQuotesQuoteIdRoute
   '/retainers/$retainerId': typeof AppRetainersRetainerIdRoute
   '/retainers/new': typeof AppRetainersNewRoute
   '/shoots/new': typeof AppShootsNewRoute
@@ -358,6 +381,7 @@ export interface FileRoutesByTo {
   '/departments': typeof AppDepartmentsIndexRoute
   '/notifications': typeof AppNotificationsIndexRoute
   '/projects': typeof AppProjectsIndexRoute
+  '/quotes': typeof AppQuotesIndexRoute
   '/retainers': typeof AppRetainersIndexRoute
   '/tasks': typeof AppTasksIndexRoute
   '/team': typeof AppTeamIndexRoute
@@ -378,6 +402,7 @@ export interface FileRoutesById {
   '/_app/design-system': typeof AppDesignSystemRoute
   '/a/$token': typeof ATokenRoute
   '/_app/': typeof AppIndexRoute
+  '/_app/catalog/settings': typeof AppCatalogSettingsRoute
   '/_app/clients/$clientId': typeof AppClientsClientIdRoute
   '/_app/clients/new': typeof AppClientsNewRoute
   '/_app/departments/$departmentId': typeof AppDepartmentsDepartmentIdRoute
@@ -385,6 +410,7 @@ export interface FileRoutesById {
   '/_app/notifications/settings': typeof AppNotificationsSettingsRoute
   '/_app/projects/$projectId': typeof AppProjectsProjectIdRoute
   '/_app/projects/new': typeof AppProjectsNewRoute
+  '/_app/quotes/$quoteId': typeof AppQuotesQuoteIdRoute
   '/_app/retainers/$retainerId': typeof AppRetainersRetainerIdRoute
   '/_app/retainers/new': typeof AppRetainersNewRoute
   '/_app/shoots/new': typeof AppShootsNewRoute
@@ -405,6 +431,7 @@ export interface FileRoutesById {
   '/_app/departments/': typeof AppDepartmentsIndexRoute
   '/_app/notifications/': typeof AppNotificationsIndexRoute
   '/_app/projects/': typeof AppProjectsIndexRoute
+  '/_app/quotes/': typeof AppQuotesIndexRoute
   '/_app/retainers/': typeof AppRetainersIndexRoute
   '/_app/tasks/': typeof AppTasksIndexRoute
   '/_app/team/': typeof AppTeamIndexRoute
@@ -425,6 +452,7 @@ export interface FileRouteTypes {
     | '/audit'
     | '/design-system'
     | '/a/$token'
+    | '/catalog/settings'
     | '/clients/$clientId'
     | '/clients/new'
     | '/departments/$departmentId'
@@ -432,6 +460,7 @@ export interface FileRouteTypes {
     | '/notifications/settings'
     | '/projects/$projectId'
     | '/projects/new'
+    | '/quotes/$quoteId'
     | '/retainers/$retainerId'
     | '/retainers/new'
     | '/shoots/new'
@@ -452,6 +481,7 @@ export interface FileRouteTypes {
     | '/departments/'
     | '/notifications/'
     | '/projects/'
+    | '/quotes/'
     | '/retainers/'
     | '/tasks/'
     | '/team/'
@@ -470,6 +500,7 @@ export interface FileRouteTypes {
     | '/design-system'
     | '/a/$token'
     | '/'
+    | '/catalog/settings'
     | '/clients/$clientId'
     | '/clients/new'
     | '/departments/$departmentId'
@@ -477,6 +508,7 @@ export interface FileRouteTypes {
     | '/notifications/settings'
     | '/projects/$projectId'
     | '/projects/new'
+    | '/quotes/$quoteId'
     | '/retainers/$retainerId'
     | '/retainers/new'
     | '/shoots/new'
@@ -497,6 +529,7 @@ export interface FileRouteTypes {
     | '/departments'
     | '/notifications'
     | '/projects'
+    | '/quotes'
     | '/retainers'
     | '/tasks'
     | '/team'
@@ -516,6 +549,7 @@ export interface FileRouteTypes {
     | '/_app/design-system'
     | '/a/$token'
     | '/_app/'
+    | '/_app/catalog/settings'
     | '/_app/clients/$clientId'
     | '/_app/clients/new'
     | '/_app/departments/$departmentId'
@@ -523,6 +557,7 @@ export interface FileRouteTypes {
     | '/_app/notifications/settings'
     | '/_app/projects/$projectId'
     | '/_app/projects/new'
+    | '/_app/quotes/$quoteId'
     | '/_app/retainers/$retainerId'
     | '/_app/retainers/new'
     | '/_app/shoots/new'
@@ -543,6 +578,7 @@ export interface FileRouteTypes {
     | '/_app/departments/'
     | '/_app/notifications/'
     | '/_app/projects/'
+    | '/_app/quotes/'
     | '/_app/retainers/'
     | '/_app/tasks/'
     | '/_app/team/'
@@ -647,6 +683,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppCatalogIndexRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/catalog/settings': {
+      id: '/_app/catalog/settings'
+      path: '/catalog/settings'
+      fullPath: '/catalog/settings'
+      preLoaderRoute: typeof AppCatalogSettingsRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/clients/': {
       id: '/_app/clients/'
       path: '/clients'
@@ -729,6 +772,20 @@ declare module '@tanstack/react-router' {
       path: '/projects/new'
       fullPath: '/projects/new'
       preLoaderRoute: typeof AppProjectsNewRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/quotes/': {
+      id: '/_app/quotes/'
+      path: '/quotes'
+      fullPath: '/quotes/'
+      preLoaderRoute: typeof AppQuotesIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/quotes/$quoteId': {
+      id: '/_app/quotes/$quoteId'
+      path: '/quotes/$quoteId'
+      fullPath: '/quotes/$quoteId'
+      preLoaderRoute: typeof AppQuotesQuoteIdRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/retainers/': {
@@ -879,6 +936,7 @@ interface AppRouteChildren {
   AppAuditRoute: typeof AppAuditRoute
   AppDesignSystemRoute: typeof AppDesignSystemRoute
   AppIndexRoute: typeof AppIndexRoute
+  AppCatalogSettingsRoute: typeof AppCatalogSettingsRoute
   AppClientsClientIdRoute: typeof AppClientsClientIdRoute
   AppClientsNewRoute: typeof AppClientsNewRoute
   AppDepartmentsDepartmentIdRoute: typeof AppDepartmentsDepartmentIdRoute
@@ -886,6 +944,7 @@ interface AppRouteChildren {
   AppNotificationsSettingsRoute: typeof AppNotificationsSettingsRoute
   AppProjectsProjectIdRoute: typeof AppProjectsProjectIdRoute
   AppProjectsNewRoute: typeof AppProjectsNewRoute
+  AppQuotesQuoteIdRoute: typeof AppQuotesQuoteIdRoute
   AppRetainersRetainerIdRoute: typeof AppRetainersRetainerIdRoute
   AppRetainersNewRoute: typeof AppRetainersNewRoute
   AppShootsNewRoute: typeof AppShootsNewRoute
@@ -906,6 +965,7 @@ interface AppRouteChildren {
   AppDepartmentsIndexRoute: typeof AppDepartmentsIndexRoute
   AppNotificationsIndexRoute: typeof AppNotificationsIndexRoute
   AppProjectsIndexRoute: typeof AppProjectsIndexRoute
+  AppQuotesIndexRoute: typeof AppQuotesIndexRoute
   AppRetainersIndexRoute: typeof AppRetainersIndexRoute
   AppTasksIndexRoute: typeof AppTasksIndexRoute
   AppTeamIndexRoute: typeof AppTeamIndexRoute
@@ -921,6 +981,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppAuditRoute: AppAuditRoute,
   AppDesignSystemRoute: AppDesignSystemRoute,
   AppIndexRoute: AppIndexRoute,
+  AppCatalogSettingsRoute: AppCatalogSettingsRoute,
   AppClientsClientIdRoute: AppClientsClientIdRoute,
   AppClientsNewRoute: AppClientsNewRoute,
   AppDepartmentsDepartmentIdRoute: AppDepartmentsDepartmentIdRoute,
@@ -928,6 +989,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppNotificationsSettingsRoute: AppNotificationsSettingsRoute,
   AppProjectsProjectIdRoute: AppProjectsProjectIdRoute,
   AppProjectsNewRoute: AppProjectsNewRoute,
+  AppQuotesQuoteIdRoute: AppQuotesQuoteIdRoute,
   AppRetainersRetainerIdRoute: AppRetainersRetainerIdRoute,
   AppRetainersNewRoute: AppRetainersNewRoute,
   AppShootsNewRoute: AppShootsNewRoute,
@@ -948,6 +1010,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppDepartmentsIndexRoute: AppDepartmentsIndexRoute,
   AppNotificationsIndexRoute: AppNotificationsIndexRoute,
   AppProjectsIndexRoute: AppProjectsIndexRoute,
+  AppQuotesIndexRoute: AppQuotesIndexRoute,
   AppRetainersIndexRoute: AppRetainersIndexRoute,
   AppTasksIndexRoute: AppTasksIndexRoute,
   AppTeamIndexRoute: AppTeamIndexRoute,
