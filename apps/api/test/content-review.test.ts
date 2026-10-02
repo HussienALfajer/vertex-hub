@@ -593,7 +593,7 @@ describe('post workflow (F08 rules 1, 10–15, 17–19, 24, 26)', () => {
         platforms: ['instagram', 'facebook'],
         cycleLineId: before.id,
       });
-      expect((await line()).tasks).toEqual({ total: 1, delivered: 0, open: 1 });
+      expect((await line()).tasks).toEqual({ total: 1, delivered: 0, open: 1, ready: 1 });
 
       const publish = (body: object, cookie = cast.writer.cookie) =>
         cast.move(post.id, cookie, { to: 'published', ...body });
@@ -620,7 +620,7 @@ describe('post workflow (F08 rules 1, 10–15, 17–19, 24, 26)', () => {
       expect(published.publishedAt).not.toBeNull();
       // The unit counts when the post is published (rule 16).
       const after = await line();
-      expect(after.tasks).toEqual({ total: 1, delivered: 1, open: 0 });
+      expect(after.tasks).toEqual({ total: 1, delivered: 1, open: 0, ready: 0 });
       expect(after.delivered).toBe(before.delivered + 1);
 
       // Published is final in V1.

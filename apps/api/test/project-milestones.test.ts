@@ -244,11 +244,11 @@ describe('project milestones', () => {
   it('asks before completing a milestone with open tasks, and reports progress (rules 8 and 9)', async () => {
     const project = await cast.createProject(clientId, { milestones: [{ name: 'Build' }] });
     const milestone = project.milestones[0]?.id ?? '';
-    tasks.set(milestone, { total: 3, delivered: 1, open: 2 });
-    tasks.set(project.id, { total: 3, delivered: 1, open: 2 });
+    tasks.set(milestone, { total: 3, delivered: 1, open: 2, ready: 0 });
+    tasks.set(project.id, { total: 3, delivered: 1, open: 2, ready: 0 });
     const seen = await detail(project.id, cast.employee.cookie);
     expect(seen.progress).toBe(33);
-    expect(seen.milestones[0]?.tasks).toEqual({ total: 3, delivered: 1, open: 2 });
+    expect(seen.milestones[0]?.tasks).toEqual({ total: 3, delivered: 1, open: 2, ready: 0 });
 
     const refused = await expectError(
       await client.post(path(project.id, `/${milestone}/complete`), cast.employee.cookie),

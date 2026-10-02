@@ -8,6 +8,10 @@ import {
   formatNumber,
   formatTimeOfDay,
 } from '../../lib/format';
+import { lineName } from '../retainers/retainer-badges';
+
+/** How many behind lines a `retainer_behind` notification names before "+n" (spec P2A). */
+const BEHIND_LINES_SHOWN = 3;
 
 /** What a notification opens (F14 rule 15). */
 export function notificationLink(notification: Notification): ToOptions {
@@ -104,6 +108,32 @@ export function notificationText(
                 retainer: data.retainer,
               }),
         context: context(data.client, formatCalendarDate(data.renewalDate)),
+      };
+    }
+    case 'retainer_behind': {
+      const { data } = notification;
+      const lines = data.lines.slice(0, BEHIND_LINES_SHOWN).map((line) => {
+        const counter = t('notifications.behindLine', {
+          name: lineName(t, line),
+          delivered: formatNumber(line.delivered),
+          committed: formatNumber(line.committed),
+        });
+        return line.ready > 0
+          ? t('notifications.behindLineReady', { line: counter, ready: formatNumber(line.ready) })
+          : counter;
+      });
+      const more = data.lines.length - lines.length;
+      if (more > 0) lines.push(t('notifications.behindMore', { n: formatNumber(more) }));
+      const values = {
+        count: data.daysLeft,
+        n: formatNumber(data.daysLeft),
+        retainer: data.retainer,
+      };
+      return {
+        text: data.final
+          ? t('notifications.text.retainer_behind_last', values)
+          : t('notifications.text.retainer_behind', values),
+        context: context(data.client, lines.join('، ')),
       };
     }
     case 'approval_responded': {
@@ -252,6 +282,7 @@ type TaskNotification = Exclude<
       | 'client_account_manager_assigned'
       | 'project_manager_assigned'
       | 'retainer_renewal_due'
+      | 'retainer_behind'
       | 'approval_responded'
       | 'approval_no_response'
       | 'approval_expired'
@@ -297,6 +328,12 @@ function taskText(t: TFunction, notification: TaskNotification, actor: string): 
       return t(`notifications.text.${notification.type}`, {
         task,
         due: formatDue(t, notification.data),
+      });
+    case 'task_over_limit_pending':
+      return t('notifications.text.task_over_limit_pending', {
+        task,
+        n: formatNumber(notification.data.revisionNumber),
+        date: formatCalendarDate(notification.data.recordedOn),
       });
     case 'task_overdue_escalated': {
       const { assignee } = notification.data;

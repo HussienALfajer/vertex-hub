@@ -1609,7 +1609,7 @@ function projectRoutes({ users, clients, projects, me }: ProjectState) {
     };
   };
   const live = (p: ProjectRecord) => p.milestones.filter((m) => !m.archived);
-  const noTasks = { total: 0, delivered: 0, open: 0 };
+  const noTasks = { total: 0, delivered: 0, open: 0, ready: 0 };
 
   const milestoneOf = (p: ProjectRecord, m: MilestoneRecord): Milestone => ({
     id: m.id,
@@ -1886,6 +1886,8 @@ interface CycleLineRecord {
   deliveredAtClose: number | null;
   /** Tasks delivered after the cycle closed (F06; seeded here). */
   afterClose: number;
+  /** Approved work not yet counted (spec P2A; seeded here). */
+  ready?: number;
   adjustments: AdjustmentRecord[];
 }
 
@@ -1973,6 +1975,7 @@ export function retainersSeed(): RetainerRecord[] {
     ],
   };
   const [octoberDesign, , octoberStory] = october.lines;
+  if (octoberDesign) octoberDesign.ready = 2;
   octoberDesign?.adjustments.push({
     id: id(961),
     delta: 3,
@@ -2138,7 +2141,7 @@ function retainerRoutes({ users, clients, retainers, me }: RetainerState) {
       canBill: !readOnly && clientScope(r) && seesMoney(r),
     };
   };
-  const noTasks = { total: 0, delivered: 0, open: 0 };
+  const noTasks = { total: 0, delivered: 0, open: 0, ready: 0 };
   const deliveredOf = (line: CycleLineRecord) =>
     line.deliveredAtClose ?? line.adjustments.reduce((sum, a) => sum + a.delta, 0);
 
@@ -2158,7 +2161,7 @@ function retainerRoutes({ users, clients, retainers, me }: RetainerState) {
         c.status === 'open' &&
         r.status === 'active' &&
         isLineBehind({ committed: line.committed, delivered }, c, today),
-      tasks: noTasks,
+      tasks: { ...noTasks, ready: line.ready ?? 0 },
     };
   };
   const cycleOf = (r: RetainerRecord, c: CycleRecord): Cycle => {
@@ -7261,6 +7264,34 @@ export function notificationsSeed(): NotificationRecord[] {
       },
       read: true,
       updatedAt: '2026-09-28T06:00:00.000Z',
+    }),
+    notificationFor(manager, 5007, {
+      type: 'retainer_behind',
+      actor: null,
+      subject: { type: 'retainer', id: id(901) },
+      data: {
+        retainer: 'إدارة السوشيال ميديا',
+        client: 'مطعم الياسمين',
+        periodEnd: '2026-09-30',
+        daysLeft: 7,
+        final: false,
+        lines: [
+          { kind: 'design', label: null, delivered: 9, committed: 12, ready: 2 },
+          { kind: 'reel', label: null, delivered: 3, committed: 4, ready: 0 },
+          { kind: 'story', label: null, delivered: 5, committed: 8, ready: 1 },
+          { kind: 'monthly_report', label: null, delivered: 0, committed: 1, ready: 0 },
+        ],
+      },
+      read: true,
+      updatedAt: '2026-09-24T06:00:00.000Z',
+    }),
+    notificationFor(manager, 5008, {
+      type: 'task_over_limit_pending',
+      actor: null,
+      subject: { type: 'task', id: id(1001) },
+      data: { task: autumnMenuSnapshot, revisionNumber: 3, recordedOn: '2026-09-21' },
+      read: true,
+      updatedAt: '2026-09-23T06:00:00.000Z',
     }),
     notificationFor(manager, 5006, {
       type: 'client_account_manager_assigned',

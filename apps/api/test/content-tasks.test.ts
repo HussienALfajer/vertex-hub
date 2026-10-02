@@ -710,7 +710,7 @@ describe('tasks linked to posts (F08 rules 5–10, 12, 16, 18, 19)', () => {
       await approve(task.id);
       await cast.moveOk(post.id, cast.writer.cookie, { to: 'internal_review' });
       await cast.moveOk(post.id, cast.contentManager.cookie, { to: 'approved' });
-      expect((await read()).line.tasks).toEqual({ total: 1, delivered: 0, open: 1 });
+      expect((await read()).line.tasks).toEqual({ total: 1, delivered: 0, open: 1, ready: 1 });
 
       // A failure after the delivery rolls everything back.
       const notices = app.get(PostNotices);
@@ -738,7 +738,7 @@ describe('tasks linked to posts (F08 rules 5–10, 12, 16, 18, 19)', () => {
         after: { status: 'delivered', reason: 'post_published', postId: post.id },
       });
       // The unit counts once, through the task.
-      expect((await read()).line.tasks).toEqual({ total: 1, delivered: 1, open: 0 });
+      expect((await read()).line.tasks).toEqual({ total: 1, delivered: 1, open: 0, ready: 0 });
 
       // Edge case 9: work reopened after publishing leaves the post, and is delivered by hand.
       await cast.task.moveOk(task.id, cast.designManager.cookie, {

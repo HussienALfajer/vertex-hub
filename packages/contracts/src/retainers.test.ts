@@ -7,6 +7,7 @@ import {
   extraWorkListQuerySchema,
 } from './extra-work.js';
 import {
+  behindAlert,
   canChangeRetainerStatus,
   createCycleAdjustmentSchema,
   createCycleLineSchema,
@@ -229,6 +230,36 @@ describe('isLineBehind (R11)', () => {
     // 12 days: on the first, 12 remain and 1/12 has elapsed.
     expect(isLineBehind({ committed: 12, delivered: 0 }, rest, '2026-10-20')).toBe(false);
     expect(isLineBehind({ committed: 12, delivered: 0 }, rest, '2026-10-25')).toBe(true);
+  });
+});
+
+describe('behindAlert (P2A rules 1–3)', () => {
+  const october = { periodStart: '2026-10-01', periodEnd: '2026-10-31' };
+
+  it('sends the first alert at 7 days or fewer and the final one at 3 or fewer', () => {
+    expect(behindAlert(october, '2026-10-24')).toBeNull(); // 8 days left
+    expect(behindAlert(october, '2026-10-25')).toBe('first'); // 7
+    expect(behindAlert(october, '2026-10-28')).toBe('first'); // 4
+    expect(behindAlert(october, '2026-10-29')).toBe('final'); // 3
+    expect(behindAlert(october, '2026-10-31')).toBe('final'); // 1
+    expect(behindAlert(october, '2026-11-01')).toBeNull();
+  });
+
+  it('skips a cycle whose period is 7 days or shorter', () => {
+    const sevenDays = { periodStart: '2026-10-25', periodEnd: '2026-10-31' };
+    expect(behindAlert(sevenDays, '2026-10-25')).toBeNull();
+    expect(behindAlert(sevenDays, '2026-10-31')).toBeNull();
+    const eightDays = { periodStart: '2026-10-24', periodEnd: '2026-10-31' };
+    expect(behindAlert(eightDays, '2026-10-24')).toBeNull();
+    expect(behindAlert(eightDays, '2026-10-25')).toBe('first');
+    expect(behindAlert(eightDays, '2026-10-30')).toBe('final');
+  });
+
+  it('follows the length of the month', () => {
+    const february = { periodStart: '2027-02-01', periodEnd: '2027-02-28' };
+    expect(behindAlert(february, '2027-02-21')).toBeNull();
+    expect(behindAlert(february, '2027-02-22')).toBe('first');
+    expect(behindAlert(february, '2027-02-26')).toBe('final');
   });
 });
 

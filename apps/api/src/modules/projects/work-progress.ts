@@ -11,7 +11,7 @@ import type { AuditActor } from '../audit/index.js';
 export interface WorkProgressSource {
   projects(ids: string[], executor?: Executor): Promise<Map<string, TaskCounts>>;
   milestones(ids: string[], executor?: Executor): Promise<Map<string, TaskCounts>>;
-  /** `delivered` feeds the deliverables counter (R7). */
+  /** `delivered` feeds the deliverables counter (R7); `ready` the behind alert (P2A rule 7). */
   cycleLines(ids: string[], executor?: Executor): Promise<Map<string, TaskCounts>>;
   /** The project's open, non-archived tasks, for the complete check (F06). */
   openTasks(tx: Transaction, projectId: string): Promise<{ id: string; name: string }[]>;
@@ -32,7 +32,7 @@ export type CycleLineCounts = (
   executor?: Executor,
 ) => Promise<Map<string, TaskCounts>>;
 
-export const NO_TASKS: TaskCounts = { total: 0, delivered: 0, open: 0 };
+export const NO_TASKS: TaskCounts = { total: 0, delivered: 0, open: 0, ready: 0 };
 
 /**
  * Lets the `tasks` module feed progress into projects without `projects` importing it (spec F05,
@@ -71,6 +71,7 @@ export class WorkProgress {
           total: current.total + added.total,
           delivered: current.delivered + added.delivered,
           open: current.open + added.open,
+          ready: current.ready + added.ready,
         });
       }
     }

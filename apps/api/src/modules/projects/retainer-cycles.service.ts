@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger, NotFoundException, type OnModuleInit } from '@nestjs/common';
 import {
   businessDate,
+  type CalendarDate,
   type CreateCycleAdjustment,
   type CreateCycleLine,
   type Cycle,
@@ -513,22 +514,32 @@ export class RetainerCyclesService implements OnModuleInit {
     return !!row;
   }
 
+  /** An open cycle of an active retainer as its page shows it on `today`, read in `tx` (A09). */
+  async counted(tx: Transaction, cycleId: string, today: CalendarDate): Promise<Cycle | null> {
+    const [row] = await tx
+      .select(cycleColumns)
+      .from(retainerCycles)
+      .where(and(eq(retainerCycles.id, cycleId), eq(retainerCycles.status, 'open')));
+    if (!row) return null;
+    const [cycle] = await this.present([row], new Map([[row.retainerId, 'active']]), tx, today);
+    return cycle ?? null;
+  }
+
   /** Cycles as the API returns them, with the counter (R7, R8, R11, R13). */
   private async present(
     cycles: CycleRow[],
     statuses: Map<string, RetainerStatus>,
     executor: Executor = this.db,
+    today: CalendarDate = businessDate(),
   ): Promise<Cycle[]> {
     const lines = await this.lineRows(
       cycles.map((cycle) => cycle.id),
       executor,
     );
     const lineIds = lines.map((line) => line.id);
-    const [live, tasks] = await Promise.all([
-      this.liveDelivered(lineIds, executor),
-      this.progress.cycleLines(lineIds, executor),
-    ]);
-    const today = businessDate();
+    // One query at a time: inside a transaction the executor is a single connection.
+    const live = await this.liveDelivered(lineIds, executor);
+    const tasks = await this.progress.cycleLines(lineIds, executor);
     return cycles.map((cycle) => {
       const open = cycle.status === 'open';
       const counting = open && statuses.get(cycle.retainerId) === 'active';
@@ -586,17 +597,15 @@ export class RetainerCyclesService implements OnModuleInit {
   /** R7: delivered tasks linked to each line + the sum of its adjustments. */
   private async liveDelivered(lineIds: string[], executor: Executor) {
     if (lineIds.length === 0) return new Map<string, number>();
-    const [sums, tasks] = await Promise.all([
-      executor
-        .select({
-          lineId: retainerCycleAdjustments.lineId,
-          total: sql<number>`${sum(retainerCycleAdjustments.delta)}::int`,
-        })
-        .from(retainerCycleAdjustments)
-        .where(inArray(retainerCycleAdjustments.lineId, lineIds))
-        .groupBy(retainerCycleAdjustments.lineId),
-      this.progress.cycleLines(lineIds, executor),
-    ]);
+    const sums = await executor
+      .select({
+        lineId: retainerCycleAdjustments.lineId,
+        total: sql<number>`${sum(retainerCycleAdjustments.delta)}::int`,
+      })
+      .from(retainerCycleAdjustments)
+      .where(inArray(retainerCycleAdjustments.lineId, lineIds))
+      .groupBy(retainerCycleAdjustments.lineId);
+    const tasks = await this.progress.cycleLines(lineIds, executor);
     const adjusted = new Map(sums.map((row) => [row.lineId, Number(row.total)]));
     return new Map(
       lineIds.map((id) => [id, (tasks.get(id)?.delivered ?? 0) + (adjusted.get(id) ?? 0)]),
