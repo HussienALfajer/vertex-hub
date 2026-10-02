@@ -37,6 +37,7 @@ import {
   BriefcaseBusinessIcon,
   Building2Icon,
   CalendarDaysIcon,
+  CameraIcon,
   EllipsisIcon,
   FolderKanbanIcon,
   KeyRoundIcon,
@@ -497,6 +498,8 @@ function ArchiveDialog({
                       <ListTodoIcon className="size-4 text-muted-foreground" />
                     ) : item.type === 'responsible_for_open_posts' ? (
                       <CalendarDaysIcon className="size-4 text-muted-foreground" />
+                    ) : item.type === 'lead_of_scheduled_shoots' ? (
+                      <CameraIcon className="size-4 text-muted-foreground" />
                     ) : (
                       <FolderKanbanIcon className="size-4 text-muted-foreground" />
                     )}
@@ -543,6 +546,14 @@ function ArchiveDialog({
                       render={<Link to="/content/posts/$postId" params={{ postId: item.id }} />}
                     >
                       {t('users.responsibilities.openPost')}
+                    </Button>
+                  ) : item.type === 'lead_of_scheduled_shoots' ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      render={<Link to="/shoots/$shootId" params={{ shootId: item.id }} />}
+                    >
+                      {t('users.responsibilities.openShoot')}
                     </Button>
                   ) : null}
                 </li>

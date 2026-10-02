@@ -16,11 +16,14 @@ import {
   BOARD_STATUSES,
   type BrandFileKind,
   type BrandKit,
+  type Calendar,
+  type CancelShoot,
   type ClientApprovals,
   type ClientDetailResponse,
   type ClientResponse,
   type ClientResponseEntry,
   type ClientStatus,
+  type CloseShoot,
   type Contact,
   type ContentCalendar,
   type CreateApprovalRequest,
@@ -32,12 +35,15 @@ import {
   type CreatePostTask,
   type CreateProject,
   type CreateRetainer,
+  type CreateShoot,
   type CreateTaskInput,
   type CreateTemplate,
+  type CrewRole,
   type Currency,
   type Cycle,
   type CycleDetail,
   type CycleStatus,
+  calendarDay,
   createTemplateSchema,
   type DeliverableKind,
   type DepartmentCode,
@@ -58,6 +64,7 @@ import {
   grantedPermissions,
   type HealthResponse,
   type IssuedApprovalRequest,
+  intervalsOverlap,
   isInlineMimeType,
   isLineBehind,
   isPostContentEditable,
@@ -67,9 +74,11 @@ import {
   isTaskFinished,
   isTaskOpen,
   isTaskOverdue,
+  type KeyDate,
   type LinkableTask,
   lastOfMonth,
   type MedicalReview,
+  type Meeting,
   type MeResponse,
   type Milestone,
   type MilestoneStatus,
@@ -111,6 +120,7 @@ import {
   postMove,
   postTaskDueDate,
   postTaskTitle,
+  type ReopenShoot,
   type RequestScope,
   type Retainer,
   type RetainerDeliverables,
@@ -126,7 +136,14 @@ import {
   renewalState,
   repeatedStepFor,
   revisionSourceOf,
+  type ScheduleConflict,
+  type Shoot,
+  type ShootDetail,
+  type ShootStatus,
+  type ShootType,
+  type ShotListInput,
   setRetainerTemplateSchema,
+  shootTaskTitle,
   TASK_PRIORITIES,
   type Task,
   type TaskBoard,
@@ -154,6 +171,7 @@ import {
   type UpdateCycleLine,
   type UpdateExtraWork,
   type UpdatePost,
+  type UpdateShoot,
   type UpdateTaskInput,
   type UserResponse,
   updateTemplateSchema,
@@ -789,6 +807,8 @@ interface MockOptions {
   approvals?: boolean;
   /** Adds the content plan: posts, their linked tasks and files (`contentSeed`, F08). */
   content?: boolean;
+  /** Adds October's shoots and meetings with their Photography tasks (`calendarSeed`, F11). */
+  calendar?: boolean;
 }
 
 const json = (route: Route, body: unknown, status = 200) => route.fulfill({ status, json: body });
@@ -830,7 +850,18 @@ export async function mockApi(page: Page, options: MockOptions): Promise<MockedA
   const planned = options.content
     ? contentSeed()
     : { posts: [], tasks: [], files: [], requests: [] };
-  const tasks = [...tasksSeed(), ...sent.tasks, ...planned.tasks];
+  const booked = options.calendar ? calendarSeed() : { shoots: [], meetings: [], tasks: [] };
+  const tasks = [...tasksSeed(), ...sent.tasks, ...planned.tasks, ...booked.tasks];
+  const calendarApi = calendarRoutes({
+    users,
+    clients,
+    projects,
+    retainers,
+    tasks,
+    shoots: booked.shoots,
+    meetings: booked.meetings,
+    me: () => me,
+  });
   const tasksApi = taskRoutes({
     users,
     clients,
@@ -1097,6 +1128,10 @@ export async function mockApi(page: Page, options: MockOptions): Promise<MockedA
     // Tasks (F06).
     const tasked = tasksApi(route, method, url, request);
     if (tasked) return tasked;
+
+    // Calendar and shoots (F11).
+    const scheduled = calendarApi(route, method, url, request);
+    if (scheduled) return scheduled;
 
     // Work templates (F07).
     const templated = templatesApi(route, method, url, request);
@@ -7334,6 +7369,743 @@ function notificationRoutes({
     return undefined;
   };
 }
+// Calendar and shoots (F11)
+
+interface ShootRecord {
+  id: string;
+  title: string;
+  type: ShootType;
+  status: ShootStatus;
+  clientId: string | null;
+  taskId: string;
+  startsAt: string;
+  endsAt: string;
+  location: string;
+  mapUrl: string | null;
+  brief: string | null;
+  crew: { userId: string; role: CrewRole; isLead: boolean }[];
+  externalCrew: ShootDetail['externalCrew'];
+  shots: {
+    id: string;
+    text: string;
+    note: string | null;
+    doneAt: string | null;
+    doneById: string | null;
+  }[];
+  closeNote: string | null;
+  rawFilesUrl: string | null;
+  editingTaskId: string | null;
+  completedAt: string | null;
+  completedById: string | null;
+  cancelledAt: string | null;
+  cancelReason: string | null;
+  createdById: string;
+  createdAt: string;
+  archivedAt: string | null;
+}
+
+interface MeetingRecord {
+  id: string;
+  title: string;
+  status: Meeting['status'];
+  clientId: string | null;
+  startsAt: string;
+  endsAt: string;
+  location: string | null;
+  onlineUrl: string | null;
+  organizerId: string;
+  attendeeIds: string[];
+}
+
+/** A Damascus wall time as the API returns it. */
+const at = (day: string, time: string) => new Date(`${day}T${time}:00+03:00`).toISOString();
+
+function shootRecord(
+  n: number,
+  fields: Partial<ShootRecord> & Pick<ShootRecord, 'title' | 'taskId' | 'startsAt' | 'endsAt'>,
+): ShootRecord {
+  return {
+    id: id(n),
+    type: 'product',
+    status: 'scheduled',
+    clientId: id(601),
+    location: 'مطعم الياسمين، فرع المزة',
+    mapUrl: null,
+    brief: null,
+    crew: [{ userId: id(4), role: 'photographer', isLead: true }],
+    externalCrew: [],
+    shots: [],
+    closeNote: null,
+    rawFilesUrl: null,
+    editingTaskId: null,
+    completedAt: null,
+    completedById: null,
+    cancelledAt: null,
+    cancelReason: null,
+    createdById: id(3),
+    createdAt: '2026-10-06T08:00:00.000Z',
+    archivedAt: null,
+    ...fields,
+  };
+}
+
+/**
+ * October's bookings around the seeded today: a shoot whose assistant is double-booked with a
+ * meeting, a shoot that started this morning and waits to be closed, a cancelled one, and the
+ * Photography tasks they belong to.
+ */
+export function calendarSeed(): {
+  shoots: ShootRecord[];
+  meetings: MeetingRecord[];
+  tasks: TaskRecord[];
+} {
+  const jasmine = id(601);
+  const shot = (n: number, text: string, done = false, note: string | null = null) => ({
+    id: id(n),
+    text,
+    note,
+    doneAt: done ? at(PROJECTS_TODAY, '08:10') : null,
+    doneById: done ? id(4) : null,
+  });
+  const shootTask = (n: number, title: string, fields: Partial<TaskRecord> = {}) =>
+    taskRecord(n, {
+      title,
+      department: 'photography',
+      assigneeId: id(4),
+      clientId: jasmine,
+      projectId: id(801),
+      ...fields,
+    });
+  return {
+    tasks: [
+      shootTask(1701, 'تصوير: أطباق الخريف', { dueDate: '2026-10-12' }),
+      shootTask(1702, 'تصوير: فريق العيادة', {
+        dueDate: '2026-10-14',
+        clientId: id(602),
+        projectId: null,
+      }),
+      shootTask(1703, 'تصوير: افتتاح فرع المالكي', { dueDate: '2026-10-20' }),
+      shootTask(1704, 'تصوير: منتجات ركن القهوة', {
+        dueDate: PROJECTS_TODAY,
+        status: 'in_progress',
+        startedAt: at(PROJECTS_TODAY, '07:30'),
+      }),
+    ],
+    shoots: [
+      shootRecord(1751, {
+        title: 'أطباق الخريف',
+        taskId: id(1701),
+        startsAt: at('2026-10-12', '10:00'),
+        endsAt: at('2026-10-12', '13:00'),
+        mapUrl: 'https://maps.app.goo.gl/jasmine-mazzeh',
+        brief:
+          'خمسة أطباق موسمية على خلفية خشبية داكنة، مع لقطات قريبة للتفاصيل. الأطباق تُجهَّز تباعًا من المطبخ.',
+        crew: [
+          { userId: id(4), role: 'photographer', isLead: true },
+          { userId: id(3), role: 'director', isLead: false },
+        ],
+        externalCrew: [{ name: 'مازن العلي', role: 'videographer', phone: '+963955700800' }],
+        shots: [
+          shot(1771, 'طبق الكبة بالكرز من الأعلى'),
+          shot(1772, 'لقطة قريبة لصحن المحمّرة', false, 'مع يد تغمس الخبز'),
+          shot(1773, 'طاولة كاملة لأربعة أشخاص'),
+          shot(1774, 'الحلويات مع القهوة'),
+          shot(1775, 'واجهة الفرع عند الغروب'),
+        ],
+      }),
+      shootRecord(1752, {
+        title: 'صور فريق العيادة',
+        type: 'people',
+        clientId: id(602),
+        taskId: id(1702),
+        startsAt: at('2026-10-14', '09:00'),
+        endsAt: at('2026-10-14', '11:00'),
+        location: 'عيادات الشفاء، الطابق الثاني',
+        createdById: id(1),
+      }),
+      shootRecord(1753, {
+        title: 'افتتاح فرع المالكي',
+        type: 'event',
+        status: 'cancelled',
+        taskId: id(1703),
+        startsAt: at('2026-10-20', '18:00'),
+        endsAt: at('2026-10-20', '21:00'),
+        location: 'مطعم الياسمين، فرع المالكي',
+        cancelledAt: '2026-10-08T10:00:00.000Z',
+        cancelReason: 'أجّل العميل الافتتاح إلى الشهر القادم.',
+      }),
+      shootRecord(1754, {
+        title: 'منتجات ركن القهوة',
+        taskId: id(1704),
+        startsAt: at(PROJECTS_TODAY, '07:30'),
+        endsAt: at(PROJECTS_TODAY, '09:30'),
+        brief: 'أكياس البن الثلاثة والأكواب الجديدة على خلفية فاتحة.',
+        shots: [
+          shot(1776, 'أكياس البن الثلاثة معًا', true),
+          shot(1777, 'كوب القهوة مع البخار', true),
+          shot(1778, 'لقطة قريبة لشعار الكيس'),
+        ],
+      }),
+    ],
+    meetings: [
+      {
+        id: id(1761),
+        title: 'خطة محتوى تشرين الثاني',
+        status: 'scheduled',
+        clientId: jasmine,
+        startsAt: at('2026-10-12', '12:00'),
+        endsAt: at('2026-10-12', '13:00'),
+        location: 'مكتب فيرتكس، قاعة الاجتماعات',
+        onlineUrl: null,
+        organizerId: id(1),
+        attendeeIds: [id(3)],
+      },
+      {
+        id: id(1762),
+        title: 'المراجعة الأسبوعية',
+        status: 'scheduled',
+        clientId: null,
+        startsAt: at('2026-10-11', '09:00'),
+        endsAt: at('2026-10-11', '10:00'),
+        location: null,
+        onlineUrl: 'https://meet.google.com/vertex-weekly',
+        organizerId: id(2),
+        attendeeIds: [id(1), id(3)],
+      },
+      // Edge case 9: the client was archived after the meeting was set.
+      {
+        id: id(1763),
+        title: 'تسليم ملفات الحملة',
+        status: 'scheduled',
+        clientId: id(604),
+        startsAt: at('2026-10-21', '11:00'),
+        endsAt: at('2026-10-21', '11:30'),
+        location: 'مكتب فيرتكس',
+        onlineUrl: null,
+        organizerId: id(2),
+        attendeeIds: [],
+      },
+    ],
+  };
+}
+
+interface CalendarState {
+  users: UserResponse[];
+  clients: ClientRecord[];
+  projects: ProjectRecord[];
+  retainers: RetainerRecord[];
+  tasks: TaskRecord[];
+  shoots: ShootRecord[];
+  meetings: MeetingRecord[];
+  me: () => MeResponse;
+}
+
+/** The calendar API over the in-memory records, with the F11 rules the screens rely on. */
+function calendarRoutes({
+  users,
+  clients,
+  projects,
+  retainers,
+  tasks,
+  shoots,
+  meetings,
+  me,
+}: CalendarState) {
+  let next = 1800;
+  const now = () => TASKS_NOW.toISOString();
+  const holds = (permission: string, scope: string) =>
+    me().permissions.some((g) => g.permission === permission && g.scopes.includes(scope as never));
+  const person = (userId: string) => ({
+    id: userId,
+    name: users.find((u) => u.id === userId)?.name ?? '',
+  });
+  const archivable = (userId: string) => ({
+    ...person(userId),
+    archived: users.find((u) => u.id === userId)?.status === 'archived',
+  });
+  const clientOf = (clientId: string | null) => {
+    const client = clients.find((c) => c.id === clientId);
+    return client ? { id: client.id, name: client.tradeName, archived: client.archived } : null;
+  };
+  const inPhotography = (userId: string) =>
+    !!users.find((u) => u.id === userId)?.departments.some((d) => d.code === 'photography');
+  // Mirrors the API's shoot scope (spec F11, "Scopes").
+  const covers = (clientId: string | null) =>
+    holds('shoots.manage', 'all') ||
+    (holds('shoots.manage', 'own_clients') &&
+      clients.find((c) => c.id === clientId)?.accountManagerId === me().user.id);
+
+  /** Rule 5: the scheduled shoots and meetings of the users overlapping the time. */
+  const conflictsOf = (
+    userIds: string[],
+    time: { startsAt: string; endsAt: string },
+    exclude?: string,
+  ): ScheduleConflict[] =>
+    userIds.flatMap((userId) => [
+      ...shoots
+        .filter(
+          (s) =>
+            s.id !== exclude &&
+            s.status === 'scheduled' &&
+            !s.archivedAt &&
+            s.crew.some((member) => member.userId === userId) &&
+            intervalsOverlap(s, time),
+        )
+        .map((s) => ({
+          user: person(userId),
+          kind: 'shoot' as const,
+          id: s.id,
+          title: s.title,
+          startsAt: s.startsAt,
+          endsAt: s.endsAt,
+        })),
+      ...meetings
+        .filter(
+          (m) =>
+            m.id !== exclude &&
+            m.status === 'scheduled' &&
+            [m.organizerId, ...m.attendeeIds].includes(userId) &&
+            intervalsOverlap(m, time),
+        )
+        .map((m) => ({
+          user: person(userId),
+          kind: 'meeting' as const,
+          id: m.id,
+          title: m.title,
+          startsAt: m.startsAt,
+          endsAt: m.endsAt,
+        })),
+    ]);
+  const crewIds = (shoot: ShootRecord) => shoot.crew.map((member) => member.userId);
+  const shootConflicts = (shoot: ShootRecord) =>
+    shoot.status === 'scheduled' && !shoot.archivedAt
+      ? conflictsOf(crewIds(shoot), shoot, shoot.id)
+      : [];
+
+  const summary = (shoot: ShootRecord): Shoot => ({
+    id: shoot.id,
+    title: shoot.title,
+    type: shoot.type,
+    status: shoot.status,
+    client: clientOf(shoot.clientId),
+    startsAt: shoot.startsAt,
+    endsAt: shoot.endsAt,
+    location: shoot.location,
+    lead: archivable(shoot.crew.find((member) => member.isLead)?.userId ?? ''),
+    crewCount: shoot.crew.length + shoot.externalCrew.length,
+    conflict: shootConflicts(shoot).length > 0,
+    archivedAt: shoot.archivedAt,
+  });
+  const taskOf = (taskId: string) => {
+    const task = tasks.find((t) => t.id === taskId);
+    if (!task) throw new Error(`No task ${taskId} for the shoot`);
+    return task;
+  };
+  const taskSummary = (task: TaskRecord) => ({
+    id: task.id,
+    title: task.title,
+    department: task.department,
+    status: task.status,
+  });
+  const detail = (shoot: ShootRecord): ShootDetail => {
+    const scope = covers(shoot.clientId);
+    const live = shoot.status === 'scheduled' && !shoot.archivedAt;
+    const lead = shoot.crew.find((member) => member.isLead)?.userId === me().user.id;
+    const task = taskOf(shoot.taskId);
+    return {
+      ...summary(shoot),
+      mapUrl: shoot.mapUrl,
+      brief: shoot.brief,
+      crew: [...shoot.crew]
+        .sort((a, b) => Number(b.isLead) - Number(a.isLead))
+        .map((member) => ({
+          user: archivable(member.userId),
+          role: member.role,
+          isLead: member.isLead,
+        })),
+      externalCrew: shoot.externalCrew,
+      shots: shoot.shots.map((shot, index) => ({
+        id: shot.id,
+        position: index + 1,
+        text: shot.text,
+        note: shot.note,
+        doneAt: shot.doneAt,
+        doneBy: shot.doneById ? person(shot.doneById) : null,
+      })),
+      task: {
+        ...taskSummary(task),
+        dependentCount: tasks.filter(
+          (t) => t.dependsOn.includes(task.id) && t.status !== 'cancelled' && !t.archived,
+        ).length,
+      },
+      editingTask: shoot.editingTaskId ? taskSummary(taskOf(shoot.editingTaskId)) : null,
+      conflicts: shootConflicts(shoot),
+      closeNote: shoot.closeNote,
+      rawFilesUrl: shoot.rawFilesUrl,
+      completedAt: shoot.completedAt,
+      completedBy: shoot.completedById ? person(shoot.completedById) : null,
+      cancelledAt: shoot.cancelledAt,
+      cancelReason: shoot.cancelReason,
+      createdBy: person(shoot.createdById),
+      createdAt: shoot.createdAt,
+      updatedAt: shoot.createdAt,
+      permissions: {
+        canEdit: live && scope,
+        canTick: live && (scope || crewIds(shoot).includes(me().user.id)),
+        canClose: live && (scope || lead) && shoot.startsAt <= now(),
+        canCancel: live && scope,
+        canReopen: shoot.status === 'cancelled' && !shoot.archivedAt && scope,
+        canArchive: holds('shoots.manage', 'all'),
+      },
+    };
+  };
+  const meetingSummary = (meeting: MeetingRecord): Meeting => ({
+    id: meeting.id,
+    title: meeting.title,
+    status: meeting.status,
+    client: clientOf(meeting.clientId),
+    startsAt: meeting.startsAt,
+    endsAt: meeting.endsAt,
+    location: meeting.location,
+    onlineUrl: meeting.onlineUrl,
+    organizer: archivable(meeting.organizerId),
+    attendeeCount: meeting.attendeeIds.length,
+    conflict:
+      meeting.status === 'scheduled' &&
+      conflictsOf([meeting.organizerId, ...meeting.attendeeIds], meeting, meeting.id).length > 0,
+    archivedAt: null,
+  });
+
+  /** Rule 15: due dates of open projects and pending milestones, renewals of running retainers. */
+  const keyDates = (from: string, to: string): KeyDate[] => {
+    const inRange = (date: string | null): date is string => !!date && date >= from && date <= to;
+    const client = (clientId: string) =>
+      clientOf(clientId) ?? { id: clientId, name: '', archived: false };
+    const open = projects.filter((p) => !p.archived && OPEN_STATUSES.includes(p.status));
+    return [
+      ...open
+        .filter((p) => inRange(p.dueDate))
+        .map((p) => ({
+          kind: 'project_due' as const,
+          date: p.dueDate,
+          title: p.name,
+          targetId: p.id,
+          client: client(p.clientId),
+        })),
+      ...open.flatMap((p) =>
+        p.milestones.flatMap((m) =>
+          !m.archived && m.status === 'pending' && inRange(m.dueDate)
+            ? [
+                {
+                  kind: 'milestone_due' as const,
+                  date: m.dueDate,
+                  title: `${m.name} · ${p.name}`,
+                  targetId: p.id,
+                  client: client(p.clientId),
+                },
+              ]
+            : [],
+        ),
+      ),
+      ...retainers.flatMap((r) =>
+        !r.archived && (r.status === 'active' || r.status === 'paused') && inRange(r.renewalDate)
+          ? [
+              {
+                kind: 'renewal' as const,
+                date: r.renewalDate,
+                title: r.name,
+                targetId: r.id,
+                client: client(r.clientId),
+              },
+            ]
+          : [],
+      ),
+    ].sort((a, b) => a.date.localeCompare(b.date));
+  };
+
+  // Answers a calendar request, or returns undefined to let the other mocks try.
+  return (route: Route, method: string, url: URL, request: Request): Promise<void> | undefined => {
+    const path = url.pathname;
+    const q = url.searchParams;
+    const body = <T>() => request.postDataJSON() as T;
+
+    if (path === '/api/calendar' && method === 'GET') {
+      const from = q.get('from') ?? PROJECTS_TODAY;
+      const to = q.get('to') ?? PROJECTS_TODAY;
+      const kinds = q.getAll('kinds');
+      const shows = (kind: string) => kinds.length === 0 || kinds.includes(kind);
+      const clientId = q.get('clientId');
+      const userId = q.get('userId') === 'me' ? me().user.id : q.get('userId');
+      const range = { startsAt: at(from, '00:00'), endsAt: at(addDays(to, 1), '00:00') };
+      const calendar: Calendar = {
+        from,
+        to,
+        shoots: shows('shoot')
+          ? shoots
+              .filter(
+                (s) =>
+                  !s.archivedAt &&
+                  intervalsOverlap(s, range) &&
+                  (!clientId || s.clientId === clientId) &&
+                  (!userId || crewIds(s).includes(userId)) &&
+                  (!q.get('shootType') || s.type === q.get('shootType')),
+              )
+              .sort((a, b) => a.startsAt.localeCompare(b.startsAt))
+              .map(summary)
+          : [],
+        meetings: shows('meeting')
+          ? meetings
+              .filter(
+                (m) =>
+                  intervalsOverlap(m, range) &&
+                  (!clientId || m.clientId === clientId) &&
+                  (!userId || [m.organizerId, ...m.attendeeIds].includes(userId)),
+              )
+              .sort((a, b) => a.startsAt.localeCompare(b.startsAt))
+              .map(meetingSummary)
+          : [],
+        keyDates: keyDates(from, to).filter(
+          (keyDate) =>
+            shows(keyDate.kind) &&
+            (!clientId || keyDate.client.id === clientId) &&
+            (!userId ||
+              clients.find((c) => c.id === keyDate.client.id)?.accountManagerId === userId ||
+              projects.find((p) => p.id === keyDate.targetId)?.projectManagerId === userId),
+        ),
+      };
+      return json(route, calendar);
+    }
+    if (path === '/api/calendar/conflicts' && method === 'GET') {
+      const items = conflictsOf(
+        q.getAll('userIds'),
+        { startsAt: q.get('startsAt') ?? '', endsAt: q.get('endsAt') ?? '' },
+        q.get('excludeShootId') ?? undefined,
+      );
+      return json(route, { items });
+    }
+
+    if (path === '/api/shoots' && method === 'GET') {
+      const items = shoots
+        .filter(
+          (s) =>
+            !s.archivedAt &&
+            (!q.get('taskId') || s.taskId === q.get('taskId')) &&
+            (!q.get('clientId') || s.clientId === q.get('clientId')),
+        )
+        .sort((a, b) => b.startsAt.localeCompare(a.startsAt))
+        .map(summary);
+      return json(route, { items, total: items.length, page: 1, pageSize: 25 });
+    }
+    if (path === '/api/shoots' && method === 'POST') {
+      const input = body<CreateShoot>();
+      const booked = input.taskId ? tasks.find((t) => t.id === input.taskId) : undefined;
+      const clientId = booked ? booked.clientId : (input.clientId ?? null);
+      if (!covers(clientId)) return fail(route, 403, null);
+      if (
+        booked &&
+        shoots.some((s) => s.taskId === booked.id && s.status !== 'cancelled' && !s.archivedAt)
+      ) {
+        return fail(route, 409, 'TASK_NOT_BOOKABLE');
+      }
+      const conflicts = conflictsOf(
+        input.crew.map((member) => member.userId),
+        input,
+      );
+      if (conflicts.length > 0 && !input.acceptConflicts) {
+        return fail(route, 409, 'SCHEDULE_CONFLICT', conflicts);
+      }
+      const lead = input.crew.find((member) => member.isLead);
+      const day = calendarDay(input.startsAt);
+      // Rule 3: a new shoot task in Photography, assigned to the lead when they belong to it.
+      const task =
+        booked ??
+        taskRecord(next++, {
+          title: shootTaskTitle(input.title),
+          department: 'photography',
+          assigneeId: lead && inPhotography(lead.userId) ? lead.userId : null,
+          clientId,
+          projectId: input.newTask?.projectId ?? null,
+          milestoneId: input.newTask?.milestoneId ?? null,
+          cycleId: input.newTask?.retainerCycleId ?? null,
+          cycleLineId: input.newTask?.cycleLineId ?? null,
+          createdById: me().user.id,
+          createdAt: now(),
+        });
+      if (!booked) tasks.push(task);
+      // Rule 4: the task is due on the shoot's day.
+      task.dueDate = day;
+      const created = shootRecord(next++, {
+        title: input.title,
+        type: input.type,
+        clientId,
+        taskId: task.id,
+        startsAt: input.startsAt,
+        endsAt: input.endsAt,
+        location: input.location,
+        mapUrl: input.mapUrl,
+        brief: input.brief,
+        crew: input.crew,
+        externalCrew: input.externalCrew,
+        shots: input.shots.map((shot) => ({
+          id: id(next++),
+          text: shot.text,
+          note: shot.note,
+          doneAt: null,
+          doneById: null,
+        })),
+        createdById: me().user.id,
+        createdAt: now(),
+      });
+      shoots.push(created);
+      return json(route, detail(created), 201);
+    }
+
+    const match = path.match(/^\/api\/shoots\/([^/]+)(?:\/(.+))?$/);
+    if (!match) return undefined;
+    const shoot = shoots.find((s) => s.id === match[1]);
+    if (!shoot || (shoot.archivedAt && !holds('shoots.manage', 'all'))) {
+      return fail(route, 404, null);
+    }
+    const action = match[2];
+    const scope = covers(shoot.clientId);
+    const scheduled = shoot.status === 'scheduled' && !shoot.archivedAt;
+    if (!action && method === 'GET') return json(route, detail(shoot));
+
+    const tick = action?.match(/^shots\/([^/]+)\/done$/);
+    if (tick && method === 'POST') {
+      if (!scope && !crewIds(shoot).includes(me().user.id)) return fail(route, 403, null);
+      if (!scheduled) return fail(route, 409, 'SHOOT_NOT_SCHEDULED');
+      const shot = shoot.shots.find((s) => s.id === tick[1]);
+      if (!shot) return fail(route, 404, null);
+      const { done } = body<{ done: boolean }>();
+      shot.doneAt = done ? now() : null;
+      shot.doneById = done ? me().user.id : null;
+      const listed = detail(shoot).shots.find((s) => s.id === shot.id);
+      return json(route, listed);
+    }
+    if (action === 'close' && method === 'POST') {
+      const lead = shoot.crew.find((member) => member.isLead)?.userId === me().user.id;
+      if (!scope && !lead) return fail(route, 403, null);
+      if (!scheduled) return fail(route, 409, 'SHOOT_NOT_SCHEDULED');
+      if (shoot.startsAt > now()) return fail(route, 409, 'SHOOT_NOT_STARTED');
+      const input = body<CloseShoot>();
+      const task = taskOf(shoot.taskId);
+      // Rule 11: the shoot task is delivered unless it already is.
+      if (task.status !== 'delivered') {
+        task.status = 'delivered';
+        task.deliveredAt = now();
+      }
+      if (input.editingTask) {
+        // Rule 12: the editing task takes the shoot task's client and links, and waits on it.
+        const editing = taskRecord(next++, {
+          title: input.editingTask.title,
+          brief: input.note,
+          department: input.editingTask.department,
+          assigneeId: input.editingTask.assigneeId,
+          dueDate: input.editingTask.dueDate,
+          needsClientApproval: input.editingTask.needsClientApproval,
+          clientId: task.clientId,
+          projectId: task.projectId,
+          milestoneId: task.milestoneId,
+          retainerId: task.retainerId,
+          cycleId: task.cycleId,
+          dependsOn: [task.id],
+          links: input.rawFilesUrl
+            ? [
+                {
+                  id: id(next++),
+                  url: input.rawFilesUrl,
+                  label: null,
+                  addedById: me().user.id,
+                  archived: false,
+                },
+              ]
+            : [],
+          createdById: me().user.id,
+          createdAt: now(),
+        });
+        tasks.push(editing);
+        shoot.editingTaskId = editing.id;
+      }
+      shoot.status = 'completed';
+      shoot.completedAt = now();
+      shoot.completedById = me().user.id;
+      shoot.closeNote = input.note;
+      shoot.rawFilesUrl = input.rawFilesUrl;
+      return json(route, detail(shoot));
+    }
+
+    // Everything below needs shoot scope.
+    if (!scope) return fail(route, 403, null);
+    if (!action && method === 'PATCH') {
+      if (!scheduled) return fail(route, 409, 'SHOOT_NOT_SCHEDULED');
+      const { acceptConflicts, ...input } = body<UpdateShoot>();
+      const time = {
+        startsAt: input.startsAt ?? shoot.startsAt,
+        endsAt: input.endsAt ?? shoot.endsAt,
+      };
+      const conflicts = conflictsOf(
+        (input.crew ?? shoot.crew).map((member) => member.userId),
+        time,
+        shoot.id,
+      );
+      if (conflicts.length > 0 && !acceptConflicts) {
+        return fail(route, 409, 'SCHEDULE_CONFLICT', conflicts);
+      }
+      Object.assign(shoot, input);
+      taskOf(shoot.taskId).dueDate = calendarDay(shoot.startsAt);
+      return json(route, detail(shoot));
+    }
+    if (action === 'shots' && method === 'PUT') {
+      if (!scheduled) return fail(route, 409, 'SHOOT_NOT_SCHEDULED');
+      const { shots } = body<ShotListInput>();
+      // Rule 7: kept items keep their ids and ticks.
+      shoot.shots = shots.map((shot) => {
+        const kept = shoot.shots.find((s) => s.id === shot.id);
+        return {
+          id: kept?.id ?? id(next++),
+          text: shot.text,
+          note: shot.note,
+          doneAt: kept?.doneAt ?? null,
+          doneById: kept?.doneById ?? null,
+        };
+      });
+      return json(route, detail(shoot));
+    }
+    if (action === 'cancel' && method === 'POST') {
+      if (!scheduled) return fail(route, 409, 'SHOOT_NOT_SCHEDULED');
+      const input = body<CancelShoot>();
+      shoot.status = 'cancelled';
+      shoot.cancelledAt = now();
+      shoot.cancelReason = input.reason;
+      if (input.cancelTask) {
+        const task = taskOf(shoot.taskId);
+        task.status = 'cancelled';
+        task.cancelledAt = now();
+        task.cancelReason = input.reason;
+      }
+      return json(route, detail(shoot));
+    }
+    if (action === 'reopen' && method === 'POST') {
+      if (shoot.status !== 'cancelled') return fail(route, 409, 'SHOOT_NOT_CANCELLED');
+      const conflicts = conflictsOf(crewIds(shoot), shoot, shoot.id);
+      if (conflicts.length > 0 && !body<ReopenShoot>().acceptConflicts) {
+        return fail(route, 409, 'SCHEDULE_CONFLICT', conflicts);
+      }
+      shoot.status = 'scheduled';
+      shoot.cancelledAt = null;
+      shoot.cancelReason = null;
+      return json(route, detail(shoot));
+    }
+    if ((action === 'archive' || action === 'restore') && method === 'POST') {
+      if (!holds('shoots.manage', 'all')) return fail(route, 403, null);
+      shoot.archivedAt = action === 'archive' ? now() : null;
+      return json(route, detail(shoot));
+    }
+    return undefined;
+  };
+}
+
 /** Ids of the seeded team, for navigating straight to a profile or department. */
 export const seedIds = {
   sara: id(1),
@@ -7379,6 +8151,11 @@ export const seedIds = {
   contentRequest: id(1681),
   openingDesign: id(1621),
   drinksDesign: id(1622),
+  // With `MockOptions.calendar`.
+  autumnShoot: id(1751),
+  clinicShoot: id(1752),
+  openingShoot: id(1753),
+  coffeeShoot: id(1754),
   websiteTemplate: id(2000),
   monthlyTemplate: id(2100),
 };

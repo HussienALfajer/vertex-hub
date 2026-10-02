@@ -852,6 +852,56 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await screenshot(page, testInfo, `content-agenda-phone-${colorScheme}`);
     });
 
+    test('company calendar: month, week and the phone agenda', async ({ page }, testInfo) => {
+      await page.setViewportSize({ width: 1440, height: 1500 });
+      await page.clock.setFixedTime(new Date(`${PROJECTS_TODAY}T09:00:00+03:00`));
+      await mockApi(page, { signedIn: true, calendar: true });
+      await page.goto('/calendar');
+      await expect(page.getByRole('link', { name: /أطباق الخريف/ })).toBeVisible();
+      await expect(page.getByText('خطة محتوى تشرين الثاني').first()).toBeVisible();
+      await screenshot(page, testInfo, `calendar-month-${colorScheme}`);
+
+      await page.setViewportSize({ width: 1440, height: 1100 });
+      await page.getByRole('button', { name: ar.calendar.views.week }).click();
+      await expect(page).toHaveURL(/view=week/);
+      await expect(page.getByRole('link', { name: /منتجات ركن القهوة/ })).toBeVisible();
+      await screenshot(page, testInfo, `calendar-week-${colorScheme}`);
+
+      await page.setViewportSize({ width: 390, height: 1600 });
+      await page.goto('/calendar');
+      await expect(page.getByRole('link', { name: 'أطباق الخريف' })).toBeVisible();
+      await screenshot(page, testInfo, `calendar-agenda-phone-${colorScheme}`);
+    });
+
+    test('shoot form with a conflict warning', async ({ page }, testInfo) => {
+      await page.setViewportSize({ width: 1280, height: 2300 });
+      await page.clock.setFixedTime(new Date(`${PROJECTS_TODAY}T09:00:00+03:00`));
+      await mockApi(page, { signedIn: true, me: accountManagerMe, calendar: true });
+      await page.goto(`/shoots/${seedIds.autumnShoot}/edit`);
+      await expect(page.getByLabel(ar.calendar.form.title)).toHaveValue('أطباق الخريف');
+      await expect(page.getByText(ar.calendar.form.conflictsBody)).toBeVisible();
+      await page.getByRole('button', { name: ar.calendar.form.addExternal }).click();
+      await screenshot(page, testInfo, `shoot-form-${colorScheme}`);
+    });
+
+    test('shoot page on a phone and the close dialog', async ({ page }, testInfo) => {
+      await page.setViewportSize({ width: 390, height: 2200 });
+      await page.clock.setFixedTime(new Date(`${PROJECTS_TODAY}T09:00:00+03:00`));
+      await mockApi(page, { signedIn: true, me: employeeMe, calendar: true });
+      await page.goto(`/shoots/${seedIds.autumnShoot}`);
+      await expect(page.getByRole('heading', { level: 1 })).toHaveText('أطباق الخريف');
+      await expect(page.getByRole('checkbox')).toHaveCount(5);
+      await screenshot(page, testInfo, `shoot-page-phone-${colorScheme}`);
+
+      await page.setViewportSize({ width: 1280, height: 1300 });
+      await page.goto(`/shoots/${seedIds.coffeeShoot}`);
+      await page.getByRole('button', { name: ar.calendar.actions.close }).click();
+      await expect(page.getByRole('dialog').getByLabel(ar.calendar.close.taskTitle)).toHaveValue(
+        'مونتاج: منتجات ركن القهوة',
+      );
+      await screenshot(page, testInfo, `shoot-close-dialog-${colorScheme}`);
+    });
+
     test('my posts', async ({ page }, testInfo) => {
       await page.setViewportSize({ width: 1280, height: 1100 });
       await page.clock.setFixedTime(new Date(`${PROJECTS_TODAY}T09:00:00+03:00`));

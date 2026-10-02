@@ -451,6 +451,7 @@ const LINK_FIELDS = new Set([
   'ownerType',
   'ownerId',
   'role',
+  'shotId',
 ]);
 
 function AuditRow({ entry, names }: { entry: AuditEntry; names: EntityNames }) {
@@ -526,6 +527,7 @@ function AuditRow({ entry, names }: { entry: AuditEntry; names: EntityNames }) {
                       entityType={entry.entityType}
                       field={field}
                       value={entry.before?.[field]}
+                      userName={names.user}
                     />
                   </td>
                   <td className="py-1.5">
@@ -533,6 +535,7 @@ function AuditRow({ entry, names }: { entry: AuditEntry; names: EntityNames }) {
                       entityType={entry.entityType}
                       field={field}
                       value={entry.after?.[field]}
+                      userName={names.user}
                     />
                   </td>
                 </tr>
@@ -685,6 +688,20 @@ const KNOWN_FIELDS = [
   'publishedAt',
   'publishedLinks',
   'fromPostId',
+  'startsAt',
+  'endsAt',
+  'location',
+  'mapUrl',
+  'crew',
+  'externalCrew',
+  'shots',
+  'acceptedConflicts',
+  'closeNote',
+  'rawFilesSite',
+  'editingTaskId',
+  'untickedShots',
+  'cancelReason',
+  'taskCancelled',
 ] as const;
 
 function fieldLabel(t: TFunction, field: string): string {
@@ -813,6 +830,14 @@ function EntityLink({ entry, names }: { entry: AuditEntry; names: EntityNames })
     return (
       <Link to="/content/posts/$postId" params={{ postId }} className={linkClass}>
         {withFileName(t, entry, typeof title === 'string' ? title : t('audit.openPost'))}
+      </Link>
+    );
+  }
+  if (entry.entityType === 'shoot') {
+    const title = entry.after?.title ?? entry.before?.title;
+    return (
+      <Link to="/shoots/$shootId" params={{ shootId: entry.entityId }} className={linkClass}>
+        {typeof title === 'string' ? title : t('audit.openShoot')}
       </Link>
     );
   }

@@ -220,6 +220,12 @@ Schemas live in a new `packages/contracts/src/calendar.ts` (shoots, meetings, ca
 7. **Task page (F06)** — a Shoot panel on a task that has a shoot (status, time, location, lead, link to the shoot page); "Book shoot" on open Photography tasks without an active shoot, for shoot scope holders.
 8. **Notifications (F14)** — render the new types; a "Calendar" group in settings.
 
+Settled while building the screens:
+- A calendar card shows the start time only (a month cell has no room for the range); the agenda, the day list and the shoot page show the range.
+- The booking form takes one date with a start and an end time; an end time at or before the start time ends the shoot on the next day. A longer shoot (up to the 72 hours the API allows) is not entered from the form; editing one keeps its times unless the time fields are changed.
+- Team crew members link to their profile (the shoot does not carry their phones); tap-to-call is for external crew.
+- Until the meeting screens ship (PR 4), a meeting on the calendar is shown without a link.
+
 Every screen: Arabic RTL, logical CSS, strings through i18next, design-system components only; loading skeletons and the shared error state.
 
 ## Audit, notifications and jobs
