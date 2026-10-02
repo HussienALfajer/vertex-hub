@@ -134,6 +134,14 @@ export const AUDIT_ACTIONS = [
   'meeting.cancelled',
   'meeting.archived',
   'meeting.restored',
+  'catalog_service.created',
+  'catalog_service.updated',
+  'catalog_service.archived',
+  'catalog_service.restored',
+  'catalog_package.created',
+  'catalog_package.updated',
+  'catalog_package.archived',
+  'catalog_package.restored',
 ] as const;
 
 export const auditActionSchema = z.enum(AUDIT_ACTIONS).meta({ id: 'AuditAction' });
@@ -163,6 +171,8 @@ export const AUDIT_ENTITY_TYPES = [
   'post',
   'shoot',
   'meeting',
+  'catalog_service',
+  'catalog_package',
 ] as const;
 
 export const auditEntityTypeSchema = z.enum(AUDIT_ENTITY_TYPES).meta({ id: 'AuditEntityType' });

@@ -2,6 +2,7 @@ import {
   APPROVAL_WITHDRAWN_REASONS,
   type AuditEntityType,
   BRAND_FILE_KINDS,
+  CATALOG_BILLINGS,
   CLIENT_DECISIONS,
   CLIENT_PLATFORMS,
   CLIENT_STATUSES,
@@ -156,6 +157,17 @@ function enumLabel(
     const kind = find(DELIVERABLE_KINDS);
     if (kind) return t(`retainers.kinds.${kind}`);
   }
+  if (
+    field === 'billing' &&
+    (entityType === 'catalog_service' || entityType === 'catalog_package')
+  ) {
+    const billing = find(CATALOG_BILLINGS);
+    if (billing) return t(`catalog.billings.${billing}`);
+  }
+  if (field === 'deliverableKind' && entityType === 'catalog_service') {
+    const kind = find(DELIVERABLE_KINDS);
+    if (kind) return t(`retainers.kinds.${kind}`);
+  }
   if (field === 'kind' && entityType === 'template') {
     const kind = find(TEMPLATE_KINDS);
     if (kind) return t(`templates.kinds.${kind}`);
@@ -288,6 +300,15 @@ function ListItem({
         <span className="tabular-nums" dir="ltr">
           {line.count}
         </span>
+      </Badge>
+    );
+  }
+  // A package's service (F04): its name and quantity.
+  const serviceName = text(item, 'serviceId') ? text(item, 'name') : undefined;
+  if (serviceName && typeof item.quantity === 'number') {
+    return (
+      <Badge tone="outline" dir="auto">
+        {t('catalog.packages.item', { n: formatNumber(item.quantity), name: serviceName })}
       </Badge>
     );
   }

@@ -16,6 +16,9 @@ const UNIQUE_CODES: Record<string, ErrorCode> = {
   template_runs_one_full_run_idx: 'ALREADY_GENERATED',
   file_items_name_unique: 'FILE_NAME_TAKEN',
   shoots_task_active_unique: 'TASK_NOT_BOOKABLE',
+  catalog_services_name_idx: 'SERVICE_NAME_TAKEN',
+  catalog_packages_name_idx: 'PACKAGE_NAME_TAKEN',
+  catalog_package_items_service_idx: 'INVALID_PACKAGE_ITEM',
 };
 
 /** PostgreSQL codes of a write that lost a race: unique violation, deadlock, serialization. */

@@ -20,6 +20,7 @@ import { Route as AppDesignSystemRouteImport } from './routes/_app/design-system
 import { Route as ATokenRouteImport } from './routes/a.$token'
 import { Route as AppApprovalsIndexRouteImport } from './routes/_app/approvals/index'
 import { Route as AppCalendarIndexRouteImport } from './routes/_app/calendar/index'
+import { Route as AppCatalogIndexRouteImport } from './routes/_app/catalog/index'
 import { Route as AppClientsIndexRouteImport } from './routes/_app/clients/index'
 import { Route as AppClientsClientIdRouteImport } from './routes/_app/clients/$clientId'
 import { Route as AppClientsNewRouteImport } from './routes/_app/clients/new'
@@ -105,6 +106,11 @@ const AppApprovalsIndexRoute = AppApprovalsIndexRouteImport.update({
 const AppCalendarIndexRoute = AppCalendarIndexRouteImport.update({
   id: '/calendar/',
   path: '/calendar/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppCatalogIndexRoute = AppCatalogIndexRouteImport.update({
+  id: '/catalog/',
+  path: '/catalog/',
   getParentRoute: () => AppRoute,
 } as any)
 const AppClientsIndexRoute = AppClientsIndexRouteImport.update({
@@ -301,6 +307,7 @@ export interface FileRoutesByFullPath {
   '/templates/new': typeof AppTemplatesNewRoute
   '/approvals/': typeof AppApprovalsIndexRoute
   '/calendar/': typeof AppCalendarIndexRoute
+  '/catalog/': typeof AppCatalogIndexRoute
   '/clients/': typeof AppClientsIndexRoute
   '/content/': typeof AppContentIndexRoute
   '/departments/': typeof AppDepartmentsIndexRoute
@@ -345,6 +352,7 @@ export interface FileRoutesByTo {
   '/templates/new': typeof AppTemplatesNewRoute
   '/approvals': typeof AppApprovalsIndexRoute
   '/calendar': typeof AppCalendarIndexRoute
+  '/catalog': typeof AppCatalogIndexRoute
   '/clients': typeof AppClientsIndexRoute
   '/content': typeof AppContentIndexRoute
   '/departments': typeof AppDepartmentsIndexRoute
@@ -391,6 +399,7 @@ export interface FileRoutesById {
   '/_app/templates/new': typeof AppTemplatesNewRoute
   '/_app/approvals/': typeof AppApprovalsIndexRoute
   '/_app/calendar/': typeof AppCalendarIndexRoute
+  '/_app/catalog/': typeof AppCatalogIndexRoute
   '/_app/clients/': typeof AppClientsIndexRoute
   '/_app/content/': typeof AppContentIndexRoute
   '/_app/departments/': typeof AppDepartmentsIndexRoute
@@ -437,6 +446,7 @@ export interface FileRouteTypes {
     | '/templates/new'
     | '/approvals/'
     | '/calendar/'
+    | '/catalog/'
     | '/clients/'
     | '/content/'
     | '/departments/'
@@ -481,6 +491,7 @@ export interface FileRouteTypes {
     | '/templates/new'
     | '/approvals'
     | '/calendar'
+    | '/catalog'
     | '/clients'
     | '/content'
     | '/departments'
@@ -526,6 +537,7 @@ export interface FileRouteTypes {
     | '/_app/templates/new'
     | '/_app/approvals/'
     | '/_app/calendar/'
+    | '/_app/catalog/'
     | '/_app/clients/'
     | '/_app/content/'
     | '/_app/departments/'
@@ -626,6 +638,13 @@ declare module '@tanstack/react-router' {
       path: '/calendar'
       fullPath: '/calendar/'
       preLoaderRoute: typeof AppCalendarIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/catalog/': {
+      id: '/_app/catalog/'
+      path: '/catalog'
+      fullPath: '/catalog/'
+      preLoaderRoute: typeof AppCatalogIndexRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/clients/': {
@@ -881,6 +900,7 @@ interface AppRouteChildren {
   AppTemplatesNewRoute: typeof AppTemplatesNewRoute
   AppApprovalsIndexRoute: typeof AppApprovalsIndexRoute
   AppCalendarIndexRoute: typeof AppCalendarIndexRoute
+  AppCatalogIndexRoute: typeof AppCatalogIndexRoute
   AppClientsIndexRoute: typeof AppClientsIndexRoute
   AppContentIndexRoute: typeof AppContentIndexRoute
   AppDepartmentsIndexRoute: typeof AppDepartmentsIndexRoute
@@ -922,6 +942,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppTemplatesNewRoute: AppTemplatesNewRoute,
   AppApprovalsIndexRoute: AppApprovalsIndexRoute,
   AppCalendarIndexRoute: AppCalendarIndexRoute,
+  AppCatalogIndexRoute: AppCatalogIndexRoute,
   AppClientsIndexRoute: AppClientsIndexRoute,
   AppContentIndexRoute: AppContentIndexRoute,
   AppDepartmentsIndexRoute: AppDepartmentsIndexRoute,

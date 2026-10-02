@@ -714,6 +714,37 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await screenshot(page, testInfo, `client-tasks-${colorScheme}`);
     });
 
+    test('catalog services', async ({ page }, testInfo) => {
+      await page.setViewportSize({ width: 1280, height: 900 });
+      await mockApi(page, { signedIn: true });
+      await page.goto('/catalog');
+      await expect(
+        page.getByRole('cell', { name: 'تصميم سوشال ميديا', exact: true }),
+      ).toBeVisible();
+      await screenshot(page, testInfo, `catalog-services-${colorScheme}`);
+
+      await page.getByRole('button', { name: ar.catalog.services.new }).click();
+      await expect(page.getByRole('dialog')).toBeVisible();
+      await screenshot(page, testInfo, `catalog-service-dialog-${colorScheme}`);
+    });
+
+    test('catalog packages', async ({ page }, testInfo) => {
+      await page.setViewportSize({ width: 1280, height: 900 });
+      await mockApi(page, { signedIn: true });
+      await page.goto('/catalog?tab=packages');
+      await expect(page.getByRole('heading', { name: 'باقة السوشال الذهبية' })).toBeVisible();
+      await screenshot(page, testInfo, `catalog-packages-${colorScheme}`);
+
+      await page
+        .getByRole('button', {
+          name: ar.catalog.actions.replace('{{name}}', 'باقة السوشال الذهبية'),
+        })
+        .click();
+      await page.getByRole('menuitem', { name: ar.catalog.edit }).click();
+      await expect(page.getByRole('dialog')).toContainText('تصميم سوشال ميديا');
+      await screenshot(page, testInfo, `catalog-package-dialog-${colorScheme}`);
+    });
+
     test('templates list', async ({ page }, testInfo) => {
       await page.setViewportSize({ width: 1280, height: 900 });
       await mockApi(page, { signedIn: true });

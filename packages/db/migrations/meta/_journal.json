@@ -162,6 +162,13 @@
       "when": 1790910629258,
       "tag": "0022_charming_mordo",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1790917870467,
+      "tag": "0023_mean_king_bedlam",
+      "breakpoints": true
     }
   ]
 }
