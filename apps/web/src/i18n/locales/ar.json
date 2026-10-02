@@ -379,7 +379,9 @@
     "ZERO_PRICE": "بعض البنود بسعر صفر. أكّد الإرسال بهذه الأسعار.",
     "DISCOUNT_APPROVAL_REQUIRED": "الخصم يبلغ الحد ويحتاج إلى اعتماد المدير العام قبل الإرسال.",
     "VERSION_EXISTS": "توجد مسودة إصدار أحدث لهذا العرض.",
-    "NOTE_REQUIRED": "أضف ملاحظة لهذا السبب."
+    "NOTE_REQUIRED": "أضف ملاحظة لهذا السبب.",
+    "CURRENCY_MISMATCH": "عملة العقد الشهري تختلف عن عملة عرض السعر، فلا يمكن تجديده منه.",
+    "QUOTE_EXPIRED": "انتهت صلاحية عرض السعر. مدّد صلاحيته قبل تسجيل القبول."
   },
   "users": {
     "title": "الفريق",
@@ -914,6 +916,7 @@
         "extended": "مدّد صلاحية عرض سعر",
         "expired": "انتهت صلاحية عرض سعر",
         "rejected": "سجّل رفض عرض سعر",
+        "accepted": "سجّل قبول عرض سعر",
         "version_created": "أنشأ إصدارًا جديدًا من عرض سعر",
         "superseded": "استُبدل عرض سعر بإصدار أحدث",
         "archived": "تجاهل مسودة عرض سعر"
@@ -1104,7 +1107,10 @@
       "defaultTerms": "الشروط الافتراضية",
       "defaultValidityDays": "مدة الصلاحية الافتراضية",
       "discountThresholdPercent": "حد الخصم ٪",
-      "displayNumber": "رقم عرض السعر"
+      "displayNumber": "رقم عرض السعر",
+      "project": "المشروع",
+      "retainer": "العقد الشهري",
+      "proofFile": "ملف إثبات القبول"
     },
     "kinds": {
       "activation": "تفعيل",
@@ -3372,7 +3378,8 @@
       "meeting_dropped": "إلغاء اجتماع أو إزالتي منه",
       "meeting_upcoming": "تذكير باجتماع قادم",
       "quote_approval_requested": "طلب اعتماد خصم على عرض سعر",
-      "quote_approval_decided": "قرار على اعتماد خصم طلبته"
+      "quote_approval_decided": "قرار على اعتماد خصم طلبته",
+      "quote_accepted": "قبول عرض سعر"
     },
     "text": {
       "task_assigned": "أُسندت إليك «{{task}}» بواسطة {{actor}}",
@@ -3511,7 +3518,8 @@
       "quote_approval_decided": {
         "approve": "اعتمد {{actor}} الخصم على {{quote}}",
         "return": "أعاد {{actor}} الخصم على {{quote}}: {{note}}"
-      }
+      },
+      "quote_accepted": "سجّل {{actor}} قبول {{quote}}"
     },
     "changes": {
       "shoot": {

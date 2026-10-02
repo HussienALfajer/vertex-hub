@@ -116,6 +116,17 @@ export function notificationText(
         }),
         context: context(notification.data.quote.client, notification.data.quote.title),
       };
+    case 'quote_accepted':
+      return {
+        text: t('notifications.text.quote_accepted', {
+          actor,
+          quote: notification.data.quote.displayNumber,
+        }),
+        context: context(
+          notification.data.quote.client,
+          notification.data.project ?? notification.data.retainer ?? notification.data.quote.title,
+        ),
+      };
     case 'retainer_renewal_due': {
       const { data } = notification;
       return {
@@ -305,6 +316,7 @@ type TaskNotification = Exclude<
       | 'retainer_behind'
       | 'quote_approval_requested'
       | 'quote_approval_decided'
+      | 'quote_accepted'
       | 'approval_responded'
       | 'approval_no_response'
       | 'approval_expired'

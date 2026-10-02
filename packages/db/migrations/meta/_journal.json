@@ -190,6 +190,13 @@
       "when": 1790929731423,
       "tag": "0026_last_vector",
       "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1790936605035,
+      "tag": "0027_burly_zarda",
+      "breakpoints": true
     }
   ]
 }

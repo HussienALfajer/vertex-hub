@@ -47,6 +47,7 @@ import {
   type ProjectLink,
 } from '../projects/index.js';
 import { TaskGenerator } from '../tasks/index.js';
+import type { NewProjectPlan } from './template-runner.js';
 import { type TemplateForRun, TemplatesService } from './templates.service.js';
 
 type Executor = Database | Transaction;
@@ -114,6 +115,60 @@ export class TemplateRunsService implements OnModuleInit {
       return this.create(tx, prepared, 'manual', toActor(actor));
     });
     return this.one(runId);
+  }
+
+  /**
+   * F04 A4: applies a project template to a project inside the caller's transaction, which locked
+   * access changes: default assignees, the later of the project's start and today, and
+   * `revisionLimit` on every task; the tasks have no creator.
+   */
+  async applyInTransaction(
+    tx: Transaction,
+    actor: CurrentUserInfo,
+    templateId: string,
+    projectId: string,
+    revisionLimit: number,
+  ): Promise<string> {
+    const prepared = await this.prepare(tx, actor, templateId, {
+      projectId,
+      revisionLimit,
+      assignees: [],
+    });
+    return this.create(tx, prepared, 'manual', toActor(actor), { systemTasks: true });
+  }
+
+  /**
+   * F04 A2–A3: what each project template would create on a new project starting `startDate`:
+   * the milestones of its stages (with their latest due date) and its tasks' latest due date.
+   * Archived templates and templates of another kind are left out.
+   */
+  async planNewProject(
+    templateIds: string[],
+    startDate: CalendarDate,
+    transaction?: Transaction,
+  ): Promise<Map<string, NewProjectPlan>> {
+    const run = async (tx: Transaction) => {
+      const plans = new Map<string, NewProjectPlan>();
+      for (const id of new Set(templateIds)) {
+        const template = await this.templates.forRun(tx, id);
+        if (!template || template.archivedAt || template.kind !== 'project') continue;
+        const plan = await this.plan(tx, template, [], {
+          type: 'project',
+          startDate,
+          dueDate: startDate,
+          milestones: [],
+          earlierRuns: 0,
+        });
+        const lastDue =
+          plan.tasks
+            .map((task) => task.dueDate)
+            .sort()
+            .at(-1) ?? null;
+        plans.set(id, { milestones: plan.milestonesToCreate, lastDue });
+      }
+      return plans;
+    };
+    return transaction ? run(transaction) : this.db.transaction(run);
   }
 
   /** Rule 18: instances of the repeated step for what a line of the open cycle is missing. */
@@ -208,13 +263,19 @@ export class TemplateRunsService implements OnModuleInit {
         .where(
           and(eq(templateRuns.templateId, templateId), eq(templateRuns.projectId, project.id)),
         );
-      const plan = await this.plan(tx, template, input.assignees, {
-        type: 'project',
-        startDate,
-        dueDate: project.dueDate,
-        milestones,
-        earlierRuns: earlier?.value ?? 0,
-      });
+      const plan = await this.plan(
+        tx,
+        template,
+        input.assignees,
+        {
+          type: 'project',
+          startDate,
+          dueDate: project.dueDate,
+          milestones,
+          earlierRuns: earlier?.value ?? 0,
+        },
+        input.revisionLimit,
+      );
       return { template, target: { type: 'project', project }, plan };
     }
 
@@ -253,13 +314,14 @@ export class TemplateRunsService implements OnModuleInit {
    * Plans with the chosen assignees over the template's defaults (rule 10). A chosen user other
    * than the default must be an active member of the department (`INVALID_ASSIGNEE`); a default
    * that became invalid is replaced by the queue in the plan. A project run that would pass 30
-   * milestones is refused (`LIMIT_REACHED`, rule 13).
+   * milestones is refused (`LIMIT_REACHED`, rule 13). `revisionLimit` replaces every step's.
    */
   private async plan(
     tx: Transaction,
     template: TemplateForRun,
     chosen: TemplateRunInput['assignees'],
     target: PlanTarget,
+    revisionLimit?: number,
   ): Promise<TemplateRunPlan> {
     const defaults = new Map(template.assignees.map((a) => [a.department, a.userId]));
     const assigned = new Map<DepartmentCode, string | null>(defaults);
@@ -289,6 +351,7 @@ export class TemplateRunsService implements OnModuleInit {
         user: userId ? { id: userId, name: people.get(userId)?.name ?? '' } : null,
       })),
       isMember: (userId, department) => pairs.has(`${userId}:${department}`),
+      revisionLimit,
     });
     if (target.type === 'project') {
       const total = target.milestones.length + plan.milestonesToCreate.length;
@@ -301,12 +364,16 @@ export class TemplateRunsService implements OnModuleInit {
     return plan;
   }
 
-  /** Writes a planned run: milestones, the run, its tasks and the audit entries (one transaction). */
+  /**
+   * Writes a planned run: milestones, the run, its tasks and the audit entries (one transaction).
+   * `systemTasks`: the tasks have no creator, as automatic tasks (F04 A4).
+   */
   private async create(
     tx: Transaction,
     { template, target, plan }: PreparedRun,
     trigger: TemplateRunTrigger,
     actor: AuditActor | null,
+    options: { systemTasks?: boolean } = {},
   ): Promise<string> {
     const project = target.type === 'project' ? target.project : null;
     const cycle = target.type === 'cycle' ? target.cycle : null;
@@ -352,7 +419,7 @@ export class TemplateRunsService implements OnModuleInit {
         checklist: task.checklist,
         dependsOn: task.dependsOn,
       })),
-      actor,
+      options.systemTasks ? null : actor,
       runId,
     );
     if (plan.tasks.length > 0) {
@@ -619,33 +686,46 @@ export class TemplateRunsService implements OnModuleInit {
   ): Promise<RetainerTemplate> {
     await this.db.transaction(async (tx) => {
       await this.engagements.workableRetainer(tx, actor, retainerId);
-      const next = input.templateId ? await this.templates.forRun(tx, input.templateId) : null;
-      if (input.templateId && !next) throw new NotFoundException();
-      if (next) assertTemplate(next, 'retainer_cycle');
-      const current = await this.linkedTemplate(tx, retainerId);
-      if ((current?.id ?? null) === (next?.id ?? null)) return;
-      if (next) {
-        await tx
-          .insert(retainerTemplates)
-          .values({ retainerId, templateId: next.id, linkedById: actor.id })
-          .onConflictDoUpdate({
-            target: retainerTemplates.retainerId,
-            set: { templateId: next.id, linkedById: actor.id, updatedAt: new Date() },
-          });
-      } else {
-        await tx.delete(retainerTemplates).where(eq(retainerTemplates.retainerId, retainerId));
-      }
-      const summary = (t: TemplateForRun | null) => (t ? { id: t.id, name: t.name } : null);
-      await recordAudit(tx, {
-        actor: toActor(actor),
-        action: 'retainer.template_changed',
-        entityType: 'retainer',
-        entityId: retainerId,
-        before: { template: summary(current) },
-        after: { template: summary(next) },
-      });
+      await this.linkInTransaction(tx, actor, retainerId, input.templateId);
     });
     return this.retainerTemplate(actor, retainerId);
+  }
+
+  /**
+   * Rule 19 on a retainer the caller locked as workable (F04 A5, A7): links (or unlinks) a
+   * non-archived monthly template; it applies from the next cycle the retainer opens.
+   */
+  async linkInTransaction(
+    tx: Transaction,
+    actor: CurrentUserInfo,
+    retainerId: string,
+    templateId: string | null,
+  ): Promise<void> {
+    const next = templateId ? await this.templates.forRun(tx, templateId) : null;
+    if (templateId && !next) throw new NotFoundException();
+    if (next) assertTemplate(next, 'retainer_cycle');
+    const current = await this.linkedTemplate(tx, retainerId);
+    if ((current?.id ?? null) === (next?.id ?? null)) return;
+    if (next) {
+      await tx
+        .insert(retainerTemplates)
+        .values({ retainerId, templateId: next.id, linkedById: actor.id })
+        .onConflictDoUpdate({
+          target: retainerTemplates.retainerId,
+          set: { templateId: next.id, linkedById: actor.id, updatedAt: new Date() },
+        });
+    } else {
+      await tx.delete(retainerTemplates).where(eq(retainerTemplates.retainerId, retainerId));
+    }
+    const summary = (t: TemplateForRun | null) => (t ? { id: t.id, name: t.name } : null);
+    await recordAudit(tx, {
+      actor: toActor(actor),
+      action: 'retainer.template_changed',
+      entityType: 'retainer',
+      entityId: retainerId,
+      before: { template: summary(current) },
+      after: { template: summary(next) },
+    });
   }
 }
 

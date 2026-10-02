@@ -10,7 +10,13 @@ import {
   sortOrderSchema,
 } from './lists.js';
 import { currencySchema, minorAmountSchema } from './money.js';
-import { deliverableKindSchema } from './retainers.js';
+import { engagementDepartmentsSchema, projectNameSchema } from './projects.js';
+import {
+  type DeliverableKind,
+  deliverableKey,
+  deliverableKindSchema,
+  retainerStatusSchema,
+} from './retainers.js';
 import { TASK_LIMITS } from './tasks.js';
 import { optionalText } from './text.js';
 
@@ -441,6 +447,8 @@ export const quotePermissionsSchema = z
     canReject: z.boolean(),
     canCreateVersion: z.boolean(),
     canArchive: z.boolean(),
+    /** A sent quote, with `projects.manage` over the client too (A1). */
+    canAccept: z.boolean(),
     /** A draft: "Preview PDF"; a sent version whose PDF is not ready: "Render again". */
     canRenderPdf: z.boolean(),
   })
@@ -524,6 +532,9 @@ export const quoteDetailSchema = quoteSchema
     versions: z.array(
       z.object({ id: z.uuid(), version: z.number().int(), status: quoteStatusSchema }),
     ),
+    /** The engagements its acceptance created or renewed (A9). */
+    project: z.object({ id: z.uuid(), name: z.string() }).nullable(),
+    retainer: z.object({ id: z.uuid(), name: z.string() }).nullable(),
     /** The PDF of a version that was sent (rule 12); null for drafts. */
     pdf: z.object({ state: quotePdfStateSchema }).nullable(),
     /** The last draft preview (rule 13); null when none was asked for, and once sent. */
@@ -550,6 +561,9 @@ export const quoteListQuerySchema = pageQuerySchema.extend({
   clientId: z.uuid().optional(),
   accountManagerId: z.uuid().optional(),
   approval: z.enum(['pending']).optional(),
+  /** Accepted quotes that created this project or created or renewed this retainer. */
+  projectId: z.uuid().optional(),
+  retainerId: z.uuid().optional(),
   /** `true` lists discarded drafts only; needs `quotes.read` with scope all. */
   archived: queryBooleanSchema.default(false),
   /** Only the newest version of each number. */
@@ -606,3 +620,195 @@ export const quoteSnapshotSchema = z
   .meta({ id: 'QuoteSnapshot' });
 
 export type QuoteSnapshot = z.infer<typeof quoteSnapshotSchema>;
+
+// Acceptance and A01 (A1–A12)
+
+/** A counted line or package item of the monthly section (A6). */
+export interface CountedQuoteItem {
+  kind: DeliverableKind;
+  label: string | null;
+  quantity: number;
+  revisionRounds: number;
+}
+
+/** A deliverable line of the retainer an accepted quote creates or renews. */
+export interface AcceptedDeliverableLine {
+  kind: DeliverableKind;
+  label: string | null;
+  monthlyQuantity: number;
+  revisionLimit: number;
+}
+
+/**
+ * A6: one deliverable line per `(kind, label)`, in first-seen order, quantities summed and the
+ * highest revision rounds as its revision limit; the first label's spelling is kept.
+ */
+export function mergeDeliverableLines(
+  items: readonly CountedQuoteItem[],
+): AcceptedDeliverableLine[] {
+  const lines = new Map<string, AcceptedDeliverableLine>();
+  for (const item of items) {
+    const key = deliverableKey(item);
+    const line = lines.get(key);
+    if (line) {
+      line.monthlyQuantity += item.quantity;
+      line.revisionLimit = Math.max(line.revisionLimit, item.revisionRounds);
+    } else {
+      lines.set(key, {
+        kind: item.kind,
+        label: item.label,
+        monthlyQuantity: item.quantity,
+        revisionLimit: item.revisionRounds,
+      });
+    }
+  }
+  return [...lines.values()];
+}
+
+/**
+ * A3: the default milestone of each installment, as indexes into `milestones`: the first to the
+ * first, the last to the last, the others in order (capped at the last).
+ */
+export function defaultInstallmentMilestones(installments: number, milestones: number): number[] {
+  if (milestones === 0) return [];
+  return Array.from({ length: installments }, (_, index) =>
+    index === installments - 1 ? milestones - 1 : Math.min(index, milestones - 1),
+  );
+}
+
+/** The dialog's current choices, so the plan follows them (A2–A5). */
+export const acceptPlanQuerySchema = z.object({
+  /** Default today. */
+  projectStartDate: calendarDateSchema.optional(),
+  /** `true`: `templateIds` is the dialog's choice, none included; otherwise the defaults (A2). */
+  chooseTemplates: queryBooleanSchema.default(false),
+  templateIds: queryListSchema(z.uuid()).default([]),
+  /** Default today. */
+  retainerStartDate: calendarDateSchema.optional(),
+});
+
+export type AcceptPlanQuery = z.infer<typeof acceptPlanQuerySchema>;
+
+const acceptPersonSchema = z.object({ id: z.uuid(), name: z.string() });
+
+export const acceptPlanSchema = z
+  .object({
+    /** The earliest response date: the sent day (A1). */
+    sentOn: calendarDateSchema,
+    /** The one-off section's project (A2–A4); null without one-off lines. */
+    project: z
+      .object({
+        name: z.string(),
+        /** The client's account manager. */
+        projectManager: acceptPersonSchema,
+        departments: z.array(departmentCodeSchema),
+        startDate: calendarDateSchema,
+        /** The latest due date of the selected templates' plans, or start + 30 days. */
+        dueDate: calendarDateSchema,
+        /** The section's non-archived project templates, in line order (A2, A4). */
+        templates: z.array(
+          acceptPersonSchema.extend({
+            selected: z.boolean(),
+            /** The highest revision rounds of the lines and items that bring it (A4). */
+            revisionLimit: z.number().int().min(0),
+          }),
+        ),
+        /** The new project's milestones: the selected templates' stages, or the installments. */
+        milestones: z.array(z.object({ name: z.string(), dueDate: calendarDateSchema.nullable() })),
+        installments: z.array(
+          z.object({
+            name: z.string(),
+            percent: z.number().int(),
+            amountMinor: minorAmountSchema,
+            /** The default milestone, an index into `milestones`. */
+            milestone: z.number().int().min(0),
+          }),
+        ),
+      })
+      .nullable(),
+    /** The monthly section's retainer (A5–A7); null without monthly lines. */
+    retainer: z
+      .object({
+        name: z.string(),
+        departments: z.array(departmentCodeSchema),
+        startDate: calendarDateSchema,
+        /** Start + the term when a term is set. */
+        renewalDate: calendarDateSchema.nullable(),
+        /** The default monthly template; null when none is offered. */
+        template: acceptPersonSchema.nullable(),
+        currency: currencySchema,
+        /** The monthly net. */
+        monthlyFeeMinor: minorAmountSchema,
+        /** The merged deliverable lines (A6); uncounted services are left out. */
+        lines: z.array(
+          z.object({
+            kind: deliverableKindSchema,
+            label: z.string().nullable(),
+            monthlyQuantity: z.number().int().min(1),
+            revisionLimit: z.number().int().min(0),
+          }),
+        ),
+        /** The client's active or paused retainers in the quote's currency (A5, edge case 9). */
+        renewable: z.array(acceptPersonSchema.extend({ status: retainerStatusSchema })),
+      })
+      .nullable(),
+    /** Templates of the quote archived since: skipped, with a warning (C3, edge case 8). */
+    archivedTemplates: z.array(acceptPersonSchema),
+  })
+  .meta({ id: 'AcceptPlan' });
+
+export type AcceptPlan = z.infer<typeof acceptPlanSchema>;
+
+const acceptRetainerSchema = z.discriminatedUnion('mode', [
+  z.object({
+    mode: z.literal('new'),
+    name: projectNameSchema,
+    departments: engagementDepartmentsSchema,
+    startDate: calendarDateSchema,
+    renewalDate: calendarDateSchema.nullable(),
+    templateId: z.uuid().nullable(),
+  }),
+  z.object({
+    mode: z.literal('renew'),
+    retainerId: z.uuid(),
+    /** Replaces the retainer's monthly template when set (A7). */
+    templateId: z.uuid().nullable(),
+  }),
+]);
+
+/**
+ * A1–A9. `project` is required when the quote has one-off lines and `retainer` when it has
+ * monthly lines; each is refused otherwise.
+ */
+export const acceptQuoteSchema = z
+  .object({
+    /** From the sent day to today (`INVALID_DATES`). */
+    respondedOn: calendarDateSchema,
+    contactId: z.uuid().nullable().default(null),
+    note: optionalText(1000).default(null),
+    /** An F10 upload, attached as a document of the quote. */
+    proofUploadId: z.uuid().nullable().default(null),
+    project: z
+      .object({
+        name: projectNameSchema,
+        projectManagerId: z.uuid(),
+        departments: engagementDepartmentsSchema,
+        startDate: calendarDateSchema,
+        dueDate: calendarDateSchema,
+        /** Applied in this order; the milestones follow from them as in the plan (A3). */
+        templateIds: z
+          .array(z.uuid())
+          .max(QUOTE_LIMITS.lines)
+          .refine((ids) => new Set(ids).size === ids.length, 'Each template once'),
+        /** Per installment, in order: its milestone, an index into the plan's milestones. */
+        installmentMilestones: z.array(z.number().int().min(0)).max(QUOTE_LIMITS.installments),
+      })
+      .nullable()
+      .default(null),
+    retainer: acceptRetainerSchema.nullable().default(null),
+  })
+  .meta({ id: 'AcceptQuote' });
+
+export type AcceptQuote = z.infer<typeof acceptQuoteSchema>;
+
+export type AcceptQuoteInput = z.input<typeof acceptQuoteSchema>;

@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+  acceptPlanQuerySchema,
+  acceptQuoteSchema,
+  defaultInstallmentMilestones,
   installmentsValid,
+  mergeDeliverableLines,
   needsDiscountApproval,
   type QuoteDraftInput,
   type QuoteTotalsInput,
@@ -219,6 +223,93 @@ describe('quoteListQuerySchema', () => {
       latestOnly: true,
       archived: false,
       sort: 'updatedAt',
+    });
+  });
+});
+
+describe('mergeDeliverableLines (A6)', () => {
+  it('merges by kind and label, sums quantities and keeps the highest rounds', () => {
+    expect(
+      mergeDeliverableLines([
+        { kind: 'design', label: null, quantity: 12, revisionRounds: 2 },
+        { kind: 'reel', label: null, quantity: 4, revisionRounds: 1 },
+        { kind: 'design', label: null, quantity: 3, revisionRounds: 3 },
+        { kind: 'other', label: 'Blog', quantity: 2, revisionRounds: 0 },
+        { kind: 'other', label: 'blog', quantity: 1, revisionRounds: 1 },
+        { kind: 'other', label: 'Vlog', quantity: 1, revisionRounds: 2 },
+      ]),
+    ).toEqual([
+      { kind: 'design', label: null, monthlyQuantity: 15, revisionLimit: 3 },
+      { kind: 'reel', label: null, monthlyQuantity: 4, revisionLimit: 1 },
+      { kind: 'other', label: 'Blog', monthlyQuantity: 3, revisionLimit: 1 },
+      { kind: 'other', label: 'Vlog', monthlyQuantity: 1, revisionLimit: 2 },
+    ]);
+  });
+});
+
+describe('defaultInstallmentMilestones (A3)', () => {
+  it('maps the first to the first, the last to the last and the others in order', () => {
+    expect(defaultInstallmentMilestones(2, 4)).toEqual([0, 3]);
+    expect(defaultInstallmentMilestones(3, 4)).toEqual([0, 1, 3]);
+    expect(defaultInstallmentMilestones(4, 2)).toEqual([0, 1, 1, 1]);
+    expect(defaultInstallmentMilestones(1, 3)).toEqual([2]);
+    expect(defaultInstallmentMilestones(2, 0)).toEqual([]);
+  });
+});
+
+describe('acceptQuoteSchema', () => {
+  const project = {
+    name: 'Brand identity',
+    projectManagerId: service,
+    departments: ['design'],
+    startDate: '2026-10-02',
+    dueDate: '2026-11-01',
+    templateIds: [pkg],
+    installmentMilestones: [0, 0],
+  };
+
+  it('takes a response with a project and a new or renewed retainer', () => {
+    const parsed = acceptQuoteSchema.parse({
+      respondedOn: '2026-10-02',
+      project,
+      retainer: { mode: 'renew', retainerId: pkg, templateId: null },
+    });
+    expect(parsed).toMatchObject({ contactId: null, note: null, proofUploadId: null });
+    expect(
+      acceptQuoteSchema.safeParse({
+        respondedOn: '2026-10-02',
+        retainer: {
+          mode: 'new',
+          name: 'Social',
+          departments: ['design', 'design'],
+          startDate: '2026-10-02',
+          renewalDate: null,
+          templateId: null,
+        },
+      }).data?.retainer,
+    ).toMatchObject({ departments: ['design'] });
+  });
+
+  it('refuses a template twice and a retainer without its mode fields', () => {
+    expect(
+      acceptQuoteSchema.safeParse({
+        respondedOn: '2026-10-02',
+        project: { ...project, templateIds: [pkg, pkg] },
+      }).success,
+    ).toBe(false);
+    expect(
+      acceptQuoteSchema.safeParse({
+        respondedOn: '2026-10-02',
+        retainer: { mode: 'renew', templateId: null },
+      }).success,
+    ).toBe(false);
+  });
+
+  it('reads the plan query: defaults unless the templates are chosen', () => {
+    expect(acceptPlanQuerySchema.parse({})).toEqual({ chooseTemplates: false, templateIds: [] });
+    expect(acceptPlanQuerySchema.parse({ chooseTemplates: 'true', templateIds: pkg })).toEqual({
+      chooseTemplates: true,
+      templateIds: [pkg],
     });
   });
 });

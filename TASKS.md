@@ -32,14 +32,15 @@ Spec: `docs/specs/F04-catalog-quotes.md` · ADRs 0006, 0007, 0008, 0013, 0014, 0
 - [x] wiring checklist, full checks (+ drift, E2E), reviewer (one finding fixed: quote documents read-only so the frozen PDF stays), owner acceptance (approved), /ship
 
 ## PR 4 — `feat/f04-quote-accept-api`: acceptance and A01
-- [ ] contracts: `revisionLimit` on retainer deliverables and cycle lines, template run `revisionLimit`, accept plan and accept schemas, A6 merge function with unit tests, error codes (`TEMPLATE_ARCHIVED`, `CURRENCY_MISMATCH`, …), notification `quote_accepted`
-- [ ] db (`/db-migration`): `revision_limit` on `retainer_deliverables` and `retainer_cycle_lines`, `quotes.project_id` / `retainer_id` foreign keys if not in PR 2; drift
-- [ ] api `projects`: `EngagementFactory` (create project with milestones, create retainer with lines and template link and current cycle, renew per R10) inside the caller's transaction; deliverable editor accepts `revisionLimit`
-- [ ] api `templates`: `TemplateRunner` with the revision override; cycle runs use the line's `revision_limit`
-- [ ] list filters `projectId`, `retainerId` and detail links to the project and retainer (columns arrive here)
-- [ ] api `quotes`: `GET accept-plan`, `POST accept` (A1–A12 in one transaction, proof upload, A10 archives a newer draft, row lock); `test/quote-accept.test.ts` (rollback, renew from next cycle, revision limits on generated tasks)
-- [ ] bridge; adapt retainer screens and fixtures to `revisionLimit`; web typecheck
-- [ ] wiring checklist, full checks (+ E2E, drift), reviewer, owner acceptance, /ship
+- [x] contracts: `revisionLimit` on retainer deliverables and cycle lines, template run `revisionLimit` (planner override and line limit), accept plan and accept schemas, `mergeDeliverableLines` (A6) and `defaultInstallmentMilestones` (A3) with unit tests, `addMonths`, error codes (`CURRENCY_MISMATCH`, `QUOTE_EXPIRED`), audit `quote.accepted`, notification `quote_accepted`, `canAccept`, detail `project` / `retainer`; `ar.json` keys (errors, audit action and fields, notification type and text)
+- [x] db (`/db-migration`): `revision_limit` on `retainer_deliverables` and `retainer_cycle_lines`, `quotes.project_id` / `retainer_id` foreign keys, `quote_accepted` notification type; migration 0027 (additive); drift
+- [x] api `projects`: `EngagementFactory` (create project with milestones, create retainer with lines, start it after the template link, renew per R10 keeping lines of the same kind and label) inside the caller's transaction; deliverable editor accepts `revisionLimit`; cycles copy it
+- [x] api `templates`: `TemplateRunner` (plan for a new project, apply with the revision override and no task creator, link a monthly template); cycle runs use the line's `revision_limit`
+- [x] api `files`: `GeneratedFiles.attachUpload` for the acceptance proof
+- [x] list filters `projectId`, `retainerId` and detail links to the project and retainer
+- [x] api `quotes`: `GET accept-plan`, `POST accept` (A1–A12 in one transaction, proof upload, A10 archives a newer draft, row lock); `test/quote-accept.test.ts` (rollback, renew from next cycle, revision limits on generated tasks); `docs/architecture.md`, spec details settled
+- [x] bridge; adapt retainer screens and fixtures to `revisionLimit` (the lines editor keeps it on save); web typecheck
+- [x] wiring checklist, full checks (+ E2E, drift), reviewer (four findings fixed: long proof names, template dates from a past start, planning inside the accept transaction, missing error-code tests), owner acceptance (approved), /ship
 
 ## PR 5 — `feat/f04-quotes-web`: quote screens
 - [ ] web: the `quote` notification link opens `/quotes/$quoteId` (it opens the home page until this PR)

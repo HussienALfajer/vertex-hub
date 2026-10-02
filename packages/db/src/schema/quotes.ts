@@ -26,8 +26,8 @@ import { catalogPackages, catalogServices } from './catalog.js';
 import { clientContacts, clients } from './clients.js';
 import { archivedAt, id, minorAmount, timestamps } from './columns.js';
 import { fileItems } from './files.js';
-import { currencyEnum } from './projects.js';
-import { deliverableKindEnum } from './retainers.js';
+import { currencyEnum, projects } from './projects.js';
+import { deliverableKindEnum, retainers } from './retainers.js';
 import { workTemplates } from './templates.js';
 
 /*
@@ -112,6 +112,9 @@ export const quotes = pgTable(
     responseNote: text('response_note'),
     respondedById: uuid('responded_by_id').references(() => users.id),
     rejectionReason: quoteRejectionReasonEnum('rejection_reason'),
+    /** Set by A01: the project created and the retainer created or renewed. */
+    projectId: uuid('project_id').references(() => projects.id),
+    retainerId: uuid('retainer_id').references(() => retainers.id),
     /** The frozen render payload of a sent version (`quoteSnapshotSchema`, rule 12). */
     snapshot: jsonb('snapshot'),
     /** The PDF of a sent version (rule 12); null for drafts. */
@@ -144,6 +147,8 @@ export const quotes = pgTable(
     index('quotes_responded_by_id_idx').on(table.respondedById),
     index('quotes_created_by_id_idx').on(table.createdById),
     index('quotes_pdf_file_item_id_idx').on(table.pdfFileItemId),
+    index('quotes_project_id_idx').on(table.projectId),
+    index('quotes_retainer_id_idx').on(table.retainerId),
     check('quotes_title_check', sql`char_length(${table.title}) between 1 and 120`),
     check('quotes_version_check', sql`${table.version} >= 1`),
     check(

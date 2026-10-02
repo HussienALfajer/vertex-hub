@@ -153,6 +153,7 @@ export const AUDIT_ACTIONS = [
   'quote.extended',
   'quote.expired',
   'quote.rejected',
+  'quote.accepted',
   'quote.version_created',
   'quote.superseded',
   'quote.archived',

@@ -79,6 +79,8 @@ export const retainerDeliverables = pgTable(
     kind: deliverableKindEnum('kind').notNull(),
     label: text('label'),
     monthlyQuantity: integer('monthly_quantity').notNull(),
+    /** The revision rounds of the line's generated tasks (F04); null: the template step's. */
+    revisionLimit: integer('revision_limit'),
     position: integer('position').notNull(),
     ...timestamps(),
     archivedAt: archivedAt(),
@@ -89,6 +91,10 @@ export const retainerDeliverables = pgTable(
       .on(table.retainerId, table.kind, sql`lower(coalesce(${table.label}, ''))`)
       .where(sql`${table.archivedAt} is null`),
     check('retainer_deliverables_quantity_check', sql`${table.monthlyQuantity} between 1 and 999`),
+    check(
+      'retainer_deliverables_revision_limit_check',
+      sql`${table.revisionLimit} between 0 and 20`,
+    ),
     check(
       'retainer_deliverables_label_check',
       sql`${table.kind} <> 'other' or ${table.label} is not null`,
@@ -133,6 +139,8 @@ export const retainerCycleLines = pgTable(
     kind: deliverableKindEnum('kind').notNull(),
     label: text('label'),
     committedQuantity: integer('committed_quantity').notNull(),
+    /** Copied from the standing line (F04); null: the template step's. */
+    revisionLimit: integer('revision_limit'),
     /** Frozen when the cycle closes (R8). */
     deliveredAtClose: integer('delivered_at_close'),
     position: integer('position').notNull(),
@@ -147,6 +155,10 @@ export const retainerCycleLines = pgTable(
       sql`lower(coalesce(${table.label}, ''))`,
     ),
     check('retainer_cycle_lines_quantity_check', sql`${table.committedQuantity} between 0 and 999`),
+    check(
+      'retainer_cycle_lines_revision_limit_check',
+      sql`${table.revisionLimit} between 0 and 20`,
+    ),
     check(
       'retainer_cycle_lines_delivered_check',
       sql`${table.deliveredAtClose} is null or ${table.deliveredAtClose} >= 0`,

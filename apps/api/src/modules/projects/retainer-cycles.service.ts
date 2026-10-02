@@ -71,6 +71,7 @@ const lineColumns = {
   kind: retainerCycleLines.kind,
   label: retainerCycleLines.label,
   committedQuantity: retainerCycleLines.committedQuantity,
+  revisionLimit: retainerCycleLines.revisionLimit,
   deliveredAtClose: retainerCycleLines.deliveredAtClose,
   position: retainerCycleLines.position,
 };
@@ -82,6 +83,7 @@ interface LineRow {
   kind: DeliverableKind;
   label: string | null;
   committedQuantity: number;
+  revisionLimit: number | null;
   deliveredAtClose: number | null;
   position: number;
 }
@@ -196,6 +198,7 @@ export class RetainerCyclesService implements OnModuleInit {
         kind: retainerDeliverables.kind,
         label: retainerDeliverables.label,
         monthlyQuantity: retainerDeliverables.monthlyQuantity,
+        revisionLimit: retainerDeliverables.revisionLimit,
       })
       .from(retainerDeliverables)
       .where(
@@ -211,6 +214,7 @@ export class RetainerCyclesService implements OnModuleInit {
       kind: line.kind,
       label: line.label,
       committedQuantity: line.monthlyQuantity,
+      revisionLimit: line.revisionLimit,
       position: index + 1,
     }));
     if (lines.length > 0) await tx.insert(retainerCycleLines).values(lines);
@@ -555,6 +559,7 @@ export class RetainerCyclesService implements OnModuleInit {
             deliverableId: line.deliverableId,
             kind: line.kind,
             label: line.label,
+            revisionLimit: line.revisionLimit,
             position: line.position,
             committed: line.committedQuantity,
             delivered,

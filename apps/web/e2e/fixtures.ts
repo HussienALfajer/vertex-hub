@@ -1897,6 +1897,8 @@ interface CycleLineRecord {
   deliverableId: string | null;
   kind: DeliverableKind;
   label: string | null;
+  /** Copied from the standing line (F04). */
+  revisionLimit: number | null;
   committed: number;
   /** Frozen when the cycle closes (R8). */
   deliveredAtClose: number | null;
@@ -1922,6 +1924,7 @@ interface DeliverableRecord {
   kind: DeliverableKind;
   label: string | null;
   monthlyQuantity: number;
+  revisionLimit: number | null;
   archived: boolean;
 }
 
@@ -1947,7 +1950,14 @@ const deliverable = (
   kind: DeliverableKind,
   monthlyQuantity: number,
   label: string | null = null,
-): DeliverableRecord => ({ id: id(n), kind, label, monthlyQuantity, archived: false });
+): DeliverableRecord => ({
+  id: id(n),
+  kind,
+  label,
+  monthlyQuantity,
+  revisionLimit: null,
+  archived: false,
+});
 
 /** A cycle line with a delivered count: frozen when `closed`, otherwise one adjustment. */
 const cycleLine = (
@@ -1962,6 +1972,7 @@ const cycleLine = (
   deliverableId: 'id' in source ? source.id : null,
   kind: source.kind,
   label: source.label,
+  revisionLimit: 'id' in source ? source.revisionLimit : null,
   committed,
   deliveredAtClose: closed ? delivered : null,
   afterClose,
@@ -2169,6 +2180,7 @@ function retainerRoutes({ users, clients, retainers, me }: RetainerState) {
       deliverableId: line.deliverableId,
       kind: line.kind,
       label: line.label,
+      revisionLimit: line.revisionLimit,
       position: c.lines.indexOf(line) + 1,
       committed: line.committed,
       delivered,
@@ -2240,6 +2252,7 @@ function retainerRoutes({ users, clients, retainers, me }: RetainerState) {
       kind: d.kind,
       label: d.label,
       monthlyQuantity: d.monthlyQuantity,
+      revisionLimit: d.revisionLimit,
       position: index + 1,
     })),
     archivedAt: r.archived ? '2026-10-01T10:00:00.000Z' : null,
@@ -2370,12 +2383,17 @@ function retainerRoutes({ users, clients, retainers, me }: RetainerState) {
       for (const d of retainer.deliverables) if (!kept.has(d.id)) d.archived = true;
       const ordered = lines.map((line) => {
         const existing = retainer.deliverables.find((d) => d.id === line.id);
-        if (!existing)
-          return deliverable(next++, line.kind, line.monthlyQuantity, line.label ?? null);
+        if (!existing) {
+          return {
+            ...deliverable(next++, line.kind, line.monthlyQuantity, line.label ?? null),
+            revisionLimit: line.revisionLimit ?? null,
+          };
+        }
         return Object.assign(existing, {
           kind: line.kind,
           label: line.label ?? null,
           monthlyQuantity: line.monthlyQuantity,
+          revisionLimit: line.revisionLimit ?? null,
         });
       });
       retainer.deliverables = [...ordered, ...retainer.deliverables.filter((d) => d.archived)];

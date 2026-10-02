@@ -22,6 +22,12 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import {
+  type AcceptPlan,
+  type AcceptPlanQuery,
+  type AcceptQuote,
+  acceptPlanQuerySchema,
+  acceptPlanSchema,
+  acceptQuoteSchema,
   type CreateQuote,
   createQuoteSchema,
   type ExtendQuote,
@@ -47,6 +53,7 @@ import {
 } from '@vertex-hub/contracts';
 import { RequirePermissions } from '../../core/access/index.js';
 import { CurrentUser, type CurrentUserInfo } from '../auth/index.js';
+import { QuoteAcceptService } from './quote-accept.service.js';
 import { QuotePdfService } from './quote-pdf.service.js';
 import { QuoteWorkflowService } from './quote-workflow.service.js';
 import { QuotesService } from './quotes.service.js';
@@ -58,6 +65,7 @@ export class QuotesController {
     private readonly quotes: QuotesService,
     private readonly workflow: QuoteWorkflowService,
     private readonly pdf: QuotePdfService,
+    private readonly acceptance: QuoteAcceptService,
   ) {}
 
   @Get()
@@ -177,6 +185,37 @@ export class QuotesController {
     @Body({ schema: rejectQuoteSchema }) input: RejectQuote,
   ): Promise<QuoteDetail> {
     return this.workflow.reject(actor, id, input);
+  }
+
+  @Get(':id/accept-plan')
+  @RequirePermissions('quotes.manage', 'projects.manage')
+  @SerializeOptions({ schema: acceptPlanSchema })
+  @ApiOkResponse({
+    description: "The accept dialog's defaults for its current choices (A2–A6)",
+    standardSchema: acceptPlanSchema,
+  })
+  acceptPlan(
+    @CurrentUser() actor: CurrentUserInfo,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query({ schema: acceptPlanQuerySchema }) query: AcceptPlanQuery,
+  ): Promise<AcceptPlan> {
+    return this.acceptance.plan(actor, id, query);
+  }
+
+  @Post(':id/accept')
+  @HttpCode(200)
+  @RequirePermissions('quotes.manage', 'projects.manage')
+  @SerializeOptions({ schema: quoteDetailSchema })
+  @ApiOkResponse({
+    description: 'The accepted quote, with the project and retainer it created or renewed (A01)',
+    standardSchema: quoteDetailSchema,
+  })
+  accept(
+    @CurrentUser() actor: CurrentUserInfo,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body({ schema: acceptQuoteSchema }) input: AcceptQuote,
+  ): Promise<QuoteDetail> {
+    return this.acceptance.accept(actor, id, input);
   }
 
   @Post(':id/versions')

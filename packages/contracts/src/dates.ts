@@ -59,6 +59,13 @@ export function addDays(date: CalendarDate, days: number): CalendarDate {
   return new Date((dayNumber(date) + days) * DAY_MS).toISOString().slice(0, 10);
 }
 
+/** `date` moved by whole months; a day the target month lacks becomes its last day. */
+export function addMonths(date: CalendarDate, months: number): CalendarDate {
+  const [year, month, day] = date.split('-').map(Number) as [number, number, number];
+  const target = new Date(Date.UTC(year, month - 1 + months, 1)).toISOString().slice(0, 10);
+  return addDays(target, Math.min(day, Number(lastOfMonth(target).slice(8))) - 1);
+}
+
 /** The first day of the calendar month of `date`. */
 export function firstOfMonth(date: CalendarDate): CalendarDate {
   return `${date.slice(0, 7)}-01`;

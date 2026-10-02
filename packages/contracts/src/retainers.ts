@@ -59,6 +59,8 @@ export const RETAINER_LIMITS = {
   deliverables: 20,
   cycleLines: 30,
   adjustmentsPerLine: 100,
+  /** A line's revision limit; the same bound as `TASK_LIMITS.revisionLimit` (no import: cycle). */
+  revisionLimit: 20,
 } as const;
 
 // Deliverable lines
@@ -76,10 +78,14 @@ const labelRequiredForOther = <T extends { kind: DeliverableKind; label?: string
 
 const labelRule = { message: 'A line of kind "other" needs a label', path: ['label'] };
 
+/** The revision rounds of the line's generated tasks (F04); null: the template step's. */
+const revisionLimitSchema = z.number().int().min(0).max(RETAINER_LIMITS.revisionLimit).nullable();
+
 const deliverableLineFieldsSchema = z.object({
   kind: deliverableKindSchema,
   label: deliverableLabelSchema.optional(),
   monthlyQuantity: z.number().int().min(1).max(999),
+  revisionLimit: revisionLimitSchema.optional(),
 });
 
 /** A line of a new retainer. */
@@ -133,6 +139,8 @@ export const deliverableLineSchema = z
     kind: deliverableKindSchema,
     label: z.string().nullable(),
     monthlyQuantity: z.number().int().min(1),
+    /** Null: the template step's revision limit. */
+    revisionLimit: z.number().int().min(0).nullable(),
     position: z.number().int().min(1),
   })
   .meta({ id: 'DeliverableLine' });
@@ -242,6 +250,8 @@ export const cycleLineSchema = z
     deliverableId: z.uuid().nullable(),
     kind: deliverableKindSchema,
     label: z.string().nullable(),
+    /** Copied from the standing line; null: the template step's. */
+    revisionLimit: z.number().int().min(0).nullable(),
     position: z.number().int().min(1),
     committed: z.number().int().min(0),
     /** Open cycle: delivered tasks + adjustments (R7). Closed cycle: frozen at close (R8). */

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  addMonths,
   businessDate,
   businessInstant,
   businessTimeOfDay,
@@ -109,5 +110,17 @@ describe('next work day (F14 rule 9)', () => {
   it('crosses month and year ends', () => {
     expect(nextWorkDay('2026-10-31')).toBe('2026-11-01');
     expect(nextWorkDay('2026-12-31')).toBe('2027-01-02');
+  });
+});
+
+describe('add months (F04 A5, A7)', () => {
+  it('keeps the day of the month', () => {
+    expect(addMonths('2026-10-02', 6)).toBe('2027-04-02');
+    expect(addMonths('2026-11-01', 1)).toBe('2026-12-01');
+  });
+
+  it('clamps to the last day of a shorter month', () => {
+    expect(addMonths('2026-01-31', 1)).toBe('2026-02-28');
+    expect(addMonths('2027-12-31', 2)).toBe('2028-02-29');
   });
 });

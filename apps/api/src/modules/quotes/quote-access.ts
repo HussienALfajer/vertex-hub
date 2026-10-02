@@ -48,6 +48,16 @@ export function assertCanManage(actor: CurrentUserInfo, client: ClientSummary): 
   }
 }
 
+/**
+ * A1: recording an acceptance also needs `projects.manage` over the client (scope `all`, or
+ * `own_clients` as its account manager), since it creates the engagements.
+ */
+export function coversEngagements(actor: CurrentUserInfo, client: ClientSummary): boolean {
+  const scopes = permissionScopes(actor.access, 'projects.manage');
+  if (scopes.includes('all')) return true;
+  return scopes.includes('own_clients') && client.accountManagerId === actor.id;
+}
+
 export const approvesDiscounts = (actor: CurrentUserInfo) =>
   hasPermission(actor.access, 'quotes.approve_discount');
 
