@@ -5,6 +5,7 @@ import {
   CLIENT_DECISIONS,
   CLIENT_PLATFORMS,
   CLIENT_STATUSES,
+  CREW_ROLES,
   CYCLE_STATUSES,
   DELIVERABLE_KINDS,
   DEPARTMENT_CODES,
@@ -24,6 +25,8 @@ import {
   REVISION_DECISIONS,
   REVISION_SOURCES,
   ROLES,
+  SHOOT_STATUSES,
+  SHOOT_TYPES,
   TASK_PRIORITIES,
   TASK_STATUSES,
   TASK_TYPES,
@@ -46,7 +49,18 @@ const text = (item: Item, key: string) =>
   typeof item[key] === 'string' ? (item[key] as string) : undefined;
 
 /** Fields whose values are codes, links or numbers: read left to right. */
-const LTR_FIELDS = new Set(['email', 'phone', 'url', 'contactId', 'host']);
+const LTR_FIELDS = new Set([
+  'email',
+  'phone',
+  'url',
+  'contactId',
+  'host',
+  'mapUrl',
+  'rawFilesSite',
+]);
+
+/** Fields that hold an instant. */
+const DATE_TIME_FIELDS = new Set(['occurredAt', 'expiresAt', 'startsAt', 'endsAt']);
 
 /** Money fields hold minor units (ADR 0006); the currency is a field of its own. */
 const isMoneyField = (field: string) => field.endsWith('Minor');
@@ -75,8 +89,14 @@ function enumLabel(
     if (cycle) return t(`retainers.cycleStatuses.${cycle}`);
     const task = entityType === 'task' ? find(TASK_STATUSES) : undefined;
     if (task) return t(`tasks.statuses.${task}`);
+    const shoot = entityType === 'shoot' ? find(SHOOT_STATUSES) : undefined;
+    if (shoot) return t(`calendar.shootStatuses.${shoot}`);
     const user = find(USER_STATUSES);
     if (user) return t(`users.statuses.${user}`);
+  }
+  if (entityType === 'shoot' && field === 'type') {
+    const type = find(SHOOT_TYPES);
+    if (type) return t(`calendar.shootTypes.${type}`);
   }
   if (entityType === 'task') {
     const priority = field === 'priority' ? find(TASK_PRIORITIES) : undefined;
@@ -155,10 +175,13 @@ export function AuditValue({
   entityType,
   field,
   value,
+  userName,
 }: {
   entityType: AuditEntityType;
   field: string;
   value: unknown;
+  /** Names the users a list refers to by id (a shoot's crew). */
+  userName?: (id: string) => string | undefined;
 }) {
   const { t } = useTranslation();
   const none = <span className="text-muted-foreground">{t('common.none')}</span>;
@@ -174,6 +197,7 @@ export function AuditValue({
             entityType={entityType}
             field={field}
             item={item}
+            userName={userName}
           />
         ))}
       </span>
@@ -201,7 +225,7 @@ export function AuditValue({
   if (field === 'month' && typeof value === 'string') {
     return <span>{formatMonth(value)}</span>;
   }
-  if ((field === 'occurredAt' || field === 'expiresAt') && typeof value === 'string') {
+  if (DATE_TIME_FIELDS.has(field) && typeof value === 'string') {
     return <span className="tabular-nums">{formatDateTime(value)}</span>;
   }
   if (entityType === 'file_item' && typeof value === 'number') {
@@ -229,10 +253,12 @@ function ListItem({
   entityType,
   field,
   item,
+  userName,
 }: {
   entityType: AuditEntityType;
   field: string;
   item: unknown;
+  userName?: (id: string) => string | undefined;
 }) {
   const { t } = useTranslation();
   if (field === 'departments' && DEPARTMENT_CODES.some((code) => code === item)) {
@@ -249,6 +275,29 @@ function ListItem({
         <span className="tabular-nums" dir="ltr">
           {line.count}
         </span>
+      </Badge>
+    );
+  }
+  // A shoot's crew member (F11): a team member by id or a freelancer by name, with the role.
+  const role = CREW_ROLES.find((known) => known === item.role);
+  if (role) {
+    const userId = text(item, 'userId');
+    const who = text(item, 'name') ?? (userId ? userName?.(userId) : undefined);
+    return (
+      <Badge tone="outline" dir="auto">
+        {[who, t(`calendar.crewRoles.${role}`), item.isLead === true && t('calendar.form.lead')]
+          .filter(Boolean)
+          .join(' · ')}
+      </Badge>
+    );
+  }
+  // A conflict accepted on save (F11 rule 5): who is booked elsewhere, and where.
+  const conflictUser = isItem(item.user) ? text(item.user, 'name') : undefined;
+  const conflictTitle = text(item, 'title');
+  if (conflictUser && conflictTitle && (item.kind === 'shoot' || item.kind === 'meeting')) {
+    return (
+      <Badge tone="outline" dir="auto">
+        {t(`calendar.conflicts.${item.kind}`, { name: conflictUser, title: conflictTitle })}
       </Badge>
     );
   }

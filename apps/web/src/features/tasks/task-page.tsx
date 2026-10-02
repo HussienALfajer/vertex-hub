@@ -19,6 +19,7 @@ import { isMissing, LoadError } from '../../components/load-error';
 import { can, useMe } from '../../lib/auth';
 import { formatCalendarDate, formatDateTime, formatNumber } from '../../lib/format';
 import { ClientApprovalSection } from '../approvals/task-approval-panel';
+import { TaskShootSection } from '../calendar/task-shoot-section';
 import { TaskPostSection } from '../content/task-post-section';
 import { PersonName, useDepartmentNames } from '../projects/project-badges';
 import { lineName } from '../retainers/retainer-badges';
@@ -85,6 +86,7 @@ function TaskView({ task }: { task: TaskDetail }) {
         </div>
         <div className="flex min-w-0 flex-col gap-6">
           {task.postId && <TaskPostSection postId={task.postId} />}
+          <TaskShootSection task={task} />
           <ClientApprovalSection task={task} />
           <DetailsSection task={task} />
           <DependenciesSection task={task} />

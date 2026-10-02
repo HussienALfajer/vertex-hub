@@ -19,6 +19,7 @@ import { Route as AppAuditRouteImport } from './routes/_app/audit'
 import { Route as AppDesignSystemRouteImport } from './routes/_app/design-system'
 import { Route as ATokenRouteImport } from './routes/a.$token'
 import { Route as AppApprovalsIndexRouteImport } from './routes/_app/approvals/index'
+import { Route as AppCalendarIndexRouteImport } from './routes/_app/calendar/index'
 import { Route as AppClientsIndexRouteImport } from './routes/_app/clients/index'
 import { Route as AppClientsClientIdRouteImport } from './routes/_app/clients/$clientId'
 import { Route as AppClientsNewRouteImport } from './routes/_app/clients/new'
@@ -33,6 +34,7 @@ import { Route as AppProjectsNewRouteImport } from './routes/_app/projects/new'
 import { Route as AppRetainersIndexRouteImport } from './routes/_app/retainers/index'
 import { Route as AppRetainersRetainerIdRouteImport } from './routes/_app/retainers/$retainerId'
 import { Route as AppRetainersNewRouteImport } from './routes/_app/retainers/new'
+import { Route as AppShootsNewRouteImport } from './routes/_app/shoots/new'
 import { Route as AppTasksIndexRouteImport } from './routes/_app/tasks/index'
 import { Route as AppTasksTaskIdRouteImport } from './routes/_app/tasks/$taskId'
 import { Route as AppTasksBoardRouteImport } from './routes/_app/tasks/board'
@@ -47,6 +49,8 @@ import { Route as AppTemplatesTemplateIdRouteImport } from './routes/_app/templa
 import { Route as AppTemplatesNewRouteImport } from './routes/_app/templates/new'
 import { Route as AppApprovalsRequestsRequestIdRouteImport } from './routes/_app/approvals/requests/$requestId'
 import { Route as AppContentPostsPostIdRouteImport } from './routes/_app/content/posts/$postId'
+import { Route as AppShootsShootIdIndexRouteImport } from './routes/_app/shoots/$shootId/index'
+import { Route as AppShootsShootIdEditRouteImport } from './routes/_app/shoots/$shootId/edit'
 
 const AppRoute = AppRouteImport.update({
   id: '/_app',
@@ -95,6 +99,11 @@ const ATokenRoute = ATokenRouteImport.update({
 const AppApprovalsIndexRoute = AppApprovalsIndexRouteImport.update({
   id: '/approvals/',
   path: '/approvals/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppCalendarIndexRoute = AppCalendarIndexRouteImport.update({
+  id: '/calendar/',
+  path: '/calendar/',
   getParentRoute: () => AppRoute,
 } as any)
 const AppClientsIndexRoute = AppClientsIndexRouteImport.update({
@@ -169,6 +178,11 @@ const AppRetainersNewRoute = AppRetainersNewRouteImport.update({
   path: '/retainers/new',
   getParentRoute: () => AppRoute,
 } as any)
+const AppShootsNewRoute = AppShootsNewRouteImport.update({
+  id: '/shoots/new',
+  path: '/shoots/new',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppTasksIndexRoute = AppTasksIndexRouteImport.update({
   id: '/tasks/',
   path: '/tasks/',
@@ -240,6 +254,16 @@ const AppContentPostsPostIdRoute = AppContentPostsPostIdRouteImport.update({
   path: '/content/posts/$postId',
   getParentRoute: () => AppRoute,
 } as any)
+const AppShootsShootIdIndexRoute = AppShootsShootIdIndexRouteImport.update({
+  id: '/shoots/$shootId/',
+  path: '/shoots/$shootId/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppShootsShootIdEditRoute = AppShootsShootIdEditRouteImport.update({
+  id: '/shoots/$shootId/edit',
+  path: '/shoots/$shootId/edit',
+  getParentRoute: () => AppRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
@@ -258,6 +282,7 @@ export interface FileRoutesByFullPath {
   '/projects/new': typeof AppProjectsNewRoute
   '/retainers/$retainerId': typeof AppRetainersRetainerIdRoute
   '/retainers/new': typeof AppRetainersNewRoute
+  '/shoots/new': typeof AppShootsNewRoute
   '/tasks/$taskId': typeof AppTasksTaskIdRoute
   '/tasks/board': typeof AppTasksBoardRoute
   '/tasks/list': typeof AppTasksListRoute
@@ -268,6 +293,7 @@ export interface FileRoutesByFullPath {
   '/templates/$templateId': typeof AppTemplatesTemplateIdRoute
   '/templates/new': typeof AppTemplatesNewRoute
   '/approvals/': typeof AppApprovalsIndexRoute
+  '/calendar/': typeof AppCalendarIndexRoute
   '/clients/': typeof AppClientsIndexRoute
   '/content/': typeof AppContentIndexRoute
   '/departments/': typeof AppDepartmentsIndexRoute
@@ -279,6 +305,8 @@ export interface FileRoutesByFullPath {
   '/templates/': typeof AppTemplatesIndexRoute
   '/approvals/requests/$requestId': typeof AppApprovalsRequestsRequestIdRoute
   '/content/posts/$postId': typeof AppContentPostsPostIdRoute
+  '/shoots/$shootId/edit': typeof AppShootsShootIdEditRoute
+  '/shoots/$shootId/': typeof AppShootsShootIdIndexRoute
 }
 export interface FileRoutesByTo {
   '/activate': typeof ActivateRoute
@@ -297,6 +325,7 @@ export interface FileRoutesByTo {
   '/projects/new': typeof AppProjectsNewRoute
   '/retainers/$retainerId': typeof AppRetainersRetainerIdRoute
   '/retainers/new': typeof AppRetainersNewRoute
+  '/shoots/new': typeof AppShootsNewRoute
   '/tasks/$taskId': typeof AppTasksTaskIdRoute
   '/tasks/board': typeof AppTasksBoardRoute
   '/tasks/list': typeof AppTasksListRoute
@@ -307,6 +336,7 @@ export interface FileRoutesByTo {
   '/templates/$templateId': typeof AppTemplatesTemplateIdRoute
   '/templates/new': typeof AppTemplatesNewRoute
   '/approvals': typeof AppApprovalsIndexRoute
+  '/calendar': typeof AppCalendarIndexRoute
   '/clients': typeof AppClientsIndexRoute
   '/content': typeof AppContentIndexRoute
   '/departments': typeof AppDepartmentsIndexRoute
@@ -318,6 +348,8 @@ export interface FileRoutesByTo {
   '/templates': typeof AppTemplatesIndexRoute
   '/approvals/requests/$requestId': typeof AppApprovalsRequestsRequestIdRoute
   '/content/posts/$postId': typeof AppContentPostsPostIdRoute
+  '/shoots/$shootId/edit': typeof AppShootsShootIdEditRoute
+  '/shoots/$shootId': typeof AppShootsShootIdIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -338,6 +370,7 @@ export interface FileRoutesById {
   '/_app/projects/new': typeof AppProjectsNewRoute
   '/_app/retainers/$retainerId': typeof AppRetainersRetainerIdRoute
   '/_app/retainers/new': typeof AppRetainersNewRoute
+  '/_app/shoots/new': typeof AppShootsNewRoute
   '/_app/tasks/$taskId': typeof AppTasksTaskIdRoute
   '/_app/tasks/board': typeof AppTasksBoardRoute
   '/_app/tasks/list': typeof AppTasksListRoute
@@ -348,6 +381,7 @@ export interface FileRoutesById {
   '/_app/templates/$templateId': typeof AppTemplatesTemplateIdRoute
   '/_app/templates/new': typeof AppTemplatesNewRoute
   '/_app/approvals/': typeof AppApprovalsIndexRoute
+  '/_app/calendar/': typeof AppCalendarIndexRoute
   '/_app/clients/': typeof AppClientsIndexRoute
   '/_app/content/': typeof AppContentIndexRoute
   '/_app/departments/': typeof AppDepartmentsIndexRoute
@@ -359,6 +393,8 @@ export interface FileRoutesById {
   '/_app/templates/': typeof AppTemplatesIndexRoute
   '/_app/approvals/requests/$requestId': typeof AppApprovalsRequestsRequestIdRoute
   '/_app/content/posts/$postId': typeof AppContentPostsPostIdRoute
+  '/_app/shoots/$shootId/edit': typeof AppShootsShootIdEditRoute
+  '/_app/shoots/$shootId/': typeof AppShootsShootIdIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -379,6 +415,7 @@ export interface FileRouteTypes {
     | '/projects/new'
     | '/retainers/$retainerId'
     | '/retainers/new'
+    | '/shoots/new'
     | '/tasks/$taskId'
     | '/tasks/board'
     | '/tasks/list'
@@ -389,6 +426,7 @@ export interface FileRouteTypes {
     | '/templates/$templateId'
     | '/templates/new'
     | '/approvals/'
+    | '/calendar/'
     | '/clients/'
     | '/content/'
     | '/departments/'
@@ -400,6 +438,8 @@ export interface FileRouteTypes {
     | '/templates/'
     | '/approvals/requests/$requestId'
     | '/content/posts/$postId'
+    | '/shoots/$shootId/edit'
+    | '/shoots/$shootId/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/activate'
@@ -418,6 +458,7 @@ export interface FileRouteTypes {
     | '/projects/new'
     | '/retainers/$retainerId'
     | '/retainers/new'
+    | '/shoots/new'
     | '/tasks/$taskId'
     | '/tasks/board'
     | '/tasks/list'
@@ -428,6 +469,7 @@ export interface FileRouteTypes {
     | '/templates/$templateId'
     | '/templates/new'
     | '/approvals'
+    | '/calendar'
     | '/clients'
     | '/content'
     | '/departments'
@@ -439,6 +481,8 @@ export interface FileRouteTypes {
     | '/templates'
     | '/approvals/requests/$requestId'
     | '/content/posts/$postId'
+    | '/shoots/$shootId/edit'
+    | '/shoots/$shootId'
   id:
     | '__root__'
     | '/_app'
@@ -458,6 +502,7 @@ export interface FileRouteTypes {
     | '/_app/projects/new'
     | '/_app/retainers/$retainerId'
     | '/_app/retainers/new'
+    | '/_app/shoots/new'
     | '/_app/tasks/$taskId'
     | '/_app/tasks/board'
     | '/_app/tasks/list'
@@ -468,6 +513,7 @@ export interface FileRouteTypes {
     | '/_app/templates/$templateId'
     | '/_app/templates/new'
     | '/_app/approvals/'
+    | '/_app/calendar/'
     | '/_app/clients/'
     | '/_app/content/'
     | '/_app/departments/'
@@ -479,6 +525,8 @@ export interface FileRouteTypes {
     | '/_app/templates/'
     | '/_app/approvals/requests/$requestId'
     | '/_app/content/posts/$postId'
+    | '/_app/shoots/$shootId/edit'
+    | '/_app/shoots/$shootId/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -559,6 +607,13 @@ declare module '@tanstack/react-router' {
       path: '/approvals'
       fullPath: '/approvals/'
       preLoaderRoute: typeof AppApprovalsIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/calendar/': {
+      id: '/_app/calendar/'
+      path: '/calendar'
+      fullPath: '/calendar/'
+      preLoaderRoute: typeof AppCalendarIndexRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/clients/': {
@@ -659,6 +714,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppRetainersNewRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/shoots/new': {
+      id: '/_app/shoots/new'
+      path: '/shoots/new'
+      fullPath: '/shoots/new'
+      preLoaderRoute: typeof AppShootsNewRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/tasks/': {
       id: '/_app/tasks/'
       path: '/tasks'
@@ -757,6 +819,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppContentPostsPostIdRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/shoots/$shootId/': {
+      id: '/_app/shoots/$shootId/'
+      path: '/shoots/$shootId'
+      fullPath: '/shoots/$shootId/'
+      preLoaderRoute: typeof AppShootsShootIdIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/shoots/$shootId/edit': {
+      id: '/_app/shoots/$shootId/edit'
+      path: '/shoots/$shootId/edit'
+      fullPath: '/shoots/$shootId/edit'
+      preLoaderRoute: typeof AppShootsShootIdEditRouteImport
+      parentRoute: typeof AppRoute
+    }
   }
 }
 
@@ -773,6 +849,7 @@ interface AppRouteChildren {
   AppProjectsNewRoute: typeof AppProjectsNewRoute
   AppRetainersRetainerIdRoute: typeof AppRetainersRetainerIdRoute
   AppRetainersNewRoute: typeof AppRetainersNewRoute
+  AppShootsNewRoute: typeof AppShootsNewRoute
   AppTasksTaskIdRoute: typeof AppTasksTaskIdRoute
   AppTasksBoardRoute: typeof AppTasksBoardRoute
   AppTasksListRoute: typeof AppTasksListRoute
@@ -783,6 +860,7 @@ interface AppRouteChildren {
   AppTemplatesTemplateIdRoute: typeof AppTemplatesTemplateIdRoute
   AppTemplatesNewRoute: typeof AppTemplatesNewRoute
   AppApprovalsIndexRoute: typeof AppApprovalsIndexRoute
+  AppCalendarIndexRoute: typeof AppCalendarIndexRoute
   AppClientsIndexRoute: typeof AppClientsIndexRoute
   AppContentIndexRoute: typeof AppContentIndexRoute
   AppDepartmentsIndexRoute: typeof AppDepartmentsIndexRoute
@@ -794,6 +872,8 @@ interface AppRouteChildren {
   AppTemplatesIndexRoute: typeof AppTemplatesIndexRoute
   AppApprovalsRequestsRequestIdRoute: typeof AppApprovalsRequestsRequestIdRoute
   AppContentPostsPostIdRoute: typeof AppContentPostsPostIdRoute
+  AppShootsShootIdEditRoute: typeof AppShootsShootIdEditRoute
+  AppShootsShootIdIndexRoute: typeof AppShootsShootIdIndexRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
@@ -809,6 +889,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppProjectsNewRoute: AppProjectsNewRoute,
   AppRetainersRetainerIdRoute: AppRetainersRetainerIdRoute,
   AppRetainersNewRoute: AppRetainersNewRoute,
+  AppShootsNewRoute: AppShootsNewRoute,
   AppTasksTaskIdRoute: AppTasksTaskIdRoute,
   AppTasksBoardRoute: AppTasksBoardRoute,
   AppTasksListRoute: AppTasksListRoute,
@@ -819,6 +900,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppTemplatesTemplateIdRoute: AppTemplatesTemplateIdRoute,
   AppTemplatesNewRoute: AppTemplatesNewRoute,
   AppApprovalsIndexRoute: AppApprovalsIndexRoute,
+  AppCalendarIndexRoute: AppCalendarIndexRoute,
   AppClientsIndexRoute: AppClientsIndexRoute,
   AppContentIndexRoute: AppContentIndexRoute,
   AppDepartmentsIndexRoute: AppDepartmentsIndexRoute,
@@ -830,6 +912,8 @@ const AppRouteChildren: AppRouteChildren = {
   AppTemplatesIndexRoute: AppTemplatesIndexRoute,
   AppApprovalsRequestsRequestIdRoute: AppApprovalsRequestsRequestIdRoute,
   AppContentPostsPostIdRoute: AppContentPostsPostIdRoute,
+  AppShootsShootIdEditRoute: AppShootsShootIdEditRoute,
+  AppShootsShootIdIndexRoute: AppShootsShootIdIndexRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)

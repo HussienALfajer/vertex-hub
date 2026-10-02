@@ -33,8 +33,9 @@ export function notificationLink(notification: Notification): ToOptions {
       return { to: '/approvals/requests/$requestId', params: { requestId: subject.id } };
     case 'post':
       return { to: '/content/posts/$postId', params: { postId: subject.id } };
-    // The shoot and meeting pages arrive with the F11 screens.
     case 'shoot':
+      return { to: '/shoots/$shootId', params: { shootId: subject.id } };
+    // The meeting page arrives with the meeting screens.
     case 'meeting':
       return { to: '/notifications' };
     default:
