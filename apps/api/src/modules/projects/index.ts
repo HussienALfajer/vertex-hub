@@ -5,6 +5,7 @@ export {
   type CycleLink,
   EngagementDirectory,
   type ExtraWorkLink,
+  type KeyDateLink,
   type MilestoneLink,
   type ProjectLink,
   type RetainerLink,

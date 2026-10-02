@@ -1828,6 +1828,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/calendar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CalendarController_range"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/calendar/conflicts": {
         parameters: {
             query?: never;
@@ -1982,6 +1998,86 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["ShootsController_restore"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/meetings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["MeetingsController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/meetings/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["MeetingsController_detail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["MeetingsController_update"];
+        trace?: never;
+    };
+    "/api/meetings/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["MeetingsController_cancel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/meetings/{id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["MeetingsController_archive"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/meetings/{id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["MeetingsController_restore"];
         delete?: never;
         options?: never;
         head?: never;
@@ -5719,35 +5815,18 @@ export interface components {
         ReturnPostTask: {
             note: string;
         };
-        /** @description By user, then start time */
-        ConflictList: {
-            items: components["schemas"]["ScheduleConflict"][];
-        };
-        ScheduleConflict: {
-            user: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            };
-            kind: components["schemas"]["CalendarItemKind"];
-            /** Format: uuid */
-            id: string;
-            title: string;
-            /** Format: date-time */
-            startsAt: string;
-            /** Format: date-time */
-            endsAt: string;
-        };
         /** @enum {string} */
-        CalendarItemKind: "shoot" | "meeting";
+        CalendarKind: "shoot" | "meeting" | "project_due" | "milestone_due" | "renewal";
         /** @enum {string} */
-        ShootStatus: "scheduled" | "completed" | "cancelled";
-        /** @description Shoots by start time, latest first */
-        ShootPage: {
-            items: components["schemas"]["Shoot"][];
-            total: number;
-            page: number;
-            pageSize: number;
+        ShootType: "product" | "video" | "event" | "people" | "other";
+        Calendar: {
+            /** Format: date */
+            from: string;
+            /** Format: date */
+            to: string;
+            shoots: components["schemas"]["Shoot"][];
+            meetings: components["schemas"]["Meeting"][];
+            keyDates: components["schemas"]["KeyDate"][];
         };
         Shoot: {
             /** Format: uuid */
@@ -5778,7 +5857,81 @@ export interface components {
             archivedAt: string | null;
         };
         /** @enum {string} */
-        ShootType: "product" | "video" | "event" | "people" | "other";
+        ShootStatus: "scheduled" | "completed" | "cancelled";
+        Meeting: {
+            /** Format: uuid */
+            id: string;
+            title: string;
+            status: components["schemas"]["MeetingStatus"];
+            client: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                archived: boolean;
+            } | null;
+            /** Format: date-time */
+            startsAt: string;
+            /** Format: date-time */
+            endsAt: string;
+            location: string | null;
+            onlineUrl: string | null;
+            organizer: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                archived: boolean;
+            };
+            attendeeCount: number;
+            conflict: boolean;
+            /** Format: date-time */
+            archivedAt: string | null;
+        };
+        /** @enum {string} */
+        MeetingStatus: "scheduled" | "cancelled";
+        KeyDate: {
+            kind: components["schemas"]["KeyDateKind"];
+            /** Format: date */
+            date: string;
+            title: string;
+            /** Format: uuid */
+            targetId: string;
+            client: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                archived: boolean;
+            };
+        };
+        /** @enum {string} */
+        KeyDateKind: "project_due" | "milestone_due" | "renewal";
+        /** @description By user, then start time */
+        ConflictList: {
+            items: components["schemas"]["ScheduleConflict"][];
+        };
+        ScheduleConflict: {
+            user: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            };
+            kind: components["schemas"]["CalendarItemKind"];
+            /** Format: uuid */
+            id: string;
+            title: string;
+            /** Format: date-time */
+            startsAt: string;
+            /** Format: date-time */
+            endsAt: string;
+        };
+        /** @enum {string} */
+        CalendarItemKind: "shoot" | "meeting";
+        /** @description Shoots by start time, latest first */
+        ShootPage: {
+            items: components["schemas"]["Shoot"][];
+            total: number;
+            page: number;
+            pageSize: number;
+        };
         CreateShoot: {
             title: string;
             type: components["schemas"]["ShootType"];
@@ -5998,6 +6151,109 @@ export interface components {
         ReopenShoot: {
             /** @default false */
             acceptConflicts: boolean;
+        };
+        CreateMeeting: {
+            title: string;
+            /**
+             * Format: uuid
+             * @default null
+             */
+            clientId: string | null;
+            /** Format: date-time */
+            startsAt: string;
+            /** Format: date-time */
+            endsAt: string;
+            location?: string | null;
+            /** @default null */
+            onlineUrl: string | null;
+            agenda?: string | null;
+            attendeeIds?: string[];
+            contactIds?: string[];
+            /** @default false */
+            acceptConflicts: boolean;
+        };
+        MeetingDetail: {
+            /** Format: uuid */
+            id: string;
+            title: string;
+            status: components["schemas"]["MeetingStatus"];
+            client: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                archived: boolean;
+            } | null;
+            /** Format: date-time */
+            startsAt: string;
+            /** Format: date-time */
+            endsAt: string;
+            location: string | null;
+            onlineUrl: string | null;
+            organizer: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                archived: boolean;
+            };
+            attendeeCount: number;
+            conflict: boolean;
+            /** Format: date-time */
+            archivedAt: string | null;
+            agenda: string | null;
+            attendees: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                archived: boolean;
+            }[];
+            contacts: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                phone: string | null;
+                archived: boolean;
+            }[];
+            conflicts: components["schemas"]["ScheduleConflict"][];
+            /** Format: date-time */
+            cancelledAt: string | null;
+            cancelReason: string | null;
+            createdBy: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            };
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            permissions: components["schemas"]["MeetingPermissions"];
+        };
+        /** @description What the caller may do, for the UI */
+        MeetingPermissions: {
+            canEdit: boolean;
+            canCancel: boolean;
+            canArchive: boolean;
+        };
+        UpdateMeeting: {
+            title?: string;
+            /** Format: uuid */
+            clientId?: string | null;
+            /** Format: date-time */
+            startsAt?: string;
+            /** Format: date-time */
+            endsAt?: string;
+            location?: string | null;
+            onlineUrl?: string | null;
+            agenda?: string | null;
+            attendeeIds?: string[];
+            contactIds?: string[];
+            /** @default false */
+            acceptConflicts: boolean;
+            /** Format: uuid */
+            organizerId?: string;
+        };
+        CancelMeeting: {
+            reason?: string | null;
         };
         /** @description Tasks and posts ready to send, grouped by client, by name */
         ApprovalReady: {
@@ -10562,6 +10818,33 @@ export interface operations {
             };
         };
     };
+    CalendarController_range: {
+        parameters: {
+            query: {
+                from: string;
+                to: string;
+                kinds?: components["schemas"]["CalendarKind"] | components["schemas"]["CalendarKind"][];
+                clientId?: string;
+                userId?: string | "me";
+                shootType?: components["schemas"]["ShootType"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Shoots and meetings overlapping the days (cancelled ones included, archived never) and the key dates of projects and retainers; at most 45 days; `shootType` narrows the shoots only */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Calendar"];
+                };
+            };
+        };
+    };
     CalendarController_conflicts: {
         parameters: {
             query: {
@@ -10921,6 +11204,183 @@ export interface operations {
                 };
             };
             /** @description `SHOOT_NOT_ARCHIVED`, `TASK_NOT_BOOKABLE` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    MeetingsController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateMeeting"];
+            };
+        };
+        responses: {
+            /** @description The created meeting; the caller is its organizer */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MeetingDetail"];
+                };
+            };
+            /** @description `SCHEDULE_CONFLICT` (details: the conflicts), `CLIENT_ARCHIVED` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    MeetingsController_detail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A meeting with its attendees, contacts and what the caller may do */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MeetingDetail"];
+                };
+            };
+        };
+    };
+    MeetingsController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateMeeting"];
+            };
+        };
+        responses: {
+            /** @description The edited meeting (meeting scope: the organizer, the account manager, or all) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MeetingDetail"];
+                };
+            };
+            /** @description `MEETING_NOT_SCHEDULED`, `MEETING_ARCHIVED`, `SCHEDULE_CONFLICT`, `CLIENT_ARCHIVED` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    MeetingsController_cancel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CancelMeeting"];
+            };
+        };
+        responses: {
+            /** @description The cancelled meeting */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MeetingDetail"];
+                };
+            };
+            /** @description `MEETING_NOT_SCHEDULED`, `MEETING_ARCHIVED` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    MeetingsController_archive: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The archived meeting (`meetings.manage` over all meetings) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MeetingDetail"];
+                };
+            };
+            /** @description `MEETING_ARCHIVED` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    MeetingsController_restore: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The restored meeting (`meetings.manage` over all meetings) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MeetingDetail"];
+                };
+            };
+            /** @description `MEETING_NOT_ARCHIVED` */
             409: {
                 headers: {
                     [name: string]: unknown;

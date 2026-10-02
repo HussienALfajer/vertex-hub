@@ -4,7 +4,9 @@ import {
   type DeliverableKind,
   type ExtraWorkBilling,
   isProjectClosed,
+  type KeyDateKind,
   type MilestoneStatus,
+  OPEN_PROJECT_STATUSES,
   PROJECT_LIMITS,
   type ProjectStatus,
   type RetainerStatus,
@@ -26,8 +28,12 @@ import {
   desc,
   eq,
   getTableName,
+  gte,
   inArray,
+  isNotNull,
   isNull,
+  lte,
+  or,
   type SQL,
   sql,
 } from 'drizzle-orm';
@@ -114,6 +120,17 @@ export interface ExtraWorkForTask {
   description: string | null;
   requestedOn: string;
   requestedByContactId: string | null;
+}
+
+/** A due date or renewal date of the company calendar (F11 rule 15). */
+export interface KeyDateLink {
+  kind: KeyDateKind;
+  date: string;
+  /** The project, milestone or retainer name. */
+  title: string;
+  /** The project (also for a milestone) or the retainer. */
+  targetId: string;
+  clientId: string;
 }
 
 /** See `ClientDirectory`: a column of another module's table, qualified by hand. */
@@ -429,6 +446,104 @@ export class EngagementDirectory {
       .from(extraWorkItems)
       .where(inArray(extraWorkItems.id, unique));
     return byId(rows.map(({ archivedAt, ...row }) => ({ ...row, archived: !!archivedAt })));
+  }
+
+  /**
+   * The key dates in `[from, to]` (F11 rule 15), by date: due dates of open projects and of their
+   * pending milestones, and renewal dates of active or paused retainers; archived records never
+   * appear. `userId` keeps the projects the user manages and the work of the clients they are
+   * primary account manager of.
+   */
+  async keyDates(query: {
+    from: string;
+    to: string;
+    kinds: readonly KeyDateKind[];
+    clientId?: string;
+    userId?: string;
+  }): Promise<KeyDateLink[]> {
+    const { from, to, clientId, userId } = query;
+    const openProject = and(
+      isNull(projects.archivedAt),
+      inArray(projects.status, [...OPEN_PROJECT_STATUSES]),
+      clientId ? eq(projects.clientId, clientId) : undefined,
+      userId
+        ? or(
+            eq(projects.projectManagerId, userId),
+            this.clients.managedBy(projects.clientId, userId),
+          )
+        : undefined,
+    );
+    const wanted = (kind: KeyDateKind) => query.kinds.includes(kind);
+    const [projectRows, milestoneRows, retainerRows] = await Promise.all([
+      wanted('project_due')
+        ? this.db
+            .select({
+              date: projects.dueDate,
+              title: projects.name,
+              targetId: projects.id,
+              clientId: projects.clientId,
+            })
+            .from(projects)
+            .where(and(openProject, gte(projects.dueDate, from), lte(projects.dueDate, to)))
+        : [],
+      wanted('milestone_due')
+        ? this.db
+            .select({
+              date: projectMilestones.dueDate,
+              title: projectMilestones.name,
+              targetId: projects.id,
+              clientId: projects.clientId,
+            })
+            .from(projectMilestones)
+            .innerJoin(projects, eq(projects.id, projectMilestones.projectId))
+            .where(
+              and(
+                openProject,
+                isNull(projectMilestones.archivedAt),
+                eq(projectMilestones.status, 'pending'),
+                isNotNull(projectMilestones.dueDate),
+                gte(projectMilestones.dueDate, from),
+                lte(projectMilestones.dueDate, to),
+              ),
+            )
+        : [],
+      wanted('renewal')
+        ? this.db
+            .select({
+              date: retainers.renewalDate,
+              title: retainers.name,
+              targetId: retainers.id,
+              clientId: retainers.clientId,
+            })
+            .from(retainers)
+            .where(
+              and(
+                isNull(retainers.archivedAt),
+                inArray(retainers.status, ['active', 'paused']),
+                isNotNull(retainers.renewalDate),
+                gte(retainers.renewalDate, from),
+                lte(retainers.renewalDate, to),
+                clientId ? eq(retainers.clientId, clientId) : undefined,
+                userId ? this.clients.managedBy(retainers.clientId, userId) : undefined,
+              ),
+            )
+        : [],
+    ]);
+    const dated = (
+      kind: KeyDateKind,
+      rows: (Omit<KeyDateLink, 'kind' | 'date'> & { date: string | null })[],
+    ) => rows.flatMap((row) => (row.date ? [{ ...row, kind, date: row.date }] : []));
+    return [
+      ...dated('project_due', projectRows),
+      ...dated('milestone_due', milestoneRows),
+      ...dated('renewal', retainerRows),
+    ].sort(
+      (a, b) =>
+        a.date.localeCompare(b.date) ||
+        a.kind.localeCompare(b.kind) ||
+        a.title.localeCompare(b.title, 'ar') ||
+        a.targetId.localeCompare(b.targetId),
+    );
   }
 
   /**
