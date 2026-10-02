@@ -60,6 +60,8 @@ export const taskCountsSchema = z
     total: z.number().int().min(0),
     delivered: z.number().int().min(0),
     open: z.number().int().min(0),
+    /** Approved but not yet delivered; on a cycle line also its approved or scheduled posts (P2A rule 7). */
+    ready: z.number().int().min(0),
   })
   .meta({ id: 'TaskCounts' });
 

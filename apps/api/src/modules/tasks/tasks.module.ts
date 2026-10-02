@@ -5,6 +5,7 @@ import { FilesModule } from '../files/index.js';
 import { NotificationsModule } from '../notifications/index.js';
 import { ProjectsModule } from '../projects/index.js';
 import { ClientReviewHooks } from './client-review-hooks.js';
+import { OverLimitReminders } from './over-limit-reminders.js';
 import { PostTaskHooks } from './post-task-hooks.js';
 import { PostTasks } from './post-tasks.js';
 import { ShootTasks } from './shoot-tasks.js';
@@ -63,6 +64,7 @@ import { TasksService } from './tasks.service.js';
     TaskGenerator,
     TaskNotices,
     TaskReminders,
+    OverLimitReminders,
     TaskFileOwner,
     TaskReviews,
     TaskReviewsService,

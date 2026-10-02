@@ -13858,6 +13858,136 @@
               "type": {
                 "type": "string",
                 "enum": [
+                  "task_over_limit_pending"
+                ]
+              },
+              "data": {
+                "type": "object",
+                "properties": {
+                  "task": {
+                    "type": "object",
+                    "properties": {
+                      "title": {
+                        "type": "string"
+                      },
+                      "department": {
+                        "$ref": "#/components/schemas/DepartmentCode"
+                      },
+                      "client": {
+                        "nullable": true,
+                        "type": "string"
+                      },
+                      "project": {
+                        "nullable": true,
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "title",
+                      "department",
+                      "client",
+                      "project"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "revisionNumber": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  },
+                  "recordedOn": {
+                    "type": "string",
+                    "format": "date",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                  }
+                },
+                "required": [
+                  "task",
+                  "revisionNumber",
+                  "recordedOn"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "id",
+              "actor",
+              "subject",
+              "count",
+              "read",
+              "createdAt",
+              "updatedAt",
+              "type",
+              "data"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "actor": {
+                "nullable": true,
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "name"
+                ],
+                "additionalProperties": false
+              },
+              "subject": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "$ref": "#/components/schemas/NotificationSubjectType"
+                  },
+                  "id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  }
+                },
+                "required": [
+                  "type",
+                  "id"
+                ],
+                "additionalProperties": false
+              },
+              "count": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "read": {
+                "type": "boolean"
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+              },
+              "updatedAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
                   "post_publish_today"
                 ]
               },
@@ -14707,6 +14837,162 @@
               "data"
             ],
             "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "actor": {
+                "nullable": true,
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "name"
+                ],
+                "additionalProperties": false
+              },
+              "subject": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "$ref": "#/components/schemas/NotificationSubjectType"
+                  },
+                  "id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  }
+                },
+                "required": [
+                  "type",
+                  "id"
+                ],
+                "additionalProperties": false
+              },
+              "count": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "read": {
+                "type": "boolean"
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+              },
+              "updatedAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "retainer_behind"
+                ]
+              },
+              "data": {
+                "type": "object",
+                "properties": {
+                  "retainer": {
+                    "type": "string"
+                  },
+                  "client": {
+                    "type": "string"
+                  },
+                  "periodEnd": {
+                    "type": "string",
+                    "format": "date",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                  },
+                  "daysLeft": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 7
+                  },
+                  "final": {
+                    "type": "boolean"
+                  },
+                  "lines": {
+                    "minItems": 1,
+                    "maxItems": 30,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "$ref": "#/components/schemas/DeliverableKind"
+                        },
+                        "label": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "delivered": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "committed": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        },
+                        "ready": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "label",
+                        "delivered",
+                        "committed",
+                        "ready"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": [
+                  "retainer",
+                  "client",
+                  "periodEnd",
+                  "daysLeft",
+                  "final",
+                  "lines"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "id",
+              "actor",
+              "subject",
+              "count",
+              "read",
+              "createdAt",
+              "updatedAt",
+              "type",
+              "data"
+            ],
+            "additionalProperties": false
           }
         ]
       },
@@ -14722,6 +15008,20 @@
           "post",
           "shoot",
           "meeting"
+        ]
+      },
+      "DeliverableKind": {
+        "type": "string",
+        "enum": [
+          "design",
+          "reel",
+          "story",
+          "post",
+          "video",
+          "photo_shoot",
+          "ad_campaign",
+          "monthly_report",
+          "other"
         ]
       },
       "NotificationUnreadCount": {
@@ -14826,6 +15126,7 @@
           "task_due_soon",
           "task_overdue",
           "task_overdue_escalated",
+          "task_over_limit_pending",
           "post_publish_today",
           "post_publish_overdue",
           "shoot_upcoming",
@@ -14833,14 +15134,15 @@
           "meeting_upcoming",
           "client_account_manager_assigned",
           "project_manager_assigned",
-          "retainer_renewal_due"
+          "retainer_renewal_due",
+          "retainer_behind"
         ]
       },
       "UpdateNotificationSettings": {
         "type": "object",
         "properties": {
           "mutedTypes": {
-            "maxItems": 43,
+            "maxItems": 45,
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/NotificationType"
@@ -17041,12 +17343,18 @@
             "type": "integer",
             "minimum": 0,
             "maximum": 9007199254740991
+          },
+          "ready": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
           }
         },
         "required": [
           "total",
           "delivered",
-          "open"
+          "open",
+          "ready"
         ],
         "additionalProperties": false
       },
@@ -17614,20 +17922,6 @@
           "tasks"
         ],
         "additionalProperties": false
-      },
-      "DeliverableKind": {
-        "type": "string",
-        "enum": [
-          "design",
-          "reel",
-          "story",
-          "post",
-          "video",
-          "photo_shoot",
-          "ad_campaign",
-          "monthly_report",
-          "other"
-        ]
       },
       "RetainerDetail": {
         "type": "object",

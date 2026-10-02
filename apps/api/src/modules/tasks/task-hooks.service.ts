@@ -72,7 +72,7 @@ export class TaskHooksService implements OnModuleInit {
     });
   }
 
-  /** `total`: non-archived, non-cancelled tasks; `delivered`: those delivered. */
+  /** `total`: non-archived, non-cancelled tasks; `delivered`, `ready`: those delivered, approved. */
   private async counts(
     column: PgColumn,
     ids: string[],
@@ -85,6 +85,7 @@ export class TaskHooksService implements OnModuleInit {
         delivered: sql<number>`count(*) filter (where ${tasks.status} = 'delivered')`.mapWith(
           Number,
         ),
+        ready: sql<number>`count(*) filter (where ${tasks.status} = 'approved')`.mapWith(Number),
       })
       .from(tasks)
       .where(and(inArray(column, ids), isNull(tasks.archivedAt), ne(tasks.status, 'cancelled')))
@@ -92,7 +93,12 @@ export class TaskHooksService implements OnModuleInit {
     return new Map(
       rows.map((row) => [
         row.id,
-        { total: row.total, delivered: row.delivered, open: row.total - row.delivered },
+        {
+          total: row.total,
+          delivered: row.delivered,
+          open: row.total - row.delivered,
+          ready: row.ready,
+        },
       ]),
     );
   }

@@ -3,6 +3,7 @@ import { CLIENT_DECISIONS } from './approvals.js';
 import { calendarDateSchema, timeOfDaySchema } from './dates.js';
 import { departmentCodeSchema } from './departments.js';
 import { pageQuerySchema, pageSchema, queryBooleanSchema } from './lists.js';
+import { BEHIND_ALERT_DAYS, deliverableKindSchema, RETAINER_LIMITS } from './retainers.js';
 
 /*
  * In-app notifications (spec F14, ADR 0018): a fixed catalog of types, each rendered by the web
@@ -49,6 +50,7 @@ export const NOTIFICATION_TYPES = [
   'task_due_soon',
   'task_overdue',
   'task_overdue_escalated',
+  'task_over_limit_pending',
   'post_publish_today',
   'post_publish_overdue',
   'shoot_upcoming',
@@ -57,6 +59,7 @@ export const NOTIFICATION_TYPES = [
   'client_account_manager_assigned',
   'project_manager_assigned',
   'retainer_renewal_due',
+  'retainer_behind',
 ] as const;
 
 export const notificationTypeSchema = z.enum(NOTIFICATION_TYPES).meta({ id: 'NotificationType' });
@@ -138,6 +141,7 @@ export const NOTIFICATION_CATALOG: Record<
   task_due_soon: { category: 'reminders', subject: 'task', mutable: true },
   task_overdue: { category: 'reminders', subject: 'task', mutable: false },
   task_overdue_escalated: { category: 'reminders', subject: 'task', mutable: false },
+  task_over_limit_pending: { category: 'reminders', subject: 'task', mutable: false },
   post_publish_today: { category: 'reminders', subject: 'post', mutable: true },
   post_publish_overdue: { category: 'reminders', subject: 'post', mutable: false },
   client_account_manager_assigned: {
@@ -147,6 +151,7 @@ export const NOTIFICATION_CATALOG: Record<
   },
   project_manager_assigned: { category: 'clients_projects', subject: 'project', mutable: false },
   retainer_renewal_due: { category: 'reminders', subject: 'retainer', mutable: true },
+  retainer_behind: { category: 'reminders', subject: 'retainer', mutable: false },
 };
 
 export function isMutableNotificationType(type: NotificationType): boolean {
@@ -316,6 +321,11 @@ export const NOTIFICATION_DATA_SCHEMAS = {
   task_overdue_escalated: taskData.extend(dueSchema.shape).extend({
     assignee: nameSchema.nullable(),
   }),
+  /** P2A rule 10: an over-limit revision still waits for its decision. */
+  task_over_limit_pending: taskData.extend({
+    revisionNumber: z.number().int().min(1),
+    recordedOn: calendarDateSchema,
+  }),
   post_publish_today: postData,
   post_publish_overdue: postData,
   client_account_manager_assigned: z.object({ client: nameSchema }),
@@ -326,6 +336,28 @@ export const NOTIFICATION_DATA_SCHEMAS = {
     renewalDate: calendarDateSchema,
     /** 0 once the renewal date is reached. */
     daysLeft: z.number().int().min(0),
+  }),
+  /** P2A rule 6: the lines of an open cycle that are behind, by position. */
+  retainer_behind: z.object({
+    retainer: nameSchema,
+    client: nameSchema,
+    periodEnd: calendarDateSchema,
+    daysLeft: z.number().int().min(1).max(BEHIND_ALERT_DAYS),
+    /** The last reminder, at `BEHIND_FINAL_DAYS` or fewer. */
+    final: z.boolean(),
+    lines: z
+      .array(
+        z.object({
+          kind: deliverableKindSchema,
+          label: z.string().nullable(),
+          delivered: z.number().int().min(0),
+          committed: z.number().int().min(1),
+          /** Approved but not yet counted (P2A rule 7). */
+          ready: z.number().int().min(0),
+        }),
+      )
+      .min(1)
+      .max(RETAINER_LIMITS.cycleLines),
   }),
 } satisfies Record<NotificationType, z.ZodType>;
 
@@ -453,6 +485,9 @@ export const NOTIFICATION_REMINDER_KINDS = [
   'shoot_upcoming',
   'shoot_not_closed',
   'meeting_upcoming',
+  'over_limit_pending',
+  'cycle_behind',
+  'cycle_behind_final',
 ] as const;
 
 export type NotificationReminderKind = (typeof NOTIFICATION_REMINDER_KINDS)[number];

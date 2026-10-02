@@ -115,6 +115,9 @@ export const TASK_LIMITS = {
 
 export const DEFAULT_REVISION_LIMIT = 2;
 
+/** An over-limit revision without a decision is reminded on this work day after it (spec P2A rule 8). */
+export const OVER_LIMIT_REMINDER_WORK_DAYS = 2;
+
 // Workflow
 
 /** A named move of the workflow (spec F06, "Task status"). */

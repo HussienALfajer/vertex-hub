@@ -295,6 +295,14 @@ function CycleLineRow({
               })}
             </Link>
           )}
+          {cycle.status === 'open' && line.tasks.ready > 0 && line.delivered < line.committed && (
+            <p className="text-xs text-muted-foreground">
+              {t('retainers.cycle.ready', {
+                count: line.tasks.ready,
+                n: formatNumber(line.tasks.ready),
+              })}
+            </p>
+          )}
         </div>
         <p className="text-2xl font-bold tabular-nums" dir="ltr">
           {formatNumber(line.delivered)}

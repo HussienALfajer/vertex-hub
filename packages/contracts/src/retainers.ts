@@ -170,6 +170,23 @@ export function isLineBehind(line: CycleCount, period: CyclePeriod, today: Calen
   return line.delivered / line.committed < elapsed - 0.25;
 }
 
+/** A09: the alert starts when this many days or fewer remain in the cycle (spec P2A). */
+export const BEHIND_ALERT_DAYS = 7;
+
+/** A09: the final reminder is sent when this many days or fewer remain. */
+export const BEHIND_FINAL_DAYS = 3;
+
+/**
+ * A09 (spec P2A rules 1–3): which notice a cycle is due on `today`, from its period alone; the
+ * caller checks the lines with `isLineBehind`. A period no longer than the alert window gets none.
+ */
+export function behindAlert(period: CyclePeriod, today: CalendarDate): 'first' | 'final' | null {
+  if (daysInclusive(period.periodStart, period.periodEnd) <= BEHIND_ALERT_DAYS) return null;
+  const daysLeft = daysInclusive(today, period.periodEnd);
+  if (daysLeft < 1 || daysLeft > BEHIND_ALERT_DAYS) return null;
+  return daysLeft <= BEHIND_FINAL_DAYS ? 'final' : 'first';
+}
+
 /** R13: Σ min(delivered, committed) ÷ Σ committed, whole percent rounded down; null if 0. */
 export function deliveryRate(lines: readonly CycleCount[]): number | null {
   const committed = lines.reduce((sum, line) => sum + Math.max(0, line.committed), 0);

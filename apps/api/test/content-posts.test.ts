@@ -218,7 +218,7 @@ describe('content posts (F08 rules 1–5, 16, 28)', () => {
       });
       // The post counts on the line beside its tasks: open until it is published.
       const counted = (await lineOf(retainer.id)).line;
-      expect(counted.tasks).toEqual({ total: 1, delivered: 0, open: 1 });
+      expect(counted.tasks).toEqual({ total: 1, delivered: 0, open: 1, ready: 0 });
       expect(counted.delivered).toBe(line.delivered);
 
       // A cancelled post leaves the count; a closed cycle takes no new post.

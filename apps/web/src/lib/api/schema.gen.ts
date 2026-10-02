@@ -3734,6 +3734,38 @@ export interface components {
             /** Format: date-time */
             updatedAt: string;
             /** @enum {string} */
+            type: "task_over_limit_pending";
+            data: {
+                task: {
+                    title: string;
+                    department: components["schemas"]["DepartmentCode"];
+                    client: string | null;
+                    project: string | null;
+                };
+                revisionNumber: number;
+                /** Format: date */
+                recordedOn: string;
+            };
+        } | {
+            /** Format: uuid */
+            id: string;
+            actor: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            subject: {
+                type: components["schemas"]["NotificationSubjectType"];
+                /** Format: uuid */
+                id: string;
+            };
+            count: number;
+            read: boolean;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @enum {string} */
             type: "post_publish_today";
             data: {
                 post: {
@@ -3946,9 +3978,47 @@ export interface components {
                 renewalDate: string;
                 daysLeft: number;
             };
+        } | {
+            /** Format: uuid */
+            id: string;
+            actor: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            subject: {
+                type: components["schemas"]["NotificationSubjectType"];
+                /** Format: uuid */
+                id: string;
+            };
+            count: number;
+            read: boolean;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @enum {string} */
+            type: "retainer_behind";
+            data: {
+                retainer: string;
+                client: string;
+                /** Format: date */
+                periodEnd: string;
+                daysLeft: number;
+                final: boolean;
+                lines: {
+                    kind: components["schemas"]["DeliverableKind"];
+                    label: string | null;
+                    delivered: number;
+                    committed: number;
+                    ready: number;
+                }[];
+            };
         };
         /** @enum {string} */
         NotificationSubjectType: "task" | "client" | "project" | "retainer" | "template_run" | "approval_request" | "post" | "shoot" | "meeting";
+        /** @enum {string} */
+        DeliverableKind: "design" | "reel" | "story" | "post" | "video" | "photo_shoot" | "ad_campaign" | "monthly_report" | "other";
         NotificationUnreadCount: {
             count: number;
         };
@@ -3964,7 +4034,7 @@ export interface components {
             }[];
         };
         /** @enum {string} */
-        NotificationType: "task_assigned" | "task_mentioned" | "task_returned" | "task_review_requested" | "task_medical_review_requested" | "task_awaiting_client" | "task_over_limit" | "approval_responded" | "approval_no_response" | "approval_expired" | "task_changed" | "task_commented" | "task_file_added" | "task_requested" | "tasks_generated" | "task_approved" | "task_opened" | "request_finished" | "post_returned" | "post_review_requested" | "post_medical_review_requested" | "post_awaiting_client" | "post_assigned" | "post_approved" | "post_task_ready" | "post_task_unlinked" | "shoot_booked" | "shoot_dropped" | "shoot_changed" | "meeting_invited" | "meeting_dropped" | "meeting_changed" | "task_due_soon" | "task_overdue" | "task_overdue_escalated" | "post_publish_today" | "post_publish_overdue" | "shoot_upcoming" | "shoot_not_closed" | "meeting_upcoming" | "client_account_manager_assigned" | "project_manager_assigned" | "retainer_renewal_due";
+        NotificationType: "task_assigned" | "task_mentioned" | "task_returned" | "task_review_requested" | "task_medical_review_requested" | "task_awaiting_client" | "task_over_limit" | "approval_responded" | "approval_no_response" | "approval_expired" | "task_changed" | "task_commented" | "task_file_added" | "task_requested" | "tasks_generated" | "task_approved" | "task_opened" | "request_finished" | "post_returned" | "post_review_requested" | "post_medical_review_requested" | "post_awaiting_client" | "post_assigned" | "post_approved" | "post_task_ready" | "post_task_unlinked" | "shoot_booked" | "shoot_dropped" | "shoot_changed" | "meeting_invited" | "meeting_dropped" | "meeting_changed" | "task_due_soon" | "task_overdue" | "task_overdue_escalated" | "task_over_limit_pending" | "post_publish_today" | "post_publish_overdue" | "shoot_upcoming" | "shoot_not_closed" | "meeting_upcoming" | "client_account_manager_assigned" | "project_manager_assigned" | "retainer_renewal_due" | "retainer_behind";
         UpdateNotificationSettings: {
             mutedTypes: components["schemas"]["NotificationType"][];
         };
@@ -4492,6 +4562,7 @@ export interface components {
             total: number;
             delivered: number;
             open: number;
+            ready: number;
         };
         /** @enum {string} */
         Currency: "USD" | "SYP";
@@ -4642,8 +4713,6 @@ export interface components {
             behind: boolean;
             tasks: components["schemas"]["TaskCounts"];
         };
-        /** @enum {string} */
-        DeliverableKind: "design" | "reel" | "story" | "post" | "video" | "photo_shoot" | "ad_campaign" | "monthly_report" | "other";
         RetainerDetail: {
             /** Format: uuid */
             id: string;

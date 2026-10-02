@@ -620,9 +620,9 @@ describe('tasks', () => {
       const seen = projectDetailSchema.parse(
         await (await client.get(`/api/projects/${project.id}`, cast.gm.cookie)).json(),
       );
-      expect(seen.tasks).toEqual({ total: 2, delivered: 1, open: 1 });
+      expect(seen.tasks).toEqual({ total: 2, delivered: 1, open: 1, ready: 0 });
       expect(seen.progress).toBe(50);
-      expect(seen.milestones[0]?.tasks).toEqual({ total: 2, delivered: 1, open: 1 });
+      expect(seen.milestones[0]?.tasks).toEqual({ total: 2, delivered: 1, open: 1, ready: 0 });
     });
 
     it('refuses to complete a project with open tasks, and cancels them with the project', async () => {

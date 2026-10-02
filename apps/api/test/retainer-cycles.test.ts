@@ -103,7 +103,7 @@ describe('retainer cycles', () => {
   describe('the counter', () => {
     it('adds reasoned adjustments to delivered tasks and never goes negative (R7)', async () => {
       const { retainer, cycle, design } = await started();
-      tasks.set(design.id, { total: 3, delivered: 2, open: 1 });
+      tasks.set(design.id, { total: 3, delivered: 2, open: 1, ready: 0 });
       const response = await adjust(retainer.id, cycle.id, design.id, cast.am.cookie, {
         delta: 3,
         reason: ' Posted from the client’s account ',
@@ -313,7 +313,7 @@ describe('retainer cycles', () => {
       ]);
 
       // R8: deliveries after close show separately and never change the closed month.
-      tasks.set(design.id, { total: 2, delivered: 2, open: 0 });
+      tasks.set(design.id, { total: 2, delivered: 2, open: 0, ready: 0 });
       const frozen = await cycleDetail(retainer.id, cycle.id, cast.gm.cookie);
       expect(frozen.lines.find((line) => line.id === design.id)).toMatchObject({
         delivered: 4,
@@ -338,13 +338,13 @@ describe('retainer cycles', () => {
 
     it('freezes a delivered count never below zero (R7, R8)', async () => {
       const { retainer, cycle, design } = await started();
-      tasks.set(design.id, { total: 1, delivered: 1, open: 0 });
+      tasks.set(design.id, { total: 1, delivered: 1, open: 0, ready: 0 });
       await adjust(retainer.id, cycle.id, design.id, cast.am.cookie, {
         delta: -1,
         reason: 'Counted twice',
       });
       // The delivered task is reopened (or archived) before the month closes.
-      tasks.set(design.id, { total: 1, delivered: 0, open: 1 });
+      tasks.set(design.id, { total: 1, delivered: 0, open: 1, ready: 0 });
       await app.get(RetainerCyclesService).runDaily(nextMonth);
       const closed = await cycleDetail(retainer.id, cycle.id, cast.gm.cookie);
       expect(closed.status).toBe('closed');

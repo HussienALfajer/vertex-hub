@@ -12,6 +12,7 @@ import { ProjectMilestonesController } from './project-milestones.controller.js'
 import { ProjectMilestonesService } from './project-milestones.service.js';
 import { ProjectsController } from './projects.controller.js';
 import { ProjectsService } from './projects.service.js';
+import { RetainerBehindAlerts } from './retainer-behind.js';
 import { RetainerCyclesController } from './retainer-cycles.controller.js';
 import { RetainerCyclesService } from './retainer-cycles.service.js';
 import { RetainerRenewals } from './retainer-renewals.js';
@@ -24,7 +25,7 @@ import { WorkProgress } from './work-progress.js';
  * clients through `clients`' `ClientDirectory`, registers the project-manager responsibility
  * (rule 4), takes task counts from whatever registers in `WorkProgress` (F06), and works the
  * `retainers.cycles` job that `apps/worker` schedules (R2). Notifies new project managers and
- * registers the renewal reminder in `notifications`' daily job (F14). Exports `EngagementDirectory` for
+ * registers the renewal reminder and the behind alert (A09) in `notifications`' daily job (F14). Exports `EngagementDirectory` for
  * the `tasks` and `templates` modules, and `CycleOpenedHooks` for `templates` (F07 rule 16).
  * Registers the `project` and `retainer` owner policies in `files` (F10).
  */
@@ -47,6 +48,7 @@ import { WorkProgress } from './work-progress.js';
     EngagementDirectory,
     CycleOpenedHooks,
     RetainerRenewals,
+    RetainerBehindAlerts,
     EngagementFileOwners,
   ],
   exports: [WorkProgress, EngagementDirectory, CycleOpenedHooks],

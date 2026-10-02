@@ -3,6 +3,7 @@ import {
   firstMatchPerRecipient,
   isMutableNotificationType,
   NOTIFICATION_CATALOG,
+  NOTIFICATION_DATA_SCHEMAS,
   NOTIFICATION_TYPES,
   notificationSchema,
   notificationTypesOf,
@@ -46,6 +47,38 @@ describe('notification catalog', () => {
     ];
     expect(all.sort()).toEqual([...NOTIFICATION_TYPES].sort());
     expect(NOTIFICATION_CATALOG.tasks_generated.subject).toBe('template_run');
+  });
+});
+
+describe('Phase 2 reminders (spec P2A)', () => {
+  it('lists both types under reminders, locked, in their place of the order', () => {
+    for (const type of ['task_over_limit_pending', 'retainer_behind'] as const) {
+      expect(NOTIFICATION_CATALOG[type].category).toBe('reminders');
+      expect(isMutableNotificationType(type)).toBe(false);
+    }
+    expect(NOTIFICATION_CATALOG.task_over_limit_pending.subject).toBe('task');
+    expect(NOTIFICATION_CATALOG.retainer_behind.subject).toBe('retainer');
+    const at = (type: (typeof NOTIFICATION_TYPES)[number]) => NOTIFICATION_TYPES.indexOf(type);
+    expect(at('task_over_limit_pending')).toBe(at('task_overdue_escalated') + 1);
+    expect(at('retainer_behind')).toBe(at('retainer_renewal_due') + 1);
+  });
+
+  it('carries 1 to 30 behind lines and 1 to 7 days left', () => {
+    const line = { kind: 'design', label: null, delivered: 9, committed: 12, ready: 2 };
+    const data = {
+      retainer: 'Monthly',
+      client: 'Clinic',
+      periodEnd: '2026-10-31',
+      daysLeft: 7,
+      final: false,
+      lines: [line],
+    };
+    const schema = NOTIFICATION_DATA_SCHEMAS.retainer_behind;
+    expect(schema.safeParse(data).success).toBe(true);
+    expect(schema.safeParse({ ...data, lines: [] }).success).toBe(false);
+    expect(schema.safeParse({ ...data, lines: Array(31).fill(line) }).success).toBe(false);
+    expect(schema.safeParse({ ...data, daysLeft: 0 }).success).toBe(false);
+    expect(schema.safeParse({ ...data, daysLeft: 8 }).success).toBe(false);
   });
 });
 

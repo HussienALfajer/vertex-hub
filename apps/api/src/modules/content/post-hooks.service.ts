@@ -83,7 +83,10 @@ export class PostHooksService implements OnModuleInit {
     };
   }
 
-  /** Rule 16: `total` is non-archived, non-cancelled posts on the line; `delivered` published. */
+  /**
+   * Rule 16: `total` is non-archived, non-cancelled posts on the line; `delivered` published;
+   * `ready` approved or scheduled (P2A rule 7).
+   */
   private async lineCounts(
     ids: string[],
     executor: Executor = this.db,
@@ -94,6 +97,10 @@ export class PostHooksService implements OnModuleInit {
         total: count(),
         delivered:
           sql<number>`count(*) filter (where ${contentPosts.status} = 'published')`.mapWith(Number),
+        ready:
+          sql<number>`count(*) filter (where ${contentPosts.status} in ('approved', 'scheduled'))`.mapWith(
+            Number,
+          ),
       })
       .from(contentPosts)
       .where(
@@ -107,7 +114,12 @@ export class PostHooksService implements OnModuleInit {
     return new Map(
       rows.map((row) => [
         row.id,
-        { total: row.total, delivered: row.delivered, open: row.total - row.delivered },
+        {
+          total: row.total,
+          delivered: row.delivered,
+          open: row.total - row.delivered,
+          ready: row.ready,
+        },
       ]),
     );
   }
