@@ -1,11 +1,13 @@
 import {
   DISCOUNT_APPROVALS,
+  QUOTE_PDF_STATES,
   QUOTE_REJECTION_REASONS,
   QUOTE_SECTIONS,
   QUOTE_STATUSES,
 } from '@vertex-hub/contracts';
 import { sql } from 'drizzle-orm';
 import {
+  type AnyPgColumn,
   boolean,
   check,
   date,
@@ -23,6 +25,7 @@ import { departmentCodeEnum, users } from './auth.js';
 import { catalogPackages, catalogServices } from './catalog.js';
 import { clientContacts, clients } from './clients.js';
 import { archivedAt, id, minorAmount, timestamps } from './columns.js';
+import { fileItems } from './files.js';
 import { currencyEnum } from './projects.js';
 import { deliverableKindEnum } from './retainers.js';
 import { workTemplates } from './templates.js';
@@ -38,6 +41,8 @@ export const quoteStatusEnum = pgEnum('quote_status', QUOTE_STATUSES);
 export const discountApprovalEnum = pgEnum('discount_approval', DISCOUNT_APPROVALS);
 
 export const quoteSectionEnum = pgEnum('quote_section', QUOTE_SECTIONS);
+
+export const quotePdfStatusEnum = pgEnum('quote_pdf_status', QUOTE_PDF_STATES);
 
 export const quoteRejectionReasonEnum = pgEnum('quote_rejection_reason', QUOTE_REJECTION_REASONS);
 
@@ -109,6 +114,16 @@ export const quotes = pgTable(
     rejectionReason: quoteRejectionReasonEnum('rejection_reason'),
     /** The frozen render payload of a sent version (`quoteSnapshotSchema`, rule 12). */
     snapshot: jsonb('snapshot'),
+    /** The PDF of a sent version (rule 12); null for drafts. */
+    pdfStatus: quotePdfStatusEnum('pdf_status'),
+    /** The document of the quote that holds the sent version's PDF, once attached. */
+    pdfFileItemId: uuid('pdf_file_item_id').references((): AnyPgColumn => fileItems.id),
+    /** The last draft preview (rule 13): asked for with this payload hash, then rendered. */
+    draftPdfStatus: quotePdfStatusEnum('draft_pdf_status'),
+    draftPdfRequestedHash: text('draft_pdf_requested_hash'),
+    draftPdfObjectKey: text('draft_pdf_object_key'),
+    draftPdfAt: timestamp('draft_pdf_at', { withTimezone: true }),
+    draftPdfHash: text('draft_pdf_hash'),
     createdById: uuid('created_by_id')
       .notNull()
       .references(() => users.id),
@@ -128,6 +143,7 @@ export const quotes = pgTable(
     index('quotes_response_contact_id_idx').on(table.responseContactId),
     index('quotes_responded_by_id_idx').on(table.respondedById),
     index('quotes_created_by_id_idx').on(table.createdById),
+    index('quotes_pdf_file_item_id_idx').on(table.pdfFileItemId),
     check('quotes_title_check', sql`char_length(${table.title}) between 1 and 120`),
     check('quotes_version_check', sql`${table.version} >= 1`),
     check(

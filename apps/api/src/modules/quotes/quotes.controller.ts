@@ -1,3 +1,4 @@
+import type { IncomingMessage, ServerResponse } from 'node:http';
 import {
   Body,
   Controller,
@@ -8,9 +9,18 @@ import {
   Post,
   Put,
   Query,
+  Req,
+  Res,
   SerializeOptions,
 } from '@nestjs/common';
-import { ApiCreatedResponse, ApiNoContentResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiCreatedResponse,
+  ApiNoContentResponse,
+  ApiNotFoundResponse,
+  ApiOkResponse,
+  ApiQuery,
+  ApiTags,
+} from '@nestjs/swagger';
 import {
   type CreateQuote,
   createQuoteSchema,
@@ -22,12 +32,14 @@ import {
   type QuoteDraft,
   type QuoteListQuery,
   type QuotePage,
+  type QuotePdfRender,
   quoteApprovalActionSchema,
   quoteApprovalDecisionSchema,
   quoteDetailSchema,
   quoteDraftSchema,
   quoteListQuerySchema,
   quotePageSchema,
+  quotePdfRenderSchema,
   type RejectQuote,
   rejectQuoteSchema,
   type SendQuote,
@@ -35,6 +47,7 @@ import {
 } from '@vertex-hub/contracts';
 import { RequirePermissions } from '../../core/access/index.js';
 import { CurrentUser, type CurrentUserInfo } from '../auth/index.js';
+import { QuotePdfService } from './quote-pdf.service.js';
 import { QuoteWorkflowService } from './quote-workflow.service.js';
 import { QuotesService } from './quotes.service.js';
 
@@ -44,6 +57,7 @@ export class QuotesController {
   constructor(
     private readonly quotes: QuotesService,
     private readonly workflow: QuoteWorkflowService,
+    private readonly pdf: QuotePdfService,
   ) {}
 
   @Get()
@@ -185,5 +199,36 @@ export class QuotesController {
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<void> {
     return this.quotes.archive(actor, id);
+  }
+
+  @Post(':id/pdf')
+  @HttpCode(200)
+  @RequirePermissions('quotes.read')
+  @SerializeOptions({ schema: quotePdfRenderSchema })
+  @ApiOkResponse({
+    description:
+      'Queues the draft preview (client scope) or renders a sent version again when its PDF is not ready',
+    standardSchema: quotePdfRenderSchema,
+  })
+  renderPdf(
+    @CurrentUser() actor: CurrentUserInfo,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<QuotePdfRender> {
+    return this.pdf.render(actor, id);
+  }
+
+  @Get(':id/pdf')
+  @RequirePermissions('quotes.read')
+  @ApiQuery({ name: 'draft', required: false, enum: ['true'] })
+  @ApiOkResponse({ description: 'The PDF of the version, or the draft preview with draft=true' })
+  @ApiNotFoundResponse({ description: 'No such quote, or its PDF is not ready' })
+  async downloadPdf(
+    @CurrentUser() actor: CurrentUserInfo,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query('draft') draft: string | undefined,
+    @Req() request: IncomingMessage,
+    @Res() response: ServerResponse,
+  ): Promise<void> {
+    await this.pdf.serve(actor, id, draft === 'true', request, response);
   }
 }

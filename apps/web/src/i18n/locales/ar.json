@@ -3274,6 +3274,7 @@
       "ofClient": "مستند العميل",
       "ofProject": "مشروع: {{name}}",
       "ofRetainer": "عقد شهري: {{name}}",
+      "ofQuote": "عرض سعر: {{name}}",
       "removed": "مستندات مُزالة"
     },
     "finalByClient": "اعتمده العميل"

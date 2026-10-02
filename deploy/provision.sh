@@ -170,6 +170,17 @@ systemctl is-active pm2-vertexhub.service
 step "Backup timer"
 systemctl enable --now vertexhub-backup.timer
 
+step "Chromium libraries"
+# The worker renders quote PDFs with Playwright's Chromium (F04, ADR 0008). The browser itself
+# is downloaded by each deploy as $APP_USER; its system libraries need root, and Playwright
+# knows the list for this Ubuntu release, so they come from the current release.
+if [ -d "$SITE_DIR/current" ]; then
+  (cd "$SITE_DIR/current" && corepack pnpm --filter @vertex-hub/worker exec playwright install-deps chromium)
+  echo "installed"
+else
+  echo "no release yet: re-run provision.sh after the first deploy"
+fi
+
 cat <<EOF
 
 Provisioning complete. Next:

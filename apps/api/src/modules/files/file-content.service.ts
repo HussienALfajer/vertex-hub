@@ -152,6 +152,25 @@ export class FileContentService implements OnModuleInit {
   }
 
   /**
+   * A stored object whose reader the calling module has checked (F04 quote PDFs), inline when
+   * its type is safe to show. Never cached: a draft preview is replaced under the same URL.
+   */
+  async object(
+    key: string,
+    name: string,
+    mimeType: string,
+    request: IncomingMessage,
+    response: ServerResponse,
+  ): Promise<void> {
+    const inline = isInlineMimeType(mimeType);
+    response.setHeader('X-Content-Type-Options', 'nosniff');
+    response.setHeader('Content-Type', inline ? mimeType : 'application/octet-stream');
+    response.setHeader('Content-Disposition', contentDisposition(inline, name));
+    response.setHeader('Cache-Control', 'private, no-store');
+    await this.send(key, request, response);
+  }
+
+  /**
    * Rule 18: renders the thumbnail and preview of pending image versions, trying each up to three
    * times before marking it `failed` (the file still downloads).
    */

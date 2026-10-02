@@ -414,6 +414,22 @@ export const quoteLineSchema = z
 
 export type QuoteLine = z.infer<typeof quoteLineSchema>;
 
+/**
+ * The PDF of a sent version (rule 12) or of a draft preview (rule 13): queued, rendered and
+ * attached, or failed after the worker's retries ("Render again").
+ */
+export const QUOTE_PDF_STATES = ['pending', 'ready', 'failed'] as const;
+
+export const quotePdfStateSchema = z.enum(QUOTE_PDF_STATES).meta({ id: 'QuotePdfState' });
+
+export type QuotePdfState = z.infer<typeof quotePdfStateSchema>;
+
+export const quotePdfRenderSchema = z
+  .object({ state: quotePdfStateSchema })
+  .meta({ id: 'QuotePdfRender', description: 'The PDF state after asking for a render' });
+
+export type QuotePdfRender = z.infer<typeof quotePdfRenderSchema>;
+
 export const quotePermissionsSchema = z
   .object({
     canEdit: z.boolean(),
@@ -425,6 +441,8 @@ export const quotePermissionsSchema = z
     canReject: z.boolean(),
     canCreateVersion: z.boolean(),
     canArchive: z.boolean(),
+    /** A draft: "Preview PDF"; a sent version whose PDF is not ready: "Render again". */
+    canRenderPdf: z.boolean(),
   })
   .meta({ id: 'QuotePermissions', description: 'What the caller may do, for the UI' });
 
@@ -506,6 +524,17 @@ export const quoteDetailSchema = quoteSchema
     versions: z.array(
       z.object({ id: z.uuid(), version: z.number().int(), status: quoteStatusSchema }),
     ),
+    /** The PDF of a version that was sent (rule 12); null for drafts. */
+    pdf: z.object({ state: quotePdfStateSchema }).nullable(),
+    /** The last draft preview (rule 13); null when none was asked for, and once sent. */
+    draftPdf: z
+      .object({
+        state: quotePdfStateSchema,
+        renderedAt: z.iso.datetime().nullable(),
+        /** The draft changed since the preview was rendered. */
+        outdated: z.boolean(),
+      })
+      .nullable(),
     permissions: quotePermissionsSchema,
   })
   .meta({ id: 'QuoteDetail' });

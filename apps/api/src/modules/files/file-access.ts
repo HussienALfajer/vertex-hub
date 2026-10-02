@@ -30,6 +30,7 @@ const OWNER_COLUMNS = {
   project: fileItems.projectId,
   retainer: fileItems.retainerId,
   post: fileItems.postId,
+  quote: fileItems.quoteId,
 } as const;
 
 /** The items of one owner. `client_id` is set on every item of a client, so the type filters too. */
@@ -44,12 +45,18 @@ export function ownerValues(owner: FileOwner) {
     projectId: owner.type === 'project' ? owner.id : null,
     retainerId: owner.type === 'retainer' ? owner.id : null,
     postId: owner.type === 'post' ? owner.id : null,
+    quoteId: owner.type === 'quote' ? owner.id : null,
     clientId: owner.clientId,
   };
 }
 
 export const ownerIdOf = (item: ItemRow): string =>
-  (item.taskId ?? item.projectId ?? item.retainerId ?? item.postId ?? item.clientId) as string;
+  (item.taskId ??
+    item.projectId ??
+    item.retainerId ??
+    item.postId ??
+    item.quoteId ??
+    item.clientId) as string;
 
 /**
  * What an audit entry carries so the audit screen links it to its owner, and to the tab that
