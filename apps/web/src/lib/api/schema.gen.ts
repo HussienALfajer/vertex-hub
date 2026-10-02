@@ -2676,6 +2676,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/quotes/{id}/accept-plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["QuotesController_acceptPlan"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/quotes/{id}/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["QuotesController_accept"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/quotes/{id}/versions": {
         parameters: {
             query?: never;
@@ -2747,7 +2779,7 @@ export interface components {
         /** @enum {string} */
         AuditEntityType: "user" | "department" | "client" | "client_contact" | "client_platform_account" | "client_note" | "project" | "project_milestone" | "retainer" | "retainer_cycle" | "extra_work" | "task" | "task_checklist_item" | "task_link" | "task_comment" | "template" | "template_run" | "file_item" | "approval_request" | "post" | "shoot" | "meeting" | "catalog_service" | "catalog_package" | "quote_settings" | "quote";
         /** @enum {string} */
-        AuditAction: "user.created" | "user.updated" | "user.roles_changed" | "user.departments_changed" | "user.archived" | "user.restored" | "user.link_issued" | "user.password_set" | "user.password_changed" | "user.two_factor_enabled" | "user.two_factor_disabled" | "user.two_factor_reset" | "user.profile_updated" | "department.updated" | "client.created" | "client.updated" | "client.status_changed" | "client.account_manager_changed" | "client.healthcare_changed" | "client.archived" | "client.restored" | "client.brand_kit_updated" | "client_contact.created" | "client_contact.updated" | "client_contact.archived" | "client_platform_account.created" | "client_platform_account.updated" | "client_platform_account.archived" | "client_note.created" | "client_note.updated" | "client_note.archived" | "project.created" | "project.updated" | "project.project_manager_changed" | "project.status_changed" | "project.money_updated" | "project.archived" | "project.restored" | "project_milestone.created" | "project_milestone.updated" | "project_milestone.reordered" | "project_milestone.completed" | "project_milestone.reopened" | "project_milestone.archived" | "retainer.created" | "retainer.updated" | "retainer.status_changed" | "retainer.deliverables_updated" | "retainer.money_updated" | "retainer.archived" | "retainer.restored" | "retainer_cycle.created" | "retainer_cycle.closed" | "retainer_cycle.line_updated" | "retainer_cycle.line_added" | "retainer_cycle.adjusted" | "extra_work.created" | "extra_work.updated" | "extra_work.billing_changed" | "extra_work.archived" | "task.created" | "task.updated" | "task.assigned" | "task.department_changed" | "task.status_changed" | "task.dependencies_updated" | "task.archived" | "task.restored" | "task.revision_decided" | "task.request_scope_changed" | "task.extra_work_moved" | "task.reviewed" | "task.client_text_updated" | "task.client_response_recorded" | "task_checklist_item.created" | "task_checklist_item.updated" | "task_checklist_item.reordered" | "task_checklist_item.archived" | "task_link.created" | "task_link.archived" | "task_comment.created" | "task_comment.updated" | "task_comment.archived" | "template.created" | "template.updated" | "template.assignees_updated" | "template.archived" | "template.restored" | "template_run.created" | "retainer.template_changed" | "file_item.created" | "file_item.renamed" | "file_item.confidential_changed" | "file_item.archived" | "file_item.restored" | "file_version.created" | "file_version.archived" | "file_version.restored" | "file_version.final_set" | "file_version.final_cleared" | "approval_request.created" | "approval_request.link_reissued" | "approval_request.revoked" | "approval_item.responded" | "approval_item.withdrawn" | "post.created" | "post.updated" | "post.status_changed" | "post.reviewed" | "post.client_response_recorded" | "post.task_linked" | "post.task_unlinked" | "post.task_returned" | "post.duplicated" | "post.archived" | "post.restored" | "shoot.created" | "shoot.updated" | "shoot.shots_changed" | "shoot.shot_ticked" | "shoot.shot_unticked" | "shoot.completed" | "shoot.cancelled" | "shoot.reopened" | "shoot.archived" | "shoot.restored" | "meeting.created" | "meeting.updated" | "meeting.cancelled" | "meeting.archived" | "meeting.restored" | "catalog_service.created" | "catalog_service.updated" | "catalog_service.archived" | "catalog_service.restored" | "catalog_package.created" | "catalog_package.updated" | "catalog_package.archived" | "catalog_package.restored" | "quote_settings.updated" | "quote.created" | "quote.updated" | "quote.approval_requested" | "quote.approval_withdrawn" | "quote.approval_approved" | "quote.approval_returned" | "quote.sent" | "quote.extended" | "quote.expired" | "quote.rejected" | "quote.version_created" | "quote.superseded" | "quote.archived";
+        AuditAction: "user.created" | "user.updated" | "user.roles_changed" | "user.departments_changed" | "user.archived" | "user.restored" | "user.link_issued" | "user.password_set" | "user.password_changed" | "user.two_factor_enabled" | "user.two_factor_disabled" | "user.two_factor_reset" | "user.profile_updated" | "department.updated" | "client.created" | "client.updated" | "client.status_changed" | "client.account_manager_changed" | "client.healthcare_changed" | "client.archived" | "client.restored" | "client.brand_kit_updated" | "client_contact.created" | "client_contact.updated" | "client_contact.archived" | "client_platform_account.created" | "client_platform_account.updated" | "client_platform_account.archived" | "client_note.created" | "client_note.updated" | "client_note.archived" | "project.created" | "project.updated" | "project.project_manager_changed" | "project.status_changed" | "project.money_updated" | "project.archived" | "project.restored" | "project_milestone.created" | "project_milestone.updated" | "project_milestone.reordered" | "project_milestone.completed" | "project_milestone.reopened" | "project_milestone.archived" | "retainer.created" | "retainer.updated" | "retainer.status_changed" | "retainer.deliverables_updated" | "retainer.money_updated" | "retainer.archived" | "retainer.restored" | "retainer_cycle.created" | "retainer_cycle.closed" | "retainer_cycle.line_updated" | "retainer_cycle.line_added" | "retainer_cycle.adjusted" | "extra_work.created" | "extra_work.updated" | "extra_work.billing_changed" | "extra_work.archived" | "task.created" | "task.updated" | "task.assigned" | "task.department_changed" | "task.status_changed" | "task.dependencies_updated" | "task.archived" | "task.restored" | "task.revision_decided" | "task.request_scope_changed" | "task.extra_work_moved" | "task.reviewed" | "task.client_text_updated" | "task.client_response_recorded" | "task_checklist_item.created" | "task_checklist_item.updated" | "task_checklist_item.reordered" | "task_checklist_item.archived" | "task_link.created" | "task_link.archived" | "task_comment.created" | "task_comment.updated" | "task_comment.archived" | "template.created" | "template.updated" | "template.assignees_updated" | "template.archived" | "template.restored" | "template_run.created" | "retainer.template_changed" | "file_item.created" | "file_item.renamed" | "file_item.confidential_changed" | "file_item.archived" | "file_item.restored" | "file_version.created" | "file_version.archived" | "file_version.restored" | "file_version.final_set" | "file_version.final_cleared" | "approval_request.created" | "approval_request.link_reissued" | "approval_request.revoked" | "approval_item.responded" | "approval_item.withdrawn" | "post.created" | "post.updated" | "post.status_changed" | "post.reviewed" | "post.client_response_recorded" | "post.task_linked" | "post.task_unlinked" | "post.task_returned" | "post.duplicated" | "post.archived" | "post.restored" | "shoot.created" | "shoot.updated" | "shoot.shots_changed" | "shoot.shot_ticked" | "shoot.shot_unticked" | "shoot.completed" | "shoot.cancelled" | "shoot.reopened" | "shoot.archived" | "shoot.restored" | "meeting.created" | "meeting.updated" | "meeting.cancelled" | "meeting.archived" | "meeting.restored" | "catalog_service.created" | "catalog_service.updated" | "catalog_service.archived" | "catalog_service.restored" | "catalog_package.created" | "catalog_package.updated" | "catalog_package.archived" | "catalog_package.restored" | "quote_settings.updated" | "quote.created" | "quote.updated" | "quote.approval_requested" | "quote.approval_withdrawn" | "quote.approval_approved" | "quote.approval_returned" | "quote.sent" | "quote.extended" | "quote.expired" | "quote.rejected" | "quote.accepted" | "quote.version_created" | "quote.superseded" | "quote.archived";
         /** @description Audit entries, newest first */
         AuditPage: {
             items: components["schemas"]["AuditEntry"][];
@@ -4377,6 +4409,36 @@ export interface components {
                 decision: "approve" | "return";
                 note: string | null;
             };
+        } | {
+            /** Format: uuid */
+            id: string;
+            actor: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            subject: {
+                type: components["schemas"]["NotificationSubjectType"];
+                /** Format: uuid */
+                id: string;
+            };
+            count: number;
+            read: boolean;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @enum {string} */
+            type: "quote_accepted";
+            data: {
+                quote: {
+                    displayNumber: string;
+                    title: string;
+                    client: string;
+                };
+                project: string | null;
+                retainer: string | null;
+            };
         };
         /** @enum {string} */
         NotificationSubjectType: "task" | "client" | "project" | "retainer" | "template_run" | "approval_request" | "post" | "shoot" | "meeting" | "quote";
@@ -4397,7 +4459,7 @@ export interface components {
             }[];
         };
         /** @enum {string} */
-        NotificationType: "task_assigned" | "task_mentioned" | "task_returned" | "task_review_requested" | "task_medical_review_requested" | "task_awaiting_client" | "task_over_limit" | "approval_responded" | "approval_no_response" | "approval_expired" | "task_changed" | "task_commented" | "task_file_added" | "task_requested" | "tasks_generated" | "task_approved" | "task_opened" | "request_finished" | "post_returned" | "post_review_requested" | "post_medical_review_requested" | "post_awaiting_client" | "post_assigned" | "post_approved" | "post_task_ready" | "post_task_unlinked" | "shoot_booked" | "shoot_dropped" | "shoot_changed" | "meeting_invited" | "meeting_dropped" | "meeting_changed" | "task_due_soon" | "task_overdue" | "task_overdue_escalated" | "task_over_limit_pending" | "post_publish_today" | "post_publish_overdue" | "shoot_upcoming" | "shoot_not_closed" | "meeting_upcoming" | "client_account_manager_assigned" | "project_manager_assigned" | "retainer_renewal_due" | "retainer_behind" | "quote_approval_requested" | "quote_approval_decided";
+        NotificationType: "task_assigned" | "task_mentioned" | "task_returned" | "task_review_requested" | "task_medical_review_requested" | "task_awaiting_client" | "task_over_limit" | "approval_responded" | "approval_no_response" | "approval_expired" | "task_changed" | "task_commented" | "task_file_added" | "task_requested" | "tasks_generated" | "task_approved" | "task_opened" | "request_finished" | "post_returned" | "post_review_requested" | "post_medical_review_requested" | "post_awaiting_client" | "post_assigned" | "post_approved" | "post_task_ready" | "post_task_unlinked" | "shoot_booked" | "shoot_dropped" | "shoot_changed" | "meeting_invited" | "meeting_dropped" | "meeting_changed" | "task_due_soon" | "task_overdue" | "task_overdue_escalated" | "task_over_limit_pending" | "post_publish_today" | "post_publish_overdue" | "shoot_upcoming" | "shoot_not_closed" | "meeting_upcoming" | "client_account_manager_assigned" | "project_manager_assigned" | "retainer_renewal_due" | "retainer_behind" | "quote_approval_requested" | "quote_approval_decided" | "quote_accepted";
         UpdateNotificationSettings: {
             mutedTypes: components["schemas"]["NotificationType"][];
         };
@@ -5069,6 +5131,7 @@ export interface components {
             deliverableId: string | null;
             kind: components["schemas"]["DeliverableKind"];
             label: string | null;
+            revisionLimit: number | null;
             position: number;
             committed: number;
             delivered: number;
@@ -5115,6 +5178,7 @@ export interface components {
             kind: components["schemas"]["DeliverableKind"];
             label: string | null;
             monthlyQuantity: number;
+            revisionLimit: number | null;
             position: number;
         };
         /** @description What the caller may do, for the UI */
@@ -5143,6 +5207,7 @@ export interface components {
             kind: components["schemas"]["DeliverableKind"];
             label?: string | null;
             monthlyQuantity: number;
+            revisionLimit?: number | null;
         };
         UpdateRetainer: {
             name?: string;
@@ -5161,6 +5226,7 @@ export interface components {
             kind: components["schemas"]["DeliverableKind"];
             label?: string | null;
             monthlyQuantity: number;
+            revisionLimit?: number | null;
             /** Format: uuid */
             id?: string;
         };
@@ -5206,6 +5272,7 @@ export interface components {
             deliverableId: string | null;
             kind: components["schemas"]["DeliverableKind"];
             label: string | null;
+            revisionLimit: number | null;
             position: number;
             committed: number;
             delivered: number;
@@ -7286,6 +7353,7 @@ export interface components {
             retainerCycleId?: string;
             /** Format: date */
             startDate?: string;
+            revisionLimit?: number;
             /** @default [] */
             assignees: {
                 department: components["schemas"]["DepartmentCode"];
@@ -7725,6 +7793,16 @@ export interface components {
                 version: number;
                 status: components["schemas"]["QuoteStatus"];
             }[];
+            project: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            retainer: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
             pdf: {
                 state: components["schemas"]["QuotePdfState"];
             } | null;
@@ -7802,6 +7880,7 @@ export interface components {
             canReject: boolean;
             canCreateVersion: boolean;
             canArchive: boolean;
+            canAccept: boolean;
             canRenderPdf: boolean;
         };
         CreateQuote: {
@@ -7888,6 +7967,119 @@ export interface components {
             contactId: string | null;
             reason: components["schemas"]["QuoteRejectionReason"];
             note?: string | null;
+        };
+        AcceptPlan: {
+            /** Format: date */
+            sentOn: string;
+            project: {
+                name: string;
+                projectManager: {
+                    /** Format: uuid */
+                    id: string;
+                    name: string;
+                };
+                departments: components["schemas"]["DepartmentCode"][];
+                /** Format: date */
+                startDate: string;
+                /** Format: date */
+                dueDate: string;
+                templates: {
+                    /** Format: uuid */
+                    id: string;
+                    name: string;
+                    selected: boolean;
+                    revisionLimit: number;
+                }[];
+                milestones: {
+                    name: string;
+                    /** Format: date */
+                    dueDate: string | null;
+                }[];
+                installments: {
+                    name: string;
+                    percent: number;
+                    amountMinor: number;
+                    milestone: number;
+                }[];
+            } | null;
+            retainer: {
+                name: string;
+                departments: components["schemas"]["DepartmentCode"][];
+                /** Format: date */
+                startDate: string;
+                /** Format: date */
+                renewalDate: string | null;
+                template: {
+                    /** Format: uuid */
+                    id: string;
+                    name: string;
+                } | null;
+                currency: components["schemas"]["Currency"];
+                monthlyFeeMinor: number;
+                lines: {
+                    kind: components["schemas"]["DeliverableKind"];
+                    label: string | null;
+                    monthlyQuantity: number;
+                    revisionLimit: number;
+                }[];
+                renewable: {
+                    /** Format: uuid */
+                    id: string;
+                    name: string;
+                    status: components["schemas"]["RetainerStatus"];
+                }[];
+            } | null;
+            archivedTemplates: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            }[];
+        };
+        AcceptQuote: {
+            /** Format: date */
+            respondedOn: string;
+            /**
+             * Format: uuid
+             * @default null
+             */
+            contactId: string | null;
+            note?: string | null;
+            /**
+             * Format: uuid
+             * @default null
+             */
+            proofUploadId: string | null;
+            project?: {
+                name: string;
+                /** Format: uuid */
+                projectManagerId: string;
+                departments: components["schemas"]["DepartmentCode"][];
+                /** Format: date */
+                startDate: string;
+                /** Format: date */
+                dueDate: string;
+                templateIds: string[];
+                installmentMilestones: number[];
+            } | null;
+            retainer?: ({
+                /** @enum {string} */
+                mode: "new";
+                name: string;
+                departments: components["schemas"]["DepartmentCode"][];
+                /** Format: date */
+                startDate: string;
+                /** Format: date */
+                renewalDate: string | null;
+                /** Format: uuid */
+                templateId: string | null;
+            } | {
+                /** @enum {string} */
+                mode: "renew";
+                /** Format: uuid */
+                retainerId: string;
+                /** Format: uuid */
+                templateId: string | null;
+            }) | null;
         };
         /** @description The PDF state after asking for a render */
         QuotePdfRender: {
@@ -13348,6 +13540,8 @@ export interface operations {
                 clientId?: string;
                 accountManagerId?: string;
                 approval?: "pending";
+                projectId?: string;
+                retainerId?: string;
                 archived?: "true" | "false";
                 latestOnly?: "true" | "false";
                 sort?: "updatedAt" | "number" | "validUntil";
@@ -13562,6 +13756,59 @@ export interface operations {
         };
         responses: {
             /** @description The rejected quote */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuoteDetail"];
+                };
+            };
+        };
+    };
+    QuotesController_acceptPlan: {
+        parameters: {
+            query?: {
+                projectStartDate?: string;
+                chooseTemplates?: "true" | "false";
+                templateIds?: string | string[];
+                retainerStartDate?: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The accept dialog's defaults for its current choices (A2–A6) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AcceptPlan"];
+                };
+            };
+        };
+    };
+    QuotesController_accept: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AcceptQuote"];
+            };
+        };
+        responses: {
+            /** @description The accepted quote, with the project and retainer it created or renewed (A01) */
             200: {
                 headers: {
                     [name: string]: unknown;
