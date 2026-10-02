@@ -24,6 +24,7 @@ import {
   CalendarRangeIcon,
   ChevronDownIcon,
   CircleUserIcon,
+  FileTextIcon,
   FolderKanbanIcon,
   LayoutTemplateIcon,
   ListTodoIcon,
@@ -58,6 +59,7 @@ interface NavItem {
     | 'nav.calendar'
     | 'nav.projects'
     | 'nav.retainers'
+    | 'nav.quotes'
     | 'nav.catalog'
     | 'nav.templates'
     | 'nav.team'
@@ -107,6 +109,7 @@ const navItems: NavItem[] = [
   { to: '/clients', label: 'nav.clients', icon: BriefcaseBusinessIcon, permission: 'clients.read' },
   { to: '/projects', label: 'nav.projects', icon: FolderKanbanIcon, permission: 'projects.read' },
   { to: '/retainers', label: 'nav.retainers', icon: RepeatIcon, permission: 'projects.read' },
+  { to: '/quotes', label: 'nav.quotes', icon: FileTextIcon, permission: 'quotes.read' },
   { to: '/catalog', label: 'nav.catalog', icon: PackageIcon, permission: 'catalog.read' },
   // Everyone reads templates; the people who apply or maintain them see the link (F07 screen 1).
   { to: '/templates', label: 'nav.templates', icon: LayoutTemplateIcon, show: managesTeams },

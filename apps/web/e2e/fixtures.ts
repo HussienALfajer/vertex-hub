@@ -16,6 +16,7 @@ import {
   BOARD_STATUSES,
   type BrandFileKind,
   type BrandKit,
+  businessDate,
   type Calendar,
   type CancelMeeting,
   type CancelShoot,
@@ -51,6 +52,7 @@ import {
   calendarDay,
   createCatalogPackageSchema,
   createCatalogServiceSchema,
+  createQuoteSchema,
   createTemplateSchema,
   type DeliverableKind,
   type DepartmentCode,
@@ -61,6 +63,7 @@ import {
   type ExtraWork,
   type ExtraWorkBilling,
   type ExtraWorkBillingChange,
+  extendQuoteSchema,
   type FileItem,
   type FileOwnerType,
   type FileRole,
@@ -71,6 +74,7 @@ import {
   grantedPermissions,
   type HealthResponse,
   type IssuedApprovalRequest,
+  installmentsValid,
   intervalsOverlap,
   isInlineMimeType,
   isLineBehind,
@@ -99,6 +103,7 @@ import {
   type NoteChannel,
   type Notification,
   type NotificationType,
+  needsDiscountApproval,
   OPEN_TASK_STATUSES,
   type Permission,
   type PlatformAccount,
@@ -130,6 +135,17 @@ import {
   postMove,
   postTaskDueDate,
   postTaskTitle,
+  QUOTE_LIMITS,
+  type Quote,
+  type QuoteDetail,
+  type QuoteDraft,
+  type QuoteLine,
+  type QuoteSettings,
+  quoteApprovalActionSchema,
+  quoteApprovalDecisionSchema,
+  quoteDisplayNumber,
+  quoteDraftSchema,
+  quoteTotals,
   type ReopenShoot,
   type RequestScope,
   type Retainer,
@@ -143,6 +159,7 @@ import {
   type RevisionDecisionInput,
   type RevisionSource,
   deliveryRate as rateOf,
+  rejectQuoteSchema,
   renewalState,
   repeatedStepFor,
   revisionSourceOf,
@@ -152,6 +169,7 @@ import {
   type ShootStatus,
   type ShootType,
   type ShotListInput,
+  sendQuoteSchema,
   serviceIssues,
   setRetainerTemplateSchema,
   shootTaskTitle,
@@ -189,6 +207,7 @@ import {
   type UserResponse,
   updateCatalogPackageSchema,
   updateCatalogServiceSchema,
+  updateQuoteSettingsSchema,
   updateTemplateSchema,
   weekOf,
 } from '@vertex-hub/contracts';
@@ -890,7 +909,15 @@ export async function mockApi(page: Page, options: MockOptions): Promise<MockedA
   });
   const templates = templatesSeed();
   const templatesApi = templateRoutes({ users, clients, retainers, templates, me: () => me });
-  const catalogApi = catalogRoutes({ catalog: catalogSeed(), templates, me: () => me });
+  const catalog = catalogSeed();
+  const catalogApi = catalogRoutes({ catalog, templates, me: () => me });
+  const quotesApi = quoteRoutes({
+    quoting: quotesSeed(),
+    catalog,
+    clients,
+    users,
+    me: () => me,
+  });
   const notificationsApi = notificationRoutes({
     notifications: options.notifications ?? notificationsSeed(),
     streamed: options.streamed ?? [],
@@ -1156,6 +1183,10 @@ export async function mockApi(page: Page, options: MockOptions): Promise<MockedA
     // Service catalog (F04).
     const cataloged = catalogApi(route, method, url, request);
     if (cataloged) return cataloged;
+
+    // Quotes (F04).
+    const quoted = quotesApi(route, method, url, request);
+    if (quoted) return quoted;
 
     // Notifications (F14).
     const notified = notificationsApi(route, method, url);
@@ -8606,6 +8637,678 @@ function catalogRoutes({ catalog, templates, me }: CatalogState) {
   };
 }
 
+// Quotes (F04)
+
+type QuoteLineRecord = Omit<QuoteLine, 'totalMinor' | 'catalogArchived'>;
+
+interface QuoteRecord
+  extends Omit<
+    QuoteDetail,
+    | 'displayNumber'
+    | 'client'
+    | 'accountManager'
+    | 'contact'
+    | 'oneOffNetMinor'
+    | 'monthlyNetMinor'
+    | 'expiresSoon'
+    | 'sentBy'
+    | 'createdBy'
+    | 'lines'
+    | 'installments'
+    | 'totals'
+    | 'discountThresholdPercent'
+    | 'needsDiscountApproval'
+    | 'versions'
+    | 'permissions'
+  > {
+  clientId: string;
+  contactId: string | null;
+  sentById: string | null;
+  createdById: string;
+  lines: QuoteLineRecord[];
+  installments: { id: string; name: string; percent: number }[];
+}
+
+interface QuoteRecords {
+  quotes: QuoteRecord[];
+  settings: Omit<QuoteSettings, 'canEdit' | 'canEditThreshold'>;
+}
+
+const quoteTimes = {
+  createdAt: '2026-09-28T08:00:00.000Z',
+  updatedAt: '2026-09-28T08:00:00.000Z',
+};
+
+/** Brand identity (one-off) and Gold social (monthly) as quote lines, at catalog prices. */
+function seedQuoteLines(first: number): QuoteLineRecord[] {
+  return [
+    {
+      id: id(first),
+      section: 'one_off',
+      serviceId: id(9004),
+      packageId: null,
+      name: 'هوية بصرية',
+      description: 'شعار ودليل هوية وتطبيقات أساسية.',
+      department: 'design',
+      quantity: 1,
+      unitPriceMinor: 80000,
+      listUnitPriceMinor: 80000,
+      revisionRounds: 3,
+      deliverableKind: null,
+      deliverableLabel: null,
+      templateId: id(2000),
+      items: [],
+    },
+    {
+      id: id(first + 1),
+      section: 'monthly',
+      serviceId: null,
+      packageId: id(9051),
+      name: 'باقة السوشال الذهبية',
+      description: null,
+      department: null,
+      quantity: 1,
+      unitPriceMinor: 45000,
+      listUnitPriceMinor: 45000,
+      revisionRounds: null,
+      deliverableKind: null,
+      deliverableLabel: null,
+      templateId: id(2100),
+      items: [
+        { serviceId: id(9001), name: 'تصميم سوشال ميديا', quantity: 12, revisionRounds: 2 },
+        { serviceId: id(9002), name: 'ريل', quantity: 4, revisionRounds: 2 },
+        { serviceId: id(9003), name: 'إدارة صفحة', quantity: 2, revisionRounds: 2 },
+      ].map((item, index) => ({
+        id: id(first + 10 + index),
+        ...item,
+        department: (['design', 'photography', 'content_management'] as const)[index] ?? 'design',
+        deliverableKind: (['design', 'reel', null] as const)[index] ?? null,
+        deliverableLabel: null,
+        templateId: null,
+      })),
+    },
+  ];
+}
+
+/**
+ * Four quotes: Jasmine's sent quote, its draft awaiting the General Manager's approval, a Shifa
+ * draft whose discount needs approval, and an expired Shifa quote.
+ */
+export function quotesSeed(): QuoteRecords {
+  const quote = (
+    n: number,
+    fields: Partial<QuoteRecord> & Pick<QuoteRecord, 'number' | 'title' | 'clientId'>,
+  ): QuoteRecord => ({
+    id: id(n),
+    year: 2026,
+    version: 1,
+    contactId: null,
+    currency: 'USD',
+    status: 'draft',
+    discountApproval: 'none',
+    discountDecision: null,
+    oneOffDiscountMinor: 0,
+    monthlyDiscountMinor: 0,
+    monthlyTermMonths: 6,
+    validityDays: 14,
+    validUntil: null,
+    clientNotes: null,
+    terms: 'تُدفع الدفعة الأولى عند التوقيع.',
+    sentAt: null,
+    sentById: null,
+    response: null,
+    createdById: id(3),
+    project: null,
+    retainer: null,
+    pdf: null,
+    draftPdf: null,
+    lines: seedQuoteLines(n * 100),
+    installments: [
+      { id: id(n * 100 + 50), name: 'البداية', percent: 50 },
+      { id: id(n * 100 + 51), name: 'التسليم', percent: 50 },
+    ],
+    archivedAt: null,
+    ...quoteTimes,
+    ...fields,
+  });
+  const today = businessDate();
+  return {
+    settings: {
+      companyDetails: 'Vertex Media\nدمشق، المزة\n+963 11 000 0000\nhello@vertex.example',
+      defaultTerms: 'تُدفع الدفعة الأولى عند التوقيع.',
+      defaultValidityDays: 14,
+      discountThresholdPercent: 10,
+      updatedAt: '2026-09-20T08:00:00.000Z',
+      updatedBy: { id: id(1), name: 'سارة الخطيب' },
+    },
+    quotes: [
+      quote(9201, {
+        number: 1,
+        title: 'هوية وسوشال الياسمين',
+        clientId: id(601),
+        contactId: id(611),
+        status: 'sent',
+        sentAt: `${addDays(today, -2)}T09:00:00.000Z`,
+        sentById: id(3),
+        validUntil: addDays(today, 2),
+        pdf: { state: 'ready' },
+      }),
+      quote(9202, {
+        number: 2,
+        title: 'حملة رمضان',
+        clientId: id(601),
+        discountApproval: 'pending',
+        oneOffDiscountMinor: 12000,
+        lines: seedQuoteLines(920200).slice(0, 1),
+        installments: [{ id: id(9202050), name: 'دفعة واحدة', percent: 100 }],
+      }),
+      quote(9203, {
+        number: 3,
+        title: 'محتوى عيادة الشفاء',
+        clientId: id(602),
+        createdById: id(1),
+        monthlyDiscountMinor: 9000,
+        lines: seedQuoteLines(920300).slice(1),
+        installments: [],
+      }),
+      quote(9204, {
+        number: 4,
+        title: 'موقع العيادة',
+        clientId: id(602),
+        createdById: id(1),
+        status: 'expired',
+        sentAt: '2026-09-01T09:00:00.000Z',
+        sentById: id(1),
+        validUntil: '2026-09-15',
+        pdf: { state: 'ready' },
+        lines: seedQuoteLines(920400).slice(0, 1),
+      }),
+    ],
+  };
+}
+
+interface QuoteState {
+  quoting: QuoteRecords;
+  catalog: CatalogRecords;
+  clients: ClientRecord[];
+  users: UserResponse[];
+  me: () => MeResponse;
+}
+
+/** The quotes API over the in-memory records, with the F04 rules the screens rely on. */
+function quoteRoutes({ quoting, catalog, clients, users, me }: QuoteState) {
+  const { quotes, settings } = quoting;
+  let nextId = 9300;
+  let clock = Date.parse('2026-10-02T09:00:00.000Z');
+  const now = () => {
+    clock += 60_000;
+    return new Date(clock).toISOString();
+  };
+  const scopes = (permission: Permission) =>
+    me().permissions.find((g) => g.permission === permission)?.scopes ?? [];
+  const holds = (permission: Permission) => scopes(permission).length > 0;
+  const covers = (permission: Permission, clientId: string) => {
+    const granted = scopes(permission);
+    const client = clients.find((c) => c.id === clientId);
+    return (
+      granted.includes('all') ||
+      (granted.includes('own_clients') && client?.accountManagerId === me().user.id)
+    );
+  };
+  const person = (userId: string) => {
+    const user = users.find((u) => u.id === userId);
+    return { id: userId, name: user?.name ?? '' };
+  };
+  const catalogPriceOf = (
+    item: { priceUsdMinor: number; priceSypMinor: number | null },
+    currency: Currency,
+  ) => (currency === 'USD' ? item.priceUsdMinor : item.priceSypMinor);
+  const totalsOf = (
+    q: Pick<
+      QuoteRecord,
+      'lines' | 'oneOffDiscountMinor' | 'monthlyDiscountMinor' | 'monthlyTermMonths'
+    > & { installments: { percent: number }[] },
+  ) =>
+    quoteTotals({
+      lines: q.lines,
+      oneOffDiscountMinor: q.oneOffDiscountMinor,
+      monthlyDiscountMinor: q.monthlyDiscountMinor,
+      installments: q.installments,
+      monthlyTermMonths: q.monthlyTermMonths,
+    });
+  const latestOf = (q: QuoteRecord) =>
+    quotes
+      .filter((x) => x.year === q.year && x.number === q.number && !x.archivedAt)
+      .reduce((a, b) => (b.version > a.version ? b : a), q);
+
+  const detailOf = (q: QuoteRecord): QuoteDetail => {
+    const client = clients.find((c) => c.id === q.clientId);
+    const contact = client?.contacts.find((c) => c.id === q.contactId);
+    const totals = totalsOf(q);
+    const manages = covers('quotes.manage', q.clientId) && !q.archivedAt;
+    const draft = q.status === 'draft';
+    const needs = needsDiscountApproval(totals, settings.discountThresholdPercent);
+    const approver = holds('quotes.approve_discount');
+    const latest = latestOf(q).id === q.id;
+    const newerDraft = quotes.some(
+      (x) =>
+        x.number === q.number && x.version > q.version && x.status === 'draft' && !x.archivedAt,
+    );
+    const daysLeft = q.validUntil
+      ? (Date.parse(q.validUntil) - Date.parse(businessDate())) / 86_400_000
+      : null;
+    return {
+      ...q,
+      displayNumber: quoteDisplayNumber(q),
+      client: { id: q.clientId, name: client?.tradeName ?? '' },
+      accountManager: person(client?.accountManagerId ?? id(1)),
+      contact: contact ? { id: contact.id, name: contact.name, archived: contact.archived } : null,
+      oneOffNetMinor: totals.oneOff.netMinor,
+      monthlyNetMinor: totals.monthly.netMinor,
+      expiresSoon:
+        q.status === 'sent' && daysLeft !== null && daysLeft <= QUOTE_LIMITS.expiresSoonDays,
+      sentBy: q.sentById ? person(q.sentById) : null,
+      createdBy: person(q.createdById),
+      lines: q.lines.map((line, index) => ({
+        ...line,
+        totalMinor: totals.lineTotalsMinor[index] ?? 0,
+        catalogArchived: !!(line.serviceId
+          ? catalog.services.find((s) => s.id === line.serviceId)?.archivedAt
+          : catalog.packages.find((p) => p.id === line.packageId)?.archivedAt),
+      })),
+      installments: q.installments.map((installment, index) => ({
+        ...installment,
+        amountMinor: totals.installmentAmountsMinor[index] ?? 0,
+      })),
+      totals: {
+        oneOff: totals.oneOff,
+        monthly: totals.monthly,
+        monthlyTermTotalMinor: totals.monthlyTermTotalMinor,
+      },
+      discountThresholdPercent: settings.discountThresholdPercent,
+      needsDiscountApproval: needs,
+      versions: quotes
+        .filter((x) => x.year === q.year && x.number === q.number && !x.archivedAt)
+        .sort((a, b) => a.version - b.version)
+        .map((x) => ({ id: x.id, version: x.version, status: x.status })),
+      permissions: {
+        canEdit: manages && draft && q.discountApproval !== 'pending',
+        canRequestApproval:
+          manages && draft && needs && ['none', 'returned'].includes(q.discountApproval),
+        canWithdrawApproval: manages && draft && q.discountApproval === 'pending',
+        canDecideApproval: approver && draft && q.discountApproval === 'pending',
+        canSend: manages && draft && q.discountApproval !== 'pending',
+        canExtend: manages && q.status === 'expired',
+        canReject: manages && ['sent', 'expired'].includes(q.status),
+        canCreateVersion:
+          manages && latest && !newerDraft && ['sent', 'expired', 'rejected'].includes(q.status),
+        canArchive: manages && draft,
+        canAccept: manages && covers('projects.manage', q.clientId) && q.status === 'sent',
+        canRenderPdf: draft ? manages : q.pdf?.state === 'failed',
+      },
+    };
+  };
+  const listItemOf = (q: QuoteRecord): Quote => {
+    const d = detailOf(q);
+    return {
+      id: d.id,
+      displayNumber: d.displayNumber,
+      year: d.year,
+      number: d.number,
+      version: d.version,
+      title: d.title,
+      client: d.client,
+      accountManager: d.accountManager,
+      currency: d.currency,
+      status: d.status,
+      discountApproval: d.discountApproval,
+      oneOffNetMinor: d.oneOffNetMinor,
+      monthlyNetMinor: d.monthlyNetMinor,
+      validUntil: d.validUntil,
+      expiresSoon: d.expiresSoon,
+      updatedAt: d.updatedAt,
+      archivedAt: d.archivedAt,
+    };
+  };
+  const settingsOf = (): QuoteSettings => ({
+    ...settings,
+    canEdit: holds('catalog.manage'),
+    canEditThreshold: holds('quotes.approve_discount'),
+  });
+
+  /** A saved draft line: a line already on the draft keeps its copy; a new one copies the catalog. */
+  const lineOf = (
+    q: QuoteRecord,
+    input: QuoteDraft['lines'][number],
+    currency: Currency,
+  ): QuoteLineRecord => {
+    const stored = q.lines.find((line) => line.id === input.id);
+    const service = catalog.services.find((s) => s.id === input.serviceId);
+    const pkg = catalog.packages.find((p) => p.id === input.packageId);
+    const item = service ?? pkg;
+    const listPrice =
+      stored && currency === q.currency
+        ? stored.listUnitPriceMinor
+        : item
+          ? catalogPriceOf(item, currency)
+          : null;
+    return {
+      id: stored?.id ?? id(nextId++),
+      section: input.section,
+      serviceId: input.serviceId,
+      packageId: input.packageId,
+      name: stored?.name ?? item?.name ?? '',
+      description: input.description,
+      department: service?.department ?? null,
+      quantity: input.quantity,
+      unitPriceMinor: currency === q.currency ? input.unitPriceMinor : (listPrice ?? 0),
+      listUnitPriceMinor: listPrice,
+      revisionRounds: input.revisionRounds,
+      deliverableKind: service?.deliverableKind ?? null,
+      deliverableLabel: service?.deliverableLabel ?? null,
+      templateId: stored?.templateId ?? item?.templateId ?? null,
+      items: input.items.map((entry, index) => {
+        const s = catalog.services.find((x) => x.id === entry.serviceId);
+        return {
+          id: stored?.items[index]?.id ?? id(nextId++),
+          serviceId: entry.serviceId,
+          name: s?.name ?? '',
+          department: s?.department ?? 'design',
+          quantity: entry.quantity,
+          revisionRounds: entry.revisionRounds,
+          deliverableKind: s?.deliverableKind ?? null,
+          deliverableLabel: s?.deliverableLabel ?? null,
+          templateId: null,
+        };
+      }),
+    };
+  };
+  /** What an approval covers (rule 7): currency, discounts, lines, prices and quantities. */
+  const pricing = (
+    q: Pick<QuoteRecord, 'currency' | 'oneOffDiscountMinor' | 'monthlyDiscountMinor' | 'lines'>,
+  ) =>
+    JSON.stringify([
+      q.currency,
+      q.oneOffDiscountMinor,
+      q.monthlyDiscountMinor,
+      q.lines.map((l) => [l.serviceId, l.packageId, l.quantity, l.unitPriceMinor]),
+    ]);
+
+  return (route: Route, method: string, url: URL, request: Request): Promise<void> | undefined => {
+    const path = url.pathname;
+    if (path === '/api/quote-settings') {
+      if (method === 'GET') {
+        return holds('quotes.read') ? json(route, settingsOf()) : fail(route, 403, null);
+      }
+      const input = updateQuoteSettingsSchema.parse(request.postDataJSON());
+      const { discountThresholdPercent, ...texts } = input;
+      if (discountThresholdPercent !== undefined && !holds('quotes.approve_discount')) {
+        return fail(route, 403, null);
+      }
+      if (Object.keys(texts).length > 0 && !holds('catalog.manage')) return fail(route, 403, null);
+      Object.assign(settings, definedFields(input), {
+        updatedAt: now(),
+        updatedBy: person(me().user.id),
+      });
+      return json(route, settingsOf());
+    }
+    if (!path.startsWith('/api/quotes')) return undefined;
+    if (!holds('quotes.read')) return fail(route, 403, null);
+
+    if (path === '/api/quotes' && method === 'GET') {
+      const statuses = url.searchParams.getAll('status');
+      const archived = url.searchParams.get('archived') === 'true';
+      const clientId = url.searchParams.get('clientId');
+      const accountManagerId = url.searchParams.get('accountManagerId');
+      const approval = url.searchParams.get('approval');
+      const search = url.searchParams.get('search')?.toLowerCase();
+      const items = quotes
+        .filter(
+          (q) =>
+            covers('quotes.read', q.clientId) &&
+            !!q.archivedAt === archived &&
+            (archived || latestOf(q).id === q.id) &&
+            (statuses.length === 0 || statuses.includes(q.status)) &&
+            (!clientId || q.clientId === clientId) &&
+            (!accountManagerId ||
+              clients.find((c) => c.id === q.clientId)?.accountManagerId === accountManagerId) &&
+            (!approval || q.discountApproval === approval),
+        )
+        .map(listItemOf)
+        .filter(
+          (q) =>
+            !search ||
+            q.title.toLowerCase().includes(search) ||
+            q.displayNumber.toLowerCase().includes(search) ||
+            q.client.name.includes(search),
+        )
+        .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+      return json(route, { items, total: items.length, page: 1, pageSize: 25 });
+    }
+    if (path === '/api/quotes' && method === 'POST') {
+      const input = createQuoteSchema.parse(request.postDataJSON());
+      if (!covers('quotes.manage', input.clientId)) return fail(route, 403, null);
+      const client = clients.find((c) => c.id === input.clientId);
+      if (!client || client.archived) return fail(route, 409, 'CLIENT_ARCHIVED');
+      if (client.status === 'ended') return fail(route, 409, 'CLIENT_ENDED');
+      const at = now();
+      const created: QuoteRecord = {
+        id: id(nextId++),
+        year: 2026,
+        number: Math.max(...quotes.map((q) => q.number)) + 1,
+        version: 1,
+        title: input.title,
+        clientId: input.clientId,
+        contactId: input.contactId,
+        currency: input.currency,
+        status: 'draft',
+        discountApproval: 'none',
+        discountDecision: null,
+        oneOffDiscountMinor: 0,
+        monthlyDiscountMinor: 0,
+        monthlyTermMonths: null,
+        validityDays: settings.defaultValidityDays,
+        validUntil: null,
+        clientNotes: null,
+        terms: settings.defaultTerms || null,
+        sentAt: null,
+        sentById: null,
+        response: null,
+        createdById: me().user.id,
+        project: null,
+        retainer: null,
+        pdf: null,
+        draftPdf: null,
+        lines: [],
+        installments: [],
+        archivedAt: null,
+        createdAt: at,
+        updatedAt: at,
+      };
+      quotes.push(created);
+      return json(route, detailOf(created), 201);
+    }
+
+    const match = path.match(/^\/api\/quotes\/([^/]+)(?:\/(.+))?$/);
+    if (!match) return undefined;
+    const q = quotes.find((x) => x.id === match[1]);
+    if (!q || !covers('quotes.read', q.clientId)) return fail(route, 404, null);
+    const action = match[2];
+    if (!action && method === 'GET') {
+      // The worker renders between two reads.
+      if (q.pdf?.state === 'pending') q.pdf = { state: 'ready' };
+      if (q.draftPdf?.state === 'pending') {
+        q.draftPdf = { state: 'ready', renderedAt: now(), outdated: false };
+      }
+      return json(route, detailOf(q));
+    }
+    if (action === 'pdf' && method === 'POST') {
+      if (q.status === 'draft') {
+        if (!covers('quotes.manage', q.clientId)) return fail(route, 403, null);
+        q.draftPdf = { state: 'pending', renderedAt: null, outdated: false };
+      } else if (q.pdf?.state === 'failed') {
+        q.pdf = { state: 'pending' };
+      }
+      return json(route, { state: 'pending' });
+    }
+    if (action === 'approval/decision') {
+      if (!holds('quotes.approve_discount')) return fail(route, 403, null);
+      if (q.discountApproval !== 'pending') return fail(route, 409, 'INVALID_TRANSITION');
+      const input = quoteApprovalDecisionSchema.parse(request.postDataJSON());
+      q.discountApproval = input.decision === 'approve' ? 'approved' : 'returned';
+      q.discountDecision = { by: person(me().user.id), at: now(), note: input.note };
+      q.updatedAt = now();
+      return json(route, detailOf(q));
+    }
+    if (!covers('quotes.manage', q.clientId)) return fail(route, 403, null);
+    const totals = totalsOf(q);
+    const needs = needsDiscountApproval(totals, settings.discountThresholdPercent);
+
+    if (!action && method === 'PUT') {
+      if (q.status !== 'draft' || q.archivedAt) return fail(route, 409, 'QUOTE_LOCKED');
+      if (q.discountApproval === 'pending') return fail(route, 409, 'APPROVAL_PENDING');
+      const input = quoteDraftSchema.parse(request.postDataJSON());
+      if (input.updatedAt !== q.updatedAt) return fail(route, 409, 'STALE_QUOTE');
+      const lines = input.lines.map((line) => lineOf(q, line, input.currency));
+      const next = { ...q, ...input, lines };
+      const nextTotals = totalsOf(next);
+      if (
+        input.oneOffDiscountMinor > nextTotals.oneOff.subtotalMinor ||
+        input.monthlyDiscountMinor > nextTotals.monthly.subtotalMinor
+      ) {
+        return fail(route, 400, 'INVALID_DISCOUNT');
+      }
+      const hasOneOff = lines.some((line) => line.section === 'one_off');
+      if (!installmentsValid(input.installments, hasOneOff, { draft: true })) {
+        return fail(route, 400, 'INVALID_INSTALLMENTS');
+      }
+      Object.assign(q, input, {
+        lines,
+        installments: input.installments.map((installment, index) => ({
+          id: q.installments[index]?.id ?? id(nextId++),
+          ...installment,
+        })),
+        discountApproval:
+          q.discountApproval === 'approved' && pricing(q) !== pricing(next)
+            ? 'none'
+            : q.discountApproval,
+        draftPdf: q.draftPdf && { ...q.draftPdf, outdated: true },
+        updatedAt: now(),
+      });
+      return json(route, detailOf(q));
+    }
+    if (action === 'approval') {
+      const { action: step } = quoteApprovalActionSchema.parse(request.postDataJSON());
+      if (q.status !== 'draft') return fail(route, 409, 'QUOTE_LOCKED');
+      if (step === 'request') {
+        if (!needs) return fail(route, 409, 'APPROVAL_NOT_NEEDED');
+        if (!['none', 'returned'].includes(q.discountApproval)) {
+          return fail(route, 409, 'INVALID_TRANSITION');
+        }
+        q.discountApproval = 'pending';
+      } else {
+        if (q.discountApproval !== 'pending') return fail(route, 409, 'INVALID_TRANSITION');
+        q.discountApproval = 'none';
+      }
+      q.updatedAt = now();
+      return json(route, detailOf(q));
+    }
+    if (action === 'send') {
+      const { confirmZeroPrice } = sendQuoteSchema.parse(request.postDataJSON());
+      if (q.status !== 'draft') return fail(route, 409, 'INVALID_TRANSITION');
+      if (q.discountApproval === 'pending') return fail(route, 409, 'APPROVAL_PENDING');
+      if (q.lines.length === 0) return fail(route, 409, 'QUOTE_EMPTY');
+      const hasOneOff = q.lines.some((line) => line.section === 'one_off');
+      if (!installmentsValid(q.installments, hasOneOff, { draft: false })) {
+        return fail(route, 409, 'INVALID_INSTALLMENTS');
+      }
+      if (!confirmZeroPrice && q.lines.some((line) => line.unitPriceMinor === 0)) {
+        return fail(route, 409, 'ZERO_PRICE');
+      }
+      const approver = holds('quotes.approve_discount');
+      if (needs && q.discountApproval !== 'approved' && !approver) {
+        return fail(route, 409, 'DISCOUNT_APPROVAL_REQUIRED');
+      }
+      for (const older of quotes) {
+        if (
+          older.number === q.number &&
+          older.id !== q.id &&
+          ['sent', 'expired'].includes(older.status)
+        ) {
+          older.status = 'superseded';
+        }
+      }
+      Object.assign(q, {
+        status: 'sent',
+        discountApproval:
+          needs && approver && q.discountApproval !== 'approved' ? 'approved' : q.discountApproval,
+        sentAt: now(),
+        sentById: me().user.id,
+        validUntil: addDays(businessDate(), q.validityDays),
+        pdf: { state: 'pending' },
+        draftPdf: null,
+        updatedAt: now(),
+      });
+      return json(route, detailOf(q));
+    }
+    if (action === 'extend') {
+      if (q.status !== 'expired') return fail(route, 409, 'INVALID_TRANSITION');
+      const { validUntil } = extendQuoteSchema.parse(request.postDataJSON());
+      Object.assign(q, { status: 'sent', validUntil, updatedAt: now() });
+      return json(route, detailOf(q));
+    }
+    if (action === 'reject') {
+      if (!['sent', 'expired'].includes(q.status)) return fail(route, 409, 'INVALID_TRANSITION');
+      const input = rejectQuoteSchema.parse(request.postDataJSON());
+      if (input.reason === 'other' && !input.note) return fail(route, 400, 'NOTE_REQUIRED');
+      const contact = clients
+        .find((c) => c.id === q.clientId)
+        ?.contacts.find((c) => c.id === input.contactId);
+      Object.assign(q, {
+        status: 'rejected',
+        response: {
+          respondedOn: input.respondedOn,
+          contact: contact ? { id: contact.id, name: contact.name } : null,
+          note: input.note,
+          by: person(me().user.id),
+          rejectionReason: input.reason,
+        },
+        updatedAt: now(),
+      });
+      return json(route, detailOf(q));
+    }
+    if (action === 'versions') {
+      if (!detailOf(q).permissions.canCreateVersion) return fail(route, 409, 'VERSION_EXISTS');
+      const at = now();
+      const created: QuoteRecord = {
+        ...structuredClone(q),
+        id: id(nextId++),
+        version: q.version + 1,
+        status: 'draft',
+        discountApproval: 'none',
+        discountDecision: null,
+        validUntil: null,
+        sentAt: null,
+        sentById: null,
+        response: null,
+        pdf: null,
+        draftPdf: null,
+        createdById: me().user.id,
+        createdAt: at,
+        updatedAt: at,
+      };
+      quotes.push(created);
+      return json(route, detailOf(created), 201);
+    }
+    if (action === 'archive') {
+      if (q.status !== 'draft') return fail(route, 409, 'INVALID_TRANSITION');
+      q.archivedAt = now();
+      return route.fulfill({ status: 204 });
+    }
+    return undefined;
+  };
+}
+
 export const seedIds = {
   sara: id(1),
   omar: id(2),
@@ -8662,6 +9365,11 @@ export const seedIds = {
   designService: id(9001),
   brandService: id(9004),
   goldPackage: id(9051),
+  // Quotes (F04).
+  sentQuote: id(9201),
+  pendingQuote: id(9202),
+  shifaDraft: id(9203),
+  expiredQuote: id(9204),
 };
 
 /** Viewport screenshot kept in the test output and attached to the HTML report. */

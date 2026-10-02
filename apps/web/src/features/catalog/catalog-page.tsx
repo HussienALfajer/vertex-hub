@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { useNavigate } from '@tanstack/react-router';
+import { Link, useNavigate } from '@tanstack/react-router';
 import {
   CATALOG_BILLINGS,
   type CatalogBilling,
@@ -47,6 +47,7 @@ import {
   PencilIcon,
   PlusIcon,
   SearchIcon,
+  SettingsIcon,
   TriangleAlertIcon,
 } from 'lucide-react';
 import { useCallback, useState } from 'react';
@@ -126,18 +127,26 @@ export function CatalogPage({ search }: { search: CatalogSearch }) {
         title={t('catalog.title')}
         description={t('catalog.subtitle')}
         actions={
-          manager &&
-          (tab === 'services' ? (
-            <Button onClick={() => setEditingService('new')}>
-              <PlusIcon />
-              {t('catalog.services.new')}
-            </Button>
-          ) : (
-            <Button onClick={() => setEditingPackage('new')}>
-              <PlusIcon />
-              {t('catalog.packages.new')}
-            </Button>
-          ))
+          <>
+            {can(me, 'quotes.read') && (
+              <Button variant="outline" render={<Link to="/catalog/settings" />}>
+                <SettingsIcon />
+                {t('quotes.settings.link')}
+              </Button>
+            )}
+            {manager &&
+              (tab === 'services' ? (
+                <Button onClick={() => setEditingService('new')}>
+                  <PlusIcon />
+                  {t('catalog.services.new')}
+                </Button>
+              ) : (
+                <Button onClick={() => setEditingPackage('new')}>
+                  <PlusIcon />
+                  {t('catalog.packages.new')}
+                </Button>
+              ))}
+          </>
         }
       />
 

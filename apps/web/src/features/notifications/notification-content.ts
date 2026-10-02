@@ -42,8 +42,7 @@ export function notificationLink(notification: Notification): ToOptions {
     case 'meeting':
       return { to: '/meetings/$meetingId', params: { meetingId: subject.id } };
     case 'quote':
-      // The quote page arrives with the quote screens (F04 PR 5); until then the client opens.
-      return { to: '/' };
+      return { to: '/quotes/$quoteId', params: { quoteId: subject.id } };
     default:
       return { to: '/tasks/$taskId', params: { taskId: subject.id } };
   }

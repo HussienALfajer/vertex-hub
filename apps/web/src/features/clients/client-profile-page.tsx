@@ -45,6 +45,7 @@ import {
   CheckIcon,
   ChevronDownIcon,
   EllipsisIcon,
+  FileTextIcon,
   FolderKanbanIcon,
   FolderOpenIcon,
   ListTodoIcon,
@@ -65,7 +66,7 @@ import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '../../components/confirm-dialog';
 import { FormAlert } from '../../components/form-alert';
 import { isMissing, LoadError } from '../../components/load-error';
-import { canAll, useMe } from '../../lib/auth';
+import { can, canAll, useMe } from '../../lib/auth';
 import { errorMessage } from '../../lib/errors';
 import { formatNumber } from '../../lib/format';
 import { ClientApprovalsTab } from '../approvals/client-approvals-tab';
@@ -73,6 +74,7 @@ import { ClientContentTab } from '../content/client-content-tab';
 import { ClientFilesTab } from '../files/client-files-tab';
 import { type FileLibrarySearch, parseFileLibrarySearch } from '../files/library-search';
 import { ClientProjectsTab } from '../projects/client-projects-tab';
+import { ClientQuotesTab } from '../quotes/client-quotes-tab';
 import { ClientRetainersTab, EndedClientWorkCallout } from '../retainers/client-retainers-tab';
 import { ClientTasksTab } from '../tasks/client-tasks-tab';
 import { BrandKitTab } from './brand-kit-tab';
@@ -98,6 +100,7 @@ const CLIENT_TABS = [
   'contacts',
   'projects',
   'retainers',
+  'quotes',
   'tasks',
   'content',
   'files',
@@ -169,6 +172,8 @@ function Profile({
   const me = useMe();
   const navigate = useNavigate({ from: '/clients/$clientId' });
   const scopeAll = canAll(me, 'clients.manage');
+  // Quotes are confidential to quote readers (F04 screen 7).
+  const quoteReader = can(me, 'quotes.read');
   const archived = client.archivedAt !== null;
   // Archived clients are read-only (rule 7); the API refuses every change but restore.
   const editable = client.canManage && !archived;
@@ -234,6 +239,12 @@ function Profile({
             <RepeatIcon />
             {t('clients.profile.tabs.retainers')}
           </TabsTrigger>
+          {quoteReader && (
+            <TabsTrigger value="quotes">
+              <FileTextIcon />
+              {t('clients.profile.tabs.quotes')}
+            </TabsTrigger>
+          )}
           <TabsTrigger value="tasks">
             <ListTodoIcon />
             {t('clients.profile.tabs.tasks')}
@@ -278,6 +289,11 @@ function Profile({
         <TabsContent value="retainers">
           <ClientRetainersTab client={client} />
         </TabsContent>
+        {quoteReader && (
+          <TabsContent value="quotes">
+            <ClientQuotesTab client={client} />
+          </TabsContent>
+        )}
         <TabsContent value="tasks">
           <ClientTasksTab client={client} />
         </TabsContent>
