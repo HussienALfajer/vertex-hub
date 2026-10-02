@@ -228,15 +228,15 @@ Schemas live in `packages/contracts/src/catalog.ts` and `quotes.ts` (with `quote
 ### Catalog
 | Method and path | Permission | Request | Response | Error codes |
 |---|---|---|---|---|
-| `GET /api/catalog/services` | `catalog.read` | `serviceListQuerySchema`: `search`, `billing`, `department`, `archived` (manage) | `servicePageSchema`: all fields + template (id, name) | — |
-| `POST /api/catalog/services` | `catalog.manage` | `serviceInputSchema` | `serviceSchema` | 403, `SERVICE_NAME_TAKEN`, `INVALID_TEMPLATE` |
-| `PATCH /api/catalog/services/:id` | `catalog.manage` | same, optional | `serviceSchema` | 403, 404, `SERVICE_ARCHIVED`, `SERVICE_NAME_TAKEN`, `SERVICE_IN_USE`, `INVALID_TEMPLATE` |
-| `POST /api/catalog/services/:id/archive` · `/restore` | `catalog.manage` | — | `serviceSchema` | 403, 404, `SERVICE_IN_PACKAGE`, `SERVICE_NAME_TAKEN` |
-| `GET /api/catalog/packages` | `catalog.read` | `packageListQuerySchema`: `search`, `billing`, `archived` (manage) | `packagePageSchema`: fields + items (service id, name, quantity) | — |
-| `GET /api/catalog/packages/:id` | `catalog.read` | — | `packageSchema` | 404 |
-| `POST /api/catalog/packages` | `catalog.manage` | `packageInputSchema` with `items[]` | `packageSchema` | 403, `PACKAGE_NAME_TAKEN`, `INVALID_PACKAGE_ITEM`, `INVALID_TEMPLATE`, `LIMIT_REACHED` |
-| `PATCH /api/catalog/packages/:id` | `catalog.manage` | same, optional | `packageSchema` | 403, 404, `PACKAGE_ARCHIVED`, `PACKAGE_NAME_TAKEN`, `INVALID_PACKAGE_ITEM`, `SERVICE_IN_USE` |
-| `POST /api/catalog/packages/:id/archive` · `/restore` | `catalog.manage` | — | `packageSchema` | 403, 404, `PACKAGE_NAME_TAKEN` |
+| `GET /api/catalog/services` | `catalog.read` | `catalogServiceListQuerySchema`: `search`, `billing`, `department`, `archived` (manage) | `catalogServicePageSchema`: all fields + template (id, name, kind, archived) | — |
+| `POST /api/catalog/services` | `catalog.manage` | `createCatalogServiceSchema` | `catalogServiceSchema` | 403, `SERVICE_NAME_TAKEN`, `INVALID_TEMPLATE` (400) |
+| `PATCH /api/catalog/services/:id` | `catalog.manage` | `updateCatalogServiceSchema`: same, optional; rules checked on the merged service | `catalogServiceSchema` | 403, 404, `SERVICE_ARCHIVED`, `SERVICE_NAME_TAKEN`, `SERVICE_IN_USE`, `INVALID_TEMPLATE` |
+| `POST /api/catalog/services/:id/archive` · `/restore` | `catalog.manage` | — | `catalogServiceSchema` | 403, 404, `SERVICE_IN_PACKAGE` (details: the packages), `SERVICE_ARCHIVED`, `SERVICE_NOT_ARCHIVED`, `SERVICE_NAME_TAKEN` |
+| `GET /api/catalog/packages` | `catalog.read` | `catalogPackageListQuerySchema`: `search`, `billing`, `archived` (manage) | `catalogPackagePageSchema`: fields + items (service id, name, department, quantity, counted kind, archived) | — |
+| `GET /api/catalog/packages/:id` | `catalog.read` | — | `catalogPackageSchema` | 404 (archived ones without `catalog.manage` too) |
+| `POST /api/catalog/packages` | `catalog.manage` | `createCatalogPackageSchema` with `items[]` (1–20, checked by the schema) | `catalogPackageSchema` | 403, `PACKAGE_NAME_TAKEN`, `INVALID_PACKAGE_ITEM` (400, details: the service ids), `INVALID_TEMPLATE` |
+| `PATCH /api/catalog/packages/:id` | `catalog.manage` | `updateCatalogPackageSchema`: same, optional; `items` replaces every item | `catalogPackageSchema` | 403, 404, `PACKAGE_ARCHIVED`, `PACKAGE_NAME_TAKEN`, `INVALID_PACKAGE_ITEM`, `INVALID_TEMPLATE`, `SERVICE_IN_USE` (once quotes exist) |
+| `POST /api/catalog/packages/:id/archive` · `/restore` | `catalog.manage` | — | `catalogPackageSchema` | 403, 404, `PACKAGE_ARCHIVED`, `PACKAGE_NOT_ARCHIVED`, `PACKAGE_NAME_TAKEN` |
 
 ### Quote settings
 | Method and path | Permission | Request | Response | Error codes |

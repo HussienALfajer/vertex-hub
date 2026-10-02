@@ -5,6 +5,9 @@ import {
   approvalItems,
   approvalRequests,
   auditEntries,
+  catalogPackageItems,
+  catalogPackages,
+  catalogServices,
   clientContacts,
   clientNotes,
   clientPlatformAccounts,
@@ -614,6 +617,25 @@ export async function removeTemplates(db: Database, ids: string[]): Promise<void
   await db.delete(workTemplateStages).where(inArray(workTemplateStages.templateId, ids));
   await db.delete(workTemplateAssignees).where(inArray(workTemplateAssignees.templateId, ids));
   await db.delete(workTemplates).where(inArray(workTemplates.id, ids));
+}
+
+/** Removes catalog packages and services with their items and audit entries (F04). */
+export async function removeCatalog(
+  db: Database,
+  serviceIds: string[],
+  packageIds: string[],
+): Promise<void> {
+  const ids = [...serviceIds, ...packageIds];
+  if (ids.length === 0) return;
+  await db.delete(auditEntries).where(inArray(auditEntries.entityId, ids));
+  if (packageIds.length) {
+    await db.delete(catalogPackageItems).where(inArray(catalogPackageItems.packageId, packageIds));
+    await db.delete(catalogPackages).where(inArray(catalogPackages.id, packageIds));
+  }
+  if (serviceIds.length) {
+    await db.delete(catalogPackageItems).where(inArray(catalogPackageItems.serviceId, serviceIds));
+    await db.delete(catalogServices).where(inArray(catalogServices.id, serviceIds));
+  }
 }
 
 function base32Decode(input: string): Buffer {

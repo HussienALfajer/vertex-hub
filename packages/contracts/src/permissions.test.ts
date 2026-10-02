@@ -413,3 +413,53 @@ describe('two-factor requirement', () => {
     ).toBe(false);
   });
 });
+
+describe('catalog and quotes (F04)', () => {
+  const operationsManager = access(
+    ['employee', 'department_manager'],
+    [{ code: 'internal_operations', isManager: true }],
+  );
+  const operationsMember = access(
+    ['employee'],
+    [{ code: 'internal_operations', isManager: false }],
+  );
+
+  it('lets the Operations manager manage the catalog and every quote', () => {
+    for (const permission of [
+      'catalog.read',
+      'catalog.manage',
+      'quotes.read',
+      'quotes.manage',
+    ] as const) {
+      expect(permissionScopes(operationsManager, permission), permission).toEqual(['all']);
+      expect(hasPermission(operationsMember, permission), permission).toBe(false);
+    }
+    expect(hasPermission(operationsManager, 'quotes.approve_discount')).toBe(false);
+  });
+
+  it('keeps account managers on their own clients and Finance read-only', () => {
+    const accountManager = access(['employee', 'account_manager']);
+    expect(permissionScopes(accountManager, 'quotes.manage')).toEqual(['own_clients']);
+    expect(hasPermission(accountManager, 'catalog.manage')).toBe(false);
+    const finance = access(['employee', 'finance']);
+    expect(permissionScopes(finance, 'quotes.read')).toEqual(['all']);
+    expect(hasPermission(finance, 'quotes.manage')).toBe(false);
+    expect(hasPermission(access(['employee']), 'quotes.read')).toBe(false);
+    expect(hasPermission(access(['employee']), 'catalog.read')).toBe(false);
+  });
+
+  it('gives every quote reader invoices.read with the same or a wider scope', () => {
+    const users = [
+      access(['general_manager', 'employee']),
+      access(['employee', 'account_manager']),
+      access(['employee', 'finance']),
+      operationsManager,
+    ];
+    for (const user of users) {
+      const invoiceScopes = permissionScopes(user, 'invoices.read');
+      for (const scope of permissionScopes(user, 'quotes.read')) {
+        expect(invoiceScopes.includes(scope) || invoiceScopes.includes('all')).toBe(true);
+      }
+    }
+  });
+});

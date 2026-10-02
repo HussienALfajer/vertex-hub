@@ -19,6 +19,9 @@ import {
   type Calendar,
   type CancelMeeting,
   type CancelShoot,
+  type CatalogBilling,
+  type CatalogPackage,
+  type CatalogService,
   type ClientApprovals,
   type ClientDetailResponse,
   type ClientResponse,
@@ -46,6 +49,8 @@ import {
   type CycleDetail,
   type CycleStatus,
   calendarDay,
+  createCatalogPackageSchema,
+  createCatalogServiceSchema,
   createTemplateSchema,
   type DeliverableKind,
   type DepartmentCode,
@@ -95,6 +100,7 @@ import {
   type Notification,
   type NotificationType,
   OPEN_TASK_STATUSES,
+  type Permission,
   type PlatformAccount,
   POST_LIMITS,
   POST_STATUSES,
@@ -119,6 +125,7 @@ import {
   type PublicApproveAll,
   type PublicResponse,
   type PublishedLink,
+  packageIssues,
   planTemplateRun,
   postMove,
   postTaskDueDate,
@@ -145,6 +152,7 @@ import {
   type ShootStatus,
   type ShootType,
   type ShotListInput,
+  serviceIssues,
   setRetainerTemplateSchema,
   shootTaskTitle,
   TASK_PRIORITIES,
@@ -161,6 +169,7 @@ import {
   type TaskStatusChange,
   type TaskType,
   type TaskWorkload,
+  TEMPLATE_KIND_BY_BILLING,
   type TemplateDetail,
   type TemplateDocument,
   type TemplateKind,
@@ -178,6 +187,8 @@ import {
   type UpdateShoot,
   type UpdateTaskInput,
   type UserResponse,
+  updateCatalogPackageSchema,
+  updateCatalogServiceSchema,
   updateTemplateSchema,
   weekOf,
 } from '@vertex-hub/contracts';
@@ -879,6 +890,7 @@ export async function mockApi(page: Page, options: MockOptions): Promise<MockedA
   });
   const templates = templatesSeed();
   const templatesApi = templateRoutes({ users, clients, retainers, templates, me: () => me });
+  const catalogApi = catalogRoutes({ catalog: catalogSeed(), templates, me: () => me });
   const notificationsApi = notificationRoutes({
     notifications: options.notifications ?? notificationsSeed(),
     streamed: options.streamed ?? [],
@@ -1140,6 +1152,10 @@ export async function mockApi(page: Page, options: MockOptions): Promise<MockedA
     // Work templates (F07).
     const templated = templatesApi(route, method, url, request);
     if (templated) return templated;
+
+    // Service catalog (F04).
+    const cataloged = catalogApi(route, method, url, request);
+    if (cataloged) return cataloged;
 
     // Notifications (F14).
     const notified = notificationsApi(route, method, url);
@@ -8266,7 +8282,312 @@ function calendarRoutes({
   };
 }
 
-/** Ids of the seeded team, for navigating straight to a profile or department. */
+/** Ids of the seeded team, for navigating straight to a profile or department. */ // Service catalog (F04)
+
+type ServiceRecord = Omit<CatalogService, 'template'> & { templateId: string | null };
+
+type PackageRecord = Omit<CatalogPackage, 'items' | 'template'> & {
+  templateId: string | null;
+  items: { serviceId: string; quantity: number }[];
+};
+
+interface CatalogRecords {
+  services: ServiceRecord[];
+  packages: PackageRecord[];
+}
+
+const catalogTimes = {
+  createdAt: '2026-09-20T08:00:00.000Z',
+  updatedAt: '2026-09-20T08:00:00.000Z',
+};
+
+/** The acceptance catalog: three monthly services, a one-off one, and the Gold social package. */
+export function catalogSeed(): CatalogRecords {
+  const service = (
+    n: number,
+    fields: Partial<ServiceRecord> & Pick<ServiceRecord, 'name' | 'department' | 'billing'>,
+  ): ServiceRecord => ({
+    id: id(n),
+    description: null,
+    priceUsdMinor: 0,
+    priceSypMinor: null,
+    revisionRounds: 2,
+    deliverableKind: null,
+    deliverableLabel: null,
+    templateId: null,
+    ...catalogTimes,
+    archivedAt: null,
+    ...fields,
+  });
+  return {
+    services: [
+      service(9001, {
+        name: 'تصميم سوشال ميديا',
+        department: 'design',
+        billing: 'monthly',
+        priceUsdMinor: 1500,
+        priceSypMinor: 200000,
+        deliverableKind: 'design',
+      }),
+      service(9002, {
+        name: 'ريل',
+        department: 'photography',
+        billing: 'monthly',
+        priceUsdMinor: 6000,
+        deliverableKind: 'reel',
+      }),
+      service(9003, {
+        name: 'إدارة صفحة',
+        department: 'content_management',
+        billing: 'monthly',
+        priceUsdMinor: 10000,
+        description: 'نشر وردود ومتابعة يومية على المنصات.',
+      }),
+      service(9004, {
+        name: 'هوية بصرية',
+        department: 'design',
+        billing: 'one_off',
+        priceUsdMinor: 80000,
+        revisionRounds: 3,
+        templateId: id(2000),
+      }),
+      service(9005, {
+        name: 'تقرير أداء قديم',
+        department: 'marketing',
+        billing: 'monthly',
+        priceUsdMinor: 5000,
+        archivedAt: '2026-09-25T08:00:00.000Z',
+      }),
+    ],
+    packages: [
+      {
+        id: id(9051),
+        name: 'باقة السوشال الذهبية',
+        description: null,
+        billing: 'monthly',
+        priceUsdMinor: 45000,
+        priceSypMinor: null,
+        templateId: id(2100),
+        items: [
+          { serviceId: id(9001), quantity: 12 },
+          { serviceId: id(9002), quantity: 4 },
+          { serviceId: id(9003), quantity: 2 },
+        ],
+        ...catalogTimes,
+        archivedAt: null,
+      },
+    ],
+  };
+}
+
+interface CatalogState {
+  catalog: CatalogRecords;
+  templates: TemplateRecord[];
+  me: () => MeResponse;
+}
+
+type Named = { id: string; name: string; archivedAt: string | null };
+
+/** The fields a partial update names; `undefined` means "unchanged". */
+const definedFields = <T extends object>(input: T): Partial<T> =>
+  Object.fromEntries(
+    Object.entries(input).filter(([, value]) => value !== undefined),
+  ) as Partial<T>;
+
+/** The catalog API over the in-memory records, with the F04 rules the screens rely on. */
+function catalogRoutes({ catalog, templates, me }: CatalogState) {
+  const holds = (permission: Permission) =>
+    me().permissions.some((g) => g.permission === permission);
+  let nextId = 9100;
+  const changedAt = '2026-10-10T09:00:00.000Z';
+
+  const templateOf = (templateId: string | null) => {
+    const template = templates.find((t) => t.id === templateId);
+    return template
+      ? { id: template.id, name: template.name, kind: template.kind, archived: template.archived }
+      : null;
+  };
+  const serviceOf = ({ templateId, ...s }: ServiceRecord): CatalogService => ({
+    ...s,
+    template: templateOf(templateId),
+  });
+  const packageOf = ({ templateId, items, ...p }: PackageRecord): CatalogPackage => ({
+    ...p,
+    template: templateOf(templateId),
+    items: items.flatMap((item) => {
+      const s = catalog.services.find((x) => x.id === item.serviceId);
+      if (!s) return [];
+      return [
+        {
+          serviceId: s.id,
+          name: s.name,
+          department: s.department,
+          quantity: item.quantity,
+          deliverableKind: s.deliverableKind,
+          deliverableLabel: s.deliverableLabel,
+          archived: !!s.archivedAt,
+        },
+      ];
+    }),
+  });
+  const taken = (list: Named[], name: string, except?: string) =>
+    list.some(
+      (x) => !x.archivedAt && x.id !== except && x.name.toLowerCase() === name.toLowerCase(),
+    );
+  const invalidTemplate = (templateId: string | null, billing: CatalogBilling) => {
+    if (!templateId) return false;
+    const template = templates.find((t) => t.id === templateId);
+    return !template || template.archived || template.kind !== TEMPLATE_KIND_BY_BILLING[billing];
+  };
+  const invalidItems = (items: { serviceId: string }[], billing: CatalogBilling) =>
+    items
+      .map((item) => item.serviceId)
+      .filter((serviceId) => {
+        const s = catalog.services.find((x) => x.id === serviceId);
+        return !s || !!s.archivedAt || s.billing !== billing;
+      });
+  const listed = <T>(items: T[]) => ({ items, total: items.length, page: 1, pageSize: 25 });
+  const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name, 'ar');
+
+  return (route: Route, method: string, url: URL, request: Request): Promise<void> | undefined => {
+    const path = url.pathname;
+    if (!path.startsWith('/api/catalog/')) return undefined;
+    if (!holds('catalog.read')) return fail(route, 403, null);
+    const manages = holds('catalog.manage');
+    const archived = url.searchParams.get('archived') === 'true';
+    const billing = url.searchParams.get('billing');
+    const search = url.searchParams.get('search')?.toLowerCase();
+    const matches = (x: Named & { billing: string }) =>
+      !!x.archivedAt === archived &&
+      (!billing || x.billing === billing) &&
+      (!search || x.name.toLowerCase().includes(search));
+
+    if (path === '/api/catalog/services' && method === 'GET') {
+      if (archived && !manages) return fail(route, 403, null);
+      const department = url.searchParams.get('department');
+      const items = catalog.services
+        .filter((s) => matches(s) && (!department || s.department === department))
+        .sort(byName)
+        .map(serviceOf);
+      return json(route, listed(items));
+    }
+    if (path === '/api/catalog/packages' && method === 'GET') {
+      if (archived && !manages) return fail(route, 403, null);
+      return json(route, listed(catalog.packages.filter(matches).sort(byName).map(packageOf)));
+    }
+    if (path === '/api/catalog/services' && method === 'POST') {
+      if (!manages) return fail(route, 403, null);
+      const input = createCatalogServiceSchema.parse(request.postDataJSON());
+      if (taken(catalog.services, input.name)) return fail(route, 409, 'SERVICE_NAME_TAKEN');
+      if (invalidTemplate(input.templateId, input.billing)) {
+        return fail(route, 400, 'INVALID_TEMPLATE');
+      }
+      const created: ServiceRecord = {
+        id: id(nextId++),
+        ...input,
+        ...catalogTimes,
+        archivedAt: null,
+      };
+      catalog.services.push(created);
+      return json(route, serviceOf(created), 201);
+    }
+    if (path === '/api/catalog/packages' && method === 'POST') {
+      if (!manages) return fail(route, 403, null);
+      const input = createCatalogPackageSchema.parse(request.postDataJSON());
+      if (taken(catalog.packages, input.name)) return fail(route, 409, 'PACKAGE_NAME_TAKEN');
+      const invalid = invalidItems(input.items, input.billing);
+      if (invalid.length) return fail(route, 400, 'INVALID_PACKAGE_ITEM', { serviceIds: invalid });
+      if (invalidTemplate(input.templateId, input.billing)) {
+        return fail(route, 400, 'INVALID_TEMPLATE');
+      }
+      const created: PackageRecord = {
+        id: id(nextId++),
+        ...input,
+        ...catalogTimes,
+        archivedAt: null,
+      };
+      catalog.packages.push(created);
+      return json(route, packageOf(created), 201);
+    }
+
+    const serviceMatch = path.match(/^\/api\/catalog\/services\/([^/]+)(?:\/(archive|restore))?$/);
+    if (serviceMatch) {
+      if (!manages) return fail(route, 403, null);
+      const s = catalog.services.find((x) => x.id === serviceMatch[1]);
+      if (!s) return fail(route, 404, null);
+      const action = serviceMatch[2];
+      if (action === 'archive') {
+        if (s.archivedAt) return fail(route, 409, 'SERVICE_ARCHIVED');
+        const using = catalog.packages.filter(
+          (p) => !p.archivedAt && p.items.some((item) => item.serviceId === s.id),
+        );
+        if (using.length) {
+          return fail(route, 409, 'SERVICE_IN_PACKAGE', {
+            packages: using.map((p) => ({ id: p.id, name: p.name })),
+          });
+        }
+        s.archivedAt = changedAt;
+        return json(route, serviceOf(s));
+      }
+      if (action === 'restore') {
+        if (!s.archivedAt) return fail(route, 409, 'SERVICE_NOT_ARCHIVED');
+        if (taken(catalog.services, s.name, s.id)) return fail(route, 409, 'SERVICE_NAME_TAKEN');
+        s.archivedAt = null;
+        return json(route, serviceOf(s));
+      }
+      if (method !== 'PATCH') return undefined;
+      if (s.archivedAt) return fail(route, 409, 'SERVICE_ARCHIVED');
+      const merged = {
+        ...s,
+        ...definedFields(updateCatalogServiceSchema.parse(request.postDataJSON())),
+      };
+      if (serviceIssues(merged).length) return fail(route, 400, null);
+      if (taken(catalog.services, merged.name, s.id)) return fail(route, 409, 'SERVICE_NAME_TAKEN');
+      const inPackage = catalog.packages.some((p) => p.items.some((i) => i.serviceId === s.id));
+      if (merged.billing !== s.billing && inPackage) return fail(route, 409, 'SERVICE_IN_USE');
+      if (
+        merged.templateId !== s.templateId &&
+        invalidTemplate(merged.templateId, merged.billing)
+      ) {
+        return fail(route, 400, 'INVALID_TEMPLATE');
+      }
+      Object.assign(s, merged, { updatedAt: changedAt });
+      return json(route, serviceOf(s));
+    }
+
+    const packageMatch = path.match(/^\/api\/catalog\/packages\/([^/]+)(?:\/(archive|restore))?$/);
+    if (!packageMatch) return undefined;
+    const p = catalog.packages.find((x) => x.id === packageMatch[1]);
+    if (!p || (p.archivedAt && !manages)) return fail(route, 404, null);
+    const action = packageMatch[2];
+    if (!action && method === 'GET') return json(route, packageOf(p));
+    if (!manages) return fail(route, 403, null);
+    if (action === 'archive') {
+      if (p.archivedAt) return fail(route, 409, 'PACKAGE_ARCHIVED');
+      p.archivedAt = changedAt;
+      return json(route, packageOf(p));
+    }
+    if (action === 'restore') {
+      if (!p.archivedAt) return fail(route, 409, 'PACKAGE_NOT_ARCHIVED');
+      if (taken(catalog.packages, p.name, p.id)) return fail(route, 409, 'PACKAGE_NAME_TAKEN');
+      p.archivedAt = null;
+      return json(route, packageOf(p));
+    }
+    if (method !== 'PATCH') return undefined;
+    if (p.archivedAt) return fail(route, 409, 'PACKAGE_ARCHIVED');
+    const input = updateCatalogPackageSchema.parse(request.postDataJSON());
+    const merged = { ...p, ...definedFields(input) };
+    if (packageIssues(merged).length) return fail(route, 400, null);
+    if (taken(catalog.packages, merged.name, p.id)) return fail(route, 409, 'PACKAGE_NAME_TAKEN');
+    const invalid = invalidItems(merged.items, merged.billing);
+    if ((input.items || merged.billing !== p.billing) && invalid.length) {
+      return fail(route, 400, 'INVALID_PACKAGE_ITEM', { serviceIds: invalid });
+    }
+    Object.assign(p, merged, { updatedAt: changedAt });
+    return json(route, packageOf(p));
+  };
+}
+
 export const seedIds = {
   sara: id(1),
   omar: id(2),
@@ -8320,6 +8641,9 @@ export const seedIds = {
   coffeeShoot: id(1754),
   websiteTemplate: id(2000),
   monthlyTemplate: id(2100),
+  designService: id(9001),
+  brandService: id(9004),
+  goldPackage: id(9051),
 };
 
 /** Viewport screenshot kept in the test output and attached to the HTML report. */

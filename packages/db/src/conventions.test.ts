@@ -51,6 +51,7 @@ const NOT_BUSINESS_RECORDS: Record<string, string> = {
   shoot_shots: "Part of its shoot's shot list; removed with the list edit, never archived (F11)",
   meeting_attendees: 'Link table; an attendee is added or removed, never archived (F11)',
   meeting_contacts: 'Link table; a contact is added or removed, never archived (F11)',
+  catalog_package_items: 'Part of its package; replaced when the package is saved (F04)',
 };
 
 /** Tables keyed by a natural value instead of a UUIDv7 `id`. Every entry needs a reason. */

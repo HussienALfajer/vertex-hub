@@ -707,6 +707,13 @@ const KNOWN_FIELDS = [
   'organizerId',
   'attendeeIds',
   'contactIds',
+  'billing',
+  'priceUsdMinor',
+  'priceSypMinor',
+  'revisionRounds',
+  'deliverableKind',
+  'deliverableLabel',
+  'items',
 ] as const;
 
 function fieldLabel(t: TFunction, field: string): string {

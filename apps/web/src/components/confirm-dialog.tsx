@@ -23,6 +23,8 @@ interface ConfirmDialogProps {
   pending: boolean;
   /** Runs the action; the dialog closes when it resolves and shows the error when it throws. */
   onConfirm: () => Promise<void>;
+  /** Says more about a failure than its code's message (the records it names); else undefined. */
+  describeFailure?: (error: unknown) => string | undefined;
 }
 
 /** Asks before an action that changes a record, and shows why it failed. */
@@ -35,6 +37,7 @@ export function ConfirmDialog({
   destructive,
   pending,
   onConfirm,
+  describeFailure,
 }: ConfirmDialogProps) {
   const { t } = useTranslation();
   const [failure, setFailure] = useState<string | null>(null);
@@ -67,7 +70,7 @@ export function ConfirmDialog({
                 await onConfirm();
                 onClose();
               } catch (error) {
-                setFailure(errorMessage(t, error));
+                setFailure(describeFailure?.(error) ?? errorMessage(t, error));
               }
             }}
           >
