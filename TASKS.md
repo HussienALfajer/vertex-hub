@@ -39,8 +39,8 @@ Spec: `docs/specs/F04-catalog-quotes.md` · ADRs 0006, 0007, 0008, 0013, 0014, 0
 - [x] api `files`: `GeneratedFiles.attachUpload` for the acceptance proof
 - [x] list filters `projectId`, `retainerId` and detail links to the project and retainer
 - [x] api `quotes`: `GET accept-plan`, `POST accept` (A1–A12 in one transaction, proof upload, A10 archives a newer draft, row lock); `test/quote-accept.test.ts` (rollback, renew from next cycle, revision limits on generated tasks); `docs/architecture.md`, spec details settled
-- [ ] bridge; adapt retainer screens and fixtures to `revisionLimit` (the lines editor keeps it on save); web typecheck
-- [ ] wiring checklist, full checks (+ E2E, drift), reviewer, owner acceptance, /ship
+- [x] bridge; adapt retainer screens and fixtures to `revisionLimit` (the lines editor keeps it on save); web typecheck
+- [x] wiring checklist, full checks (+ E2E, drift), reviewer (four findings fixed: long proof names, template dates from a past start, planning inside the accept transaction, missing error-code tests), owner acceptance (approved), /ship
 
 ## PR 5 — `feat/f04-quotes-web`: quote screens
 - [ ] web: the `quote` notification link opens `/quotes/$quoteId` (it opens the home page until this PR)
