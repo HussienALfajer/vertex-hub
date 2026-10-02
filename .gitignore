@@ -36,7 +36,6 @@ logs/
 # Local agent files
 CLAUDE.local.md
 .claude/settings.local.json
-TASKS.md
 
 # OS and editors
 .DS_Store

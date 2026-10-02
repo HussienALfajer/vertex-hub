@@ -22,7 +22,7 @@ A feature runs through separate sessions. Each session ends with a merged PR (or
 | 4 | Phase deploy (once per phase) | Opus 5.5, `low` | `Deploy phase <n> to production` | Approves the deploy; checks the live site | Deploy done, the phase's deploy item ticked in `docs/ROADMAP.md` |
 
 - A small feature (about one table and one screen) does sessions 2 and 3 in one session and one PR.
-- `/feature-slice` reads `TASKS.md` and continues from the first open PR, so a session can stop between PRs and a new one picks up.
+- `/feature-slice` reads `TASKS.md` and continues from the first open PR, so a session can stop between PRs and a new one picks up. `TASKS.md` is committed with each PR (`/ship` stages it), so a new session, local or cloud, finds the plan in the checkout.
 - After each merge the owner runs the cleanup line from the report, then `/clear`.
 - **Deploys happen at the end of a phase, not after each feature.** Merging to `main` does not deploy; the phase-deploy session runs `vertexhub-deploy` on the server after the owner approves it (`docs/deployment.md`). A hotfix for a bug in production is the exception, deployed when the owner asks.
 - Inside session 2 or 3, use `/compact` between layers if the context grows, never in the middle of one.
