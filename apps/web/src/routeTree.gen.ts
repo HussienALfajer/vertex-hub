@@ -26,6 +26,7 @@ import { Route as AppClientsNewRouteImport } from './routes/_app/clients/new'
 import { Route as AppContentIndexRouteImport } from './routes/_app/content/index'
 import { Route as AppDepartmentsIndexRouteImport } from './routes/_app/departments/index'
 import { Route as AppDepartmentsDepartmentIdRouteImport } from './routes/_app/departments/$departmentId'
+import { Route as AppMeetingsMeetingIdRouteImport } from './routes/_app/meetings/$meetingId'
 import { Route as AppNotificationsIndexRouteImport } from './routes/_app/notifications/index'
 import { Route as AppNotificationsSettingsRouteImport } from './routes/_app/notifications/settings'
 import { Route as AppProjectsIndexRouteImport } from './routes/_app/projects/index'
@@ -137,6 +138,11 @@ const AppDepartmentsDepartmentIdRoute =
     path: '/departments/$departmentId',
     getParentRoute: () => AppRoute,
   } as any)
+const AppMeetingsMeetingIdRoute = AppMeetingsMeetingIdRouteImport.update({
+  id: '/meetings/$meetingId',
+  path: '/meetings/$meetingId',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppNotificationsIndexRoute = AppNotificationsIndexRouteImport.update({
   id: '/notifications/',
   path: '/notifications/',
@@ -277,6 +283,7 @@ export interface FileRoutesByFullPath {
   '/clients/$clientId': typeof AppClientsClientIdRoute
   '/clients/new': typeof AppClientsNewRoute
   '/departments/$departmentId': typeof AppDepartmentsDepartmentIdRoute
+  '/meetings/$meetingId': typeof AppMeetingsMeetingIdRoute
   '/notifications/settings': typeof AppNotificationsSettingsRoute
   '/projects/$projectId': typeof AppProjectsProjectIdRoute
   '/projects/new': typeof AppProjectsNewRoute
@@ -320,6 +327,7 @@ export interface FileRoutesByTo {
   '/clients/$clientId': typeof AppClientsClientIdRoute
   '/clients/new': typeof AppClientsNewRoute
   '/departments/$departmentId': typeof AppDepartmentsDepartmentIdRoute
+  '/meetings/$meetingId': typeof AppMeetingsMeetingIdRoute
   '/notifications/settings': typeof AppNotificationsSettingsRoute
   '/projects/$projectId': typeof AppProjectsProjectIdRoute
   '/projects/new': typeof AppProjectsNewRoute
@@ -365,6 +373,7 @@ export interface FileRoutesById {
   '/_app/clients/$clientId': typeof AppClientsClientIdRoute
   '/_app/clients/new': typeof AppClientsNewRoute
   '/_app/departments/$departmentId': typeof AppDepartmentsDepartmentIdRoute
+  '/_app/meetings/$meetingId': typeof AppMeetingsMeetingIdRoute
   '/_app/notifications/settings': typeof AppNotificationsSettingsRoute
   '/_app/projects/$projectId': typeof AppProjectsProjectIdRoute
   '/_app/projects/new': typeof AppProjectsNewRoute
@@ -410,6 +419,7 @@ export interface FileRouteTypes {
     | '/clients/$clientId'
     | '/clients/new'
     | '/departments/$departmentId'
+    | '/meetings/$meetingId'
     | '/notifications/settings'
     | '/projects/$projectId'
     | '/projects/new'
@@ -453,6 +463,7 @@ export interface FileRouteTypes {
     | '/clients/$clientId'
     | '/clients/new'
     | '/departments/$departmentId'
+    | '/meetings/$meetingId'
     | '/notifications/settings'
     | '/projects/$projectId'
     | '/projects/new'
@@ -497,6 +508,7 @@ export interface FileRouteTypes {
     | '/_app/clients/$clientId'
     | '/_app/clients/new'
     | '/_app/departments/$departmentId'
+    | '/_app/meetings/$meetingId'
     | '/_app/notifications/settings'
     | '/_app/projects/$projectId'
     | '/_app/projects/new'
@@ -656,6 +668,13 @@ declare module '@tanstack/react-router' {
       path: '/departments/$departmentId'
       fullPath: '/departments/$departmentId'
       preLoaderRoute: typeof AppDepartmentsDepartmentIdRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/meetings/$meetingId': {
+      id: '/_app/meetings/$meetingId'
+      path: '/meetings/$meetingId'
+      fullPath: '/meetings/$meetingId'
+      preLoaderRoute: typeof AppMeetingsMeetingIdRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/notifications/': {
@@ -844,6 +863,7 @@ interface AppRouteChildren {
   AppClientsClientIdRoute: typeof AppClientsClientIdRoute
   AppClientsNewRoute: typeof AppClientsNewRoute
   AppDepartmentsDepartmentIdRoute: typeof AppDepartmentsDepartmentIdRoute
+  AppMeetingsMeetingIdRoute: typeof AppMeetingsMeetingIdRoute
   AppNotificationsSettingsRoute: typeof AppNotificationsSettingsRoute
   AppProjectsProjectIdRoute: typeof AppProjectsProjectIdRoute
   AppProjectsNewRoute: typeof AppProjectsNewRoute
@@ -884,6 +904,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppClientsClientIdRoute: AppClientsClientIdRoute,
   AppClientsNewRoute: AppClientsNewRoute,
   AppDepartmentsDepartmentIdRoute: AppDepartmentsDepartmentIdRoute,
+  AppMeetingsMeetingIdRoute: AppMeetingsMeetingIdRoute,
   AppNotificationsSettingsRoute: AppNotificationsSettingsRoute,
   AppProjectsProjectIdRoute: AppProjectsProjectIdRoute,
   AppProjectsNewRoute: AppProjectsNewRoute,

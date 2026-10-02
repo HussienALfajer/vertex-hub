@@ -6,11 +6,14 @@ import {
   useQueryClient,
 } from '@tanstack/react-query';
 import type {
+  CancelMeeting,
   CancelShoot,
   CloseShoot,
+  CreateMeeting,
   CreateShoot,
   ReopenShoot,
   ShotListInput,
+  UpdateMeeting,
   UpdateShoot,
 } from '@vertex-hub/contracts';
 import { api, call } from '../../lib/api/client';
@@ -29,6 +32,7 @@ export const calendarKeys = {
   conflicts: (filters: ConflictFilters) => ['calendar', 'conflicts', filters] as const,
   shoots: (filters: ShootListFilters) => ['calendar', 'shoots', filters] as const,
   shoot: (id: string) => ['calendar', 'shoot', id] as const,
+  meeting: (id: string) => ['calendar', 'meeting', id] as const,
 };
 
 export const calendarQuery = (filters: CalendarFilters) =>
@@ -59,10 +63,16 @@ export const shootQuery = (id: string) =>
     queryFn: () => call(api.GET('/api/shoots/{id}', { params: { path: { id } } })),
   });
 
+export const meetingQuery = (id: string) =>
+  queryOptions({
+    queryKey: calendarKeys.meeting(id),
+    queryFn: () => call(api.GET('/api/meetings/{id}', { params: { path: { id } } })),
+  });
+
 const WITH_TASKS: readonly QueryKey[] = [calendarKeys.all, ['tasks'], ['projects'], ['retainers']];
 
 /**
- * A change to shoots, refreshing also on failure: a refusal after the shoot moved (edge cases 2
+ * A change to shoots or meetings, refreshing also on failure: a refusal after the shoot moved (edge cases 2
  * and 10) reloads the page with its current actions. Every change refreshes the whole `calendar`
  * cache; the ones that touch the shoot task (its due date, its delivery, the editing task) and
  * the retainer counter it feeds (rule 11) refresh those too.
@@ -128,3 +138,31 @@ export const useArchiveShoot = (id: string) =>
 
 export const useRestoreShoot = (id: string) =>
   useCalendarMutation(() => call(api.POST('/api/shoots/{id}/restore', path(id))));
+
+/** A meeting touches no task: the `calendar` cache is all it refreshes. */
+const CALENDAR_ONLY: readonly QueryKey[] = [calendarKeys.all];
+
+export const useCreateMeeting = () =>
+  useCalendarMutation(
+    (input: CreateMeeting) => call(api.POST('/api/meetings', { body: input })),
+    CALENDAR_ONLY,
+  );
+
+export const useUpdateMeeting = (id: string) =>
+  useCalendarMutation(
+    (input: UpdateMeeting) => call(api.PATCH('/api/meetings/{id}', { ...path(id), body: input })),
+    CALENDAR_ONLY,
+  );
+
+export const useCancelMeeting = (id: string) =>
+  useCalendarMutation(
+    (input: CancelMeeting) =>
+      call(api.POST('/api/meetings/{id}/cancel', { ...path(id), body: input })),
+    CALENDAR_ONLY,
+  );
+
+export const useArchiveMeeting = (id: string) =>
+  useCalendarMutation(() => call(api.POST('/api/meetings/{id}/archive', path(id))), CALENDAR_ONLY);
+
+export const useRestoreMeeting = (id: string) =>
+  useCalendarMutation(() => call(api.POST('/api/meetings/{id}/restore', path(id))), CALENDAR_ONLY);

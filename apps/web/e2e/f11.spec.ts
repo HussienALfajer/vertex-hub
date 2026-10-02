@@ -207,3 +207,118 @@ test('a user without shoot scope sees the calendar and the shoot, but no actions
   await page.goto('/shoots/new');
   await expect(page).toHaveURL(/\/calendar$/);
 });
+
+test('create a meeting with a conflict warning → open it → edit → cancel', async ({ page }) => {
+  test.setTimeout(90_000);
+  await page.setViewportSize({ width: 1440, height: 1500 });
+  await onToday(page);
+  await mockApi(page, { signedIn: true, me: manager, calendar: true });
+
+  await page.goto('/calendar');
+  await page.getByRole('button', { name: ar.calendar.actions.newMeeting }).click();
+  const dialog = page.getByRole('dialog');
+
+  // Validation in place: the title and the time are required.
+  await dialog.getByRole('button', { name: ar.calendar.meetings.form.create }).click();
+  await expect(dialog.getByText(ar.calendar.meetings.form.errors.title)).toBeVisible();
+  await expect(dialog.getByText(ar.calendar.meetings.form.errors.time)).toBeVisible();
+
+  await dialog.getByLabel(ar.calendar.meetings.form.title).fill('تحضير تصوير الأطباق');
+  await pick(
+    page,
+    dialog.getByRole('combobox', { name: ar.calendar.form.client }),
+    'مطعم الياسمين',
+  );
+  await dialog.getByLabel(ar.calendar.form.date).fill('2026-10-12');
+  await dialog.getByLabel(ar.calendar.form.startTime).fill('10:30');
+  await dialog.getByLabel(ar.calendar.form.endTime).fill('11:30');
+  await dialog.getByLabel(new RegExp(`^${ar.calendar.meetings.attendees}`)).fill('كريم');
+  await page.getByRole('option', { name: 'كريم الزين' }).click();
+  // The contacts of the picked client are offered.
+  await dialog.getByLabel(new RegExp(`^${ar.calendar.meetings.contacts}`)).fill('هالة');
+  await page.getByRole('option', { name: 'هالة الشامي' }).click();
+
+  // Rule 5: the attendee is on a shoot then; the dialog lists it before saving.
+  const clash = 'كريم الزين: جلسة التصوير «أطباق الخريف»';
+  await expect(dialog.getByText(clash)).toBeVisible();
+
+  // Saving asks first, then sends `acceptConflicts`.
+  await dialog.getByRole('button', { name: ar.calendar.meetings.form.create }).click();
+  const confirm = page.getByRole('alertdialog');
+  await expect(confirm.getByText(ar.calendar.form.confirmConflictsTitle)).toBeVisible();
+  await confirm.getByRole('button', { name: ar.calendar.form.saveAnyway }).click();
+  await expect(page.getByText(ar.calendar.meetings.form.created)).toBeVisible();
+
+  // Both bookings carry the conflict mark on the calendar; the meeting opens its page.
+  const card = page.getByRole('link', { name: /تحضير تصوير الأطباق/ });
+  await expect(card.locator('[data-conflict]')).toBeVisible();
+  await card.click();
+  await expect(page).toHaveURL(/\/meetings\/[0-9a-f-]{36}$/);
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('تحضير تصوير الأطباق');
+  await expect(page.getByText(clash)).toBeVisible();
+  await expect(page.getByRole('link', { name: '+963944555666' })).toHaveAttribute(
+    'href',
+    'tel:+963944555666',
+  );
+
+  // Moving it after the shoot clears the warning, and saving no longer asks.
+  await page.getByRole('button', { name: ar.calendar.meetings.actions.edit }).click();
+  await expect(dialog.getByLabel(ar.calendar.meetings.form.title)).toHaveValue(
+    'تحضير تصوير الأطباق',
+  );
+  await dialog.getByLabel(ar.calendar.form.startTime).fill('14:00');
+  await dialog.getByLabel(ar.calendar.form.endTime).fill('15:00');
+  await expect(dialog.getByText(clash)).toHaveCount(0);
+  await dialog.getByRole('button', { name: ar.calendar.form.save }).click();
+  await expect(page.getByText(ar.calendar.meetings.form.saved)).toBeVisible();
+  const hero = page.locator('section').first();
+  await expect(hero.locator('[data-conflict]')).toHaveCount(0);
+
+  // Cancelling is final: the reason shows and the meeting can no longer be edited.
+  await page.getByRole('button', { name: ar.calendar.actions.more }).click();
+  await page.getByRole('menuitem', { name: ar.calendar.meetings.actions.cancel }).click();
+  await dialog.getByLabel(new RegExp(`^${ar.calendar.cancel.reason}`)).fill('طلب العميل التأجيل.');
+  await dialog.getByRole('button', { name: ar.calendar.meetings.actions.cancel }).click();
+  await expect(page.getByText(ar.calendar.meetings.cancel.done, { exact: true })).toBeVisible();
+  await expect(page.getByText('السبب: طلب العميل التأجيل.')).toBeVisible();
+  await expect(hero.locator('[data-status="cancelled"]')).toBeVisible();
+  await expect(page.getByRole('button', { name: ar.calendar.meetings.actions.edit })).toHaveCount(
+    0,
+  );
+});
+
+test('an employee creates meetings and edits only the ones they organize', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 1400 });
+  await onToday(page);
+  await mockApi(page, { signedIn: true, me: employeeMe, calendar: true });
+
+  // Someone else's meeting: everything is readable, nothing is editable.
+  await page.goto(`/meetings/${seedIds.contentMeeting}`);
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('خطة محتوى تشرين الثاني');
+  await expect(page.getByRole('link', { name: /meet\.google\.com/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: ar.calendar.meetings.actions.edit })).toHaveCount(
+    0,
+  );
+  await expect(page.getByRole('button', { name: ar.calendar.actions.more })).toHaveCount(0);
+
+  // Every user creates a meeting and becomes its organizer.
+  await page.goto('/calendar');
+  await page.getByRole('button', { name: ar.calendar.actions.newMeeting }).click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByLabel(ar.calendar.meetings.form.title).fill('تجهيز معدات التصوير');
+  await dialog.getByLabel(ar.calendar.form.date).fill('2026-10-15');
+  await dialog.getByLabel(ar.calendar.form.startTime).fill('09:00');
+  await dialog.getByLabel(ar.calendar.form.endTime).fill('09:30');
+  await dialog.getByRole('button', { name: ar.calendar.meetings.form.create }).click();
+  await expect(page.getByText(ar.calendar.meetings.form.created)).toBeVisible();
+  await page.getByRole('link', { name: /تجهيز معدات التصوير/ }).click();
+  await expect(page.getByRole('button', { name: ar.calendar.meetings.actions.edit })).toBeVisible();
+  // Archiving stays with meeting scope `all`.
+  await page.getByRole('button', { name: ar.calendar.actions.more }).click();
+  await expect(
+    page.getByRole('menuitem', { name: ar.calendar.meetings.actions.cancel }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('menuitem', { name: ar.calendar.meetings.actions.archive }),
+  ).toHaveCount(0);
+});

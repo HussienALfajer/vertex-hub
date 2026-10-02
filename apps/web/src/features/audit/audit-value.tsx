@@ -13,6 +13,7 @@ import {
   EXTRA_WORK_BILLING,
   FILE_FINAL_SOURCES,
   FILE_VERSION_KINDS,
+  MEETING_STATUSES,
   MILESTONE_STATUSES,
   NOTE_CHANNELS,
   PLATFORM_ACCESS_STATES,
@@ -56,6 +57,7 @@ const LTR_FIELDS = new Set([
   'contactId',
   'host',
   'mapUrl',
+  'onlineUrl',
   'rawFilesSite',
 ]);
 
@@ -91,6 +93,8 @@ function enumLabel(
     if (task) return t(`tasks.statuses.${task}`);
     const shoot = entityType === 'shoot' ? find(SHOOT_STATUSES) : undefined;
     if (shoot) return t(`calendar.shootStatuses.${shoot}`);
+    const meeting = entityType === 'meeting' ? find(MEETING_STATUSES) : undefined;
+    if (meeting) return t(`calendar.meetingStatuses.${meeting}`);
     const user = find(USER_STATUSES);
     if (user) return t(`users.statuses.${user}`);
   }
@@ -215,6 +219,9 @@ export function AuditValue({
   }
   const label = enumLabel(t, entityType, field, value);
   if (label) return <span>{label}</span>;
+  // A meeting's organizer (F11) is recorded by id.
+  const organizer = field === 'organizerId' && typeof value === 'string' && userName?.(value);
+  if (organizer) return <span>{organizer}</span>;
   if (isMoneyField(field) && typeof value === 'number') {
     return (
       <span dir="ltr" className="tabular-nums">
@@ -265,7 +272,13 @@ function ListItem({
     return <DepartmentItem code={item as DepartmentCode} />;
   }
   if (!isItem(item)) {
-    return <Badge tone="outline">{enumLabel(t, entityType, field, item) ?? String(item)}</Badge>;
+    // A meeting's attendees (F11) are recorded by id.
+    const attendee = field === 'attendeeIds' ? userName?.(String(item)) : undefined;
+    return (
+      <Badge tone="outline">
+        {attendee ?? enumLabel(t, entityType, field, item) ?? String(item)}
+      </Badge>
+    );
   }
   const line = deliverableLine(item);
   if (line) {

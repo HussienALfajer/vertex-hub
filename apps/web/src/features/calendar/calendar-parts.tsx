@@ -234,11 +234,12 @@ export function EntryCard({ entry, me }: { entry: CalendarEntry; me: MeResponse 
   if (entry.kind === 'meeting') {
     const { meeting } = entry;
     const cancelled = meeting.status === 'cancelled';
-    // The meeting page arrives with the meeting screens; until then the card is not a link.
     return (
-      <div
+      <Link
+        to="/meetings/$meetingId"
+        params={{ meetingId: meeting.id }}
         data-meeting-status={meeting.status}
-        className={cn(cardClass, cancelled && 'opacity-60')}
+        className={cn(cardClass, cardLinkClass, cancelled && 'opacity-60')}
       >
         <span className="flex items-center gap-1 text-muted-foreground tabular-nums">
           <UsersRoundIcon
@@ -257,7 +258,7 @@ export function EntryCard({ entry, me }: { entry: CalendarEntry; me: MeResponse 
             .filter(Boolean)
             .join(' · ')}
         </span>
-      </div>
+      </Link>
     );
   }
   const { shoot } = entry;
@@ -329,27 +330,17 @@ export function EntryRows({ entries, me }: { entries: CalendarEntry[]; me: MeRes
                 )}
               </span>
               <div className="flex min-w-0 flex-col gap-0.5">
-                {entry.kind === 'shoot' ? (
-                  <Link
-                    to="/shoots/$shootId"
-                    params={{ shootId: item.id }}
-                    className={cn(
-                      'w-fit max-w-full truncate font-medium hover:underline',
-                      cancelled && 'text-muted-foreground line-through',
-                    )}
-                  >
-                    {item.title}
-                  </Link>
-                ) : (
-                  <span
-                    className={cn(
-                      'truncate font-medium',
-                      cancelled && 'text-muted-foreground line-through',
-                    )}
-                  >
-                    {item.title}
-                  </span>
-                )}
+                <Link
+                  {...(entry.kind === 'shoot'
+                    ? { to: '/shoots/$shootId', params: { shootId: item.id } }
+                    : { to: '/meetings/$meetingId', params: { meetingId: item.id } })}
+                  className={cn(
+                    'w-fit max-w-full truncate font-medium hover:underline',
+                    cancelled && 'text-muted-foreground line-through',
+                  )}
+                >
+                  {item.title}
+                </Link>
                 <span className="truncate text-xs text-muted-foreground">
                   {[clientLabel(item.client), place].filter(Boolean).join(' · ')}
                 </span>
@@ -363,7 +354,9 @@ export function EntryRows({ entries, me }: { entries: CalendarEntry[]; me: MeRes
               {cancelled && (
                 <Badge tone="outline" className="text-muted-foreground">
                   <BanIcon aria-hidden="true" />
-                  {t('calendar.shootStatuses.cancelled')}
+                  {entry.kind === 'shoot'
+                    ? t('calendar.shootStatuses.cancelled')
+                    : t('calendar.meetingStatuses.cancelled')}
                 </Badge>
               )}
               {item.conflict && !cancelled && <ConflictBadge />}

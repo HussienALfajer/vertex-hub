@@ -35,9 +35,8 @@ export function notificationLink(notification: Notification): ToOptions {
       return { to: '/content/posts/$postId', params: { postId: subject.id } };
     case 'shoot':
       return { to: '/shoots/$shootId', params: { shootId: subject.id } };
-    // The meeting page arrives with the meeting screens.
     case 'meeting':
-      return { to: '/notifications' };
+      return { to: '/meetings/$meetingId', params: { meetingId: subject.id } };
     default:
       return { to: '/tasks/$taskId', params: { taskId: subject.id } };
   }

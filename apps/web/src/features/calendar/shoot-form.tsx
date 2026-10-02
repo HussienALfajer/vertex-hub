@@ -158,10 +158,10 @@ const PROBLEM_OF_CODE: Record<string, Problem> = {
 };
 
 /**
- * The start and end as instants. An end time at or before the start time ends the shoot on the
+ * The start and end as instants. An end time at or before the start time ends the booking on the
  * next day (edge case 3). Null until the date and both times are entered.
  */
-function instantsOf(values: Pick<ShootFormValues, 'date' | 'startTime' | 'endTime'>) {
+export function instantsOf(values: { date: string; startTime: string; endTime: string }) {
   const { date, startTime, endTime } = values;
   if (!date || !startTime || !endTime) return null;
   const endDay = endTime <= startTime ? addDays(date, 1) : date;
@@ -171,7 +171,7 @@ function instantsOf(values: Pick<ShootFormValues, 'date' | 'startTime' | 'endTim
   };
 }
 
-const timeInput = (instant: string) => businessTimeOfDay(new Date(instant)).slice(0, 5);
+export const timeInput = (instant: string) => businessTimeOfDay(new Date(instant)).slice(0, 5);
 
 function defaultsOf(shoot: ShootDetail | undefined, task: TaskDetail | undefined, all: boolean) {
   const values: ShootFormValues = {

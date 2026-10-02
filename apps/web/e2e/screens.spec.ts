@@ -902,6 +902,24 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await screenshot(page, testInfo, `shoot-close-dialog-${colorScheme}`);
     });
 
+    test('meeting page and the meeting dialog', async ({ page }, testInfo) => {
+      await page.setViewportSize({ width: 1280, height: 1100 });
+      await page.clock.setFixedTime(new Date(`${PROJECTS_TODAY}T09:00:00+03:00`));
+      await mockApi(page, { signedIn: true, calendar: true });
+      await page.goto(`/meetings/${seedIds.contentMeeting}`);
+      await expect(page.getByRole('heading', { level: 1 })).toHaveText('خطة محتوى تشرين الثاني');
+      await expect(page.getByRole('link', { name: '+963944555666' })).toBeVisible();
+      await screenshot(page, testInfo, `meeting-page-${colorScheme}`);
+
+      await page.getByRole('button', { name: ar.calendar.meetings.actions.edit }).click();
+      const dialog = page.getByRole('dialog');
+      await expect(dialog.getByLabel(ar.calendar.meetings.form.title)).toHaveValue(
+        'خطة محتوى تشرين الثاني',
+      );
+      await expect(dialog.getByText(ar.calendar.meetings.form.conflictsBody)).toBeVisible();
+      await screenshot(page, testInfo, `meeting-dialog-${colorScheme}`);
+    });
+
     test('my posts', async ({ page }, testInfo) => {
       await page.setViewportSize({ width: 1280, height: 1100 });
       await page.clock.setFixedTime(new Date(`${PROJECTS_TODAY}T09:00:00+03:00`));
