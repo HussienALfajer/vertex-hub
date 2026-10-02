@@ -40,7 +40,7 @@ Build order (owner, 2026-09-30): F10 → F09 → F08 → F11. F09 approves exact
 - [ ] Production deploy of Phase 2
 
 ## Phase 3 — Money and sales
-- [ ] F04 Service catalog and quotes
+- [~] F04 Service catalog and quotes (spec: `docs/specs/F04-catalog-quotes.md`, ADR 0023; includes the engagement part of A01)
 - [ ] F13 Invoicing and collection
 - [ ] F12 Ad campaigns and ad budget
 - [ ] F03 Leads
