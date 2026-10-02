@@ -562,6 +562,29 @@ describe('quote acceptance (F04 A01)', () => {
     await expectError(
       await accept(quote, {
         ...body,
+        project: { ...body.project, projectManagerId: randomUUID() },
+      }),
+      400,
+      'INVALID_PROJECT_MANAGER',
+    );
+    // A proof named like a document the quote already has.
+    await db.insert(fileItems).values({
+      ownerType: 'quote',
+      quoteId: quote.id,
+      clientId,
+      role: 'document',
+      name: `taken ${cast.run}.pdf`,
+      createdById: cast.am.id,
+    });
+    const twin = await uploaded(cast.am.cookie, `taken ${cast.run}.pdf`);
+    await expectError(
+      await accept(quote, { ...body, proofUploadId: twin.uploadId }),
+      409,
+      'FILE_NAME_TAKEN',
+    );
+    await expectError(
+      await accept(quote, {
+        ...body,
         project: { ...body.project, installmentMilestones: [0, 5] },
       }),
       400,
@@ -603,6 +626,88 @@ describe('quote acceptance (F04 A01)', () => {
       'QUOTE_EXPIRED',
     );
     await expectError(await accept(quote, acceptBody(plan)), 409, 'QUOTE_EXPIRED');
+  });
+
+  it('cuts a long proof name to the item name limit, keeping its extension', async () => {
+    const quote = await sentQuote();
+    const proof = await uploaded(cast.am.cookie, `${'ب'.repeat(200)}.pdf`);
+    const response = await accept(
+      quote,
+      acceptBody(await planOf(quote), { proofUploadId: proof.uploadId }),
+    );
+    expect(response.status).toBe(200);
+    const [document] = await db
+      .select({ name: fileItems.name })
+      .from(fileItems)
+      .where(eq(fileItems.quoteId, quote.id));
+    expect(document?.name).toBe(`${'ب'.repeat(116)}.pdf`);
+  });
+
+  it('plans template dates from today when the project starts in the past (F07 rule 6)', async () => {
+    const quote = await sentQuote();
+    const plan = await planOf(quote, '?projectStartDate=2020-01-06');
+    expect(plan.project?.startDate).toBe('2020-01-06');
+    expect(plan.project?.milestones.every((m) => (m.dueDate ?? '') >= today)).toBe(true);
+    expect(plan.project?.dueDate && plan.project.dueDate >= today).toBe(true);
+  });
+
+  it('rolls back on a template archived since sending (A9, C3)', async () => {
+    const archivedTemplate = await createTemplate({
+      name: `مؤرشف ${cast.run}`,
+      kind: 'project',
+      stages: [{ key: 'only', name: 'المرحلة' }],
+      steps: [{ key: 'one', stageKey: 'only', title: 'Step', department: 'design', dueDay: 1 }],
+    });
+    const logo = await createService({
+      billing: 'one_off',
+      priceUsdMinor: 30000,
+      templateId: archivedTemplate,
+    });
+    const quote = await sentQuote({
+      lines: [{ ...brandLine, serviceId: logo.id }],
+      monthlyTermMonths: null,
+    });
+    const plan = await planOf(quote);
+    expect(
+      (await client.post(`/api/templates/${archivedTemplate}/archive`, cast.operations.cookie, {}))
+        .status,
+    ).toBe(200);
+    const after = await planOf(quote);
+    expect(after.project?.templates).toEqual([]);
+    expect(after.archivedTemplates.map((t) => t.id)).toEqual([archivedTemplate]);
+    await expectError(await accept(quote, acceptBody(plan)), 409, 'TEMPLATE_ARCHIVED');
+    expect((await detail(quote.id)).status).toBe('sent');
+  });
+
+  it('refuses more than 999 a month on a merged line (A6)', async () => {
+    const quote = await sentQuote({
+      lines: [
+        goldLine(),
+        {
+          section: 'monthly',
+          serviceId: design.id,
+          quantity: 999,
+          unitPriceMinor: 1500,
+          revisionRounds: 2,
+        },
+      ],
+      installments: [],
+    });
+    await expectError(await accept(quote, acceptBody(await planOf(quote))), 409, 'LIMIT_REACHED');
+  });
+
+  it('refuses an archived client', async () => {
+    const archiving = await cast.createClient();
+    const quote = await sentQuote({}, 'USD', archiving.id);
+    const plan = await planOf(quote);
+    expect(
+      (await client.post(`/api/clients/${archiving.id}/archive`, cast.gm.cookie, {})).status,
+    ).toBe(200);
+    await expectError(
+      await accept(quote, acceptBody(plan), cast.gm.cookie),
+      409,
+      'CLIENT_ARCHIVED',
+    );
   });
 
   it('repeats rule 1: an ended client accepts nothing', async () => {
@@ -671,6 +776,36 @@ describe('quote acceptance (F04 A01)', () => {
       ['design', null],
       ['reel', null],
     ]);
+
+    // An ended retainer, or another client's, is not renewed.
+    const monthlyOnly = await sentQuote({ lines: [goldLine()], installments: [] });
+    const monthlyPlan = await planOf(monthlyOnly);
+    const ending = await cast.createRetainer(clientId);
+    expect(
+      (await client.post(`/api/retainers/${ending.id}/status`, cast.gm.cookie, { status: 'ended' }))
+        .status,
+    ).toBe(200);
+    await expectError(
+      await accept(
+        monthlyOnly,
+        acceptBody(monthlyPlan, {
+          retainer: { mode: 'renew', retainerId: ending.id, templateId: null },
+        }),
+      ),
+      409,
+      'RETAINER_ENDED',
+    );
+    const elsewhere = await cast.createRetainer((await cast.createClient()).id);
+    expect(
+      (
+        await accept(
+          monthlyOnly,
+          acceptBody(monthlyPlan, {
+            retainer: { mode: 'renew', retainerId: elsewhere.id, templateId: null },
+          }),
+        )
+      ).status,
+    ).toBe(404);
 
     // Edge case 9: a quote in SYP does not renew a USD retainer.
     const syp = await sentQuote(

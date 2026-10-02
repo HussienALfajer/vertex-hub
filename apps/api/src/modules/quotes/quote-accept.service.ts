@@ -233,6 +233,7 @@ export class QuoteAcceptService {
           choice.templateIds,
           choice.startDate,
           children,
+          tx,
         );
         const mapping = choice.installmentMilestones;
         if (
@@ -404,14 +405,18 @@ export class QuoteAcceptService {
   /**
    * A3: the milestones of the selected templates' stages in order, de-duplicated by name and due
    * on their latest task; without stages, one per installment. The due date defaults to the
-   * plans' latest task, or the start + 30 days.
+   * plans' latest task, or the start + 30 days. Templates run from the later of the start and
+   * today (F07 rule 6), as `applyToProject` will.
    */
   private async projectPlan(
     templateIds: string[],
     startDate: CalendarDate,
     children: QuoteChildren,
+    tx?: Transaction,
   ): Promise<{ milestones: { name: string; dueDate: CalendarDate | null }[]; dueDate: string }> {
-    const plans = await this.runner.planNewProject(templateIds, startDate);
+    const today = businessDate();
+    const runStart = startDate > today ? startDate : today;
+    const plans = await this.runner.planNewProject(templateIds, runStart, tx);
     const milestones = new Map<string, { name: string; dueDate: CalendarDate | null }>();
     let lastDue: CalendarDate | null = null;
     for (const templateId of templateIds) {

@@ -145,8 +145,9 @@ export class TemplateRunsService implements OnModuleInit {
   async planNewProject(
     templateIds: string[],
     startDate: CalendarDate,
+    transaction?: Transaction,
   ): Promise<Map<string, NewProjectPlan>> {
-    return this.db.transaction(async (tx) => {
+    const run = async (tx: Transaction) => {
       const plans = new Map<string, NewProjectPlan>();
       for (const id of new Set(templateIds)) {
         const template = await this.templates.forRun(tx, id);
@@ -166,7 +167,8 @@ export class TemplateRunsService implements OnModuleInit {
         plans.set(id, { milestones: plan.milestonesToCreate, lastDue });
       }
       return plans;
-    });
+    };
+    return transaction ? run(transaction) : this.db.transaction(run);
   }
 
   /** Rule 18: instances of the repeated step for what a line of the open cycle is missing. */

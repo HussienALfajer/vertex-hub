@@ -1,6 +1,8 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { Inject, Injectable } from '@nestjs/common';
 import {
+  DEFAULT_FILE_NAME,
+  FILE_NAME_MAX,
   FILE_PREVIEW_MAX_BYTES,
   FILES_PREVIEW_JOB,
   isPreviewableMimeType,
@@ -74,7 +76,7 @@ export class GeneratedFiles {
       .where(and(eq(fileUploads.id, document.uploadId), eq(fileUploads.userId, actor.id)))
       .returning();
     if (!upload) throw new CodedException(400, 'UPLOAD_NOT_FOUND', 'Upload the file again');
-    const name = upload.originalName;
+    const name = documentName(upload.originalName);
     const [taken] = await tx
       .select({ id: fileItems.id })
       .from(fileItems)
@@ -209,4 +211,13 @@ export class GeneratedFiles {
   remove(key: string): Promise<void> {
     return this.storage.remove(key);
   }
+}
+
+/** The uploaded name with its extension, cut to the item name limit. */
+function documentName(originalName: string): string {
+  const dot = originalName.lastIndexOf('.');
+  const extension = dot > 0 && originalName.length - dot <= 16 ? originalName.slice(dot) : '';
+  const stem = originalName.slice(0, originalName.length - extension.length).trim();
+  const cut = stem.slice(0, FILE_NAME_MAX - extension.length).trim();
+  return cut ? `${cut}${extension}` : DEFAULT_FILE_NAME;
 }

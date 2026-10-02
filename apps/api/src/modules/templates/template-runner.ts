@@ -20,12 +20,16 @@ export interface NewProjectPlan {
 export class TemplateRunner {
   constructor(private readonly runs: TemplateRunsService) {}
 
-  /** Non-archived project templates only; the others are left out of the map. */
+  /**
+   * Non-archived project templates only; the others are left out of the map. Reads in `tx` when
+   * given, so an acceptance plans and applies from one snapshot.
+   */
   planNewProject(
     templateIds: string[],
     startDate: CalendarDate,
+    tx?: Transaction,
   ): Promise<Map<string, NewProjectPlan>> {
-    return this.runs.planNewProject(templateIds, startDate);
+    return this.runs.planNewProject(templateIds, startDate, tx);
   }
 
   /** A4: default assignees, every task with `revisionLimit`; the caller locked access changes. */
