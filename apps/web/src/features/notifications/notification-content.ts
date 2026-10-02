@@ -41,6 +41,9 @@ export function notificationLink(notification: Notification): ToOptions {
       return { to: '/shoots/$shootId', params: { shootId: subject.id } };
     case 'meeting':
       return { to: '/meetings/$meetingId', params: { meetingId: subject.id } };
+    case 'quote':
+      // The quote page arrives with the quote screens (F04 PR 5); until then the client opens.
+      return { to: '/' };
     default:
       return { to: '/tasks/$taskId', params: { taskId: subject.id } };
   }
@@ -95,6 +98,23 @@ export function notificationText(
           project: notification.data.project,
         }),
         context: notification.data.client,
+      };
+    case 'quote_approval_requested':
+      return {
+        text: t('notifications.text.quote_approval_requested', {
+          actor,
+          quote: notification.data.quote.displayNumber,
+        }),
+        context: context(notification.data.quote.client, notification.data.quote.title),
+      };
+    case 'quote_approval_decided':
+      return {
+        text: t(`notifications.text.quote_approval_decided.${notification.data.decision}`, {
+          actor,
+          quote: notification.data.quote.displayNumber,
+          note: notification.data.note ?? '',
+        }),
+        context: context(notification.data.quote.client, notification.data.quote.title),
       };
     case 'retainer_renewal_due': {
       const { data } = notification;
@@ -283,6 +303,8 @@ type TaskNotification = Exclude<
       | 'project_manager_assigned'
       | 'retainer_renewal_due'
       | 'retainer_behind'
+      | 'quote_approval_requested'
+      | 'quote_approval_decided'
       | 'approval_responded'
       | 'approval_no_response'
       | 'approval_expired'

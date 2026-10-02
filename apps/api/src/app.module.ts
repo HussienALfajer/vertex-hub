@@ -22,6 +22,7 @@ import { FilesModule } from './modules/files/index.js';
 import { HealthModule } from './modules/health/index.js';
 import { NotificationsModule } from './modules/notifications/index.js';
 import { ProjectsModule } from './modules/projects/index.js';
+import { QuotesModule } from './modules/quotes/index.js';
 import { TasksModule } from './modules/tasks/index.js';
 import { TemplatesModule } from './modules/templates/index.js';
 
@@ -54,6 +55,7 @@ import { TemplatesModule } from './modules/templates/index.js';
     ApprovalsModule,
     TemplatesModule,
     CatalogModule,
+    QuotesModule,
     HealthModule,
   ],
   providers: [

@@ -60,6 +60,8 @@ export const NOTIFICATION_TYPES = [
   'project_manager_assigned',
   'retainer_renewal_due',
   'retainer_behind',
+  'quote_approval_requested',
+  'quote_approval_decided',
 ] as const;
 
 export const notificationTypeSchema = z.enum(NOTIFICATION_TYPES).meta({ id: 'NotificationType' });
@@ -90,6 +92,7 @@ export const NOTIFICATION_SUBJECTS = [
   'post',
   'shoot',
   'meeting',
+  'quote',
 ] as const;
 
 export const notificationSubjectTypeSchema = z
@@ -152,6 +155,8 @@ export const NOTIFICATION_CATALOG: Record<
   project_manager_assigned: { category: 'clients_projects', subject: 'project', mutable: false },
   retainer_renewal_due: { category: 'reminders', subject: 'retainer', mutable: true },
   retainer_behind: { category: 'reminders', subject: 'retainer', mutable: false },
+  quote_approval_requested: { category: 'clients_projects', subject: 'quote', mutable: false },
+  quote_approval_decided: { category: 'clients_projects', subject: 'quote', mutable: false },
 };
 
 export function isMutableNotificationType(type: NotificationType): boolean {
@@ -248,6 +253,11 @@ const meetingData = z.object({
     startsAt: z.iso.datetime(),
     endsAt: z.iso.datetime(),
   }),
+});
+
+/** A quote as it was when the notification was sent (F04). */
+const quoteData = z.object({
+  quote: z.object({ displayNumber: nameSchema, title: nameSchema, client: nameSchema }),
 });
 
 /** What changed on a scheduled shoot that its crew is told about. */
@@ -358,6 +368,12 @@ export const NOTIFICATION_DATA_SCHEMAS = {
       )
       .min(1)
       .max(RETAINER_LIMITS.cycleLines),
+  }),
+  /** F04 rule 7: a draft's discount waits for the General Manager. */
+  quote_approval_requested: quoteData,
+  quote_approval_decided: quoteData.extend({
+    decision: z.enum(['approve', 'return']),
+    note: z.string().nullable(),
   }),
 } satisfies Record<NotificationType, z.ZodType>;
 

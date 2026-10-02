@@ -52,6 +52,11 @@ const NOT_BUSINESS_RECORDS: Record<string, string> = {
   meeting_attendees: 'Link table; an attendee is added or removed, never archived (F11)',
   meeting_contacts: 'Link table; a contact is added or removed, never archived (F11)',
   catalog_package_items: 'Part of its package; replaced when the package is saved (F04)',
+  quote_settings: 'One settings row, edited in place and audited (F04)',
+  quote_numbers: 'Counter of quote numbers per year (F04 rule 2)',
+  quote_lines: 'Part of its quote version; replaced while a draft, frozen once sent (F04)',
+  quote_line_items: 'Part of its quote line; replaced while a draft, frozen once sent (F04)',
+  quote_installments: 'Part of its quote version; replaced while a draft, frozen once sent (F04)',
 };
 
 /** Tables keyed by a natural value instead of a UUIDv7 `id`. Every entry needs a reason. */
@@ -59,6 +64,8 @@ const NATURAL_KEYS: Record<string, string> = {
   worker_heartbeats: 'One row per worker name, upserted',
   retainer_templates: 'One row per retainer, keyed by the retainer (F07)',
   notification_settings: 'One row per user, keyed by the user (F14)',
+  quote_settings: 'A single row, keyed by a constant (F04)',
+  quote_numbers: 'One row per year, keyed by the year (F04 rule 2)',
 };
 
 describe('database conventions', () => {

@@ -31,6 +31,10 @@ import {
   postReviews,
   projectMilestones,
   projects,
+  quoteInstallments,
+  quoteLineItems,
+  quoteLines,
+  quotes,
   retainerCycleAdjustments,
   retainerCycleLines,
   retainerCycles,
@@ -324,6 +328,7 @@ export async function removeClients(db: Database, ids: string[]): Promise<void> 
         .where(inArray(contentPosts.clientId, ids))
     ).map((row) => row.id),
   );
+  await removeQuotes(db, ids);
   const clientProjects = await db
     .select({ id: projects.id })
     .from(projects)
@@ -617,6 +622,25 @@ export async function removeTemplates(db: Database, ids: string[]): Promise<void
   await db.delete(workTemplateStages).where(inArray(workTemplateStages.templateId, ids));
   await db.delete(workTemplateAssignees).where(inArray(workTemplateAssignees.templateId, ids));
   await db.delete(workTemplates).where(inArray(workTemplates.id, ids));
+}
+
+/** Removes the quotes of the clients with their lines, items, installments and audit (F04). */
+export async function removeQuotes(db: Database, clientIds: string[]): Promise<void> {
+  if (clientIds.length === 0) return;
+  const ids = (
+    await db.select({ id: quotes.id }).from(quotes).where(inArray(quotes.clientId, clientIds))
+  ).map((row) => row.id);
+  if (ids.length === 0) return;
+  const lineIds = (
+    await db.select({ id: quoteLines.id }).from(quoteLines).where(inArray(quoteLines.quoteId, ids))
+  ).map((row) => row.id);
+  await db.delete(auditEntries).where(inArray(auditEntries.entityId, ids));
+  await db.delete(notifications).where(inArray(notifications.subjectId, ids));
+  if (lineIds.length)
+    await db.delete(quoteLineItems).where(inArray(quoteLineItems.lineId, lineIds));
+  await db.delete(quoteLines).where(inArray(quoteLines.quoteId, ids));
+  await db.delete(quoteInstallments).where(inArray(quoteInstallments.quoteId, ids));
+  await db.delete(quotes).where(inArray(quotes.id, ids));
 }
 
 /** Removes catalog packages and services with their items and audit entries (F04). */

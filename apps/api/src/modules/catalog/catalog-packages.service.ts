@@ -31,6 +31,7 @@ import {
   toActor,
   toTemplate,
 } from './catalog-rules.js';
+import { CatalogUsage } from './catalog-usage.js';
 
 type PackageRow = typeof catalogPackages.$inferSelect;
 
@@ -57,6 +58,7 @@ export class CatalogPackagesService {
   constructor(
     @Inject(DATABASE) private readonly db: Database,
     private readonly templates: TemplateDirectory,
+    private readonly usage: CatalogUsage,
   ) {}
 
   async list(actor: CurrentUserInfo, query: CatalogPackageListQuery): Promise<CatalogPackagePage> {
@@ -136,6 +138,9 @@ export class CatalogPackagesService {
         await this.assertNameFree(tx, merged.name, id);
       }
       const billingChanged = merged.billing !== current.billing;
+      if (billingChanged && (await this.usage.isUsed(tx, { type: 'package', id }))) {
+        throw new CodedException(409, 'SERVICE_IN_USE', 'The package is on a quote');
+      }
       if (input.items || billingChanged) {
         const names = await this.assertItems(tx, input.items ?? before.items, merged.billing);
         if (input.items) merged.items = withNames(input.items, names);

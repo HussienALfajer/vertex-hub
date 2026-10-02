@@ -41,3 +41,10 @@ export const FILES_PURGE_UPLOADS_JOB = {
   cron: '0 3 * * *',
   tz: BUSINESS_TIME_ZONE,
 } as const;
+
+/** F04 rule 9: expires sent quotes whose last valid day has passed, once a day. */
+export const QUOTES_DAILY_JOB = {
+  queue: 'quotes.daily',
+  cron: '10 0 * * *',
+  tz: BUSINESS_TIME_ZONE,
+} as const;

@@ -367,7 +367,19 @@
     "PACKAGE_ARCHIVED": "هذه الباقة مؤرشفة.",
     "PACKAGE_NOT_ARCHIVED": "هذه الباقة غير مؤرشفة.",
     "INVALID_PACKAGE_ITEM": "كل خدمات الباقة يجب أن تكون نشطة وبنفس طريقة فوترة الباقة.",
-    "INVALID_TEMPLATE": "القالب غير صالح: يجب أن يكون نشطًا، قالب مشروع للخدمات لمرة واحدة وقالبًا شهريًا للخدمات الشهرية."
+    "INVALID_TEMPLATE": "القالب غير صالح: يجب أن يكون نشطًا، قالب مشروع للخدمات لمرة واحدة وقالبًا شهريًا للخدمات الشهرية.",
+    "QUOTE_LOCKED": "لا يمكن تعديل عرض السعر: المسودات فقط قابلة للتعديل.",
+    "APPROVAL_PENDING": "عرض السعر بانتظار اعتماد الخصم ولا يمكن تعديله الآن. اسحب الطلب أولًا.",
+    "STALE_QUOTE": "عدّل شخص آخر عرض السعر منذ فتحته. أعد تحميله ثم أعد التعديل.",
+    "CATALOG_ITEM_ARCHIVED": "إحدى الخدمات أو الباقات مؤرشفة ولا يمكن إضافتها.",
+    "INVALID_DISCOUNT": "الخصم أكبر من مجموع القسم.",
+    "INVALID_INSTALLMENTS": "الدفعات غير صالحة: من 1 إلى 10 دفعات مجموعها 100٪ عند وجود بنود لمرة واحدة، ولا دفعات بدونها.",
+    "APPROVAL_NOT_NEEDED": "الخصم أقل من الحد ولا يحتاج إلى اعتماد.",
+    "QUOTE_EMPTY": "أضف بندًا واحدًا على الأقل قبل الإرسال.",
+    "ZERO_PRICE": "بعض البنود بسعر صفر. أكّد الإرسال بهذه الأسعار.",
+    "DISCOUNT_APPROVAL_REQUIRED": "الخصم يبلغ الحد ويحتاج إلى اعتماد المدير العام قبل الإرسال.",
+    "VERSION_EXISTS": "توجد مسودة إصدار أحدث لهذا العرض.",
+    "NOTE_REQUIRED": "أضف ملاحظة لهذا السبب."
   },
   "users": {
     "title": "الفريق",
@@ -692,7 +704,9 @@
       "shoot": "جلسة تصوير",
       "meeting": "اجتماع",
       "catalog_service": "خدمة في الكتالوج",
-      "catalog_package": "باقة في الكتالوج"
+      "catalog_package": "باقة في الكتالوج",
+      "quote_settings": "إعدادات عروض الأسعار",
+      "quote": "عرض سعر"
     },
     "actions": {
       "user": {
@@ -885,6 +899,24 @@
         "updated": "عدّل باقة في الكتالوج",
         "archived": "أرشف باقة في الكتالوج",
         "restored": "استعاد باقة في الكتالوج"
+      },
+      "quote_settings": {
+        "updated": "عدّل إعدادات عروض الأسعار"
+      },
+      "quote": {
+        "created": "أنشأ عرض سعر",
+        "updated": "عدّل مسودة عرض سعر",
+        "approval_requested": "طلب اعتماد خصم",
+        "approval_withdrawn": "سحب طلب اعتماد خصم",
+        "approval_approved": "اعتمد خصمًا",
+        "approval_returned": "أعاد خصمًا بملاحظة",
+        "sent": "أرسل عرض سعر",
+        "extended": "مدّد صلاحية عرض سعر",
+        "expired": "انتهت صلاحية عرض سعر",
+        "rejected": "سجّل رفض عرض سعر",
+        "version_created": "أنشأ إصدارًا جديدًا من عرض سعر",
+        "superseded": "استُبدل عرض سعر بإصدار أحدث",
+        "archived": "تجاهل مسودة عرض سعر"
       }
     },
     "fields": {
@@ -1052,7 +1084,27 @@
       "agenda": "جدول الأعمال",
       "organizerId": "المنظّم",
       "attendeeIds": "الحضور",
-      "contactIds": "جهات اتصال العميل"
+      "contactIds": "جهات اتصال العميل",
+      "validityDays": "مدة الصلاحية بالأيام",
+      "validUntil": "صالح حتى",
+      "oneOffNetMinor": "صافي القسم لمرة واحدة",
+      "monthlyNetMinor": "الصافي الشهري",
+      "oneOffDiscountMinor": "خصم القسم لمرة واحدة",
+      "monthlyDiscountMinor": "الخصم الشهري",
+      "oneOffEffectiveDiscount": "الخصم الفعلي لمرة واحدة ٪",
+      "monthlyEffectiveDiscount": "الخصم الفعلي الشهري ٪",
+      "monthlyTermMonths": "مدة العقد بالأشهر",
+      "lineCount": "عدد البنود",
+      "installments": "الدفعات",
+      "discountApproval": "اعتماد الخصم",
+      "respondedOn": "تاريخ الرد",
+      "clientNotes": "ملاحظات للعميل",
+      "terms": "الشروط",
+      "companyDetails": "بيانات الشركة",
+      "defaultTerms": "الشروط الافتراضية",
+      "defaultValidityDays": "مدة الصلاحية الافتراضية",
+      "discountThresholdPercent": "حد الخصم ٪",
+      "displayNumber": "رقم عرض السعر"
     },
     "kinds": {
       "activation": "تفعيل",
@@ -3317,7 +3369,9 @@
       "meeting_invited": "دعوة إلى اجتماع",
       "meeting_changed": "تغيير موعد أو مكان اجتماع",
       "meeting_dropped": "إلغاء اجتماع أو إزالتي منه",
-      "meeting_upcoming": "تذكير باجتماع قادم"
+      "meeting_upcoming": "تذكير باجتماع قادم",
+      "quote_approval_requested": "طلب اعتماد خصم على عرض سعر",
+      "quote_approval_decided": "قرار على اعتماد خصم طلبته"
     },
     "text": {
       "task_assigned": "أُسندت إليك «{{task}}» بواسطة {{actor}}",
@@ -3451,7 +3505,12 @@
         "cancelled": "ألغى {{actor}} الاجتماع «{{meeting}}» الذي كان في {{when}}",
         "removed": "أزالك {{actor}} من الاجتماع «{{meeting}}»"
       },
-      "meeting_upcoming": "تذكير: الاجتماع «{{meeting}}» في {{when}}"
+      "meeting_upcoming": "تذكير: الاجتماع «{{meeting}}» في {{when}}",
+      "quote_approval_requested": "طلب {{actor}} اعتماد خصم على {{quote}}",
+      "quote_approval_decided": {
+        "approve": "اعتمد {{actor}} الخصم على {{quote}}",
+        "return": "أعاد {{actor}} الخصم على {{quote}}: {{note}}"
+      }
     },
     "changes": {
       "shoot": {
@@ -4370,6 +4429,30 @@
         "body": "يعود الاجتماع إلى التقويم بحالته السابقة.",
         "done": "استُعيد الاجتماع"
       }
+    }
+  },
+  "quotes": {
+    "statuses": {
+      "draft": "مسودة",
+      "sent": "مُرسل",
+      "accepted": "مقبول",
+      "rejected": "مرفوض",
+      "expired": "منتهي الصلاحية",
+      "superseded": "مستبدل بإصدار أحدث"
+    },
+    "approvals": {
+      "none": "لا يحتاج",
+      "pending": "بانتظار الاعتماد",
+      "approved": "معتمد",
+      "returned": "مُعاد بملاحظة"
+    },
+    "rejectionReasons": {
+      "price": "السعر",
+      "timing": "التوقيت",
+      "competitor": "منافس",
+      "scope": "نطاق العمل",
+      "no_response": "لا رد",
+      "other": "سبب آخر"
     }
   }
 }

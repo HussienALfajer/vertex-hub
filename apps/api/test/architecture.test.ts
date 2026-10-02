@@ -263,6 +263,7 @@ describe('module boundaries', () => {
     files: 'files',
     notifications: 'notifications',
     projects: 'projects',
+    quotes: 'quotes',
     retainers: 'projects',
     reviews: 'tasks',
     system: null,

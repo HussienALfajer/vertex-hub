@@ -8,6 +8,7 @@ export * from './content.js';
 export * from './files.js';
 export * from './notifications.js';
 export * from './projects.js';
+export * from './quotes.js';
 export * from './retainers.js';
 export * from './reviews.js';
 export * from './system.js';
