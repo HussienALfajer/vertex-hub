@@ -27,6 +27,7 @@ import {
 } from '@vertex-hub/contracts';
 import {
   auditEntries,
+  clients,
   createDatabase,
   fileItems,
   notifications,
@@ -308,7 +309,16 @@ describe('quote acceptance (F04 A01)', () => {
   afterAll(async () => {
     await app?.close();
     // Quotes hold catalog items, which hold templates, which hold their creator.
-    if (clientId) await removeClients(db, [clientId]);
+    if (cast) {
+      const ownClients = await db
+        .select({ id: clients.id })
+        .from(clients)
+        .where(eq(clients.accountManagerId, cast.am.id));
+      await removeClients(
+        db,
+        ownClients.map((row) => row.id),
+      );
+    }
     await removeCatalog(db, services, packages);
     await removeTemplates(db, templates);
     await cast?.cleanup();
