@@ -2548,6 +2548,166 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/quote-settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["QuoteSettingsController_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["QuoteSettingsController_update"];
+        trace?: never;
+    };
+    "/api/quotes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["QuotesController_list"];
+        put?: never;
+        post: operations["QuotesController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/quotes/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["QuotesController_detail"];
+        put: operations["QuotesController_saveDraft"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/quotes/{id}/approval": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["QuotesController_approval"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/quotes/{id}/approval/decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["QuotesController_decide"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/quotes/{id}/send": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["QuotesController_send"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/quotes/{id}/extend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["QuotesController_extend"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/quotes/{id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["QuotesController_reject"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/quotes/{id}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["QuotesController_newVersion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/quotes/{id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["QuotesController_archive"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -2569,9 +2729,9 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         /** @enum {string} */
-        AuditEntityType: "user" | "department" | "client" | "client_contact" | "client_platform_account" | "client_note" | "project" | "project_milestone" | "retainer" | "retainer_cycle" | "extra_work" | "task" | "task_checklist_item" | "task_link" | "task_comment" | "template" | "template_run" | "file_item" | "approval_request" | "post" | "shoot" | "meeting" | "catalog_service" | "catalog_package";
+        AuditEntityType: "user" | "department" | "client" | "client_contact" | "client_platform_account" | "client_note" | "project" | "project_milestone" | "retainer" | "retainer_cycle" | "extra_work" | "task" | "task_checklist_item" | "task_link" | "task_comment" | "template" | "template_run" | "file_item" | "approval_request" | "post" | "shoot" | "meeting" | "catalog_service" | "catalog_package" | "quote_settings" | "quote";
         /** @enum {string} */
-        AuditAction: "user.created" | "user.updated" | "user.roles_changed" | "user.departments_changed" | "user.archived" | "user.restored" | "user.link_issued" | "user.password_set" | "user.password_changed" | "user.two_factor_enabled" | "user.two_factor_disabled" | "user.two_factor_reset" | "user.profile_updated" | "department.updated" | "client.created" | "client.updated" | "client.status_changed" | "client.account_manager_changed" | "client.healthcare_changed" | "client.archived" | "client.restored" | "client.brand_kit_updated" | "client_contact.created" | "client_contact.updated" | "client_contact.archived" | "client_platform_account.created" | "client_platform_account.updated" | "client_platform_account.archived" | "client_note.created" | "client_note.updated" | "client_note.archived" | "project.created" | "project.updated" | "project.project_manager_changed" | "project.status_changed" | "project.money_updated" | "project.archived" | "project.restored" | "project_milestone.created" | "project_milestone.updated" | "project_milestone.reordered" | "project_milestone.completed" | "project_milestone.reopened" | "project_milestone.archived" | "retainer.created" | "retainer.updated" | "retainer.status_changed" | "retainer.deliverables_updated" | "retainer.money_updated" | "retainer.archived" | "retainer.restored" | "retainer_cycle.created" | "retainer_cycle.closed" | "retainer_cycle.line_updated" | "retainer_cycle.line_added" | "retainer_cycle.adjusted" | "extra_work.created" | "extra_work.updated" | "extra_work.billing_changed" | "extra_work.archived" | "task.created" | "task.updated" | "task.assigned" | "task.department_changed" | "task.status_changed" | "task.dependencies_updated" | "task.archived" | "task.restored" | "task.revision_decided" | "task.request_scope_changed" | "task.extra_work_moved" | "task.reviewed" | "task.client_text_updated" | "task.client_response_recorded" | "task_checklist_item.created" | "task_checklist_item.updated" | "task_checklist_item.reordered" | "task_checklist_item.archived" | "task_link.created" | "task_link.archived" | "task_comment.created" | "task_comment.updated" | "task_comment.archived" | "template.created" | "template.updated" | "template.assignees_updated" | "template.archived" | "template.restored" | "template_run.created" | "retainer.template_changed" | "file_item.created" | "file_item.renamed" | "file_item.confidential_changed" | "file_item.archived" | "file_item.restored" | "file_version.created" | "file_version.archived" | "file_version.restored" | "file_version.final_set" | "file_version.final_cleared" | "approval_request.created" | "approval_request.link_reissued" | "approval_request.revoked" | "approval_item.responded" | "approval_item.withdrawn" | "post.created" | "post.updated" | "post.status_changed" | "post.reviewed" | "post.client_response_recorded" | "post.task_linked" | "post.task_unlinked" | "post.task_returned" | "post.duplicated" | "post.archived" | "post.restored" | "shoot.created" | "shoot.updated" | "shoot.shots_changed" | "shoot.shot_ticked" | "shoot.shot_unticked" | "shoot.completed" | "shoot.cancelled" | "shoot.reopened" | "shoot.archived" | "shoot.restored" | "meeting.created" | "meeting.updated" | "meeting.cancelled" | "meeting.archived" | "meeting.restored" | "catalog_service.created" | "catalog_service.updated" | "catalog_service.archived" | "catalog_service.restored" | "catalog_package.created" | "catalog_package.updated" | "catalog_package.archived" | "catalog_package.restored";
+        AuditAction: "user.created" | "user.updated" | "user.roles_changed" | "user.departments_changed" | "user.archived" | "user.restored" | "user.link_issued" | "user.password_set" | "user.password_changed" | "user.two_factor_enabled" | "user.two_factor_disabled" | "user.two_factor_reset" | "user.profile_updated" | "department.updated" | "client.created" | "client.updated" | "client.status_changed" | "client.account_manager_changed" | "client.healthcare_changed" | "client.archived" | "client.restored" | "client.brand_kit_updated" | "client_contact.created" | "client_contact.updated" | "client_contact.archived" | "client_platform_account.created" | "client_platform_account.updated" | "client_platform_account.archived" | "client_note.created" | "client_note.updated" | "client_note.archived" | "project.created" | "project.updated" | "project.project_manager_changed" | "project.status_changed" | "project.money_updated" | "project.archived" | "project.restored" | "project_milestone.created" | "project_milestone.updated" | "project_milestone.reordered" | "project_milestone.completed" | "project_milestone.reopened" | "project_milestone.archived" | "retainer.created" | "retainer.updated" | "retainer.status_changed" | "retainer.deliverables_updated" | "retainer.money_updated" | "retainer.archived" | "retainer.restored" | "retainer_cycle.created" | "retainer_cycle.closed" | "retainer_cycle.line_updated" | "retainer_cycle.line_added" | "retainer_cycle.adjusted" | "extra_work.created" | "extra_work.updated" | "extra_work.billing_changed" | "extra_work.archived" | "task.created" | "task.updated" | "task.assigned" | "task.department_changed" | "task.status_changed" | "task.dependencies_updated" | "task.archived" | "task.restored" | "task.revision_decided" | "task.request_scope_changed" | "task.extra_work_moved" | "task.reviewed" | "task.client_text_updated" | "task.client_response_recorded" | "task_checklist_item.created" | "task_checklist_item.updated" | "task_checklist_item.reordered" | "task_checklist_item.archived" | "task_link.created" | "task_link.archived" | "task_comment.created" | "task_comment.updated" | "task_comment.archived" | "template.created" | "template.updated" | "template.assignees_updated" | "template.archived" | "template.restored" | "template_run.created" | "retainer.template_changed" | "file_item.created" | "file_item.renamed" | "file_item.confidential_changed" | "file_item.archived" | "file_item.restored" | "file_version.created" | "file_version.archived" | "file_version.restored" | "file_version.final_set" | "file_version.final_cleared" | "approval_request.created" | "approval_request.link_reissued" | "approval_request.revoked" | "approval_item.responded" | "approval_item.withdrawn" | "post.created" | "post.updated" | "post.status_changed" | "post.reviewed" | "post.client_response_recorded" | "post.task_linked" | "post.task_unlinked" | "post.task_returned" | "post.duplicated" | "post.archived" | "post.restored" | "shoot.created" | "shoot.updated" | "shoot.shots_changed" | "shoot.shot_ticked" | "shoot.shot_unticked" | "shoot.completed" | "shoot.cancelled" | "shoot.reopened" | "shoot.archived" | "shoot.restored" | "meeting.created" | "meeting.updated" | "meeting.cancelled" | "meeting.archived" | "meeting.restored" | "catalog_service.created" | "catalog_service.updated" | "catalog_service.archived" | "catalog_service.restored" | "catalog_package.created" | "catalog_package.updated" | "catalog_package.archived" | "catalog_package.restored" | "quote_settings.updated" | "quote.created" | "quote.updated" | "quote.approval_requested" | "quote.approval_withdrawn" | "quote.approval_approved" | "quote.approval_returned" | "quote.sent" | "quote.extended" | "quote.expired" | "quote.rejected" | "quote.version_created" | "quote.superseded" | "quote.archived";
         /** @description Audit entries, newest first */
         AuditPage: {
             items: components["schemas"]["AuditEntry"][];
@@ -4142,9 +4302,68 @@ export interface components {
                     ready: number;
                 }[];
             };
+        } | {
+            /** Format: uuid */
+            id: string;
+            actor: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            subject: {
+                type: components["schemas"]["NotificationSubjectType"];
+                /** Format: uuid */
+                id: string;
+            };
+            count: number;
+            read: boolean;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @enum {string} */
+            type: "quote_approval_requested";
+            data: {
+                quote: {
+                    displayNumber: string;
+                    title: string;
+                    client: string;
+                };
+            };
+        } | {
+            /** Format: uuid */
+            id: string;
+            actor: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            subject: {
+                type: components["schemas"]["NotificationSubjectType"];
+                /** Format: uuid */
+                id: string;
+            };
+            count: number;
+            read: boolean;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @enum {string} */
+            type: "quote_approval_decided";
+            data: {
+                quote: {
+                    displayNumber: string;
+                    title: string;
+                    client: string;
+                };
+                /** @enum {string} */
+                decision: "approve" | "return";
+                note: string | null;
+            };
         };
         /** @enum {string} */
-        NotificationSubjectType: "task" | "client" | "project" | "retainer" | "template_run" | "approval_request" | "post" | "shoot" | "meeting";
+        NotificationSubjectType: "task" | "client" | "project" | "retainer" | "template_run" | "approval_request" | "post" | "shoot" | "meeting" | "quote";
         /** @enum {string} */
         DeliverableKind: "design" | "reel" | "story" | "post" | "video" | "photo_shoot" | "ad_campaign" | "monthly_report" | "other";
         NotificationUnreadCount: {
@@ -4162,7 +4381,7 @@ export interface components {
             }[];
         };
         /** @enum {string} */
-        NotificationType: "task_assigned" | "task_mentioned" | "task_returned" | "task_review_requested" | "task_medical_review_requested" | "task_awaiting_client" | "task_over_limit" | "approval_responded" | "approval_no_response" | "approval_expired" | "task_changed" | "task_commented" | "task_file_added" | "task_requested" | "tasks_generated" | "task_approved" | "task_opened" | "request_finished" | "post_returned" | "post_review_requested" | "post_medical_review_requested" | "post_awaiting_client" | "post_assigned" | "post_approved" | "post_task_ready" | "post_task_unlinked" | "shoot_booked" | "shoot_dropped" | "shoot_changed" | "meeting_invited" | "meeting_dropped" | "meeting_changed" | "task_due_soon" | "task_overdue" | "task_overdue_escalated" | "task_over_limit_pending" | "post_publish_today" | "post_publish_overdue" | "shoot_upcoming" | "shoot_not_closed" | "meeting_upcoming" | "client_account_manager_assigned" | "project_manager_assigned" | "retainer_renewal_due" | "retainer_behind";
+        NotificationType: "task_assigned" | "task_mentioned" | "task_returned" | "task_review_requested" | "task_medical_review_requested" | "task_awaiting_client" | "task_over_limit" | "approval_responded" | "approval_no_response" | "approval_expired" | "task_changed" | "task_commented" | "task_file_added" | "task_requested" | "tasks_generated" | "task_approved" | "task_opened" | "request_finished" | "post_returned" | "post_review_requested" | "post_medical_review_requested" | "post_awaiting_client" | "post_assigned" | "post_approved" | "post_task_ready" | "post_task_unlinked" | "shoot_booked" | "shoot_dropped" | "shoot_changed" | "meeting_invited" | "meeting_dropped" | "meeting_changed" | "task_due_soon" | "task_overdue" | "task_overdue_escalated" | "task_over_limit_pending" | "post_publish_today" | "post_publish_overdue" | "shoot_upcoming" | "shoot_not_closed" | "meeting_upcoming" | "client_account_manager_assigned" | "project_manager_assigned" | "retainer_renewal_due" | "retainer_behind" | "quote_approval_requested" | "quote_approval_decided";
         UpdateNotificationSettings: {
             mutedTypes: components["schemas"]["NotificationType"][];
         };
@@ -7328,6 +7547,319 @@ export interface components {
                 serviceId: string;
                 quantity: number;
             }[];
+        };
+        QuoteSettings: {
+            companyDetails: string;
+            defaultTerms: string;
+            defaultValidityDays: number;
+            discountThresholdPercent: number;
+            /** Format: date-time */
+            updatedAt: string;
+            updatedBy: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            canEdit: boolean;
+            canEditThreshold: boolean;
+        };
+        UpdateQuoteSettings: {
+            companyDetails?: string;
+            defaultTerms?: string;
+            defaultValidityDays?: number;
+            discountThresholdPercent?: number;
+        };
+        /** @enum {string} */
+        QuoteStatus: "draft" | "sent" | "accepted" | "rejected" | "expired" | "superseded";
+        QuotePage: {
+            items: components["schemas"]["Quote"][];
+            total: number;
+            page: number;
+            pageSize: number;
+        };
+        Quote: {
+            /** Format: uuid */
+            id: string;
+            displayNumber: string;
+            year: number;
+            number: number;
+            version: number;
+            title: string;
+            client: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            };
+            accountManager: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            };
+            currency: components["schemas"]["Currency"];
+            status: components["schemas"]["QuoteStatus"];
+            discountApproval: components["schemas"]["DiscountApproval"];
+            oneOffNetMinor: number;
+            monthlyNetMinor: number;
+            /** Format: date */
+            validUntil: string | null;
+            expiresSoon: boolean;
+            /** Format: date-time */
+            updatedAt: string;
+            /** Format: date-time */
+            archivedAt: string | null;
+        };
+        /** @enum {string} */
+        DiscountApproval: "none" | "pending" | "approved" | "returned";
+        QuoteDetail: {
+            /** Format: uuid */
+            id: string;
+            displayNumber: string;
+            year: number;
+            number: number;
+            version: number;
+            title: string;
+            client: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            };
+            accountManager: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            };
+            currency: components["schemas"]["Currency"];
+            status: components["schemas"]["QuoteStatus"];
+            discountApproval: components["schemas"]["DiscountApproval"];
+            oneOffNetMinor: number;
+            monthlyNetMinor: number;
+            /** Format: date */
+            validUntil: string | null;
+            expiresSoon: boolean;
+            /** Format: date-time */
+            updatedAt: string;
+            /** Format: date-time */
+            archivedAt: string | null;
+            contact: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                archived: boolean;
+            } | null;
+            discountDecision: {
+                by: {
+                    /** Format: uuid */
+                    id: string;
+                    name: string;
+                };
+                /** Format: date-time */
+                at: string;
+                note: string | null;
+            } | null;
+            oneOffDiscountMinor: number;
+            monthlyDiscountMinor: number;
+            monthlyTermMonths: number | null;
+            validityDays: number;
+            clientNotes: string | null;
+            terms: string | null;
+            /** Format: date-time */
+            sentAt: string | null;
+            sentBy: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            response: {
+                /** Format: date */
+                respondedOn: string;
+                contact: {
+                    /** Format: uuid */
+                    id: string;
+                    name: string;
+                } | null;
+                note: string | null;
+                by: {
+                    /** Format: uuid */
+                    id: string;
+                    name: string;
+                };
+                rejectionReason: components["schemas"]["QuoteRejectionReason"] | null;
+            } | null;
+            createdBy: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            };
+            /** Format: date-time */
+            createdAt: string;
+            lines: components["schemas"]["QuoteLine"][];
+            installments: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                percent: number;
+                amountMinor: number;
+            }[];
+            totals: components["schemas"]["QuoteTotals"];
+            discountThresholdPercent: number;
+            needsDiscountApproval: boolean;
+            versions: {
+                /** Format: uuid */
+                id: string;
+                version: number;
+                status: components["schemas"]["QuoteStatus"];
+            }[];
+            permissions: components["schemas"]["QuotePermissions"];
+        };
+        /** @enum {string} */
+        QuoteRejectionReason: "price" | "timing" | "competitor" | "scope" | "no_response" | "other";
+        QuoteLine: {
+            /** Format: uuid */
+            id: string;
+            section: components["schemas"]["QuoteSection"];
+            /** Format: uuid */
+            serviceId: string | null;
+            /** Format: uuid */
+            packageId: string | null;
+            name: string;
+            description: string | null;
+            department: components["schemas"]["DepartmentCode"] | null;
+            quantity: number;
+            unitPriceMinor: number;
+            listUnitPriceMinor: number | null;
+            totalMinor: number;
+            revisionRounds: number | null;
+            deliverableKind: components["schemas"]["DeliverableKind"] | null;
+            deliverableLabel: string | null;
+            /** Format: uuid */
+            templateId: string | null;
+            catalogArchived: boolean;
+            items: components["schemas"]["QuoteLineItem"][];
+        };
+        /** @enum {string} */
+        QuoteSection: "one_off" | "monthly";
+        QuoteLineItem: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            serviceId: string;
+            name: string;
+            department: components["schemas"]["DepartmentCode"];
+            quantity: number;
+            revisionRounds: number;
+            deliverableKind: components["schemas"]["DeliverableKind"] | null;
+            deliverableLabel: string | null;
+            /** Format: uuid */
+            templateId: string | null;
+        };
+        QuoteTotals: {
+            oneOff: components["schemas"]["QuoteSectionTotals"];
+            monthly: components["schemas"]["QuoteSectionTotals"];
+            monthlyTermTotalMinor: number | null;
+        };
+        QuoteSectionTotals: {
+            subtotalMinor: number;
+            discountMinor: number;
+            netMinor: number;
+            listMinor: number;
+            effectiveDiscountBasisPoints: number;
+        };
+        /** @description What the caller may do, for the UI */
+        QuotePermissions: {
+            canEdit: boolean;
+            canRequestApproval: boolean;
+            canWithdrawApproval: boolean;
+            canDecideApproval: boolean;
+            canSend: boolean;
+            canExtend: boolean;
+            canReject: boolean;
+            canCreateVersion: boolean;
+            canArchive: boolean;
+        };
+        CreateQuote: {
+            /** Format: uuid */
+            clientId: string;
+            /**
+             * Format: uuid
+             * @default null
+             */
+            contactId: string | null;
+            title: string;
+            /** @default USD */
+            currency: components["schemas"]["Currency"];
+        };
+        QuoteDraft: {
+            /** Format: date-time */
+            updatedAt: string;
+            /** Format: uuid */
+            contactId: string | null;
+            title: string;
+            currency: components["schemas"]["Currency"];
+            validityDays: number;
+            oneOffDiscountMinor: number;
+            monthlyDiscountMinor: number;
+            monthlyTermMonths: number | null;
+            clientNotes: string | null;
+            terms: string | null;
+            lines: {
+                /** Format: uuid */
+                id?: string;
+                section: components["schemas"]["QuoteSection"];
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                serviceId: string | null;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                packageId: string | null;
+                description?: string | null;
+                quantity: number;
+                unitPriceMinor: number;
+                /** @default null */
+                revisionRounds: number | null;
+                /** @default [] */
+                items: {
+                    /** Format: uuid */
+                    serviceId: string;
+                    quantity: number;
+                    revisionRounds: number;
+                }[];
+            }[];
+            installments: {
+                name: string;
+                percent: number;
+            }[];
+        };
+        QuoteApprovalAction: {
+            /** @enum {string} */
+            action: "request" | "withdraw";
+        };
+        QuoteApprovalDecision: {
+            /** @enum {string} */
+            decision: "approve" | "return";
+            note?: string | null;
+        };
+        SendQuote: {
+            /** @default false */
+            confirmZeroPrice: boolean;
+        };
+        ExtendQuote: {
+            /** Format: date */
+            validUntil: string;
+        };
+        RejectQuote: {
+            /** Format: date */
+            respondedOn: string;
+            /**
+             * Format: uuid
+             * @default null
+             */
+            contactId: string | null;
+            reason: components["schemas"]["QuoteRejectionReason"];
+            note?: string | null;
         };
         /** @description Liveness of the API and its dependencies */
         HealthResponse: {
@@ -12727,6 +13259,326 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["CatalogPackage"];
                 };
+            };
+        };
+    };
+    QuoteSettingsController_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The quote settings */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuoteSettings"];
+                };
+            };
+        };
+    };
+    QuoteSettingsController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateQuoteSettings"];
+            };
+        };
+        responses: {
+            /** @description The settings after the change. Texts and validity need `catalog.manage`; the threshold `quotes.approve_discount` */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuoteSettings"];
+                };
+            };
+        };
+    };
+    QuotesController_list: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+                search?: string;
+                status?: components["schemas"]["QuoteStatus"] | components["schemas"]["QuoteStatus"][];
+                clientId?: string;
+                accountManagerId?: string;
+                approval?: "pending";
+                archived?: "true" | "false";
+                latestOnly?: "true" | "false";
+                sort?: "updatedAt" | "number" | "validUntil";
+                order?: components["schemas"]["SortOrder"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Quotes of the clients in scope; the latest open versions by default */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuotePage"];
+                };
+            };
+        };
+    };
+    QuotesController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateQuote"];
+            };
+        };
+        responses: {
+            /** @description The new draft */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuoteDetail"];
+                };
+            };
+        };
+    };
+    QuotesController_detail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A quote version */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuoteDetail"];
+                };
+            };
+        };
+    };
+    QuotesController_saveDraft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QuoteDraft"];
+            };
+        };
+        responses: {
+            /** @description The saved draft */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuoteDetail"];
+                };
+            };
+        };
+    };
+    QuotesController_approval: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QuoteApprovalAction"];
+            };
+        };
+        responses: {
+            /** @description The draft after requesting or withdrawing discount approval */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuoteDetail"];
+                };
+            };
+        };
+    };
+    QuotesController_decide: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QuoteApprovalDecision"];
+            };
+        };
+        responses: {
+            /** @description The draft after the discount was approved or returned */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuoteDetail"];
+                };
+            };
+        };
+    };
+    QuotesController_send: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SendQuote"];
+            };
+        };
+        responses: {
+            /** @description The sent quote */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuoteDetail"];
+                };
+            };
+        };
+    };
+    QuotesController_extend: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExtendQuote"];
+            };
+        };
+        responses: {
+            /** @description The quote, sent again */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuoteDetail"];
+                };
+            };
+        };
+    };
+    QuotesController_reject: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RejectQuote"];
+            };
+        };
+        responses: {
+            /** @description The rejected quote */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuoteDetail"];
+                };
+            };
+        };
+    };
+    QuotesController_newVersion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The new draft version */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuoteDetail"];
+                };
+            };
+        };
+    };
+    QuotesController_archive: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The draft was discarded */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

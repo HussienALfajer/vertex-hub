@@ -11,6 +11,7 @@ import {
   DELIVERABLE_KINDS,
   DEPARTMENT_CODES,
   type DepartmentCode,
+  DISCOUNT_APPROVALS,
   EXTRA_WORK_BILLING,
   FILE_FINAL_SOURCES,
   FILE_VERSION_KINDS,
@@ -19,6 +20,8 @@ import {
   NOTE_CHANNELS,
   PLATFORM_ACCESS_STATES,
   PROJECT_STATUSES,
+  QUOTE_REJECTION_REASONS,
+  QUOTE_STATUSES,
   REQUEST_SCOPES,
   RESPONSE_CHANNELS,
   RETAINER_STATUSES,
@@ -167,6 +170,14 @@ function enumLabel(
   if (field === 'deliverableKind' && entityType === 'catalog_service') {
     const kind = find(DELIVERABLE_KINDS);
     if (kind) return t(`retainers.kinds.${kind}`);
+  }
+  if (entityType === 'quote') {
+    const status = field === 'status' ? find(QUOTE_STATUSES) : undefined;
+    if (status) return t(`quotes.statuses.${status}`);
+    const approval = field === 'discountApproval' ? find(DISCOUNT_APPROVALS) : undefined;
+    if (approval) return t(`quotes.approvals.${approval}`);
+    const reason = field === 'reason' ? find(QUOTE_REJECTION_REASONS) : undefined;
+    if (reason) return t(`quotes.rejectionReasons.${reason}`);
   }
   if (field === 'kind' && entityType === 'template') {
     const kind = find(TEMPLATE_KINDS);

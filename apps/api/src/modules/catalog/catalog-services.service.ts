@@ -30,6 +30,7 @@ import {
   toActor,
   toTemplate,
 } from './catalog-rules.js';
+import { CatalogUsage } from './catalog-usage.js';
 
 type ServiceRow = typeof catalogServices.$inferSelect;
 
@@ -53,6 +54,7 @@ export class CatalogServicesService {
   constructor(
     @Inject(DATABASE) private readonly db: Database,
     private readonly templates: TemplateDirectory,
+    private readonly usage: CatalogUsage,
   ) {}
 
   async list(actor: CurrentUserInfo, query: CatalogServiceListQuery): Promise<CatalogServicePage> {
@@ -123,9 +125,10 @@ export class CatalogServicesService {
       }
       if (
         merged.billing !== current.billing &&
-        (await this.usedInPackages(tx, id, false)).length > 0
+        ((await this.usedInPackages(tx, id, false)).length > 0 ||
+          (await this.usage.isUsed(tx, { type: 'service', id })))
       ) {
-        throw new CodedException(409, 'SERVICE_IN_USE', 'The service is used in a package');
+        throw new CodedException(409, 'SERVICE_IN_USE', 'The service is in a package or a quote');
       }
       if (input.templateId !== undefined || input.billing !== undefined) {
         if (merged.templateId !== current.templateId || merged.billing !== current.billing) {

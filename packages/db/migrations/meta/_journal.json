@@ -169,6 +169,20 @@
       "when": 1790917870467,
       "tag": "0023_mean_king_bedlam",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1790924285665,
+      "tag": "0024_magical_captain_stacy",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1790924293805,
+      "tag": "0025_seed_quote_settings",
+      "breakpoints": true
     }
   ]
 }

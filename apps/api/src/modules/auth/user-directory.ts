@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import type { DepartmentCode, UserAccess } from '@vertex-hub/contracts';
+import type { DepartmentCode, Role, UserAccess } from '@vertex-hub/contracts';
 import {
   type Database,
   departmentMembers,
@@ -79,6 +79,17 @@ export class UserDirectory {
         and(eq(users.id, userId), eq(userRoles.role, 'account_manager'), isNull(users.archivedAt)),
       );
     return row ? { ...row, archived: false } : null;
+  }
+
+  /** The ids of the non-archived holders of a role; invited users included. */
+  async withRole(role: Role, executor: Database | Transaction = this.db): Promise<string[]> {
+    const rows = await executor
+      .select({ id: users.id })
+      .from(users)
+      .innerJoin(userRoles, eq(userRoles.userId, users.id))
+      .where(and(eq(userRoles.role, role), isNull(users.archivedAt)))
+      .orderBy(users.id);
+    return rows.map((row) => row.id);
   }
 
   /** A non-archived member (primary or secondary) of the department; an invited user qualifies. */
