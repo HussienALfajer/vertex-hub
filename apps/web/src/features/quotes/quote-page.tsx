@@ -21,12 +21,14 @@ import {
   FolderKanbanIcon,
   RepeatIcon,
   ThumbsDownIcon,
+  ThumbsUpIcon,
 } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { isMissing, LoadError } from '../../components/load-error';
 import { errorMessage } from '../../lib/errors';
 import { formatCalendarDate, formatDateTime, formatNumber } from '../../lib/format';
+import { AcceptDialog } from './accept-dialog';
 import {
   ApprovalBadge,
   DiscardedBadge,
@@ -116,7 +118,7 @@ function SentQuote({ quote }: { quote: QuoteDetail }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const version = useCreateVersion(quote.id);
-  const [open, setOpen] = useState<'extend' | 'reject' | null>(null);
+  const [open, setOpen] = useState<'accept' | 'extend' | 'reject' | null>(null);
   const { permissions } = quote;
 
   async function newVersion() {
@@ -133,6 +135,12 @@ function SentQuote({ quote }: { quote: QuoteDetail }) {
     <>
       <div className="flex flex-wrap items-center gap-2">
         <SentPdf quote={quote} />
+        {permissions.canAccept && (
+          <Button onClick={() => setOpen('accept')}>
+            <ThumbsUpIcon />
+            {t('quotes.accept.action')}
+          </Button>
+        )}
         {permissions.canExtend && (
           <Button variant="outline" onClick={() => setOpen('extend')}>
             <CalendarPlusIcon />
@@ -199,6 +207,7 @@ function SentQuote({ quote }: { quote: QuoteDetail }) {
         </aside>
       </div>
 
+      <AcceptDialog quote={quote} open={open === 'accept'} onClose={() => setOpen(null)} />
       <ExtendDialog quote={quote} open={open === 'extend'} onClose={() => setOpen(null)} />
       <RejectDialog quote={quote} open={open === 'reject'} onClose={() => setOpen(null)} />
     </>

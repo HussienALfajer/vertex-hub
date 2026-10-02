@@ -35,7 +35,8 @@ function repositoryRoot(): string {
   return dir;
 }
 
-async function loadAssets(): Promise<QuoteTemplateAssets> {
+/** The fonts and logo the quote template embeds; also used by the page screenshot test. */
+export async function loadAssets(): Promise<QuoteTemplateAssets> {
   const faces: string[] = [];
   for (const font of FONTS) {
     const files = join(dirname(require.resolve(`${font.pkg}/package.json`)), 'files');

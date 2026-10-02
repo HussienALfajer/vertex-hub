@@ -1,13 +1,16 @@
 import { mkdtemp, readFile, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { type QuoteSnapshot, quotePdfStorageKey } from '@vertex-hub/contracts';
+import { chromium } from 'playwright';
 import { extractText, getDocumentProxy } from 'unpdf';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { parseEnv } from '../src/core/config/env.js';
 import type { PgBossService } from '../src/jobs/pg-boss.service.js';
 import { QuotesPdfJob } from '../src/jobs/quotes-pdf.job.js';
-import { PdfRenderer } from '../src/pdf/pdf-renderer.js';
+import { loadAssets, PdfRenderer } from '../src/pdf/pdf-renderer.js';
+import { quoteHtml } from '../src/pdf/quote-template.js';
 
 const quoteId = '0190a3c2-0000-7000-8000-0000000000aa';
 const hash = 'b'.repeat(64);
@@ -102,6 +105,26 @@ describe('quotes.pdf', () => {
     const second = await job.render({ quoteId, draft: true, hash: 'c'.repeat(64), snapshot });
     expect(second).toEqual(first);
     expect((await stat(path)).mtimeMs).toBe(before.mtimeMs);
+  });
+
+  it('lays out its first page in print media (the RTL screenshot of the PDF)', async () => {
+    const html = quoteHtml(snapshot, { draft: false }, await loadAssets());
+    const browser = await chromium.launch();
+    try {
+      // An A4 page at 96 dpi; headless Chromium has no PDF viewer, so the print layout is shot.
+      const page = await browser.newPage({ viewport: { width: 794, height: 1123 } });
+      await page.emulateMedia({ media: 'print' });
+      await page.setContent(html, { waitUntil: 'load' });
+      await page.evaluate('document.fonts.ready.then(() => true)');
+      const path = join(
+        dirname(fileURLToPath(import.meta.url)),
+        '../test-results/quote-pdf-page.png',
+      );
+      await page.screenshot({ path });
+      expect((await stat(path)).size).toBeGreaterThan(10_000);
+    } finally {
+      await browser.close();
+    }
   });
 
   it('refuses a payload that is not a quote render', async () => {

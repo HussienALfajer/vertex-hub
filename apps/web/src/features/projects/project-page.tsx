@@ -41,6 +41,7 @@ import { formatCalendarDate, formatDateTime, formatNumber } from '../../lib/form
 import { formatMoney } from '../../lib/money';
 import { idParam } from '../../lib/search-params';
 import { OwnerDocumentsTab } from '../files/owner-documents-tab';
+import { SourceQuotes } from '../quotes/source-quotes';
 import { ProjectTasksTab } from '../tasks/project-tasks-tab';
 import { ExtraWorkTab } from './extra-work-tab';
 import { MilestonesTab } from './milestones-tab';
@@ -280,6 +281,7 @@ function ProjectHero({
                   <DepartmentChips codes={project.departments} />
                 </dd>
               </div>
+              <SourceQuotes projectId={project.id} />
             </dl>
           </div>
           <ProjectActions project={project} onShowMilestones={onShowMilestones} />

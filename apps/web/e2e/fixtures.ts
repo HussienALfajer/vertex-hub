@@ -1,5 +1,6 @@
 import type { Page, Route, TestInfo } from '@playwright/test';
 import {
+  type AcceptPlan,
   APPROVAL_LIMITS,
   type ApprovalItem,
   type ApprovalItemStatus,
@@ -8,7 +9,9 @@ import {
   type ApprovalRequestDetail,
   type ApprovalWithdrawnReason,
   type AuditEntry,
+  acceptQuoteSchema,
   addDays,
+  addMonths,
   allowedPostTransitions,
   allowedTaskTransitions,
   approvalRequestState,
@@ -59,6 +62,7 @@ import {
   type DepartmentDetailResponse,
   type DepartmentResponse,
   type DuplicatePost,
+  defaultInstallmentMilestones,
   type ErrorCode,
   type ExtraWork,
   type ExtraWorkBilling,
@@ -97,6 +101,7 @@ import {
   type MyContentSummary,
   type MyTaskSummary,
   mentionedUserIds,
+  mergeDeliverableLines,
   NOTIFICATION_CATALOG,
   NOTIFICATION_TYPES,
   type Note,
@@ -916,6 +921,9 @@ export async function mockApi(page: Page, options: MockOptions): Promise<MockedA
     catalog,
     clients,
     users,
+    projects,
+    retainers,
+    templates,
     me: () => me,
   });
   const notificationsApi = notificationRoutes({
@@ -8832,11 +8840,23 @@ interface QuoteState {
   catalog: CatalogRecords;
   clients: ClientRecord[];
   users: UserResponse[];
+  projects: ProjectRecord[];
+  retainers: RetainerRecord[];
+  templates: TemplateRecord[];
   me: () => MeResponse;
 }
 
 /** The quotes API over the in-memory records, with the F04 rules the screens rely on. */
-function quoteRoutes({ quoting, catalog, clients, users, me }: QuoteState) {
+function quoteRoutes({
+  quoting,
+  catalog,
+  clients,
+  users,
+  projects,
+  retainers,
+  templates,
+  me,
+}: QuoteState) {
   const { quotes, settings } = quoting;
   let nextId = 9300;
   let clock = Date.parse('2026-10-02T09:00:00.000Z');
@@ -8946,6 +8966,142 @@ function quoteRoutes({ quoting, catalog, clients, users, me }: QuoteState) {
         canAccept: manages && covers('projects.manage', q.clientId) && q.status === 'sent',
         canRenderPdf: draft ? manages : q.pdf?.state === 'failed',
       },
+    };
+  };
+  /** A2–A6 over the seeded catalog, templates and retainers; enough for the dialog's choices. */
+  const acceptPlanOf = (q: QuoteRecord, query: URLSearchParams): AcceptPlan => {
+    const detail = detailOf(q);
+    const today = businessDate();
+    const client = clients.find((c) => c.id === q.clientId);
+    const departmentsOf = (lines: QuoteLineRecord[]) => [
+      ...new Set(
+        lines
+          .flatMap((line) => [line.department, ...line.items.map((item) => item.department)])
+          .filter((code): code is DepartmentCode => !!code),
+      ),
+    ];
+    const templateIdsOf = (lines: QuoteLineRecord[]) => [
+      ...new Set(
+        lines
+          .flatMap((line) => [line.templateId, ...line.items.map((item) => item.templateId)])
+          .filter((templateId): templateId is string => !!templateId),
+      ),
+    ];
+    const used = templateIdsOf(q.lines).flatMap((templateId) =>
+      templates.filter((t) => t.id === templateId),
+    );
+    const oneOff = q.lines.filter((line) => line.section === 'one_off');
+    const monthly = q.lines.filter((line) => line.section === 'monthly');
+
+    let project: AcceptPlan['project'] = null;
+    if (oneOff.length > 0) {
+      const startDate = query.get('projectStartDate') ?? today;
+      const choose = query.get('chooseTemplates') === 'true';
+      const chosen = query.getAll('templateIds');
+      const offered = templateIdsOf(oneOff).flatMap((templateId) =>
+        templates.filter((t) => t.id === templateId && t.kind === 'project' && !t.archived),
+      );
+      const selected = offered.filter((t) => !choose || chosen.includes(t.id));
+      const stages = [
+        ...new Set(
+          selected.flatMap((t) =>
+            [...t.stages].sort((a, b) => a.position - b.position).map((stage) => stage.name),
+          ),
+        ),
+      ];
+      const milestones =
+        stages.length > 0
+          ? stages.map((name, at) => ({ name, dueDate: addDays(startDate, 7 * (at + 1)) }))
+          : detail.installments.map((installment) => ({ name: installment.name, dueDate: null }));
+      const defaults = defaultInstallmentMilestones(detail.installments.length, milestones.length);
+      project = {
+        name: q.title,
+        projectManager: person(client?.accountManagerId ?? id(1)),
+        departments: departmentsOf(oneOff),
+        startDate,
+        dueDate: milestones.at(-1)?.dueDate ?? addDays(startDate, 30),
+        templates: offered.map((t) => ({
+          id: t.id,
+          name: t.name,
+          selected: selected.includes(t),
+          revisionLimit: Math.max(
+            0,
+            ...oneOff
+              .filter((line) => line.templateId === t.id)
+              .map((line) => line.revisionRounds ?? 0),
+          ),
+        })),
+        milestones,
+        installments: detail.installments.map((installment, at) => ({
+          name: installment.name,
+          percent: installment.percent,
+          amountMinor: installment.amountMinor,
+          milestone: defaults[at] ?? 0,
+        })),
+      };
+    }
+
+    let retainer: AcceptPlan['retainer'] = null;
+    if (monthly.length > 0) {
+      const startDate = query.get('retainerStartDate') ?? today;
+      const template = templateIdsOf(monthly)
+        .flatMap((templateId) =>
+          templates.filter(
+            (t) => t.id === templateId && t.kind === 'retainer_cycle' && !t.archived,
+          ),
+        )
+        .at(0);
+      const counted = monthly.flatMap((line) =>
+        line.items.length > 0
+          ? line.items.flatMap((item) =>
+              item.deliverableKind
+                ? [
+                    {
+                      kind: item.deliverableKind,
+                      label: item.deliverableLabel,
+                      quantity: item.quantity * line.quantity,
+                      revisionRounds: item.revisionRounds,
+                    },
+                  ]
+                : [],
+            )
+          : line.deliverableKind
+            ? [
+                {
+                  kind: line.deliverableKind,
+                  label: line.deliverableLabel,
+                  quantity: line.quantity,
+                  revisionRounds: line.revisionRounds ?? 0,
+                },
+              ]
+            : [],
+      );
+      retainer = {
+        name: q.title,
+        departments: departmentsOf(monthly),
+        startDate,
+        renewalDate: q.monthlyTermMonths ? addMonths(startDate, q.monthlyTermMonths) : null,
+        template: template ? { id: template.id, name: template.name } : null,
+        currency: q.currency,
+        monthlyFeeMinor: detail.totals.monthly.netMinor,
+        lines: mergeDeliverableLines(counted),
+        renewable: retainers
+          .filter(
+            (r) =>
+              r.clientId === q.clientId &&
+              !r.archived &&
+              r.status !== 'ended' &&
+              r.currency === q.currency,
+          )
+          .map((r) => ({ id: r.id, name: r.name, status: r.status })),
+      };
+    }
+
+    return {
+      sentOn: q.sentAt ? businessDate(new Date(q.sentAt)) : today,
+      project,
+      retainer,
+      archivedTemplates: used.filter((t) => t.archived).map((t) => ({ id: t.id, name: t.name })),
     };
   };
   const listItemOf = (q: QuoteRecord): Quote => {
@@ -9061,13 +9217,18 @@ function quoteRoutes({ quoting, catalog, clients, users, me }: QuoteState) {
       const clientId = url.searchParams.get('clientId');
       const accountManagerId = url.searchParams.get('accountManagerId');
       const approval = url.searchParams.get('approval');
+      const projectId = url.searchParams.get('projectId');
+      const retainerId = url.searchParams.get('retainerId');
+      const latestOnly = url.searchParams.get('latestOnly') !== 'false';
       const search = url.searchParams.get('search')?.toLowerCase();
       const items = quotes
         .filter(
           (q) =>
             covers('quotes.read', q.clientId) &&
             !!q.archivedAt === archived &&
-            (archived || latestOf(q).id === q.id) &&
+            (archived || !latestOnly || latestOf(q).id === q.id) &&
+            (!projectId || q.project?.id === projectId) &&
+            (!retainerId || q.retainer?.id === retainerId) &&
             (statuses.length === 0 || statuses.includes(q.status)) &&
             (!clientId || q.clientId === clientId) &&
             (!accountManagerId ||
@@ -9275,6 +9436,129 @@ function quoteRoutes({ quoting, catalog, clients, users, me }: QuoteState) {
         },
         updatedAt: now(),
       });
+      return json(route, detailOf(q));
+    }
+    if (action === 'accept-plan' || action === 'accept') {
+      if (q.status === 'expired') return fail(route, 409, 'QUOTE_EXPIRED');
+      if (q.status !== 'sent') return fail(route, 409, 'INVALID_TRANSITION');
+    }
+    if (action === 'accept-plan' && method === 'GET') {
+      return json(route, acceptPlanOf(q, url.searchParams));
+    }
+    if (action === 'accept' && method === 'POST') {
+      const input = acceptQuoteSchema.parse(request.postDataJSON());
+      const choices: string[][] = [];
+      if (input.project) {
+        choices.push(['projectStartDate', input.project.startDate], ['chooseTemplates', 'true']);
+        for (const templateId of input.project.templateIds)
+          choices.push(['templateIds', templateId]);
+      }
+      if (input.retainer?.mode === 'new') {
+        choices.push(['retainerStartDate', input.retainer.startDate]);
+      }
+      const plan = acceptPlanOf(q, new URLSearchParams(choices));
+      if (input.respondedOn > businessDate() || input.respondedOn < plan.sentOn) {
+        return fail(route, 400, 'INVALID_DATES');
+      }
+      let project: QuoteRecord['project'] = null;
+      if (input.project && plan.project) {
+        const { installments, milestones } = plan.project;
+        const chosen = input.project.installmentMilestones;
+        const created: ProjectRecord = {
+          id: id(nextId++),
+          clientId: q.clientId,
+          name: input.project.name,
+          description: null,
+          projectManagerId: input.project.projectManagerId,
+          departments: input.project.departments,
+          status: 'planned',
+          startDate: input.project.startDate,
+          dueDate: input.project.dueDate,
+          currency: q.currency,
+          completedAt: null,
+          cancelledAt: null,
+          cancelReason: null,
+          archived: false,
+          milestones: milestones.map((stage, position) => {
+            const amount = installments.reduce(
+              (sum, installment, at) =>
+                chosen[at] === position ? sum + installment.amountMinor : sum,
+              0,
+            );
+            return {
+              id: id(nextId++),
+              name: stage.name,
+              dueDate: stage.dueDate,
+              status: 'pending',
+              doneAt: null,
+              doneById: null,
+              installmentMinor: amount > 0 ? amount : null,
+              archived: false,
+            };
+          }),
+          extraWork: [],
+        };
+        projects.push(created);
+        project = { id: created.id, name: created.name };
+      }
+      let retainer: QuoteRecord['retainer'] = null;
+      if (input.retainer && plan.retainer) {
+        const lines = plan.retainer.lines.map((line) => ({
+          id: id(nextId++),
+          ...line,
+          archived: false,
+        }));
+        if (input.retainer.mode === 'renew') {
+          const { retainerId } = input.retainer;
+          const renewed = retainers.find((r) => r.id === retainerId);
+          if (!renewed) return fail(route, 404, null);
+          if (renewed.currency !== q.currency) return fail(route, 409, 'CURRENCY_MISMATCH');
+          renewed.monthlyFeeMinor = plan.retainer.monthlyFeeMinor;
+          renewed.deliverables = lines;
+          retainer = { id: renewed.id, name: renewed.name };
+        } else {
+          const created: RetainerRecord = {
+            id: id(nextId++),
+            clientId: q.clientId,
+            name: input.retainer.name,
+            departments: input.retainer.departments,
+            status: 'active',
+            startDate: input.retainer.startDate,
+            renewalDate: input.retainer.renewalDate,
+            endedOn: null,
+            currency: q.currency,
+            monthlyFeeMinor: plan.retainer.monthlyFeeMinor,
+            archived: false,
+            deliverables: lines,
+            cycles: [],
+            extraWork: [],
+          };
+          retainers.push(created);
+          retainer = { id: created.id, name: created.name };
+        }
+      }
+      const contact = clients
+        .find((c) => c.id === q.clientId)
+        ?.contacts.find((c) => c.id === input.contactId);
+      Object.assign(q, {
+        status: 'accepted',
+        project,
+        retainer,
+        response: {
+          respondedOn: input.respondedOn,
+          contact: contact ? { id: contact.id, name: contact.name } : null,
+          note: input.note,
+          by: person(me().user.id),
+          rejectionReason: null,
+        },
+        updatedAt: now(),
+      });
+      // A10: a newer draft of the accepted quote is archived.
+      for (const newer of quotes) {
+        if (newer.number === q.number && newer.version > q.version && newer.status === 'draft') {
+          newer.archivedAt = now();
+        }
+      }
       return json(route, detailOf(q));
     }
     if (action === 'versions') {

@@ -322,7 +322,10 @@ export function parseLines(
   let placed = true;
   for (const issue of result.error.issues) {
     const [, index, field] = issue.path;
-    if (typeof index === 'number' && (field === 'label' || field === 'monthlyQuantity')) {
+    if (
+      typeof index === 'number' &&
+      (field === 'label' || field === 'monthlyQuantity' || field === 'revisionLimit')
+    ) {
       form.setError(`deliverables.${index}.${field}`, {
         type: SCREEN_ERROR,
         message: '',
@@ -355,7 +358,8 @@ export function checkDuplicateLines(
 
 /**
  * The retainer's standing lines: a kind (with its icon), an optional name (required for
- * "other"), and a monthly quantity, in display order. New lines start from the kind chips.
+ * "other"), a monthly quantity and an optional revision limit for the line's generated tasks
+ * (empty: the template step's), in display order. New lines start from the kind chips.
  */
 export function DeliverablesEditor({ form }: { form: DeliverablesFormMethods }) {
   const { t } = useTranslation();
@@ -377,91 +381,130 @@ export function DeliverablesEditor({ form }: { form: DeliverablesFormMethods }) 
           description={t('retainers.lines.emptyHint')}
         />
       ) : (
-        <ul aria-label={t('retainers.lines.title')} className="flex flex-col gap-3">
-          {fields.map((row, index) => {
-            const errors = form.formState.errors.deliverables?.[index];
-            const kind = lines[index]?.kind ?? row.kind;
-            const position = index + 1;
-            const name = lineName(t, { kind });
-            return (
-              <li key={row.id} className="flex flex-col gap-3 rounded-lg border border-border p-3">
-                <div className="flex items-center gap-1">
-                  <span className="me-1 flex size-8 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
-                    <DeliverableIcon kind={kind} />
-                  </span>
-                  <span className="flex-1 text-sm font-medium">{name}</span>
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    disabled={index === 0}
-                    aria-label={t('projects.milestones.moveUp')}
-                    onClick={() => move(index, index - 1)}
-                  >
-                    <ArrowUpIcon />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    disabled={index === fields.length - 1}
-                    aria-label={t('projects.milestones.moveDown')}
-                    onClick={() => move(index, index + 1)}
-                  >
-                    <ArrowDownIcon />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    aria-label={t('retainers.lines.remove', { name })}
-                    onClick={() => remove(index)}
-                  >
-                    <Trash2Icon />
-                  </Button>
-                </div>
-                <div className="grid grid-cols-[minmax(0,1fr)_6rem] items-start gap-3">
-                  <div className="flex min-w-0 flex-col gap-1">
-                    <Input
-                      aria-label={t('retainers.lines.label', { position })}
-                      aria-invalid={!!errors?.label || undefined}
-                      autoComplete="off"
-                      placeholder={
-                        kind === 'other'
-                          ? t('retainers.lines.labelRequired')
-                          : t('retainers.lines.labelPlaceholder', { kind: name })
-                      }
-                      {...form.register(`deliverables.${index}.label`, {
-                        setValueAs: (value: string | null) => value?.trim() || null,
-                      })}
-                    />
-                    {errors?.label && (
-                      <p className="text-sm text-destructive-text">
-                        {fieldError(errors.label, t('retainers.lines.errors.label'))}
-                      </p>
-                    )}
+        <div className="flex flex-col gap-2">
+          <div
+            aria-hidden="true"
+            className="grid grid-cols-[minmax(0,1fr)_6rem_6rem] gap-3 px-3 text-xs text-muted-foreground"
+          >
+            <span>{t('retainers.lines.name')}</span>
+            <span>{t('retainers.lines.columns.quantity')}</span>
+            <span>{t('retainers.lines.columns.revisionLimit')}</span>
+          </div>
+          <ul aria-label={t('retainers.lines.title')} className="flex flex-col gap-3">
+            {fields.map((row, index) => {
+              const errors = form.formState.errors.deliverables?.[index];
+              const kind = lines[index]?.kind ?? row.kind;
+              const position = index + 1;
+              const name = lineName(t, { kind });
+              return (
+                <li
+                  key={row.id}
+                  className="flex flex-col gap-3 rounded-lg border border-border p-3"
+                >
+                  <div className="flex items-center gap-1">
+                    <span className="me-1 flex size-8 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+                      <DeliverableIcon kind={kind} />
+                    </span>
+                    <span className="flex-1 text-sm font-medium">{name}</span>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      disabled={index === 0}
+                      aria-label={t('projects.milestones.moveUp')}
+                      onClick={() => move(index, index - 1)}
+                    >
+                      <ArrowUpIcon />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      disabled={index === fields.length - 1}
+                      aria-label={t('projects.milestones.moveDown')}
+                      onClick={() => move(index, index + 1)}
+                    >
+                      <ArrowDownIcon />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label={t('retainers.lines.remove', { name })}
+                      onClick={() => remove(index)}
+                    >
+                      <Trash2Icon />
+                    </Button>
                   </div>
-                  <div className="flex flex-col gap-1">
-                    <Input
-                      type="number"
-                      inputMode="numeric"
-                      min={1}
-                      max={999}
-                      aria-label={t('retainers.lines.quantity', { position })}
-                      aria-invalid={!!errors?.monthlyQuantity || undefined}
-                      className="text-end tabular-nums"
-                      {...form.register(`deliverables.${index}.monthlyQuantity`, {
-                        valueAsNumber: true,
-                      })}
-                    />
-                    {errors?.monthlyQuantity && (
-                      <p className="text-sm text-destructive-text">
-                        {t('retainers.lines.errors.quantity')}
-                      </p>
-                    )}
+                  <div className="grid grid-cols-[minmax(0,1fr)_6rem_6rem] items-start gap-3">
+                    <div className="flex min-w-0 flex-col gap-1">
+                      <Input
+                        aria-label={t('retainers.lines.label', { position })}
+                        aria-invalid={!!errors?.label || undefined}
+                        autoComplete="off"
+                        placeholder={
+                          kind === 'other'
+                            ? t('retainers.lines.labelRequired')
+                            : t('retainers.lines.labelPlaceholder', { kind: name })
+                        }
+                        {...form.register(`deliverables.${index}.label`, {
+                          setValueAs: (value: string | null) => value?.trim() || null,
+                        })}
+                      />
+                      {errors?.label && (
+                        <p className="text-sm text-destructive-text">
+                          {fieldError(errors.label, t('retainers.lines.errors.label'))}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <Input
+                        type="number"
+                        inputMode="numeric"
+                        min={1}
+                        max={999}
+                        aria-label={t('retainers.lines.quantity', { position })}
+                        aria-invalid={!!errors?.monthlyQuantity || undefined}
+                        className="text-end tabular-nums"
+                        {...form.register(`deliverables.${index}.monthlyQuantity`, {
+                          valueAsNumber: true,
+                        })}
+                      />
+                      {errors?.monthlyQuantity && (
+                        <p className="text-sm text-destructive-text">
+                          {t('retainers.lines.errors.quantity')}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <Input
+                        type="number"
+                        inputMode="numeric"
+                        min={0}
+                        max={RETAINER_LIMITS.revisionLimit}
+                        aria-label={t('retainers.lines.revisionLimit', { position })}
+                        aria-invalid={!!errors?.revisionLimit || undefined}
+                        placeholder={t('retainers.lines.revisionLimitPlaceholder')}
+                        title={t('retainers.lines.revisionLimitHint')}
+                        className="text-end tabular-nums"
+                        {...form.register(`deliverables.${index}.revisionLimit`, {
+                          setValueAs: (value: string | number | null | undefined) =>
+                            value === '' || value === null || value === undefined
+                              ? null
+                              : Number(value),
+                        })}
+                      />
+                      {errors?.revisionLimit && (
+                        <p className="text-sm text-destructive-text">
+                          {t('retainers.lines.errors.revisionLimit', {
+                            max: formatNumber(RETAINER_LIMITS.revisionLimit),
+                          })}
+                        </p>
+                      )}
+                    </div>
                   </div>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
       )}
 
       <div className="flex flex-col gap-2">

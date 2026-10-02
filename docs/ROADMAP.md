@@ -40,7 +40,7 @@ Build order (owner, 2026-09-30): F10 → F09 → F08 → F11. F09 approves exact
 - [ ] Production deploy of Phase 2
 
 ## Phase 3 — Money and sales
-- [~] F04 Service catalog and quotes (spec: `docs/specs/F04-catalog-quotes.md`, ADR 0023; includes the engagement part of A01): catalog end to end (PR 1); quote settings, drafts, approval, send, versions, expiry API (PR 2); the PDF pipeline (PR 3); acceptance and A01's engagement part in the API: accept plan and accept, `EngagementFactory`, `TemplateRunner`, revision limits on retainer lines and generated tasks (PR 4); quote screens: settings, list, builder, quote page, client Quotes tab (PR 5); accept dialog and "From quote" links next (PR 6)
+- [x] F04 Service catalog and quotes (spec: `docs/specs/F04-catalog-quotes.md`, ADR 0023; includes the engagement part of A01): catalog end to end (PR 1); quote settings, drafts, approval, send, versions, expiry API (PR 2); the PDF pipeline (PR 3); acceptance and A01's engagement part in the API: accept plan and accept, `EngagementFactory`, `TemplateRunner`, revision limits on retainer lines and generated tasks (PR 4); quote screens: settings, list, builder, quote page, client Quotes tab (PR 5); the accept dialog, "From quote" links on project and retainer pages and the revision limit column of retainer lines (PR 6); owner acceptance passed
 - [ ] F13 Invoicing and collection
 - [ ] F12 Ad campaigns and ad budget
 - [ ] F03 Leads

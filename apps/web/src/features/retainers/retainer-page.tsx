@@ -33,6 +33,7 @@ import { formatMoney } from '../../lib/money';
 import { OwnerDocumentsTab } from '../files/owner-documents-tab';
 import { ExtraWorkTab } from '../projects/extra-work-tab';
 import { ArchivedBadge, DepartmentChips, PersonName } from '../projects/project-badges';
+import { SourceQuotes } from '../quotes/source-quotes';
 import { ThisMonthTab } from './cycle-tab';
 import { HistoryTab } from './history-tab';
 import { RetainerActions } from './retainer-actions';
@@ -213,6 +214,7 @@ function RetainerHero({ retainer }: { retainer: RetainerDetail }) {
                   <DepartmentChips codes={retainer.departments} />
                 </dd>
               </div>
+              <SourceQuotes retainerId={retainer.id} />
             </dl>
           </div>
           <RetainerActions retainer={retainer} />
