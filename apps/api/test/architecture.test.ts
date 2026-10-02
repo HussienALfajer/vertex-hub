@@ -192,7 +192,7 @@ describe('module boundaries', () => {
   });
 
   it('keeps files independent of the modules that own files (ADR 0019)', () => {
-    const owners = ['tasks', 'clients', 'projects', 'content'];
+    const owners = ['tasks', 'clients', 'projects', 'content', 'quotes'];
     const offenders = imports
       .filter(({ file, specifier }) => moduleOf(file) === 'files' && specifier.startsWith('.'))
       .filter(({ file, specifier }) => {

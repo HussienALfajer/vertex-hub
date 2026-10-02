@@ -1,4 +1,12 @@
-import { type QuoteTotals, quoteDisplayNumber, quoteTotals } from '@vertex-hub/contracts';
+import { createHash } from 'node:crypto';
+import {
+  businessDate,
+  type QuoteSnapshot,
+  type QuoteTotals,
+  quoteDisplayNumber,
+  quoteTotals,
+  quoteValidUntil,
+} from '@vertex-hub/contracts';
 import {
   type Database,
   quoteInstallments,
@@ -104,4 +112,97 @@ export function amounts(totals: QuoteTotals) {
     oneOffEffectiveDiscount: percentOf(totals.oneOff.effectiveDiscountBasisPoints),
     monthlyEffectiveDiscount: percentOf(totals.monthly.effectiveDiscountBasisPoints),
   };
+}
+
+/** Rule 12: what the PDF prints, frozen at send; no list prices or effective discounts (rule 14). */
+export function buildSnapshot(
+  quote: QuoteRow,
+  children: QuoteChildren,
+  context: Pick<QuoteSnapshot, 'companyDetails' | 'client' | 'addressee' | 'sentOn' | 'validUntil'>,
+): QuoteSnapshot {
+  const totals = totalsOf(quote, children);
+  const section = (name: 'one_off' | 'monthly') =>
+    children.lines.flatMap((line, index) =>
+      line.section === name
+        ? [
+            {
+              name: line.name,
+              description: line.description,
+              quantity: line.quantity,
+              unitPriceMinor: line.unitPriceMinor,
+              totalMinor: totals.lineTotalsMinor[index] ?? 0,
+              items: line.items.map((item) => ({ name: item.name, quantity: item.quantity })),
+            },
+          ]
+        : [],
+    );
+  const sums = (name: 'oneOff' | 'monthly') => ({
+    subtotalMinor: totals[name].subtotalMinor,
+    discountMinor: totals[name].discountMinor,
+    netMinor: totals[name].netMinor,
+  });
+  return {
+    ...context,
+    displayNumber: quoteDisplayNumber(quote),
+    title: quote.title,
+    currency: quote.currency,
+    oneOff: { lines: section('one_off'), ...sums('oneOff') },
+    monthly: {
+      lines: section('monthly'),
+      ...sums('monthly'),
+      termMonths: quote.monthlyTermMonths,
+      termTotalMinor: totals.monthlyTermTotalMinor,
+    },
+    installments: children.installments.map((installment, index) => ({
+      name: installment.name,
+      percent: installment.percent,
+      amountMinor: totals.installmentAmountsMinor[index] ?? 0,
+    })),
+    clientNotes: quote.clientNotes,
+    terms: quote.terms,
+  };
+}
+
+/** JSON with sorted keys: `jsonb` does not keep key order, and the hash must survive it. */
+function canonicalJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
+  if (value && typeof value === 'object') {
+    const entries = Object.entries(value)
+      .filter(([, item]) => item !== undefined)
+      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+    return `{${entries.map(([key, item]) => `${JSON.stringify(key)}:${canonicalJson(item)}`).join(',')}}`;
+  }
+  return JSON.stringify(value);
+}
+
+/** Names a render (rules 12 and 13): the same payload, the same PDF. */
+export function renderHash(snapshot: QuoteSnapshot, draft: boolean): string {
+  return createHash('sha256').update(canonicalJson({ draft, snapshot })).digest('hex');
+}
+
+/** A quote without a draft preview: before the first, and once the draft is sent or discarded. */
+export const NO_DRAFT_PDF = {
+  draftPdfStatus: null,
+  draftPdfRequestedHash: null,
+  draftPdfObjectKey: null,
+  draftPdfAt: null,
+  draftPdfHash: null,
+} as const;
+
+/** The file name of a version's PDF: `Q-2026-0007 v1.pdf`, the version always shown. */
+export const pdfFileName = (quote: Pick<QuoteRow, 'year' | 'number' | 'version'>) =>
+  `${quoteDisplayNumber({ ...quote, version: 1 })} v${quote.version}.pdf`;
+
+/** Rule 13: the payload of a draft preview, dated as if sent today. */
+export function draftSnapshot(
+  quote: QuoteRow,
+  children: QuoteChildren,
+  context: Pick<QuoteSnapshot, 'companyDetails' | 'client' | 'addressee'>,
+): QuoteSnapshot {
+  const sentOn = businessDate();
+  return buildSnapshot(quote, children, {
+    ...context,
+    sentOn,
+    validUntil: quoteValidUntil(sentOn, quote.validityDays),
+  });
 }

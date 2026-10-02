@@ -10,7 +10,6 @@ import {
   type QuoteApprovalAction,
   type QuoteApprovalDecision,
   type QuoteDetail,
-  type QuoteSnapshot,
   quoteDisplayNumber,
   quoteValidUntil,
   type RejectQuote,
@@ -26,8 +25,11 @@ import { type CurrentUserInfo, UserDirectory } from '../auth/index.js';
 import { ClientDirectory, type ClientSummary } from '../clients/index.js';
 import { NotificationCenter } from '../notifications/index.js';
 import { actorOf, approvesDiscounts, assertClientTakesQuotes } from './quote-access.js';
+import { QuotePdfService } from './quote-pdf.service.js';
 import {
+  buildSnapshot,
   identity,
+  NO_DRAFT_PDF,
   type QuoteChildren,
   type QuoteRow,
   quoteChildren,
@@ -49,12 +51,14 @@ export class QuoteWorkflowService implements OnModuleInit {
     private readonly users: UserDirectory,
     private readonly notifications: NotificationCenter,
     private readonly jobs: JobQueue,
+    private readonly pdf: QuotePdfService,
   ) {}
 
   onModuleInit(): void {
     this.jobs.work(QUOTES_DAILY_JOB.queue, async () => {
       const expired = await this.runDaily();
-      this.logger.log(`Quotes: ${expired} expired`);
+      const requeued = await this.pdf.requeuePending();
+      this.logger.log(`Quotes: ${expired} expired, ${requeued} PDFs queued again`);
     });
   }
 
@@ -153,7 +157,7 @@ export class QuoteWorkflowService implements OnModuleInit {
    * previous sent or expired version. A sender who approves discounts approves by sending.
    */
   async send(actor: CurrentUserInfo, id: string, input: SendQuote): Promise<QuoteDetail> {
-    return this.db.transaction(async (tx) => {
+    const { detail, sent, previewKey } = await this.db.transaction(async (tx) => {
       const { quote, client } = await this.quotes.lockForChange(tx, actor, id);
       if (quote.archivedAt || quote.status !== 'draft') {
         throw new CodedException(409, 'INVALID_TRANSITION', 'Only a draft is sent');
@@ -217,6 +221,9 @@ export class QuoteWorkflowService implements OnModuleInit {
           sentById: actor.id,
           validUntil,
           snapshot,
+          // Rule 12: the PDF is queued once committed; rule 13: the draft preview is discarded.
+          pdfStatus: 'pending',
+          ...NO_DRAFT_PDF,
           updatedAt: new Date(),
         })
         .where(eq(quotes.id, id))
@@ -249,8 +256,12 @@ export class QuoteWorkflowService implements OnModuleInit {
           after: { ...identity(older), status: 'superseded', byQuoteId: quote.id },
         });
       }
-      return this.quotes.toDetail(actor, updated, client, tx);
+      const detail = await this.quotes.toDetail(actor, updated, client, tx);
+      return { detail, sent: updated, previewKey: quote.draftPdfObjectKey };
     });
+    await this.pdf.queueSent(sent);
+    await this.pdf.discardPreview(previewKey);
+    return detail;
   }
 
   /** Rule 10: an expired quote is sent again until a new last valid day. */
@@ -431,52 +442,3 @@ const noticeOf = (quote: QuoteRow, client: ClientSummary) => ({
   title: quote.title,
   client: client.name,
 });
-
-/** Rule 12: what the PDF prints, frozen at send; no list prices or effective discounts (rule 14). */
-function buildSnapshot(
-  quote: QuoteRow,
-  children: QuoteChildren,
-  context: Pick<QuoteSnapshot, 'companyDetails' | 'client' | 'addressee' | 'sentOn' | 'validUntil'>,
-): QuoteSnapshot {
-  const totals = totalsOf(quote, children);
-  const section = (name: 'one_off' | 'monthly') =>
-    children.lines.flatMap((line, index) =>
-      line.section === name
-        ? [
-            {
-              name: line.name,
-              description: line.description,
-              quantity: line.quantity,
-              unitPriceMinor: line.unitPriceMinor,
-              totalMinor: totals.lineTotalsMinor[index] ?? 0,
-              items: line.items.map((item) => ({ name: item.name, quantity: item.quantity })),
-            },
-          ]
-        : [],
-    );
-  const sums = (name: 'oneOff' | 'monthly') => ({
-    subtotalMinor: totals[name].subtotalMinor,
-    discountMinor: totals[name].discountMinor,
-    netMinor: totals[name].netMinor,
-  });
-  return {
-    ...context,
-    displayNumber: quoteDisplayNumber(quote),
-    title: quote.title,
-    currency: quote.currency,
-    oneOff: { lines: section('one_off'), ...sums('oneOff') },
-    monthly: {
-      lines: section('monthly'),
-      ...sums('monthly'),
-      termMonths: quote.monthlyTermMonths,
-      termTotalMinor: totals.monthlyTermTotalMinor,
-    },
-    installments: children.installments.map((installment, index) => ({
-      name: installment.name,
-      percent: installment.percent,
-      amountMinor: totals.installmentAmountsMinor[index] ?? 0,
-    })),
-    clientNotes: quote.clientNotes,
-    terms: quote.terms,
-  };
-}

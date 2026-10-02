@@ -2708,6 +2708,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/quotes/{id}/pdf": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["QuotesController_downloadPdf"];
+        put?: never;
+        post: operations["QuotesController_renderPdf"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -4394,7 +4410,7 @@ export interface components {
             mimeType: string;
         };
         /** @enum {string} */
-        FileOwnerType: "task" | "client" | "project" | "retainer" | "post";
+        FileOwnerType: "task" | "client" | "project" | "retainer" | "post" | "quote";
         /** @enum {string} */
         FileRole: "deliverable" | "reference" | "brand" | "document";
         /** @description Newest first */
@@ -7709,6 +7725,15 @@ export interface components {
                 version: number;
                 status: components["schemas"]["QuoteStatus"];
             }[];
+            pdf: {
+                state: components["schemas"]["QuotePdfState"];
+            } | null;
+            draftPdf: {
+                state: components["schemas"]["QuotePdfState"];
+                /** Format: date-time */
+                renderedAt: string | null;
+                outdated: boolean;
+            } | null;
             permissions: components["schemas"]["QuotePermissions"];
         };
         /** @enum {string} */
@@ -7764,6 +7789,8 @@ export interface components {
             listMinor: number;
             effectiveDiscountBasisPoints: number;
         };
+        /** @enum {string} */
+        QuotePdfState: "pending" | "ready" | "failed";
         /** @description What the caller may do, for the UI */
         QuotePermissions: {
             canEdit: boolean;
@@ -7775,6 +7802,7 @@ export interface components {
             canReject: boolean;
             canCreateVersion: boolean;
             canArchive: boolean;
+            canRenderPdf: boolean;
         };
         CreateQuote: {
             /** Format: uuid */
@@ -7860,6 +7888,10 @@ export interface components {
             contactId: string | null;
             reason: components["schemas"]["QuoteRejectionReason"];
             note?: string | null;
+        };
+        /** @description The PDF state after asking for a render */
+        QuotePdfRender: {
+            state: components["schemas"]["QuotePdfState"];
         };
         /** @description Liveness of the API and its dependencies */
         HealthResponse: {
@@ -13579,6 +13611,57 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    QuotesController_downloadPdf: {
+        parameters: {
+            query?: {
+                draft?: "true";
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The PDF of the version, or the draft preview with draft=true */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such quote, or its PDF is not ready */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    QuotesController_renderPdf: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Queues the draft preview (client scope) or renders a sent version again when its PDF is not ready */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuotePdfRender"];
+                };
             };
         };
     };

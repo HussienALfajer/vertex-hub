@@ -285,6 +285,8 @@ export async function removeLeftoverUsers(db: Database): Promise<number> {
  */
 export async function removeClients(db: Database, ids: string[]): Promise<void> {
   if (ids.length === 0) return;
+  // Quotes point at their PDF document (F04): unlink them before the file items go.
+  await db.update(quotes).set({ pdfFileItemId: null }).where(inArray(quotes.clientId, ids));
   await removeFileItems(db, inArray(fileItems.clientId, ids));
   await removeShoots(
     db,

@@ -316,7 +316,7 @@ function LibraryTile({ entry, onPreview }: { entry: FileLibraryEntry; onPreview:
   );
 }
 
-/** Where a document belongs: the client itself, or one of its projects or retainers. */
+/** Where a document belongs: the client itself, or one of its projects, retainers or quotes. */
 function DocumentOwner({ document }: { document: FileDocument }) {
   const { t } = useTranslation();
   const { owner } = document;
@@ -346,6 +346,14 @@ function DocumentOwner({ document }: { document: FileDocument }) {
       >
         {t('files.documents.ofRetainer', { name: owner.label })}
       </Link>
+    );
+  }
+  if (owner.type === 'quote') {
+    // The quote page arrives with the quote screens (F04 PR 5); the PDF opens from the list.
+    link = (
+      <span className="text-xs text-muted-foreground">
+        {t('files.documents.ofQuote', { name: owner.label })}
+      </span>
     );
   }
   return link;

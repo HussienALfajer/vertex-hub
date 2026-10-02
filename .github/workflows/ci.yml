@@ -49,6 +49,8 @@ jobs:
         run: pnpm audit --prod --audit-level=high
       - run: pnpm lint
       - run: pnpm typecheck
+      # The worker's quote PDF test renders with Chromium (F04).
+      - run: pnpm --filter @vertex-hub/worker exec playwright install --with-deps chromium
       - run: pnpm test
       - run: pnpm build
       - name: Migrations match the schema

@@ -5,10 +5,10 @@ import { httpUrlSchema, optionalText } from './text.js';
 
 /*
  * Files and versions (spec F10, ADR 0019): named items of a task, a client, a project, a
- * retainer or a post (F08), each with a chain of immutable versions (an upload or a link).
+ * retainer, a post (F08) or a quote (F04), each with a chain of immutable versions (an upload or a link).
  */
 
-export const FILE_OWNER_TYPES = ['task', 'client', 'project', 'retainer', 'post'] as const;
+export const FILE_OWNER_TYPES = ['task', 'client', 'project', 'retainer', 'post', 'quote'] as const;
 
 export const fileOwnerTypeSchema = z.enum(FILE_OWNER_TYPES).meta({ id: 'FileOwnerType' });
 
@@ -27,6 +27,7 @@ export const FILE_ROLES_BY_OWNER: Record<FileOwnerType, readonly FileRole[]> = {
   project: ['document'],
   retainer: ['document'],
   post: ['deliverable'],
+  quote: ['document'],
 };
 
 export const brandFileKindSchema = z.enum(BRAND_FILE_KINDS).meta({ id: 'BrandFileKind' });

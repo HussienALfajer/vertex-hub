@@ -16,25 +16,40 @@ import { ENV, type Env } from '../config/env.js';
 @Injectable()
 export class JobQueue implements OnApplicationBootstrap, OnApplicationShutdown {
   private readonly logger = new Logger(JobQueue.name);
-  private readonly handlers = new Map<string, () => Promise<void>>();
+  private readonly handlers = new Map<string, (data: unknown) => Promise<void>>();
+  /** Queues this process sends to but another one works, created on first send. */
+  private readonly created = new Set<string>();
   private boss: PgBoss | undefined;
 
   constructor(@Inject(ENV) private readonly env: Env) {}
 
-  /** Runs `handler` for each job of `queue`. The handler must be idempotent: pg-boss retries. */
-  work(queue: string, handler: () => Promise<void>): void {
+  /**
+   * Runs `handler` for each job of `queue`, with the job's data (unvalidated: parse it with its
+   * contract schema). The handler must be idempotent: pg-boss retries.
+   */
+  work(queue: string, handler: (data: unknown) => Promise<void>): void {
     this.handlers.set(queue, handler);
   }
 
   /**
-   * Queues a job for a queue this process works, after the change that needs it committed. A
-   * no-op while pg-boss is off (tests, the OpenAPI export): the handler's service must also pick
-   * up work it missed, since a job is only a nudge.
+   * Queues a job, after the change that needs it committed: for a queue this process works, or
+   * for one the worker works (F04 `quotes.pdf`). A no-op while pg-boss is off (tests, the
+   * OpenAPI export): the handler's service must also pick up work it missed, since a job is only
+   * a nudge.
    */
-  async send(queue: string): Promise<void> {
+  async send(
+    queue: string,
+    data: object = {},
+    options: { retryLimit?: number } = {},
+  ): Promise<void> {
     if (!this.boss) return;
     try {
-      await this.boss.send(queue, {});
+      if (!this.handlers.has(queue) && !this.created.has(queue)) {
+        // A queue the worker works (F04 `quotes.pdf`) may not exist yet when the worker is down.
+        await this.boss.createQueue(queue);
+        this.created.add(queue);
+      }
+      await this.boss.send(queue, data, options);
     } catch (error) {
       this.logger.error(error, `Could not queue ${queue}`);
     }
@@ -48,7 +63,7 @@ export class JobQueue implements OnApplicationBootstrap, OnApplicationShutdown {
     this.boss = boss;
     for (const [queue, handler] of this.handlers) {
       await boss.createQueue(queue);
-      await boss.work(queue, async () => handler());
+      await boss.work(queue, async ([job]) => handler(job?.data));
       this.logger.log(`Working ${queue}`);
     }
   }
