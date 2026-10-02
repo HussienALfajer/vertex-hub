@@ -51,7 +51,8 @@ Spec: `docs/specs/F04-catalog-quotes.md` · ADRs 0006, 0007, 0008, 0013, 0014, 0
 - [x] follow-up found: the local API test suite is flaky across files (each failing file passes alone); handed to a separate task
 
 ## PR 6 — `feat/f04-quote-accept-web`: accept dialog and links
-- [ ] web: accept dialog (response, project, retainer, summary, errors kept), "From quote" links on project and retainer pages, revision limit column on the retainer deliverable lines editor; `ar.json`
-- [ ] e2e: full flow (build, send, accept, land on the project), screenshots (accept dialog steps, quote page accepted, one rendered PDF page)
-- [ ] `docs/ROADMAP.md`, spec details settled during implementation
-- [ ] wiring checklist, full checks (+ E2E), reviewer, owner acceptance (steps 7–9, 12), /ship
+- [x] web: accept dialog (response, project, retainer, summary, errors kept), "From quote" links on project and retainer pages, revision limit column on the retainer deliverable lines editor; `ar.json`
+- [x] e2e: full flow (build, send, accept, land on the project), screenshots (accept dialog steps, quote page accepted, one rendered PDF page: the worker test shoots the template's print layout)
+- [x] `docs/ROADMAP.md`, spec details settled during implementation
+- [x] wiring checklist, full checks (+ E2E), reviewer (three findings fixed: a template id in the summary, the plan asked again after a successful accept, the quote page not refreshed after `QUOTE_EXPIRED` or `INVALID_TRANSITION`)
+- [x] owner acceptance (approved; Renew keeps defaulting to the package's monthly template), /ship

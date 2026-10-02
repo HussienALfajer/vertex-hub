@@ -787,6 +787,29 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await screenshot(page, testInfo, `quote-sent-${colorScheme}`);
     });
 
+    test('accept dialog and accepted quote', async ({ page }, testInfo) => {
+      await page.setViewportSize({ width: 1440, height: 1300 });
+      await mockApi(page, { signedIn: true });
+      await page.goto(`/quotes/${seedIds.sentQuote}`);
+      await page.getByRole('button', { name: ar.quotes.accept.action }).click();
+      const accept = page.getByRole('dialog');
+      for (const step of ['response', 'project', 'retainer'] as const) {
+        await expect(accept.getByText(ar.quotes.accept.steps[step], { exact: true })).toBeVisible();
+        await screenshot(page, testInfo, `quote-accept-${step}-${colorScheme}`);
+        await accept.getByRole('button', { name: ar.common.next }).click();
+      }
+      await expect(accept.getByRole('button', { name: ar.quotes.accept.submit })).toBeVisible();
+      await screenshot(page, testInfo, `quote-accept-summary-${colorScheme}`);
+      await accept.getByRole('button', { name: ar.quotes.accept.submit }).click();
+      await expect(page).toHaveURL(/\/projects\/[^/]+$/);
+
+      await page.goto(`/quotes/${seedIds.sentQuote}`);
+      await expect(page.getByRole('heading', { level: 1 })).toContainText(
+        ar.quotes.statuses.accepted,
+      );
+      await screenshot(page, testInfo, `quote-accepted-${colorScheme}`);
+    });
+
     test('client quotes tab', async ({ page }, testInfo) => {
       await page.setViewportSize({ width: 1280, height: 900 });
       await mockApi(page, { signedIn: true });
