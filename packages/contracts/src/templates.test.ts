@@ -366,6 +366,23 @@ describe('planTemplateRun: project runs (rules 7, 10, 13)', () => {
     });
   });
 
+  it('replaces every revision limit with the run override (F04 A4)', () => {
+    const overridden = planTemplateRun({
+      template: { stages, steps },
+      target: {
+        type: 'project',
+        startDate: '2026-10-01',
+        dueDate: '2026-12-31',
+        milestones: [],
+        earlierRuns: 0,
+      },
+      assignees: [],
+      isMember,
+      revisionLimit: 0,
+    });
+    expect(overridden.tasks.map((task) => task.revisionLimit)).toEqual([0, 0, 0, 0]);
+  });
+
   it('replaces an assignee who left the department with the queue, and warns', () => {
     expect(plan.tasks.map((task) => [task.assignee?.id ?? null, task.assigneeReplaced])).toEqual([
       [null, true],
@@ -398,11 +415,13 @@ describe('planTemplateRun: cycle runs (rules 8, 9, 12, 14)', () => {
     committed: number,
     kind: DeliverableKind = 'design',
     label: string | null = null,
+    revisionLimit: number | null = null,
   ) => ({
     id: uuid(n),
     kind,
     label,
     committed,
+    revisionLimit,
   });
   const run = (lines: PlanCycleLine[], startDate = '2026-10-01', periodEnd = '2026-10-31') =>
     planTemplateRun({
@@ -484,6 +503,16 @@ describe('planTemplateRun: cycle runs (rules 8, 9, 12, 14)', () => {
     expect(capped.warnings).toContainEqual({ type: 'over_cap', department: null, count: 12 });
   });
 
+  it("gives a line's instances its revision limit when set (F04)", () => {
+    const tasks = run([line(41, 1, 'design', null, 5), line(42, 1, 'reel')]).tasks;
+    expect(tasks.map((task) => [task.title, task.revisionLimit])).toEqual([
+      ['Content plan', 2],
+      ['Report', 2],
+      ['Design 1', 5],
+      ['Reel 1', 2],
+    ]);
+  });
+
   it('ends a period that ends on a Friday on the Thursday before', () => {
     expect(cycleLastWorkDay('2026-10-01', '2026-10-30')).toBe('2026-10-29');
     expect(cycleLastWorkDay('2026-10-30', '2026-10-30')).toBe('2026-10-30');
@@ -506,7 +535,7 @@ describe('planTemplateRun: missing tasks (rule 18)', () => {
         type: 'missing',
         startDate: '2026-10-20',
         periodEnd: '2026-10-31',
-        line: { id: uuid(61), kind: 'design', label: null, committed: 14 },
+        line: { id: uuid(61), kind: 'design', label: null, committed: 14, revisionLimit: null },
         existing: 12,
         missing: count,
       },
@@ -540,6 +569,12 @@ describe('template run input', () => {
     expect(
       templateRunInputSchema.safeParse({ retainerCycleId: uuid(2), startDate: '2026-10-01' })
         .success,
+    ).toBe(false);
+    expect(templateRunInputSchema.safeParse({ projectId: uuid(1), revisionLimit: 3 }).success).toBe(
+      true,
+    );
+    expect(
+      templateRunInputSchema.safeParse({ retainerCycleId: uuid(2), revisionLimit: 3 }).success,
     ).toBe(false);
     expect(
       templateRunInputSchema.safeParse({

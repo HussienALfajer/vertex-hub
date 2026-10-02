@@ -6,6 +6,7 @@ import { ProjectsModule } from '../projects/index.js';
 import { TasksModule } from '../tasks/index.js';
 import { RetainerTemplatesController } from './retainer-templates.controller.js';
 import { TemplateDirectory } from './template-directory.js';
+import { TemplateRunner } from './template-runner.js';
 import { TemplateRunsController } from './template-runs.controller.js';
 import { TemplateRunsService } from './template-runs.service.js';
 import { TemplatesController } from './templates.controller.js';
@@ -17,12 +18,13 @@ import { TemplatesService } from './templates.service.js';
  * retainers and cycles through `projects`' `EngagementDirectory`; creates tasks through `tasks`'
  * `TaskGenerator` and generates each new cycle's tasks through `projects`' `CycleOpenedHooks`;
  * notifies each run's assignees and department managers through `notifications` (F14). Exports
- * `TemplateDirectory` (names, kinds, archived state) for the catalog (F04).
+ * `TemplateDirectory` (names, kinds, archived state) for the catalog (F04) and `TemplateRunner`
+ * (project runs and monthly links inside another module's transaction) for quotes (F04 A01).
  */
 @Module({
   imports: [AuthModule, ClientsModule, ProjectsModule, TasksModule, NotificationsModule],
   controllers: [TemplatesController, TemplateRunsController, RetainerTemplatesController],
-  providers: [TemplatesService, TemplateRunsService, TemplateDirectory],
-  exports: [TemplateDirectory],
+  providers: [TemplatesService, TemplateRunsService, TemplateDirectory, TemplateRunner],
+  exports: [TemplateDirectory, TemplateRunner],
 })
 export class TemplatesModule {}

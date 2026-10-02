@@ -7,6 +7,7 @@ import {
   type Cycle,
   canChangeRetainerStatus,
   type DeliverableLine,
+  type DeliverableLineInput,
   type DeliverableLineList,
   deliverableKey,
   duplicateDeliverables,
@@ -103,6 +104,7 @@ const lineColumns = {
   kind: retainerDeliverables.kind,
   label: retainerDeliverables.label,
   monthlyQuantity: retainerDeliverables.monthlyQuantity,
+  revisionLimit: retainerDeliverables.revisionLimit,
   position: retainerDeliverables.position,
 };
 
@@ -213,7 +215,7 @@ export class RetainersService {
         })
         .from(retainers)
         .where(eq(retainers.id, id)),
-      this.lines(this.db, id),
+      this.standingLines(this.db, id),
     ]);
     if (!row) throw new NotFoundException();
     const [currentCycles, people] = await Promise.all([
@@ -242,56 +244,76 @@ export class RetainersService {
     const id = await this.db.transaction(async (tx) => {
       // A cycle opening at once may assign its tasks (F07 rule 16): users must stay active.
       if (input.startDate <= businessDate()) await lockAccessChanges(tx);
-      const client = await this.clients.summary(input.clientId, tx, { forUpdate: true });
-      if (!client) throw new NotFoundException();
-      if (!coversClient(actor, client)) throw new ForbiddenException();
-      assertClientTakesWork(client);
-      if (input.currency !== undefined || input.monthlyFeeMinor !== undefined) {
-        assertCanEditMoney(actor, client);
-      }
-      assertLines(input.deliverables);
-      assertDates(input.startDate, input.renewalDate ?? null);
-      await this.assertNameFree(tx, client.id, input.name);
-
-      const values = {
-        name: input.name,
-        departments: input.departments,
-        startDate: input.startDate,
-        renewalDate: input.renewalDate ?? null,
-        currency: input.currency ?? 'USD',
-        monthlyFeeMinor: input.monthlyFeeMinor ?? null,
-      };
-      const [created] = await tx
-        .insert(retainers)
-        .values({ ...values, clientId: client.id })
-        .returning({ id: retainers.id });
-      if (!created) throw new Error('Retainer insert returned no row');
-      const lines = input.deliverables.map((line, index) => ({
-        kind: line.kind,
-        label: line.label ?? null,
-        monthlyQuantity: line.monthlyQuantity,
-        position: index + 1,
-      }));
-      if (lines.length > 0) {
-        await tx
-          .insert(retainerDeliverables)
-          .values(lines.map((line) => ({ ...line, retainerId: created.id })));
-      }
-      await recordAudit(tx, {
-        actor: actorOf(actor),
-        action: 'retainer.created',
-        entityType: 'retainer',
-        entityId: created.id,
-        after: { ...values, client: { id: client.id, name: client.name }, deliverables: lines },
-      });
+      const created = await this.createIn(tx, actor, input);
       // R3: a retainer that has started gets this month's cycle at once.
-      const today = businessDate();
-      if (input.startDate <= today) {
-        await this.cycles.open(tx, created.id, input.startDate, today, actorOf(actor));
-      }
-      return created.id;
+      await this.start(tx, actor, created, input.startDate);
+      return created;
     });
     return this.detail(actor, id);
+  }
+
+  /**
+   * Creates a retainer and its standing lines in the caller's transaction, without its first
+   * cycle: `start` opens it, once the caller linked a template (F04 A8).
+   */
+  async createIn(tx: Transaction, actor: CurrentUserInfo, input: CreateRetainer): Promise<string> {
+    const client = await this.clients.summary(input.clientId, tx, { forUpdate: true });
+    if (!client) throw new NotFoundException();
+    if (!coversClient(actor, client)) throw new ForbiddenException();
+    assertClientTakesWork(client);
+    if (input.currency !== undefined || input.monthlyFeeMinor !== undefined) {
+      assertCanEditMoney(actor, client);
+    }
+    assertLines(input.deliverables);
+    assertDates(input.startDate, input.renewalDate ?? null);
+    await this.assertNameFree(tx, client.id, input.name);
+
+    const values = {
+      name: input.name,
+      departments: input.departments,
+      startDate: input.startDate,
+      renewalDate: input.renewalDate ?? null,
+      currency: input.currency ?? 'USD',
+      monthlyFeeMinor: input.monthlyFeeMinor ?? null,
+    };
+    const [created] = await tx
+      .insert(retainers)
+      .values({ ...values, clientId: client.id })
+      .returning({ id: retainers.id });
+    if (!created) throw new Error('Retainer insert returned no row');
+    const lines = input.deliverables.map((line, index) => ({
+      kind: line.kind,
+      label: line.label ?? null,
+      monthlyQuantity: line.monthlyQuantity,
+      revisionLimit: line.revisionLimit ?? null,
+      position: index + 1,
+    }));
+    if (lines.length > 0) {
+      await tx
+        .insert(retainerDeliverables)
+        .values(lines.map((line) => ({ ...line, retainerId: created.id })));
+    }
+    await recordAudit(tx, {
+      actor: actorOf(actor),
+      action: 'retainer.created',
+      entityType: 'retainer',
+      entityId: created.id,
+      after: { ...values, client: { id: client.id, name: client.name }, deliverables: lines },
+    });
+    return created.id;
+  }
+
+  /** R3: a retainer that has started gets this month's cycle, from its start date. */
+  async start(
+    tx: Transaction,
+    actor: CurrentUserInfo,
+    retainerId: string,
+    startDate: string,
+  ): Promise<void> {
+    const today = businessDate();
+    if (startDate <= today) {
+      await this.cycles.open(tx, retainerId, startDate, today, actorOf(actor));
+    }
   }
 
   async update(actor: CurrentUserInfo, id: string, input: UpdateRetainer): Promise<RetainerDetail> {
@@ -392,62 +414,81 @@ export class RetainersService {
   ): Promise<DeliverableLineList> {
     await this.db.transaction(async (tx) => {
       await workableRetainer(tx, this.clients, actor, id);
-      assertLines(input.lines);
-      const current = await this.lines(tx, id);
-      const known = new Set(current.map((line) => line.id));
-      if (input.lines.some((line) => line.id !== undefined && !known.has(line.id))) {
-        throw new NotFoundException('A line does not belong to the retainer');
-      }
-      const next = input.lines.map((line, index) => ({
-        id: line.id,
-        kind: line.kind,
-        label: line.label ?? null,
-        monthlyQuantity: line.monthlyQuantity,
-        position: index + 1,
-      }));
-      const keys = new Map(
-        next.flatMap((line) => (line.id ? [[line.id, deliverableKey(line)]] : [])),
-      );
-      // Removed lines, and kept lines whose kind or label changes, leave the unique index first;
-      // every write after that only adds a line of the final set, which has no duplicates.
-      const moving = current.filter((line) => keys.get(line.id) !== deliverableKey(line));
-      if (moving.length > 0) {
+      await this.replaceLines(tx, actor, id, input.lines);
+    });
+    return { items: await this.standingLines(this.db, id) };
+  }
+
+  /**
+   * R10 on a retainer the caller locked as workable: the lines replace the standing lines, kept
+   * by `id`; lines left out are archived. The open cycle keeps its own.
+   */
+  async replaceLines(
+    tx: Transaction,
+    actor: CurrentUserInfo,
+    id: string,
+    lines: DeliverableLineInput[],
+  ): Promise<void> {
+    assertLines(lines);
+    const current = await this.standingLines(tx, id);
+    const known = new Set(current.map((line) => line.id));
+    if (lines.some((line) => line.id !== undefined && !known.has(line.id))) {
+      throw new NotFoundException('A line does not belong to the retainer');
+    }
+    const next = lines.map((line, index) => ({
+      id: line.id,
+      kind: line.kind,
+      label: line.label ?? null,
+      monthlyQuantity: line.monthlyQuantity,
+      revisionLimit: line.revisionLimit ?? null,
+      position: index + 1,
+    }));
+    const keys = new Map(
+      next.flatMap((line) => (line.id ? [[line.id, deliverableKey(line)]] : [])),
+    );
+    // Removed lines, and kept lines whose kind or label changes, leave the unique index first;
+    // every write after that only adds a line of the final set, which has no duplicates.
+    const moving = current.filter((line) => keys.get(line.id) !== deliverableKey(line));
+    if (moving.length > 0) {
+      await tx
+        .update(retainerDeliverables)
+        .set({ archivedAt: new Date() })
+        .where(
+          inArray(
+            retainerDeliverables.id,
+            moving.map((line) => line.id),
+          ),
+        );
+    }
+    for (const line of next) {
+      const { id: lineId, ...values } = line;
+      if (lineId) {
         await tx
           .update(retainerDeliverables)
-          .set({ archivedAt: new Date() })
-          .where(
-            inArray(
-              retainerDeliverables.id,
-              moving.map((line) => line.id),
-            ),
-          );
+          .set({ ...values, archivedAt: null })
+          .where(eq(retainerDeliverables.id, lineId));
+      } else {
+        await tx.insert(retainerDeliverables).values({ ...values, retainerId: id });
       }
-      for (const line of next) {
-        const { id: lineId, ...values } = line;
-        if (lineId) {
-          await tx
-            .update(retainerDeliverables)
-            .set({ ...values, archivedAt: null })
-            .where(eq(retainerDeliverables.id, lineId));
-        } else {
-          await tx.insert(retainerDeliverables).values({ ...values, retainerId: id });
-        }
-      }
-      const shape = (lines: Omit<DeliverableLine, 'id'>[]) =>
-        lines.map(({ kind, label, monthlyQuantity }) => ({ kind, label, monthlyQuantity }));
-      const before = shape(current);
-      const after = shape(next);
-      if (JSON.stringify(before) === JSON.stringify(after)) return;
-      await recordAudit(tx, {
-        actor: actorOf(actor),
-        action: 'retainer.deliverables_updated',
-        entityType: 'retainer',
-        entityId: id,
-        before: { deliverables: before },
-        after: { deliverables: after },
-      });
+    }
+    const shape = (rows: Omit<DeliverableLine, 'id'>[]) =>
+      rows.map(({ kind, label, monthlyQuantity, revisionLimit }) => ({
+        kind,
+        label,
+        monthlyQuantity,
+        revisionLimit,
+      }));
+    const before = shape(current);
+    const after = shape(next);
+    if (JSON.stringify(before) === JSON.stringify(after)) return;
+    await recordAudit(tx, {
+      actor: actorOf(actor),
+      action: 'retainer.deliverables_updated',
+      entityType: 'retainer',
+      entityId: id,
+      before: { deliverables: before },
+      after: { deliverables: after },
     });
-    return { items: await this.lines(this.db, id) };
   }
 
   /** The status diagram (R3, R5): who may make each change is checked after it is allowed. */
@@ -544,7 +585,7 @@ export class RetainersService {
   }
 
   /** Non-archived standing lines, by position. */
-  private lines(executor: Executor, retainerId: string): Promise<DeliverableLine[]> {
+  standingLines(executor: Executor, retainerId: string): Promise<DeliverableLine[]> {
     return executor
       .select(lineColumns)
       .from(retainerDeliverables)

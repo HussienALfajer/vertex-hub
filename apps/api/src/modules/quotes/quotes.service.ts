@@ -56,6 +56,7 @@ import {
   catalogPrice,
 } from '../catalog/index.js';
 import { ClientDirectory, type ClientSummary } from '../clients/index.js';
+import { EngagementDirectory } from '../projects/index.js';
 import {
   actorOf,
   approvesDiscounts,
@@ -63,6 +64,7 @@ import {
   assertClientTakesQuotes,
   canManage,
   canRead,
+  coversEngagements,
   holdsAll,
 } from './quote-access.js';
 import { QuotePdfService } from './quote-pdf.service.js';
@@ -108,6 +110,7 @@ export class QuotesService {
     private readonly catalog: CatalogDirectory,
     private readonly settings: QuoteSettingsService,
     private readonly pdf: QuotePdfService,
+    private readonly engagements: EngagementDirectory,
     usage: CatalogUsage,
   ) {
     // SERVICE_IN_USE: an item on any quote version keeps its billing.
@@ -157,6 +160,8 @@ export class QuotesService {
       filters.push(this.clients.managedBy(quotes.clientId, query.accountManagerId));
     }
     if (query.approval) filters.push(eq(quotes.discountApproval, query.approval));
+    if (query.projectId) filters.push(eq(quotes.projectId, query.projectId));
+    if (query.retainerId) filters.push(eq(quotes.retainerId, query.retainerId));
     const where = and(...filters);
     const order = query.order === 'desc' ? desc : asc;
     const sorts =
@@ -519,6 +524,12 @@ export class QuotesService {
           ) !== row.draftPdfHash
         : false;
     const responseContact = row.responseContactId ? contacts.get(row.responseContactId) : undefined;
+    const project = row.projectId
+      ? (await this.engagements.projects([row.projectId], executor)).get(row.projectId)
+      : undefined;
+    const retainer = row.retainerId
+      ? (await this.engagements.retainers([row.retainerId], executor)).get(row.retainerId)
+      : undefined;
     return {
       ...this.toSummary(row, client, children, people, businessDate()),
       contact: contact ?? null,
@@ -590,6 +601,8 @@ export class QuotesService {
       },
       discountThresholdPercent: settings.discountThresholdPercent,
       needsDiscountApproval: needsApproval,
+      project: project ? { id: project.id, name: project.name } : null,
+      retainer: retainer ? { id: retainer.id, name: retainer.name } : null,
       versions: versions
         .filter((version) => !version.archivedAt || version.id === row.id)
         .map((version) => ({ id: version.id, version: version.version, status: version.status })),
@@ -618,6 +631,7 @@ export class QuotesService {
         canCreateVersion:
           manages && ['sent', 'expired', 'rejected'].includes(row.status) && newer.length === 0,
         canArchive: manages && isDraft,
+        canAccept: manages && row.status === 'sent' && coversEngagements(actor, client),
         canRenderPdf: isDraft ? manages : row.status !== 'draft' && row.pdfStatus !== 'ready',
       },
     };

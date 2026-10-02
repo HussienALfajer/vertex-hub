@@ -105,6 +105,8 @@ export interface ExtraWorkLink {
 /** A cycle line with its committed quantity and its non-archived, non-cancelled tasks (F07). */
 export interface CycleLineSummary extends CycleLineLink {
   committed: number;
+  /** Replaces the repeated step's revision limit when set (F04). */
+  revisionLimit: number | null;
   tasks: number;
 }
 
@@ -274,6 +276,7 @@ export class EngagementDirectory {
         kind: retainerCycleLines.kind,
         label: retainerCycleLines.label,
         committed: retainerCycleLines.committedQuantity,
+        revisionLimit: retainerCycleLines.revisionLimit,
       })
       .from(retainerCycleLines)
       .where(inArray(retainerCycleLines.cycleId, cycleIds))

@@ -331,6 +331,8 @@ export const templateRunInputSchema = z
     retainerCycleId: z.uuid().optional(),
     /** Project runs only: default the later of the project's start date and today (rule 6). */
     startDate: calendarDateSchema.optional(),
+    /** Project runs only: replaces every step's revision limit (F04 A4). */
+    revisionLimit: z.number().int().min(0).max(TASK_LIMITS.revisionLimit).optional(),
     /** Per department: a user, or null for its queue; others get the template's default. */
     assignees: z
       .array(z.object({ department: departmentCodeSchema, userId: z.uuid().nullable() }))
@@ -343,6 +345,9 @@ export const templateRunInputSchema = z
     }
     if (input.startDate && !input.projectId) {
       ctx.addIssue({ code: 'custom', path: ['startDate'], message: 'Project runs only' });
+    }
+    if (input.revisionLimit !== undefined && !input.projectId) {
+      ctx.addIssue({ code: 'custom', path: ['revisionLimit'], message: 'Project runs only' });
     }
     const departments = input.assignees.map((a) => a.department);
     if (new Set(departments).size !== departments.length) {
@@ -431,6 +436,8 @@ export interface PlanCycleLine {
   kind: DeliverableKind;
   label: string | null;
   committed: number;
+  /** Replaces the repeated step's revision limit when set (F04). */
+  revisionLimit: number | null;
 }
 
 export type PlanTarget =
@@ -462,6 +469,8 @@ export interface PlanInput {
   assignees: { department: DepartmentCode; user: { id: string; name: string } | null }[];
   /** Whether the user is a non-archived member of the department at run time (rule 10). */
   isMember: (userId: string, department: DepartmentCode) => boolean;
+  /** Replaces every step's revision limit (F04 A4: project runs from an accepted quote). */
+  revisionLimit?: number;
 }
 
 const sameName = (a: string, b: string) =>
@@ -510,7 +519,10 @@ const instanceTitle = (title: string, i: number) => {
 type TaskFields = Pick<
   PlannedTask,
   'key' | 'title' | 'dueDate' | 'milestone' | 'cycleLineId' | 'instance' | 'dependsOn'
->;
+> & {
+  /** The cycle line's revision limit, for its repeated instances (F04). */
+  lineRevisionLimit?: number | null;
+};
 
 /**
  * Plans a run (rules 7–14 and 18) without side effects: the preview returns it and the apply
@@ -521,7 +533,10 @@ export function planTemplateRun(input: PlanInput): TemplateRunPlan {
   const start = target.startDate;
   const replaced = new Map<DepartmentCode, number>();
   const chosen = new Map(input.assignees.map((a) => [a.department, a.user]));
-  const taskOf = (step: TemplateStep, fields: TaskFields): PlannedTask => {
+  const taskOf = (
+    step: TemplateStep,
+    { lineRevisionLimit, ...fields }: TaskFields,
+  ): PlannedTask => {
     const user = chosen.get(step.department) ?? null;
     const stale = !!user && !input.isMember(user.id, step.department);
     if (stale) replaced.set(step.department, (replaced.get(step.department) ?? 0) + 1);
@@ -534,7 +549,7 @@ export function planTemplateRun(input: PlanInput): TemplateRunPlan {
       brief: step.brief,
       priority: step.priority,
       needsClientApproval: step.needsClientApproval,
-      revisionLimit: step.revisionLimit,
+      revisionLimit: input.revisionLimit ?? lineRevisionLimit ?? step.revisionLimit,
       checklist: step.checklist,
     };
   };
@@ -610,6 +625,7 @@ export function planTemplateRun(input: PlanInput): TemplateRunPlan {
             cycleLineId: line.id,
             instance: i,
             dependsOn,
+            lineRevisionLimit: line.revisionLimit,
           }),
         );
       }

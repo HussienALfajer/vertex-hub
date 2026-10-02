@@ -11,4 +11,4 @@ export {
 } from './file-owner-registry.js';
 export { FileVersions, type SentVersion, type VersionRef } from './file-versions.js';
 export { FilesModule } from './files.module.js';
-export { type GeneratedDocument, GeneratedFiles } from './generated-files.js';
+export { type AttachedUpload, type GeneratedDocument, GeneratedFiles } from './generated-files.js';

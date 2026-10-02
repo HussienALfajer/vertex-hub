@@ -269,62 +269,67 @@ export class ProjectsService implements OnModuleInit {
     const id = await this.db.transaction(async (tx) => {
       // Serialized with archiving users (rule 4).
       await lockAccessChanges(tx);
-      const client = await this.clients.summary(input.clientId, tx, { forUpdate: true });
-      if (!client) throw new NotFoundException();
-      if (!coversClient(actor, client)) throw new ForbiddenException();
-      assertClientTakesWork(client);
-      const setsMoney =
-        input.currency !== undefined ||
-        input.milestones.some((milestone) => milestone.installmentMinor !== undefined);
-      if (setsMoney) assertCanEditMoney(actor, client);
-      if (input.milestones.length > PROJECT_LIMITS.milestones) {
-        throw new CodedException(409, 'LIMIT_REACHED', 'A project holds at most 30 milestones');
-      }
-      assertDates(input.startDate, input.dueDate);
-      const manager = await this.validProjectManager(tx, input.projectManagerId);
-      await this.assertNameFree(tx, client.id, input.name);
-
-      const values = {
-        name: input.name,
-        description: input.description ?? null,
-        departments: input.departments,
-        status: input.status,
-        startDate: input.startDate,
-        dueDate: input.dueDate,
-        currency: input.currency ?? 'USD',
-      };
-      const [created] = await tx
-        .insert(projects)
-        .values({ ...values, clientId: client.id, projectManagerId: manager.id })
-        .returning({ id: projects.id });
-      if (!created) throw new Error('Project insert returned no row');
-      const milestones = input.milestones.map((milestone, index) => ({
-        name: milestone.name,
-        dueDate: milestone.dueDate ?? null,
-        installmentMinor: milestone.installmentMinor ?? null,
-        position: index + 1,
-      }));
-      if (milestones.length > 0) {
-        await tx
-          .insert(projectMilestones)
-          .values(milestones.map((milestone) => ({ ...milestone, projectId: created.id })));
-      }
-      await recordAudit(tx, {
-        actor: actorOf(actor),
-        action: 'project.created',
-        entityType: 'project',
-        entityId: created.id,
-        after: {
-          ...values,
-          client: { id: client.id, name: client.name },
-          projectManager: { id: manager.id, name: manager.name },
-          milestones,
-        },
-      });
-      await this.notifyManager(tx, actor, created.id, manager.id, input.name, client.name);
-      return created.id;
+      return this.createIn(tx, actor, input);
     });
     return this.detail(actor, id);
+  }
+
+  /** Creates a project and its milestones in the caller's transaction, which locked access changes. */
+  async createIn(tx: Transaction, actor: CurrentUserInfo, input: CreateProject): Promise<string> {
+    const client = await this.clients.summary(input.clientId, tx, { forUpdate: true });
+    if (!client) throw new NotFoundException();
+    if (!coversClient(actor, client)) throw new ForbiddenException();
+    assertClientTakesWork(client);
+    const setsMoney =
+      input.currency !== undefined ||
+      input.milestones.some((milestone) => milestone.installmentMinor !== undefined);
+    if (setsMoney) assertCanEditMoney(actor, client);
+    if (input.milestones.length > PROJECT_LIMITS.milestones) {
+      throw new CodedException(409, 'LIMIT_REACHED', 'A project holds at most 30 milestones');
+    }
+    assertDates(input.startDate, input.dueDate);
+    const manager = await this.validProjectManager(tx, input.projectManagerId);
+    await this.assertNameFree(tx, client.id, input.name);
+
+    const values = {
+      name: input.name,
+      description: input.description ?? null,
+      departments: input.departments,
+      status: input.status,
+      startDate: input.startDate,
+      dueDate: input.dueDate,
+      currency: input.currency ?? 'USD',
+    };
+    const [created] = await tx
+      .insert(projects)
+      .values({ ...values, clientId: client.id, projectManagerId: manager.id })
+      .returning({ id: projects.id });
+    if (!created) throw new Error('Project insert returned no row');
+    const milestones = input.milestones.map((milestone, index) => ({
+      name: milestone.name,
+      dueDate: milestone.dueDate ?? null,
+      installmentMinor: milestone.installmentMinor ?? null,
+      position: index + 1,
+    }));
+    if (milestones.length > 0) {
+      await tx
+        .insert(projectMilestones)
+        .values(milestones.map((milestone) => ({ ...milestone, projectId: created.id })));
+    }
+    await recordAudit(tx, {
+      actor: actorOf(actor),
+      action: 'project.created',
+      entityType: 'project',
+      entityId: created.id,
+      after: {
+        ...values,
+        client: { id: client.id, name: client.name },
+        projectManager: { id: manager.id, name: manager.name },
+        milestones,
+      },
+    });
+    await this.notifyManager(tx, actor, created.id, manager.id, input.name, client.name);
+    return created.id;
   }
 
   async update(actor: CurrentUserInfo, id: string, input: UpdateProject): Promise<ProjectDetail> {

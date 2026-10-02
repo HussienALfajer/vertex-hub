@@ -151,6 +151,8 @@ export const ERROR_CODES = [
   'DISCOUNT_APPROVAL_REQUIRED',
   'VERSION_EXISTS',
   'NOTE_REQUIRED',
+  'CURRENCY_MISMATCH',
+  'QUOTE_EXPIRED',
 ] as const;
 
 export const errorCodeSchema = z.enum(ERROR_CODES).meta({ id: 'ErrorCode' });

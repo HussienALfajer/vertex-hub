@@ -301,12 +301,16 @@ function EditLines({ retainer }: { retainer: RetainerDetail }) {
     // A refetch keeps what the user already changed.
     resetOptions: { keepDirtyValues: true },
     values: {
-      deliverables: retainer.deliverables.map(({ id, kind, label, monthlyQuantity }) => ({
-        id,
-        kind,
-        label,
-        monthlyQuantity,
-      })),
+      // The revision limit has no column yet (F04 PR 6) but is kept, not cleared, on save.
+      deliverables: retainer.deliverables.map(
+        ({ id, kind, label, monthlyQuantity, revisionLimit }) => ({
+          id,
+          kind,
+          label,
+          monthlyQuantity,
+          revisionLimit,
+        }),
+      ),
     },
   });
 

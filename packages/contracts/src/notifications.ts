@@ -62,6 +62,7 @@ export const NOTIFICATION_TYPES = [
   'retainer_behind',
   'quote_approval_requested',
   'quote_approval_decided',
+  'quote_accepted',
 ] as const;
 
 export const notificationTypeSchema = z.enum(NOTIFICATION_TYPES).meta({ id: 'NotificationType' });
@@ -157,6 +158,7 @@ export const NOTIFICATION_CATALOG: Record<
   retainer_behind: { category: 'reminders', subject: 'retainer', mutable: false },
   quote_approval_requested: { category: 'clients_projects', subject: 'quote', mutable: false },
   quote_approval_decided: { category: 'clients_projects', subject: 'quote', mutable: false },
+  quote_accepted: { category: 'clients_projects', subject: 'quote', mutable: true },
 };
 
 export function isMutableNotificationType(type: NotificationType): boolean {
@@ -374,6 +376,11 @@ export const NOTIFICATION_DATA_SCHEMAS = {
   quote_approval_decided: quoteData.extend({
     decision: z.enum(['approve', 'return']),
     note: z.string().nullable(),
+  }),
+  /** F04 A11: the engagements an accepted quote created or renewed. */
+  quote_accepted: quoteData.extend({
+    project: nameSchema.nullable(),
+    retainer: nameSchema.nullable(),
   }),
 } satisfies Record<NotificationType, z.ZodType>;
 
