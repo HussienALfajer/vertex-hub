@@ -26,6 +26,7 @@ Short records of decisions that shape the system. Each has a status: **Accepted*
 | [0020](0020-review-snapshots-and-approval-links.md) | Review snapshots, medical review stage and client approval links | Accepted |
 | [0021](0021-content-posts-and-linked-tasks.md) | Content posts: linked tasks, approval of the finished post, counting at publish | Accepted |
 | [0022](0022-shoots-meetings-and-company-calendar.md) | Shoots tied to tasks, warned conflicts and one company calendar | Accepted |
+| [0023](0023-quotes-versions-discounts-and-acceptance.md) | Quotes: catalog-priced sections, versions, discount approval and acceptance into engagements | Accepted |
 
 Template:
 
