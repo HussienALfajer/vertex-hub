@@ -34,7 +34,7 @@ Steps inside a session:
 2. **Plan** (`/feature-slice`, first step): the agent splits the feature into PRs and writes `TASKS.md`; the owner approves before any code.
 3. **Implement** (`/feature-slice`): one layer at a time, contracts → db → api → OpenAPI → web → E2E, each followed by a check gate through the `checker` subagent. The new-module wiring checklist and the F01 files to copy from are in `.claude/skills/feature-slice/wiring.md`.
 4. **Review:** the `reviewer` subagent (fresh context) checks the branch against the spec and the rules and reports blocking issues only.
-5. **Accept and close:** the owner tries it in the browser, `/ship` runs the checks, opens the PR with auto-merge and updates `docs/ROADMAP.md`.
+5. **Accept and close:** the owner tries it in the browser, `/ship` runs the checks that have not already passed on the same files (the `checker` subagent records each pass in `scripts/check-record.mjs`; documentation-only changes skip local checks), opens the PR with auto-merge and updates `docs/ROADMAP.md`. CI runs every check on every PR before the merge.
 
 ## How the instructions are layered
 

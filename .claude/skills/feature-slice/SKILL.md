@@ -36,7 +36,7 @@ Layers a PR does not include are skipped. Helpers that ADR 0013 says arrive with
 
 ## 3. Close each PR
 1. Walk the wiring checklist in `wiring.md` against the diff (`git diff main...HEAD --stat`).
-2. Full checks once, through `checker`: lint, typecheck, test, build; add E2E when web changed and migration drift when db changed.
+2. Full checks once, through `checker`: lint, typecheck, test, build; add E2E when web changed and migration drift when db changed. `checker` records the passes against the exact working tree, and `/ship` reuses them while no file changes; any later fix (reviewer, owner) invalidates the record, so the last full run after the last fix is the one `/ship` reuses.
 3. Run the `reviewer` subagent with the spec path. Fix every blocking finding, then re-run the affected gates.
 4. Owner acceptance, in Arabic:
    - PR with screens: turn the spec's "Acceptance" section into numbered browser steps for the owner (`pnpm dev`, which roles to sign in as, what to click, what they should see). Ask before `pnpm db:migrate` on the dev database.
