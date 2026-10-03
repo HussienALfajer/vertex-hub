@@ -1,4 +1,5 @@
 // Public surface of the projects module. Code outside this folder imports from here only.
+export { type BillingLockSource, BillingLocks } from './billing-locks.js';
 export {
   type BillableWork,
   type BillingEngagement,
@@ -23,5 +24,6 @@ export {
   type RenewableRetainer,
   type RetainerRenewal,
 } from './engagement-factory.js';
+export { type MilestoneDone, MilestoneDoneHooks } from './milestone-done-hooks.js';
 export { ProjectsModule } from './projects.module.js';
 export { type CycleLineCounts, WorkProgress, type WorkProgressSource } from './work-progress.js';

@@ -9,7 +9,7 @@ import {
   retainerDetailSchema,
   retainerPageSchema,
 } from '@vertex-hub/contracts';
-import { auditEntries, createDatabase } from '@vertex-hub/db';
+import { auditEntries, createDatabase, invoices } from '@vertex-hub/db';
 import { testDatabaseUrl } from '@vertex-hub/db/testing';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -308,7 +308,7 @@ describe('retainers', () => {
       expect(actions).toEqual(['retainer.created', 'retainer.updated', 'retainer.money_updated']);
     });
 
-    it('locks the currency once a fee is set (M2)', async () => {
+    it('locks the currency once a fee is set (M2) or an invoice exists (F13 rule 24)', async () => {
       const { id: clientId } = await cast.createClient();
       const created = await cast.createRetainer(clientId, { monthlyFeeMinor: 1000 });
       await expectError(
@@ -317,6 +317,16 @@ describe('retainers', () => {
         'CURRENCY_LOCKED',
       );
       expect((await patch(created.id, cast.gm.cookie, { monthlyFeeMinor: null })).status).toBe(200);
+      // The first cycle's month was drafted when the retainer started.
+      await expectError(
+        await patch(created.id, cast.gm.cookie, { currency: 'SYP' }),
+        409,
+        'CURRENCY_LOCKED',
+      );
+      const [draft] = await db.select().from(invoices).where(eq(invoices.retainerId, created.id));
+      expect((await client.post(`/api/invoices/${draft?.id}/archive`, cast.gm.cookie)).status).toBe(
+        204,
+      );
       expect((await patch(created.id, cast.gm.cookie, { currency: 'SYP' })).status).toBe(200);
     });
 

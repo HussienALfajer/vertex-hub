@@ -34,6 +34,7 @@ import { GeneratedFiles } from '../files/index.js';
 import { NotificationCenter } from '../notifications/index.js';
 import { EngagementFactory } from '../projects/index.js';
 import { TemplateDirectory, TemplateRunner, type TemplateSummary } from '../templates/index.js';
+import { QuoteAcceptedHooks } from './quote-accepted-hooks.js';
 import {
   actorOf,
   assertClientTakesQuotes,
@@ -93,6 +94,7 @@ export class QuoteAcceptService {
     private readonly files: GeneratedFiles,
     private readonly notifications: NotificationCenter,
     private readonly pdf: QuotePdfService,
+    private readonly acceptedHooks: QuoteAcceptedHooks,
   ) {}
 
   /** A2–A6: the dialog's defaults for its current choices. Nothing is written. */
@@ -218,7 +220,8 @@ export class QuoteAcceptService {
       const totals = totalsOf(quote, children);
       const departments = new Set<DepartmentCode>();
 
-      let project: { id: string; name: string } | null = null;
+      let project: { id: string; name: string; firstInstallmentMilestoneId: string | null } | null =
+        null;
       if (derived.oneOff && input.project) {
         const choice = input.project;
         const brought = new Map(derived.oneOff.templates.map((t) => [t.id, t.revisionLimit]));
@@ -246,7 +249,7 @@ export class QuoteAcceptService {
             'Each installment needs one of the milestones',
           );
         }
-        const projectId = await this.engagements.createProject(tx, actor, {
+        const created = await this.engagements.createProject(tx, actor, {
           clientId: client.id,
           name: choice.name,
           projectManagerId: choice.projectManagerId,
@@ -274,11 +277,16 @@ export class QuoteAcceptService {
             tx,
             actor,
             templateId,
-            projectId,
+            created.id,
             brought.get(templateId) ?? 0,
           );
         }
-        project = { id: projectId, name: choice.name };
+        project = {
+          id: created.id,
+          name: choice.name,
+          firstInstallmentMilestoneId:
+            mapping[0] === undefined ? null : (created.milestoneIds[mapping[0]] ?? null),
+        };
         for (const code of choice.departments) departments.add(code);
       }
 
@@ -373,6 +381,15 @@ export class QuoteAcceptService {
         },
       });
       const discarded = await this.archiveNewerDrafts(tx, actor, quote);
+      // F13 rule 2: the deposit is drafted inside the acceptance.
+      await this.acceptedHooks.run(tx, {
+        quoteId: quote.id,
+        project: project && {
+          id: project.id,
+          firstInstallmentMilestoneId: project.firstInstallmentMilestoneId,
+        },
+        actor: actorOf(actor),
+      });
 
       // A11: the account manager and the departments' managers, never the actor.
       const managers = await this.users.departmentManagers([...departments], tx);

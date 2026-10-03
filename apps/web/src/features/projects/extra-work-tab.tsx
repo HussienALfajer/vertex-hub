@@ -228,6 +228,8 @@ function ExtraWorkItem({
   const archive = useArchiveExtraWork(owner);
   const [dialog, setDialog] = useState<'edit' | 'billing' | 'archive' | null>(null);
   const estimate = item.money?.estimateMinor ?? null;
+  // Billed work follows its invoice (F13 rule 25): void the invoice to change it.
+  const canChangeBilling = canBill && item.billingStatus !== 'billed';
 
   return (
     <li className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-4 sm:flex-row sm:items-start">
@@ -276,7 +278,7 @@ function ExtraWorkItem({
             </span>
           </span>
         )}
-        {(canEdit || canBill) && (
+        {(canEdit || canChangeBilling) && (
           <DropdownMenu>
             <DropdownMenuTrigger
               render={
@@ -296,7 +298,7 @@ function ExtraWorkItem({
                   {t('common.edit')}
                 </DropdownMenuItem>
               )}
-              {canBill && (
+              {canChangeBilling && (
                 <DropdownMenuItem onClick={() => setDialog('billing')}>
                   <ReceiptTextIcon />
                   {t('projects.extraWork.changeBilling')}
@@ -563,7 +565,10 @@ function ExtraWorkDialog({
   );
 }
 
-/** Marks an item billed (with the invoice reference), waived (with why) or back to unbilled (M3). */
+/** What a person sets by hand; issuing its invoice bills the work (F13 rule 25). */
+const HAND_BILLING = ['unbilled', 'waived'] as const satisfies readonly ExtraWorkBilling[];
+
+/** Marks an item waived (with why) or back to unbilled (M3); never billed (F13 rule 25). */
 function BillingDialog({
   owner,
   item,
@@ -639,7 +644,7 @@ function BillingDialog({
                   value={[field.value]}
                   onValueChange={(next: ExtraWorkBilling[]) => next[0] && field.onChange(next[0])}
                 >
-                  {EXTRA_WORK_BILLING.map((value) => (
+                  {HAND_BILLING.map((value) => (
                     <ToggleGroupItem key={value} value={value}>
                       {t(`projects.extraWork.billing.${value}`)}
                     </ToggleGroupItem>

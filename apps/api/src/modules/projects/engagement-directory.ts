@@ -43,6 +43,7 @@ import { CodedException } from '../../core/errors/index.js';
 import { type AuditActor, recordAudit } from '../audit/index.js';
 import type { CurrentUserInfo } from '../auth/index.js';
 import { ClientDirectory } from '../clients/index.js';
+import { BillingLocks } from './billing-locks.js';
 import { assertClientTakesWork, readableProject, workableProject } from './project-access.js';
 import { readableRetainer, retainerPermissions, workableRetainer } from './retainer-access.js';
 import { NO_TASKS, WorkProgress } from './work-progress.js';
@@ -152,6 +153,7 @@ export class EngagementDirectory {
     @Inject(DATABASE) private readonly db: Database,
     private readonly clients: ClientDirectory,
     private readonly progress: WorkProgress,
+    private readonly locks: BillingLocks,
   ) {}
 
   /**
@@ -644,9 +646,16 @@ export class EngagementDirectory {
 
   /**
    * Withdraws the extra work of a task while it is unbilled (F06 rule 11, edge case 10);
-   * `EXTRA_WORK_BILLED` once billed or waived.
+   * `EXTRA_WORK_BILLED` once billed or waived, `ALREADY_INVOICED` while a live invoice bills it
+   * (F13 rule 25). With `keepBilled`, such an item stays and nothing is thrown. Returns whether
+   * the item was archived.
    */
-  async archiveExtraWork(tx: Transaction, id: string, actor: AuditActor): Promise<void> {
+  async archiveExtraWork(
+    tx: Transaction,
+    id: string,
+    actor: AuditActor,
+    options: { keepBilled?: boolean } = {},
+  ): Promise<boolean> {
     const [item] = await tx
       .select({
         billingStatus: extraWorkItems.billingStatus,
@@ -657,14 +666,19 @@ export class EngagementDirectory {
       .from(extraWorkItems)
       .where(eq(extraWorkItems.id, id))
       .for('update');
-    if (!item || item.archivedAt) return;
-    if (item.billingStatus !== 'unbilled') {
+    if (!item || item.archivedAt) return false;
+    const billed = item.billingStatus !== 'unbilled';
+    if (options.keepBilled && (billed || (await this.locks.extraWorkInvoiced(tx, id)))) {
+      return false;
+    }
+    if (billed) {
       throw new CodedException(
         409,
         'EXTRA_WORK_BILLED',
         'The extra work is billed or waived and stays',
       );
     }
+    await this.locks.assertExtraWorkFree(tx, id);
     await tx
       .update(extraWorkItems)
       .set({ archivedAt: new Date() })
@@ -680,6 +694,7 @@ export class EngagementDirectory {
         ...(item.projectId ? { projectId: item.projectId } : { retainerId: item.retainerId }),
       },
     });
+    return true;
   }
 }
 

@@ -124,12 +124,16 @@ test('billing stays open on a completed project while its work is read-only (M3)
   await page.getByRole('menuitem', { name: ar.projects.extraWork.changeBilling }).click();
   const dialog = page.getByRole('dialog');
   await dialog
-    .getByRole('button', { name: ar.projects.extraWork.billing.billed, exact: true })
+    .getByRole('button', { name: ar.projects.extraWork.billing.waived, exact: true })
     .click();
-  await dialog.getByLabel(ar.projects.extraWork.fields.billingNote).fill('INV-2026-031');
+  // F13 rule 25: issuing its invoice bills the work, so "billed" is not offered by hand.
+  await expect(
+    dialog.getByRole('button', { name: ar.projects.extraWork.billing.billed, exact: true }),
+  ).toHaveCount(0);
+  await dialog.getByLabel(ar.projects.extraWork.fields.billingNote).fill('هدية للافتتاح');
   await dialog.getByRole('button', { name: ar.common.save }).click();
   await expect(page.getByText(ar.projects.extraWork.billingSaved)).toBeVisible();
-  await expect(page.getByText('INV-2026-031')).toBeVisible();
+  await expect(page.getByText('هدية للافتتاح')).toBeVisible();
 });
 
 test('the audit log names project changes in Arabic and shows amounts in major units', async ({
