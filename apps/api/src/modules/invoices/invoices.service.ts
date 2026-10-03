@@ -535,7 +535,8 @@ export class InvoicesService {
     if (new Set(keys).size !== keys.length) {
       throw new CodedException(409, 'ALREADY_INVOICED', 'A source is billed once per invoice');
     }
-    const resolved = await this.sources.resolve(refs, tx);
+    // Locked so rule 25's refusals and automatic drafts wait for this draft (edge case 4).
+    const resolved = await this.sources.resolve(refs, tx, { lock: true });
     const engagements = new Map<string, BillingEngagement>();
     for (const ref of refs) {
       const source = resolved.get(sourceKey(ref));

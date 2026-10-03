@@ -14,7 +14,10 @@ export const extraWorkBillingSchema = z.enum(EXTRA_WORK_BILLING).meta({ id: 'Ext
 
 export type ExtraWorkBilling = z.infer<typeof extraWorkBillingSchema>;
 
-/** M3: `waived` needs why it is free, `billed` the invoice reference (`BILLING_NOTE_REQUIRED`). */
+/**
+ * M3: `waived` needs why it is free, `billed` the invoice reference (`BILLING_NOTE_REQUIRED`).
+ * Since F13 only issuing an invoice sets `billed` (`BILLED_BY_INVOICE` by hand).
+ */
 export const billingNeedsNote = (status: ExtraWorkBilling) => status !== 'unbilled';
 
 const extraWorkFieldsSchema = z.object({

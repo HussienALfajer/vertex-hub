@@ -14,12 +14,13 @@ Spec: `docs/specs/F13-invoicing-collection.md` · ADRs 0006, 0007, 0008, 0013, 0
 - [x] wiring checklist, full checks (+ drift), reviewer (three findings fixed: USD balance of a void invoice, `canEdit` on an archived client's draft, missing 403 and error-code tests), owner acceptance (approved), /ship
 
 ## PR 2 — `feat/f13-invoice-drafts`: automatic drafts and billing locks
-- [ ] api `quotes`: `QuoteAcceptedHooks` run at the end of the accept transaction
-- [ ] api `projects`: `MilestoneDoneHooks`; `BillingLocks` registry; rule 24 `CURRENCY_LOCKED`, rule 25 (`MILESTONE_INVOICED`, `ALREADY_INVOICED`, `BILLED_BY_INVOICE`) with their error codes and `ar.json` keys
-- [ ] api `invoices`: A01, milestone done and A02 drafts (rules 2–5, skip rules); registers the billing locks source
-- [ ] api tests: `test/invoice-drafts.test.ts` (each trigger incl. job, new retainer, resume, reactivate; rollback with the trigger; skip rules; locks); adapted F05 tests
-- [ ] bridge; web typecheck (F05 extra work billing UI no longer offers `billed`)
-- [ ] wiring checklist, full checks, reviewer, owner acceptance, /ship
+- [x] api `quotes`: `QuoteAcceptedHooks` run at the end of the accept transaction
+- [x] api `projects`: `MilestoneDoneHooks`; `BillingLocks` registry; rule 24 `CURRENCY_LOCKED`, rule 25 (`MILESTONE_INVOICED`, `ALREADY_INVOICED`, `BILLED_BY_INVOICE`) with their error codes and `ar.json` keys
+- [x] api `invoices`: A01, milestone done and A02 drafts (rules 2–5, skip rules); registers the billing locks source
+- [x] api tests: `test/invoice-drafts.test.ts` (each trigger incl. job, new retainer, resume, earlier start — reactivating shares resume's path; rollback with the trigger; skip rules; locks); adapted F05 tests
+- [x] bridge (OpenAPI unchanged); web: F05 extra work billing dialog offers `unbilled` / `waived` only and is hidden on `billed` items; `f05.spec.ts` adapted; web typecheck
+- [x] wiring checklist, full checks (lint, typecheck, build, E2E pass; `test` passes except two `users.test.ts` General Manager cases blocked by leftover rows in the test database), reviewer (two findings fixed: task paths archived invoiced extra work; drafting now locks its source rows `FOR SHARE`; rule 8 kept literal: same trigger)
+- [x] owner acceptance (approved, incl. rules 8 and 24 as implemented), test database leftovers cleaned, /ship
 
 ## PR 3 — `feat/f13-payments-api`: payments, overdue and notifications
 - [ ] contracts: `applyPayment` with unit tests; payment schemas; audit `payment.*`, `invoice.overdue`; notification types `invoice_overdue`, `invoice_paid` with subject `invoice` (and `ar.json` keys); job `invoices.daily`

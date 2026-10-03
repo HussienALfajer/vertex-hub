@@ -175,7 +175,7 @@ describe('extra work', () => {
       );
     });
 
-    it('bills with client scope and money access; waived and billed need a note', async () => {
+    it('bills with client scope and money access; waived needs a note', async () => {
       const { id: clientId } = await cast.createClient();
       const project = await cast.createProject(clientId);
       const item = await logged('projects', project.id, cast.employee.cookie);
@@ -248,11 +248,20 @@ describe('extra work', () => {
       expect(
         (
           await bill('projects', project.id, item.id, cast.gm.cookie, {
-            billingStatus: 'billed',
-            billingNote: 'INV-2026-014',
+            billingStatus: 'waived',
+            billingNote: 'هدية للعميل',
           })
         ).status,
       ).toBe(200);
+      // F13 rule 25: issuing an invoice bills the work, never a hand change.
+      await expectError(
+        await bill('projects', project.id, item.id, cast.gm.cookie, {
+          billingStatus: 'billed',
+          billingNote: 'INV-2026-014',
+        }),
+        409,
+        'BILLED_BY_INVOICE',
+      );
     });
 
     it('archives an item: hidden from the list and 404 afterwards', async () => {
@@ -315,8 +324,8 @@ describe('extra work', () => {
       expect(
         (
           await bill('retainers', retainer.id, item.id, cast.am.cookie, {
-            billingStatus: 'billed',
-            billingNote: 'INV-2026-015',
+            billingStatus: 'waived',
+            billingNote: 'ضمن الاتفاق',
           })
         ).status,
       ).toBe(200);

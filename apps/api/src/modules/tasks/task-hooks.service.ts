@@ -174,9 +174,13 @@ export class TaskHooksService implements OnModuleInit {
     );
     for (const task of open) {
       const item = task.extraWorkItemId ? items.get(task.extraWorkItemId) : undefined;
-      const withdrawn = !!item && !item.archived && item.billingStatus === 'unbilled';
+      // Billed, waived or invoiced work stays (F13 rule 25).
+      const withdrawn =
+        !!item &&
+        !item.archived &&
+        item.billingStatus === 'unbilled' &&
+        (await this.engagements.archiveExtraWork(tx, item.id, actor, { keepBilled: true }));
       if (withdrawn) {
-        await this.engagements.archiveExtraWork(tx, item.id, actor);
         await tx.update(tasks).set({ extraWorkItemId: null }).where(eq(tasks.id, task.id));
       }
       await recordAudit(tx, {

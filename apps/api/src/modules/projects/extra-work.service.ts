@@ -19,6 +19,7 @@ import { CodedException } from '../../core/errors/index.js';
 import { changedFields, recordAudit } from '../audit/index.js';
 import { type CurrentUserInfo, UserDirectory } from '../auth/index.js';
 import { ClientDirectory, type ClientSummary } from '../clients/index.js';
+import { BillingLocks } from './billing-locks.js';
 import {
   actorOf,
   assertCanEditMoney,
@@ -88,6 +89,7 @@ export class ExtraWorkService {
     @Inject(DATABASE) private readonly db: Database,
     private readonly users: UserDirectory,
     private readonly clients: ClientDirectory,
+    private readonly locks: BillingLocks,
   ) {}
 
   async list(
@@ -181,6 +183,9 @@ export class ExtraWorkService {
         input,
       );
       if (!change) return;
+      if (change.after.estimateMinor !== undefined) {
+        await this.locks.assertExtraWorkFree(tx, itemId);
+      }
       if (change.after.requestedOn !== undefined) assertRequestedOn(change.after.requestedOn);
       if (change.after.requestedByContactId !== undefined) {
         await this.assertContact(tx, owner, change.after.requestedByContactId);
@@ -209,6 +214,10 @@ export class ExtraWorkService {
       }
       owner.assertNotArchived();
       const current = await this.item(tx, owner, itemId, { forUpdate: true });
+      // F13 rule 25: issuing its invoice bills the work, never a hand change.
+      if (input.billingStatus === 'billed') {
+        throw new CodedException(409, 'BILLED_BY_INVOICE', 'Issuing its invoice bills the work');
+      }
       const note = input.billingNote ?? null;
       if (billingNeedsNote(input.billingStatus) && !note) {
         throw new CodedException(
@@ -222,6 +231,8 @@ export class ExtraWorkService {
         { billingStatus: input.billingStatus, billingNote: note },
       );
       if (!change) return;
+      // F13 rule 25: waiving or reopening invoiced work is refused.
+      await this.locks.assertExtraWorkFree(tx, itemId);
       await tx
         .update(extraWorkItems)
         .set({ billingStatus: input.billingStatus, billingNote: note })
@@ -240,6 +251,7 @@ export class ExtraWorkService {
     await this.db.transaction(async (tx) => {
       const owner = await this.workable(tx, actor, kind, ownerId);
       await this.item(tx, owner, itemId, { forUpdate: true });
+      await this.locks.assertExtraWorkFree(tx, itemId);
       await tx
         .update(extraWorkItems)
         .set({ archivedAt: new Date() })

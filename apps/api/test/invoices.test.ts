@@ -261,6 +261,15 @@ describe('invoices', () => {
 
   describe('drafting (rules 1, 4, 6–8)', () => {
     it('lists billable work of the client in the currency', async () => {
+      // The open cycle was drafted automatically (rule 4); once discarded it is billable again.
+      const [automatic] = await db
+        .select()
+        .from(invoices)
+        .where(eq(invoices.retainerId, retainer.id));
+      expect(automatic).toMatchObject({ origin: 'cycle_opened', status: 'draft' });
+      expect(
+        (await client.post(`/api/invoices/${automatic?.id}/archive`, finance.cookie)).status,
+      ).toBe(204);
       const response = await client.get(
         `/api/invoices/billable?clientId=${clientId}&currency=USD`,
         finance.cookie,

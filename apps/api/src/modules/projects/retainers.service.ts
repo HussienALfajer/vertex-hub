@@ -59,6 +59,7 @@ import {
   type UserSummary,
 } from '../auth/index.js';
 import { ClientDirectory, type ClientSummary } from '../clients/index.js';
+import { BillingLocks } from './billing-locks.js';
 import {
   actorOf,
   assertCanEditMoney,
@@ -116,6 +117,7 @@ export class RetainersService {
     private readonly users: UserDirectory,
     private readonly clients: ClientDirectory,
     private readonly cycles: RetainerCyclesService,
+    private readonly locks: BillingLocks,
   ) {}
 
   async list(actor: CurrentUserInfo, query: RetainerListQuery): Promise<RetainerPage> {
@@ -373,6 +375,7 @@ export class RetainersService {
       );
       if (money?.after.currency !== undefined) {
         await this.assertCurrencyFree(tx, id, current.monthlyFeeMinor);
+        await this.locks.assertCurrencyFree(tx, { type: 'retainer', id });
       }
       if (!basics && !money) return;
 

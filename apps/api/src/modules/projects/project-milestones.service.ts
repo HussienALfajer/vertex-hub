@@ -18,6 +18,8 @@ import { CodedException } from '../../core/errors/index.js';
 import { changedFields, recordAudit } from '../audit/index.js';
 import { type CurrentUserInfo, UserDirectory } from '../auth/index.js';
 import { ClientDirectory } from '../clients/index.js';
+import { BillingLocks } from './billing-locks.js';
+import { MilestoneDoneHooks } from './milestone-done-hooks.js';
 import {
   actorOf,
   assertCanEditMoney,
@@ -62,6 +64,8 @@ export class ProjectMilestonesService {
     private readonly users: UserDirectory,
     private readonly clients: ClientDirectory,
     private readonly progress: WorkProgress,
+    private readonly locks: BillingLocks,
+    private readonly doneHooks: MilestoneDoneHooks,
   ) {}
 
   /** Non-archived milestones of the projects, by position. */
@@ -156,6 +160,9 @@ export class ProjectMilestonesService {
         input,
       );
       if (!change) return;
+      if (change.after.installmentMinor !== undefined) {
+        await this.locks.assertMilestoneFree(tx, milestoneId);
+      }
       await tx
         .update(projectMilestones)
         .set(change.after)
@@ -235,6 +242,8 @@ export class ProjectMilestonesService {
         before: { status: 'pending' },
         after: { status: 'done', ...(openTasks > 0 && { openTasks }) },
       });
+      // F13 rule 3: the installment is drafted inside the completion.
+      await this.doneHooks.run(tx, { milestoneId, projectId, actor: actorOf(actor) });
     });
     return this.one(actor, projectId, milestoneId);
   }
@@ -246,6 +255,7 @@ export class ProjectMilestonesService {
       if (current.status !== 'done') {
         throw new CodedException(409, 'MILESTONE_NOT_DONE', 'The milestone is not done');
       }
+      await this.locks.assertMilestoneFree(tx, milestoneId);
       await tx
         .update(projectMilestones)
         .set({ status: 'pending', doneAt: null, doneById: null })
@@ -266,6 +276,7 @@ export class ProjectMilestonesService {
       if (current.status === 'done') {
         throw new CodedException(409, 'MILESTONE_DONE', 'Only a pending milestone can be removed');
       }
+      await this.locks.assertMilestoneFree(tx, milestoneId);
       await tx
         .update(projectMilestones)
         .set({ archivedAt: new Date() })

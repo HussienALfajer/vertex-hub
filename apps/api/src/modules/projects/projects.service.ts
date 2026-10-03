@@ -61,6 +61,7 @@ import {
 } from '../auth/index.js';
 import { ClientDirectory, type ClientSummary } from '../clients/index.js';
 import { NotificationCenter } from '../notifications/index.js';
+import { BillingLocks } from './billing-locks.js';
 import {
   actorOf,
   assertCanEditMoney,
@@ -119,6 +120,7 @@ export class ProjectsService implements OnModuleInit {
     private readonly milestones: ProjectMilestonesService,
     private readonly progress: WorkProgress,
     private readonly notifications: NotificationCenter,
+    private readonly locks: BillingLocks,
   ) {}
 
   /** Rule 4: a user cannot be archived while they manage an open project. */
@@ -377,7 +379,10 @@ export class ProjectsService implements OnModuleInit {
         },
       );
       const money = changedFields({ currency: current.currency }, { currency: input.currency });
-      if (money) await this.assertCurrencyFree(tx, id);
+      if (money) {
+        await this.assertCurrencyFree(tx, id);
+        await this.locks.assertCurrencyFree(tx, { type: 'project', id });
+      }
       let manager: UserSummary | undefined;
       let managerChange: Change | null = null;
       if (managerChanges && input.projectManagerId) {

@@ -8,7 +8,7 @@ import {
   deliverableKey,
   type RetainerStatus,
 } from '@vertex-hub/contracts';
-import { type Database, retainers, type Transaction } from '@vertex-hub/db';
+import { type Database, projectMilestones, retainers, type Transaction } from '@vertex-hub/db';
 import { and, asc, eq, inArray, isNull } from 'drizzle-orm';
 import { DATABASE } from '../../core/database/database.module.js';
 import { CodedException } from '../../core/errors/index.js';
@@ -59,8 +59,19 @@ export class EngagementFactory {
     private readonly retainers: RetainersService,
   ) {}
 
-  createProject(tx: Transaction, actor: CurrentUserInfo, input: CreateProject): Promise<string> {
-    return this.projects.createIn(tx, actor, input);
+  /** Returns the project and its milestones' ids in order (F13 A01 drafts the first installment). */
+  async createProject(
+    tx: Transaction,
+    actor: CurrentUserInfo,
+    input: CreateProject,
+  ): Promise<{ id: string; milestoneIds: string[] }> {
+    const id = await this.projects.createIn(tx, actor, input);
+    const milestones = await tx
+      .select({ id: projectMilestones.id })
+      .from(projectMilestones)
+      .where(eq(projectMilestones.projectId, id))
+      .orderBy(asc(projectMilestones.position));
+    return { id, milestoneIds: milestones.map((milestone) => milestone.id) };
   }
 
   /** Without its first cycle: link its template, then `startRetainer` (A8). */

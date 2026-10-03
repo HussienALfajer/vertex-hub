@@ -136,10 +136,15 @@ export class BillingSources {
     return result;
   }
 
-  /** The sources by `type:id`; unknown ones are missing from the map. */
+  /**
+   * The sources by `type:id`; unknown ones are missing from the map. With `lock`, inside a
+   * transaction, milestone and extra work rows are locked `FOR SHARE` until it ends, so drafting
+   * waits for, and is waited on by, the changes rule 25 refuses (F13).
+   */
   async resolve(
     sources: readonly InvoiceSource[],
     executor: Executor = this.db,
+    options: { lock?: boolean } = {},
   ): Promise<Map<string, BillingSource>> {
     const ids = (type: InvoiceSourceType) => [
       ...new Set(sources.filter((source) => source.type === type).map((source) => source.id)),
@@ -147,7 +152,7 @@ export class BillingSources {
     const result = new Map<string, BillingSource>();
     const milestoneIds = ids('milestone');
     if (milestoneIds.length) {
-      const rows = await executor
+      const query = executor
         .select({
           id: projectMilestones.id,
           name: projectMilestones.name,
@@ -158,6 +163,7 @@ export class BillingSources {
         .from(projectMilestones)
         .innerJoin(projects, eq(projects.id, projectMilestones.projectId))
         .where(inArray(projectMilestones.id, milestoneIds));
+      const rows = options.lock ? await query.for('share', { of: projectMilestones }) : await query;
       for (const row of rows) {
         const engagement: BillingEngagement = {
           type: 'project',
@@ -207,7 +213,7 @@ export class BillingSources {
     }
     const extraIds = ids('extra_work');
     if (extraIds.length) {
-      const rows = await executor
+      const query = executor
         .select({
           id: extraWorkItems.id,
           title: extraWorkItems.title,
@@ -219,6 +225,7 @@ export class BillingSources {
         })
         .from(extraWorkItems)
         .where(inArray(extraWorkItems.id, extraIds));
+      const rows = options.lock ? await query.for('share') : await query;
       const engagements = await this.engagements(
         {
           projectIds: rows.flatMap((row) => (row.projectId ? [row.projectId] : [])),

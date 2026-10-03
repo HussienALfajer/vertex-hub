@@ -522,7 +522,7 @@ export class TaskWorkflowService {
     return move;
   }
 
-  /** Edge case 10: returns whether an unbilled item was withdrawn and unlinked. */
+  /** Edge case 10: returns whether an unbilled, uninvoiced item was withdrawn and unlinked. */
   private async withdrawRequestExtraWork(
     tx: Transaction,
     actor: CurrentUserInfo,
@@ -533,7 +533,12 @@ export class TaskWorkflowService {
       task.extraWorkItemId,
     );
     if (!item || item.archived || item.billingStatus !== 'unbilled') return false;
-    await this.engagements.archiveExtraWork(tx, item.id, actorOf(actor));
+    // Work a live invoice bills stays linked (F13 rule 25).
+    if (
+      !(await this.engagements.archiveExtraWork(tx, item.id, actorOf(actor), { keepBilled: true }))
+    ) {
+      return false;
+    }
     await tx.update(tasks).set({ extraWorkItemId: null }).where(eq(tasks.id, task.id));
     return true;
   }
