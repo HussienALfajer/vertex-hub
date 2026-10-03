@@ -743,6 +743,7 @@ const KNOWN_FIELDS = [
   'amountMinor',
   'appliedMinor',
   'method',
+  'spentOn',
 ] as const;
 
 function fieldLabel(t: TFunction, field: string): string {

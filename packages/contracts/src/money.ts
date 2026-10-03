@@ -88,3 +88,126 @@ export function applyPayment(
   const applied = convertMinor(amount, paymentCurrency, invoiceCurrency, rate);
   return applied <= balance ? applied : null;
 }
+
+/** An issued, non-void invoice on a client's statement. */
+export interface StatementInvoice {
+  id: string;
+  displayNumber: string;
+  issuedOn: string;
+  totalMinor: number;
+}
+
+/** A non-void payment of an issued, non-void invoice on a client's statement. */
+export interface StatementPayment {
+  id: string;
+  receiptNumber: string;
+  invoiceId: string;
+  invoiceNumber: string;
+  paidOn: string;
+  /** In the statement's currency (rule 19). */
+  appliedMinor: number;
+  amountMinor: number;
+  currency: Currency;
+}
+
+export interface StatementRow {
+  kind: 'invoice' | 'payment';
+  /** The invoice or the payment. */
+  id: string;
+  date: string;
+  /** `INV-…` or `RC-…`. */
+  number: string;
+  /** The invoice itself, or the invoice a payment pays. */
+  invoiceId: string;
+  invoiceNumber: string;
+  debitMinor: number;
+  creditMinor: number;
+  /** The running balance after this row; negative when payments came first. */
+  balanceMinor: number;
+  /** A payment's own amount when it was paid in the other currency. */
+  original: { amountMinor: number; currency: Currency } | null;
+}
+
+export interface StatementRows {
+  openingMinor: number;
+  rows: StatementRow[];
+  closingMinor: number;
+  invoicedMinor: number;
+  paidMinor: number;
+}
+
+/**
+ * Rule 28: a client's statement in one currency over the days `[from, to]`. The opening balance
+ * is what was invoiced before `from` minus what was paid before it; each invoice in the period is
+ * a debit and each payment a credit by its applied amount, by date (an invoice before the
+ * payments of its day); the closing balance is the outstanding amount. Pass issued, non-void
+ * invoices and the non-void payments of those invoices only, all in the statement's currency.
+ */
+export function statementRows(input: {
+  invoices: readonly StatementInvoice[];
+  payments: readonly StatementPayment[];
+  statementCurrency: Currency;
+  from: string;
+  to: string;
+}): StatementRows {
+  const { from, to } = input;
+  const before = (date: string) => date < from;
+  const within = (date: string) => date >= from && date <= to;
+  const openingMinor =
+    input.invoices.reduce(
+      (sum, invoice) => sum + (before(invoice.issuedOn) ? invoice.totalMinor : 0),
+      0,
+    ) -
+    input.payments.reduce(
+      (sum, payment) => sum + (before(payment.paidOn) ? payment.appliedMinor : 0),
+      0,
+    );
+  const entries: Omit<StatementRow, 'balanceMinor'>[] = [
+    ...input.invoices
+      .filter((invoice) => within(invoice.issuedOn))
+      .map((invoice) => ({
+        kind: 'invoice' as const,
+        id: invoice.id,
+        date: invoice.issuedOn,
+        number: invoice.displayNumber,
+        invoiceId: invoice.id,
+        invoiceNumber: invoice.displayNumber,
+        debitMinor: invoice.totalMinor,
+        creditMinor: 0,
+        original: null,
+      })),
+    ...input.payments
+      .filter((payment) => within(payment.paidOn))
+      .map((payment) => ({
+        kind: 'payment' as const,
+        id: payment.id,
+        date: payment.paidOn,
+        number: payment.receiptNumber,
+        invoiceId: payment.invoiceId,
+        invoiceNumber: payment.invoiceNumber,
+        debitMinor: 0,
+        creditMinor: payment.appliedMinor,
+        original:
+          payment.currency === input.statementCurrency
+            ? null
+            : { amountMinor: payment.amountMinor, currency: payment.currency },
+      })),
+  ].sort(
+    (a, b) =>
+      a.date.localeCompare(b.date) ||
+      (a.kind === b.kind ? 0 : a.kind === 'invoice' ? -1 : 1) ||
+      a.number.localeCompare(b.number),
+  );
+  let balance = openingMinor;
+  const rows = entries.map((entry) => {
+    balance += entry.debitMinor - entry.creditMinor;
+    return { ...entry, balanceMinor: balance };
+  });
+  return {
+    openingMinor,
+    rows,
+    closingMinor: balance,
+    invoicedMinor: rows.reduce((sum, row) => sum + row.debitMinor, 0),
+    paidMinor: rows.reduce((sum, row) => sum + row.creditMinor, 0),
+  };
+}

@@ -722,7 +722,8 @@
       "quote": "عرض سعر",
       "invoice_settings": "إعدادات الفواتير",
       "invoice": "فاتورة",
-      "payment": "دفعة"
+      "payment": "دفعة",
+      "project_expense": "مصروف مشروع"
     },
     "actions": {
       "user": {
@@ -950,6 +951,11 @@
       "payment": {
         "recorded": "سجّل دفعة",
         "voided": "ألغى دفعة"
+      },
+      "project_expense": {
+        "created": "سجّل مصروفًا على مشروع",
+        "updated": "عدّل مصروف مشروع",
+        "archived": "أرشف مصروف مشروع"
       }
     },
     "fields": {
@@ -969,6 +975,7 @@
       "amountMinor": "المبلغ",
       "appliedMinor": "المبلغ المحتسب من الفاتورة",
       "method": "طريقة الدفع",
+      "spentOn": "تاريخ المصروف",
       "priceUsdMinor": "السعر بالدولار",
       "priceSypMinor": "السعر بالليرة",
       "revisionRounds": "جولات التعديل",
@@ -4201,12 +4208,14 @@
       "meeting": "الاجتماعات",
       "project_due": "استحقاق المشاريع",
       "milestone_due": "استحقاق المراحل",
-      "renewal": "تجديد العقود"
+      "renewal": "تجديد العقود",
+      "invoice_due": "استحقاق الفواتير"
     },
     "keyDates": {
       "project_due": "استحقاق مشروع",
       "milestone_due": "استحقاق مرحلة",
-      "renewal": "تجديد عقد"
+      "renewal": "تجديد عقد",
+      "invoice_due": "استحقاق فاتورة"
     },
     "conflicts": {
       "shoot": "{{name}}: جلسة التصوير «{{title}}»",

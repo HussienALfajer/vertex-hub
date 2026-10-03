@@ -7968,6 +7968,7 @@ function calendarRoutes({
           title: p.name,
           targetId: p.id,
           client: client(p.clientId),
+          invoiceStatus: null,
         })),
       ...open.flatMap((p) =>
         p.milestones.flatMap((m) =>
@@ -7979,6 +7980,7 @@ function calendarRoutes({
                   title: `${m.name} · ${p.name}`,
                   targetId: p.id,
                   client: client(p.clientId),
+                  invoiceStatus: null,
                 },
               ]
             : [],
@@ -7993,6 +7995,7 @@ function calendarRoutes({
                 title: r.name,
                 targetId: r.id,
                 client: client(r.clientId),
+                invoiceStatus: null,
               },
             ]
           : [],

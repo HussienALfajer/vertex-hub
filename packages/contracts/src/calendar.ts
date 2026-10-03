@@ -11,6 +11,7 @@ import {
   workDaysBefore,
 } from './dates.js';
 import { type DepartmentCode, departmentCodeSchema } from './departments.js';
+import { invoiceStatusSchema } from './invoices.js';
 import { pageQuerySchema, pageSchema, queryBooleanSchema, queryListSchema } from './lists.js';
 import { taskLinkProblem, taskStatusSchema, taskTitleSchema } from './tasks.js';
 import { httpUrlSchema, optionalText } from './text.js';
@@ -647,7 +648,8 @@ export type MeetingDetail = z.infer<typeof meetingDetailSchema>;
 
 // Company calendar
 
-export const KEY_DATE_KINDS = ['project_due', 'milestone_due', 'renewal'] as const;
+/** `invoice_due` (F13) reaches invoice readers only, for the invoices they may read. */
+export const KEY_DATE_KINDS = ['project_due', 'milestone_due', 'renewal', 'invoice_due'] as const;
 
 export const keyDateKindSchema = z.enum(KEY_DATE_KINDS).meta({ id: 'KeyDateKind' });
 
@@ -660,16 +662,18 @@ export const calendarKindSchema = z.enum(CALENDAR_KINDS).meta({ id: 'CalendarKin
 
 export type CalendarKind = z.infer<typeof calendarKindSchema>;
 
-/** A due date or renewal date read from `projects`, never stored (ADR 0022). */
+/** A due date or renewal date read from `projects` or `invoices`, never stored (ADR 0022). */
 export const keyDateSchema = z
   .object({
     kind: keyDateKindSchema,
     date: calendarDateSchema,
-    /** The project, milestone or retainer name. */
+    /** The project, milestone or retainer name; the invoice number (`INV-2026-0012`). */
     title: z.string(),
-    /** What the chip opens: the project (also for a milestone) or the retainer. */
+    /** What the chip opens: the project (also for a milestone), the retainer or the invoice. */
     targetId: z.uuid(),
     client: archivablePersonSchema,
+    /** The invoice's status for `invoice_due` (never an amount); null for the other kinds. */
+    invoiceStatus: invoiceStatusSchema.nullable(),
   })
   .meta({ id: 'KeyDate' });
 

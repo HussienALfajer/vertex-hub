@@ -18,7 +18,7 @@ export const holdsAll = (actor: CurrentUserInfo, permission: Permission) =>
 /** `permission` covers the client: scope `all`, or `own_clients` as its account manager. */
 export function covers(
   actor: CurrentUserInfo,
-  permission: 'invoices.read' | 'invoices.manage' | 'payments.manage',
+  permission: 'invoices.read' | 'invoices.manage' | 'payments.manage' | 'expenses.manage',
   client: ClientSummary,
 ): boolean {
   const scopes = permissionScopes(actor.access, permission);

@@ -2084,14 +2084,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/approvals/ready": {
+    "/api/invoice-settings": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["ApprovalsController_ready"];
+        get: operations["InvoiceSettingsController_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["InvoiceSettingsController_update"];
+        trace?: never;
+    };
+    "/api/invoices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["InvoicesController_list"];
+        put?: never;
+        post: operations["InvoicesController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/invoices/billable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["InvoicesController_billable"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2100,31 +2132,15 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/approvals/requests": {
+    "/api/invoices/{id}": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["ApprovalsController_list"];
-        put?: never;
-        post: operations["ApprovalsController_create"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/approvals/requests/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["ApprovalsController_detail"];
-        put?: never;
+        get: operations["InvoicesController_detail"];
+        put: operations["InvoicesController_saveDraft"];
         post?: never;
         delete?: never;
         options?: never;
@@ -2132,7 +2148,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/approvals/requests/{id}/reissue": {
+    "/api/invoices/{id}/issue": {
         parameters: {
             query?: never;
             header?: never;
@@ -2141,14 +2157,14 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["ApprovalsController_reissue"];
+        post: operations["InvoicesController_issue"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/approvals/requests/{id}/revoke": {
+    "/api/invoices/{id}/due-date": {
         parameters: {
             query?: never;
             header?: never;
@@ -2157,46 +2173,14 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["ApprovalsController_revoke"];
+        post: operations["InvoicesController_changeDueDate"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/clients/{id}/approvals": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["ClientApprovalsController_list"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/public/approvals/{token}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["PublicApprovalsController_page"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/public/approvals/{token}/items/{itemId}/response": {
+    "/api/invoices/{id}/void": {
         parameters: {
             query?: never;
             header?: never;
@@ -2205,14 +2189,14 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["PublicApprovalsController_respond"];
+        post: operations["InvoicesController_void"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/public/approvals/{token}/approve-all": {
+    "/api/invoices/{id}/archive": {
         parameters: {
             query?: never;
             header?: never;
@@ -2221,94 +2205,14 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["PublicApprovalsController_approveAll"];
+        post: operations["InvoicesController_archive"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/public/approvals/{token}/versions/{versionId}/content": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["PublicApprovalsController_content"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/public/approvals/{token}/versions/{versionId}/preview": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["PublicApprovalsController_preview"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/public/approvals/{token}/versions/{versionId}/thumbnail": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["PublicApprovalsController_thumbnail"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/templates": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["TemplatesController_list"];
-        put?: never;
-        post: operations["TemplatesController_create"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/templates/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["TemplatesController_detail"];
-        put: operations["TemplatesController_update"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/templates/{id}/archive": {
+    "/api/invoices/{id}/payments": {
         parameters: {
             query?: never;
             header?: never;
@@ -2317,14 +2221,14 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["TemplatesController_archive"];
+        post: operations["PaymentsController_record"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/templates/{id}/restore": {
+    "/api/payments/{id}/void": {
         parameters: {
             query?: never;
             header?: never;
@@ -2333,53 +2237,21 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["TemplatesController_restore"];
+        post: operations["PaymentsController_void"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/templates/{id}/preview": {
+    "/api/clients/{id}/billing": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get?: never;
-        put?: never;
-        post: operations["TemplateRunsController_preview"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/templates/{id}/runs": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["TemplateRunsController_apply"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/template-runs": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["TemplateRunsController_list"];
+        get: operations["InvoiceBillingController_clientBilling"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2388,15 +2260,15 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/retainers/{id}/template": {
+    "/api/clients/{id}/statement": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["RetainerTemplatesController_get"];
-        put: operations["RetainerTemplatesController_set"];
+        get: operations["InvoiceBillingController_statement"];
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -2404,7 +2276,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/retainers/{id}/cycles/{cycleId}/lines/{lineId}/missing-tasks": {
+    "/api/projects/{id}/billing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["InvoiceBillingController_projectBilling"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{id}/expenses": {
         parameters: {
             query?: never;
             header?: never;
@@ -2413,30 +2301,14 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["RetainerTemplatesController_generateMissing"];
+        post: operations["InvoiceBillingController_createExpense"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/catalog/services": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["CatalogServicesController_list"];
-        put?: never;
-        post: operations["CatalogServicesController_create"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/catalog/services/{id}": {
+    "/api/project-expenses/{id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -2449,10 +2321,10 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        patch: operations["CatalogServicesController_update"];
+        patch: operations["InvoiceBillingController_updateExpense"];
         trace?: never;
     };
-    "/api/catalog/services/{id}/archive": {
+    "/api/project-expenses/{id}/archive": {
         parameters: {
             query?: never;
             header?: never;
@@ -2461,87 +2333,23 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["CatalogServicesController_archive"];
+        post: operations["InvoiceBillingController_archiveExpense"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/catalog/services/{id}/restore": {
+    "/api/retainers/{id}/billing": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get?: never;
-        put?: never;
-        post: operations["CatalogServicesController_restore"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/catalog/packages": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["CatalogPackagesController_list"];
-        put?: never;
-        post: operations["CatalogPackagesController_create"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/catalog/packages/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["CatalogPackagesController_detail"];
+        get: operations["InvoiceBillingController_retainerBilling"];
         put?: never;
         post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch: operations["CatalogPackagesController_update"];
-        trace?: never;
-    };
-    "/api/catalog/packages/{id}/archive": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["CatalogPackagesController_archive"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/catalog/packages/{id}/restore": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["CatalogPackagesController_restore"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2756,46 +2564,238 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/invoice-settings": {
+    "/api/catalog/services": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["InvoiceSettingsController_get"];
+        get: operations["CatalogServicesController_list"];
+        put?: never;
+        post: operations["CatalogServicesController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/catalog/services/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
         put?: never;
         post?: never;
         delete?: never;
         options?: never;
         head?: never;
-        patch: operations["InvoiceSettingsController_update"];
+        patch: operations["CatalogServicesController_update"];
         trace?: never;
     };
-    "/api/invoices": {
+    "/api/catalog/services/{id}/archive": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["InvoicesController_list"];
+        get?: never;
         put?: never;
-        post: operations["InvoicesController_create"];
+        post: operations["CatalogServicesController_archive"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/invoices/billable": {
+    "/api/catalog/services/{id}/restore": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["InvoicesController_billable"];
+        get?: never;
+        put?: never;
+        post: operations["CatalogServicesController_restore"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/catalog/packages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CatalogPackagesController_list"];
+        put?: never;
+        post: operations["CatalogPackagesController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/catalog/packages/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CatalogPackagesController_detail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["CatalogPackagesController_update"];
+        trace?: never;
+    };
+    "/api/catalog/packages/{id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CatalogPackagesController_archive"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/catalog/packages/{id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CatalogPackagesController_restore"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["TemplatesController_list"];
+        put?: never;
+        post: operations["TemplatesController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/templates/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["TemplatesController_detail"];
+        put: operations["TemplatesController_update"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/templates/{id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["TemplatesController_archive"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/templates/{id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["TemplatesController_restore"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/templates/{id}/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["TemplateRunsController_preview"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/templates/{id}/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["TemplateRunsController_apply"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/template-runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["TemplateRunsController_list"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2804,15 +2804,15 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/invoices/{id}": {
+    "/api/retainers/{id}/template": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["InvoicesController_detail"];
-        put: operations["InvoicesController_saveDraft"];
+        get: operations["RetainerTemplatesController_get"];
+        put: operations["RetainerTemplatesController_set"];
         post?: never;
         delete?: never;
         options?: never;
@@ -2820,7 +2820,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/invoices/{id}/issue": {
+    "/api/retainers/{id}/cycles/{cycleId}/lines/{lineId}/missing-tasks": {
         parameters: {
             query?: never;
             header?: never;
@@ -2829,62 +2829,62 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["InvoicesController_issue"];
+        post: operations["RetainerTemplatesController_generateMissing"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/invoices/{id}/due-date": {
+    "/api/approvals/ready": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        get: operations["ApprovalsController_ready"];
         put?: never;
-        post: operations["InvoicesController_changeDueDate"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/invoices/{id}/void": {
+    "/api/approvals/requests": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        get: operations["ApprovalsController_list"];
         put?: never;
-        post: operations["InvoicesController_void"];
+        post: operations["ApprovalsController_create"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/invoices/{id}/archive": {
+    "/api/approvals/requests/{id}": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        get: operations["ApprovalsController_detail"];
         put?: never;
-        post: operations["InvoicesController_archive"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/invoices/{id}/payments": {
+    "/api/approvals/requests/{id}/reissue": {
         parameters: {
             query?: never;
             header?: never;
@@ -2893,14 +2893,14 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["PaymentsController_record"];
+        post: operations["ApprovalsController_reissue"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/payments/{id}/void": {
+    "/api/approvals/requests/{id}/revoke": {
         parameters: {
             query?: never;
             header?: never;
@@ -2909,7 +2909,119 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["PaymentsController_void"];
+        post: operations["ApprovalsController_revoke"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/clients/{id}/approvals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ClientApprovalsController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/public/approvals/{token}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PublicApprovalsController_page"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/public/approvals/{token}/items/{itemId}/response": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PublicApprovalsController_respond"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/public/approvals/{token}/approve-all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PublicApprovalsController_approveAll"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/public/approvals/{token}/versions/{versionId}/content": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PublicApprovalsController_content"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/public/approvals/{token}/versions/{versionId}/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PublicApprovalsController_preview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/public/approvals/{token}/versions/{versionId}/thumbnail": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PublicApprovalsController_thumbnail"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2937,9 +3049,9 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         /** @enum {string} */
-        AuditEntityType: "user" | "department" | "client" | "client_contact" | "client_platform_account" | "client_note" | "project" | "project_milestone" | "retainer" | "retainer_cycle" | "extra_work" | "task" | "task_checklist_item" | "task_link" | "task_comment" | "template" | "template_run" | "file_item" | "approval_request" | "post" | "shoot" | "meeting" | "catalog_service" | "catalog_package" | "quote_settings" | "quote" | "invoice_settings" | "invoice" | "payment";
+        AuditEntityType: "user" | "department" | "client" | "client_contact" | "client_platform_account" | "client_note" | "project" | "project_milestone" | "retainer" | "retainer_cycle" | "extra_work" | "task" | "task_checklist_item" | "task_link" | "task_comment" | "template" | "template_run" | "file_item" | "approval_request" | "post" | "shoot" | "meeting" | "catalog_service" | "catalog_package" | "quote_settings" | "quote" | "invoice_settings" | "invoice" | "payment" | "project_expense";
         /** @enum {string} */
-        AuditAction: "user.created" | "user.updated" | "user.roles_changed" | "user.departments_changed" | "user.archived" | "user.restored" | "user.link_issued" | "user.password_set" | "user.password_changed" | "user.two_factor_enabled" | "user.two_factor_disabled" | "user.two_factor_reset" | "user.profile_updated" | "department.updated" | "client.created" | "client.updated" | "client.status_changed" | "client.account_manager_changed" | "client.healthcare_changed" | "client.archived" | "client.restored" | "client.brand_kit_updated" | "client_contact.created" | "client_contact.updated" | "client_contact.archived" | "client_platform_account.created" | "client_platform_account.updated" | "client_platform_account.archived" | "client_note.created" | "client_note.updated" | "client_note.archived" | "project.created" | "project.updated" | "project.project_manager_changed" | "project.status_changed" | "project.money_updated" | "project.archived" | "project.restored" | "project_milestone.created" | "project_milestone.updated" | "project_milestone.reordered" | "project_milestone.completed" | "project_milestone.reopened" | "project_milestone.archived" | "retainer.created" | "retainer.updated" | "retainer.status_changed" | "retainer.deliverables_updated" | "retainer.money_updated" | "retainer.archived" | "retainer.restored" | "retainer_cycle.created" | "retainer_cycle.closed" | "retainer_cycle.line_updated" | "retainer_cycle.line_added" | "retainer_cycle.adjusted" | "extra_work.created" | "extra_work.updated" | "extra_work.billing_changed" | "extra_work.archived" | "task.created" | "task.updated" | "task.assigned" | "task.department_changed" | "task.status_changed" | "task.dependencies_updated" | "task.archived" | "task.restored" | "task.revision_decided" | "task.request_scope_changed" | "task.extra_work_moved" | "task.reviewed" | "task.client_text_updated" | "task.client_response_recorded" | "task_checklist_item.created" | "task_checklist_item.updated" | "task_checklist_item.reordered" | "task_checklist_item.archived" | "task_link.created" | "task_link.archived" | "task_comment.created" | "task_comment.updated" | "task_comment.archived" | "template.created" | "template.updated" | "template.assignees_updated" | "template.archived" | "template.restored" | "template_run.created" | "retainer.template_changed" | "file_item.created" | "file_item.renamed" | "file_item.confidential_changed" | "file_item.archived" | "file_item.restored" | "file_version.created" | "file_version.archived" | "file_version.restored" | "file_version.final_set" | "file_version.final_cleared" | "approval_request.created" | "approval_request.link_reissued" | "approval_request.revoked" | "approval_item.responded" | "approval_item.withdrawn" | "post.created" | "post.updated" | "post.status_changed" | "post.reviewed" | "post.client_response_recorded" | "post.task_linked" | "post.task_unlinked" | "post.task_returned" | "post.duplicated" | "post.archived" | "post.restored" | "shoot.created" | "shoot.updated" | "shoot.shots_changed" | "shoot.shot_ticked" | "shoot.shot_unticked" | "shoot.completed" | "shoot.cancelled" | "shoot.reopened" | "shoot.archived" | "shoot.restored" | "meeting.created" | "meeting.updated" | "meeting.cancelled" | "meeting.archived" | "meeting.restored" | "catalog_service.created" | "catalog_service.updated" | "catalog_service.archived" | "catalog_service.restored" | "catalog_package.created" | "catalog_package.updated" | "catalog_package.archived" | "catalog_package.restored" | "quote_settings.updated" | "quote.created" | "quote.updated" | "quote.approval_requested" | "quote.approval_withdrawn" | "quote.approval_approved" | "quote.approval_returned" | "quote.sent" | "quote.extended" | "quote.expired" | "quote.rejected" | "quote.accepted" | "quote.version_created" | "quote.superseded" | "quote.archived" | "invoice_settings.updated" | "invoice.created" | "invoice.updated" | "invoice.archived" | "invoice.issued" | "invoice.due_date_changed" | "invoice.voided" | "invoice.overdue" | "payment.recorded" | "payment.voided";
+        AuditAction: "user.created" | "user.updated" | "user.roles_changed" | "user.departments_changed" | "user.archived" | "user.restored" | "user.link_issued" | "user.password_set" | "user.password_changed" | "user.two_factor_enabled" | "user.two_factor_disabled" | "user.two_factor_reset" | "user.profile_updated" | "department.updated" | "client.created" | "client.updated" | "client.status_changed" | "client.account_manager_changed" | "client.healthcare_changed" | "client.archived" | "client.restored" | "client.brand_kit_updated" | "client_contact.created" | "client_contact.updated" | "client_contact.archived" | "client_platform_account.created" | "client_platform_account.updated" | "client_platform_account.archived" | "client_note.created" | "client_note.updated" | "client_note.archived" | "project.created" | "project.updated" | "project.project_manager_changed" | "project.status_changed" | "project.money_updated" | "project.archived" | "project.restored" | "project_milestone.created" | "project_milestone.updated" | "project_milestone.reordered" | "project_milestone.completed" | "project_milestone.reopened" | "project_milestone.archived" | "retainer.created" | "retainer.updated" | "retainer.status_changed" | "retainer.deliverables_updated" | "retainer.money_updated" | "retainer.archived" | "retainer.restored" | "retainer_cycle.created" | "retainer_cycle.closed" | "retainer_cycle.line_updated" | "retainer_cycle.line_added" | "retainer_cycle.adjusted" | "extra_work.created" | "extra_work.updated" | "extra_work.billing_changed" | "extra_work.archived" | "task.created" | "task.updated" | "task.assigned" | "task.department_changed" | "task.status_changed" | "task.dependencies_updated" | "task.archived" | "task.restored" | "task.revision_decided" | "task.request_scope_changed" | "task.extra_work_moved" | "task.reviewed" | "task.client_text_updated" | "task.client_response_recorded" | "task_checklist_item.created" | "task_checklist_item.updated" | "task_checklist_item.reordered" | "task_checklist_item.archived" | "task_link.created" | "task_link.archived" | "task_comment.created" | "task_comment.updated" | "task_comment.archived" | "template.created" | "template.updated" | "template.assignees_updated" | "template.archived" | "template.restored" | "template_run.created" | "retainer.template_changed" | "file_item.created" | "file_item.renamed" | "file_item.confidential_changed" | "file_item.archived" | "file_item.restored" | "file_version.created" | "file_version.archived" | "file_version.restored" | "file_version.final_set" | "file_version.final_cleared" | "approval_request.created" | "approval_request.link_reissued" | "approval_request.revoked" | "approval_item.responded" | "approval_item.withdrawn" | "post.created" | "post.updated" | "post.status_changed" | "post.reviewed" | "post.client_response_recorded" | "post.task_linked" | "post.task_unlinked" | "post.task_returned" | "post.duplicated" | "post.archived" | "post.restored" | "shoot.created" | "shoot.updated" | "shoot.shots_changed" | "shoot.shot_ticked" | "shoot.shot_unticked" | "shoot.completed" | "shoot.cancelled" | "shoot.reopened" | "shoot.archived" | "shoot.restored" | "meeting.created" | "meeting.updated" | "meeting.cancelled" | "meeting.archived" | "meeting.restored" | "catalog_service.created" | "catalog_service.updated" | "catalog_service.archived" | "catalog_service.restored" | "catalog_package.created" | "catalog_package.updated" | "catalog_package.archived" | "catalog_package.restored" | "quote_settings.updated" | "quote.created" | "quote.updated" | "quote.approval_requested" | "quote.approval_withdrawn" | "quote.approval_approved" | "quote.approval_returned" | "quote.sent" | "quote.extended" | "quote.expired" | "quote.rejected" | "quote.accepted" | "quote.version_created" | "quote.superseded" | "quote.archived" | "invoice_settings.updated" | "invoice.created" | "invoice.updated" | "invoice.archived" | "invoice.issued" | "invoice.due_date_changed" | "invoice.voided" | "invoice.overdue" | "payment.recorded" | "payment.voided" | "project_expense.created" | "project_expense.updated" | "project_expense.archived";
         /** @description Audit entries, newest first */
         AuditPage: {
             items: components["schemas"]["AuditEntry"][];
@@ -6534,7 +6646,7 @@ export interface components {
             note: string;
         };
         /** @enum {string} */
-        CalendarKind: "shoot" | "meeting" | "project_due" | "milestone_due" | "renewal";
+        CalendarKind: "shoot" | "meeting" | "project_due" | "milestone_due" | "renewal" | "invoice_due";
         /** @enum {string} */
         ShootType: "product" | "video" | "event" | "people" | "other";
         Calendar: {
@@ -6619,9 +6731,12 @@ export interface components {
                 name: string;
                 archived: boolean;
             };
+            invoiceStatus: components["schemas"]["InvoiceStatus"] | null;
         };
         /** @enum {string} */
-        KeyDateKind: "project_due" | "milestone_due" | "renewal";
+        KeyDateKind: "project_due" | "milestone_due" | "renewal" | "invoice_due";
+        /** @enum {string} */
+        InvoiceStatus: "draft" | "sent" | "partially_paid" | "paid" | "overdue" | "void";
         /** @description By user, then start time */
         ConflictList: {
             items: components["schemas"]["ScheduleConflict"][];
@@ -6973,688 +7088,199 @@ export interface components {
         CancelMeeting: {
             reason?: string | null;
         };
-        /** @description Tasks and posts ready to send, grouped by client, by name */
-        ApprovalReady: {
-            clients: components["schemas"]["ReadyClient"][];
+        InvoiceSettings: {
+            sypPerUsd: components["schemas"]["ExchangeRate"] | null;
+            paymentTermsDays: number;
+            paymentDetails: string;
+            invoiceFooter: string;
+            /** Format: date-time */
+            rateUpdatedAt: string | null;
+            rateUpdatedBy: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            rateStale: boolean;
+            /** Format: date-time */
+            updatedAt: string;
+            updatedBy: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            canEdit: boolean;
         };
-        ReadyClient: {
+        ExchangeRate: string;
+        UpdateInvoiceSettings: {
+            sypPerUsd?: components["schemas"]["ExchangeRate"];
+            paymentTermsDays?: number;
+            paymentDetails?: string;
+            invoiceFooter?: string;
+        };
+        /** @enum {string} */
+        InvoiceOrigin: "quote_accepted" | "milestone_done" | "cycle_opened" | "manual";
+        InvoicePage: {
+            items: components["schemas"]["Invoice"][];
+            total: number;
+            page: number;
+            pageSize: number;
+            totals: components["schemas"]["InvoiceTotals"];
+        };
+        Invoice: {
+            /** Format: uuid */
+            id: string;
+            displayNumber: string | null;
             client: {
                 /** Format: uuid */
                 id: string;
                 name: string;
             };
-            isHealthcare: boolean;
-            contacts: {
+            accountManager: {
                 /** Format: uuid */
                 id: string;
                 name: string;
-                phone: string | null;
-            }[];
-            tasks: components["schemas"]["ReadyTask"][];
-            posts: components["schemas"]["ReadyPost"][];
-        };
-        ReadyTask: {
-            /** Format: uuid */
-            id: string;
-            title: string;
-            type: components["schemas"]["TaskType"];
-            department: components["schemas"]["DepartmentCode"];
-            assignee: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-                archived: boolean;
-                inDepartment: boolean;
-            } | null;
-            status: components["schemas"]["TaskStatus"];
-            reviewStage: components["schemas"]["ReviewStage"] | null;
-            priority: components["schemas"]["TaskPriority"];
+            };
+            engagement: components["schemas"]["InvoiceEngagement"] | null;
+            origin: components["schemas"]["InvoiceOrigin"];
+            currency: components["schemas"]["Currency"];
+            status: components["schemas"]["InvoiceStatus"];
             /** Format: date */
-            dueDate: string;
-            dueTime: string | null;
-            overdue: boolean;
-            blocked: boolean;
-            client: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            } | null;
-            project: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            } | null;
-            milestone: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            } | null;
-            retainer: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            } | null;
-            cycle: {
-                /** Format: uuid */
-                id: string;
-                /** Format: date */
-                periodStart: string;
-                /** Format: date */
-                periodEnd: string;
-            } | null;
-            cycleLine: {
-                /** Format: uuid */
-                id: string;
-                kind: components["schemas"]["DeliverableKind"];
-                label: string | null;
-            } | null;
-            checklist: {
-                done: number;
-                total: number;
-            };
-            revisions: {
-                clientCount: number;
-                limit: number;
-            };
-            overLimitPending: boolean;
-            /** Format: uuid */
-            postId: string | null;
-            snapshot: {
-                files: number;
-                hasText: boolean;
-            };
-        };
-        ReadyPost: {
-            /** Format: uuid */
-            id: string;
-            client: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            };
-            title: string;
-            type: components["schemas"]["PostType"];
-            platforms: components["schemas"]["PostPlatform"][];
+            issuedOn: string | null;
             /** Format: date */
-            publishDate: string;
-            publishTime: string | null;
-            status: components["schemas"]["PostStatus"];
-            reviewStage: components["schemas"]["ReviewStage"] | null;
-            responsible: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-                archived: boolean;
-            };
-            /** Format: uuid */
-            thumbnailVersionId: string | null;
-            linkedTaskCount: number;
-            overdue: boolean;
-            snapshot: {
-                files: number;
-                caption: string | null;
-                /** Format: uuid */
-                thumbnailVersionId: string | null;
-            };
-        };
-        /** @description Approval requests, newest first */
-        ApprovalRequestPage: {
-            items: components["schemas"]["ApprovalRequest"][];
-            total: number;
-            page: number;
-            pageSize: number;
-        };
-        ApprovalRequest: {
-            /** Format: uuid */
-            id: string;
-            client: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            };
-            contact: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-                archived: boolean;
-            };
-            state: components["schemas"]["ApprovalRequestState"];
-            items: {
-                total: number;
-                approved: number;
-                changesRequested: number;
-                pending: number;
-            };
-            /** Format: date-time */
-            issuedAt: string;
-            /** Format: date-time */
-            expiresAt: string;
-            /** Format: date-time */
-            remindedAt: string | null;
-            createdBy: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            };
-            /** Format: date-time */
-            createdAt: string;
-        };
-        ApprovalRequestDetail: {
-            /** Format: uuid */
-            id: string;
-            client: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            };
-            contact: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-                archived: boolean;
-            };
-            state: components["schemas"]["ApprovalRequestState"];
-            /** Format: date-time */
-            issuedAt: string;
-            /** Format: date-time */
-            expiresAt: string;
-            /** Format: date-time */
-            remindedAt: string | null;
-            createdBy: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            };
-            /** Format: date-time */
-            createdAt: string;
-            counts: {
-                total: number;
-                approved: number;
-                changesRequested: number;
-                pending: number;
-            };
-            message: string | null;
-            items: components["schemas"]["ApprovalItem"][];
-            contactPhone: string | null;
-            permissions: {
-                canReissue: boolean;
-                canRevoke: boolean;
-            };
-        };
-        ApprovalItem: {
-            /** Format: uuid */
-            id: string;
-            position: number;
-            kind: components["schemas"]["ApprovalItemKind"];
-            title: string;
-            task: {
-                /** Format: uuid */
-                id: string;
-                title: string;
-            } | null;
-            post: {
-                type: components["schemas"]["PostType"];
-                platforms: components["schemas"]["PostPlatform"][];
-                /** Format: date */
-                publishDate: string;
-                publishTime: string | null;
-                caption: string | null;
-                hashtags: string | null;
-                /** Format: uuid */
-                id: string;
-                title: string;
-            } | null;
-            status: components["schemas"]["ApprovalItemStatus"];
-            withdrawnReason: components["schemas"]["ApprovalWithdrawnReason"] | null;
-            /** Format: date-time */
-            closedAt: string | null;
-            versions: components["schemas"]["ApprovalVersion"][];
-            text: string | null;
-            response: {
-                decision: components["schemas"]["ClientDecision"];
-                channel: components["schemas"]["ResponseChannel"];
-                note: string | null;
-                /** Format: date-time */
-                createdAt: string;
-            } | null;
-        };
-        /** @enum {string} */
-        ApprovalItemKind: "task" | "post";
-        /** @enum {string} */
-        ApprovalItemStatus: "pending" | "approved" | "changes_requested" | "withdrawn";
-        /** @enum {string} */
-        ApprovalWithdrawnReason: "revoked" | "resent" | "task_moved" | "post_moved";
-        ApprovalVersion: {
-            /** Format: uuid */
-            id: string;
-            /** Format: uuid */
-            fileItemId: string;
-            name: string;
-            number: number;
-            kind: components["schemas"]["FileVersionKind"];
-            type: components["schemas"]["FileType"];
-            previewStatus: components["schemas"]["FilePreviewStatus"];
-        };
-        CreateApprovalRequest: {
-            /** Format: uuid */
-            clientId: string;
-            /** Format: uuid */
-            contactId: string;
-            message?: string | null;
-            items: ({
-                /** Format: uuid */
-                taskId: string;
-                title?: string;
-            } | {
-                /** Format: uuid */
-                postId: string;
-                title?: string;
-            })[];
-        };
-        IssuedApprovalRequest: {
-            /** Format: uuid */
-            id: string;
-            client: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            };
-            contact: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-                archived: boolean;
-            };
-            state: components["schemas"]["ApprovalRequestState"];
-            /** Format: date-time */
-            issuedAt: string;
-            /** Format: date-time */
-            expiresAt: string;
-            /** Format: date-time */
-            remindedAt: string | null;
-            createdBy: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            };
-            /** Format: date-time */
-            createdAt: string;
-            counts: {
-                total: number;
-                approved: number;
-                changesRequested: number;
-                pending: number;
-            };
-            message: string | null;
-            items: components["schemas"]["ApprovalItem"][];
-            contactPhone: string | null;
-            permissions: {
-                canReissue: boolean;
-                canRevoke: boolean;
-            };
-            link: string;
-        };
-        ClientApprovals: {
-            requests: components["schemas"]["ApprovalRequestPage"];
-            responses: components["schemas"]["ClientResponsePage"];
-        };
-        /** @description Client responses, newest first */
-        ClientResponsePage: {
-            items: components["schemas"]["ClientResponseEntry"][];
-            total: number;
-            page: number;
-            pageSize: number;
-        };
-        ClientResponseEntry: {
-            /** Format: uuid */
-            id: string;
-            decision: components["schemas"]["ClientDecision"];
-            channel: components["schemas"]["ResponseChannel"];
-            contact: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-                archived: boolean;
-            };
-            note: string | null;
-            versions: components["schemas"]["ReviewVersion"][];
-            recordedBy: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            } | null;
-            /** Format: date-time */
-            createdAt: string;
-            kind: components["schemas"]["ApprovalItemKind"];
-            task: {
-                /** Format: uuid */
-                id: string;
-                title: string;
-            } | null;
-            post: {
-                /** Format: uuid */
-                id: string;
-                title: string;
-            } | null;
-        };
-        PublicApproval: {
-            clientName: string;
-            contactName: string;
-            accountManagerName: string;
-            message: string | null;
-            /** Format: date-time */
-            expiresAt: string;
-            items: components["schemas"]["PublicApprovalItem"][];
-        };
-        PublicApprovalItem: {
-            /** Format: uuid */
-            id: string;
-            kind: components["schemas"]["ApprovalItemKind"];
-            title: string;
-            text: string | null;
-            post: {
-                type: components["schemas"]["PostType"];
-                platforms: components["schemas"]["PostPlatform"][];
-                /** Format: date */
-                publishDate: string;
-                publishTime: string | null;
-                caption: string | null;
-                hashtags: string | null;
-            } | null;
-            files: components["schemas"]["PublicApprovalFile"][];
-            status: components["schemas"]["ApprovalItemStatus"];
-            note: string | null;
-            /** Format: date-time */
-            decidedAt: string | null;
-            recordedByAgency: boolean;
-        };
-        PublicApprovalFile: {
-            /** Format: uuid */
-            versionId: string;
-            kind: components["schemas"]["FileVersionKind"];
-            name: string;
-            type: components["schemas"]["FileType"];
-            sizeBytes: number | null;
-            /** @enum {string} */
-            display: "inline" | "download" | "link";
-            previewAvailable: boolean;
-            linkUrl: string | null;
-            linkLabel: string | null;
-        };
-        PublicApprovalResponse: {
-            decision: components["schemas"]["ClientDecision"];
-            note?: string | null;
-        };
-        PublicApproveAll: {
-            note?: string | null;
-        };
-        PublicApprovalItems: {
-            items: components["schemas"]["PublicApprovalItem"][];
-        };
-        /** @enum {string} */
-        TemplateKind: "project" | "retainer_cycle";
-        /** @description Work templates */
-        TemplatePage: {
-            items: components["schemas"]["TemplateListItem"][];
-            total: number;
-            page: number;
-            pageSize: number;
-        };
-        TemplateListItem: {
-            /** Format: uuid */
-            id: string;
-            name: string;
-            kind: components["schemas"]["TemplateKind"];
-            description: string | null;
-            stepCount: number;
-            departments: components["schemas"]["DepartmentCode"][];
-            warningCount: number;
-            linkedRetainerCount: number;
+            dueOn: string | null;
+            totalMinor: number;
+            paidMinor: number;
+            balanceMinor: number;
+            daysOverdue: number | null;
             /** Format: date-time */
             updatedAt: string;
             /** Format: date-time */
             archivedAt: string | null;
         };
-        TemplateDetail: {
+        InvoiceEngagement: {
+            /** @enum {string} */
+            type: "project" | "retainer";
             /** Format: uuid */
             id: string;
             name: string;
-            kind: components["schemas"]["TemplateKind"];
-            description: string | null;
-            stages: components["schemas"]["TemplateStage"][];
-            steps: components["schemas"]["TemplateStep"][];
-            assignees: components["schemas"]["TemplateAssignee"][];
-            warnings: {
-                /** @enum {string} */
-                type: "invalid_assignee";
-                department: components["schemas"]["DepartmentCode"];
+        };
+        InvoiceTotals: {
+            byCurrency: {
+                outstandingMinor: number;
+                overdueMinor: number;
+                currency: components["schemas"]["Currency"];
             }[];
-            linkedRetainers: {
+            usd: {
+                outstandingMinor: number;
+                overdueMinor: number;
+            };
+        };
+        BillableItems: {
+            milestones: {
                 /** Format: uuid */
                 id: string;
-                name: string;
-                client: {
+                project: {
                     /** Format: uuid */
                     id: string;
                     name: string;
                 };
+                name: string;
+                status: components["schemas"]["MilestoneStatus"];
+                installmentMinor: number;
             }[];
-            /** Format: date-time */
-            createdAt: string;
-            /** Format: date-time */
-            updatedAt: string;
-            /** Format: date-time */
-            archivedAt: string | null;
-            permissions: components["schemas"]["TemplatePermissions"];
-        };
-        TemplateStage: {
-            /** Format: uuid */
-            id: string;
-            name: string;
-            position: number;
-        };
-        TemplateStep: {
-            /** Format: uuid */
-            id: string;
-            /** Format: uuid */
-            stageId: string | null;
-            position: number;
-            title: string;
-            brief: string | null;
-            department: components["schemas"]["DepartmentCode"];
-            dueDay: number | null;
-            priority: components["schemas"]["TaskPriority"];
-            needsClientApproval: boolean;
-            revisionLimit: number;
-            checklist: string[];
-            repeatKind: components["schemas"]["DeliverableKind"] | null;
-            repeatLabel: string | null;
-            spreadFromDay: number | null;
-            dependsOn: string[];
-        };
-        TemplateAssignee: {
-            department: components["schemas"]["DepartmentCode"];
-            user: {
+            cycles: {
                 /** Format: uuid */
                 id: string;
-                name: string;
-                archived: boolean;
-            };
-            valid: boolean;
-        };
-        TemplatePermissions: {
-            canEdit: boolean;
-            canArchive: boolean;
-        };
-        CreateTemplate: {
-            name: string;
-            description?: string | null;
-            /** @default [] */
-            stages: {
-                key: string;
-                name: string;
-            }[];
-            steps: {
-                key: string;
-                /** @default null */
-                stageKey: string | null;
-                title: string;
-                brief?: string | null;
-                department: components["schemas"]["DepartmentCode"];
-                /** @default null */
-                dueDay: number | null;
-                /** @default normal */
-                priority: components["schemas"]["TaskPriority"];
-                /** @default true */
-                needsClientApproval: boolean;
-                /** @default 2 */
-                revisionLimit: number;
-                /** @default [] */
-                checklist: string[];
-                /** @default null */
-                repeatKind: components["schemas"]["DeliverableKind"] | null;
-                repeatLabel?: string | null;
-                /** @default null */
-                spreadFromDay: number | null;
-                dependsOn?: string[];
-            }[];
-            /** @default [] */
-            assignees: {
-                department: components["schemas"]["DepartmentCode"];
-                /** Format: uuid */
-                userId: string;
-            }[];
-            kind: components["schemas"]["TemplateKind"];
-        };
-        UpdateTemplate: {
-            name: string;
-            description?: string | null;
-            /** @default [] */
-            stages: {
-                key: string;
-                name: string;
-            }[];
-            steps: {
-                key: string;
-                /** @default null */
-                stageKey: string | null;
-                title: string;
-                brief?: string | null;
-                department: components["schemas"]["DepartmentCode"];
-                /** @default null */
-                dueDay: number | null;
-                /** @default normal */
-                priority: components["schemas"]["TaskPriority"];
-                /** @default true */
-                needsClientApproval: boolean;
-                /** @default 2 */
-                revisionLimit: number;
-                /** @default [] */
-                checklist: string[];
-                /** @default null */
-                repeatKind: components["schemas"]["DeliverableKind"] | null;
-                repeatLabel?: string | null;
-                /** @default null */
-                spreadFromDay: number | null;
-                dependsOn?: string[];
-            }[];
-            /** @default [] */
-            assignees: {
-                department: components["schemas"]["DepartmentCode"];
-                /** Format: uuid */
-                userId: string;
-            }[];
-        };
-        TemplateRunInput: {
-            /** Format: uuid */
-            projectId?: string;
-            /** Format: uuid */
-            retainerCycleId?: string;
-            /** Format: date */
-            startDate?: string;
-            revisionLimit?: number;
-            /** @default [] */
-            assignees: {
-                department: components["schemas"]["DepartmentCode"];
-                /** Format: uuid */
-                userId: string | null;
-            }[];
-        };
-        TemplateRunPlan: {
-            /** Format: date */
-            startDate: string;
-            tasks: components["schemas"]["TemplatePlannedTask"][];
-            milestonesToCreate: {
-                name: string;
-                /** Format: date */
-                dueDate: string;
-            }[];
-            warnings: components["schemas"]["TemplateRunWarning"][];
-            taskCount: number;
-        };
-        TemplatePlannedTask: {
-            key: string;
-            title: string;
-            department: components["schemas"]["DepartmentCode"];
-            assignee: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            } | null;
-            assigneeReplaced: boolean;
-            /** Format: date */
-            dueDate: string;
-            milestone: {
-                /** Format: uuid */
-                existingId: string | null;
-                name: string;
-            } | null;
-            /** Format: uuid */
-            cycleLineId: string | null;
-            dependsOn: string[];
-        };
-        TemplateRunWarning: {
-            /** @enum {string} */
-            type: "due_after_project" | "applied_before" | "assignee_replaced" | "over_cap";
-            department: components["schemas"]["DepartmentCode"] | null;
-            count: number;
-        };
-        TemplateRun: {
-            /** Format: uuid */
-            id: string;
-            template: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-                archived: boolean;
-            };
-            trigger: components["schemas"]["TemplateRunTrigger"];
-            project: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            } | null;
-            cycle: {
-                /** Format: uuid */
-                id: string;
-                /** Format: date */
-                month: string;
                 retainer: {
                     /** Format: uuid */
                     id: string;
                     name: string;
                 };
-            } | null;
-            cycleLine: {
+                /** Format: date */
+                month: string;
+                feeMinor: number | null;
+            }[];
+            extraWork: {
                 /** Format: uuid */
                 id: string;
-                kind: components["schemas"]["DeliverableKind"];
-                label: string | null;
-            } | null;
+                project: {
+                    /** Format: uuid */
+                    id: string;
+                    name: string;
+                } | null;
+                retainer: {
+                    /** Format: uuid */
+                    id: string;
+                    name: string;
+                } | null;
+                title: string;
+                estimateMinor: number | null;
+            }[];
+        };
+        InvoiceDetail: {
+            /** Format: uuid */
+            id: string;
+            displayNumber: string | null;
+            client: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            };
+            accountManager: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            };
+            engagement: components["schemas"]["InvoiceEngagement"] | null;
+            origin: components["schemas"]["InvoiceOrigin"];
+            currency: components["schemas"]["Currency"];
+            status: components["schemas"]["InvoiceStatus"];
             /** Format: date */
-            startDate: string;
-            taskCount: number;
-            milestonesCreated: number;
+            issuedOn: string | null;
+            /** Format: date */
+            dueOn: string | null;
+            totalMinor: number;
+            paidMinor: number;
+            balanceMinor: number;
+            daysOverdue: number | null;
+            /** Format: date-time */
+            updatedAt: string;
+            /** Format: date-time */
+            archivedAt: string | null;
+            billingName: string;
+            billingAddress: string | null;
+            year: number | null;
+            number: number | null;
+            quote: {
+                /** Format: uuid */
+                id: string;
+                displayNumber: string;
+            } | null;
+            paymentTermsDays: number;
+            sypPerUsd: components["schemas"]["ExchangeRate"] | null;
+            usd: {
+                totalMinor: number;
+                paidMinor: number;
+                balanceMinor: number;
+            } | null;
+            notes: string | null;
+            lines: components["schemas"]["InvoiceLine"][];
+            payments: components["schemas"]["Payment"][];
+            issuedBy: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            voided: {
+                /** Format: date-time */
+                at: string;
+                by: {
+                    /** Format: uuid */
+                    id: string;
+                    name: string;
+                };
+                reason: string;
+            } | null;
             createdBy: {
                 /** Format: uuid */
                 id: string;
@@ -7662,194 +7288,313 @@ export interface components {
             } | null;
             /** Format: date-time */
             createdAt: string;
-            tasks?: components["schemas"]["TemplateRunTask"][];
+            permissions: components["schemas"]["InvoicePermissions"];
         };
-        /** @enum {string} */
-        TemplateRunTrigger: "manual" | "cycle_opened" | "missing_tasks";
-        TemplateRunTask: {
+        InvoiceLine: {
             /** Format: uuid */
             id: string;
-            title: string;
-            status: components["schemas"]["TaskStatus"];
-        };
-        /** @description Template runs, newest first */
-        TemplateRunPage: {
-            items: components["schemas"]["TemplateRun"][];
-            total: number;
-            page: number;
-            pageSize: number;
-        };
-        RetainerTemplate: {
-            template: {
+            description: string;
+            quantity: number;
+            unitPriceMinor: number;
+            totalMinor: number;
+            source: {
+                type: components["schemas"]["InvoiceSourceType"];
                 /** Format: uuid */
                 id: string;
                 name: string;
-                archived: boolean;
+                project: {
+                    /** Format: uuid */
+                    id: string;
+                    name: string;
+                } | null;
+                retainer: {
+                    /** Format: uuid */
+                    id: string;
+                    name: string;
+                } | null;
             } | null;
-            cycle: {
+        };
+        /** @enum {string} */
+        InvoiceSourceType: "milestone" | "retainer_cycle" | "extra_work";
+        Payment: {
+            /** Format: uuid */
+            id: string;
+            receiptNumber: string;
+            /** Format: date */
+            paidOn: string;
+            amountMinor: number;
+            currency: components["schemas"]["Currency"];
+            sypPerUsd: components["schemas"]["ExchangeRate"];
+            appliedMinor: number;
+            method: components["schemas"]["PaymentMethod"];
+            reference: string | null;
+            note: string | null;
+            proof: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            recordedBy: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            };
+            /** Format: date-time */
+            createdAt: string;
+            voided: {
+                /** Format: date-time */
+                at: string;
+                by: {
+                    /** Format: uuid */
+                    id: string;
+                    name: string;
+                };
+                reason: string;
+            } | null;
+        };
+        /** @enum {string} */
+        PaymentMethod: "cash" | "bank_transfer" | "e_wallet";
+        /** @description What the caller may do, for the UI */
+        InvoicePermissions: {
+            canEdit: boolean;
+            canIssue: boolean;
+            canArchive: boolean;
+            canChangeDueDate: boolean;
+            canVoid: boolean;
+            canRecordPayment: boolean;
+            canVoidPayments: boolean;
+        };
+        CreateInvoice: {
+            /** Format: uuid */
+            clientId: string;
+            currency: components["schemas"]["Currency"];
+            /**
+             * Format: uuid
+             * @default null
+             */
+            projectId: string | null;
+            /**
+             * Format: uuid
+             * @default null
+             */
+            retainerId: string | null;
+            /** @default [] */
+            sources: components["schemas"]["InvoiceSource"][];
+        };
+        InvoiceSource: {
+            type: components["schemas"]["InvoiceSourceType"];
+            /** Format: uuid */
+            id: string;
+        };
+        InvoiceDraft: {
+            /** Format: date-time */
+            updatedAt: string;
+            /** Format: uuid */
+            projectId: string | null;
+            /** Format: uuid */
+            retainerId: string | null;
+            paymentTermsDays: number;
+            notes: string | null;
+            lines: {
+                /** Format: uuid */
+                id?: string;
+                description: string;
+                quantity: number;
+                unitPriceMinor: number;
+                /** @default null */
+                source: components["schemas"]["InvoiceSource"] | null;
+            }[];
+        };
+        IssueInvoice: {
+            /** Format: date-time */
+            updatedAt: string;
+            /**
+             * Format: date
+             * @default null
+             */
+            dueOn: string | null;
+            /** @default null */
+            sypPerUsd: components["schemas"]["ExchangeRate"] | null;
+        };
+        ChangeInvoiceDueDate: {
+            /** Format: date */
+            dueOn: string;
+            reason: string;
+        };
+        VoidInvoice: {
+            reason: string;
+        };
+        RecordPayment: {
+            /** Format: date */
+            paidOn: string;
+            amountMinor: number;
+            currency: components["schemas"]["Currency"];
+            /** @default null */
+            sypPerUsd: components["schemas"]["ExchangeRate"] | null;
+            method: components["schemas"]["PaymentMethod"];
+            reference?: string | null;
+            note?: string | null;
+            /**
+             * Format: uuid
+             * @default null
+             */
+            proofUploadId: string | null;
+        };
+        VoidPayment: {
+            reason: string;
+        };
+        ClientBilling: {
+            byCurrency: {
+                outstandingMinor: number;
+                overdueMinor: number;
+                currency: components["schemas"]["Currency"];
+                invoicedMinor: number;
+                paidMinor: number;
+            }[];
+            latest: components["schemas"]["Invoice"][];
+        };
+        ClientStatement: {
+            client: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            };
+            billingName: string;
+            billingAddress: string | null;
+            currency: components["schemas"]["Currency"];
+            /** Format: date */
+            from: string;
+            /** Format: date */
+            to: string;
+            openingMinor: number;
+            rows: components["schemas"]["StatementRow"][];
+            closingMinor: number;
+            invoicedMinor: number;
+            paidMinor: number;
+            outstandingMinor: number;
+        };
+        StatementRow: {
+            /** @enum {string} */
+            kind: "invoice" | "payment";
+            /** Format: uuid */
+            id: string;
+            /** Format: date */
+            date: string;
+            number: string;
+            /** Format: uuid */
+            invoiceId: string;
+            invoiceNumber: string;
+            debitMinor: number;
+            creditMinor: number;
+            balanceMinor: number;
+            original: {
+                amountMinor: number;
+                currency: components["schemas"]["Currency"];
+            } | null;
+        };
+        ProjectBilling: {
+            project: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                currency: components["schemas"]["Currency"];
+                archived: boolean;
+            };
+            milestones: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                status: components["schemas"]["MilestoneStatus"];
+                /** Format: date */
+                dueDate: string | null;
+                installmentMinor: number | null;
+                invoice: components["schemas"]["SourceInvoice"] | null;
+            }[];
+            invoices: components["schemas"]["Invoice"][];
+            expenses: components["schemas"]["ProjectExpense"][];
+            margin: components["schemas"]["ProjectMargin"];
+            canManageExpenses: boolean;
+        };
+        SourceInvoice: {
+            /** Format: uuid */
+            id: string;
+            displayNumber: string | null;
+            status: components["schemas"]["InvoiceStatus"];
+        };
+        ProjectExpense: {
+            /** Format: date */
+            spentOn: string;
+            description: string;
+            amountMinor: number;
+            currency: components["schemas"]["Currency"];
+            sypPerUsd: components["schemas"]["ExchangeRate"];
+            note: string | null;
+            /** Format: uuid */
+            id: string;
+            usdMinor: number;
+            loggedBy: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            };
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        ProjectMargin: {
+            invoicedUsdMinor: number;
+            collectedUsdMinor: number;
+            expensesUsdMinor: number;
+            marginUsdMinor: number;
+            plannedInstallmentsMinor: number;
+        };
+        CreateProjectExpense: {
+            /** Format: date */
+            spentOn: string;
+            description: string;
+            amountMinor: number;
+            /** @default null */
+            currency: components["schemas"]["Currency"] | null;
+            /** @default null */
+            sypPerUsd: components["schemas"]["ExchangeRate"] | null;
+            note?: string | null;
+        };
+        UpdateProjectExpense: {
+            /** Format: date */
+            spentOn?: string;
+            description?: string;
+            amountMinor?: number;
+            currency?: components["schemas"]["Currency"];
+            sypPerUsd?: components["schemas"]["ExchangeRate"];
+            note?: string | null;
+        };
+        RetainerBilling: {
+            retainer: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                currency: components["schemas"]["Currency"];
+                monthlyFeeMinor: number | null;
+                archived: boolean;
+            };
+            cycles: {
                 /** Format: uuid */
                 id: string;
                 /** Format: date */
                 month: string;
-                /** Format: date */
-                periodStart: string;
-                /** Format: date */
-                periodEnd: string;
-            } | null;
-            run: components["schemas"]["TemplateRun"] | null;
-            lines: components["schemas"]["RetainerTemplateLine"][];
-            permissions: {
-                canLink: boolean;
-                canGenerate: boolean;
-            };
-        };
-        RetainerTemplateLine: {
-            /** Format: uuid */
-            id: string;
-            kind: components["schemas"]["DeliverableKind"];
-            label: string | null;
-            committed: number;
-            tasks: number;
-            missing: number;
-            canGenerate: boolean;
-        };
-        SetRetainerTemplate: {
-            /** Format: uuid */
-            templateId: string | null;
-        };
-        /** @enum {string} */
-        CatalogBilling: "one_off" | "monthly";
-        /** @description Catalog services, by name */
-        CatalogServicePage: {
-            items: components["schemas"]["CatalogService"][];
-            total: number;
-            page: number;
-            pageSize: number;
-        };
-        CatalogService: {
-            /** Format: uuid */
-            id: string;
-            name: string;
-            description: string | null;
-            department: components["schemas"]["DepartmentCode"];
-            billing: components["schemas"]["CatalogBilling"];
-            priceUsdMinor: number;
-            priceSypMinor: number | null;
-            revisionRounds: number;
-            deliverableKind: components["schemas"]["DeliverableKind"] | null;
-            deliverableLabel: string | null;
-            template: components["schemas"]["CatalogTemplate"] | null;
-            /** Format: date-time */
-            createdAt: string;
-            /** Format: date-time */
-            updatedAt: string;
-            /** Format: date-time */
-            archivedAt: string | null;
-        };
-        CatalogTemplate: {
-            /** Format: uuid */
-            id: string;
-            name: string;
-            kind: components["schemas"]["TemplateKind"];
-            archived: boolean;
-        };
-        CreateCatalogService: {
-            name: string;
-            description?: string | null;
-            department: components["schemas"]["DepartmentCode"];
-            billing: components["schemas"]["CatalogBilling"];
-            priceUsdMinor: number;
-            /** @default null */
-            priceSypMinor: number | null;
-            /** @default 2 */
-            revisionRounds: number;
-            /** @default null */
-            deliverableKind: components["schemas"]["DeliverableKind"] | null;
-            deliverableLabel?: string | null;
-            /**
-             * Format: uuid
-             * @default null
-             */
-            templateId: string | null;
-        };
-        UpdateCatalogService: {
-            name?: string;
-            description?: string | null;
-            department?: components["schemas"]["DepartmentCode"];
-            billing?: components["schemas"]["CatalogBilling"];
-            priceUsdMinor?: number;
-            priceSypMinor?: number | null;
-            revisionRounds?: number;
-            deliverableKind?: components["schemas"]["DeliverableKind"] | null;
-            deliverableLabel?: string | null;
-            /** Format: uuid */
-            templateId?: string | null;
-        };
-        /** @description Catalog packages, by name */
-        CatalogPackagePage: {
-            items: components["schemas"]["CatalogPackage"][];
-            total: number;
-            page: number;
-            pageSize: number;
-        };
-        CatalogPackage: {
-            /** Format: uuid */
-            id: string;
-            name: string;
-            description: string | null;
-            billing: components["schemas"]["CatalogBilling"];
-            priceUsdMinor: number;
-            priceSypMinor: number | null;
-            template: components["schemas"]["CatalogTemplate"] | null;
-            items: components["schemas"]["CatalogPackageItem"][];
-            /** Format: date-time */
-            createdAt: string;
-            /** Format: date-time */
-            updatedAt: string;
-            /** Format: date-time */
-            archivedAt: string | null;
-        };
-        CatalogPackageItem: {
-            /** Format: uuid */
-            serviceId: string;
-            name: string;
-            department: components["schemas"]["DepartmentCode"];
-            quantity: number;
-            deliverableKind: components["schemas"]["DeliverableKind"] | null;
-            deliverableLabel: string | null;
-            archived: boolean;
-        };
-        CreateCatalogPackage: {
-            name: string;
-            description?: string | null;
-            billing: components["schemas"]["CatalogBilling"];
-            priceUsdMinor: number;
-            /** @default null */
-            priceSypMinor: number | null;
-            /**
-             * Format: uuid
-             * @default null
-             */
-            templateId: string | null;
-            items: {
-                /** Format: uuid */
-                serviceId: string;
-                quantity: number;
+                status: components["schemas"]["CycleStatus"];
+                invoice: components["schemas"]["SourceInvoice"] | null;
             }[];
-        };
-        UpdateCatalogPackage: {
-            name?: string;
-            description?: string | null;
-            billing?: components["schemas"]["CatalogBilling"];
-            priceUsdMinor?: number;
-            priceSypMinor?: number | null;
-            /** Format: uuid */
-            templateId?: string | null;
-            items?: {
+            extraWork: {
                 /** Format: uuid */
-                serviceId: string;
-                quantity: number;
+                id: string;
+                title: string;
+                billingStatus: components["schemas"]["ExtraWorkBilling"];
+                estimateMinor: number | null;
+                invoice: components["schemas"]["SourceInvoice"] | null;
             }[];
+            invoices: components["schemas"]["Invoice"][];
         };
         QuoteSettings: {
             companyDetails: string;
@@ -8304,201 +8049,404 @@ export interface components {
         QuotePdfRender: {
             state: components["schemas"]["QuotePdfState"];
         };
-        InvoiceSettings: {
-            sypPerUsd: components["schemas"]["ExchangeRate"] | null;
-            paymentTermsDays: number;
-            paymentDetails: string;
-            invoiceFooter: string;
-            /** Format: date-time */
-            rateUpdatedAt: string | null;
-            rateUpdatedBy: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            } | null;
-            rateStale: boolean;
-            /** Format: date-time */
-            updatedAt: string;
-            updatedBy: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            } | null;
-            canEdit: boolean;
-        };
-        ExchangeRate: string;
-        UpdateInvoiceSettings: {
-            sypPerUsd?: components["schemas"]["ExchangeRate"];
-            paymentTermsDays?: number;
-            paymentDetails?: string;
-            invoiceFooter?: string;
-        };
         /** @enum {string} */
-        InvoiceStatus: "draft" | "sent" | "partially_paid" | "paid" | "overdue" | "void";
-        /** @enum {string} */
-        InvoiceOrigin: "quote_accepted" | "milestone_done" | "cycle_opened" | "manual";
-        InvoicePage: {
-            items: components["schemas"]["Invoice"][];
+        CatalogBilling: "one_off" | "monthly";
+        /** @description Catalog services, by name */
+        CatalogServicePage: {
+            items: components["schemas"]["CatalogService"][];
             total: number;
             page: number;
             pageSize: number;
-            totals: components["schemas"]["InvoiceTotals"];
         };
-        Invoice: {
-            /** Format: uuid */
-            id: string;
-            displayNumber: string | null;
-            client: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            };
-            accountManager: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            };
-            engagement: components["schemas"]["InvoiceEngagement"] | null;
-            origin: components["schemas"]["InvoiceOrigin"];
-            currency: components["schemas"]["Currency"];
-            status: components["schemas"]["InvoiceStatus"];
-            /** Format: date */
-            issuedOn: string | null;
-            /** Format: date */
-            dueOn: string | null;
-            totalMinor: number;
-            paidMinor: number;
-            balanceMinor: number;
-            daysOverdue: number | null;
-            /** Format: date-time */
-            updatedAt: string;
-            /** Format: date-time */
-            archivedAt: string | null;
-        };
-        InvoiceEngagement: {
-            /** @enum {string} */
-            type: "project" | "retainer";
+        CatalogService: {
             /** Format: uuid */
             id: string;
             name: string;
-        };
-        InvoiceTotals: {
-            byCurrency: {
-                outstandingMinor: number;
-                overdueMinor: number;
-                currency: components["schemas"]["Currency"];
-            }[];
-            usd: {
-                outstandingMinor: number;
-                overdueMinor: number;
-            };
-        };
-        BillableItems: {
-            milestones: {
-                /** Format: uuid */
-                id: string;
-                project: {
-                    /** Format: uuid */
-                    id: string;
-                    name: string;
-                };
-                name: string;
-                status: components["schemas"]["MilestoneStatus"];
-                installmentMinor: number;
-            }[];
-            cycles: {
-                /** Format: uuid */
-                id: string;
-                retainer: {
-                    /** Format: uuid */
-                    id: string;
-                    name: string;
-                };
-                /** Format: date */
-                month: string;
-                feeMinor: number | null;
-            }[];
-            extraWork: {
-                /** Format: uuid */
-                id: string;
-                project: {
-                    /** Format: uuid */
-                    id: string;
-                    name: string;
-                } | null;
-                retainer: {
-                    /** Format: uuid */
-                    id: string;
-                    name: string;
-                } | null;
-                title: string;
-                estimateMinor: number | null;
-            }[];
-        };
-        InvoiceDetail: {
-            /** Format: uuid */
-            id: string;
-            displayNumber: string | null;
-            client: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            };
-            accountManager: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            };
-            engagement: components["schemas"]["InvoiceEngagement"] | null;
-            origin: components["schemas"]["InvoiceOrigin"];
-            currency: components["schemas"]["Currency"];
-            status: components["schemas"]["InvoiceStatus"];
-            /** Format: date */
-            issuedOn: string | null;
-            /** Format: date */
-            dueOn: string | null;
-            totalMinor: number;
-            paidMinor: number;
-            balanceMinor: number;
-            daysOverdue: number | null;
+            description: string | null;
+            department: components["schemas"]["DepartmentCode"];
+            billing: components["schemas"]["CatalogBilling"];
+            priceUsdMinor: number;
+            priceSypMinor: number | null;
+            revisionRounds: number;
+            deliverableKind: components["schemas"]["DeliverableKind"] | null;
+            deliverableLabel: string | null;
+            template: components["schemas"]["CatalogTemplate"] | null;
+            /** Format: date-time */
+            createdAt: string;
             /** Format: date-time */
             updatedAt: string;
             /** Format: date-time */
             archivedAt: string | null;
-            billingName: string;
-            billingAddress: string | null;
-            year: number | null;
-            number: number | null;
-            quote: {
+        };
+        CatalogTemplate: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            kind: components["schemas"]["TemplateKind"];
+            archived: boolean;
+        };
+        /** @enum {string} */
+        TemplateKind: "project" | "retainer_cycle";
+        CreateCatalogService: {
+            name: string;
+            description?: string | null;
+            department: components["schemas"]["DepartmentCode"];
+            billing: components["schemas"]["CatalogBilling"];
+            priceUsdMinor: number;
+            /** @default null */
+            priceSypMinor: number | null;
+            /** @default 2 */
+            revisionRounds: number;
+            /** @default null */
+            deliverableKind: components["schemas"]["DeliverableKind"] | null;
+            deliverableLabel?: string | null;
+            /**
+             * Format: uuid
+             * @default null
+             */
+            templateId: string | null;
+        };
+        UpdateCatalogService: {
+            name?: string;
+            description?: string | null;
+            department?: components["schemas"]["DepartmentCode"];
+            billing?: components["schemas"]["CatalogBilling"];
+            priceUsdMinor?: number;
+            priceSypMinor?: number | null;
+            revisionRounds?: number;
+            deliverableKind?: components["schemas"]["DeliverableKind"] | null;
+            deliverableLabel?: string | null;
+            /** Format: uuid */
+            templateId?: string | null;
+        };
+        /** @description Catalog packages, by name */
+        CatalogPackagePage: {
+            items: components["schemas"]["CatalogPackage"][];
+            total: number;
+            page: number;
+            pageSize: number;
+        };
+        CatalogPackage: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            description: string | null;
+            billing: components["schemas"]["CatalogBilling"];
+            priceUsdMinor: number;
+            priceSypMinor: number | null;
+            template: components["schemas"]["CatalogTemplate"] | null;
+            items: components["schemas"]["CatalogPackageItem"][];
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** Format: date-time */
+            archivedAt: string | null;
+        };
+        CatalogPackageItem: {
+            /** Format: uuid */
+            serviceId: string;
+            name: string;
+            department: components["schemas"]["DepartmentCode"];
+            quantity: number;
+            deliverableKind: components["schemas"]["DeliverableKind"] | null;
+            deliverableLabel: string | null;
+            archived: boolean;
+        };
+        CreateCatalogPackage: {
+            name: string;
+            description?: string | null;
+            billing: components["schemas"]["CatalogBilling"];
+            priceUsdMinor: number;
+            /** @default null */
+            priceSypMinor: number | null;
+            /**
+             * Format: uuid
+             * @default null
+             */
+            templateId: string | null;
+            items: {
                 /** Format: uuid */
-                id: string;
-                displayNumber: string;
-            } | null;
-            paymentTermsDays: number;
-            sypPerUsd: components["schemas"]["ExchangeRate"] | null;
-            usd: {
-                totalMinor: number;
-                paidMinor: number;
-                balanceMinor: number;
-            } | null;
-            notes: string | null;
-            lines: components["schemas"]["InvoiceLine"][];
-            payments: components["schemas"]["Payment"][];
-            issuedBy: {
+                serviceId: string;
+                quantity: number;
+            }[];
+        };
+        UpdateCatalogPackage: {
+            name?: string;
+            description?: string | null;
+            billing?: components["schemas"]["CatalogBilling"];
+            priceUsdMinor?: number;
+            priceSypMinor?: number | null;
+            /** Format: uuid */
+            templateId?: string | null;
+            items?: {
+                /** Format: uuid */
+                serviceId: string;
+                quantity: number;
+            }[];
+        };
+        /** @description Work templates */
+        TemplatePage: {
+            items: components["schemas"]["TemplateListItem"][];
+            total: number;
+            page: number;
+            pageSize: number;
+        };
+        TemplateListItem: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            kind: components["schemas"]["TemplateKind"];
+            description: string | null;
+            stepCount: number;
+            departments: components["schemas"]["DepartmentCode"][];
+            warningCount: number;
+            linkedRetainerCount: number;
+            /** Format: date-time */
+            updatedAt: string;
+            /** Format: date-time */
+            archivedAt: string | null;
+        };
+        TemplateDetail: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            kind: components["schemas"]["TemplateKind"];
+            description: string | null;
+            stages: components["schemas"]["TemplateStage"][];
+            steps: components["schemas"]["TemplateStep"][];
+            assignees: components["schemas"]["TemplateAssignee"][];
+            warnings: {
+                /** @enum {string} */
+                type: "invalid_assignee";
+                department: components["schemas"]["DepartmentCode"];
+            }[];
+            linkedRetainers: {
                 /** Format: uuid */
                 id: string;
                 name: string;
-            } | null;
-            voided: {
-                /** Format: date-time */
-                at: string;
-                by: {
+                client: {
                     /** Format: uuid */
                     id: string;
                     name: string;
                 };
-                reason: string;
+            }[];
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** Format: date-time */
+            archivedAt: string | null;
+            permissions: components["schemas"]["TemplatePermissions"];
+        };
+        TemplateStage: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            position: number;
+        };
+        TemplateStep: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            stageId: string | null;
+            position: number;
+            title: string;
+            brief: string | null;
+            department: components["schemas"]["DepartmentCode"];
+            dueDay: number | null;
+            priority: components["schemas"]["TaskPriority"];
+            needsClientApproval: boolean;
+            revisionLimit: number;
+            checklist: string[];
+            repeatKind: components["schemas"]["DeliverableKind"] | null;
+            repeatLabel: string | null;
+            spreadFromDay: number | null;
+            dependsOn: string[];
+        };
+        TemplateAssignee: {
+            department: components["schemas"]["DepartmentCode"];
+            user: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                archived: boolean;
+            };
+            valid: boolean;
+        };
+        TemplatePermissions: {
+            canEdit: boolean;
+            canArchive: boolean;
+        };
+        CreateTemplate: {
+            name: string;
+            description?: string | null;
+            /** @default [] */
+            stages: {
+                key: string;
+                name: string;
+            }[];
+            steps: {
+                key: string;
+                /** @default null */
+                stageKey: string | null;
+                title: string;
+                brief?: string | null;
+                department: components["schemas"]["DepartmentCode"];
+                /** @default null */
+                dueDay: number | null;
+                /** @default normal */
+                priority: components["schemas"]["TaskPriority"];
+                /** @default true */
+                needsClientApproval: boolean;
+                /** @default 2 */
+                revisionLimit: number;
+                /** @default [] */
+                checklist: string[];
+                /** @default null */
+                repeatKind: components["schemas"]["DeliverableKind"] | null;
+                repeatLabel?: string | null;
+                /** @default null */
+                spreadFromDay: number | null;
+                dependsOn?: string[];
+            }[];
+            /** @default [] */
+            assignees: {
+                department: components["schemas"]["DepartmentCode"];
+                /** Format: uuid */
+                userId: string;
+            }[];
+            kind: components["schemas"]["TemplateKind"];
+        };
+        UpdateTemplate: {
+            name: string;
+            description?: string | null;
+            /** @default [] */
+            stages: {
+                key: string;
+                name: string;
+            }[];
+            steps: {
+                key: string;
+                /** @default null */
+                stageKey: string | null;
+                title: string;
+                brief?: string | null;
+                department: components["schemas"]["DepartmentCode"];
+                /** @default null */
+                dueDay: number | null;
+                /** @default normal */
+                priority: components["schemas"]["TaskPriority"];
+                /** @default true */
+                needsClientApproval: boolean;
+                /** @default 2 */
+                revisionLimit: number;
+                /** @default [] */
+                checklist: string[];
+                /** @default null */
+                repeatKind: components["schemas"]["DeliverableKind"] | null;
+                repeatLabel?: string | null;
+                /** @default null */
+                spreadFromDay: number | null;
+                dependsOn?: string[];
+            }[];
+            /** @default [] */
+            assignees: {
+                department: components["schemas"]["DepartmentCode"];
+                /** Format: uuid */
+                userId: string;
+            }[];
+        };
+        TemplateRunInput: {
+            /** Format: uuid */
+            projectId?: string;
+            /** Format: uuid */
+            retainerCycleId?: string;
+            /** Format: date */
+            startDate?: string;
+            revisionLimit?: number;
+            /** @default [] */
+            assignees: {
+                department: components["schemas"]["DepartmentCode"];
+                /** Format: uuid */
+                userId: string | null;
+            }[];
+        };
+        TemplateRunPlan: {
+            /** Format: date */
+            startDate: string;
+            tasks: components["schemas"]["TemplatePlannedTask"][];
+            milestonesToCreate: {
+                name: string;
+                /** Format: date */
+                dueDate: string;
+            }[];
+            warnings: components["schemas"]["TemplateRunWarning"][];
+            taskCount: number;
+        };
+        TemplatePlannedTask: {
+            key: string;
+            title: string;
+            department: components["schemas"]["DepartmentCode"];
+            assignee: {
+                /** Format: uuid */
+                id: string;
+                name: string;
             } | null;
+            assigneeReplaced: boolean;
+            /** Format: date */
+            dueDate: string;
+            milestone: {
+                /** Format: uuid */
+                existingId: string | null;
+                name: string;
+            } | null;
+            /** Format: uuid */
+            cycleLineId: string | null;
+            dependsOn: string[];
+        };
+        TemplateRunWarning: {
+            /** @enum {string} */
+            type: "due_after_project" | "applied_before" | "assignee_replaced" | "over_cap";
+            department: components["schemas"]["DepartmentCode"] | null;
+            count: number;
+        };
+        TemplateRun: {
+            /** Format: uuid */
+            id: string;
+            template: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                archived: boolean;
+            };
+            trigger: components["schemas"]["TemplateRunTrigger"];
+            project: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            cycle: {
+                /** Format: uuid */
+                id: string;
+                /** Format: date */
+                month: string;
+                retainer: {
+                    /** Format: uuid */
+                    id: string;
+                    name: string;
+                };
+            } | null;
+            cycleLine: {
+                /** Format: uuid */
+                id: string;
+                kind: components["schemas"]["DeliverableKind"];
+                label: string | null;
+            } | null;
+            /** Format: date */
+            startDate: string;
+            taskCount: number;
+            milestonesCreated: number;
             createdBy: {
                 /** Format: uuid */
                 id: string;
@@ -8506,160 +8454,478 @@ export interface components {
             } | null;
             /** Format: date-time */
             createdAt: string;
-            permissions: components["schemas"]["InvoicePermissions"];
-        };
-        InvoiceLine: {
-            /** Format: uuid */
-            id: string;
-            description: string;
-            quantity: number;
-            unitPriceMinor: number;
-            totalMinor: number;
-            source: {
-                type: components["schemas"]["InvoiceSourceType"];
-                /** Format: uuid */
-                id: string;
-                name: string;
-                project: {
-                    /** Format: uuid */
-                    id: string;
-                    name: string;
-                } | null;
-                retainer: {
-                    /** Format: uuid */
-                    id: string;
-                    name: string;
-                } | null;
-            } | null;
+            tasks?: components["schemas"]["TemplateRunTask"][];
         };
         /** @enum {string} */
-        InvoiceSourceType: "milestone" | "retainer_cycle" | "extra_work";
-        Payment: {
+        TemplateRunTrigger: "manual" | "cycle_opened" | "missing_tasks";
+        TemplateRunTask: {
             /** Format: uuid */
             id: string;
-            receiptNumber: string;
+            title: string;
+            status: components["schemas"]["TaskStatus"];
+        };
+        /** @description Template runs, newest first */
+        TemplateRunPage: {
+            items: components["schemas"]["TemplateRun"][];
+            total: number;
+            page: number;
+            pageSize: number;
+        };
+        RetainerTemplate: {
+            template: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                archived: boolean;
+            } | null;
+            cycle: {
+                /** Format: uuid */
+                id: string;
+                /** Format: date */
+                month: string;
+                /** Format: date */
+                periodStart: string;
+                /** Format: date */
+                periodEnd: string;
+            } | null;
+            run: components["schemas"]["TemplateRun"] | null;
+            lines: components["schemas"]["RetainerTemplateLine"][];
+            permissions: {
+                canLink: boolean;
+                canGenerate: boolean;
+            };
+        };
+        RetainerTemplateLine: {
+            /** Format: uuid */
+            id: string;
+            kind: components["schemas"]["DeliverableKind"];
+            label: string | null;
+            committed: number;
+            tasks: number;
+            missing: number;
+            canGenerate: boolean;
+        };
+        SetRetainerTemplate: {
+            /** Format: uuid */
+            templateId: string | null;
+        };
+        /** @description Tasks and posts ready to send, grouped by client, by name */
+        ApprovalReady: {
+            clients: components["schemas"]["ReadyClient"][];
+        };
+        ReadyClient: {
+            client: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            };
+            isHealthcare: boolean;
+            contacts: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                phone: string | null;
+            }[];
+            tasks: components["schemas"]["ReadyTask"][];
+            posts: components["schemas"]["ReadyPost"][];
+        };
+        ReadyTask: {
+            /** Format: uuid */
+            id: string;
+            title: string;
+            type: components["schemas"]["TaskType"];
+            department: components["schemas"]["DepartmentCode"];
+            assignee: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                archived: boolean;
+                inDepartment: boolean;
+            } | null;
+            status: components["schemas"]["TaskStatus"];
+            reviewStage: components["schemas"]["ReviewStage"] | null;
+            priority: components["schemas"]["TaskPriority"];
             /** Format: date */
-            paidOn: string;
-            amountMinor: number;
-            currency: components["schemas"]["Currency"];
-            sypPerUsd: components["schemas"]["ExchangeRate"];
-            appliedMinor: number;
-            method: components["schemas"]["PaymentMethod"];
-            reference: string | null;
-            note: string | null;
-            proof: {
+            dueDate: string;
+            dueTime: string | null;
+            overdue: boolean;
+            blocked: boolean;
+            client: {
                 /** Format: uuid */
                 id: string;
                 name: string;
             } | null;
-            recordedBy: {
+            project: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            milestone: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            retainer: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            cycle: {
+                /** Format: uuid */
+                id: string;
+                /** Format: date */
+                periodStart: string;
+                /** Format: date */
+                periodEnd: string;
+            } | null;
+            cycleLine: {
+                /** Format: uuid */
+                id: string;
+                kind: components["schemas"]["DeliverableKind"];
+                label: string | null;
+            } | null;
+            checklist: {
+                done: number;
+                total: number;
+            };
+            revisions: {
+                clientCount: number;
+                limit: number;
+            };
+            overLimitPending: boolean;
+            /** Format: uuid */
+            postId: string | null;
+            snapshot: {
+                files: number;
+                hasText: boolean;
+            };
+        };
+        ReadyPost: {
+            /** Format: uuid */
+            id: string;
+            client: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            };
+            title: string;
+            type: components["schemas"]["PostType"];
+            platforms: components["schemas"]["PostPlatform"][];
+            /** Format: date */
+            publishDate: string;
+            publishTime: string | null;
+            status: components["schemas"]["PostStatus"];
+            reviewStage: components["schemas"]["ReviewStage"] | null;
+            responsible: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                archived: boolean;
+            };
+            /** Format: uuid */
+            thumbnailVersionId: string | null;
+            linkedTaskCount: number;
+            overdue: boolean;
+            snapshot: {
+                files: number;
+                caption: string | null;
+                /** Format: uuid */
+                thumbnailVersionId: string | null;
+            };
+        };
+        /** @description Approval requests, newest first */
+        ApprovalRequestPage: {
+            items: components["schemas"]["ApprovalRequest"][];
+            total: number;
+            page: number;
+            pageSize: number;
+        };
+        ApprovalRequest: {
+            /** Format: uuid */
+            id: string;
+            client: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            };
+            contact: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                archived: boolean;
+            };
+            state: components["schemas"]["ApprovalRequestState"];
+            items: {
+                total: number;
+                approved: number;
+                changesRequested: number;
+                pending: number;
+            };
+            /** Format: date-time */
+            issuedAt: string;
+            /** Format: date-time */
+            expiresAt: string;
+            /** Format: date-time */
+            remindedAt: string | null;
+            createdBy: {
                 /** Format: uuid */
                 id: string;
                 name: string;
             };
             /** Format: date-time */
             createdAt: string;
-            voided: {
+        };
+        ApprovalRequestDetail: {
+            /** Format: uuid */
+            id: string;
+            client: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            };
+            contact: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                archived: boolean;
+            };
+            state: components["schemas"]["ApprovalRequestState"];
+            /** Format: date-time */
+            issuedAt: string;
+            /** Format: date-time */
+            expiresAt: string;
+            /** Format: date-time */
+            remindedAt: string | null;
+            createdBy: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            };
+            /** Format: date-time */
+            createdAt: string;
+            counts: {
+                total: number;
+                approved: number;
+                changesRequested: number;
+                pending: number;
+            };
+            message: string | null;
+            items: components["schemas"]["ApprovalItem"][];
+            contactPhone: string | null;
+            permissions: {
+                canReissue: boolean;
+                canRevoke: boolean;
+            };
+        };
+        ApprovalItem: {
+            /** Format: uuid */
+            id: string;
+            position: number;
+            kind: components["schemas"]["ApprovalItemKind"];
+            title: string;
+            task: {
+                /** Format: uuid */
+                id: string;
+                title: string;
+            } | null;
+            post: {
+                type: components["schemas"]["PostType"];
+                platforms: components["schemas"]["PostPlatform"][];
+                /** Format: date */
+                publishDate: string;
+                publishTime: string | null;
+                caption: string | null;
+                hashtags: string | null;
+                /** Format: uuid */
+                id: string;
+                title: string;
+            } | null;
+            status: components["schemas"]["ApprovalItemStatus"];
+            withdrawnReason: components["schemas"]["ApprovalWithdrawnReason"] | null;
+            /** Format: date-time */
+            closedAt: string | null;
+            versions: components["schemas"]["ApprovalVersion"][];
+            text: string | null;
+            response: {
+                decision: components["schemas"]["ClientDecision"];
+                channel: components["schemas"]["ResponseChannel"];
+                note: string | null;
                 /** Format: date-time */
-                at: string;
-                by: {
-                    /** Format: uuid */
-                    id: string;
-                    name: string;
-                };
-                reason: string;
+                createdAt: string;
             } | null;
         };
         /** @enum {string} */
-        PaymentMethod: "cash" | "bank_transfer" | "e_wallet";
-        /** @description What the caller may do, for the UI */
-        InvoicePermissions: {
-            canEdit: boolean;
-            canIssue: boolean;
-            canArchive: boolean;
-            canChangeDueDate: boolean;
-            canVoid: boolean;
-            canRecordPayment: boolean;
-            canVoidPayments: boolean;
-        };
-        CreateInvoice: {
-            /** Format: uuid */
-            clientId: string;
-            currency: components["schemas"]["Currency"];
-            /**
-             * Format: uuid
-             * @default null
-             */
-            projectId: string | null;
-            /**
-             * Format: uuid
-             * @default null
-             */
-            retainerId: string | null;
-            /** @default [] */
-            sources: components["schemas"]["InvoiceSource"][];
-        };
-        InvoiceSource: {
-            type: components["schemas"]["InvoiceSourceType"];
+        ApprovalItemKind: "task" | "post";
+        /** @enum {string} */
+        ApprovalItemStatus: "pending" | "approved" | "changes_requested" | "withdrawn";
+        /** @enum {string} */
+        ApprovalWithdrawnReason: "revoked" | "resent" | "task_moved" | "post_moved";
+        ApprovalVersion: {
             /** Format: uuid */
             id: string;
+            /** Format: uuid */
+            fileItemId: string;
+            name: string;
+            number: number;
+            kind: components["schemas"]["FileVersionKind"];
+            type: components["schemas"]["FileType"];
+            previewStatus: components["schemas"]["FilePreviewStatus"];
         };
-        InvoiceDraft: {
-            /** Format: date-time */
-            updatedAt: string;
+        CreateApprovalRequest: {
             /** Format: uuid */
-            projectId: string | null;
+            clientId: string;
             /** Format: uuid */
-            retainerId: string | null;
-            paymentTermsDays: number;
-            notes: string | null;
-            lines: {
+            contactId: string;
+            message?: string | null;
+            items: ({
                 /** Format: uuid */
-                id?: string;
-                description: string;
-                quantity: number;
-                unitPriceMinor: number;
-                /** @default null */
-                source: components["schemas"]["InvoiceSource"] | null;
-            }[];
+                taskId: string;
+                title?: string;
+            } | {
+                /** Format: uuid */
+                postId: string;
+                title?: string;
+            })[];
         };
-        IssueInvoice: {
+        IssuedApprovalRequest: {
+            /** Format: uuid */
+            id: string;
+            client: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            };
+            contact: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                archived: boolean;
+            };
+            state: components["schemas"]["ApprovalRequestState"];
             /** Format: date-time */
-            updatedAt: string;
-            /**
-             * Format: date
-             * @default null
-             */
-            dueOn: string | null;
-            /** @default null */
-            sypPerUsd: components["schemas"]["ExchangeRate"] | null;
+            issuedAt: string;
+            /** Format: date-time */
+            expiresAt: string;
+            /** Format: date-time */
+            remindedAt: string | null;
+            createdBy: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            };
+            /** Format: date-time */
+            createdAt: string;
+            counts: {
+                total: number;
+                approved: number;
+                changesRequested: number;
+                pending: number;
+            };
+            message: string | null;
+            items: components["schemas"]["ApprovalItem"][];
+            contactPhone: string | null;
+            permissions: {
+                canReissue: boolean;
+                canRevoke: boolean;
+            };
+            link: string;
         };
-        ChangeInvoiceDueDate: {
-            /** Format: date */
-            dueOn: string;
-            reason: string;
+        ClientApprovals: {
+            requests: components["schemas"]["ApprovalRequestPage"];
+            responses: components["schemas"]["ClientResponsePage"];
         };
-        VoidInvoice: {
-            reason: string;
+        /** @description Client responses, newest first */
+        ClientResponsePage: {
+            items: components["schemas"]["ClientResponseEntry"][];
+            total: number;
+            page: number;
+            pageSize: number;
         };
-        RecordPayment: {
-            /** Format: date */
-            paidOn: string;
-            amountMinor: number;
-            currency: components["schemas"]["Currency"];
-            /** @default null */
-            sypPerUsd: components["schemas"]["ExchangeRate"] | null;
-            method: components["schemas"]["PaymentMethod"];
-            reference?: string | null;
+        ClientResponseEntry: {
+            /** Format: uuid */
+            id: string;
+            decision: components["schemas"]["ClientDecision"];
+            channel: components["schemas"]["ResponseChannel"];
+            contact: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                archived: boolean;
+            };
+            note: string | null;
+            versions: components["schemas"]["ReviewVersion"][];
+            recordedBy: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            /** Format: date-time */
+            createdAt: string;
+            kind: components["schemas"]["ApprovalItemKind"];
+            task: {
+                /** Format: uuid */
+                id: string;
+                title: string;
+            } | null;
+            post: {
+                /** Format: uuid */
+                id: string;
+                title: string;
+            } | null;
+        };
+        PublicApproval: {
+            clientName: string;
+            contactName: string;
+            accountManagerName: string;
+            message: string | null;
+            /** Format: date-time */
+            expiresAt: string;
+            items: components["schemas"]["PublicApprovalItem"][];
+        };
+        PublicApprovalItem: {
+            /** Format: uuid */
+            id: string;
+            kind: components["schemas"]["ApprovalItemKind"];
+            title: string;
+            text: string | null;
+            post: {
+                type: components["schemas"]["PostType"];
+                platforms: components["schemas"]["PostPlatform"][];
+                /** Format: date */
+                publishDate: string;
+                publishTime: string | null;
+                caption: string | null;
+                hashtags: string | null;
+            } | null;
+            files: components["schemas"]["PublicApprovalFile"][];
+            status: components["schemas"]["ApprovalItemStatus"];
+            note: string | null;
+            /** Format: date-time */
+            decidedAt: string | null;
+            recordedByAgency: boolean;
+        };
+        PublicApprovalFile: {
+            /** Format: uuid */
+            versionId: string;
+            kind: components["schemas"]["FileVersionKind"];
+            name: string;
+            type: components["schemas"]["FileType"];
+            sizeBytes: number | null;
+            /** @enum {string} */
+            display: "inline" | "download" | "link";
+            previewAvailable: boolean;
+            linkUrl: string | null;
+            linkLabel: string | null;
+        };
+        PublicApprovalResponse: {
+            decision: components["schemas"]["ClientDecision"];
             note?: string | null;
-            /**
-             * Format: uuid
-             * @default null
-             */
-            proofUploadId: string | null;
         };
-        VoidPayment: {
-            reason: string;
+        PublicApproveAll: {
+            note?: string | null;
+        };
+        PublicApprovalItems: {
+            items: components["schemas"]["PublicApprovalItem"][];
         };
         /** @description Liveness of the API and its dependencies */
         HealthResponse: {
@@ -13052,6 +13318,1480 @@ export interface operations {
             };
         };
     };
+    InvoiceSettingsController_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The invoice settings */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvoiceSettings"];
+                };
+            };
+        };
+    };
+    InvoiceSettingsController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateInvoiceSettings"];
+            };
+        };
+        responses: {
+            /** @description The settings after the change; a new rate records who set it and when */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvoiceSettings"];
+                };
+            };
+        };
+    };
+    InvoicesController_list: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+                search?: string;
+                status?: components["schemas"]["InvoiceStatus"] | components["schemas"]["InvoiceStatus"][];
+                clientId?: string;
+                projectId?: string;
+                retainerId?: string;
+                currency?: components["schemas"]["Currency"];
+                origin?: components["schemas"]["InvoiceOrigin"];
+                accountManagerId?: string;
+                dueFrom?: string;
+                dueTo?: string;
+                sort?: "updatedAt" | "number" | "dueOn";
+                order?: components["schemas"]["SortOrder"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Invoices of the clients in scope; drafts and open invoices by default */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvoicePage"];
+                };
+            };
+        };
+    };
+    InvoicesController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateInvoice"];
+            };
+        };
+        responses: {
+            /** @description The new draft */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvoiceDetail"];
+                };
+            };
+        };
+    };
+    InvoicesController_billable: {
+        parameters: {
+            query: {
+                clientId: string;
+                currency: components["schemas"]["Currency"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The client's work in the currency that no live invoice holds */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BillableItems"];
+                };
+            };
+        };
+    };
+    InvoicesController_detail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description An invoice */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvoiceDetail"];
+                };
+            };
+        };
+    };
+    InvoicesController_saveDraft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InvoiceDraft"];
+            };
+        };
+        responses: {
+            /** @description The saved draft */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvoiceDetail"];
+                };
+            };
+        };
+    };
+    InvoicesController_issue: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IssueInvoice"];
+            };
+        };
+        responses: {
+            /** @description The issued invoice with its number, rate and due date */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvoiceDetail"];
+                };
+            };
+        };
+    };
+    InvoicesController_changeDueDate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangeInvoiceDueDate"];
+            };
+        };
+        responses: {
+            /** @description The invoice with its new due date and status */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvoiceDetail"];
+                };
+            };
+        };
+    };
+    InvoicesController_void: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VoidInvoice"];
+            };
+        };
+        responses: {
+            /** @description The voided invoice */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvoiceDetail"];
+                };
+            };
+        };
+    };
+    InvoicesController_archive: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The draft was discarded */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PaymentsController_record: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecordPayment"];
+            };
+        };
+        responses: {
+            /** @description The invoice with the new payment, its paid amount and status */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvoiceDetail"];
+                };
+            };
+        };
+    };
+    PaymentsController_void: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VoidPayment"];
+            };
+        };
+        responses: {
+            /** @description The invoice with the payment void, its paid amount and status recomputed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvoiceDetail"];
+                };
+            };
+        };
+    };
+    InvoiceBillingController_clientBilling: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The client's balances per currency and its newest invoices */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClientBilling"];
+                };
+            };
+        };
+    };
+    InvoiceBillingController_statement: {
+        parameters: {
+            query: {
+                currency: components["schemas"]["Currency"];
+                from?: string;
+                to?: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The client's statement in one currency (rule 28) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClientStatement"];
+                };
+            };
+        };
+    };
+    InvoiceBillingController_projectBilling: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Milestones with their invoices, invoices, expenses and margin (money access) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectBilling"];
+                };
+            };
+        };
+    };
+    InvoiceBillingController_createExpense: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateProjectExpense"];
+            };
+        };
+        responses: {
+            /** @description The project's billing with the new expense */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectBilling"];
+                };
+            };
+        };
+    };
+    InvoiceBillingController_updateExpense: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateProjectExpense"];
+            };
+        };
+        responses: {
+            /** @description The project's billing with the edited expense */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectBilling"];
+                };
+            };
+        };
+    };
+    InvoiceBillingController_archiveExpense: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The project's billing without the archived expense */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectBilling"];
+                };
+            };
+        };
+    };
+    InvoiceBillingController_retainerBilling: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cycles and extra work with their invoices, and invoices (money access) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RetainerBilling"];
+                };
+            };
+        };
+    };
+    QuoteSettingsController_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The quote settings */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuoteSettings"];
+                };
+            };
+        };
+    };
+    QuoteSettingsController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateQuoteSettings"];
+            };
+        };
+        responses: {
+            /** @description The settings after the change. Texts and validity need `catalog.manage`; the threshold `quotes.approve_discount` */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuoteSettings"];
+                };
+            };
+        };
+    };
+    QuotesController_list: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+                search?: string;
+                status?: components["schemas"]["QuoteStatus"] | components["schemas"]["QuoteStatus"][];
+                clientId?: string;
+                accountManagerId?: string;
+                approval?: "pending";
+                projectId?: string;
+                retainerId?: string;
+                archived?: "true" | "false";
+                latestOnly?: "true" | "false";
+                sort?: "updatedAt" | "number" | "validUntil";
+                order?: components["schemas"]["SortOrder"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Quotes of the clients in scope; the latest open versions by default */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuotePage"];
+                };
+            };
+        };
+    };
+    QuotesController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateQuote"];
+            };
+        };
+        responses: {
+            /** @description The new draft */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuoteDetail"];
+                };
+            };
+        };
+    };
+    QuotesController_detail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A quote version */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuoteDetail"];
+                };
+            };
+        };
+    };
+    QuotesController_saveDraft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QuoteDraft"];
+            };
+        };
+        responses: {
+            /** @description The saved draft */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuoteDetail"];
+                };
+            };
+        };
+    };
+    QuotesController_approval: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QuoteApprovalAction"];
+            };
+        };
+        responses: {
+            /** @description The draft after requesting or withdrawing discount approval */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuoteDetail"];
+                };
+            };
+        };
+    };
+    QuotesController_decide: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QuoteApprovalDecision"];
+            };
+        };
+        responses: {
+            /** @description The draft after the discount was approved or returned */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuoteDetail"];
+                };
+            };
+        };
+    };
+    QuotesController_send: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SendQuote"];
+            };
+        };
+        responses: {
+            /** @description The sent quote */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuoteDetail"];
+                };
+            };
+        };
+    };
+    QuotesController_extend: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExtendQuote"];
+            };
+        };
+        responses: {
+            /** @description The quote, sent again */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuoteDetail"];
+                };
+            };
+        };
+    };
+    QuotesController_reject: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RejectQuote"];
+            };
+        };
+        responses: {
+            /** @description The rejected quote */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuoteDetail"];
+                };
+            };
+        };
+    };
+    QuotesController_acceptPlan: {
+        parameters: {
+            query?: {
+                projectStartDate?: string;
+                chooseTemplates?: "true" | "false";
+                templateIds?: string | string[];
+                retainerStartDate?: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The accept dialog's defaults for its current choices (A2–A6) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AcceptPlan"];
+                };
+            };
+        };
+    };
+    QuotesController_accept: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AcceptQuote"];
+            };
+        };
+        responses: {
+            /** @description The accepted quote, with the project and retainer it created or renewed (A01) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuoteDetail"];
+                };
+            };
+        };
+    };
+    QuotesController_newVersion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The new draft version */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuoteDetail"];
+                };
+            };
+        };
+    };
+    QuotesController_archive: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The draft was discarded */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    QuotesController_downloadPdf: {
+        parameters: {
+            query?: {
+                draft?: "true";
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The PDF of the version, or the draft preview with draft=true */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such quote, or its PDF is not ready */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    QuotesController_renderPdf: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Queues the draft preview (client scope) or renders a sent version again when its PDF is not ready */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuotePdfRender"];
+                };
+            };
+        };
+    };
+    CatalogServicesController_list: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+                search?: string;
+                billing?: components["schemas"]["CatalogBilling"];
+                department?: components["schemas"]["DepartmentCode"];
+                archived?: "true" | "false";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Catalog services; archived ones with `catalog.manage` only */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogServicePage"];
+                };
+            };
+        };
+    };
+    CatalogServicesController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateCatalogService"];
+            };
+        };
+        responses: {
+            /** @description The new service */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogService"];
+                };
+            };
+        };
+    };
+    CatalogServicesController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateCatalogService"];
+            };
+        };
+        responses: {
+            /** @description The service after the change */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogService"];
+                };
+            };
+        };
+    };
+    CatalogServicesController_archive: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The archived service */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogService"];
+                };
+            };
+        };
+    };
+    CatalogServicesController_restore: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The restored service */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogService"];
+                };
+            };
+        };
+    };
+    CatalogPackagesController_list: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+                search?: string;
+                billing?: components["schemas"]["CatalogBilling"];
+                archived?: "true" | "false";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Catalog packages with their items; archived ones with `catalog.manage` only */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogPackagePage"];
+                };
+            };
+        };
+    };
+    CatalogPackagesController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateCatalogPackage"];
+            };
+        };
+        responses: {
+            /** @description The new package */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogPackage"];
+                };
+            };
+        };
+    };
+    CatalogPackagesController_detail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A package with its items */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogPackage"];
+                };
+            };
+        };
+    };
+    CatalogPackagesController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateCatalogPackage"];
+            };
+        };
+        responses: {
+            /** @description The package after the change; `items`, when given, replaces every item */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogPackage"];
+                };
+            };
+        };
+    };
+    CatalogPackagesController_archive: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The archived package */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogPackage"];
+                };
+            };
+        };
+    };
+    CatalogPackagesController_restore: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The restored package */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogPackage"];
+                };
+            };
+        };
+    };
+    TemplatesController_list: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+                search?: string;
+                kind?: components["schemas"]["TemplateKind"];
+                archived?: "true" | "false";
+                sort?: "name" | "updatedAt";
+                order?: components["schemas"]["SortOrder"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Work templates; archived ones with `templates.manage` only */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TemplatePage"];
+                };
+            };
+        };
+    };
+    TemplatesController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateTemplate"];
+            };
+        };
+        responses: {
+            /** @description The new template */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TemplateDetail"];
+                };
+            };
+        };
+    };
+    TemplatesController_detail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A template with its stages, steps and default assignees */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TemplateDetail"];
+                };
+            };
+        };
+    };
+    TemplatesController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateTemplate"];
+            };
+        };
+        responses: {
+            /** @description The template after replacing its document; a `key` equal to an id keeps that row */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TemplateDetail"];
+                };
+            };
+        };
+    };
+    TemplatesController_archive: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The archived template */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TemplateDetail"];
+                };
+            };
+        };
+    };
+    TemplatesController_restore: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The restored template */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TemplateDetail"];
+                };
+            };
+        };
+    };
+    TemplateRunsController_preview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TemplateRunInput"];
+            };
+        };
+        responses: {
+            /** @description The tasks and milestones a run would create; nothing is written */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TemplateRunPlan"];
+                };
+            };
+        };
+    };
+    TemplateRunsController_apply: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TemplateRunInput"];
+            };
+        };
+        responses: {
+            /** @description The run; the project's or cycle's tasks are created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TemplateRun"];
+                };
+            };
+        };
+    };
+    TemplateRunsController_list: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+                projectId?: string;
+                retainerId?: string;
+                taskId?: string;
+                include?: "tasks";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Runs of a project, a retainer or the run that created a task, newest first */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TemplateRunPage"];
+                };
+            };
+        };
+    };
+    RetainerTemplatesController_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The linked monthly template, the current cycle's run and its lines' tasks */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RetainerTemplate"];
+                };
+            };
+        };
+    };
+    RetainerTemplatesController_set: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetRetainerTemplate"];
+            };
+        };
+        responses: {
+            /** @description Links or unlinks the monthly template; it applies from the next cycle */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RetainerTemplate"];
+                };
+            };
+        };
+    };
+    RetainerTemplatesController_generateMissing: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                cycleId: string;
+                lineId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tasks for the units of the line that have none, from the template's repeated step */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TemplateRun"];
+                };
+            };
+        };
+    };
     ApprovalsController_ready: {
         parameters: {
             query?: {
@@ -13500,1314 +15240,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-        };
-    };
-    TemplatesController_list: {
-        parameters: {
-            query?: {
-                page?: number;
-                pageSize?: number;
-                search?: string;
-                kind?: components["schemas"]["TemplateKind"];
-                archived?: "true" | "false";
-                sort?: "name" | "updatedAt";
-                order?: components["schemas"]["SortOrder"];
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Work templates; archived ones with `templates.manage` only */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TemplatePage"];
-                };
-            };
-        };
-    };
-    TemplatesController_create: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CreateTemplate"];
-            };
-        };
-        responses: {
-            /** @description The new template */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TemplateDetail"];
-                };
-            };
-        };
-    };
-    TemplatesController_detail: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description A template with its stages, steps and default assignees */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TemplateDetail"];
-                };
-            };
-        };
-    };
-    TemplatesController_update: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["UpdateTemplate"];
-            };
-        };
-        responses: {
-            /** @description The template after replacing its document; a `key` equal to an id keeps that row */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TemplateDetail"];
-                };
-            };
-        };
-    };
-    TemplatesController_archive: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description The archived template */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TemplateDetail"];
-                };
-            };
-        };
-    };
-    TemplatesController_restore: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description The restored template */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TemplateDetail"];
-                };
-            };
-        };
-    };
-    TemplateRunsController_preview: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["TemplateRunInput"];
-            };
-        };
-        responses: {
-            /** @description The tasks and milestones a run would create; nothing is written */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TemplateRunPlan"];
-                };
-            };
-        };
-    };
-    TemplateRunsController_apply: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["TemplateRunInput"];
-            };
-        };
-        responses: {
-            /** @description The run; the project's or cycle's tasks are created */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TemplateRun"];
-                };
-            };
-        };
-    };
-    TemplateRunsController_list: {
-        parameters: {
-            query?: {
-                page?: number;
-                pageSize?: number;
-                projectId?: string;
-                retainerId?: string;
-                taskId?: string;
-                include?: "tasks";
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Runs of a project, a retainer or the run that created a task, newest first */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TemplateRunPage"];
-                };
-            };
-        };
-    };
-    RetainerTemplatesController_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description The linked monthly template, the current cycle's run and its lines' tasks */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RetainerTemplate"];
-                };
-            };
-        };
-    };
-    RetainerTemplatesController_set: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SetRetainerTemplate"];
-            };
-        };
-        responses: {
-            /** @description Links or unlinks the monthly template; it applies from the next cycle */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RetainerTemplate"];
-                };
-            };
-        };
-    };
-    RetainerTemplatesController_generateMissing: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-                cycleId: string;
-                lineId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Tasks for the units of the line that have none, from the template's repeated step */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TemplateRun"];
-                };
-            };
-        };
-    };
-    CatalogServicesController_list: {
-        parameters: {
-            query?: {
-                page?: number;
-                pageSize?: number;
-                search?: string;
-                billing?: components["schemas"]["CatalogBilling"];
-                department?: components["schemas"]["DepartmentCode"];
-                archived?: "true" | "false";
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Catalog services; archived ones with `catalog.manage` only */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CatalogServicePage"];
-                };
-            };
-        };
-    };
-    CatalogServicesController_create: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CreateCatalogService"];
-            };
-        };
-        responses: {
-            /** @description The new service */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CatalogService"];
-                };
-            };
-        };
-    };
-    CatalogServicesController_update: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["UpdateCatalogService"];
-            };
-        };
-        responses: {
-            /** @description The service after the change */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CatalogService"];
-                };
-            };
-        };
-    };
-    CatalogServicesController_archive: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description The archived service */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CatalogService"];
-                };
-            };
-        };
-    };
-    CatalogServicesController_restore: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description The restored service */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CatalogService"];
-                };
-            };
-        };
-    };
-    CatalogPackagesController_list: {
-        parameters: {
-            query?: {
-                page?: number;
-                pageSize?: number;
-                search?: string;
-                billing?: components["schemas"]["CatalogBilling"];
-                archived?: "true" | "false";
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Catalog packages with their items; archived ones with `catalog.manage` only */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CatalogPackagePage"];
-                };
-            };
-        };
-    };
-    CatalogPackagesController_create: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CreateCatalogPackage"];
-            };
-        };
-        responses: {
-            /** @description The new package */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CatalogPackage"];
-                };
-            };
-        };
-    };
-    CatalogPackagesController_detail: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description A package with its items */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CatalogPackage"];
-                };
-            };
-        };
-    };
-    CatalogPackagesController_update: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["UpdateCatalogPackage"];
-            };
-        };
-        responses: {
-            /** @description The package after the change; `items`, when given, replaces every item */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CatalogPackage"];
-                };
-            };
-        };
-    };
-    CatalogPackagesController_archive: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description The archived package */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CatalogPackage"];
-                };
-            };
-        };
-    };
-    CatalogPackagesController_restore: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description The restored package */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CatalogPackage"];
-                };
-            };
-        };
-    };
-    QuoteSettingsController_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description The quote settings */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["QuoteSettings"];
-                };
-            };
-        };
-    };
-    QuoteSettingsController_update: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["UpdateQuoteSettings"];
-            };
-        };
-        responses: {
-            /** @description The settings after the change. Texts and validity need `catalog.manage`; the threshold `quotes.approve_discount` */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["QuoteSettings"];
-                };
-            };
-        };
-    };
-    QuotesController_list: {
-        parameters: {
-            query?: {
-                page?: number;
-                pageSize?: number;
-                search?: string;
-                status?: components["schemas"]["QuoteStatus"] | components["schemas"]["QuoteStatus"][];
-                clientId?: string;
-                accountManagerId?: string;
-                approval?: "pending";
-                projectId?: string;
-                retainerId?: string;
-                archived?: "true" | "false";
-                latestOnly?: "true" | "false";
-                sort?: "updatedAt" | "number" | "validUntil";
-                order?: components["schemas"]["SortOrder"];
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Quotes of the clients in scope; the latest open versions by default */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["QuotePage"];
-                };
-            };
-        };
-    };
-    QuotesController_create: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CreateQuote"];
-            };
-        };
-        responses: {
-            /** @description The new draft */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["QuoteDetail"];
-                };
-            };
-        };
-    };
-    QuotesController_detail: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description A quote version */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["QuoteDetail"];
-                };
-            };
-        };
-    };
-    QuotesController_saveDraft: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["QuoteDraft"];
-            };
-        };
-        responses: {
-            /** @description The saved draft */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["QuoteDetail"];
-                };
-            };
-        };
-    };
-    QuotesController_approval: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["QuoteApprovalAction"];
-            };
-        };
-        responses: {
-            /** @description The draft after requesting or withdrawing discount approval */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["QuoteDetail"];
-                };
-            };
-        };
-    };
-    QuotesController_decide: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["QuoteApprovalDecision"];
-            };
-        };
-        responses: {
-            /** @description The draft after the discount was approved or returned */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["QuoteDetail"];
-                };
-            };
-        };
-    };
-    QuotesController_send: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SendQuote"];
-            };
-        };
-        responses: {
-            /** @description The sent quote */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["QuoteDetail"];
-                };
-            };
-        };
-    };
-    QuotesController_extend: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ExtendQuote"];
-            };
-        };
-        responses: {
-            /** @description The quote, sent again */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["QuoteDetail"];
-                };
-            };
-        };
-    };
-    QuotesController_reject: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["RejectQuote"];
-            };
-        };
-        responses: {
-            /** @description The rejected quote */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["QuoteDetail"];
-                };
-            };
-        };
-    };
-    QuotesController_acceptPlan: {
-        parameters: {
-            query?: {
-                projectStartDate?: string;
-                chooseTemplates?: "true" | "false";
-                templateIds?: string | string[];
-                retainerStartDate?: string;
-            };
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description The accept dialog's defaults for its current choices (A2–A6) */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AcceptPlan"];
-                };
-            };
-        };
-    };
-    QuotesController_accept: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["AcceptQuote"];
-            };
-        };
-        responses: {
-            /** @description The accepted quote, with the project and retainer it created or renewed (A01) */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["QuoteDetail"];
-                };
-            };
-        };
-    };
-    QuotesController_newVersion: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description The new draft version */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["QuoteDetail"];
-                };
-            };
-        };
-    };
-    QuotesController_archive: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description The draft was discarded */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    QuotesController_downloadPdf: {
-        parameters: {
-            query?: {
-                draft?: "true";
-            };
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description The PDF of the version, or the draft preview with draft=true */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description No such quote, or its PDF is not ready */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    QuotesController_renderPdf: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Queues the draft preview (client scope) or renders a sent version again when its PDF is not ready */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["QuotePdfRender"];
-                };
-            };
-        };
-    };
-    InvoiceSettingsController_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description The invoice settings */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["InvoiceSettings"];
-                };
-            };
-        };
-    };
-    InvoiceSettingsController_update: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["UpdateInvoiceSettings"];
-            };
-        };
-        responses: {
-            /** @description The settings after the change; a new rate records who set it and when */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["InvoiceSettings"];
-                };
-            };
-        };
-    };
-    InvoicesController_list: {
-        parameters: {
-            query?: {
-                page?: number;
-                pageSize?: number;
-                search?: string;
-                status?: components["schemas"]["InvoiceStatus"] | components["schemas"]["InvoiceStatus"][];
-                clientId?: string;
-                projectId?: string;
-                retainerId?: string;
-                currency?: components["schemas"]["Currency"];
-                origin?: components["schemas"]["InvoiceOrigin"];
-                accountManagerId?: string;
-                dueFrom?: string;
-                dueTo?: string;
-                sort?: "updatedAt" | "number" | "dueOn";
-                order?: components["schemas"]["SortOrder"];
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Invoices of the clients in scope; drafts and open invoices by default */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["InvoicePage"];
-                };
-            };
-        };
-    };
-    InvoicesController_create: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CreateInvoice"];
-            };
-        };
-        responses: {
-            /** @description The new draft */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["InvoiceDetail"];
-                };
-            };
-        };
-    };
-    InvoicesController_billable: {
-        parameters: {
-            query: {
-                clientId: string;
-                currency: components["schemas"]["Currency"];
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description The client's work in the currency that no live invoice holds */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["BillableItems"];
-                };
-            };
-        };
-    };
-    InvoicesController_detail: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description An invoice */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["InvoiceDetail"];
-                };
-            };
-        };
-    };
-    InvoicesController_saveDraft: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["InvoiceDraft"];
-            };
-        };
-        responses: {
-            /** @description The saved draft */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["InvoiceDetail"];
-                };
-            };
-        };
-    };
-    InvoicesController_issue: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["IssueInvoice"];
-            };
-        };
-        responses: {
-            /** @description The issued invoice with its number, rate and due date */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["InvoiceDetail"];
-                };
-            };
-        };
-    };
-    InvoicesController_changeDueDate: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ChangeInvoiceDueDate"];
-            };
-        };
-        responses: {
-            /** @description The invoice with its new due date and status */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["InvoiceDetail"];
-                };
-            };
-        };
-    };
-    InvoicesController_void: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["VoidInvoice"];
-            };
-        };
-        responses: {
-            /** @description The voided invoice */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["InvoiceDetail"];
-                };
-            };
-        };
-    };
-    InvoicesController_archive: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description The draft was discarded */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    PaymentsController_record: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["RecordPayment"];
-            };
-        };
-        responses: {
-            /** @description The invoice with the new payment, its paid amount and status */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["InvoiceDetail"];
-                };
-            };
-        };
-    };
-    PaymentsController_void: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["VoidPayment"];
-            };
-        };
-        responses: {
-            /** @description The invoice with the payment void, its paid amount and status recomputed */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["InvoiceDetail"];
                 };
             };
         };

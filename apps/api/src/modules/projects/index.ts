@@ -3,9 +3,11 @@ export { type BillingLockSource, BillingLocks } from './billing-locks.js';
 export {
   type BillableWork,
   type BillingEngagement,
+  type BillingMilestone,
   type BillingSource,
   BillingSources,
   cycleMonthName,
+  type RetainerWork,
   sourceKey,
 } from './billing-sources.js';
 export { type CycleOpened, CycleOpenedHooks } from './cycle-opened-hooks.js';

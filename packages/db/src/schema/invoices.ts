@@ -238,3 +238,40 @@ export const payments = pgTable(
     ),
   ],
 );
+
+/**
+ * A direct cost of a project (rule 26), in its own currency and at its own rate, for the project
+ * margin (rule 27). Archived when entered by mistake.
+ */
+export const projectExpenses = pgTable(
+  'project_expenses',
+  {
+    id: id(),
+    projectId: uuid('project_id')
+      .notNull()
+      .references(() => projects.id),
+    spentOn: date('spent_on', { mode: 'string' }).notNull(),
+    description: text('description').notNull(),
+    /** In the expense's own currency, which may differ from the project's (ADR 0006). */
+    amountMinor: minorAmount('amount_minor').notNull(),
+    currency: currencyEnum('currency').notNull(),
+    sypPerUsd: exchangeRate('syp_per_usd').notNull(),
+    note: text('note'),
+    loggedById: uuid('logged_by_id')
+      .notNull()
+      .references(() => users.id),
+    ...timestamps(),
+    archivedAt: archivedAt(),
+  },
+  (table) => [
+    index('project_expenses_project_id_idx').on(table.projectId),
+    index('project_expenses_logged_by_id_idx').on(table.loggedById),
+    check('project_expenses_amount_check', sql`${table.amountMinor} > 0`),
+    check('project_expenses_rate_check', sql`${table.sypPerUsd} > 0`),
+    check(
+      'project_expenses_description_check',
+      sql`char_length(${table.description}) between 1 and 200`,
+    ),
+    check('project_expenses_note_check', sql`char_length(${table.note}) <= 500`),
+  ],
+);

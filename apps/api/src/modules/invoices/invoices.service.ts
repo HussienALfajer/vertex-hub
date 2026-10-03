@@ -519,7 +519,7 @@ export class InvoicesService {
     };
   }
 
-  private async summaries(
+  async summaries(
     rows: InvoiceRow[],
     executor: Database | Transaction = this.db,
   ): Promise<Invoice[]> {

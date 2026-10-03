@@ -5,7 +5,10 @@ import { FilesModule } from '../files/index.js';
 import { NotificationsModule } from '../notifications/index.js';
 import { ProjectsModule } from '../projects/index.js';
 import { QuotesModule } from '../quotes/index.js';
+import { InvoiceBillingController } from './invoice-billing.controller.js';
+import { InvoiceBillingService } from './invoice-billing.service.js';
 import { InvoiceDrafts } from './invoice-drafts.js';
+import { InvoiceDueDates } from './invoice-due-dates.js';
 import { InvoiceFileOwner } from './invoice-file-owner.js';
 import { InvoiceOverdueService } from './invoice-overdue.service.js';
 import { InvoiceSettingsController } from './invoice-settings.controller.js';
@@ -15,6 +18,7 @@ import { InvoicesController } from './invoices.controller.js';
 import { InvoicesService } from './invoices.service.js';
 import { PaymentsController } from './payments.controller.js';
 import { PaymentsService } from './payments.service.js';
+import { ProjectExpensesService } from './project-expenses.service.js';
 
 /**
  * Invoices (F13): settings with the current rate, drafts billed from milestones, retainer cycles
@@ -24,7 +28,9 @@ import { PaymentsService } from './payments.service.js';
  * `CycleOpenedHooks`, and answers `projects`' `BillingLocks`. Records and voids payments with
  * receipt numbers, keeps payment proofs as invoice documents (`files`' `GeneratedFiles`, owner
  * type `invoice`), marks invoices overdue in `invoices.daily` and repeats the alert as a source of
- * `notifications.daily`.
+ * `notifications.daily`. Owns `project_expenses` and serves client balances and statements, and the
+ * billing summaries of projects (with their margin) and retainers; exports `InvoiceDueDates` for
+ * the company calendar.
  */
 @Module({
   imports: [
@@ -35,7 +41,12 @@ import { PaymentsService } from './payments.service.js';
     ProjectsModule,
     QuotesModule,
   ],
-  controllers: [InvoiceSettingsController, InvoicesController, PaymentsController],
+  controllers: [
+    InvoiceSettingsController,
+    InvoicesController,
+    PaymentsController,
+    InvoiceBillingController,
+  ],
   providers: [
     InvoiceSettingsService,
     InvoicesService,
@@ -44,6 +55,10 @@ import { PaymentsService } from './payments.service.js';
     PaymentsService,
     InvoiceOverdueService,
     InvoiceFileOwner,
+    InvoiceDueDates,
+    InvoiceBillingService,
+    ProjectExpensesService,
   ],
+  exports: [InvoiceDueDates],
 })
 export class InvoicesModule {}
