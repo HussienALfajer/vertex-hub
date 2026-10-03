@@ -14,7 +14,9 @@ import {
   addMonths,
   allowedPostTransitions,
   allowedTaskTransitions,
+  applyPayment,
   approvalRequestState,
+  type BillableItems,
   BOARD_LIMITS,
   BOARD_STATUSES,
   type BrandFileKind,
@@ -48,13 +50,16 @@ import {
   type CreateTaskInput,
   type CreateTemplate,
   type CrewRole,
+  CURRENCIES,
   type Currency,
   type Cycle,
   type CycleDetail,
   type CycleStatus,
   calendarDay,
+  changeInvoiceDueDateSchema,
   createCatalogPackageSchema,
   createCatalogServiceSchema,
+  createInvoiceSchema,
   createQuoteSchema,
   createTemplateSchema,
   type DeliverableKind,
@@ -77,14 +82,26 @@ import {
   firstOfMonth,
   grantedPermissions,
   type HealthResponse,
+  type Invoice,
+  type InvoiceDetail,
+  type InvoiceOrigin,
+  type InvoicePage,
+  type InvoiceSettings,
+  type InvoiceSource,
+  type InvoiceStatus,
   type IssuedApprovalRequest,
   installmentsValid,
   intervalsOverlap,
+  invoiceDisplayNumber,
+  invoiceDraftSchema,
+  invoiceStatus,
+  invoiceTotal,
   isInlineMimeType,
   isLineBehind,
   isPostContentEditable,
   isPostOverdue,
   isProjectClosed,
+  issueInvoiceSchema,
   isTaskBlocked,
   isTaskFinished,
   isTaskOpen,
@@ -109,7 +126,9 @@ import {
   type Notification,
   type NotificationType,
   needsDiscountApproval,
+  OPEN_INVOICE_STATUSES,
   OPEN_TASK_STATUSES,
+  type Payment,
   type Permission,
   type PlatformAccount,
   POST_LIMITS,
@@ -163,7 +182,10 @@ import {
   type RevisionDecision,
   type RevisionDecisionInput,
   type RevisionSource,
+  rateIsStale,
   deliveryRate as rateOf,
+  receiptDisplayNumber,
+  recordPaymentSchema,
   rejectQuoteSchema,
   renewalState,
   repeatedStepFor,
@@ -203,6 +225,7 @@ import {
   type TemplateStep,
   taskMove,
   templateRunInputSchema,
+  toUsdMinor,
   type UpdateCycleLine,
   type UpdateExtraWork,
   type UpdateMeeting,
@@ -212,8 +235,11 @@ import {
   type UserResponse,
   updateCatalogPackageSchema,
   updateCatalogServiceSchema,
+  updateInvoiceSettingsSchema,
   updateQuoteSettingsSchema,
   updateTemplateSchema,
+  voidInvoiceSchema,
+  voidPaymentSchema,
   weekOf,
 } from '@vertex-hub/contracts';
 import { isDeclaredEndpoint, reportApiProblem } from './test';
@@ -926,6 +952,14 @@ export async function mockApi(page: Page, options: MockOptions): Promise<MockedA
     templates,
     me: () => me,
   });
+  const invoicesApi = invoiceRoutes({
+    billing: invoicesSeed(),
+    clients,
+    users,
+    projects,
+    retainers,
+    me: () => me,
+  });
   const notificationsApi = notificationRoutes({
     notifications: options.notifications ?? notificationsSeed(),
     streamed: options.streamed ?? [],
@@ -1195,6 +1229,10 @@ export async function mockApi(page: Page, options: MockOptions): Promise<MockedA
     // Quotes (F04).
     const quoted = quotesApi(route, method, url, request);
     if (quoted) return quoted;
+
+    // Invoices (F13).
+    const invoiced = invoicesApi(route, method, url, request);
+    if (invoiced) return invoiced;
 
     // Notifications (F14).
     const notified = notificationsApi(route, method, url);
@@ -9598,6 +9636,744 @@ function quoteRoutes({
   };
 }
 
+// Invoices (F13)
+
+interface PaymentRecord extends Omit<Payment, 'receiptNumber' | 'recordedBy' | 'voided'> {
+  year: number;
+  number: number;
+  recordedById: string;
+  voided: { at: string; byId: string; reason: string } | null;
+}
+
+interface InvoiceRecord {
+  id: string;
+  clientId: string;
+  year: number | null;
+  number: number | null;
+  origin: InvoiceOrigin;
+  currency: Currency;
+  /** Stored as issued; `invoiceStatus` recomputes it on read (rule 21). */
+  status: InvoiceStatus;
+  projectId: string | null;
+  retainerId: string | null;
+  issuedOn: string | null;
+  dueOn: string | null;
+  sypPerUsd: string | null;
+  paymentTermsDays: number;
+  notes: string | null;
+  lines: {
+    id: string;
+    description: string;
+    quantity: number;
+    unitPriceMinor: number;
+    source: InvoiceSource | null;
+  }[];
+  payments: PaymentRecord[];
+  pdf: InvoiceDetail['pdf'];
+  draftPdf: InvoiceDetail['draftPdf'];
+  issuedById: string | null;
+  voided: { at: string; byId: string; reason: string } | null;
+  createdById: string | null;
+  createdAt: string;
+  updatedAt: string;
+  archivedAt: string | null;
+}
+
+interface InvoiceRecords {
+  invoices: InvoiceRecord[];
+  settings: Omit<InvoiceSettings, 'canEdit' | 'rateStale' | 'rateUpdatedBy' | 'updatedBy'> & {
+    rateUpdatedById: string | null;
+    updatedById: string | null;
+  };
+}
+
+/**
+ * Five invoices: Jasmine's two drafts (the Design milestone and October's social retainer month),
+ * Jasmine's overdue, partly paid Discovery invoice, and Shifa's paid and void SYP invoices.
+ */
+export function invoicesSeed(): InvoiceRecords {
+  const today = businessDate();
+  const time = `${addDays(today, -2)}T08:00:00.000Z`;
+  const invoice = (
+    n: number,
+    fields: Partial<InvoiceRecord> & Pick<InvoiceRecord, 'clientId' | 'origin' | 'lines'>,
+  ): InvoiceRecord => ({
+    id: id(n),
+    year: null,
+    number: null,
+    currency: 'USD',
+    status: 'draft',
+    projectId: null,
+    retainerId: null,
+    issuedOn: null,
+    dueOn: null,
+    sypPerUsd: null,
+    paymentTermsDays: 7,
+    notes: null,
+    payments: [],
+    pdf: null,
+    draftPdf: null,
+    issuedById: null,
+    voided: null,
+    createdById: null,
+    createdAt: time,
+    updatedAt: time,
+    archivedAt: null,
+    ...fields,
+  });
+  const issued = (issuedOn: string) => ({
+    issuedOn,
+    dueOn: addDays(issuedOn, 7),
+    issuedById: id(1),
+    pdf: { state: 'ready' as const },
+  });
+  const payment = (
+    n: number,
+    number: number,
+    fields: Pick<PaymentRecord, 'paidOn' | 'amountMinor' | 'currency' | 'appliedMinor' | 'method'> &
+      Partial<PaymentRecord>,
+  ): PaymentRecord => ({
+    id: id(n),
+    year: 2026,
+    number,
+    sypPerUsd: '118.5000',
+    reference: null,
+    note: null,
+    proof: null,
+    receiptPdf: { state: 'ready' },
+    recordedById: id(1),
+    createdAt: `${fields.paidOn}T10:00:00.000Z`,
+    voided: null,
+    ...fields,
+  });
+  return {
+    settings: {
+      sypPerUsd: '118.5000',
+      paymentTermsDays: 7,
+      paymentDetails: 'بنك سورية الدولي الإسلامي — حساب 0000-1111\nشام كاش: 0999 000 000',
+      invoiceFooter: 'شكرًا لثقتكم بـ Vertex Media.',
+      rateUpdatedAt: time,
+      rateUpdatedById: id(1),
+      updatedAt: time,
+      updatedById: id(1),
+    },
+    invoices: [
+      invoice(9401, {
+        clientId: id(601),
+        origin: 'milestone_done',
+        projectId: id(801),
+        lines: [
+          {
+            id: id(9411),
+            description: 'الهوية البصرية الجديدة — التصميم',
+            quantity: 1,
+            unitPriceMinor: 150_000,
+            source: { type: 'milestone', id: id(812) },
+          },
+        ],
+      }),
+      invoice(9402, {
+        clientId: id(601),
+        origin: 'cycle_opened',
+        retainerId: id(901),
+        lines: [
+          {
+            id: id(9412),
+            description: 'إدارة السوشيال ميديا — أكتوبر 2026',
+            quantity: 1,
+            unitPriceMinor: 150_000,
+            source: { type: 'retainer_cycle', id: id(921) },
+          },
+        ],
+      }),
+      invoice(9403, {
+        clientId: id(601),
+        origin: 'quote_accepted',
+        projectId: id(801),
+        year: 2026,
+        number: 1,
+        status: 'sent',
+        sypPerUsd: '118.5000',
+        ...issued(addDays(today, -25)),
+        lines: [
+          {
+            id: id(9413),
+            description: 'الهوية البصرية الجديدة — الاستكشاف',
+            quantity: 1,
+            unitPriceMinor: 60_000,
+            source: { type: 'milestone', id: id(811) },
+          },
+        ],
+        payments: [
+          payment(9431, 1, {
+            paidOn: addDays(today, -20),
+            amountMinor: 20_000,
+            currency: 'USD',
+            appliedMinor: 20_000,
+            method: 'bank_transfer',
+            reference: 'بنك البركة 77120',
+          }),
+        ],
+      }),
+      invoice(9404, {
+        clientId: id(602),
+        origin: 'manual',
+        currency: 'SYP',
+        year: 2026,
+        number: 2,
+        status: 'sent',
+        sypPerUsd: '118.5000',
+        createdById: id(1),
+        ...issued(addDays(today, -40)),
+        lines: [
+          {
+            id: id(9414),
+            description: 'تصميم بروشور العيادة',
+            quantity: 2,
+            unitPriceMinor: 2_500_000,
+            source: null,
+          },
+        ],
+        payments: [
+          payment(9432, 2, {
+            paidOn: addDays(today, -35),
+            amountMinor: 5_000_000,
+            currency: 'SYP',
+            appliedMinor: 5_000_000,
+            method: 'cash',
+          }),
+        ],
+      }),
+      invoice(9405, {
+        clientId: id(602),
+        origin: 'manual',
+        currency: 'SYP',
+        year: 2026,
+        number: 3,
+        status: 'void',
+        sypPerUsd: '118.5000',
+        createdById: id(1),
+        ...issued(addDays(today, -30)),
+        voided: { at: `${addDays(today, -29)}T09:00:00.000Z`, byId: id(1), reason: 'خطأ في السعر' },
+        lines: [
+          {
+            id: id(9415),
+            description: 'تصميم بروشور العيادة',
+            quantity: 1,
+            unitPriceMinor: 3_000_000,
+            source: null,
+          },
+        ],
+      }),
+    ],
+  };
+}
+
+interface InvoiceState {
+  billing: InvoiceRecords;
+  clients: ClientRecord[];
+  users: UserResponse[];
+  projects: ProjectRecord[];
+  retainers: RetainerRecord[];
+  me: () => MeResponse;
+}
+
+/** The invoices API over the in-memory records, with the F13 rules the screens rely on. */
+function invoiceRoutes({ billing, clients, users, projects, retainers, me }: InvoiceState) {
+  const { invoices, settings } = billing;
+  let nextId = 9500;
+  let clock = Date.parse('2026-10-02T09:00:00.000Z');
+  const now = () => {
+    clock += 60_000;
+    return new Date(clock).toISOString();
+  };
+  const today = () => businessDate();
+  const scopes = (permission: Permission) =>
+    me().permissions.find((g) => g.permission === permission)?.scopes ?? [];
+  const holds = (permission: Permission) => scopes(permission).length > 0;
+  const covers = (permission: Permission, clientId: string) => {
+    const granted = scopes(permission);
+    const client = clients.find((c) => c.id === clientId);
+    return (
+      granted.includes('all') ||
+      (granted.includes('own_clients') && client?.accountManagerId === me().user.id)
+    );
+  };
+  const person = (userId: string) => ({
+    id: userId,
+    name: users.find((u) => u.id === userId)?.name ?? '',
+  });
+  const named = (record: { id: string; name: string } | undefined) =>
+    record ? { id: record.id, name: record.name } : null;
+  const live = (i: InvoiceRecord) => !i.archivedAt && i.status !== 'void';
+  const heldBy = (sourceId: string) =>
+    invoices.find((i) => live(i) && i.lines.some((line) => line.source?.id === sourceId));
+
+  const sourceOf = (source: InvoiceSource) => {
+    if (source.type === 'milestone') {
+      const project = projects.find((p) => p.milestones.some((m) => m.id === source.id));
+      const found = project?.milestones.find((m) => m.id === source.id);
+      return { ...source, name: found?.name ?? '', project: named(project), retainer: null };
+    }
+    if (source.type === 'retainer_cycle') {
+      const retainer = retainers.find((r) => r.cycles.some((c) => c.id === source.id));
+      const cycle = retainer?.cycles.find((c) => c.id === source.id);
+      return { ...source, name: cycle?.month ?? '', project: null, retainer: named(retainer) };
+    }
+    const project = projects.find((p) => p.extraWork.some((w) => w.id === source.id));
+    const retainer = retainers.find((r) => r.extraWork.some((w) => w.id === source.id));
+    const work = [...(project?.extraWork ?? []), ...(retainer?.extraWork ?? [])].find(
+      (w) => w.id === source.id,
+    );
+    return {
+      ...source,
+      name: work?.title ?? '',
+      project: named(project),
+      retainer: named(retainer),
+    };
+  };
+  const extraWorkOf = (i: InvoiceRecord) =>
+    i.lines.flatMap((line) =>
+      line.source?.type === 'extra_work'
+        ? [...projects, ...retainers].flatMap((e) =>
+            e.extraWork.filter((w) => w.id === line.source?.id),
+          )
+        : [],
+    );
+
+  const listItemOf = (i: InvoiceRecord): Invoice => {
+    const client = clients.find((c) => c.id === i.clientId);
+    const totalMinor = invoiceTotal(i.lines);
+    const paidMinor = i.payments.reduce((sum, p) => sum + (p.voided ? 0 : p.appliedMinor), 0);
+    const status = invoiceStatus({
+      status: i.status,
+      totalMinor,
+      paidMinor,
+      dueOn: i.dueOn,
+      today: today(),
+    });
+    const project = projects.find((p) => p.id === i.projectId);
+    const retainer = retainers.find((r) => r.id === i.retainerId);
+    return {
+      id: i.id,
+      displayNumber:
+        i.year && i.number ? invoiceDisplayNumber({ year: i.year, number: i.number }) : null,
+      client: { id: i.clientId, name: client?.tradeName ?? '' },
+      accountManager: person(client?.accountManagerId ?? id(1)),
+      engagement: project
+        ? { type: 'project', id: project.id, name: project.name }
+        : retainer
+          ? { type: 'retainer', id: retainer.id, name: retainer.name }
+          : null,
+      origin: i.origin,
+      currency: i.currency,
+      status,
+      issuedOn: i.issuedOn,
+      dueOn: i.dueOn,
+      totalMinor,
+      paidMinor,
+      balanceMinor: totalMinor - paidMinor,
+      daysOverdue:
+        status === 'overdue' && i.dueOn
+          ? Math.round((Date.parse(today()) - Date.parse(i.dueOn)) / 86_400_000)
+          : null,
+      updatedAt: i.updatedAt,
+      archivedAt: i.archivedAt,
+    };
+  };
+
+  const detailOf = (i: InvoiceRecord): InvoiceDetail => {
+    const item = listItemOf(i);
+    const client = clients.find((c) => c.id === i.clientId);
+    const manages = holds('invoices.manage');
+    const pays = holds('payments.manage');
+    const draft = item.status === 'draft' && !i.archivedAt;
+    const open = (OPEN_INVOICE_STATUSES as readonly InvoiceStatus[]).includes(item.status);
+    const livePayments = i.payments.some((p) => !p.voided);
+    const usd = (minor: number) => (i.sypPerUsd ? toUsdMinor(minor, i.currency, i.sypPerUsd) : 0);
+    return {
+      ...item,
+      billingName: client?.tradeName ?? '',
+      billingAddress: null,
+      year: i.year,
+      number: i.number,
+      quote: null,
+      paymentTermsDays: i.paymentTermsDays,
+      sypPerUsd: i.sypPerUsd,
+      usd: i.sypPerUsd
+        ? {
+            totalMinor: usd(item.totalMinor),
+            paidMinor: usd(item.paidMinor),
+            balanceMinor: usd(item.balanceMinor),
+          }
+        : null,
+      notes: i.notes,
+      lines: i.lines.map((line) => ({
+        ...line,
+        totalMinor: line.quantity * line.unitPriceMinor,
+        source: line.source ? sourceOf(line.source) : null,
+      })),
+      payments: i.payments.map((p) => ({
+        id: p.id,
+        receiptNumber: receiptDisplayNumber(p),
+        paidOn: p.paidOn,
+        amountMinor: p.amountMinor,
+        currency: p.currency,
+        sypPerUsd: p.sypPerUsd,
+        appliedMinor: p.appliedMinor,
+        method: p.method,
+        reference: p.reference,
+        note: p.note,
+        proof: p.proof,
+        receiptPdf: p.receiptPdf,
+        recordedBy: person(p.recordedById),
+        createdAt: p.createdAt,
+        voided: p.voided
+          ? { at: p.voided.at, by: person(p.voided.byId), reason: p.voided.reason }
+          : null,
+      })),
+      pdf: i.pdf,
+      draftPdf: i.draftPdf,
+      issuedBy: i.issuedById ? person(i.issuedById) : null,
+      voided: i.voided
+        ? { at: i.voided.at, by: person(i.voided.byId), reason: i.voided.reason }
+        : null,
+      createdBy: i.createdById ? person(i.createdById) : null,
+      createdAt: i.createdAt,
+      permissions: {
+        canEdit: manages && draft,
+        canIssue: manages && draft,
+        canArchive: manages && draft,
+        canChangeDueDate: manages && open,
+        canVoid: manages && ['sent', 'overdue'].includes(item.status) && !livePayments,
+        canRecordPayment: pays && open,
+        canVoidPayments: pays && item.status !== 'draft' && item.status !== 'void',
+        canRenderPdf: draft ? manages : i.pdf?.state === 'failed',
+      },
+    };
+  };
+  const settingsOf = (): InvoiceSettings => {
+    const { rateUpdatedById, updatedById, ...rest } = settings;
+    return {
+      ...rest,
+      rateUpdatedBy: rateUpdatedById ? person(rateUpdatedById) : null,
+      updatedBy: updatedById ? person(updatedById) : null,
+      rateStale: rateIsStale(settings.rateUpdatedAt ? new Date(settings.rateUpdatedAt) : null),
+      canEdit: holds('invoices.manage'),
+    };
+  };
+  const nextNumber = (year: number) =>
+    Math.max(0, ...invoices.filter((i) => i.year === year).map((i) => i.number ?? 0)) + 1;
+  const nextReceipt = (year: number) =>
+    Math.max(
+      0,
+      ...invoices.flatMap((i) => i.payments.filter((p) => p.year === year).map((p) => p.number)),
+    ) + 1;
+
+  return (route: Route, method: string, url: URL, request: Request): Promise<void> | undefined => {
+    const path = url.pathname;
+    if (path === '/api/invoice-settings') {
+      if (!holds('invoices.read')) return fail(route, 403, null);
+      if (method === 'PATCH') {
+        if (!holds('invoices.manage')) return fail(route, 403, null);
+        const input = updateInvoiceSettingsSchema.parse(request.postDataJSON());
+        const at = now();
+        if (input.sypPerUsd !== undefined) {
+          settings.sypPerUsd = input.sypPerUsd;
+          settings.rateUpdatedAt = at;
+          settings.rateUpdatedById = me().user.id;
+        }
+        Object.assign(settings, definedFields({ ...input, sypPerUsd: undefined }), {
+          updatedAt: at,
+          updatedById: me().user.id,
+        });
+      }
+      return json(route, settingsOf());
+    }
+    if (path.startsWith('/api/payments/')) {
+      const match = path.match(/^\/api\/payments\/([^/]+)\/(void|receipt)$/);
+      const owner = invoices.find((i) => i.payments.some((p) => p.id === match?.[1]));
+      const payment = owner?.payments.find((p) => p.id === match?.[1]);
+      if (!match || !owner || !payment || !covers('invoices.read', owner.clientId)) {
+        return fail(route, 404, null);
+      }
+      if (match[2] === 'void' && method === 'POST') {
+        if (!holds('payments.manage')) return fail(route, 403, null);
+        if (payment.voided) return fail(route, 409, 'INVALID_TRANSITION');
+        const { reason } = voidPaymentSchema.parse(request.postDataJSON());
+        payment.voided = { at: now(), byId: me().user.id, reason };
+        owner.updatedAt = now();
+        return json(route, detailOf(owner));
+      }
+      if (match[2] === 'receipt' && method === 'POST') {
+        payment.receiptPdf = { state: 'ready' };
+        return json(route, { state: 'ready' });
+      }
+      return undefined;
+    }
+    if (!path.startsWith('/api/invoices')) return undefined;
+    if (!holds('invoices.read')) return fail(route, 403, null);
+
+    if (path === '/api/invoices' && method === 'GET') {
+      const q = url.searchParams;
+      const statuses = q.getAll('status');
+      const wanted: string[] = statuses.length > 0 ? statuses : ['draft', ...OPEN_INVOICE_STATUSES];
+      const search = q.get('search')?.toLowerCase();
+      const matching = invoices
+        .filter((i) => !i.archivedAt && covers('invoices.read', i.clientId))
+        .map(listItemOf)
+        .filter(
+          (i) =>
+            (!q.get('clientId') || i.client.id === q.get('clientId')) &&
+            (!q.get('currency') || i.currency === q.get('currency')) &&
+            (!q.get('accountManagerId') || i.accountManager.id === q.get('accountManagerId')) &&
+            (!q.get('dueFrom') || (i.dueOn ?? '') >= (q.get('dueFrom') ?? '')) &&
+            (!q.get('dueTo') || (i.dueOn !== null && i.dueOn <= (q.get('dueTo') ?? ''))) &&
+            (!search ||
+              i.client.name.toLowerCase().includes(search) ||
+              (i.displayNumber ?? '').toLowerCase().includes(search)),
+        );
+      const items = matching
+        .filter((i) => wanted.includes(i.status))
+        .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+      const open = matching.filter((i) =>
+        (OPEN_INVOICE_STATUSES as readonly string[]).includes(i.status),
+      );
+      const rateOf = (i: Invoice) => invoices.find((r) => r.id === i.id)?.sypPerUsd ?? '1';
+      const sum = (list: Invoice[], usd: boolean) =>
+        list.reduce(
+          (total, i) =>
+            total + (usd ? toUsdMinor(i.balanceMinor, i.currency, rateOf(i)) : i.balanceMinor),
+          0,
+        );
+      const totals: InvoicePage['totals'] = {
+        byCurrency: CURRENCIES.filter((currency) => open.some((i) => i.currency === currency)).map(
+          (currency) => {
+            const mine = open.filter((i) => i.currency === currency);
+            return {
+              currency,
+              outstandingMinor: sum(mine, false),
+              overdueMinor: sum(
+                mine.filter((i) => i.status === 'overdue'),
+                false,
+              ),
+            };
+          },
+        ),
+        usd: {
+          outstandingMinor: sum(open, true),
+          overdueMinor: sum(
+            open.filter((i) => i.status === 'overdue'),
+            true,
+          ),
+        },
+      };
+      return json(route, { items, total: items.length, page: 1, pageSize: 25, totals });
+    }
+    if (path === '/api/invoices/billable' && method === 'GET') {
+      if (!holds('invoices.manage')) return fail(route, 403, null);
+      const clientId = url.searchParams.get('clientId') ?? '';
+      const currency = url.searchParams.get('currency');
+      const ownProjects = projects.filter(
+        (p) => p.clientId === clientId && !p.archived && p.currency === currency,
+      );
+      const ownRetainers = retainers.filter(
+        (r) => r.clientId === clientId && !r.archived && r.currency === currency,
+      );
+      const items: BillableItems = {
+        milestones: ownProjects.flatMap((p) =>
+          p.milestones
+            .filter((m) => !m.archived && (m.installmentMinor ?? 0) > 0 && !heldBy(m.id))
+            .map((m) => ({
+              id: m.id,
+              project: { id: p.id, name: p.name },
+              name: m.name,
+              status: m.status,
+              installmentMinor: m.installmentMinor ?? 0,
+            })),
+        ),
+        cycles: ownRetainers.flatMap((r) =>
+          r.cycles
+            .filter((c) => !heldBy(c.id))
+            .map((c) => ({
+              id: c.id,
+              retainer: { id: r.id, name: r.name },
+              month: c.month,
+              feeMinor: r.monthlyFeeMinor,
+            })),
+        ),
+        extraWork: [...ownProjects, ...ownRetainers].flatMap((e) =>
+          e.extraWork
+            .filter((w) => !w.archived && w.billingStatus === 'unbilled' && !heldBy(w.id))
+            .map((w) => ({
+              id: w.id,
+              project: 'milestones' in e ? { id: e.id, name: e.name } : null,
+              retainer: 'cycles' in e ? { id: e.id, name: e.name } : null,
+              title: w.title,
+              estimateMinor: w.estimateMinor,
+            })),
+        ),
+      };
+      return json(route, items);
+    }
+    if (path === '/api/invoices' && method === 'POST') {
+      if (!holds('invoices.manage')) return fail(route, 403, null);
+      const input = createInvoiceSchema.parse(request.postDataJSON());
+      const at = now();
+      const created: InvoiceRecord = {
+        id: id(nextId++),
+        clientId: input.clientId,
+        year: null,
+        number: null,
+        origin: 'manual',
+        currency: input.currency,
+        status: 'draft',
+        projectId: input.projectId,
+        retainerId: input.retainerId,
+        issuedOn: null,
+        dueOn: null,
+        sypPerUsd: null,
+        paymentTermsDays: settings.paymentTermsDays,
+        notes: null,
+        lines: [],
+        payments: [],
+        pdf: null,
+        draftPdf: null,
+        issuedById: null,
+        voided: null,
+        createdById: me().user.id,
+        createdAt: at,
+        updatedAt: at,
+        archivedAt: null,
+      };
+      invoices.push(created);
+      return json(route, detailOf(created), 201);
+    }
+
+    const match = path.match(/^\/api\/invoices\/([^/]+)(?:\/(.+))?$/);
+    if (!match) return undefined;
+    const i = invoices.find((x) => x.id === match[1]);
+    if (!i || !covers('invoices.read', i.clientId)) return fail(route, 404, null);
+    const action = match[2];
+    if (!action && method === 'GET') return json(route, detailOf(i));
+    if (action === 'pdf' && method === 'POST') {
+      if (i.status === 'draft') {
+        i.draftPdf = { state: 'ready', renderedAt: now(), outdated: false };
+      } else {
+        i.pdf = { state: 'ready' };
+      }
+      return json(route, { state: 'ready' });
+    }
+
+    if (!holds(action === 'payments' ? 'payments.manage' : 'invoices.manage')) {
+      return fail(route, 403, null);
+    }
+    const status = listItemOf(i).status;
+    if (!action && method === 'PUT') {
+      if (status !== 'draft') return fail(route, 409, 'INVOICE_LOCKED');
+      const input = invoiceDraftSchema.parse(request.postDataJSON());
+      if (input.updatedAt !== i.updatedAt) return fail(route, 409, 'STALE_INVOICE');
+      Object.assign(i, {
+        projectId: input.projectId,
+        retainerId: input.retainerId,
+        paymentTermsDays: input.paymentTermsDays,
+        notes: input.notes,
+        lines: input.lines.map((line) => ({ ...line, id: line.id ?? id(nextId++) })),
+        updatedAt: now(),
+      });
+      if (i.draftPdf) i.draftPdf.outdated = true;
+      return json(route, detailOf(i));
+    }
+    if (action === 'issue' && method === 'POST') {
+      if (status !== 'draft' || i.archivedAt) return fail(route, 409, 'INVALID_TRANSITION');
+      const input = issueInvoiceSchema.parse(request.postDataJSON());
+      if (input.updatedAt !== i.updatedAt) return fail(route, 409, 'STALE_INVOICE');
+      if (invoiceTotal(i.lines) === 0) return fail(route, 409, 'INVOICE_EMPTY');
+      const rate = input.sypPerUsd ?? settings.sypPerUsd;
+      if (!rate) return fail(route, 409, 'RATE_REQUIRED');
+      const year = Number(today().slice(0, 4));
+      Object.assign(i, {
+        year,
+        number: nextNumber(year),
+        status: 'sent',
+        issuedOn: today(),
+        dueOn: input.dueOn ?? addDays(today(), i.paymentTermsDays),
+        sypPerUsd: rate,
+        issuedById: me().user.id,
+        pdf: { state: 'ready' },
+        draftPdf: null,
+        updatedAt: now(),
+      });
+      for (const work of extraWorkOf(i)) work.billingStatus = 'billed';
+      return json(route, detailOf(i));
+    }
+    if (action === 'due-date' && method === 'POST') {
+      if (!(OPEN_INVOICE_STATUSES as readonly string[]).includes(status)) {
+        return fail(route, 409, 'INVALID_TRANSITION');
+      }
+      const input = changeInvoiceDueDateSchema.parse(request.postDataJSON());
+      if (input.dueOn < today()) return fail(route, 400, 'INVALID_DATES');
+      Object.assign(i, { dueOn: input.dueOn, updatedAt: now() });
+      return json(route, detailOf(i));
+    }
+    if (action === 'void' && method === 'POST') {
+      if (i.payments.some((p) => !p.voided)) return fail(route, 409, 'INVOICE_HAS_PAYMENTS');
+      if (status !== 'sent' && status !== 'overdue') return fail(route, 409, 'INVALID_TRANSITION');
+      const { reason } = voidInvoiceSchema.parse(request.postDataJSON());
+      Object.assign(i, {
+        status: 'void',
+        voided: { at: now(), byId: me().user.id, reason },
+        updatedAt: now(),
+      });
+      for (const work of extraWorkOf(i)) work.billingStatus = 'unbilled';
+      return json(route, detailOf(i));
+    }
+    if (action === 'archive' && method === 'POST') {
+      if (status !== 'draft') return fail(route, 409, 'INVALID_TRANSITION');
+      i.archivedAt = now();
+      return route.fulfill({ status: 204 });
+    }
+    if (action === 'payments' && method === 'POST') {
+      if (!(OPEN_INVOICE_STATUSES as readonly string[]).includes(status)) {
+        return fail(route, 409, 'INVALID_TRANSITION');
+      }
+      const input = recordPaymentSchema.parse(request.postDataJSON());
+      if (input.paidOn > today()) return fail(route, 400, 'INVALID_DATES');
+      const rate = input.sypPerUsd ?? settings.sypPerUsd;
+      if (!rate) return fail(route, 409, 'RATE_REQUIRED');
+      const applied = applyPayment(
+        listItemOf(i).balanceMinor,
+        input.amountMinor,
+        input.currency,
+        i.currency,
+        rate,
+      );
+      if (applied === null) return fail(route, 409, 'OVERPAYMENT');
+      const year = Number(input.paidOn.slice(0, 4));
+      i.payments.push({
+        id: id(nextId++),
+        year,
+        number: nextReceipt(year),
+        paidOn: input.paidOn,
+        amountMinor: input.amountMinor,
+        currency: input.currency,
+        sypPerUsd: rate,
+        appliedMinor: applied,
+        method: input.method,
+        reference: input.reference,
+        note: input.note,
+        proof: input.proofUploadId ? { id: id(nextId++), name: 'إثبات الدفع.jpg' } : null,
+        receiptPdf: { state: 'ready' },
+        recordedById: me().user.id,
+        createdAt: now(),
+        voided: null,
+      });
+      i.updatedAt = now();
+      return json(route, detailOf(i));
+    }
+    return undefined;
+  };
+}
 export const seedIds = {
   sara: id(1),
   omar: id(2),
@@ -9659,6 +10435,12 @@ export const seedIds = {
   pendingQuote: id(9202),
   shifaDraft: id(9203),
   expiredQuote: id(9204),
+  // Invoices (F13).
+  designDraft: id(9401),
+  octoberDraft: id(9402),
+  overdueInvoice: id(9403),
+  paidInvoice: id(9404),
+  voidInvoice: id(9405),
 };
 
 /** Viewport screenshot kept in the test output and attached to the HTML report. */

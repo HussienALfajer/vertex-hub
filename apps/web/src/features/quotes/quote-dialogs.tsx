@@ -41,7 +41,7 @@ import { useDecideApproval, useExtendQuote, useRejectQuote } from './quotes.quer
 const NONE = 'none';
 
 /** A dialog around one small form: its title, fields, error and submit button. */
-function FormDialog({
+export function FormDialog({
   open,
   onClose,
   submitting,

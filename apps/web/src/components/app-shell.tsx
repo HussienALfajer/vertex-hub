@@ -33,6 +33,7 @@ import {
   MenuIcon,
   MoonIcon,
   PackageIcon,
+  ReceiptTextIcon,
   RepeatIcon,
   ScrollTextIcon,
   StampIcon,
@@ -60,6 +61,7 @@ interface NavItem {
     | 'nav.projects'
     | 'nav.retainers'
     | 'nav.quotes'
+    | 'nav.invoices'
     | 'nav.catalog'
     | 'nav.templates'
     | 'nav.team'
@@ -110,6 +112,7 @@ const navItems: NavItem[] = [
   { to: '/projects', label: 'nav.projects', icon: FolderKanbanIcon, permission: 'projects.read' },
   { to: '/retainers', label: 'nav.retainers', icon: RepeatIcon, permission: 'projects.read' },
   { to: '/quotes', label: 'nav.quotes', icon: FileTextIcon, permission: 'quotes.read' },
+  { to: '/invoices', label: 'nav.invoices', icon: ReceiptTextIcon, permission: 'invoices.read' },
   { to: '/catalog', label: 'nav.catalog', icon: PackageIcon, permission: 'catalog.read' },
   // Everyone reads templates; the people who apply or maintain them see the link (F07 screen 1).
   { to: '/templates', label: 'nav.templates', icon: LayoutTemplateIcon, show: managesTeams },

@@ -28,6 +28,9 @@ import { Route as AppClientsNewRouteImport } from './routes/_app/clients/new'
 import { Route as AppContentIndexRouteImport } from './routes/_app/content/index'
 import { Route as AppDepartmentsIndexRouteImport } from './routes/_app/departments/index'
 import { Route as AppDepartmentsDepartmentIdRouteImport } from './routes/_app/departments/$departmentId'
+import { Route as AppInvoicesIndexRouteImport } from './routes/_app/invoices/index'
+import { Route as AppInvoicesInvoiceIdRouteImport } from './routes/_app/invoices/$invoiceId'
+import { Route as AppInvoicesSettingsRouteImport } from './routes/_app/invoices/settings'
 import { Route as AppMeetingsMeetingIdRouteImport } from './routes/_app/meetings/$meetingId'
 import { Route as AppNotificationsIndexRouteImport } from './routes/_app/notifications/index'
 import { Route as AppNotificationsSettingsRouteImport } from './routes/_app/notifications/settings'
@@ -152,6 +155,21 @@ const AppDepartmentsDepartmentIdRoute =
     path: '/departments/$departmentId',
     getParentRoute: () => AppRoute,
   } as any)
+const AppInvoicesIndexRoute = AppInvoicesIndexRouteImport.update({
+  id: '/invoices/',
+  path: '/invoices/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppInvoicesInvoiceIdRoute = AppInvoicesInvoiceIdRouteImport.update({
+  id: '/invoices/$invoiceId',
+  path: '/invoices/$invoiceId',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppInvoicesSettingsRoute = AppInvoicesSettingsRouteImport.update({
+  id: '/invoices/settings',
+  path: '/invoices/settings',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppMeetingsMeetingIdRoute = AppMeetingsMeetingIdRouteImport.update({
   id: '/meetings/$meetingId',
   path: '/meetings/$meetingId',
@@ -308,6 +326,8 @@ export interface FileRoutesByFullPath {
   '/clients/$clientId': typeof AppClientsClientIdRoute
   '/clients/new': typeof AppClientsNewRoute
   '/departments/$departmentId': typeof AppDepartmentsDepartmentIdRoute
+  '/invoices/$invoiceId': typeof AppInvoicesInvoiceIdRoute
+  '/invoices/settings': typeof AppInvoicesSettingsRoute
   '/meetings/$meetingId': typeof AppMeetingsMeetingIdRoute
   '/notifications/settings': typeof AppNotificationsSettingsRoute
   '/projects/$projectId': typeof AppProjectsProjectIdRoute
@@ -331,6 +351,7 @@ export interface FileRoutesByFullPath {
   '/clients/': typeof AppClientsIndexRoute
   '/content/': typeof AppContentIndexRoute
   '/departments/': typeof AppDepartmentsIndexRoute
+  '/invoices/': typeof AppInvoicesIndexRoute
   '/notifications/': typeof AppNotificationsIndexRoute
   '/projects/': typeof AppProjectsIndexRoute
   '/quotes/': typeof AppQuotesIndexRoute
@@ -356,6 +377,8 @@ export interface FileRoutesByTo {
   '/clients/$clientId': typeof AppClientsClientIdRoute
   '/clients/new': typeof AppClientsNewRoute
   '/departments/$departmentId': typeof AppDepartmentsDepartmentIdRoute
+  '/invoices/$invoiceId': typeof AppInvoicesInvoiceIdRoute
+  '/invoices/settings': typeof AppInvoicesSettingsRoute
   '/meetings/$meetingId': typeof AppMeetingsMeetingIdRoute
   '/notifications/settings': typeof AppNotificationsSettingsRoute
   '/projects/$projectId': typeof AppProjectsProjectIdRoute
@@ -379,6 +402,7 @@ export interface FileRoutesByTo {
   '/clients': typeof AppClientsIndexRoute
   '/content': typeof AppContentIndexRoute
   '/departments': typeof AppDepartmentsIndexRoute
+  '/invoices': typeof AppInvoicesIndexRoute
   '/notifications': typeof AppNotificationsIndexRoute
   '/projects': typeof AppProjectsIndexRoute
   '/quotes': typeof AppQuotesIndexRoute
@@ -406,6 +430,8 @@ export interface FileRoutesById {
   '/_app/clients/$clientId': typeof AppClientsClientIdRoute
   '/_app/clients/new': typeof AppClientsNewRoute
   '/_app/departments/$departmentId': typeof AppDepartmentsDepartmentIdRoute
+  '/_app/invoices/$invoiceId': typeof AppInvoicesInvoiceIdRoute
+  '/_app/invoices/settings': typeof AppInvoicesSettingsRoute
   '/_app/meetings/$meetingId': typeof AppMeetingsMeetingIdRoute
   '/_app/notifications/settings': typeof AppNotificationsSettingsRoute
   '/_app/projects/$projectId': typeof AppProjectsProjectIdRoute
@@ -429,6 +455,7 @@ export interface FileRoutesById {
   '/_app/clients/': typeof AppClientsIndexRoute
   '/_app/content/': typeof AppContentIndexRoute
   '/_app/departments/': typeof AppDepartmentsIndexRoute
+  '/_app/invoices/': typeof AppInvoicesIndexRoute
   '/_app/notifications/': typeof AppNotificationsIndexRoute
   '/_app/projects/': typeof AppProjectsIndexRoute
   '/_app/quotes/': typeof AppQuotesIndexRoute
@@ -456,6 +483,8 @@ export interface FileRouteTypes {
     | '/clients/$clientId'
     | '/clients/new'
     | '/departments/$departmentId'
+    | '/invoices/$invoiceId'
+    | '/invoices/settings'
     | '/meetings/$meetingId'
     | '/notifications/settings'
     | '/projects/$projectId'
@@ -479,6 +508,7 @@ export interface FileRouteTypes {
     | '/clients/'
     | '/content/'
     | '/departments/'
+    | '/invoices/'
     | '/notifications/'
     | '/projects/'
     | '/quotes/'
@@ -504,6 +534,8 @@ export interface FileRouteTypes {
     | '/clients/$clientId'
     | '/clients/new'
     | '/departments/$departmentId'
+    | '/invoices/$invoiceId'
+    | '/invoices/settings'
     | '/meetings/$meetingId'
     | '/notifications/settings'
     | '/projects/$projectId'
@@ -527,6 +559,7 @@ export interface FileRouteTypes {
     | '/clients'
     | '/content'
     | '/departments'
+    | '/invoices'
     | '/notifications'
     | '/projects'
     | '/quotes'
@@ -553,6 +586,8 @@ export interface FileRouteTypes {
     | '/_app/clients/$clientId'
     | '/_app/clients/new'
     | '/_app/departments/$departmentId'
+    | '/_app/invoices/$invoiceId'
+    | '/_app/invoices/settings'
     | '/_app/meetings/$meetingId'
     | '/_app/notifications/settings'
     | '/_app/projects/$projectId'
@@ -576,6 +611,7 @@ export interface FileRouteTypes {
     | '/_app/clients/'
     | '/_app/content/'
     | '/_app/departments/'
+    | '/_app/invoices/'
     | '/_app/notifications/'
     | '/_app/projects/'
     | '/_app/quotes/'
@@ -730,6 +766,27 @@ declare module '@tanstack/react-router' {
       path: '/departments/$departmentId'
       fullPath: '/departments/$departmentId'
       preLoaderRoute: typeof AppDepartmentsDepartmentIdRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/invoices/': {
+      id: '/_app/invoices/'
+      path: '/invoices'
+      fullPath: '/invoices/'
+      preLoaderRoute: typeof AppInvoicesIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/invoices/$invoiceId': {
+      id: '/_app/invoices/$invoiceId'
+      path: '/invoices/$invoiceId'
+      fullPath: '/invoices/$invoiceId'
+      preLoaderRoute: typeof AppInvoicesInvoiceIdRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/invoices/settings': {
+      id: '/_app/invoices/settings'
+      path: '/invoices/settings'
+      fullPath: '/invoices/settings'
+      preLoaderRoute: typeof AppInvoicesSettingsRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/meetings/$meetingId': {
@@ -940,6 +997,8 @@ interface AppRouteChildren {
   AppClientsClientIdRoute: typeof AppClientsClientIdRoute
   AppClientsNewRoute: typeof AppClientsNewRoute
   AppDepartmentsDepartmentIdRoute: typeof AppDepartmentsDepartmentIdRoute
+  AppInvoicesInvoiceIdRoute: typeof AppInvoicesInvoiceIdRoute
+  AppInvoicesSettingsRoute: typeof AppInvoicesSettingsRoute
   AppMeetingsMeetingIdRoute: typeof AppMeetingsMeetingIdRoute
   AppNotificationsSettingsRoute: typeof AppNotificationsSettingsRoute
   AppProjectsProjectIdRoute: typeof AppProjectsProjectIdRoute
@@ -963,6 +1022,7 @@ interface AppRouteChildren {
   AppClientsIndexRoute: typeof AppClientsIndexRoute
   AppContentIndexRoute: typeof AppContentIndexRoute
   AppDepartmentsIndexRoute: typeof AppDepartmentsIndexRoute
+  AppInvoicesIndexRoute: typeof AppInvoicesIndexRoute
   AppNotificationsIndexRoute: typeof AppNotificationsIndexRoute
   AppProjectsIndexRoute: typeof AppProjectsIndexRoute
   AppQuotesIndexRoute: typeof AppQuotesIndexRoute
@@ -985,6 +1045,8 @@ const AppRouteChildren: AppRouteChildren = {
   AppClientsClientIdRoute: AppClientsClientIdRoute,
   AppClientsNewRoute: AppClientsNewRoute,
   AppDepartmentsDepartmentIdRoute: AppDepartmentsDepartmentIdRoute,
+  AppInvoicesInvoiceIdRoute: AppInvoicesInvoiceIdRoute,
+  AppInvoicesSettingsRoute: AppInvoicesSettingsRoute,
   AppMeetingsMeetingIdRoute: AppMeetingsMeetingIdRoute,
   AppNotificationsSettingsRoute: AppNotificationsSettingsRoute,
   AppProjectsProjectIdRoute: AppProjectsProjectIdRoute,
@@ -1008,6 +1070,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppClientsIndexRoute: AppClientsIndexRoute,
   AppContentIndexRoute: AppContentIndexRoute,
   AppDepartmentsIndexRoute: AppDepartmentsIndexRoute,
+  AppInvoicesIndexRoute: AppInvoicesIndexRoute,
   AppNotificationsIndexRoute: AppNotificationsIndexRoute,
   AppProjectsIndexRoute: AppProjectsIndexRoute,
   AppQuotesIndexRoute: AppQuotesIndexRoute,
