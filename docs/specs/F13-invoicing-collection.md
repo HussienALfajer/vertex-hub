@@ -191,7 +191,7 @@ draft ──discard──→ archived
 ### Engagements, expenses and statements
 24. Changing a project's or retainer's currency is refused while it has invoices (`CURRENCY_LOCKED`, F05 M2): any invoice that is not a discarded draft, void ones included.
 25. **Billing locks** (F05 changes): reopening a done milestone, editing its installment, or archiving it is refused while it is on a live invoice, draft included (`MILESTONE_INVOICED`; discard the draft or void the invoice first). An extra work item on a live invoice cannot be archived, waived or re-estimated (`ALREADY_INVOICED`). Setting `billed` by hand is no longer accepted (`BILLED_BY_INVOICE`); items marked `billed` by hand before F13 keep their note. The extra work billing dialog offers `unbilled` and `waived` only, and is not offered on `billed` items.
-26. **Expenses:** allowed on non-archived projects in any status (expenses often arrive after delivery), by `expenses.manage` covering the client.
+26. **Expenses:** allowed on non-archived projects in any status (expenses often arrive after delivery), by `expenses.manage` covering the client. The project must be readable first (F05: an archived project only by `projects.manage` scope-all holders, else 404).
 27. **Project margin** (money access): invoiced = Σ `total_minor` of the project's issued, non-void invoices converted to USD with each invoice's rate; collected = Σ of their non-void payments' amounts converted with each payment's rate; expenses = Σ non-archived expenses converted with each expense's rate; margin = invoiced − expenses; shown in USD (reporting currency, ADR 0006), with the planned installments total in the project's currency beside it.
 28. **Statement** for a client, a currency and a period (default: the current year to today): opening balance (issued non-void invoices before the period minus their non-void payments' applied amounts before the period), each issued invoice in the period (debit) and each non-void payment in the period (credit, by its applied amount, with its original amount and currency when they differ), closing balance; and the totals invoiced, paid and outstanding. Void documents are left out. One statement per currency (owner decision).
 29. The statement PDF is rendered on request by the worker with the same pipeline, downloadable for 24 hours and not kept as a document.
@@ -247,7 +247,7 @@ Schemas live in `packages/contracts/src/invoices.ts` (and the money functions ab
 Changes to other endpoints:
 - F02: `PATCH /api/clients/:id` accepts `billingName`, `billingAddress`.
 - F05: milestone done, reopen, installment edit and archive, extra work billing and archive return the codes of rule 25; `billing_status: 'billed'` is refused (`BILLED_BY_INVOICE`).
-- F11: `GET /api/calendar` returns `invoice_due` key dates (number, client, status; no amounts) only for invoices the caller may read.
+- F11: `GET /api/calendar` returns `invoice_due` key dates (number, client, status; no amounts) of open invoices (`sent`, `partially_paid`, `overdue`) only for invoices the caller may read; the `clientId` and `userId` filters apply as for renewals.
 
 ## Screens
 

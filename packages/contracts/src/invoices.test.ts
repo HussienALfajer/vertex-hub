@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   changeInvoiceDueDateSchema,
+  clientStatementQuerySchema,
   createInvoiceSchema,
+  createProjectExpenseSchema,
   type InvoiceDraftInput,
   type InvoiceStatus,
   invoiceDisplayNumber,
@@ -13,6 +15,7 @@ import {
   receiptDisplayNumber,
   recordPaymentSchema,
   updateInvoiceSettingsSchema,
+  updateProjectExpenseSchema,
   voidPaymentSchema,
 } from './invoices.js';
 
@@ -241,5 +244,47 @@ describe('voidPaymentSchema', () => {
     expect(voidPaymentSchema.parse({ reason: ' Recorded twice ' })).toEqual({
       reason: 'Recorded twice',
     });
+  });
+});
+
+describe('project expense schemas (rule 26)', () => {
+  const expense = { spentOn: '2026-10-01', description: 'Studio rent', amountMinor: 5_000 };
+
+  it('defaults the currency, the rate and the note to null', () => {
+    expect(createProjectExpenseSchema.parse(expense)).toEqual({
+      ...expense,
+      currency: null,
+      sypPerUsd: null,
+      note: null,
+    });
+  });
+
+  it('refuses a zero amount, an empty or long description and a bad rate', () => {
+    for (const change of [
+      { amountMinor: 0 },
+      { description: ' ' },
+      { description: 'x'.repeat(201) },
+      { sypPerUsd: '0' },
+      { note: 'x'.repeat(501) },
+    ]) {
+      expect(createProjectExpenseSchema.safeParse({ ...expense, ...change }).success).toBe(false);
+    }
+  });
+
+  it('takes a partial change', () => {
+    expect(updateProjectExpenseSchema.parse({ amountMinor: 7_000 })).toEqual({
+      amountMinor: 7_000,
+    });
+    expect(updateProjectExpenseSchema.safeParse({ currency: null }).success).toBe(false);
+  });
+});
+
+describe('clientStatementQuerySchema (rule 28)', () => {
+  it('needs a currency and takes an optional period', () => {
+    expect(clientStatementQuerySchema.parse({ currency: 'SYP' })).toEqual({ currency: 'SYP' });
+    expect(clientStatementQuerySchema.safeParse({ from: '2026-01-01' }).success).toBe(false);
+    expect(
+      clientStatementQuerySchema.safeParse({ currency: 'USD', to: '2026-13-01' }).success,
+    ).toBe(false);
   });
 });

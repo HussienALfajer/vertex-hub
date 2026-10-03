@@ -32,12 +32,12 @@ Spec: `docs/specs/F13-invoicing-collection.md` · ADRs 0006, 0007, 0008, 0013, 0
 - [x] owner acceptance (approved, incl. `INVOICE_HAS_PAYMENTS` first and the alert when a payment void makes an invoice overdue), dev database migrated, /ship
 
 ## PR 4 — `feat/f13-billing-api`: statements, expenses, billing summaries, calendar
-- [ ] contracts: `statementRows` with unit tests; statement, client / project / retainer billing, expense schemas; audit `project_expense.*`; key date kind `invoice_due`
-- [ ] db (`/db-migration`): `project_expenses`; drift
-- [ ] api: client billing and statement (rule 28), project billing and margin (rule 27), retainer billing, expenses (rule 26), calendar `invoice_due` key dates filtered by invoice access
-- [ ] api tests: `test/project-expenses.test.ts`, statement and billing cases, calendar filtering
-- [ ] bridge; web typecheck
-- [ ] wiring checklist, full checks (+ drift), reviewer, owner acceptance, /ship
+- [x] contracts: `statementRows` with unit tests; statement, client / project / retainer billing, expense schemas; audit `project_expense.*` (and `ar.json` keys); key date kind `invoice_due` with `invoiceStatus` on key dates (calendar filter and chip adapted, no link until PR 6)
+- [x] db (`/db-migration`, 0031): `project_expenses`; drift
+- [x] api: client billing and statement (rule 28), project billing and margin (rule 27), retainer billing, expenses (rule 26), calendar `invoice_due` key dates filtered by invoice access
+- [x] api tests: `test/project-expenses.test.ts`, `test/invoice-billing.test.ts` (balances, statement, retainer billing, calendar filtering); cleanup helpers remove expenses
+- [x] bridge; web typecheck (calendar fixtures gain `invoiceStatus`)
+- [x] wiring checklist, full checks (lint, typecheck, test, build, E2E, drift pass), reviewer (no blocking findings), owner acceptance (approved, incl. open invoices only on the calendar and the F05 read rule for archived projects), /ship
 
 ## PR 5 — `feat/f13-invoices-pdf`: invoice, draft, receipt and statement PDFs
 - [ ] contracts: jobs `invoices.pdf`, `invoices.pdf-ready` (kinds `invoice`, `invoice_draft`, `receipt`, `statement`), render payloads
@@ -45,7 +45,7 @@ Spec: `docs/specs/F13-invoicing-collection.md` · ADRs 0006, 0007, 0008, 0013, 0
 - [ ] worker: Arabic RTL brand templates for the four kinds, handler idempotent per payload hash; worker test with text extraction
 - [ ] api: queue on issue, due date change, payment and preview; ready handler attaching once; `POST` / `GET` PDF endpoints for invoices, receipts and statements; daily re-queue; statement objects purged after 24 hours; `test/invoice-pdf.test.ts`
 - [ ] bridge; web: invoice documents in the client Files tab
-- [ ] wiring checklist, full checks (+ drift), reviewer, owner acceptance, /ship
+- [x] wiring checklist, full checks (lint, typecheck, test, build, E2E, drift pass), reviewer (no blocking findings), owner acceptance (approved, incl. open invoices only on the calendar and the F05 read rule for archived projects), /ship
 
 ## PR 6 — `feat/f13-invoices-web`: invoice screens
 - [ ] web `features/invoices/`: list with tabs and totals, new invoice dialog, editor with billable items picker, issue dialog, invoice page with payments, payment dialog, void and due date dialogs, settings page; routes; nav item; `ar.json` `invoices` namespace; loading, empty, error states

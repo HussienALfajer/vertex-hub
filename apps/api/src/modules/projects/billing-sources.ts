@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import type {
   Currency,
+  CycleStatus,
   ExtraWorkBilling,
   InvoiceSource,
   InvoiceSourceType,
@@ -67,6 +68,27 @@ export interface BillableWork {
     project: { id: string; name: string } | null;
     retainer: { id: string; name: string } | null;
     title: string;
+    estimateMinor: number | null;
+  }[];
+}
+
+/** A milestone on a project's billing summary (F13). */
+export interface BillingMilestone {
+  id: string;
+  name: string;
+  status: MilestoneStatus;
+  dueDate: string | null;
+  installmentMinor: number | null;
+}
+
+/** What a retainer's billing summary lists (F13). */
+export interface RetainerWork {
+  monthlyFeeMinor: number | null;
+  cycles: { id: string; month: string; status: CycleStatus }[];
+  extraWork: {
+    id: string;
+    title: string;
+    billingStatus: ExtraWorkBilling;
     estimateMinor: number | null;
   }[];
 }
@@ -354,6 +376,54 @@ export class BillingSources {
           estimateMinor: row.estimateMinor,
         })),
     };
+  }
+
+  /** F13 project billing: the project's non-archived milestones by position. */
+  async projectMilestones(projectId: string): Promise<BillingMilestone[]> {
+    return this.db
+      .select({
+        id: projectMilestones.id,
+        name: projectMilestones.name,
+        status: projectMilestones.status,
+        dueDate: projectMilestones.dueDate,
+        installmentMinor: projectMilestones.installmentMinor,
+      })
+      .from(projectMilestones)
+      .where(and(eq(projectMilestones.projectId, projectId), isNull(projectMilestones.archivedAt)))
+      .orderBy(asc(projectMilestones.position), asc(projectMilestones.id));
+  }
+
+  /**
+   * F13 retainer billing: the retainer's current fee, its cycles (newest month first) and its
+   * non-archived extra work (newest first).
+   */
+  async retainerWork(retainerId: string): Promise<RetainerWork> {
+    const [[retainer], cycles, extraWork] = await Promise.all([
+      this.db
+        .select({ monthlyFeeMinor: retainers.monthlyFeeMinor })
+        .from(retainers)
+        .where(eq(retainers.id, retainerId)),
+      this.db
+        .select({
+          id: retainerCycles.id,
+          month: retainerCycles.month,
+          status: retainerCycles.status,
+        })
+        .from(retainerCycles)
+        .where(eq(retainerCycles.retainerId, retainerId))
+        .orderBy(desc(retainerCycles.month)),
+      this.db
+        .select({
+          id: extraWorkItems.id,
+          title: extraWorkItems.title,
+          billingStatus: extraWorkItems.billingStatus,
+          estimateMinor: extraWorkItems.estimateMinor,
+        })
+        .from(extraWorkItems)
+        .where(and(eq(extraWorkItems.retainerId, retainerId), isNull(extraWorkItems.archivedAt)))
+        .orderBy(desc(extraWorkItems.requestedOn), asc(extraWorkItems.id)),
+    ]);
+    return { monthlyFeeMinor: retainer?.monthlyFeeMinor ?? null, cycles, extraWork };
   }
 
   /**

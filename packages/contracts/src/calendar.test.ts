@@ -260,6 +260,10 @@ describe('calendar queries', () => {
     expect(
       calendarQuerySchema.parse({ from: '2026-10-01', to: '2026-10-31', kinds: 'shoot' }).kinds,
     ).toEqual(['shoot']);
+    expect(
+      calendarQuerySchema.parse({ from: '2026-10-01', to: '2026-10-31', kinds: 'invoice_due' })
+        .kinds,
+    ).toEqual(['invoice_due']);
   });
 
   it('checks at most 30 users for conflicts', () => {

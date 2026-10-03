@@ -32,6 +32,7 @@ import {
   payments,
   postClientResponses,
   postReviews,
+  projectExpenses,
   projectMilestones,
   projects,
   quoteInstallments,
@@ -171,6 +172,8 @@ export async function removeUsers(db: Database, ids: string[]): Promise<void> {
     await db.delete(auditEntries).where(inArray(auditEntries.entityId, userPayments));
     await db.delete(payments).where(inArray(payments.id, userPayments));
   }
+  // Expenses point at who logged them (F13).
+  await db.delete(projectExpenses).where(inArray(projectExpenses.loggedById, ids));
   const touched = await db
     .selectDistinct({ id: fileVersions.fileItemId })
     .from(fileVersions)
@@ -558,6 +561,16 @@ export async function removeProjects(db: Database, ids: string[]): Promise<void>
   await db
     .delete(auditEntries)
     .where(inArray(auditEntries.entityId, [...ids, ...milestones, ...extraWork]));
+  const expenses = await db
+    .delete(projectExpenses)
+    .where(inArray(projectExpenses.projectId, ids))
+    .returning({ id: projectExpenses.id });
+  await db.delete(auditEntries).where(
+    inArray(
+      auditEntries.entityId,
+      expenses.map((row) => row.id),
+    ),
+  );
   await db.delete(extraWorkItems).where(inArray(extraWorkItems.projectId, ids));
   await db.delete(projectMilestones).where(inArray(projectMilestones.projectId, ids));
   await db.delete(projects).where(inArray(projects.id, ids));

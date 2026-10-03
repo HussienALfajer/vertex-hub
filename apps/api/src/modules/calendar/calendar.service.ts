@@ -8,12 +8,14 @@ import {
   type ConflictList,
   type ConflictQuery,
   KEY_DATE_KINDS,
+  type KeyDate,
 } from '@vertex-hub/contracts';
 import { type Database, meetingAttendees, meetings, shootCrew, shoots } from '@vertex-hub/db';
 import { and, asc, eq, gt, inArray, isNull, lt, or } from 'drizzle-orm';
 import { DATABASE } from '../../core/database/database.module.js';
 import type { CurrentUserInfo } from '../auth/index.js';
 import { ClientDirectory } from '../clients/index.js';
+import { InvoiceDueDates } from '../invoices/index.js';
 import { EngagementDirectory } from '../projects/index.js';
 import { MeetingsService } from './meetings.service.js';
 import { ScheduleConflicts } from './schedule-conflicts.js';
@@ -29,6 +31,7 @@ export class CalendarService {
     private readonly meetingsService: MeetingsService,
     private readonly engagements: EngagementDirectory,
     private readonly clients: ClientDirectory,
+    private readonly invoiceDueDates: InvoiceDueDates,
   ) {}
 
   /**
@@ -92,13 +95,7 @@ export class CalendarService {
             )
             .orderBy(asc(meetings.startsAt), asc(meetings.id))
         : [],
-      this.engagements.keyDates({
-        from: query.from,
-        to: query.to,
-        kinds: KEY_DATE_KINDS.filter(wanted),
-        clientId: query.clientId,
-        userId,
-      }),
+      this.keyDates(actor, query, wanted, userId),
     ]);
     const [shootItems, meetingItems, clients] = await Promise.all([
       this.shootsService.present(shootRows),
@@ -119,6 +116,33 @@ export class CalendarService {
         },
       })),
     };
+  }
+
+  /**
+   * Rule 15's key dates by date: those of projects and retainers, and the due dates of the open
+   * invoices the actor may read (F13).
+   */
+  private async keyDates(
+    actor: CurrentUserInfo,
+    query: CalendarQuery,
+    wanted: (kind: CalendarKind) => boolean,
+    userId: string | undefined,
+  ): Promise<(Omit<KeyDate, 'client'> & { clientId: string })[]> {
+    const range = { from: query.from, to: query.to, clientId: query.clientId, userId };
+    const [engagementDates, invoiceDates] = await Promise.all([
+      this.engagements.keyDates({ ...range, kinds: KEY_DATE_KINDS.filter(wanted) }),
+      wanted('invoice_due') ? this.invoiceDueDates.keyDates(actor, range) : [],
+    ]);
+    return [
+      ...engagementDates.map((keyDate) => ({ ...keyDate, invoiceStatus: null })),
+      ...invoiceDates,
+    ].sort(
+      (a, b) =>
+        a.date.localeCompare(b.date) ||
+        a.kind.localeCompare(b.kind) ||
+        a.title.localeCompare(b.title, 'ar') ||
+        a.targetId.localeCompare(b.targetId),
+    );
   }
 
   /** Rule 5 for a booking being edited; the shoot or meeting itself never conflicts. */

@@ -4,6 +4,7 @@ import {
   convertMinor,
   exchangeRateSchema,
   invoiceTotal,
+  statementRows,
   toUsdMinor,
 } from './money.js';
 
@@ -118,5 +119,75 @@ describe('applyPayment (rule 19)', () => {
   it('refuses a payment on a paid invoice', () => {
     expect(applyPayment(0, 1, 'USD', 'USD', '118.5')).toBeNull();
     expect(applyPayment(0, 1, 'USD', 'SYP', '118.5')).toBeNull();
+  });
+});
+
+describe('statementRows', () => {
+  const invoice = (id: string, issuedOn: string, totalMinor: number) => ({
+    id,
+    displayNumber: `INV-2026-${id}`,
+    issuedOn,
+    totalMinor,
+  });
+  const payment = (
+    id: string,
+    invoiceId: string,
+    paidOn: string,
+    appliedMinor: number,
+    other?: { amountMinor: number; currency: 'SYP' },
+  ) => ({
+    id,
+    receiptNumber: `RC-2026-${id}`,
+    invoiceId,
+    invoiceNumber: `INV-2026-${invoiceId}`,
+    paidOn,
+    appliedMinor,
+    amountMinor: other?.amountMinor ?? appliedMinor,
+    currency: other?.currency ?? ('USD' as const),
+  });
+
+  it('carries the opening balance and runs the balance through the period', () => {
+    const result = statementRows({
+      invoices: [invoice('0001', '2026-01-10', 10_000), invoice('0002', '2026-03-01', 5_000)],
+      payments: [
+        payment('0001', '0001', '2026-01-20', 4_000),
+        payment('0002', '0001', '2026-03-01', 6_000, { amountMinor: 711_000, currency: 'SYP' }),
+      ],
+      statementCurrency: 'USD',
+      from: '2026-02-01',
+      to: '2026-12-31',
+    });
+    expect(result.openingMinor).toBe(6_000);
+    // Same day: the invoice before the payment.
+    expect(result.rows.map((row) => [row.number, row.balanceMinor])).toEqual([
+      ['INV-2026-0002', 11_000],
+      ['RC-2026-0002', 5_000],
+    ]);
+    expect(result.rows[1]?.original).toEqual({ amountMinor: 711_000, currency: 'SYP' });
+    expect(result.rows[0]?.original).toBeNull();
+    expect(result).toMatchObject({ closingMinor: 5_000, invoicedMinor: 5_000, paidMinor: 6_000 });
+  });
+
+  it('leaves out documents after the period', () => {
+    const result = statementRows({
+      invoices: [invoice('0001', '2026-05-01', 10_000)],
+      payments: [payment('0001', '0001', '2026-05-02', 10_000)],
+      statementCurrency: 'USD',
+      from: '2026-01-01',
+      to: '2026-04-30',
+    });
+    expect(result).toMatchObject({ openingMinor: 0, rows: [], closingMinor: 0 });
+  });
+
+  it('goes negative for a payment received before its invoice (edge case 15)', () => {
+    const result = statementRows({
+      invoices: [invoice('0001', '2026-05-10', 10_000)],
+      payments: [payment('0001', '0001', '2026-05-01', 3_000)],
+      statementCurrency: 'USD',
+      from: '2026-05-01',
+      to: '2026-05-05',
+    });
+    expect(result.rows.map((row) => row.balanceMinor)).toEqual([-3_000]);
+    expect(result.closingMinor).toBe(-3_000);
   });
 });

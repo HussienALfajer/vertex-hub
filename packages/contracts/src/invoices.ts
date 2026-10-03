@@ -1,8 +1,10 @@
 import { z } from 'zod';
 import { calendarDateSchema } from './dates.js';
+import { extraWorkBillingSchema } from './extra-work.js';
 import { pageQuerySchema, pageSchema, queryListSchema, sortOrderSchema } from './lists.js';
 import { currencySchema, exchangeRateSchema, minorAmountSchema } from './money.js';
 import { milestoneStatusSchema } from './projects.js';
+import { cycleStatusSchema } from './retainers.js';
 import { optionalText } from './text.js';
 
 /*
@@ -500,3 +502,213 @@ export const invoiceSnapshotSchema = z
   .meta({ id: 'InvoiceSnapshot' });
 
 export type InvoiceSnapshot = z.infer<typeof invoiceSnapshotSchema>;
+
+// Client billing and statements (rule 28)
+
+const signedMinorSchema = z
+  .number()
+  .int()
+  .min(-Number.MAX_SAFE_INTEGER)
+  .max(Number.MAX_SAFE_INTEGER);
+
+export const clientBillingSchema = z
+  .object({
+    /** Over the client's issued, non-void invoices, one entry per currency it was invoiced in. */
+    byCurrency: z.array(
+      outstandingSchema.extend({
+        currency: currencySchema,
+        invoicedMinor: minorAmountSchema,
+        paidMinor: minorAmountSchema,
+      }),
+    ),
+    /** The newest non-archived invoices, drafts included. */
+    latest: z.array(invoiceSchema),
+  })
+  .meta({ id: 'ClientBilling' });
+
+export type ClientBilling = z.infer<typeof clientBillingSchema>;
+
+export const CLIENT_BILLING_LATEST = 5;
+
+/** Rule 28: one currency; the period defaults to the current year up to today. */
+export const clientStatementQuerySchema = z.object({
+  currency: currencySchema,
+  from: calendarDateSchema.optional(),
+  to: calendarDateSchema.optional(),
+});
+
+export type ClientStatementQuery = z.infer<typeof clientStatementQuerySchema>;
+
+export const statementRowSchema = z
+  .object({
+    kind: z.enum(['invoice', 'payment']),
+    /** The invoice or the payment. */
+    id: z.uuid(),
+    date: calendarDateSchema,
+    /** `INV-…` or `RC-…`. */
+    number: z.string(),
+    /** The invoice itself, or the invoice a payment pays. */
+    invoiceId: z.uuid(),
+    invoiceNumber: z.string(),
+    debitMinor: minorAmountSchema,
+    /** A payment's applied amount (rule 19). */
+    creditMinor: minorAmountSchema,
+    /** The running balance; negative when a payment came before its invoice (edge case 15). */
+    balanceMinor: signedMinorSchema,
+    /** A payment's own amount when it was paid in the other currency. */
+    original: z.object({ amountMinor: minorAmountSchema, currency: currencySchema }).nullable(),
+  })
+  .meta({ id: 'StatementRow' });
+
+export type StatementRowItem = z.infer<typeof statementRowSchema>;
+
+export const clientStatementSchema = z
+  .object({
+    client: namedSchema,
+    /** The billing name, else the trade name. */
+    billingName: z.string(),
+    billingAddress: z.string().nullable(),
+    currency: currencySchema,
+    from: calendarDateSchema,
+    to: calendarDateSchema,
+    openingMinor: signedMinorSchema,
+    rows: z.array(statementRowSchema),
+    closingMinor: signedMinorSchema,
+    invoicedMinor: minorAmountSchema,
+    paidMinor: minorAmountSchema,
+    /** The closing balance. */
+    outstandingMinor: signedMinorSchema,
+  })
+  .meta({ id: 'ClientStatement' });
+
+export type ClientStatement = z.infer<typeof clientStatementSchema>;
+
+// Project expenses (rule 26) and billing summaries (rule 27)
+
+const expenseFieldsSchema = z.object({
+  /** ≤ today (`INVALID_DATES`). */
+  spentOn: calendarDateSchema,
+  description: z.string().trim().min(1).max(200),
+  amountMinor: minorAmountSchema.min(1),
+  currency: currencySchema,
+  sypPerUsd: exchangeRateSchema,
+  note: optionalText(500),
+});
+
+/** The currency defaults to the project's, the rate to the current one (`RATE_REQUIRED`). */
+export const createProjectExpenseSchema = expenseFieldsSchema
+  .extend({
+    currency: currencySchema.nullable().default(null),
+    sypPerUsd: exchangeRateSchema.nullable().default(null),
+    note: optionalText(500).default(null),
+  })
+  .meta({ id: 'CreateProjectExpense' });
+
+export type CreateProjectExpense = z.infer<typeof createProjectExpenseSchema>;
+
+export type CreateProjectExpenseInput = z.input<typeof createProjectExpenseSchema>;
+
+export const updateProjectExpenseSchema = expenseFieldsSchema
+  .partial()
+  .meta({ id: 'UpdateProjectExpense' });
+
+export type UpdateProjectExpense = z.infer<typeof updateProjectExpenseSchema>;
+
+export const projectExpenseSchema = expenseFieldsSchema
+  .extend({
+    id: z.uuid(),
+    description: z.string(),
+    note: z.string().nullable(),
+    /** The amount at the expense's own rate (ADR 0006). */
+    usdMinor: minorAmountSchema,
+    loggedBy: personSchema,
+    createdAt: z.iso.datetime(),
+    updatedAt: z.iso.datetime(),
+  })
+  .meta({ id: 'ProjectExpense' });
+
+export type ProjectExpense = z.infer<typeof projectExpenseSchema>;
+
+/** The live invoice (draft or issued, not void) that holds a source; null: "not invoiced". */
+export const sourceInvoiceSchema = z
+  .object({ id: z.uuid(), displayNumber: z.string().nullable(), status: invoiceStatusSchema })
+  .meta({ id: 'SourceInvoice' });
+
+export type SourceInvoice = z.infer<typeof sourceInvoiceSchema>;
+
+export const projectMarginSchema = z
+  .object({
+    /** Issued, non-void invoices of the project, each at its own rate. */
+    invoicedUsdMinor: minorAmountSchema,
+    /** Their non-void payments, each at its own rate. */
+    collectedUsdMinor: minorAmountSchema,
+    /** Non-archived expenses, each at its own rate. */
+    expensesUsdMinor: minorAmountSchema,
+    /** Invoiced − expenses. */
+    marginUsdMinor: signedMinorSchema,
+    /** Σ installments of the non-archived milestones, in the project's currency. */
+    plannedInstallmentsMinor: minorAmountSchema,
+  })
+  .meta({ id: 'ProjectMargin' });
+
+export type ProjectMargin = z.infer<typeof projectMarginSchema>;
+
+export const projectBillingSchema = z
+  .object({
+    project: namedSchema.extend({ currency: currencySchema, archived: z.boolean() }),
+    /** Non-archived milestones by position. */
+    milestones: z.array(
+      z.object({
+        id: z.uuid(),
+        name: z.string(),
+        status: milestoneStatusSchema,
+        dueDate: calendarDateSchema.nullable(),
+        installmentMinor: minorAmountSchema.nullable(),
+        invoice: sourceInvoiceSchema.nullable(),
+      }),
+    ),
+    /** Non-archived invoices of the project, newest first. */
+    invoices: z.array(invoiceSchema),
+    /** Non-archived expenses, newest first. */
+    expenses: z.array(projectExpenseSchema),
+    margin: projectMarginSchema,
+    /** `expenses.manage` covering the client on a non-archived project. */
+    canManageExpenses: z.boolean(),
+  })
+  .meta({ id: 'ProjectBilling' });
+
+export type ProjectBilling = z.infer<typeof projectBillingSchema>;
+
+export const retainerBillingSchema = z
+  .object({
+    retainer: namedSchema.extend({
+      currency: currencySchema,
+      monthlyFeeMinor: minorAmountSchema.nullable(),
+      archived: z.boolean(),
+    }),
+    /** Newest month first. */
+    cycles: z.array(
+      z.object({
+        id: z.uuid(),
+        /** The first day of the month. */
+        month: calendarDateSchema,
+        status: cycleStatusSchema,
+        invoice: sourceInvoiceSchema.nullable(),
+      }),
+    ),
+    /** Non-archived extra work, newest first. */
+    extraWork: z.array(
+      z.object({
+        id: z.uuid(),
+        title: z.string(),
+        billingStatus: extraWorkBillingSchema,
+        estimateMinor: minorAmountSchema.nullable(),
+        invoice: sourceInvoiceSchema.nullable(),
+      }),
+    ),
+    /** Non-archived invoices of the retainer, newest first. */
+    invoices: z.array(invoiceSchema),
+  })
+  .meta({ id: 'RetainerBilling' });
+
+export type RetainerBilling = z.infer<typeof retainerBillingSchema>;

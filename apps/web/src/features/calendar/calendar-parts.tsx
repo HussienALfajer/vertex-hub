@@ -20,6 +20,7 @@ import {
   type LucideIcon,
   PackageIcon,
   PartyPopperIcon,
+  ReceiptIcon,
   RepeatIcon,
   TriangleAlertIcon,
   UsersIcon,
@@ -157,6 +158,7 @@ const KEY_DATE_ICONS: Record<KeyDateKind, LucideIcon> = {
   project_due: FolderKanbanIcon,
   milestone_due: FlagIcon,
   renewal: RepeatIcon,
+  invoice_due: ReceiptIcon,
 };
 
 const cardClass =
@@ -207,7 +209,8 @@ function KeyDateChip({ keyDate, me }: { keyDate: KeyDate; me: MeResponse }) {
   );
   const className =
     'flex min-w-0 items-center gap-1 rounded-sm bg-status-gold px-1.5 py-0.5 text-xs font-medium text-status-gold-foreground';
-  return can(me, 'projects.read') ? (
+  // The invoice page arrives with the invoice screens; until then its due date is not a link.
+  return keyDate.kind !== 'invoice_due' && can(me, 'projects.read') ? (
     <KeyDateLink
       keyDate={keyDate}
       className={cn(
