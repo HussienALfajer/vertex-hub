@@ -11,8 +11,10 @@ import { InvoiceDrafts } from './invoice-drafts.js';
 import { InvoiceDueDates } from './invoice-due-dates.js';
 import { InvoiceFileOwner } from './invoice-file-owner.js';
 import { InvoiceOverdueService } from './invoice-overdue.service.js';
+import { InvoicePdfService } from './invoice-pdf.service.js';
 import { InvoiceSettingsController } from './invoice-settings.controller.js';
 import { InvoiceSettingsService } from './invoice-settings.service.js';
+import { InvoiceSnapshots } from './invoice-snapshots.js';
 import { InvoiceWorkflowService } from './invoice-workflow.service.js';
 import { InvoicesController } from './invoices.controller.js';
 import { InvoicesService } from './invoices.service.js';
@@ -27,7 +29,9 @@ import { ProjectExpensesService } from './project-expenses.service.js';
  * `QuoteDirectory`. Drafts automatically through `QuoteAcceptedHooks`, `MilestoneDoneHooks` and
  * `CycleOpenedHooks`, and answers `projects`' `BillingLocks`. Records and voids payments with
  * receipt numbers, keeps payment proofs as invoice documents (`files`' `GeneratedFiles`, owner
- * type `invoice`), marks invoices overdue in `invoices.daily` and repeats the alert as a source of
+ * type `invoice`), renders invoice, draft, receipt and statement PDFs through the worker
+ * (`invoices.pdf`, `invoices.pdf-ready`; statement renders purged through `files`' `FilePurges`),
+ * marks invoices overdue in `invoices.daily` and repeats the alert as a source of
  * `notifications.daily`. Owns `project_expenses` and serves client balances and statements, and the
  * billing summaries of projects (with their margin) and retainers; exports `InvoiceDueDates` for
  * the company calendar.
@@ -49,7 +53,9 @@ import { ProjectExpensesService } from './project-expenses.service.js';
   ],
   providers: [
     InvoiceSettingsService,
+    InvoiceSnapshots,
     InvoicesService,
+    InvoicePdfService,
     InvoiceWorkflowService,
     InvoiceDrafts,
     PaymentsService,

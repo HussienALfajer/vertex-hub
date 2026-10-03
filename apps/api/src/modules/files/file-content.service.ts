@@ -16,6 +16,7 @@ import { JobQueue } from '../../core/jobs/index.js';
 import type { CurrentUserInfo } from '../auth/index.js';
 import { assertVisible, ownerIdOf, type VersionRow } from './file-access.js';
 import { FileOwnerRegistry } from './file-owner-registry.js';
+import { FilePurges } from './file-purges.js';
 import { FileStorage } from './file-storage.js';
 import { FileUploadsService } from './file-uploads.service.js';
 
@@ -57,6 +58,7 @@ export class FileContentService implements OnModuleInit {
     private readonly owners: FileOwnerRegistry,
     private readonly storage: FileStorage,
     private readonly uploads: FileUploadsService,
+    private readonly purges: FilePurges,
     private readonly jobs: JobQueue,
   ) {}
 
@@ -68,6 +70,9 @@ export class FileContentService implements OnModuleInit {
     this.jobs.work(FILES_PURGE_UPLOADS_JOB.queue, async () => {
       const purged = await this.uploads.purgeUploads();
       this.logger.log(`Purged ${purged} unattached uploads`);
+      for (const [name, count] of await this.purges.run()) {
+        this.logger.log(`Purged ${count} ${name}`);
+      }
       // A preview queued just before a restart is still `pending`: the daily run picks it up.
       await this.jobs.send(FILES_PREVIEW_JOB.queue);
     });

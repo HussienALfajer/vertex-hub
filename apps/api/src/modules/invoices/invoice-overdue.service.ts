@@ -15,6 +15,7 @@ import { recordAudit } from '../audit/index.js';
 import { UserDirectory } from '../auth/index.js';
 import { ClientDirectory, type ClientSummary } from '../clients/index.js';
 import { DailyReminders, type Notice, NotificationCenter } from '../notifications/index.js';
+import { InvoicePdfService } from './invoice-pdf.service.js';
 import { type InvoiceRow, identity } from './invoices.service.js';
 
 /** The overdue alert repeats every this many days while the invoice stays overdue (A10). */
@@ -24,7 +25,8 @@ const REMINDER_EVERY_DAYS = 7;
  * A10 (spec F13): the `invoices.daily` job marks issued invoices past their due date `overdue`
  * (rule 21) and alerts Finance, the Internal Operations manager and the account manager; the
  * `invoices-overdue` source of `notifications.daily` repeats the alert every 7 days while the
- * invoice stays overdue. `apps/worker` schedules the job; this process works it.
+ * invoice stays overdue. The job also queues again the invoice and receipt PDFs still pending
+ * (edge case 12). `apps/worker` schedules the job; this process works it.
  */
 @Injectable()
 export class InvoiceOverdueService implements OnModuleInit {
@@ -37,12 +39,14 @@ export class InvoiceOverdueService implements OnModuleInit {
     private readonly center: NotificationCenter,
     private readonly clients: ClientDirectory,
     private readonly users: UserDirectory,
+    private readonly pdf: InvoicePdfService,
   ) {}
 
   onModuleInit(): void {
     this.jobs.work(INVOICES_DAILY_JOB.queue, async () => {
       const marked = await this.runDaily();
-      this.logger.log(`Daily invoices: ${marked} marked overdue`);
+      const requeued = await this.pdf.requeuePending();
+      this.logger.log(`Daily invoices: ${marked} marked overdue, ${requeued} PDFs queued again`);
     });
     this.reminders.register('invoices-overdue', (today) => this.remind(today));
   }

@@ -1,3 +1,4 @@
+import type { IncomingMessage, ServerResponse } from 'node:http';
 import {
   Body,
   Controller,
@@ -8,9 +9,11 @@ import {
   Patch,
   Post,
   Query,
+  Req,
+  Res,
   SerializeOptions,
 } from '@nestjs/common';
-import { ApiCreatedResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
+import { ApiCreatedResponse, ApiNotFoundResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import {
   type ClientBilling,
   type ClientStatement,
@@ -22,6 +25,8 @@ import {
   createProjectExpenseSchema,
   type ProjectBilling,
   projectBillingSchema,
+  type QuotePdfRender,
+  quotePdfRenderSchema,
   type RetainerBilling,
   retainerBillingSchema,
   type UpdateProjectExpense,
@@ -30,6 +35,7 @@ import {
 import { RequirePermissions } from '../../core/access/index.js';
 import { CurrentUser, type CurrentUserInfo } from '../auth/index.js';
 import { InvoiceBillingService } from './invoice-billing.service.js';
+import { InvoicePdfService } from './invoice-pdf.service.js';
 import { ProjectExpensesService } from './project-expenses.service.js';
 
 /**
@@ -42,6 +48,7 @@ export class InvoiceBillingController {
   constructor(
     private readonly billing: InvoiceBillingService,
     private readonly expenses: ProjectExpensesService,
+    private readonly pdf: InvoicePdfService,
   ) {}
 
   @Get('clients/:id/billing')
@@ -71,6 +78,36 @@ export class InvoiceBillingController {
     @Query({ schema: clientStatementQuerySchema }) query: ClientStatementQuery,
   ): Promise<ClientStatement> {
     return this.billing.statement(actor, id, query);
+  }
+
+  @Post('clients/:id/statement/pdf')
+  @HttpCode(200)
+  @RequirePermissions('invoices.read')
+  @SerializeOptions({ schema: quotePdfRenderSchema })
+  @ApiOkResponse({
+    description: 'Queues the PDF of the statement as it is now (rule 29), or finds it ready',
+    standardSchema: quotePdfRenderSchema,
+  })
+  renderStatement(
+    @CurrentUser() actor: CurrentUserInfo,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query({ schema: clientStatementQuerySchema }) query: ClientStatementQuery,
+  ): Promise<QuotePdfRender> {
+    return this.pdf.requestStatement(actor, id, query);
+  }
+
+  @Get('clients/:id/statement/pdf')
+  @RequirePermissions('invoices.read')
+  @ApiOkResponse({ description: 'The statement PDF, for 24 hours after it was asked for' })
+  @ApiNotFoundResponse({ description: 'No such client, or no ready PDF of this statement' })
+  async downloadStatement(
+    @CurrentUser() actor: CurrentUserInfo,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query({ schema: clientStatementQuerySchema }) query: ClientStatementQuery,
+    @Req() request: IncomingMessage,
+    @Res() response: ServerResponse,
+  ): Promise<void> {
+    await this.pdf.serveStatement(actor, id, query, request, response);
   }
 
   @Get('projects/:id/billing')

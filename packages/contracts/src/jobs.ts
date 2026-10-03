@@ -6,6 +6,12 @@
 
 import { z } from 'zod';
 import { BUSINESS_TIME_ZONE } from './dates.js';
+import {
+  invoiceDraftSnapshotSchema,
+  invoiceSnapshotSchema,
+  receiptSnapshotSchema,
+  statementSnapshotSchema,
+} from './invoices.js';
 import { quoteSnapshotSchema } from './quotes.js';
 
 /** F05 R2: closes past retainer cycles and opens the current month's, once a day. */
@@ -69,12 +75,24 @@ export const INVOICES_DAILY_JOB = {
  */
 export const QUOTES_PDF_JOB = { queue: 'quotes.pdf', retryLimit: 3 } as const;
 
+/** SHA-256 of a render payload, hex. */
+const renderHashSchema = z.string().regex(/^[0-9a-f]{64}$/);
+
+/** The PDF a render stored, handed back to the API; null when the render failed for good. */
+const renderedFileSchema = z
+  .object({
+    storageKey: z.string().min(1),
+    sizeBytes: z.number().int().min(1),
+    sha256: renderHashSchema,
+  })
+  .nullable();
+
 export const quotePdfJobSchema = z.object({
   quoteId: z.uuid(),
   /** A draft preview, printed with a "draft" watermark. */
   draft: z.boolean(),
   /** SHA-256 of the payload, hex. */
-  hash: z.string().regex(/^[0-9a-f]{64}$/),
+  hash: renderHashSchema,
   snapshot: quoteSnapshotSchema,
 });
 
@@ -94,13 +112,74 @@ export const quotePdfReadyJobSchema = quotePdfJobSchema
   .pick({ quoteId: true, draft: true, hash: true })
   .extend({
     /** The stored PDF; null when the render failed for good. */
-    file: z
-      .object({
-        storageKey: z.string().min(1),
-        sizeBytes: z.number().int().min(1),
-        sha256: z.string().regex(/^[0-9a-f]{64}$/),
-      })
-      .nullable(),
+    file: renderedFileSchema,
   });
 
 export type QuotePdfReadyJob = z.infer<typeof quotePdfReadyJobSchema>;
+
+/**
+ * F13 rules 15, 20 and 29: renders the PDF of an issued invoice, a draft preview, a payment's
+ * receipt or a client statement, as `quotes.pdf` does. `id` is the record the result goes back
+ * to: the invoice, the payment, or the statement render.
+ */
+export const INVOICES_PDF_JOB = { queue: 'invoices.pdf', retryLimit: 3 } as const;
+
+export const INVOICE_PDF_KINDS = ['invoice', 'invoice_draft', 'receipt', 'statement'] as const;
+
+export type InvoicePdfKind = (typeof INVOICE_PDF_KINDS)[number];
+
+export const invoicePdfJobSchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('invoice'),
+    id: z.uuid(),
+    hash: renderHashSchema,
+    snapshot: invoiceSnapshotSchema,
+  }),
+  z.object({
+    kind: z.literal('invoice_draft'),
+    id: z.uuid(),
+    hash: renderHashSchema,
+    snapshot: invoiceDraftSnapshotSchema,
+  }),
+  z.object({
+    kind: z.literal('receipt'),
+    id: z.uuid(),
+    hash: renderHashSchema,
+    snapshot: receiptSnapshotSchema,
+  }),
+  z.object({
+    kind: z.literal('statement'),
+    id: z.uuid(),
+    hash: renderHashSchema,
+    snapshot: statementSnapshotSchema,
+  }),
+]);
+
+export type InvoicePdfJob = z.infer<typeof invoicePdfJobSchema>;
+
+const INVOICE_PDF_FOLDERS: Record<InvoicePdfKind, string> = {
+  invoice: 'invoices',
+  invoice_draft: 'invoices',
+  receipt: 'receipts',
+  statement: 'statements',
+};
+
+/** Where the worker writes the PDF of an `invoices.pdf` render, under `FILES_ROOT`. */
+export const invoicePdfStorageKey = (job: Pick<InvoicePdfJob, 'kind' | 'id' | 'hash'>) =>
+  `objects/${INVOICE_PDF_FOLDERS[job.kind]}/${job.id}/${job.hash}.pdf`;
+
+/**
+ * The result of an `invoices.pdf` render, worked by the API: attached as a document of the
+ * invoice (invoices and receipts), kept as the draft preview, recorded as a statement render, or
+ * marked failed after the last retry.
+ */
+export const INVOICES_PDF_READY_JOB = { queue: 'invoices.pdf-ready' } as const;
+
+export const invoicePdfReadyJobSchema = z.object({
+  kind: z.enum(INVOICE_PDF_KINDS),
+  id: z.uuid(),
+  hash: renderHashSchema,
+  file: renderedFileSchema,
+});
+
+export type InvoicePdfReadyJob = z.infer<typeof invoicePdfReadyJobSchema>;

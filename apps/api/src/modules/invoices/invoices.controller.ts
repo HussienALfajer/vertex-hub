@@ -1,3 +1,4 @@
+import type { IncomingMessage, ServerResponse } from 'node:http';
 import {
   Body,
   Controller,
@@ -8,9 +9,18 @@ import {
   Post,
   Put,
   Query,
+  Req,
+  Res,
   SerializeOptions,
 } from '@nestjs/common';
-import { ApiCreatedResponse, ApiNoContentResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiCreatedResponse,
+  ApiNoContentResponse,
+  ApiNotFoundResponse,
+  ApiOkResponse,
+  ApiQuery,
+  ApiTags,
+} from '@nestjs/swagger';
 import {
   type BillableItems,
   type BillableItemsQuery,
@@ -30,11 +40,14 @@ import {
   invoiceListQuerySchema,
   invoicePageSchema,
   issueInvoiceSchema,
+  type QuotePdfRender,
+  quotePdfRenderSchema,
   type VoidInvoice,
   voidInvoiceSchema,
 } from '@vertex-hub/contracts';
 import { RequirePermissions } from '../../core/access/index.js';
 import { CurrentUser, type CurrentUserInfo } from '../auth/index.js';
+import { InvoicePdfService } from './invoice-pdf.service.js';
 import { InvoiceWorkflowService } from './invoice-workflow.service.js';
 import { InvoicesService } from './invoices.service.js';
 
@@ -44,6 +57,7 @@ export class InvoicesController {
   constructor(
     private readonly invoices: InvoicesService,
     private readonly workflow: InvoiceWorkflowService,
+    private readonly pdf: InvoicePdfService,
   ) {}
 
   @Get()
@@ -162,5 +176,36 @@ export class InvoicesController {
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<void> {
     return this.invoices.archive(actor, id);
+  }
+
+  @Post(':id/pdf')
+  @HttpCode(200)
+  @RequirePermissions('invoices.read')
+  @SerializeOptions({ schema: quotePdfRenderSchema })
+  @ApiOkResponse({
+    description:
+      'Queues the draft preview (managers) or renders an issued invoice again when its PDF is not ready',
+    standardSchema: quotePdfRenderSchema,
+  })
+  renderPdf(
+    @CurrentUser() actor: CurrentUserInfo,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<QuotePdfRender> {
+    return this.pdf.render(actor, id);
+  }
+
+  @Get(':id/pdf')
+  @RequirePermissions('invoices.read')
+  @ApiQuery({ name: 'draft', required: false, enum: ['true'] })
+  @ApiOkResponse({ description: 'The PDF of the invoice, or the draft preview with draft=true' })
+  @ApiNotFoundResponse({ description: 'No such invoice, or its PDF is not ready' })
+  async downloadPdf(
+    @CurrentUser() actor: CurrentUserInfo,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query('draft') draft: string | undefined,
+    @Req() request: IncomingMessage,
+    @Res() response: ServerResponse,
+  ): Promise<void> {
+    await this.pdf.serve(actor, id, draft === 'true', request, response);
   }
 }

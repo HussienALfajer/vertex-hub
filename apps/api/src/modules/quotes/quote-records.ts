@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import {
   businessDate,
   type QuoteSnapshot,
@@ -16,6 +15,7 @@ import {
   type Transaction,
 } from '@vertex-hub/db';
 import { asc, inArray } from 'drizzle-orm';
+import { payloadHash } from '../../core/jobs/index.js';
 
 /*
  * The rows of a quote version and the amounts computed from them, shared by the quote services.
@@ -163,21 +163,9 @@ export function buildSnapshot(
   };
 }
 
-/** JSON with sorted keys: `jsonb` does not keep key order, and the hash must survive it. */
-function canonicalJson(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
-  if (value && typeof value === 'object') {
-    const entries = Object.entries(value)
-      .filter(([, item]) => item !== undefined)
-      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
-    return `{${entries.map(([key, item]) => `${JSON.stringify(key)}:${canonicalJson(item)}`).join(',')}}`;
-  }
-  return JSON.stringify(value);
-}
-
 /** Names a render (rules 12 and 13): the same payload, the same PDF. */
 export function renderHash(snapshot: QuoteSnapshot, draft: boolean): string {
-  return createHash('sha256').update(canonicalJson({ draft, snapshot })).digest('hex');
+  return payloadHash({ draft, snapshot });
 }
 
 /** A quote without a draft preview: before the first, and once the draft is sent or discarded. */

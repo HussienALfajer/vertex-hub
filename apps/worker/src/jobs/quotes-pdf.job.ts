@@ -1,6 +1,4 @@
-import { createHash } from 'node:crypto';
-import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
-import { dirname, resolve, sep } from 'node:path';
+import { resolve } from 'node:path';
 import { Inject, Injectable, Logger, type OnApplicationBootstrap } from '@nestjs/common';
 import {
   QUOTES_PDF_JOB,
@@ -11,6 +9,7 @@ import {
   quotePdfStorageKey,
 } from '@vertex-hub/contracts';
 import { ENV, type Env } from '../core/config/env.js';
+import { storeOnce } from '../pdf/pdf-objects.js';
 import { PdfRenderer } from '../pdf/pdf-renderer.js';
 import { PgBossService } from './pg-boss.service.js';
 
@@ -55,43 +54,13 @@ export class QuotesPdfJob implements OnApplicationBootstrap {
   /** Writes the PDF once per payload hash; a rerun finds it and reports the same file. */
   async render(data: unknown): Promise<QuotePdfReadyJob> {
     const job = quotePdfJobSchema.parse(data);
-    const storageKey = quotePdfStorageKey(job);
-    const path = this.path(storageKey);
-    const bytes: Buffer = (await readFile(path).catch(() => null)) ?? (await this.write(path, job));
-    return {
-      quoteId: job.quoteId,
-      draft: job.draft,
-      hash: job.hash,
-      file: {
-        storageKey,
-        sizeBytes: bytes.length,
-        sha256: createHash('sha256').update(bytes).digest('hex'),
-      },
-    };
-  }
-
-  private async write(path: string, job: QuotePdfJob): Promise<Buffer> {
-    const bytes = await this.renderer.quote(job.snapshot, { draft: job.draft });
-    await mkdir(dirname(path), { recursive: true });
-    // Written aside, then renamed: a reader never sees half a file.
-    const partial = `${path}.${process.pid}.part`;
-    try {
-      await writeFile(partial, bytes);
-      await rename(partial, path);
-    } finally {
-      await rm(partial, { force: true });
-    }
-    return bytes;
+    const file = await storeOnce(this.root, quotePdfStorageKey(job), () =>
+      this.renderer.quote(job.snapshot, { draft: job.draft }),
+    );
+    return { quoteId: job.quoteId, draft: job.draft, hash: job.hash, file };
   }
 
   private async report(result: QuotePdfReadyJob): Promise<void> {
     await this.pgBoss.boss.send(QUOTES_PDF_READY_JOB.queue, result);
-  }
-
-  /** The absolute path of a key, refusing anything that would leave the root. */
-  private path(key: string): string {
-    const path = resolve(this.root, key);
-    if (!path.startsWith(this.root + sep)) throw new Error(`Invalid storage key: ${key}`);
-    return path;
   }
 }
