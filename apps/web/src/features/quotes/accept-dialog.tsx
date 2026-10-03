@@ -28,14 +28,13 @@ import {
   FieldLabel,
   Input,
   MultiCombobox,
-  Progress,
   Skeleton,
   Textarea,
   ToggleGroup,
   ToggleGroupItem,
   toast,
 } from '@vertex-hub/ui';
-import { PaperclipIcon, TriangleAlertIcon, XIcon } from 'lucide-react';
+import { TriangleAlertIcon } from 'lucide-react';
 import { type ReactNode, useEffect, useId, useRef, useState } from 'react';
 import { Controller, type FieldPath, type UseFormReturn, useForm, useWatch } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
@@ -43,10 +42,10 @@ import { FormAlert } from '../../components/form-alert';
 import { LoadError } from '../../components/load-error';
 import { ApiError } from '../../lib/api/client';
 import { errorMessage, fieldError, SCREEN_ERROR } from '../../lib/errors';
-import { formatCalendarDate, formatFileSize, formatNumber } from '../../lib/format';
+import { formatCalendarDate, formatNumber } from '../../lib/format';
 import { clientQuery } from '../clients/clients.queries';
 import { departmentListQuery } from '../departments/departments.queries';
-import { UploadNetworkError, uploadFile } from '../files/files.queries';
+import { type Proof, ProofField } from '../files/proof-field';
 import { DepartmentChips } from '../projects/project-badges';
 import { useProjectManagerOptions } from '../projects/project-form';
 import { DeliverableIcon, lineName, RetainerStatusBadge } from '../retainers/retainer-badges';
@@ -93,15 +92,6 @@ interface AcceptValues {
 }
 
 type AcceptForm = UseFormReturn<AcceptValues>;
-
-/** The proof file, uploaded as soon as it is picked (A1). */
-interface Proof {
-  file: File;
-  sent: number;
-  uploadId: string | null;
-  error: string | null;
-  controller: AbortController | null;
-}
 
 const isDate = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value);
 
@@ -528,129 +518,13 @@ function ResponseStep({
         <Textarea id={ids.note} rows={3} {...form.register('note')} />
         <FieldError match={!!errors.note}>{t('quotes.accept.errors.note')}</FieldError>
       </Field>
-      <ProofField proof={proof} onProof={onProof} />
-    </div>
-  );
-}
-
-/** One proof file (A1): uploaded at once, attached to the quote's documents on acceptance. */
-function ProofField({
-  proof,
-  onProof,
-}: {
-  proof: Proof | null;
-  onProof: (proof: Proof | null) => void;
-}) {
-  const { t } = useTranslation();
-  const input = useRef<HTMLInputElement>(null);
-  const labelId = useId();
-  const progressId = useId();
-  // Answers of an upload replaced or removed meanwhile are dropped.
-  const current = useRef<Proof | null>(proof);
-  current.current = proof;
-
-  async function pick(file: File | undefined) {
-    if (!file) return;
-    proof?.controller?.abort();
-    const controller = new AbortController();
-    let entry: Proof = { file, sent: 0, uploadId: null, error: null, controller };
-    const update = (change: Partial<Proof>) => {
-      if (current.current?.controller !== controller) return;
-      entry = { ...entry, ...change };
-      onProof(entry);
-    };
-    onProof(entry);
-    current.current = entry;
-    try {
-      const upload = await uploadFile(file, {
-        signal: controller.signal,
-        onProgress: (sent) => update({ sent }),
-      });
-      update({ uploadId: upload.uploadId, sent: 1 });
-    } catch (error) {
-      if (error instanceof DOMException && error.name === 'AbortError') return;
-      update({
-        error:
-          error instanceof UploadNetworkError ? t('files.upload.network') : errorMessage(t, error),
-      });
-    }
-  }
-
-  function remove() {
-    proof?.controller?.abort();
-    onProof(null);
-  }
-
-  return (
-    <Field>
-      <FieldLabel id={labelId} render={<span />}>
-        {t('quotes.accept.proof.label')}
-      </FieldLabel>
-      {proof ? (
-        <div
-          className={cn(
-            'flex flex-col gap-2 rounded-md border px-3 py-2',
-            proof.error ? 'border-destructive' : 'border-border',
-          )}
-        >
-          <div className="flex items-center gap-2">
-            <PaperclipIcon aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
-            <span
-              id={progressId}
-              className="min-w-0 flex-1 truncate text-sm font-medium"
-              dir="auto"
-            >
-              {proof.file.name}
-            </span>
-            <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
-              {formatFileSize(proof.file.size)}
-            </span>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              aria-label={t('quotes.accept.proof.remove', { name: proof.file.name })}
-              onClick={remove}
-            >
-              <XIcon />
-            </Button>
-          </div>
-          {!proof.error && !proof.uploadId && (
-            <Progress aria-labelledby={progressId} value={Math.round(proof.sent * 100)} />
-          )}
-          {proof.error && (
-            <p role="alert" className="text-sm text-destructive-text">
-              {proof.error}
-            </p>
-          )}
-        </div>
-      ) : (
-        <div>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            aria-describedby={labelId}
-            onClick={() => input.current?.click()}
-          >
-            <PaperclipIcon />
-            {t('quotes.accept.proof.choose')}
-          </Button>
-        </div>
-      )}
-      <input
-        ref={input}
-        type="file"
-        className="sr-only"
-        tabIndex={-1}
-        aria-hidden="true"
-        onChange={(event) => {
-          void pick(event.target.files?.[0]);
-          event.target.value = '';
-        }}
+      <ProofField
+        proof={proof}
+        onProof={onProof}
+        label={t('quotes.accept.proof.label')}
+        hint={t('quotes.accept.proof.hint')}
       />
-      <FieldDescription>{t('quotes.accept.proof.hint')}</FieldDescription>
-    </Field>
+    </div>
   );
 }
 

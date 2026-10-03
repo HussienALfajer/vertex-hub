@@ -48,9 +48,10 @@ Spec: `docs/specs/F13-invoicing-collection.md` · ADRs 0006, 0007, 0008, 0013, 0
 - [x] wiring checklist, full checks (lint, typecheck, test, build, E2E, drift pass), reviewer (one finding fixed: 403 and out-of-scope tests for the receipt render and the statement download), owner acceptance (approved; dev database not migrated), /ship
 
 ## PR 6 — `feat/f13-invoices-web`: invoice screens
-- [ ] web `features/invoices/`: list with tabs and totals, new invoice dialog, editor with billable items picker, issue dialog, invoice page with payments, payment dialog, void and due date dialogs, settings page; routes; nav item; `ar.json` `invoices` namespace; loading, empty, error states
-- [ ] e2e: fixtures, `f13-invoices.spec.ts` (issue a drafted invoice, two payments, paid; role differences), screenshots light + dark
-- [ ] wiring checklist, full checks (+ E2E), reviewer, owner acceptance, /ship
+- [x] web `features/invoices/`: list with tabs and totals, new invoice dialog, editor with billable items picker, issue dialog, invoice page with payments, payment dialog, void and due date dialogs, settings page; routes; nav item; `ar.json` `invoices` namespace; loading, empty, error states; the quote accept dialog's proof upload moved to `features/files/proof-field.tsx` (second use: the payment proof)
+- [x] e2e: fixtures (`invoicesSeed`, `invoiceRoutes`), `f13-invoices.spec.ts` (issue a drafted invoice, two payments, paid; a manual draft from billable items and a free line; role differences), screenshots light + dark (list To issue / Open, new dialog, editor, picker, issue dialog, invoice page, payment dialog in SYP, settings)
+- [x] wiring checklist, full checks (+ E2E), reviewer (three findings fixed: rate field when no current rate is set, void shown disabled on paid invoices, forms validated with the contract schemas)
+- [x] owner acceptance (approved), dev database migrated, /ship
 
 ## PR 7 — `feat/f13-billing-web`: client, project, retainer and calendar
 - [ ] web: client Invoices tab with balances and statement, billing fields on Basics; project Billing section (milestones, invoices, expenses, margin); retainer Billing section; `invoice_due` on the calendar

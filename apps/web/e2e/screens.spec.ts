@@ -818,6 +818,64 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await screenshot(page, testInfo, `client-quotes-${colorScheme}`);
     });
 
+    test('invoice list', async ({ page }, testInfo) => {
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await mockApi(page, { signedIn: true });
+      await page.goto('/invoices');
+      await expect(page.getByRole('link', { name: ar.invoices.draftNumber }).first()).toBeVisible();
+      await screenshot(page, testInfo, `invoices-to-issue-${colorScheme}`);
+
+      await page.getByRole('tab', { name: ar.invoices.tabs.open }).click();
+      await expect(page.getByRole('link', { name: 'INV-2026-0001' })).toBeVisible();
+      await screenshot(page, testInfo, `invoices-open-${colorScheme}`);
+
+      await page.getByRole('button', { name: ar.invoices.new.action }).click();
+      await expect(page.getByRole('dialog')).toBeVisible();
+      await screenshot(page, testInfo, `invoice-new-dialog-${colorScheme}`);
+    });
+
+    test('invoice editor', async ({ page }, testInfo) => {
+      await page.setViewportSize({ width: 1440, height: 1300 });
+      await mockApi(page, { signedIn: true });
+      await page.goto(`/invoices/${seedIds.designDraft}`);
+      await expect(page.getByRole('button', { name: ar.invoices.issue.action })).toBeVisible();
+      await screenshot(page, testInfo, `invoice-editor-${colorScheme}`);
+
+      await page.getByRole('button', { name: ar.invoices.editor.addBillable }).click();
+      await expect(page.getByRole('dialog')).toContainText('تصميم إضافي لإعلان العيد');
+      await screenshot(page, testInfo, `invoice-billable-picker-${colorScheme}`);
+      await page.keyboard.press('Escape');
+
+      await page.getByRole('button', { name: ar.invoices.issue.action }).click();
+      await expect(page.getByRole('dialog')).toContainText(ar.invoices.issue.title);
+      await screenshot(page, testInfo, `invoice-issue-dialog-${colorScheme}`);
+    });
+
+    test('invoice page with payments', async ({ page }, testInfo) => {
+      await page.setViewportSize({ width: 1440, height: 1100 });
+      await mockApi(page, { signedIn: true });
+      await page.goto(`/invoices/${seedIds.overdueInvoice}`);
+      await expect(page.getByText('RC-2026-0001')).toBeVisible();
+      await screenshot(page, testInfo, `invoice-page-${colorScheme}`);
+
+      // A payment of the USD invoice in the other currency, at its rate.
+      await page.getByRole('button', { name: ar.invoices.payments.action }).click();
+      const pay = page.getByRole('dialog');
+      await pay.getByRole('combobox', { name: ar.invoices.payments.currency }).click();
+      await page.getByRole('option', { name: ar.invoices.currencies.SYP }).click();
+      await pay.getByRole('button', { name: ar.invoices.payments.payTheRest }).click();
+      await expect(pay.getByText(ar.invoices.payments.balanceAfter)).toBeVisible();
+      await screenshot(page, testInfo, `invoice-payment-dialog-${colorScheme}`);
+    });
+
+    test('invoice settings', async ({ page }, testInfo) => {
+      await page.setViewportSize({ width: 1280, height: 1000 });
+      await mockApi(page, { signedIn: true });
+      await page.goto('/invoices/settings');
+      await expect(page.getByLabel(ar.invoices.settings.sypPerUsd)).toHaveValue('118.5000');
+      await screenshot(page, testInfo, `invoice-settings-${colorScheme}`);
+    });
+
     test('templates list', async ({ page }, testInfo) => {
       await page.setViewportSize({ width: 1280, height: 900 });
       await mockApi(page, { signedIn: true });
