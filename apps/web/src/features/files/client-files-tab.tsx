@@ -316,7 +316,10 @@ function LibraryTile({ entry, onPreview }: { entry: FileLibraryEntry; onPreview:
   );
 }
 
-/** Where a document belongs: the client itself, or one of its projects, retainers or quotes. */
+/**
+ * Where a document belongs: the client itself, or one of its projects, retainers, quotes or
+ * invoices.
+ */
 function DocumentOwner({ document }: { document: FileDocument }) {
   const { t } = useTranslation();
   const { owner } = document;
@@ -353,6 +356,14 @@ function DocumentOwner({ document }: { document: FileDocument }) {
     link = (
       <span className="text-xs text-muted-foreground">
         {t('files.documents.ofQuote', { name: owner.label })}
+      </span>
+    );
+  }
+  if (owner.type === 'invoice') {
+    // The invoice page arrives with the invoice screens (F13 PR 6); the file opens from the list.
+    link = (
+      <span className="text-xs text-muted-foreground">
+        {t('files.documents.ofInvoice', { name: owner.label })}
       </span>
     );
   }

@@ -18,7 +18,7 @@ import { LocalFileStorage } from './local-file-storage.js';
  * reads users through `auth`'s `UserDirectory` and notifies through `notifications`. Never
  * imports `tasks`, `clients` or `projects`: they register their owner policies in the exported
  * `FileOwnerRegistry`, and `tasks` calls the exported `FileVersions` in its transactions;
- * `quotes` attaches and serves its PDFs through `GeneratedFiles`. Works
+ * `quotes` and `invoices` attach and serve their documents through `GeneratedFiles`. Works
  * the `files.preview` and `files.purge-uploads` jobs.
  */
 @Module({

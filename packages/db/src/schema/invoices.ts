@@ -1,6 +1,7 @@
-import { INVOICE_ORIGINS, INVOICE_STATUSES } from '@vertex-hub/contracts';
+import { INVOICE_ORIGINS, INVOICE_STATUSES, PAYMENT_METHODS } from '@vertex-hub/contracts';
 import { sql } from 'drizzle-orm';
 import {
+  type AnyPgColumn,
   boolean,
   check,
   date,
@@ -19,6 +20,7 @@ import {
 import { users } from './auth.js';
 import { clients } from './clients.js';
 import { archivedAt, id, minorAmount, timestamps } from './columns.js';
+import { fileItems } from './files.js';
 import { currencyEnum, projectMilestones, projects } from './projects.js';
 import { quotes } from './quotes.js';
 import { extraWorkItems, retainerCycles, retainers } from './retainers.js';
@@ -31,6 +33,8 @@ import { extraWorkItems, retainerCycles, retainers } from './retainers.js';
 export const invoiceStatusEnum = pgEnum('invoice_status', INVOICE_STATUSES);
 
 export const invoiceOriginEnum = pgEnum('invoice_origin', INVOICE_ORIGINS);
+
+export const paymentMethodEnum = pgEnum('payment_method', PAYMENT_METHODS);
 
 export const documentNumberKindEnum = pgEnum('document_number_kind', ['invoice', 'receipt']);
 
@@ -181,5 +185,56 @@ export const invoiceLines = pgTable(
     ),
     check('invoice_lines_quantity_check', sql`${table.quantity} between 1 and 999`),
     check('invoice_lines_price_check', sql`${table.unitPriceMinor} >= 0`),
+  ],
+);
+
+/**
+ * A payment on an issued invoice (rules 16–22), with its receipt number. Voided by mistake,
+ * never archived or edited.
+ */
+export const payments = pgTable(
+  'payments',
+  {
+    id: id(),
+    invoiceId: uuid('invoice_id')
+      .notNull()
+      .references(() => invoices.id),
+    /** The receipt number, assigned when recorded and kept by a void payment. */
+    year: integer('year').notNull(),
+    number: integer('number').notNull(),
+    paidOn: date('paid_on', { mode: 'string' }).notNull(),
+    /** In the payment's own currency. */
+    amountMinor: minorAmount('amount_minor').notNull(),
+    currency: currencyEnum('currency').notNull(),
+    sypPerUsd: exchangeRate('syp_per_usd').notNull(),
+    /** The amount in the invoice's currency (rule 19). */
+    appliedMinor: minorAmount('applied_minor').notNull(),
+    method: paymentMethodEnum('method').notNull(),
+    reference: text('reference'),
+    note: text('note'),
+    /** The proof, a document of the invoice. */
+    proofFileItemId: uuid('proof_file_item_id').references((): AnyPgColumn => fileItems.id),
+    recordedById: uuid('recorded_by_id')
+      .notNull()
+      .references(() => users.id),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    voidedAt: timestamp('voided_at', { withTimezone: true }),
+    voidedById: uuid('voided_by_id').references(() => users.id),
+    voidReason: text('void_reason'),
+  },
+  (table) => [
+    uniqueIndex('payments_number_idx').on(table.year, table.number),
+    index('payments_invoice_id_idx').on(table.invoiceId),
+    index('payments_proof_file_item_id_idx').on(table.proofFileItemId),
+    index('payments_recorded_by_id_idx').on(table.recordedById),
+    index('payments_voided_by_id_idx').on(table.voidedById),
+    check('payments_amounts_check', sql`${table.amountMinor} > 0 and ${table.appliedMinor} > 0`),
+    check('payments_rate_check', sql`${table.sypPerUsd} > 0`),
+    check('payments_reference_check', sql`char_length(${table.reference}) <= 200`),
+    check('payments_note_check', sql`char_length(${table.note}) <= 500`),
+    check(
+      'payments_void_check',
+      sql`(${table.voidedAt} is null) = (${table.voidReason} is null) and char_length(${table.voidReason}) <= 500`,
+    ),
   ],
 );

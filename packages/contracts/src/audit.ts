@@ -164,6 +164,9 @@ export const AUDIT_ACTIONS = [
   'invoice.issued',
   'invoice.due_date_changed',
   'invoice.voided',
+  'invoice.overdue',
+  'payment.recorded',
+  'payment.voided',
 ] as const;
 
 export const auditActionSchema = z.enum(AUDIT_ACTIONS).meta({ id: 'AuditAction' });
@@ -199,6 +202,7 @@ export const AUDIT_ENTITY_TYPES = [
   'quote',
   'invoice_settings',
   'invoice',
+  'payment',
 ] as const;
 
 export const auditEntityTypeSchema = z.enum(AUDIT_ENTITY_TYPES).meta({ id: 'AuditEntityType' });

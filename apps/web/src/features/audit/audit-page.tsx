@@ -739,6 +739,10 @@ const KNOWN_FIELDS = [
   'defaultTerms',
   'defaultValidityDays',
   'discountThresholdPercent',
+  'paidOn',
+  'amountMinor',
+  'appliedMinor',
+  'method',
 ] as const;
 
 function fieldLabel(t: TFunction, field: string): string {

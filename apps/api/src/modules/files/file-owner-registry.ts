@@ -85,8 +85,8 @@ export interface FileOwnerPolicy {
   /**
    * The live owners of this type under a client: non-archived, non-cancelled tasks for the
    * library (rule 13); the client itself, or its non-archived projects and retainers, for the
-   * documents list (rule 14); the quotes `actor` reads (F04), whose documents are for quote
-   * readers only.
+   * documents list (rule 14); the quotes (F04) or invoices (F13) `actor` reads, whose documents
+   * are for their readers only.
    */
   ownersOfClient(
     executor: Executor,

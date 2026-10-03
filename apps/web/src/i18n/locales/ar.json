@@ -391,7 +391,8 @@
     "RATE_REQUIRED": "لا يوجد سعر صرف. أدخل سعر الصرف أو حدّثه في إعدادات الفواتير.",
     "INVOICE_HAS_PAYMENTS": "على الفاتورة دفعات مسجّلة. ألغِ الدفعات أولًا ثم ألغِ الفاتورة.",
     "MILESTONE_INVOICED": "هذه المرحلة موجودة في فاتورة قائمة. تجاهل مسودتها أو ألغِ الفاتورة أولًا.",
-    "BILLED_BY_INVOICE": "تصبح الأعمال الإضافية «مفوترة» عند إصدار فاتورتها، لا يدويًا."
+    "BILLED_BY_INVOICE": "تصبح الأعمال الإضافية «مفوترة» عند إصدار فاتورتها، لا يدويًا.",
+    "OVERPAYMENT": "المبلغ أكبر من المتبقي على الفاتورة. سجّل المتبقي فقط؛ لا يُحفظ رصيد للعميل."
   },
   "users": {
     "title": "الفريق",
@@ -720,7 +721,8 @@
       "quote_settings": "إعدادات عروض الأسعار",
       "quote": "عرض سعر",
       "invoice_settings": "إعدادات الفواتير",
-      "invoice": "فاتورة"
+      "invoice": "فاتورة",
+      "payment": "دفعة"
     },
     "actions": {
       "user": {
@@ -942,7 +944,12 @@
         "archived": "تجاهل مسودة فاتورة",
         "issued": "أصدر فاتورة",
         "due_date_changed": "غيّر تاريخ استحقاق فاتورة",
-        "voided": "ألغى فاتورة"
+        "voided": "ألغى فاتورة",
+        "overdue": "تأخر سداد فاتورة"
+      },
+      "payment": {
+        "recorded": "سجّل دفعة",
+        "voided": "ألغى دفعة"
       }
     },
     "fields": {
@@ -958,6 +965,10 @@
       "sources": "البنود المفوترة",
       "dueOn": "تاريخ الاستحقاق",
       "invoice": "الفاتورة",
+      "paidOn": "تاريخ الدفع",
+      "amountMinor": "المبلغ",
+      "appliedMinor": "المبلغ المحتسب من الفاتورة",
+      "method": "طريقة الدفع",
       "priceUsdMinor": "السعر بالدولار",
       "priceSypMinor": "السعر بالليرة",
       "revisionRounds": "جولات التعديل",
@@ -3324,6 +3335,7 @@
       "ofProject": "مشروع: {{name}}",
       "ofRetainer": "عقد شهري: {{name}}",
       "ofQuote": "عرض سعر: {{name}}",
+      "ofInvoice": "فاتورة: {{name}}",
       "removed": "مستندات مُزالة"
     },
     "finalByClient": "اعتمده العميل"
@@ -3422,7 +3434,9 @@
       "meeting_upcoming": "تذكير باجتماع قادم",
       "quote_approval_requested": "طلب اعتماد خصم على عرض سعر",
       "quote_approval_decided": "قرار على اعتماد خصم طلبته",
-      "quote_accepted": "قبول عرض سعر"
+      "quote_accepted": "قبول عرض سعر",
+      "invoice_overdue": "فاتورة متأخرة السداد",
+      "invoice_paid": "سداد فاتورة عميل أتابعه"
     },
     "text": {
       "task_assigned": "أُسندت إليك «{{task}}» بواسطة {{actor}}",
@@ -3562,7 +3576,13 @@
         "approve": "اعتمد {{actor}} الخصم على {{quote}}",
         "return": "أعاد {{actor}} الخصم على {{quote}}: {{note}}"
       },
-      "quote_accepted": "سجّل {{actor}} قبول {{quote}}"
+      "quote_accepted": "سجّل {{actor}} قبول {{quote}}",
+      "invoice_overdue_one": "تأخر سداد الفاتورة {{invoice}} يومًا واحدًا",
+      "invoice_overdue_two": "تأخر سداد الفاتورة {{invoice}} يومين",
+      "invoice_overdue_few": "تأخر سداد الفاتورة {{invoice}} {{n}} أيام",
+      "invoice_overdue_many": "تأخر سداد الفاتورة {{invoice}} {{n}} يومًا",
+      "invoice_overdue_other": "تأخر سداد الفاتورة {{invoice}} {{n}} يوم",
+      "invoice_paid": "سُدّدت الفاتورة {{invoice}} بالكامل"
     },
     "changes": {
       "shoot": {

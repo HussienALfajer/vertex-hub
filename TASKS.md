@@ -23,12 +23,13 @@ Spec: `docs/specs/F13-invoicing-collection.md` · ADRs 0006, 0007, 0008, 0013, 0
 - [x] owner acceptance (approved, incl. rules 8 and 24 as implemented), test database leftovers cleaned, /ship
 
 ## PR 3 — `feat/f13-payments-api`: payments, overdue and notifications
-- [ ] contracts: `applyPayment` with unit tests; payment schemas; audit `payment.*`, `invoice.overdue`; notification types `invoice_overdue`, `invoice_paid` with subject `invoice` (and `ar.json` keys); job `invoices.daily`
-- [ ] db (`/db-migration`): `payment_method` enum, `payments`; receipt numbers through `document_numbers`; drift
-- [ ] api: record payment (rules 16–21, row lock, proof upload as an invoice document), void payment (rule 22), `invoice_paid` (rule 23); daily job (overdue, null actor) scheduled by the worker; `invoices-overdue` source of `notifications.daily`
-- [ ] api tests: `test/payments.test.ts` (concurrency, settle tolerance, overpayment, status recompute, job and reminder idempotency)
-- [ ] bridge; web typecheck
-- [ ] wiring checklist, full checks (+ drift), reviewer, owner acceptance, /ship
+- [x] contracts: `applyPayment` with unit tests; payment schemas (`recordPaymentSchema`, `voidPaymentSchema`, `paymentSchema`, `receiptDisplayNumber`, detail `payments` and permission flags); `OVERPAYMENT`; audit `payment.*`, `invoice.overdue`, entity `payment`; notification types `invoice_overdue`, `invoice_paid` with subject `invoice`, reminder kind `invoice_overdue` (and `ar.json` keys, `notification-content.ts`); job `invoices.daily`; file owner type `invoice`
+- [x] db (`/db-migration`, 0030): `payment_method` enum, `payments`; receipt numbers through `document_numbers`; `file_owner_type` gains `invoice` and `file_items.invoice_id` (moved here from PR 5: the payment proof is its first use); notification enums; drift
+- [x] api: record payment (rules 16–21, row lock, proof upload as an invoice document through `GeneratedFiles`, `invoice` owner policy listed in the client's documents for invoice readers), void payment (rule 22), `invoice_paid` (rule 23); daily job (overdue, null actor) scheduled by the worker; `invoices-overdue` source of `notifications.daily`; `invoices:run-daily` dev CLI; voiding an invoice with payments answers `INVOICE_HAS_PAYMENTS` before its status
+- [x] api tests: `test/payments.test.ts` (concurrency, settle tolerance, overpayment, status recompute, job and reminder idempotency, proof); cleanup helpers remove payments first
+- [x] bridge; web typecheck; client Files tab names invoice documents
+- [x] wiring checklist, full checks (lint, typecheck, build, E2E, drift pass; `test` passes in full after a rerun, `files` / `tasks` failed once in the full turbo run and pass alone), reviewer (two findings fixed: out-of-scope and hidden-proof tests; `invoice_overdue` when a payment change makes an invoice overdue)
+- [x] owner acceptance (approved, incl. `INVOICE_HAS_PAYMENTS` first and the alert when a payment void makes an invoice overdue), dev database migrated, /ship
 
 ## PR 4 — `feat/f13-billing-api`: statements, expenses, billing summaries, calendar
 - [ ] contracts: `statementRows` with unit tests; statement, client / project / retainer billing, expense schemas; audit `project_expense.*`; key date kind `invoice_due`
@@ -40,7 +41,7 @@ Spec: `docs/specs/F13-invoicing-collection.md` · ADRs 0006, 0007, 0008, 0013, 0
 
 ## PR 5 — `feat/f13-invoices-pdf`: invoice, draft, receipt and statement PDFs
 - [ ] contracts: jobs `invoices.pdf`, `invoices.pdf-ready` (kinds `invoice`, `invoice_draft`, `receipt`, `statement`), render payloads
-- [ ] db (`/db-migration`): `file_owner_type` gains `invoice`, `file_items.invoice_id`; PDF state columns if not added earlier; drift
+- [ ] db (`/db-migration`): PDF state columns (invoices, payments' receipts); drift (owner type `invoice` arrived in PR 3)
 - [ ] worker: Arabic RTL brand templates for the four kinds, handler idempotent per payload hash; worker test with text extraction
 - [ ] api: queue on issue, due date change, payment and preview; ready handler attaching once; `POST` / `GET` PDF endpoints for invoices, receipts and statements; daily re-queue; statement objects purged after 24 hours; `test/invoice-pdf.test.ts`
 - [ ] bridge; web: invoice documents in the client Files tab

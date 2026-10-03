@@ -178,7 +178,15 @@ describe('module boundaries', () => {
   });
 
   it('keeps notifications independent of the modules that emit them (ADR 0018)', () => {
-    const emitters = ['tasks', 'clients', 'projects', 'templates', 'content', 'calendar'];
+    const emitters = [
+      'tasks',
+      'clients',
+      'projects',
+      'templates',
+      'content',
+      'calendar',
+      'invoices',
+    ];
     const offenders = imports
       .filter(
         ({ file, specifier }) => moduleOf(file) === 'notifications' && specifier.startsWith('.'),
@@ -192,7 +200,7 @@ describe('module boundaries', () => {
   });
 
   it('keeps files independent of the modules that own files (ADR 0019)', () => {
-    const owners = ['tasks', 'clients', 'projects', 'content', 'quotes'];
+    const owners = ['tasks', 'clients', 'projects', 'content', 'quotes', 'invoices'];
     const offenders = imports
       .filter(({ file, specifier }) => moduleOf(file) === 'files' && specifier.startsWith('.'))
       .filter(({ file, specifier }) => {

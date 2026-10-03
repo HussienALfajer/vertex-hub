@@ -21,6 +21,8 @@ describe('notification catalog', () => {
         'post_assigned',
         'post_publish_today',
         'post_task_ready',
+        'invoice_overdue',
+        'invoice_paid',
         'quote_accepted',
         'request_finished',
         'retainer_renewal_due',
@@ -180,5 +182,31 @@ describe('notification schema', () => {
         data: { task, excerpt: 'x'.repeat(141) },
       }).success,
     ).toBe(false);
+  });
+});
+
+describe('invoice notifications (spec F13)', () => {
+  it('sends overdue alerts as reminders and paid invoices to clients and projects, both mutable', () => {
+    expect(NOTIFICATION_CATALOG.invoice_overdue).toEqual({
+      category: 'reminders',
+      subject: 'invoice',
+      mutable: true,
+    });
+    expect(NOTIFICATION_CATALOG.invoice_paid).toEqual({
+      category: 'clients_projects',
+      subject: 'invoice',
+      mutable: true,
+    });
+  });
+
+  it('carries the number, the client and the days overdue', () => {
+    const invoice = { displayNumber: 'INV-2026-0012', client: 'Client' };
+    expect(
+      NOTIFICATION_DATA_SCHEMAS.invoice_overdue.safeParse({ invoice, daysOverdue: 7 }).success,
+    ).toBe(true);
+    expect(
+      NOTIFICATION_DATA_SCHEMAS.invoice_overdue.safeParse({ invoice, daysOverdue: 0 }).success,
+    ).toBe(false);
+    expect(NOTIFICATION_DATA_SCHEMAS.invoice_paid.safeParse({ invoice }).success).toBe(true);
   });
 });

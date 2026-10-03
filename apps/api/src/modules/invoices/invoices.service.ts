@@ -1,4 +1,10 @@
-import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import {
   type BillableItems,
   type BillableItemsQuery,
@@ -17,9 +23,12 @@ import {
   invoiceDisplayNumber,
   invoiceTotal,
   OPEN_INVOICE_STATUSES,
+  type Payment,
+  type Permission,
+  receiptDisplayNumber,
   toUsdMinor,
 } from '@vertex-hub/contracts';
-import { type Database, invoiceLines, invoices, type Transaction } from '@vertex-hub/db';
+import { type Database, invoiceLines, invoices, payments, type Transaction } from '@vertex-hub/db';
 import {
   and,
   asc,
@@ -41,6 +50,7 @@ import { CodedException } from '../../core/errors/index.js';
 import { changedFields, recordAudit } from '../audit/index.js';
 import { type CurrentUserInfo, UserDirectory } from '../auth/index.js';
 import { ClientDirectory, type ClientSummary } from '../clients/index.js';
+import { GeneratedFiles } from '../files/index.js';
 import {
   type BillingEngagement,
   type BillingSource,
@@ -115,6 +125,7 @@ export class InvoicesService {
     private readonly sources: BillingSources,
     private readonly quotes: QuoteDirectory,
     private readonly settings: InvoiceSettingsService,
+    private readonly files: GeneratedFiles,
   ) {}
 
   async list(actor: CurrentUserInfo, query: InvoiceListQuery): Promise<InvoicePage> {
@@ -340,20 +351,21 @@ export class InvoicesService {
   }
 
   /**
-   * Locks an invoice for a change by an invoice manager: 404 outside read access, 403 without
-   * `invoices.manage` over the client.
+   * Locks an invoice for a change: 404 outside read access, 403 without `permission` over the
+   * client (`invoices.manage`, or `payments.manage` for payments).
    */
   async lockForChange(
     tx: Transaction,
     actor: CurrentUserInfo,
     id: string,
+    permission: Extract<Permission, 'invoices.manage' | 'payments.manage'> = 'invoices.manage',
   ): Promise<{ invoice: InvoiceRow; client: ClientSummary }> {
     const [invoice] = await tx.select().from(invoices).where(eq(invoices.id, id)).for('update');
     const client = invoice ? await this.clients.summary(invoice.clientId, tx) : null;
     if (!invoice || !client || !covers(actor, 'invoices.read', client)) {
       throw new NotFoundException();
     }
-    assertCanManage(actor, client);
+    if (!covers(actor, permission, client)) throw new ForbiddenException();
     return { invoice, client };
   }
 
@@ -392,8 +404,26 @@ export class InvoicesService {
       const user = userId ? people.get(userId) : undefined;
       return user ? { id: user.id, name: user.name } : null;
     };
+    const paymentRows = await executor
+      .select()
+      .from(payments)
+      .where(eq(payments.invoiceId, row.id))
+      .orderBy(asc(payments.year), asc(payments.number));
+    const proofs = await this.files.names(
+      paymentRows.flatMap((payment) => payment.proofFileItemId ?? []),
+      executor,
+    );
+    const recorders = await this.users.summaries(
+      paymentRows.flatMap((payment) => [payment.recordedById, payment.voidedById ?? []]).flat(),
+      executor,
+    );
+    const recorder = (userId: string) => ({
+      id: userId,
+      name: recorders.get(userId)?.name ?? '',
+    });
     const rate = row.sypPerUsd;
     const manages = canManage(actor, client);
+    const takesPayments = covers(actor, 'payments.manage', client);
     const isDraft = row.status === 'draft' && !row.archivedAt;
     const voidedBy = person(row.voidedById);
     return {
@@ -443,6 +473,33 @@ export class InvoicesService {
               : null,
         };
       }),
+      payments: paymentRows.map(
+        (payment): Payment => ({
+          id: payment.id,
+          receiptNumber: receiptDisplayNumber(payment),
+          paidOn: payment.paidOn,
+          amountMinor: payment.amountMinor,
+          currency: payment.currency,
+          sypPerUsd: payment.sypPerUsd,
+          appliedMinor: payment.appliedMinor,
+          method: payment.method,
+          reference: payment.reference,
+          note: payment.note,
+          proof: payment.proofFileItemId
+            ? { id: payment.proofFileItemId, name: proofs.get(payment.proofFileItemId) ?? '' }
+            : null,
+          recordedBy: recorder(payment.recordedById),
+          createdAt: payment.createdAt.toISOString(),
+          voided:
+            payment.voidedAt && payment.voidedById
+              ? {
+                  at: payment.voidedAt.toISOString(),
+                  by: recorder(payment.voidedById),
+                  reason: payment.voidReason ?? '',
+                }
+              : null,
+        }),
+      ),
       issuedBy: person(row.issuedById),
       voided:
         row.voidedAt && voidedBy
@@ -456,6 +513,8 @@ export class InvoicesService {
         canArchive: manages && isDraft,
         canChangeDueDate: manages && OPEN_STATUSES.includes(row.status),
         canVoid: manages && ['sent', 'overdue'].includes(row.status) && row.paidMinor === 0,
+        canRecordPayment: takesPayments && OPEN_STATUSES.includes(row.status),
+        canVoidPayments: takesPayments && row.status !== 'draft' && row.status !== 'void',
       },
     };
   }
