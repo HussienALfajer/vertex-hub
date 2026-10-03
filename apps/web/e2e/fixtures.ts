@@ -29,9 +29,11 @@ import {
   type CatalogPackage,
   type CatalogService,
   type ClientApprovals,
+  type ClientBilling,
   type ClientDetailResponse,
   type ClientResponse,
   type ClientResponseEntry,
+  type ClientStatement,
   type ClientStatus,
   type CloseShoot,
   type Contact,
@@ -60,6 +62,7 @@ import {
   createCatalogPackageSchema,
   createCatalogServiceSchema,
   createInvoiceSchema,
+  createProjectExpenseSchema,
   createQuoteSchema,
   createTemplateSchema,
   type DeliverableKind,
@@ -146,7 +149,9 @@ import {
   type PostType,
   type PostView,
   type Project,
+  type ProjectBilling,
   type ProjectDetail,
+  type ProjectExpense,
   type ProjectStatus,
   type ProjectStatusChange,
   type PublicApproval,
@@ -173,6 +178,7 @@ import {
   type ReopenShoot,
   type RequestScope,
   type Retainer,
+  type RetainerBilling,
   type RetainerDeliverables,
   type RetainerDetail,
   type RetainerStatus,
@@ -196,10 +202,12 @@ import {
   type ShootStatus,
   type ShootType,
   type ShotListInput,
+  type SourceInvoice,
   sendQuoteSchema,
   serviceIssues,
   setRetainerTemplateSchema,
   shootTaskTitle,
+  statementRows,
   TASK_PRIORITIES,
   type Task,
   type TaskBoard,
@@ -236,6 +244,7 @@ import {
   updateCatalogPackageSchema,
   updateCatalogServiceSchema,
   updateInvoiceSettingsSchema,
+  updateProjectExpenseSchema,
   updateQuoteSettingsSchema,
   updateTemplateSchema,
   voidInvoiceSchema,
@@ -636,6 +645,8 @@ interface ClientRecord {
   archived: boolean;
   contacts: (Contact & { archived: boolean })[];
   platformAccounts: (PlatformAccount & { archived: boolean })[];
+  billingName?: string | null;
+  billingAddress?: string | null;
   notes: {
     id: string;
     occurredAt: string;
@@ -917,6 +928,7 @@ export async function mockApi(page: Page, options: MockOptions): Promise<MockedA
     : { posts: [], tasks: [], files: [], requests: [] };
   const booked = options.calendar ? calendarSeed() : { shoots: [], meetings: [], tasks: [] };
   const tasks = [...tasksSeed(), ...sent.tasks, ...planned.tasks, ...booked.tasks];
+  const billing = invoicesSeed();
   const calendarApi = calendarRoutes({
     users,
     clients,
@@ -925,6 +937,7 @@ export async function mockApi(page: Page, options: MockOptions): Promise<MockedA
     tasks,
     shoots: booked.shoots,
     meetings: booked.meetings,
+    invoices: billing.invoices,
     me: () => me,
   });
   const tasksApi = taskRoutes({
@@ -953,7 +966,7 @@ export async function mockApi(page: Page, options: MockOptions): Promise<MockedA
     me: () => me,
   });
   const invoicesApi = invoiceRoutes({
-    billing: invoicesSeed(),
+    billing,
     clients,
     users,
     projects,
@@ -1196,6 +1209,17 @@ export async function mockApi(page: Page, options: MockOptions): Promise<MockedA
       if (listed) return listed;
     }
 
+    // Billing summaries, statements and expenses (F13) belong to the invoices mock.
+    if (
+      /^\/api\/(clients|projects|retainers)\/[^/]+\/(billing|statement|statement\/pdf|expenses)$/.test(
+        path,
+      ) ||
+      path.startsWith('/api/project-expenses/')
+    ) {
+      const billed = invoicesApi(route, method, url, request);
+      if (billed) return billed;
+    }
+
     // Clients (F02).
     const handled = clientsApi(route, method, url, request);
     if (handled) return handled;
@@ -1291,8 +1315,8 @@ function clientRoutes({ users, clients, me }: ClientState) {
     brandKit: c.brandKit,
     contacts: c.contacts.filter((x) => !x.archived).map(strip),
     platformAccounts: c.platformAccounts.filter((x) => !x.archived).map(strip),
-    billingName: null,
-    billingAddress: null,
+    billingName: c.billingName ?? null,
+    billingAddress: c.billingAddress ?? null,
     archivedAt: c.archived ? '2026-09-20T10:00:00.000Z' : null,
     canManage: canManage(c),
   });
@@ -7769,6 +7793,8 @@ interface CalendarState {
   tasks: TaskRecord[];
   shoots: ShootRecord[];
   meetings: MeetingRecord[];
+  /** For the `invoice_due` key dates (F13). */
+  invoices: InvoiceRecord[];
   me: () => MeResponse;
 }
 
@@ -7781,6 +7807,7 @@ function calendarRoutes({
   tasks,
   shoots,
   meetings,
+  invoices,
   me,
 }: CalendarState) {
   let next = 1800;
@@ -7991,7 +8018,10 @@ function calendarRoutes({
     };
   };
 
-  /** Rule 15: due dates of open projects and pending milestones, renewals of running retainers. */
+  /**
+   * Rule 15: due dates of open projects and pending milestones, renewals of running retainers, and
+   * (F13) due dates of the open invoices the user may read.
+   */
   const keyDates = (from: string, to: string): KeyDate[] => {
     const inRange = (date: string | null): date is string => !!date && date >= from && date <= to;
     const client = (clientId: string) =>
@@ -8038,6 +8068,34 @@ function calendarRoutes({
             ]
           : [],
       ),
+      ...invoices.flatMap((i) => {
+        const readable =
+          holds('invoices.read', 'all') ||
+          (holds('invoices.read', 'own_clients') &&
+            clients.find((c) => c.id === i.clientId)?.accountManagerId === me().user.id);
+        const totalMinor = invoiceTotal(i.lines);
+        const paidMinor = i.payments.reduce((sum, p) => sum + (p.voided ? 0 : p.appliedMinor), 0);
+        const status = invoiceStatus({
+          status: i.status,
+          totalMinor,
+          paidMinor,
+          dueOn: i.dueOn,
+          today: businessDate(),
+        });
+        const open = (OPEN_INVOICE_STATUSES as readonly InvoiceStatus[]).includes(status);
+        return readable && open && !i.archivedAt && i.year && i.number && inRange(i.dueOn)
+          ? [
+              {
+                kind: 'invoice_due' as const,
+                date: i.dueOn,
+                title: invoiceDisplayNumber({ year: i.year, number: i.number }),
+                targetId: i.id,
+                client: client(i.clientId),
+                invoiceStatus: status,
+              },
+            ]
+          : [];
+      }),
     ].sort((a, b) => a.date.localeCompare(b.date));
   };
 
@@ -9679,8 +9737,15 @@ interface InvoiceRecord {
   archivedAt: string | null;
 }
 
+interface ExpenseRecord extends Omit<ProjectExpense, 'usdMinor' | 'loggedBy'> {
+  projectId: string;
+  loggedById: string;
+  archived: boolean;
+}
+
 interface InvoiceRecords {
   invoices: InvoiceRecord[];
+  expenses: ExpenseRecord[];
   settings: Omit<InvoiceSettings, 'canEdit' | 'rateStale' | 'rateUpdatedBy' | 'updatedBy'> & {
     rateUpdatedById: string | null;
     updatedById: string | null;
@@ -9689,7 +9754,8 @@ interface InvoiceRecords {
 
 /**
  * Five invoices: Jasmine's two drafts (the Design milestone and October's social retainer month),
- * Jasmine's overdue, partly paid Discovery invoice, and Shifa's paid and void SYP invoices.
+ * Jasmine's overdue, partly paid Discovery invoice, and Shifa's paid and void SYP invoices; two
+ * expenses on Jasmine's identity project, one in SYP.
  */
 export function invoicesSeed(): InvoiceRecords {
   const today = businessDate();
@@ -9746,7 +9812,35 @@ export function invoicesSeed(): InvoiceRecords {
     voided: null,
     ...fields,
   });
+  const expense = (
+    n: number,
+    fields: Pick<ExpenseRecord, 'spentOn' | 'description' | 'amountMinor' | 'currency'>,
+  ): ExpenseRecord => ({
+    id: id(n),
+    projectId: id(801),
+    sypPerUsd: '118.5000',
+    note: null,
+    loggedById: id(1),
+    createdAt: `${fields.spentOn}T12:00:00.000Z`,
+    updatedAt: `${fields.spentOn}T12:00:00.000Z`,
+    archived: false,
+    ...fields,
+  });
   return {
+    expenses: [
+      expense(9451, {
+        spentOn: addDays(today, -18),
+        description: 'طباعة نماذج الهوية',
+        amountMinor: 1_185_000,
+        currency: 'SYP',
+      }),
+      expense(9452, {
+        spentOn: addDays(today, -10),
+        description: 'خطوط مرخّصة للهوية',
+        amountMinor: 12_000,
+        currency: 'USD',
+      }),
+    ],
     settings: {
       sypPerUsd: '118.5000',
       paymentTermsDays: 7,
@@ -9880,7 +9974,7 @@ interface InvoiceState {
 
 /** The invoices API over the in-memory records, with the F13 rules the screens rely on. */
 function invoiceRoutes({ billing, clients, users, projects, retainers, me }: InvoiceState) {
-  const { invoices, settings } = billing;
+  const { invoices, settings, expenses } = billing;
   let nextId = 9500;
   let clock = Date.parse('2026-10-02T09:00:00.000Z');
   const now = () => {
@@ -9993,8 +10087,8 @@ function invoiceRoutes({ billing, clients, users, projects, retainers, me }: Inv
     const usd = (minor: number) => (i.sypPerUsd ? toUsdMinor(minor, i.currency, i.sypPerUsd) : 0);
     return {
       ...item,
-      billingName: client?.tradeName ?? '',
-      billingAddress: null,
+      billingName: client?.billingName ?? client?.tradeName ?? '',
+      billingAddress: client?.billingAddress ?? null,
       year: i.year,
       number: i.number,
       quote: null,
@@ -10070,8 +10164,245 @@ function invoiceRoutes({ billing, clients, users, projects, retainers, me }: Inv
       ...invoices.flatMap((i) => i.payments.filter((p) => p.year === year).map((p) => p.number)),
     ) + 1;
 
+  const sourceInvoiceOf = (sourceId: string): SourceInvoice | null => {
+    const held = heldBy(sourceId);
+    if (!held) return null;
+    const item = listItemOf(held);
+    return { id: item.id, displayNumber: item.displayNumber, status: item.status };
+  };
+  const newestFirst = (list: Invoice[]) =>
+    list.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  const issuedLive = (i: Invoice) => i.status !== 'draft' && i.status !== 'void';
+  const rateOf = (invoiceId: string) => invoices.find((r) => r.id === invoiceId)?.sypPerUsd ?? '1';
+
+  const clientBillingOf = (clientId: string): ClientBilling => {
+    const own = invoices.filter((i) => !i.archivedAt && i.clientId === clientId).map(listItemOf);
+    const issued = own.filter(issuedLive);
+    const open = (i: Invoice) => (OPEN_INVOICE_STATUSES as readonly string[]).includes(i.status);
+    const sum = (list: Invoice[], pick: (i: Invoice) => number) =>
+      list.reduce((total, i) => total + pick(i), 0);
+    return {
+      byCurrency: CURRENCIES.filter((c) => issued.some((i) => i.currency === c)).map((currency) => {
+        const mine = issued.filter((i) => i.currency === currency);
+        return {
+          currency,
+          invoicedMinor: sum(mine, (i) => i.totalMinor),
+          paidMinor: sum(mine, (i) => i.paidMinor),
+          outstandingMinor: sum(mine.filter(open), (i) => i.balanceMinor),
+          overdueMinor: sum(
+            mine.filter((i) => i.status === 'overdue'),
+            (i) => i.balanceMinor,
+          ),
+        };
+      }),
+      latest: newestFirst(own).slice(0, 5),
+    };
+  };
+
+  const statementOf = (client: ClientRecord, q: URLSearchParams): ClientStatement => {
+    const currency = (q.get('currency') ?? 'USD') as Currency;
+    const from = q.get('from') ?? `${today().slice(0, 4)}-01-01`;
+    const to = q.get('to') ?? today();
+    const live = invoices.filter(
+      (i) =>
+        !i.archivedAt &&
+        i.clientId === client.id &&
+        i.currency === currency &&
+        issuedLive(listItemOf(i)),
+    );
+    const number = (i: InvoiceRecord) =>
+      invoiceDisplayNumber({ year: i.year ?? 0, number: i.number ?? 0 });
+    const rows = statementRows({
+      invoices: live.map((i) => ({
+        id: i.id,
+        displayNumber: number(i),
+        issuedOn: i.issuedOn ?? '',
+        totalMinor: invoiceTotal(i.lines),
+      })),
+      payments: live.flatMap((i) =>
+        i.payments
+          .filter((p) => !p.voided)
+          .map((p) => ({
+            id: p.id,
+            receiptNumber: receiptDisplayNumber(p),
+            invoiceId: i.id,
+            invoiceNumber: number(i),
+            paidOn: p.paidOn,
+            appliedMinor: p.appliedMinor,
+            amountMinor: p.amountMinor,
+            currency: p.currency,
+          })),
+      ),
+      statementCurrency: currency,
+      from,
+      to,
+    });
+    return {
+      client: { id: client.id, name: client.tradeName },
+      billingName: client.billingName ?? client.tradeName,
+      billingAddress: client.billingAddress ?? null,
+      currency,
+      from,
+      to,
+      ...rows,
+      outstandingMinor: rows.closingMinor,
+    };
+  };
+
+  const expenseUsd = (e: Pick<ExpenseRecord, 'amountMinor' | 'currency' | 'sypPerUsd'>) =>
+    toUsdMinor(e.amountMinor, e.currency, e.sypPerUsd);
+
+  const projectBillingOf = (project: ProjectRecord): ProjectBilling => {
+    const own = invoices.filter((i) => !i.archivedAt && i.projectId === project.id).map(listItemOf);
+    const issued = own.filter(issuedLive);
+    const kept = expenses.filter((e) => e.projectId === project.id && !e.archived);
+    const invoicedUsdMinor = issued.reduce(
+      (sum, i) => sum + toUsdMinor(i.totalMinor, i.currency, rateOf(i.id)),
+      0,
+    );
+    const collectedUsdMinor = invoices
+      .filter((r) => issued.some((i) => i.id === r.id))
+      .flatMap((r) => r.payments.filter((p) => !p.voided))
+      .reduce((sum, p) => sum + toUsdMinor(p.amountMinor, p.currency, p.sypPerUsd), 0);
+    const expensesUsdMinor = kept.reduce((sum, e) => sum + expenseUsd(e), 0);
+    const milestones = project.milestones.filter((m) => !m.archived);
+    return {
+      project: {
+        id: project.id,
+        name: project.name,
+        currency: project.currency,
+        archived: project.archived,
+      },
+      milestones: milestones.map((m) => ({
+        id: m.id,
+        name: m.name,
+        status: m.status,
+        dueDate: m.dueDate,
+        installmentMinor: m.installmentMinor,
+        invoice: sourceInvoiceOf(m.id),
+      })),
+      invoices: newestFirst(own),
+      expenses: [...kept]
+        .sort((a, b) => b.spentOn.localeCompare(a.spentOn))
+        .map(({ projectId: _, loggedById, archived: __, ...e }) => ({
+          ...e,
+          usdMinor: expenseUsd(e),
+          loggedBy: person(loggedById),
+        })),
+      margin: {
+        invoicedUsdMinor,
+        collectedUsdMinor,
+        expensesUsdMinor,
+        marginUsdMinor: invoicedUsdMinor - expensesUsdMinor,
+        plannedInstallmentsMinor: milestones.reduce((sum, m) => sum + (m.installmentMinor ?? 0), 0),
+      },
+      canManageExpenses: covers('expenses.manage', project.clientId) && !project.archived,
+    };
+  };
+
+  const retainerBillingOf = (retainer: RetainerRecord): RetainerBilling => ({
+    retainer: {
+      id: retainer.id,
+      name: retainer.name,
+      currency: retainer.currency,
+      monthlyFeeMinor: retainer.monthlyFeeMinor,
+      archived: retainer.archived,
+    },
+    cycles: [...retainer.cycles]
+      .sort((a, b) => b.month.localeCompare(a.month))
+      .map((c) => ({ id: c.id, month: c.month, status: c.status, invoice: sourceInvoiceOf(c.id) })),
+    extraWork: retainer.extraWork
+      .filter((w) => !w.archived)
+      .map((w) => ({
+        id: w.id,
+        title: w.title,
+        billingStatus: w.billingStatus,
+        estimateMinor: w.estimateMinor,
+        invoice: sourceInvoiceOf(w.id),
+      })),
+    invoices: newestFirst(
+      invoices.filter((i) => !i.archivedAt && i.retainerId === retainer.id).map(listItemOf),
+    ),
+  });
+
+  /** Client balances and statements, project and retainer billing, and project expenses. */
+  const billingRoutes = (
+    route: Route,
+    method: string,
+    url: URL,
+    request: Request,
+  ): Promise<void> | undefined => {
+    const path = url.pathname;
+    const owned = path.match(/^\/api\/(clients|projects|retainers)\/([^/]+)\/(.+)$/);
+    if (owned?.[1] === 'clients') {
+      const client = clients.find((c) => c.id === owned[2]);
+      if (!client || !covers('invoices.read', client.id)) return fail(route, 404, null);
+      if (owned[3] === 'billing') return json(route, clientBillingOf(client.id));
+      if (owned[3] === 'statement') return json(route, statementOf(client, url.searchParams));
+      if (owned[3] === 'statement/pdf') {
+        // Asked for, then found ready by the page's `HEAD` check.
+        if (method === 'POST') return json(route, { state: 'pending' });
+        return route.fulfill({ status: 200, contentType: 'application/pdf', body: '%PDF-1.4\n' });
+      }
+      return undefined;
+    }
+    if (owned?.[1] === 'projects') {
+      const project = projects.find((p) => p.id === owned[2]);
+      if (!project) return fail(route, 404, null);
+      if (owned[3] === 'billing') {
+        if (!covers('invoices.read', project.clientId)) return fail(route, 403, null);
+        return json(route, projectBillingOf(project));
+      }
+      if (owned[3] === 'expenses' && method === 'POST') {
+        if (!covers('expenses.manage', project.clientId)) return fail(route, 403, null);
+        if (project.archived) return fail(route, 409, 'PROJECT_ARCHIVED');
+        const input = createProjectExpenseSchema.parse(request.postDataJSON());
+        const at = now();
+        expenses.push({
+          id: id(nextId++),
+          projectId: project.id,
+          spentOn: input.spentOn,
+          description: input.description,
+          amountMinor: input.amountMinor,
+          currency: input.currency ?? project.currency,
+          sypPerUsd: input.sypPerUsd ?? settings.sypPerUsd ?? '1',
+          note: input.note,
+          loggedById: me().user.id,
+          createdAt: at,
+          updatedAt: at,
+          archived: false,
+        });
+        return json(route, projectBillingOf(project), 201);
+      }
+      return undefined;
+    }
+    if (owned?.[1] === 'retainers' && owned[3] === 'billing') {
+      const retainer = retainers.find((r) => r.id === owned[2]);
+      if (!retainer) return fail(route, 404, null);
+      if (!covers('invoices.read', retainer.clientId)) return fail(route, 403, null);
+      return json(route, retainerBillingOf(retainer));
+    }
+    const expenseMatch = path.match(/^\/api\/project-expenses\/([^/]+)(?:\/(archive))?$/);
+    if (expenseMatch) {
+      const expense = expenses.find((e) => e.id === expenseMatch[1] && !e.archived);
+      const project = projects.find((p) => p.id === expense?.projectId);
+      if (!expense || !project) return fail(route, 404, null);
+      if (!covers('expenses.manage', project.clientId)) return fail(route, 403, null);
+      if (expenseMatch[2] === 'archive') {
+        expense.archived = true;
+      } else {
+        const input = updateProjectExpenseSchema.parse(request.postDataJSON());
+        Object.assign(expense, definedFields(input), { updatedAt: now() });
+      }
+      return json(route, projectBillingOf(project));
+    }
+    return undefined;
+  };
+
   return (route: Route, method: string, url: URL, request: Request): Promise<void> | undefined => {
     const path = url.pathname;
+    const billed = billingRoutes(route, method, url, request);
+    if (billed) return billed;
     if (path === '/api/invoice-settings') {
       if (!holds('invoices.read')) return fail(route, 403, null);
       if (method === 'PATCH') {
@@ -10220,6 +10551,29 @@ function invoiceRoutes({ billing, clients, users, projects, retainers, me }: Inv
       if (!holds('invoices.manage')) return fail(route, 403, null);
       const input = createInvoiceSchema.parse(request.postDataJSON());
       const at = now();
+      // Rule 6: each source at its default amount; the sources set the engagement.
+      const lines = input.sources.map((source) => {
+        const found = sourceOf(source);
+        const project = projects.find((p) => p.id === found.project?.id);
+        const retainer = retainers.find((r) => r.id === found.retainer?.id);
+        const work = [...(project?.extraWork ?? []), ...(retainer?.extraWork ?? [])].find(
+          (w) => w.id === source.id,
+        );
+        const amount =
+          source.type === 'milestone'
+            ? (project?.milestones.find((m) => m.id === source.id)?.installmentMinor ?? 0)
+            : source.type === 'retainer_cycle'
+              ? (retainer?.monthlyFeeMinor ?? 0)
+              : (work?.estimateMinor ?? 0);
+        return {
+          id: id(nextId++),
+          description: `${found.project?.name ?? found.retainer?.name ?? ''} — ${found.name}`,
+          quantity: 1,
+          unitPriceMinor: amount,
+          source,
+        };
+      });
+      const first = lines[0] ? sourceOf(lines[0].source) : null;
       const created: InvoiceRecord = {
         id: id(nextId++),
         clientId: input.clientId,
@@ -10228,14 +10582,14 @@ function invoiceRoutes({ billing, clients, users, projects, retainers, me }: Inv
         origin: 'manual',
         currency: input.currency,
         status: 'draft',
-        projectId: input.projectId,
-        retainerId: input.retainerId,
+        projectId: input.projectId ?? first?.project?.id ?? null,
+        retainerId: input.retainerId ?? first?.retainer?.id ?? null,
         issuedOn: null,
         dueOn: null,
         sypPerUsd: null,
         paymentTermsDays: settings.paymentTermsDays,
         notes: null,
-        lines: [],
+        lines,
         payments: [],
         pdf: null,
         draftPdf: null,

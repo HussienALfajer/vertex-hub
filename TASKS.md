@@ -54,6 +54,6 @@ Spec: `docs/specs/F13-invoicing-collection.md` · ADRs 0006, 0007, 0008, 0013, 0
 - [x] owner acceptance (approved), dev database migrated, /ship
 
 ## PR 7 — `feat/f13-billing-web`: client, project, retainer and calendar
-- [ ] web: client Invoices tab with balances and statement, billing fields on Basics; project Billing section (milestones, invoices, expenses, margin); retainer Billing section; `invoice_due` on the calendar
-- [ ] e2e: fixtures, flows, screenshots light + dark (client Invoices tab, project Billing, rendered PDFs)
-- [ ] wiring checklist, full checks (+ E2E), reviewer, owner acceptance (the full spec acceptance), /ship
+- [x] web: client Invoices tab with billing details (no Basics tab exists: spec updated), balances, latest invoices and statement (PDF asked for, then checked with `HEAD` until ready); project Billing tab (margin, milestones with "Create invoice", invoices, expenses); retainer Billing tab; `invoice_due` key dates open the invoice
+- [x] e2e: fixtures (client, project and retainer billing, statement, expenses, drafts from sources, `invoice_due` key dates; `HEAD` allowed where `GET` is declared), `f13-billing.spec.ts`, screenshots light + dark (client Invoices tab, project Billing, expense dialog, retainer Billing; PDF pages come from the worker test of PR 5); API test checks `HEAD` on the statement download
+- [x] wiring checklist, full checks (+ E2E; `test` passes once no concurrent run shares the test database), reviewer (two findings fixed: billing details form reset to stale values after a save; the statement PDF check now throws `ApiError` and retries only 404), owner acceptance (approved; billing details on the Invoices tab), /ship

@@ -876,6 +876,35 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await screenshot(page, testInfo, `invoice-settings-${colorScheme}`);
     });
 
+    test('client invoices tab with statement', async ({ page }, testInfo) => {
+      await page.setViewportSize({ width: 1280, height: 1900 });
+      await mockApi(page, { signedIn: true });
+      await page.goto(`/clients/${seedIds.jasmine}?tab=invoices`);
+      await expect(page.getByText(ar.invoices.statement.closing)).toBeVisible();
+      await screenshot(page, testInfo, `client-invoices-${colorScheme}`);
+    });
+
+    test('project billing', async ({ page }, testInfo) => {
+      await page.setViewportSize({ width: 1280, height: 1900 });
+      await mockApi(page, { signedIn: true });
+      await page.goto(`/projects/${seedIds.identityProject}?tab=billing`);
+      await expect(page.getByText('خطوط مرخّصة للهوية')).toBeVisible();
+      await screenshot(page, testInfo, `project-billing-${colorScheme}`);
+
+      await page.setViewportSize({ width: 1280, height: 900 });
+      await page.getByRole('button', { name: ar.invoices.expenses.add }).click();
+      await expect(page.getByRole('dialog')).toContainText(ar.invoices.expenses.addTitle);
+      await screenshot(page, testInfo, `project-expense-dialog-${colorScheme}`);
+    });
+
+    test('retainer billing', async ({ page }, testInfo) => {
+      await page.setViewportSize({ width: 1280, height: 1400 });
+      await mockApi(page, { signedIn: true });
+      await page.goto(`/retainers/${seedIds.socialRetainer}?tab=billing`);
+      await expect(page.getByText(ar.invoices.billing.cycles)).toBeVisible();
+      await screenshot(page, testInfo, `retainer-billing-${colorScheme}`);
+    });
+
     test('templates list', async ({ page }, testInfo) => {
       await page.setViewportSize({ width: 1280, height: 900 });
       await mockApi(page, { signedIn: true });

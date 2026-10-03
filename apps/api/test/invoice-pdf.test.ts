@@ -504,6 +504,13 @@ describe('invoice PDFs', () => {
       );
       expect(served.status).toBe(200);
       expect(served.headers.get('content-type')).toBe('application/pdf');
+      // The statement section asks with `HEAD` whether the render is ready.
+      const checked = await client.request(
+        'HEAD',
+        `/api/clients/${clientId}/statement/pdf${query()}`,
+        { cookie: cast.am.cookie },
+      );
+      expect(checked.status).toBe(200);
       expect(
         (await client.get(`/api/clients/${clientId}/statement/pdf${query()}`, cast.otherAm.cookie))
           .status,
