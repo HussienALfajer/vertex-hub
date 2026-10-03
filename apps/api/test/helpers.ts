@@ -29,6 +29,7 @@ import {
   notificationReminders,
   notificationSettings,
   notifications,
+  payments,
   postClientResponses,
   postReviews,
   projectMilestones,
@@ -152,6 +153,24 @@ export async function seedUser(db: Database, input: SeedUser = {}): Promise<Seed
 /** Removes seeded users with everything that points at them (test cleanup only). */
 export async function removeUsers(db: Database, ids: string[]): Promise<void> {
   if (ids.length === 0) return;
+  // Payments point at their recorder and their proof document (F13): they go first.
+  const userPayments = (
+    await db
+      .select({ id: payments.id })
+      .from(payments)
+      .leftJoin(fileItems, eq(fileItems.id, payments.proofFileItemId))
+      .where(
+        or(
+          inArray(payments.recordedById, ids),
+          inArray(payments.voidedById, ids),
+          inArray(fileItems.createdById, ids),
+        ),
+      )
+  ).map((row) => row.id);
+  if (userPayments.length > 0) {
+    await db.delete(auditEntries).where(inArray(auditEntries.entityId, userPayments));
+    await db.delete(payments).where(inArray(payments.id, userPayments));
+  }
   const touched = await db
     .selectDistinct({ id: fileVersions.fileItemId })
     .from(fileVersions)
@@ -289,6 +308,8 @@ export async function removeClients(db: Database, ids: string[]): Promise<void> 
   if (ids.length === 0) return;
   // Quotes point at their PDF document (F04): unlink them before the file items go.
   await db.update(quotes).set({ pdfFileItemId: null }).where(inArray(quotes.clientId, ids));
+  // Payments point at their proof document (F13): they go before the file items.
+  await removePayments(db, ids);
   await removeFileItems(db, inArray(fileItems.clientId, ids));
   await removeShoots(
     db,
@@ -636,10 +657,27 @@ export async function removeInvoices(db: Database, clientIds: string[]): Promise
     await db.select({ id: invoices.id }).from(invoices).where(inArray(invoices.clientId, clientIds))
   ).map((row) => row.id);
   if (ids.length === 0) return;
+  await removePayments(db, clientIds);
+  await removeFileItems(db, inArray(fileItems.invoiceId, ids));
   await db.delete(auditEntries).where(inArray(auditEntries.entityId, ids));
   await db.delete(notifications).where(inArray(notifications.subjectId, ids));
+  await db.delete(notificationReminders).where(inArray(notificationReminders.subjectId, ids));
   await db.delete(invoiceLines).where(inArray(invoiceLines.invoiceId, ids));
   await db.delete(invoices).where(inArray(invoices.id, ids));
+}
+
+/** Removes the payments on the clients' invoices with their audit entries (F13). */
+export async function removePayments(db: Database, clientIds: string[]): Promise<void> {
+  if (clientIds.length === 0) return;
+  const rows = await db
+    .select({ id: payments.id })
+    .from(payments)
+    .innerJoin(invoices, eq(invoices.id, payments.invoiceId))
+    .where(inArray(invoices.clientId, clientIds));
+  const ids = rows.map((row) => row.id);
+  if (ids.length === 0) return;
+  await db.delete(auditEntries).where(inArray(auditEntries.entityId, ids));
+  await db.delete(payments).where(inArray(payments.id, ids));
 }
 
 /** Removes the quotes of the clients with their lines, items, installments and audit (F04). */

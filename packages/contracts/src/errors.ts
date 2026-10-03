@@ -162,6 +162,7 @@ export const ERROR_CODES = [
   'INVOICE_HAS_PAYMENTS',
   'MILESTONE_INVOICED',
   'BILLED_BY_INVOICE',
+  'OVERPAYMENT',
 ] as const;
 
 export const errorCodeSchema = z.enum(ERROR_CODES).meta({ id: 'ErrorCode' });

@@ -43,6 +43,9 @@ export function notificationLink(notification: Notification): ToOptions {
       return { to: '/meetings/$meetingId', params: { meetingId: subject.id } };
     case 'quote':
       return { to: '/quotes/$quoteId', params: { quoteId: subject.id } };
+    case 'invoice':
+      // The invoice page arrives with the invoice screens (F13 PR 6).
+      return { to: '/' };
     default:
       return { to: '/tasks/$taskId', params: { taskId: subject.id } };
   }
@@ -125,6 +128,24 @@ export function notificationText(
           notification.data.quote.client,
           notification.data.project ?? notification.data.retainer ?? notification.data.quote.title,
         ),
+      };
+    case 'invoice_overdue': {
+      const { data } = notification;
+      return {
+        text: t('notifications.text.invoice_overdue', {
+          count: data.daysOverdue,
+          n: formatNumber(data.daysOverdue),
+          invoice: data.invoice.displayNumber,
+        }),
+        context: data.invoice.client,
+      };
+    }
+    case 'invoice_paid':
+      return {
+        text: t('notifications.text.invoice_paid', {
+          invoice: notification.data.invoice.displayNumber,
+        }),
+        context: notification.data.invoice.client,
       };
     case 'retainer_renewal_due': {
       const { data } = notification;
@@ -316,6 +337,7 @@ type TaskNotification = Exclude<
       | 'quote_approval_requested'
       | 'quote_approval_decided'
       | 'quote_accepted'
+      | `invoice_${string}`
       | 'approval_responded'
       | 'approval_no_response'
       | 'approval_expired'

@@ -8,7 +8,15 @@ import { httpUrlSchema, optionalText } from './text.js';
  * retainer, a post (F08) or a quote (F04), each with a chain of immutable versions (an upload or a link).
  */
 
-export const FILE_OWNER_TYPES = ['task', 'client', 'project', 'retainer', 'post', 'quote'] as const;
+export const FILE_OWNER_TYPES = [
+  'task',
+  'client',
+  'project',
+  'retainer',
+  'post',
+  'quote',
+  'invoice',
+] as const;
 
 export const fileOwnerTypeSchema = z.enum(FILE_OWNER_TYPES).meta({ id: 'FileOwnerType' });
 
@@ -28,6 +36,7 @@ export const FILE_ROLES_BY_OWNER: Record<FileOwnerType, readonly FileRole[]> = {
   retainer: ['document'],
   post: ['deliverable'],
   quote: ['document'],
+  invoice: ['document'],
 };
 
 export const brandFileKindSchema = z.enum(BRAND_FILE_KINDS).meta({ id: 'BrandFileKind' });

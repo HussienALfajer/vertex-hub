@@ -53,6 +53,16 @@ export const QUOTES_DAILY_JOB = {
 } as const;
 
 /**
+ * F13 A10: marks issued invoices past their due date `overdue` and alerts Finance, the Internal
+ * Operations manager and the account manager, once a day.
+ */
+export const INVOICES_DAILY_JOB = {
+  queue: 'invoices.daily',
+  cron: '15 0 * * *',
+  tz: BUSINESS_TIME_ZONE,
+} as const;
+
+/**
  * F04 rules 12 and 13: renders the PDF of a sent version or a draft preview. Queued by the API,
  * worked by the worker (Chromium). The job carries the frozen render payload and its hash, so
  * the worker reads no business table; the hash names the output, so a rerun writes nothing new.

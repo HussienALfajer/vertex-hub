@@ -63,6 +63,8 @@ export const NOTIFICATION_TYPES = [
   'quote_approval_requested',
   'quote_approval_decided',
   'quote_accepted',
+  'invoice_overdue',
+  'invoice_paid',
 ] as const;
 
 export const notificationTypeSchema = z.enum(NOTIFICATION_TYPES).meta({ id: 'NotificationType' });
@@ -94,6 +96,7 @@ export const NOTIFICATION_SUBJECTS = [
   'shoot',
   'meeting',
   'quote',
+  'invoice',
 ] as const;
 
 export const notificationSubjectTypeSchema = z
@@ -159,6 +162,8 @@ export const NOTIFICATION_CATALOG: Record<
   quote_approval_requested: { category: 'clients_projects', subject: 'quote', mutable: false },
   quote_approval_decided: { category: 'clients_projects', subject: 'quote', mutable: false },
   quote_accepted: { category: 'clients_projects', subject: 'quote', mutable: true },
+  invoice_overdue: { category: 'reminders', subject: 'invoice', mutable: true },
+  invoice_paid: { category: 'clients_projects', subject: 'invoice', mutable: true },
 };
 
 export function isMutableNotificationType(type: NotificationType): boolean {
@@ -260,6 +265,11 @@ const meetingData = z.object({
 /** A quote as it was when the notification was sent (F04). */
 const quoteData = z.object({
   quote: z.object({ displayNumber: nameSchema, title: nameSchema, client: nameSchema }),
+});
+
+/** An invoice as it was when the notification was sent (F13). */
+const invoiceData = z.object({
+  invoice: z.object({ displayNumber: nameSchema, client: nameSchema }),
 });
 
 /** What changed on a scheduled shoot that its crew is told about. */
@@ -382,6 +392,10 @@ export const NOTIFICATION_DATA_SCHEMAS = {
     project: nameSchema.nullable(),
     retainer: nameSchema.nullable(),
   }),
+  /** F13 A10: when the invoice becomes overdue, then every 7 days while it stays overdue. */
+  invoice_overdue: invoiceData.extend({ daysOverdue: z.number().int().min(1) }),
+  /** F13 rule 23: the invoice is fully paid. */
+  invoice_paid: invoiceData,
 } satisfies Record<NotificationType, z.ZodType>;
 
 export type NotificationData<Type extends NotificationType> = z.infer<
@@ -511,6 +525,7 @@ export const NOTIFICATION_REMINDER_KINDS = [
   'over_limit_pending',
   'cycle_behind',
   'cycle_behind_final',
+  'invoice_overdue',
 ] as const;
 
 export type NotificationReminderKind = (typeof NOTIFICATION_REMINDER_KINDS)[number];

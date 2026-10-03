@@ -42,7 +42,7 @@ function typeFilter(type: FileType): SQL {
 
 /**
  * The client's files (spec F10 rules 13, 14, 19): the library of final deliverables, the
- * documents of the client, its projects, retainers and quotes, and storage usage.
+ * documents of the client, its projects, retainers, quotes and invoices, and storage usage.
  */
 @Injectable()
 export class FileLibraryService {
@@ -124,17 +124,20 @@ export class FileLibraryService {
 
   async documents(actor: CurrentUserInfo, query: ClientDocumentsQuery): Promise<FileItemPage> {
     const client = await this.owners.policy('client').find(this.db, actor, query.clientId);
-    const [projects, retainers, quotes] = await Promise.all([
+    const [projects, retainers, quotes, invoices] = await Promise.all([
       this.owners.policy('project').ownersOfClient(this.db, query.clientId),
       this.owners.policy('retainer').ownersOfClient(this.db, query.clientId),
       // F04: quote documents are listed to the client's quote readers only.
       this.owners.policy('quote').ownersOfClient(this.db, query.clientId, actor),
+      // F13: invoice documents (proofs, PDFs) are listed to the client's invoice readers only.
+      this.owners.policy('invoice').ownersOfClient(this.db, query.clientId, actor),
     ]);
     const labels = new Map([
       [client.id, client.label],
       ...projects.map((owner) => [owner.id, owner.label] as const),
       ...retainers.map((owner) => [owner.id, owner.label] as const),
       ...quotes.map((owner) => [owner.id, owner.label] as const),
+      ...invoices.map((owner) => [owner.id, owner.label] as const),
     ]);
     const where = and(
       eq(fileItems.role, 'document'),
@@ -152,6 +155,10 @@ export class FileLibraryService {
         inArray(
           fileItems.quoteId,
           quotes.map((owner) => owner.id),
+        ),
+        inArray(
+          fileItems.invoiceId,
+          invoices.map((owner) => owner.id),
         ),
       ),
       // Confidential readers are the client's (rule 15), whichever owner holds the document.

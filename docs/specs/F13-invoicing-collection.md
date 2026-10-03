@@ -268,7 +268,7 @@ Loading, empty and error states follow the existing list and detail pages. What 
   - `invoice_overdue` → users with the Finance role, the Internal Operations manager(s) and the client's account manager (owner decision), when the invoice becomes overdue and again every 7 days while it stays overdue ("INV-… is N days overdue"); category `reminders`, can be muted.
   - `invoice_paid` → the client's account manager, when an invoice becomes `paid`, unless they recorded the payment (owner decision); category `clients_projects`, can be muted.
 - Jobs:
-  - `invoices.daily`: pg-boss cron `15 0 * * *` Asia/Damascus, scheduled by the worker and worked by the API: sets `overdue` (rule 21) with `invoice_overdue`, one transaction per invoice under its row lock, and queues again issued invoices and receipts whose PDF is still `pending`. Idempotent.
+  - `invoices.daily`: pg-boss cron `15 0 * * *` Asia/Damascus, scheduled by the worker and worked by the API: sets `overdue` (rule 21) with `invoice_overdue`, one transaction per invoice under its row lock, and queues again issued invoices and receipts whose PDF is still `pending`. Idempotent. `invoices:run-daily --date` runs it in development.
   - A new source `invoices-overdue` of `notifications.daily` sends the 7-day reminders with `remindOnce` per invoice and week (the `retainer-renewals` pattern). `notifications:run-daily --date` runs it in development.
   - `invoices.pdf` (worker; kinds `invoice`, `invoice_draft`, `receipt`, `statement`), retry 3; `invoices.pdf-ready` (API; attaches invoice and receipt PDFs, records statement objects). Idempotent per payload hash. Statement objects older than 24 hours are deleted by the existing files purge job.
 

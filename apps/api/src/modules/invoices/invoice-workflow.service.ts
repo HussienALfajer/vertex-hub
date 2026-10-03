@@ -10,14 +10,8 @@ import {
   invoiceStatus,
   type VoidInvoice,
 } from '@vertex-hub/contracts';
-import {
-  type Database,
-  documentNumbers,
-  invoiceLines,
-  invoices,
-  type Transaction,
-} from '@vertex-hub/db';
-import { eq, sql } from 'drizzle-orm';
+import { type Database, invoiceLines, invoices } from '@vertex-hub/db';
+import { eq } from 'drizzle-orm';
 import { DATABASE } from '../../core/database/database.module.js';
 import { CodedException } from '../../core/errors/index.js';
 import { recordAudit } from '../audit/index.js';
@@ -25,6 +19,7 @@ import type { CurrentUserInfo } from '../auth/index.js';
 import { ClientDirectory } from '../clients/index.js';
 import { BillingSources } from '../projects/index.js';
 import { QuoteDirectory } from '../quotes/index.js';
+import { nextDocumentNumber } from './document-numbers.js';
 import { actorOf, assertClientNotArchived } from './invoice-access.js';
 import { InvoiceSettingsService } from './invoice-settings.service.js';
 import { InvoicesService, identity } from './invoices.service.js';
@@ -70,7 +65,7 @@ export class InvoiceWorkflowService {
         throw new CodedException(400, 'INVALID_DATES', 'The due date is before the issue date');
       }
       const year = Number(today.slice(0, 4));
-      const number = await this.nextNumber(tx, year);
+      const number = await nextDocumentNumber(tx, 'invoice', year);
       const displayNumber = invoiceDisplayNumber({ year, number });
       const billing = await this.clients.billingDetails(client.id, tx);
       const snapshot: InvoiceSnapshot = {
@@ -177,11 +172,12 @@ export class InvoiceWorkflowService {
   async void(actor: CurrentUserInfo, id: string, input: VoidInvoice): Promise<InvoiceDetail> {
     return this.db.transaction(async (tx) => {
       const { invoice, client } = await this.invoices.lockForChange(tx, actor, id);
+      // Payments are checked first: a paid or partly paid invoice is voided once they are.
+      if (invoice.paidMinor > 0 && invoice.status !== 'void') {
+        throw new CodedException(409, 'INVOICE_HAS_PAYMENTS', 'Void its payments first');
+      }
       if (invoice.archivedAt || !['sent', 'overdue'].includes(invoice.status)) {
         throw new CodedException(409, 'INVALID_TRANSITION', 'Only a sent or overdue invoice');
-      }
-      if (invoice.paidMinor > 0) {
-        throw new CodedException(409, 'INVOICE_HAS_PAYMENTS', 'Void its payments first');
       }
       const [voided] = await tx
         .update(invoices)
@@ -217,19 +213,5 @@ export class InvoiceWorkflowService {
       );
       return this.invoices.toDetail(actor, voided, client, tx);
     });
-  }
-
-  /** The counter row of the kind and year is locked by the upsert until the transaction ends. */
-  private async nextNumber(tx: Transaction, year: number): Promise<number> {
-    const [row] = await tx
-      .insert(documentNumbers)
-      .values({ kind: 'invoice', year, lastNumber: 1 })
-      .onConflictDoUpdate({
-        target: [documentNumbers.kind, documentNumbers.year],
-        set: { lastNumber: sql`${documentNumbers.lastNumber} + 1` },
-      })
-      .returning({ lastNumber: documentNumbers.lastNumber });
-    if (!row) throw new Error('No invoice number');
-    return row.lastNumber;
   }
 }

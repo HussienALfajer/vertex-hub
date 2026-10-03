@@ -6,6 +6,7 @@ import { DatabaseModule } from './core/database/database.module.js';
 import { ApprovalsRemindersJob } from './jobs/approvals-reminders.job.js';
 import { FilesPurgeUploadsJob } from './jobs/files-purge-uploads.job.js';
 import { HeartbeatJob } from './jobs/heartbeat.job.js';
+import { InvoicesDailyJob } from './jobs/invoices-daily.job.js';
 import { NotificationsDailyJob } from './jobs/notifications-daily.job.js';
 import { PgBossService } from './jobs/pg-boss.service.js';
 import { QuotesDailyJob } from './jobs/quotes-daily.job.js';
@@ -35,6 +36,7 @@ import { PdfRenderer } from './pdf/pdf-renderer.js';
     FilesPurgeUploadsJob,
     ApprovalsRemindersJob,
     QuotesDailyJob,
+    InvoicesDailyJob,
     PdfRenderer,
     QuotesPdfJob,
   ],

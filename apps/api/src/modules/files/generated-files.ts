@@ -14,19 +14,29 @@ import {
   fileVersions,
   type Transaction,
 } from '@vertex-hub/db';
-import { and, desc, eq, isNull, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { DATABASE } from '../../core/database/database.module.js';
 import { CodedException } from '../../core/errors/index.js';
 import { JobQueue } from '../../core/jobs/index.js';
 import { recordAudit } from '../audit/index.js';
 import type { CurrentUserInfo } from '../auth/index.js';
-import { auditRefs } from './file-access.js';
+import { auditRefs, ownerFilter } from './file-access.js';
 import { FileContentService } from './file-content.service.js';
 import { FileStorage } from './file-storage.js';
 
+/** The owners whose documents only their module adds (F04 quotes, F13 invoices). */
+type DocumentOwnerType = 'quote' | 'invoice';
+
+/** The owner columns of a document of `type`. */
+const documentOwner = (type: DocumentOwnerType, id: string) => ({
+  ownerType: type,
+  quoteId: type === 'quote' ? id : null,
+  invoiceId: type === 'invoice' ? id : null,
+});
+
 /** A file the system produced and already stored, such as the PDF of a sent quote (F04). */
 export interface GeneratedDocument {
-  ownerType: 'quote';
+  ownerType: DocumentOwnerType;
   ownerId: string;
   clientId: string;
   name: string;
@@ -38,12 +48,17 @@ export interface GeneratedDocument {
   createdById: string;
 }
 
-/** An upload a module attaches to its own record, such as a quote's acceptance proof (F04 A1). */
+/**
+ * An upload a module attaches to its own record, such as a quote's acceptance proof (F04 A1) or a
+ * payment's proof (F13).
+ */
 export interface AttachedUpload {
-  ownerType: 'quote';
+  ownerType: DocumentOwnerType;
   ownerId: string;
   clientId: string;
   uploadId: string;
+  /** Put before the uploaded name, such as the receipt number of a payment's proof. */
+  namePrefix?: string;
 }
 
 /**
@@ -76,13 +91,15 @@ export class GeneratedFiles {
       .where(and(eq(fileUploads.id, document.uploadId), eq(fileUploads.userId, actor.id)))
       .returning();
     if (!upload) throw new CodedException(400, 'UPLOAD_NOT_FOUND', 'Upload the file again');
-    const name = documentName(upload.originalName);
+    const name = documentName(
+      document.namePrefix ? `${document.namePrefix} ${upload.originalName}` : upload.originalName,
+    );
     const [taken] = await tx
       .select({ id: fileItems.id })
       .from(fileItems)
       .where(
         and(
-          eq(fileItems.quoteId, document.ownerId),
+          ownerFilter(document.ownerType, document.ownerId),
           eq(fileItems.role, 'document'),
           isNull(fileItems.archivedAt),
           sql`lower(${fileItems.name}) = lower(${name})`,
@@ -97,8 +114,7 @@ export class GeneratedFiles {
     const [item] = await tx
       .insert(fileItems)
       .values({
-        ownerType: document.ownerType,
-        quoteId: document.ownerId,
+        ...documentOwner(document.ownerType, document.ownerId),
         clientId: document.clientId,
         role: 'document',
         name,
@@ -140,8 +156,7 @@ export class GeneratedFiles {
     const [item] = await tx
       .insert(fileItems)
       .values({
-        ownerType: document.ownerType,
-        quoteId: document.ownerId,
+        ...documentOwner(document.ownerType, document.ownerId),
         clientId: document.clientId,
         role: 'document',
         name: document.name,
@@ -174,6 +189,19 @@ export class GeneratedFiles {
       },
     });
     return item.id;
+  }
+
+  /** The names of the given items, by id. */
+  async names(
+    itemIds: readonly string[],
+    executor: Database | Transaction = this.db,
+  ): Promise<Map<string, string>> {
+    if (itemIds.length === 0) return new Map();
+    const rows = await executor
+      .select({ id: fileItems.id, name: fileItems.name })
+      .from(fileItems)
+      .where(inArray(fileItems.id, [...itemIds]));
+    return new Map(rows.map((row) => [row.id, row.name]));
   }
 
   /** The latest live version of a live item, or null once removed. */

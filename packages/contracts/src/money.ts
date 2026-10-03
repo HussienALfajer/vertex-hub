@@ -62,3 +62,29 @@ export function toUsdMinor(amount: number, currency: Currency, rate: string): nu
 export function invoiceTotal(lines: readonly { quantity: number; unitPriceMinor: number }[]) {
   return lines.reduce((sum, line) => sum + line.quantity * line.unitPriceMinor, 0);
 }
+
+/**
+ * Rule 19: the part of a payment applied to an invoice, in the invoice's currency. The same
+ * currency applies as is; another is converted with the payment's rate, rounded half up. A payment
+ * less than one minor unit of its own currency away from the exact remaining balance settles it
+ * exactly ("pay the rest"). Returns null when the applied amount exceeds the balance (`OVERPAYMENT`).
+ */
+export function applyPayment(
+  balance: number,
+  amount: number,
+  paymentCurrency: Currency,
+  invoiceCurrency: Currency,
+  rate: string,
+): number | null {
+  if (paymentCurrency === invoiceCurrency) return amount <= balance ? amount : null;
+  const rateE4 = rateTenThousandths(rate);
+  // Both sides scaled to whole numbers: the payment and the rest in payment minor units × unit.
+  const [paid, rest, unit] =
+    paymentCurrency === 'USD'
+      ? [BigInt(amount) * rateE4, BigInt(balance) * 10_000n, rateE4]
+      : [BigInt(amount) * 10_000n, BigInt(balance) * rateE4, 10_000n];
+  const gap = paid > rest ? paid - rest : rest - paid;
+  if (balance > 0 && gap < unit) return balance;
+  const applied = convertMinor(amount, paymentCurrency, invoiceCurrency, rate);
+  return applied <= balance ? applied : null;
+}

@@ -10,7 +10,10 @@ import {
   invoiceStatus,
   issueInvoiceSchema,
   rateIsStale,
+  receiptDisplayNumber,
+  recordPaymentSchema,
   updateInvoiceSettingsSchema,
+  voidPaymentSchema,
 } from './invoices.js';
 
 const id = '0192f000-0000-7000-8000-000000000001';
@@ -183,5 +186,60 @@ describe('invoiceListQuerySchema', () => {
       'overdue',
     ]);
     expect(invoiceListQuerySchema.parse({ status: 'void' }).status).toEqual(['void']);
+  });
+});
+
+describe('receiptDisplayNumber', () => {
+  it('pads the number to four digits', () => {
+    expect(receiptDisplayNumber({ year: 2026, number: 7 })).toBe('RC-2026-0007');
+    expect(receiptDisplayNumber({ year: 2026, number: 12345 })).toBe('RC-2026-12345');
+  });
+});
+
+describe('recordPaymentSchema', () => {
+  const payment = { paidOn: '2026-10-10', amountMinor: 5_000, currency: 'USD', method: 'cash' };
+
+  it('defaults the rate to the server and blank texts to null', () => {
+    expect(recordPaymentSchema.parse({ ...payment, reference: ' ', note: '' })).toEqual({
+      ...payment,
+      sypPerUsd: null,
+      reference: null,
+      note: null,
+      proofUploadId: null,
+    });
+  });
+
+  it('needs a positive amount, a known method and a valid rate', () => {
+    for (const change of [
+      { amountMinor: 0 },
+      { amountMinor: 1.5 },
+      { method: 'cheque' },
+      { sypPerUsd: '0' },
+      { currency: 'EUR' },
+      { paidOn: '2026-13-01' },
+    ]) {
+      expect(
+        recordPaymentSchema.safeParse({ ...payment, ...change }).success,
+        JSON.stringify(change),
+      ).toBe(false);
+    }
+  });
+
+  it('limits the reference to 200 and the note to 500 characters', () => {
+    expect(recordPaymentSchema.safeParse({ ...payment, reference: 'x'.repeat(201) }).success).toBe(
+      false,
+    );
+    expect(recordPaymentSchema.safeParse({ ...payment, note: 'x'.repeat(501) }).success).toBe(
+      false,
+    );
+  });
+});
+
+describe('voidPaymentSchema', () => {
+  it('needs a reason', () => {
+    expect(voidPaymentSchema.safeParse({ reason: '  ' }).success).toBe(false);
+    expect(voidPaymentSchema.parse({ reason: ' Recorded twice ' })).toEqual({
+      reason: 'Recorded twice',
+    });
   });
 });

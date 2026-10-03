@@ -64,6 +64,11 @@ export function invoiceDisplayNumber(invoice: { year: number; number: number }) 
   return `INV-${invoice.year}-${String(invoice.number).padStart(4, '0')}`;
 }
 
+/** `RC-2026-0007`, a payment's receipt. */
+export function receiptDisplayNumber(payment: { year: number; number: number }) {
+  return `RC-${payment.year}-${String(payment.number).padStart(4, '0')}`;
+}
+
 /** The current rate warns when it was last set more than 7 days ago (rule 10). */
 export function rateIsStale(rateUpdatedAt: Date | null, now: Date = new Date()): boolean {
   if (!rateUpdatedAt) return false;
@@ -217,6 +222,43 @@ export const voidInvoiceSchema = z.object({ reason: reasonSchema }).meta({ id: '
 
 export type VoidInvoice = z.infer<typeof voidInvoiceSchema>;
 
+// Payments (rules 16–22)
+
+/** How the money arrived (owner decision: required). */
+export const PAYMENT_METHODS = ['cash', 'bank_transfer', 'e_wallet'] as const;
+
+export const paymentMethodSchema = z.enum(PAYMENT_METHODS).meta({ id: 'PaymentMethod' });
+
+export type PaymentMethod = z.infer<typeof paymentMethodSchema>;
+
+/**
+ * Rules 17 and 19. `paidOn` ≤ today (`INVALID_DATES`), possibly before the issue date; the rate
+ * defaults to the current one (`RATE_REQUIRED` when none is set); the applied amount above the
+ * balance is `OVERPAYMENT`. The proof is the actor's upload, kept as a document of the invoice.
+ */
+export const recordPaymentSchema = z
+  .object({
+    paidOn: calendarDateSchema,
+    amountMinor: minorAmountSchema.min(1),
+    currency: currencySchema,
+    sypPerUsd: exchangeRateSchema.nullable().default(null),
+    method: paymentMethodSchema,
+    /** Bank or wallet name and transaction number. */
+    reference: optionalText(200).default(null),
+    note: optionalText(500).default(null),
+    proofUploadId: z.uuid().nullable().default(null),
+  })
+  .meta({ id: 'RecordPayment' });
+
+export type RecordPayment = z.infer<typeof recordPaymentSchema>;
+
+export type RecordPaymentInput = z.input<typeof recordPaymentSchema>;
+
+/** Rule 22: a payment recorded by mistake. */
+export const voidPaymentSchema = z.object({ reason: reasonSchema }).meta({ id: 'VoidPayment' });
+
+export type VoidPayment = z.infer<typeof voidPaymentSchema>;
+
 // Billable items (rule 6)
 
 export const billableItemsQuerySchema = z.object({ clientId: z.uuid(), currency: currencySchema });
@@ -313,6 +355,30 @@ export const invoiceLineSchema = z
 
 export type InvoiceLine = z.infer<typeof invoiceLineSchema>;
 
+export const paymentSchema = z
+  .object({
+    id: z.uuid(),
+    /** `RC-2026-0007`; kept by a void payment. */
+    receiptNumber: z.string(),
+    paidOn: calendarDateSchema,
+    amountMinor: minorAmountSchema,
+    currency: currencySchema,
+    sypPerUsd: exchangeRateSchema,
+    /** In the invoice's currency (rule 19). */
+    appliedMinor: minorAmountSchema,
+    method: paymentMethodSchema,
+    reference: z.string().nullable(),
+    note: z.string().nullable(),
+    /** The proof, a document of the invoice. */
+    proof: z.object({ id: z.uuid(), name: z.string() }).nullable(),
+    recordedBy: personSchema,
+    createdAt: z.iso.datetime(),
+    voided: z.object({ at: z.iso.datetime(), by: personSchema, reason: z.string() }).nullable(),
+  })
+  .meta({ id: 'Payment' });
+
+export type Payment = z.infer<typeof paymentSchema>;
+
 export const invoicePermissionsSchema = z
   .object({
     /** A draft: edit, preview and discard. */
@@ -322,6 +388,10 @@ export const invoicePermissionsSchema = z
     canChangeDueDate: z.boolean(),
     /** `sent` or `overdue`; payments block it (`INVOICE_HAS_PAYMENTS`). */
     canVoid: z.boolean(),
+    /** `payments.manage` on a `sent`, `partially_paid` or `overdue` invoice (rule 16). */
+    canRecordPayment: z.boolean(),
+    /** `payments.manage`: void a non-void payment of an issued invoice (rule 22). */
+    canVoidPayments: z.boolean(),
   })
   .meta({ id: 'InvoicePermissions', description: 'What the caller may do, for the UI' });
 
@@ -348,6 +418,8 @@ export const invoiceDetailSchema = invoiceSchema
       .nullable(),
     notes: z.string().nullable(),
     lines: z.array(invoiceLineSchema),
+    /** Oldest first, void ones included. */
+    payments: z.array(paymentSchema),
     issuedBy: personSchema.nullable(),
     voided: z.object({ at: z.iso.datetime(), by: personSchema, reason: z.string() }).nullable(),
     /** Null for automatic drafts. */
