@@ -9,6 +9,7 @@ export {
   type FileOwnerRights,
   isConfidentialReader,
 } from './file-owner-registry.js';
+export { type FilePurge, FilePurges } from './file-purges.js';
 export { FileVersions, type SentVersion, type VersionRef } from './file-versions.js';
 export { FilesModule } from './files.module.js';
 export { type AttachedUpload, type GeneratedDocument, GeneratedFiles } from './generated-files.js';

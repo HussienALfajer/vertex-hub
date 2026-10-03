@@ -61,6 +61,7 @@ const NOT_BUSINESS_RECORDS: Record<string, string> = {
   document_numbers: 'Counter of invoice and receipt numbers per kind and year (F13)',
   invoice_lines: 'Part of its invoice; replaced while a draft, frozen once issued (F13)',
   payments: 'Voided, never archived or edited once recorded (F13 rule 22)',
+  statement_pdfs: 'Temporary statement renders, deleted after 24 hours (F13 rule 29)',
 };
 
 /** Tables keyed by a natural value instead of a UUIDv7 `id`. Every entry needs a reason. */

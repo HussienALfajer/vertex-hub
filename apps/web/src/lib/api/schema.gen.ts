@@ -2212,6 +2212,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/invoices/{id}/pdf": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["InvoicesController_downloadPdf"];
+        put?: never;
+        post: operations["InvoicesController_renderPdf"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/invoices/{id}/payments": {
         parameters: {
             query?: never;
@@ -2244,6 +2260,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/payments/{id}/receipt": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PaymentsController_downloadReceipt"];
+        put?: never;
+        post: operations["PaymentsController_renderReceipt"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/clients/{id}/billing": {
         parameters: {
             query?: never;
@@ -2270,6 +2302,22 @@ export interface paths {
         get: operations["InvoiceBillingController_statement"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/clients/{id}/statement/pdf": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["InvoiceBillingController_downloadStatement"];
+        put?: never;
+        post: operations["InvoiceBillingController_renderStatement"];
         delete?: never;
         options?: never;
         head?: never;
@@ -7266,6 +7314,15 @@ export interface components {
             notes: string | null;
             lines: components["schemas"]["InvoiceLine"][];
             payments: components["schemas"]["Payment"][];
+            pdf: {
+                state: components["schemas"]["QuotePdfState"];
+            } | null;
+            draftPdf: {
+                state: components["schemas"]["QuotePdfState"];
+                /** Format: date-time */
+                renderedAt: string | null;
+                outdated: boolean;
+            } | null;
             issuedBy: {
                 /** Format: uuid */
                 id: string;
@@ -7334,6 +7391,9 @@ export interface components {
                 id: string;
                 name: string;
             } | null;
+            receiptPdf: {
+                state: components["schemas"]["QuotePdfState"];
+            } | null;
             recordedBy: {
                 /** Format: uuid */
                 id: string;
@@ -7354,6 +7414,8 @@ export interface components {
         };
         /** @enum {string} */
         PaymentMethod: "cash" | "bank_transfer" | "e_wallet";
+        /** @enum {string} */
+        QuotePdfState: "pending" | "ready" | "failed";
         /** @description What the caller may do, for the UI */
         InvoicePermissions: {
             canEdit: boolean;
@@ -7363,6 +7425,7 @@ export interface components {
             canVoid: boolean;
             canRecordPayment: boolean;
             canVoidPayments: boolean;
+            canRenderPdf: boolean;
         };
         CreateInvoice: {
             /** Format: uuid */
@@ -7423,6 +7486,10 @@ export interface components {
         };
         VoidInvoice: {
             reason: string;
+        };
+        /** @description The PDF state after asking for a render */
+        QuotePdfRender: {
+            state: components["schemas"]["QuotePdfState"];
         };
         RecordPayment: {
             /** Format: date */
@@ -7831,8 +7898,6 @@ export interface components {
             listMinor: number;
             effectiveDiscountBasisPoints: number;
         };
-        /** @enum {string} */
-        QuotePdfState: "pending" | "ready" | "failed";
         /** @description What the caller may do, for the UI */
         QuotePermissions: {
             canEdit: boolean;
@@ -8044,10 +8109,6 @@ export interface components {
                 /** Format: uuid */
                 templateId: string | null;
             }) | null;
-        };
-        /** @description The PDF state after asking for a render */
-        QuotePdfRender: {
-            state: components["schemas"]["QuotePdfState"];
         };
         /** @enum {string} */
         CatalogBilling: "one_off" | "monthly";
@@ -13590,6 +13651,57 @@ export interface operations {
             };
         };
     };
+    InvoicesController_downloadPdf: {
+        parameters: {
+            query?: {
+                draft?: "true";
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The PDF of the invoice, or the draft preview with draft=true */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such invoice, or its PDF is not ready */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    InvoicesController_renderPdf: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Queues the draft preview (managers) or renders an issued invoice again when its PDF is not ready */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuotePdfRender"];
+                };
+            };
+        };
+    };
     PaymentsController_record: {
         parameters: {
             query?: never;
@@ -13642,6 +13754,55 @@ export interface operations {
             };
         };
     };
+    PaymentsController_downloadReceipt: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The receipt PDF of the payment */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such payment, its receipt is not ready, or it is void */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PaymentsController_renderReceipt: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Renders the receipt again when its PDF is not ready */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuotePdfRender"];
+                };
+            };
+        };
+    };
     InvoiceBillingController_clientBilling: {
         parameters: {
             query?: never;
@@ -13686,6 +13847,63 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ClientStatement"];
+                };
+            };
+        };
+    };
+    InvoiceBillingController_downloadStatement: {
+        parameters: {
+            query: {
+                currency: components["schemas"]["Currency"];
+                from?: string;
+                to?: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The statement PDF, for 24 hours after it was asked for */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such client, or no ready PDF of this statement */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    InvoiceBillingController_renderStatement: {
+        parameters: {
+            query: {
+                currency: components["schemas"]["Currency"];
+                from?: string;
+                to?: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Queues the PDF of the statement as it is now (rule 29), or finds it ready */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuotePdfRender"];
                 };
             };
         };

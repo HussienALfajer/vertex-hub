@@ -4,6 +4,7 @@ import { extraWorkBillingSchema } from './extra-work.js';
 import { pageQuerySchema, pageSchema, queryListSchema, sortOrderSchema } from './lists.js';
 import { currencySchema, exchangeRateSchema, minorAmountSchema } from './money.js';
 import { milestoneStatusSchema } from './projects.js';
+import { quotePdfStateSchema } from './quotes.js';
 import { cycleStatusSchema } from './retainers.js';
 import { optionalText } from './text.js';
 
@@ -373,6 +374,11 @@ export const paymentSchema = z
     note: z.string().nullable(),
     /** The proof, a document of the invoice. */
     proof: z.object({ id: z.uuid(), name: z.string() }).nullable(),
+    /**
+     * The receipt PDF (rule 20), a document of the invoice archived with a void payment; null for
+     * a payment recorded before receipts were rendered.
+     */
+    receiptPdf: z.object({ state: quotePdfStateSchema }).nullable(),
     recordedBy: personSchema,
     createdAt: z.iso.datetime(),
     voided: z.object({ at: z.iso.datetime(), by: personSchema, reason: z.string() }).nullable(),
@@ -394,6 +400,8 @@ export const invoicePermissionsSchema = z
     canRecordPayment: z.boolean(),
     /** `payments.manage`: void a non-void payment of an issued invoice (rule 22). */
     canVoidPayments: z.boolean(),
+    /** A draft: "Preview PDF" (managers); an issued invoice whose PDF is not ready: "Render again". */
+    canRenderPdf: z.boolean(),
   })
   .meta({ id: 'InvoicePermissions', description: 'What the caller may do, for the UI' });
 
@@ -422,6 +430,17 @@ export const invoiceDetailSchema = invoiceSchema
     lines: z.array(invoiceLineSchema),
     /** Oldest first, void ones included. */
     payments: z.array(paymentSchema),
+    /** The PDF of the issued invoice (rule 15); null for drafts. */
+    pdf: z.object({ state: quotePdfStateSchema }).nullable(),
+    /** The last draft preview; null when none was asked for, and once issued. */
+    draftPdf: z
+      .object({
+        state: quotePdfStateSchema,
+        renderedAt: z.iso.datetime().nullable(),
+        /** The draft (or what it prints) changed since the preview was rendered. */
+        outdated: z.boolean(),
+      })
+      .nullable(),
     issuedBy: personSchema.nullable(),
     voided: z.object({ at: z.iso.datetime(), by: personSchema, reason: z.string() }).nullable(),
     /** Null for automatic drafts. */
@@ -503,6 +522,35 @@ export const invoiceSnapshotSchema = z
 
 export type InvoiceSnapshot = z.infer<typeof invoiceSnapshotSchema>;
 
+/** A draft preview prints no number, dated as if issued today, with a "draft" watermark. */
+export const invoiceDraftSnapshotSchema = invoiceSnapshotSchema.extend({
+  displayNumber: z.null(),
+});
+
+export type InvoiceDraftSnapshot = z.infer<typeof invoiceDraftSnapshotSchema>;
+
+/** The frozen render payload of a payment's receipt (rule 20), taken when it is recorded. */
+export const receiptSnapshotSchema = z.object({
+  displayNumber: z.string(),
+  companyDetails: z.string(),
+  billingName: z.string(),
+  billingAddress: z.string().nullable(),
+  paidOn: calendarDateSchema,
+  amountMinor: minorAmountSchema,
+  currency: currencySchema,
+  method: paymentMethodSchema,
+  reference: z.string().nullable(),
+  invoiceNumber: z.string(),
+  invoiceCurrency: currencySchema,
+  /** In the invoice's currency (rule 19). */
+  appliedMinor: minorAmountSchema,
+  /** The invoice's balance right after this payment, in its currency. */
+  balanceAfterMinor: minorAmountSchema,
+  footer: z.string(),
+});
+
+export type ReceiptSnapshot = z.infer<typeof receiptSnapshotSchema>;
+
 // Client billing and statements (rule 28)
 
 const signedMinorSchema = z
@@ -582,6 +630,13 @@ export const clientStatementSchema = z
   .meta({ id: 'ClientStatement' });
 
 export type ClientStatement = z.infer<typeof clientStatementSchema>;
+
+/** The render payload of a statement PDF (rule 29): the statement with the company details. */
+export const statementSnapshotSchema = clientStatementSchema.extend({
+  companyDetails: z.string(),
+});
+
+export type StatementSnapshot = z.infer<typeof statementSnapshotSchema>;
 
 // Project expenses (rule 26) and billing summaries (rule 27)
 

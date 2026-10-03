@@ -40,12 +40,12 @@ Spec: `docs/specs/F13-invoicing-collection.md` · ADRs 0006, 0007, 0008, 0013, 0
 - [x] wiring checklist, full checks (lint, typecheck, test, build, E2E, drift pass), reviewer (no blocking findings), owner acceptance (approved, incl. open invoices only on the calendar and the F05 read rule for archived projects), /ship
 
 ## PR 5 — `feat/f13-invoices-pdf`: invoice, draft, receipt and statement PDFs
-- [ ] contracts: jobs `invoices.pdf`, `invoices.pdf-ready` (kinds `invoice`, `invoice_draft`, `receipt`, `statement`), render payloads
-- [ ] db (`/db-migration`): PDF state columns (invoices, payments' receipts); drift (owner type `invoice` arrived in PR 3)
-- [ ] worker: Arabic RTL brand templates for the four kinds, handler idempotent per payload hash; worker test with text extraction
-- [ ] api: queue on issue, due date change, payment and preview; ready handler attaching once; `POST` / `GET` PDF endpoints for invoices, receipts and statements; daily re-queue; statement objects purged after 24 hours; `test/invoice-pdf.test.ts`
-- [ ] bridge; web: invoice documents in the client Files tab
-- [x] wiring checklist, full checks (lint, typecheck, test, build, E2E, drift pass), reviewer (no blocking findings), owner acceptance (approved, incl. open invoices only on the calendar and the F05 read rule for archived projects), /ship
+- [x] contracts: jobs `invoices.pdf`, `invoices.pdf-ready` (kinds `invoice`, `invoice_draft`, `receipt`, `statement`) with storage keys; receipt and statement render payloads; invoice detail `pdf`, `draftPdf`, `canRenderPdf`; payment `receiptPdf`
+- [x] db (`/db-migration`): enum `pdf_status`; invoice PDF and draft preview columns; payment receipt snapshot and PDF columns; `statement_pdfs` (temporary renders, conventions exception); drift
+- [x] worker: Arabic RTL brand templates for the four kinds (shared document styles with the quote template), `invoices.pdf` job idempotent per payload hash; worker test with text extraction and page screenshots
+- [x] api: render hashes in `core/jobs`; queue on issue, due date change (new version of the same document), payment and preview; ready handler attaching once; receipt document archived with its payment; `POST` / `GET` PDF endpoints for invoices, receipts and statements; daily re-queue of pending PDFs; statement renders purged after 24 hours by `files.purge-uploads` (`FilePurges`); `test/invoice-pdf.test.ts`
+- [x] bridge (`openapi:export`, `api:generate`); web typecheck (no invoice mocks yet: screens arrive in PR 6)
+- [x] wiring checklist, full checks (lint, typecheck, test, build, E2E, drift pass), reviewer (one finding fixed: 403 and out-of-scope tests for the receipt render and the statement download), owner acceptance (approved; dev database not migrated), /ship
 
 ## PR 6 — `feat/f13-invoices-web`: invoice screens
 - [ ] web `features/invoices/`: list with tabs and totals, new invoice dialog, editor with billable items picker, issue dialog, invoice page with payments, payment dialog, void and due date dialogs, settings page; routes; nav item; `ar.json` `invoices` namespace; loading, empty, error states

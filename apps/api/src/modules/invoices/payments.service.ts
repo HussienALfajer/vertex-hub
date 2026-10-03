@@ -22,7 +22,9 @@ import { NotificationCenter } from '../notifications/index.js';
 import { nextDocumentNumber } from './document-numbers.js';
 import { actorOf } from './invoice-access.js';
 import { InvoiceOverdueService } from './invoice-overdue.service.js';
+import { InvoicePdfService } from './invoice-pdf.service.js';
 import { InvoiceSettingsService } from './invoice-settings.service.js';
+import { InvoiceSnapshots } from './invoice-snapshots.js';
 import { type InvoiceRow, InvoicesService, identity } from './invoices.service.js';
 
 const OPEN: readonly InvoiceStatus[] = OPEN_INVOICE_STATUSES;
@@ -39,11 +41,14 @@ export class PaymentsService {
     private readonly files: GeneratedFiles,
     private readonly center: NotificationCenter,
     private readonly overdue: InvoiceOverdueService,
+    private readonly snapshots: InvoiceSnapshots,
+    private readonly pdf: InvoicePdfService,
   ) {}
 
   /**
    * Rules 16–20 and 23, under the invoice row lock (edge case 2): the applied amount, the next
-   * receipt number, the proof as a document of the invoice, the new paid amount and status.
+   * receipt number, the proof as a document of the invoice, the new paid amount and status, and
+   * the receipt PDF queued once committed.
    */
   async record(
     actor: CurrentUserInfo,
@@ -51,7 +56,7 @@ export class PaymentsService {
     input: RecordPayment,
   ): Promise<InvoiceDetail> {
     let preview = false;
-    const detail = await this.db.transaction(async (tx) => {
+    const { detail, recorded } = await this.db.transaction(async (tx) => {
       const { invoice, client } = await this.invoices.lockForChange(
         tx,
         actor,
@@ -113,6 +118,15 @@ export class PaymentsService {
         .returning();
       if (!payment) throw new Error('The payment was not recorded');
       const updated = await this.setPaid(tx, invoice, invoice.paidMinor + applied, today);
+      const [recorded] = await tx
+        .update(payments)
+        .set({
+          receiptSnapshot: await this.snapshots.receipt(tx, updated, payment, client),
+          receiptPdfStatus: 'pending',
+        })
+        .where(eq(payments.id, payment.id))
+        .returning();
+      if (!recorded) throw new Error('The payment was not recorded');
       await recordAudit(tx, {
         actor: actorOf(actor),
         action: 'payment.recorded',
@@ -135,15 +149,16 @@ export class PaymentsService {
       if (updated.status === 'overdue' && invoice.status !== 'overdue') {
         await this.overdue.alert(tx, updated, client, today);
       }
-      return this.invoices.toDetail(actor, updated, client, tx);
+      return { detail: await this.invoices.toDetail(actor, updated, client, tx), recorded };
     });
     if (preview) await this.files.queuePreviews();
+    await this.pdf.queueReceipt(recorded);
     return detail;
   }
 
   /**
    * Rule 22: a payment recorded by mistake. The invoice's paid amount and status are recomputed;
-   * the receipt number stays used.
+   * the receipt number stays used and its document is archived.
    */
   async void(
     actor: CurrentUserInfo,
@@ -176,6 +191,9 @@ export class PaymentsService {
         .update(payments)
         .set({ voidedAt: new Date(), voidedById: actor.id, voidReason: input.reason })
         .where(eq(payments.id, paymentId));
+      if (payment.receiptFileItemId) {
+        await this.files.archiveDocument(tx, payment.receiptFileItemId, actorOf(actor));
+      }
       const today = businessDate();
       const updated = await this.setPaid(
         tx,

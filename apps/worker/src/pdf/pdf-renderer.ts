@@ -4,9 +4,17 @@ import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Injectable } from '@nestjs/common';
-import type { QuoteSnapshot } from '@vertex-hub/contracts';
+import type {
+  InvoiceDraftSnapshot,
+  InvoiceSnapshot,
+  QuoteSnapshot,
+  ReceiptSnapshot,
+  StatementSnapshot,
+} from '@vertex-hub/contracts';
 import { chromium } from 'playwright';
-import { type QuoteTemplateAssets, quoteHtml } from './quote-template.js';
+import type { TemplateAssets } from './document.js';
+import { invoiceHtml, receiptHtml, statementHtml } from './invoice-templates.js';
+import { quoteHtml } from './quote-template.js';
 
 const require = createRequire(import.meta.url);
 
@@ -35,8 +43,8 @@ function repositoryRoot(): string {
   return dir;
 }
 
-/** The fonts and logo the quote template embeds; also used by the page screenshot test. */
-export async function loadAssets(): Promise<QuoteTemplateAssets> {
+/** The fonts and logo the templates embed; also used by the page screenshot tests. */
+export async function loadAssets(): Promise<TemplateAssets> {
   const faces: string[] = [];
   for (const font of FONTS) {
     const files = join(dirname(require.resolve(`${font.pkg}/package.json`)), 'files');
@@ -57,25 +65,42 @@ export async function loadAssets(): Promise<QuoteTemplateAssets> {
 }
 
 /**
- * Renders quote PDFs with Chromium (ADR 0008). One browser per render: renders are rare, and
- * the memory goes back to the server between them (Q7).
+ * Renders the document PDFs with Chromium (ADR 0008). One browser per render: renders are rare,
+ * and the memory goes back to the server between them (Q7).
  */
 @Injectable()
 export class PdfRenderer {
-  private assets: Promise<QuoteTemplateAssets> | undefined;
+  private assets: Promise<TemplateAssets> | undefined;
 
-  async quote(snapshot: QuoteSnapshot, options: { draft: boolean }): Promise<Buffer> {
+  quote(snapshot: QuoteSnapshot, options: { draft: boolean }): Promise<Buffer> {
+    return this.render((assets) => quoteHtml(snapshot, options, assets));
+  }
+
+  /** An issued invoice, or a draft preview when it has no number. */
+  invoice(snapshot: InvoiceSnapshot | InvoiceDraftSnapshot): Promise<Buffer> {
+    return this.render((assets) => invoiceHtml(snapshot, assets));
+  }
+
+  receipt(snapshot: ReceiptSnapshot): Promise<Buffer> {
+    return this.render((assets) => receiptHtml(snapshot, assets));
+  }
+
+  statement(snapshot: StatementSnapshot): Promise<Buffer> {
+    return this.render((assets) => statementHtml(snapshot, assets));
+  }
+
+  private async render(html: (assets: TemplateAssets) => string): Promise<Buffer> {
     this.assets ??= loadAssets();
-    const html = quoteHtml(snapshot, options, await this.assets);
+    const page = html(await this.assets);
     const browser = await chromium.launch();
     try {
-      const page = await browser.newPage();
+      const tab = await browser.newPage();
       // Everything is inline: the page loads nothing from the network.
-      await page.route('**/*', (route) => route.abort());
-      await page.setContent(html, { waitUntil: 'load' });
+      await tab.route('**/*', (route) => route.abort());
+      await tab.setContent(page, { waitUntil: 'load' });
       // A string: the worker is compiled without the DOM types.
-      await page.evaluate('document.fonts.ready.then(() => true)');
-      return await page.pdf({ format: 'A4', printBackground: true, preferCSSPageSize: true });
+      await tab.evaluate('document.fonts.ready.then(() => true)');
+      return await tab.pdf({ format: 'A4', printBackground: true, preferCSSPageSize: true });
     } finally {
       await browser.close();
     }

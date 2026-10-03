@@ -16,13 +16,13 @@ import { DATABASE } from '../../core/database/database.module.js';
 import { CodedException } from '../../core/errors/index.js';
 import { recordAudit } from '../audit/index.js';
 import type { CurrentUserInfo } from '../auth/index.js';
-import { ClientDirectory } from '../clients/index.js';
 import { BillingSources } from '../projects/index.js';
-import { QuoteDirectory } from '../quotes/index.js';
 import { nextDocumentNumber } from './document-numbers.js';
 import { actorOf, assertClientNotArchived } from './invoice-access.js';
+import { InvoicePdfService } from './invoice-pdf.service.js';
 import { InvoiceSettingsService } from './invoice-settings.service.js';
-import { InvoicesService, identity } from './invoices.service.js';
+import { InvoiceSnapshots } from './invoice-snapshots.js';
+import { type InvoiceRow, InvoicesService, identity, NO_DRAFT_PDF } from './invoices.service.js';
 
 const OPEN = ['sent', 'partially_paid', 'overdue'];
 
@@ -33,17 +33,18 @@ export class InvoiceWorkflowService {
     @Inject(DATABASE) private readonly db: Database,
     private readonly invoices: InvoicesService,
     private readonly settings: InvoiceSettingsService,
-    private readonly clients: ClientDirectory,
-    private readonly quotes: QuoteDirectory,
+    private readonly snapshots: InvoiceSnapshots,
     private readonly sources: BillingSources,
+    private readonly pdf: InvoicePdfService,
   ) {}
 
   /**
-   * Rules 9–11: numbers the draft, fixes its rate and due date, freezes what it prints and bills
-   * its extra work.
+   * Rules 9–11 and 15: numbers the draft, fixes its rate and due date, freezes what it prints,
+   * bills its extra work and queues its PDF; the draft preview goes.
    */
   async issue(actor: CurrentUserInfo, id: string, input: IssueInvoice): Promise<InvoiceDetail> {
-    return this.db.transaction(async (tx) => {
+    let preview: string | null = null;
+    const { detail, row } = await this.db.transaction(async (tx) => {
       const { invoice, client } = await this.invoices.lockForChange(tx, actor, id);
       if (invoice.archivedAt || invoice.status !== 'draft') {
         throw new CodedException(409, 'INVALID_TRANSITION', 'Only a draft is issued');
@@ -67,26 +68,11 @@ export class InvoiceWorkflowService {
       const year = Number(today.slice(0, 4));
       const number = await nextDocumentNumber(tx, 'invoice', year);
       const displayNumber = invoiceDisplayNumber({ year, number });
-      const billing = await this.clients.billingDetails(client.id, tx);
-      const snapshot: InvoiceSnapshot = {
+      const snapshot: InvoiceSnapshot = await this.snapshots.issued(tx, invoice, lines, client, {
         displayNumber,
-        companyDetails: await this.quotes.companyDetails(tx),
-        billingName: billing?.name ?? client.name,
-        billingAddress: billing?.address ?? null,
-        currency: invoice.currency,
         issuedOn: today,
         dueOn,
-        lines: lines.map((line) => ({
-          description: line.description,
-          quantity: line.quantity,
-          unitPriceMinor: line.unitPriceMinor,
-          totalMinor: line.quantity * line.unitPriceMinor,
-        })),
-        totalMinor: invoice.totalMinor,
-        notes: invoice.notes,
-        paymentDetails: settings.paymentDetails,
-        footer: settings.invoiceFooter,
-      };
+      });
       const [issued] = await tx
         .update(invoices)
         .set({
@@ -98,6 +84,8 @@ export class InvoiceWorkflowService {
           snapshot,
           status: 'sent',
           issuedById: actor.id,
+          pdfStatus: 'pending',
+          ...NO_DRAFT_PDF,
           updatedAt: new Date(),
         })
         .where(eq(invoices.id, id))
@@ -124,17 +112,23 @@ export class InvoiceWorkflowService {
         displayNumber,
         actorOf(actor),
       );
-      return this.invoices.toDetail(actor, issued, client, tx);
+      preview = invoice.draftPdfObjectKey;
+      return { detail: await this.invoices.toDetail(actor, issued, client, tx), row: issued };
     });
+    await this.afterRender(row, preview);
+    return detail;
   }
 
-  /** Rule 13: a new due date (≥ today) with a reason; the status follows (rule 21). */
+  /**
+   * Rule 13: a new due date (≥ today) with a reason; the status follows (rule 21) and the PDF is
+   * rendered again as the next version of its document.
+   */
   async changeDueDate(
     actor: CurrentUserInfo,
     id: string,
     input: ChangeInvoiceDueDate,
   ): Promise<InvoiceDetail> {
-    return this.db.transaction(async (tx) => {
+    const { detail, row } = await this.db.transaction(async (tx) => {
       const { invoice, client } = await this.invoices.lockForChange(tx, actor, id);
       if (invoice.archivedAt || !OPEN.includes(invoice.status)) {
         throw new CodedException(409, 'INVALID_TRANSITION', 'Only an open invoice');
@@ -149,7 +143,7 @@ export class InvoiceWorkflowService {
         : null;
       const [updated] = await tx
         .update(invoices)
-        .set({ dueOn: input.dueOn, status, snapshot, updatedAt: new Date() })
+        .set({ dueOn: input.dueOn, status, snapshot, pdfStatus: 'pending', updatedAt: new Date() })
         .where(eq(invoices.id, id))
         .returning();
       if (!updated) throw new Error('The invoice was not updated');
@@ -161,8 +155,10 @@ export class InvoiceWorkflowService {
         before: { ...identity(invoice), dueOn: invoice.dueOn, status: invoice.status },
         after: { ...identity(updated), dueOn: updated.dueOn, status, reason: input.reason },
       });
-      return this.invoices.toDetail(actor, updated, client, tx);
+      return { detail: await this.invoices.toDetail(actor, updated, client, tx), row: updated };
     });
+    await this.afterRender(row, null);
+    return detail;
   }
 
   /**
@@ -213,5 +209,11 @@ export class InvoiceWorkflowService {
       );
       return this.invoices.toDetail(actor, voided, client, tx);
     });
+  }
+
+  /** After the commit: queues the issued invoice's PDF and deletes the draft preview it had. */
+  private async afterRender(invoice: InvoiceRow, previewKey: string | null): Promise<void> {
+    await this.pdf.queueIssued(invoice);
+    await this.pdf.discardPreview(previewKey);
   }
 }

@@ -126,6 +126,7 @@ At most 50 lines per invoice (`LIMIT_REACHED`).
 | `reference` | text | optional, ≤ 200 chars: bank or wallet name and transaction number |
 | `note` | text | optional, ≤ 500 chars |
 | `proof_file_item_id` | uuid → `file_items.id` | optional proof (a document of the invoice, F10) |
+| `receipt_snapshot` | jsonb | the frozen render payload of the receipt (rule 20), taken when recorded |
 | `receipt_pdf_status`, `receipt_file_item_id` | `pdf_status`, uuid | the receipt PDF (a document of the invoice) |
 | `recorded_by_id`, `created_at` | | |
 | `voided_at`, `voided_by_id`, `void_reason` | | a payment recorded by mistake; reason required, ≤ 500 chars; void payments keep their receipt number |
@@ -142,6 +143,9 @@ At most 50 lines per invoice (`LIMIT_REACHED`).
 | `note` | text | optional, ≤ 500 chars |
 | `logged_by_id` | uuid → `users.id` | from the session |
 | timestamps, `archived_at` | | archived = entered by mistake; hidden and out of the margin |
+
+### `statement_pdfs` (temporary, not a business table)
+`client_id`, `hash` (unique: the render payload's hash), `status` (`pdf_status`), `storage_key`, `size_bytes`, `requested_at`. One row per statement render (rule 29); asking again for the same statement within 24 hours reuses it and restarts its 24 hours; the daily `files.purge-uploads` run deletes rows older than 24 hours with their objects.
 
 ### Changes to other tables
 - `clients`: `billing_name` (optional, ≤ 160 chars; the client's name is printed when empty) and `billing_address` (optional, ≤ 500 chars).

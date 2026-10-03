@@ -7728,6 +7728,71 @@
         ]
       }
     },
+    "/api/invoices/{id}/pdf": {
+      "post": {
+        "operationId": "InvoicesController_renderPdf",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Queues the draft preview (managers) or renders an issued invoice again when its PDF is not ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuotePdfRender"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "invoices"
+        ]
+      },
+      "get": {
+        "operationId": "InvoicesController_downloadPdf",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "draft",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "true"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The PDF of the invoice, or the draft preview with draft=true"
+          },
+          "404": {
+            "description": "No such invoice, or its PDF is not ready"
+          }
+        },
+        "tags": [
+          "invoices"
+        ]
+      }
+    },
     "/api/invoices/{id}/payments": {
       "post": {
         "operationId": "PaymentsController_record",
@@ -7801,6 +7866,60 @@
                 }
               }
             }
+          }
+        },
+        "tags": [
+          "invoices"
+        ]
+      }
+    },
+    "/api/payments/{id}/receipt": {
+      "post": {
+        "operationId": "PaymentsController_renderReceipt",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Renders the receipt again when its PDF is not ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuotePdfRender"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "invoices"
+        ]
+      },
+      "get": {
+        "operationId": "PaymentsController_downloadReceipt",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The receipt PDF of the payment"
+          },
+          "404": {
+            "description": "No such payment, its receipt is not ready, or it is void"
           }
         },
         "tags": [
@@ -7889,6 +8008,116 @@
                 }
               }
             }
+          }
+        },
+        "tags": [
+          "invoices"
+        ]
+      }
+    },
+    "/api/clients/{id}/statement/pdf": {
+      "post": {
+        "operationId": "InvoiceBillingController_renderStatement",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "currency",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/Currency"
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Queues the PDF of the statement as it is now (rule 29), or finds it ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuotePdfRender"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "invoices"
+        ]
+      },
+      "get": {
+        "operationId": "InvoiceBillingController_downloadStatement",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "currency",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/Currency"
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The statement PDF, for 24 hours after it was asked for"
+          },
+          "404": {
+            "description": "No such client, or no ready PDF of this statement"
           }
         },
         "tags": [
@@ -27878,6 +28107,43 @@
               "$ref": "#/components/schemas/Payment"
             }
           },
+          "pdf": {
+            "nullable": true,
+            "type": "object",
+            "properties": {
+              "state": {
+                "$ref": "#/components/schemas/QuotePdfState"
+              }
+            },
+            "required": [
+              "state"
+            ],
+            "additionalProperties": false
+          },
+          "draftPdf": {
+            "nullable": true,
+            "type": "object",
+            "properties": {
+              "state": {
+                "$ref": "#/components/schemas/QuotePdfState"
+              },
+              "renderedAt": {
+                "nullable": true,
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+              },
+              "outdated": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "state",
+              "renderedAt",
+              "outdated"
+            ],
+            "additionalProperties": false
+          },
           "issuedBy": {
             "nullable": true,
             "type": "object",
@@ -27991,6 +28257,8 @@
           "notes",
           "lines",
           "payments",
+          "pdf",
+          "draftPdf",
           "issuedBy",
           "voided",
           "createdBy",
@@ -28169,6 +28437,19 @@
             ],
             "additionalProperties": false
           },
+          "receiptPdf": {
+            "nullable": true,
+            "type": "object",
+            "properties": {
+              "state": {
+                "$ref": "#/components/schemas/QuotePdfState"
+              }
+            },
+            "required": [
+              "state"
+            ],
+            "additionalProperties": false
+          },
           "recordedBy": {
             "type": "object",
             "properties": {
@@ -28243,6 +28524,7 @@
           "reference",
           "note",
           "proof",
+          "receiptPdf",
           "recordedBy",
           "createdAt",
           "voided"
@@ -28255,6 +28537,14 @@
           "cash",
           "bank_transfer",
           "e_wallet"
+        ]
+      },
+      "QuotePdfState": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "ready",
+          "failed"
         ]
       },
       "InvoicePermissions": {
@@ -28280,6 +28570,9 @@
           },
           "canVoidPayments": {
             "type": "boolean"
+          },
+          "canRenderPdf": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -28289,7 +28582,8 @@
           "canChangeDueDate",
           "canVoid",
           "canRecordPayment",
-          "canVoidPayments"
+          "canVoidPayments",
+          "canRenderPdf"
         ],
         "additionalProperties": false,
         "description": "What the caller may do, for the UI"
@@ -28492,6 +28786,19 @@
         "required": [
           "reason"
         ]
+      },
+      "QuotePdfRender": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "$ref": "#/components/schemas/QuotePdfState"
+          }
+        },
+        "required": [
+          "state"
+        ],
+        "additionalProperties": false,
+        "description": "The PDF state after asking for a render"
       },
       "RecordPayment": {
         "type": "object",
@@ -30277,14 +30584,6 @@
         ],
         "additionalProperties": false
       },
-      "QuotePdfState": {
-        "type": "string",
-        "enum": [
-          "pending",
-          "ready",
-          "failed"
-        ]
-      },
       "QuotePermissions": {
         "type": "object",
         "properties": {
@@ -31106,19 +31405,6 @@
         "required": [
           "respondedOn"
         ]
-      },
-      "QuotePdfRender": {
-        "type": "object",
-        "properties": {
-          "state": {
-            "$ref": "#/components/schemas/QuotePdfState"
-          }
-        },
-        "required": [
-          "state"
-        ],
-        "additionalProperties": false,
-        "description": "The PDF state after asking for a render"
       },
       "CatalogBilling": {
         "type": "string",

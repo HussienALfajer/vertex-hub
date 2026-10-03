@@ -14,7 +14,7 @@ import {
   fileVersions,
   type Transaction,
 } from '@vertex-hub/db';
-import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, max, sql } from 'drizzle-orm';
 import { DATABASE } from '../../core/database/database.module.js';
 import { CodedException } from '../../core/errors/index.js';
 import { JobQueue } from '../../core/jobs/index.js';
@@ -189,6 +189,85 @@ export class GeneratedFiles {
       },
     });
     return item.id;
+  }
+
+  /**
+   * A new rendering of a generated document (F13 rule 13: an invoice whose due date changed)
+   * becomes its next version; audited without an actor. Nothing is added when the latest version
+   * already holds the object, so a repeated result adds nothing.
+   */
+  async addDocumentVersion(
+    tx: Transaction,
+    itemId: string,
+    file: Pick<
+      GeneratedDocument,
+      'storageKey' | 'mimeType' | 'sizeBytes' | 'sha256' | 'createdById'
+    >,
+  ): Promise<void> {
+    const [item] = await tx.select().from(fileItems).where(eq(fileItems.id, itemId)).for('update');
+    if (!item) throw new Error('File item not found');
+    const [latest] = await tx
+      .select({ storageKey: fileVersions.storageKey })
+      .from(fileVersions)
+      .where(eq(fileVersions.fileItemId, itemId))
+      .orderBy(desc(fileVersions.number))
+      .limit(1);
+    if (latest?.storageKey === file.storageKey) return;
+    const [counts] = await tx
+      .select({ highest: max(fileVersions.number) })
+      .from(fileVersions)
+      .where(eq(fileVersions.fileItemId, itemId));
+    const number = (counts?.highest ?? 0) + 1;
+    await tx.insert(fileVersions).values({
+      fileItemId: itemId,
+      number,
+      kind: 'upload',
+      storageKey: file.storageKey,
+      originalName: item.name,
+      mimeType: file.mimeType,
+      sizeBytes: file.sizeBytes,
+      sha256: file.sha256,
+      uploadedById: file.createdById,
+    });
+    await tx.update(fileItems).set({ updatedAt: new Date() }).where(eq(fileItems.id, itemId));
+    await recordAudit(tx, {
+      actor: null,
+      action: 'file_version.created',
+      entityType: 'file_item',
+      entityId: itemId,
+      after: { ...auditRefs(item), number, kind: 'upload', sizeBytes: file.sizeBytes },
+    });
+  }
+
+  /** Whether a document version holds the object, so it must not be deleted. */
+  async holdsObject(executor: Database | Transaction, storageKey: string): Promise<boolean> {
+    const [row] = await executor
+      .select({ id: fileVersions.id })
+      .from(fileVersions)
+      .where(eq(fileVersions.storageKey, storageKey))
+      .limit(1);
+    return !!row;
+  }
+
+  /** Archives a generated document (F13 rule 22: the receipt of a void payment), once. */
+  async archiveDocument(
+    tx: Transaction,
+    itemId: string,
+    actor: { id: string; name: string } | null,
+  ): Promise<void> {
+    const [item] = await tx
+      .update(fileItems)
+      .set({ archivedAt: new Date() })
+      .where(and(eq(fileItems.id, itemId), isNull(fileItems.archivedAt)))
+      .returning();
+    if (!item) return;
+    await recordAudit(tx, {
+      actor,
+      action: 'file_item.archived',
+      entityType: 'file_item',
+      entityId: itemId,
+      after: { ...auditRefs(item), name: item.name },
+    });
   }
 
   /** The names of the given items, by id. */

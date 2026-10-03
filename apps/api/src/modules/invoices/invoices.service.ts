@@ -3,6 +3,7 @@ import {
   ForbiddenException,
   Inject,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import {
@@ -67,6 +68,7 @@ import {
   holdsAll,
 } from './invoice-access.js';
 import { InvoiceSettingsService } from './invoice-settings.service.js';
+import { InvoiceSnapshots } from './invoice-snapshots.js';
 
 export type InvoiceRow = typeof invoices.$inferSelect;
 
@@ -105,6 +107,15 @@ export const identity = (row: InvoiceRow) => ({
 
 const displayNumber = (row: InvoiceRow) => identity(row).number;
 
+/** An invoice without a draft preview: before the first, and once issued or discarded. */
+export const NO_DRAFT_PDF = {
+  draftPdfStatus: null,
+  draftPdfRequestedHash: null,
+  draftPdfObjectKey: null,
+  draftPdfAt: null,
+  draftPdfHash: null,
+} as const;
+
 /** Rule 21's "days overdue": whole days after the due date. */
 function daysOverdue(row: InvoiceRow, today: string): number | null {
   if (row.status !== 'overdue' || !row.dueOn) return null;
@@ -126,7 +137,10 @@ export class InvoicesService {
     private readonly quotes: QuoteDirectory,
     private readonly settings: InvoiceSettingsService,
     private readonly files: GeneratedFiles,
+    private readonly snapshots: InvoiceSnapshots,
   ) {}
+
+  private readonly logger = new Logger(InvoicesService.name);
 
   async list(actor: CurrentUserInfo, query: InvoiceListQuery): Promise<InvoicePage> {
     const base: (SQL | undefined)[] = [
@@ -329,12 +343,15 @@ export class InvoicesService {
 
   /** Rule 8: discarding a draft archives it and releases its sources. */
   async archive(actor: CurrentUserInfo, id: string): Promise<void> {
-    await this.db.transaction(async (tx) => {
+    const preview = await this.db.transaction(async (tx) => {
       const { invoice } = await this.lockForChange(tx, actor, id);
       if (invoice.archivedAt || invoice.status !== 'draft') {
         throw new CodedException(409, 'INVALID_TRANSITION', 'Only a draft is discarded');
       }
-      await tx.update(invoices).set({ archivedAt: new Date() }).where(eq(invoices.id, id));
+      await tx
+        .update(invoices)
+        .set({ archivedAt: new Date(), ...NO_DRAFT_PDF })
+        .where(eq(invoices.id, id));
       await tx
         .update(invoiceLines)
         .set({ holdsSource: false })
@@ -347,7 +364,14 @@ export class InvoicesService {
         before: { ...identity(invoice), archived: false },
         after: { ...identity(invoice), archived: true },
       });
+      return invoice.draftPdfObjectKey;
     });
+    // The preview of a discarded draft is deleted.
+    if (preview) {
+      await this.files.remove(preview).catch((error: unknown) => {
+        this.logger.warn(`Could not delete ${preview}: ${String(error)}`);
+      });
+    }
   }
 
   /**
@@ -426,6 +450,11 @@ export class InvoicesService {
     const takesPayments = covers(actor, 'payments.manage', client);
     const isDraft = row.status === 'draft' && !row.archivedAt;
     const voidedBy = person(row.voidedById);
+    // A preview is outdated once the draft (or what it prints) changed.
+    const previewOutdated =
+      isDraft && row.draftPdfStatus && row.draftPdfHash
+        ? (await this.snapshots.draftHash(row, lines, client, executor)) !== row.draftPdfHash
+        : false;
     return {
       ...summary,
       billingName: snapshot?.billingName ?? billing?.name ?? client.name,
@@ -488,6 +517,7 @@ export class InvoicesService {
           proof: payment.proofFileItemId
             ? { id: payment.proofFileItemId, name: proofs.get(payment.proofFileItemId) ?? '' }
             : null,
+          receiptPdf: payment.receiptPdfStatus ? { state: payment.receiptPdfStatus } : null,
           recordedBy: recorder(payment.recordedById),
           createdAt: payment.createdAt.toISOString(),
           voided:
@@ -500,6 +530,15 @@ export class InvoicesService {
               : null,
         }),
       ),
+      pdf: row.status !== 'draft' && row.pdfStatus ? { state: row.pdfStatus } : null,
+      draftPdf:
+        isDraft && row.draftPdfStatus
+          ? {
+              state: row.draftPdfStatus,
+              renderedAt: row.draftPdfAt?.toISOString() ?? null,
+              outdated: previewOutdated,
+            }
+          : null,
       issuedBy: person(row.issuedById),
       voided:
         row.voidedAt && voidedBy
@@ -515,6 +554,7 @@ export class InvoicesService {
         canVoid: manages && ['sent', 'overdue'].includes(row.status) && row.paidMinor === 0,
         canRecordPayment: takesPayments && OPEN_STATUSES.includes(row.status),
         canVoidPayments: takesPayments && row.status !== 'draft' && row.status !== 'void',
+        canRenderPdf: isDraft ? manages : row.status !== 'draft' && row.pdfStatus !== 'ready',
       },
     };
   }

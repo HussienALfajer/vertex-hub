@@ -48,6 +48,7 @@ import {
   shootCrew,
   shootShots,
   shoots,
+  statementPdfs,
   taskChecklistItems,
   taskClientResponses,
   taskComments,
@@ -311,8 +312,11 @@ export async function removeClients(db: Database, ids: string[]): Promise<void> 
   if (ids.length === 0) return;
   // Quotes point at their PDF document (F04): unlink them before the file items go.
   await db.update(quotes).set({ pdfFileItemId: null }).where(inArray(quotes.clientId, ids));
-  // Payments point at their proof document (F13): they go before the file items.
+  // Invoices point at their PDF document, payments at their proof and receipt (F13): unlinked or
+  // removed before the file items go.
+  await db.update(invoices).set({ pdfFileItemId: null }).where(inArray(invoices.clientId, ids));
   await removePayments(db, ids);
+  await db.delete(statementPdfs).where(inArray(statementPdfs.clientId, ids));
   await removeFileItems(db, inArray(fileItems.clientId, ids));
   await removeShoots(
     db,

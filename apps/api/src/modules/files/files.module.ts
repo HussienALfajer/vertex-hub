@@ -5,6 +5,7 @@ import { FileContentController } from './file-content.controller.js';
 import { FileContentService } from './file-content.service.js';
 import { FileLibraryService } from './file-library.service.js';
 import { FileOwnerRegistry } from './file-owner-registry.js';
+import { FilePurges } from './file-purges.js';
 import { FileStorage } from './file-storage.js';
 import { FileUploadsService } from './file-uploads.service.js';
 import { FileVersions } from './file-versions.js';
@@ -19,7 +20,8 @@ import { LocalFileStorage } from './local-file-storage.js';
  * imports `tasks`, `clients` or `projects`: they register their owner policies in the exported
  * `FileOwnerRegistry`, and `tasks` calls the exported `FileVersions` in its transactions;
  * `quotes` and `invoices` attach and serve their documents through `GeneratedFiles`. Works
- * the `files.preview` and `files.purge-uploads` jobs.
+ * the `files.preview` and `files.purge-uploads` jobs; the purge also runs the `FilePurges` other
+ * modules register (`invoices`' statement PDFs).
  */
 @Module({
   imports: [AuthModule, NotificationsModule],
@@ -27,6 +29,7 @@ import { LocalFileStorage } from './local-file-storage.js';
   providers: [
     { provide: FileStorage, useClass: LocalFileStorage },
     FileOwnerRegistry,
+    FilePurges,
     FilesService,
     FileVersions,
     FileLibraryService,
@@ -34,6 +37,6 @@ import { LocalFileStorage } from './local-file-storage.js';
     FileContentService,
     GeneratedFiles,
   ],
-  exports: [FileOwnerRegistry, FileVersions, GeneratedFiles],
+  exports: [FileOwnerRegistry, FilePurges, FileVersions, GeneratedFiles],
 })
 export class FilesModule {}

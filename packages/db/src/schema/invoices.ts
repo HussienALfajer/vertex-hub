@@ -1,7 +1,13 @@
-import { INVOICE_ORIGINS, INVOICE_STATUSES, PAYMENT_METHODS } from '@vertex-hub/contracts';
+import {
+  INVOICE_ORIGINS,
+  INVOICE_STATUSES,
+  PAYMENT_METHODS,
+  QUOTE_PDF_STATES,
+} from '@vertex-hub/contracts';
 import { sql } from 'drizzle-orm';
 import {
   type AnyPgColumn,
+  bigint,
   boolean,
   check,
   date,
@@ -37,6 +43,9 @@ export const invoiceOriginEnum = pgEnum('invoice_origin', INVOICE_ORIGINS);
 export const paymentMethodEnum = pgEnum('payment_method', PAYMENT_METHODS);
 
 export const documentNumberKindEnum = pgEnum('document_number_kind', ['invoice', 'receipt']);
+
+/** The state of a rendered PDF (rules 15, 20 and 29), as a quote's (F04 rule 12). */
+export const pdfStatusEnum = pgEnum('pdf_status', QUOTE_PDF_STATES);
 
 /** An exchange rate column: SYP per 1 USD, read and written as a decimal string. */
 const exchangeRate = (name: string) => numeric(name, { precision: 12, scale: 4 });
@@ -106,6 +115,16 @@ export const invoices = pgTable(
     notes: text('notes'),
     /** The frozen render payload of an issued invoice (`invoiceSnapshotSchema`, rule 15). */
     snapshot: jsonb('snapshot'),
+    /** The PDF of the issued invoice (rule 15); null for drafts. */
+    pdfStatus: pdfStatusEnum('pdf_status'),
+    /** The document of the invoice that holds its PDF, once attached; a due date change adds a version. */
+    pdfFileItemId: uuid('pdf_file_item_id').references((): AnyPgColumn => fileItems.id),
+    /** The last draft preview, kept outside file items until the draft is issued or discarded. */
+    draftPdfStatus: pdfStatusEnum('draft_pdf_status'),
+    draftPdfRequestedHash: text('draft_pdf_requested_hash'),
+    draftPdfObjectKey: text('draft_pdf_object_key'),
+    draftPdfAt: timestamp('draft_pdf_at', { withTimezone: true }),
+    draftPdfHash: text('draft_pdf_hash'),
     issuedById: uuid('issued_by_id').references(() => users.id),
     voidedAt: timestamp('voided_at', { withTimezone: true }),
     voidedById: uuid('voided_by_id').references(() => users.id),
@@ -125,6 +144,7 @@ export const invoices = pgTable(
     index('invoices_status_idx').on(table.status),
     index('invoices_due_on_idx').on(table.dueOn),
     index('invoices_updated_at_idx').on(table.updatedAt),
+    index('invoices_pdf_file_item_id_idx').on(table.pdfFileItemId),
     index('invoices_issued_by_id_idx').on(table.issuedById),
     index('invoices_voided_by_id_idx').on(table.voidedById),
     index('invoices_created_by_id_idx').on(table.createdById),
@@ -214,6 +234,12 @@ export const payments = pgTable(
     note: text('note'),
     /** The proof, a document of the invoice. */
     proofFileItemId: uuid('proof_file_item_id').references((): AnyPgColumn => fileItems.id),
+    /** The frozen render payload of the receipt (`receiptSnapshotSchema`, rule 20). */
+    receiptSnapshot: jsonb('receipt_snapshot'),
+    /** Null for payments recorded before receipts were rendered. */
+    receiptPdfStatus: pdfStatusEnum('receipt_pdf_status'),
+    /** The receipt, a document of the invoice; archived with a void payment (rule 22). */
+    receiptFileItemId: uuid('receipt_file_item_id').references((): AnyPgColumn => fileItems.id),
     recordedById: uuid('recorded_by_id')
       .notNull()
       .references(() => users.id),
@@ -226,6 +252,7 @@ export const payments = pgTable(
     uniqueIndex('payments_number_idx').on(table.year, table.number),
     index('payments_invoice_id_idx').on(table.invoiceId),
     index('payments_proof_file_item_id_idx').on(table.proofFileItemId),
+    index('payments_receipt_file_item_id_idx').on(table.receiptFileItemId),
     index('payments_recorded_by_id_idx').on(table.recordedById),
     index('payments_voided_by_id_idx').on(table.voidedById),
     check('payments_amounts_check', sql`${table.amountMinor} > 0 and ${table.appliedMinor} > 0`),
@@ -273,5 +300,31 @@ export const projectExpenses = pgTable(
       sql`char_length(${table.description}) between 1 and 200`,
     ),
     check('project_expenses_note_check', sql`char_length(${table.note}) <= 500`),
+  ],
+);
+
+/**
+ * A statement PDF rendered on request (rule 29): not a document, downloadable for 24 hours, then
+ * deleted with its object by `files.purge-uploads`. One row per payload hash.
+ */
+export const statementPdfs = pgTable(
+  'statement_pdfs',
+  {
+    id: id(),
+    clientId: uuid('client_id')
+      .notNull()
+      .references(() => clients.id),
+    /** The render payload's hash: the same statement, the same PDF. */
+    hash: text('hash').notNull(),
+    status: pdfStatusEnum('status').notNull(),
+    storageKey: text('storage_key'),
+    sizeBytes: bigint('size_bytes', { mode: 'number' }),
+    /** Asked for (or asked for again); the 24 hours count from here. */
+    requestedAt: timestamp('requested_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex('statement_pdfs_hash_idx').on(table.hash),
+    index('statement_pdfs_client_id_idx').on(table.clientId),
+    index('statement_pdfs_requested_at_idx').on(table.requestedAt),
   ],
 );

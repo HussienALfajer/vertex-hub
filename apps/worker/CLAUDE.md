@@ -5,7 +5,7 @@ NestJS standalone context for background work: pg-boss queues and cron (ADR 0008
 ## Layout
 - `src/core/`: config and database, the same role as in `apps/api`.
 - `src/jobs/<name>.job.ts`: one job per file. Pattern to copy: `src/jobs/heartbeat.job.ts`.
-- `src/pdf/`: Chromium rendering (`pdf-renderer.ts`) and the document templates; fonts are embedded from `@fontsource`, the logo is read from `brand/`.
+- `src/pdf/`: Chromium rendering (`pdf-renderer.ts`) and the document templates; fonts are embedded from `@fontsource`, the logo is read from `brand/`. A new template builds on the shared shell in `document.ts` (brand header, styles, watermark); a render job stores its output with `storeOnce` (`pdf-objects.ts`). Pattern: `src/jobs/invoices-pdf.job.ts` with `src/pdf/invoice-templates.ts`.
 
 ## Rules
 - Queue names are `<module>.<action>` (`system.heartbeat`), exported as constants next to the job.

@@ -225,6 +225,13 @@
       "when": 1791048358767,
       "tag": "0031_superb_betty_ross",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1791052411991,
+      "tag": "0032_common_alice",
+      "breakpoints": true
     }
   ]
 }
