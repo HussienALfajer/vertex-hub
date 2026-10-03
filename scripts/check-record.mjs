@@ -6,7 +6,8 @@
 //   node scripts/check-record.mjs status <check>…          per check: "recorded" or "needed"
 //
 // The fingerprint is the git tree of every tracked and untracked, non-ignored file, written through
-// a temporary index seeded from HEAD, so any edit, new file or deletion changes it. The record
+// a temporary index seeded from HEAD, so any edit, new file or deletion changes it, except Markdown
+// that no check reads (task lists, roadmap, specs; brand/identity.md counts). The record
 // lives in the git directory of the current worktree and is never committed.
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -26,12 +27,27 @@ function git(args, env) {
   }).trim();
 }
 
-function fingerprint() {
+/**
+ * Markdown that no check reads: TASKS.md ticks and ROADMAP.md updates after a full run leave the
+ * record valid. brand/identity.md stays in: the design token tests read it (tokens.test.ts).
+ */
+const UNCHECKED_DOCS = [':(glob)**/*.md', ':(exclude,glob)brand/**'];
+
+/**
+ * The git tree of the working tree. `withDocs: false` (the checks' fingerprint) leaves out the
+ * Markdown no check reads; `docsOnly` needs every file.
+ */
+function fingerprint({ withDocs = false } = {}) {
   const index = join(tmpdir(), `vertex-hub-check-index-${process.pid}`);
   try {
     // Start from HEAD so file modes survive where the file system has none (core.fileMode=false).
     git(['read-tree', 'HEAD'], { GIT_INDEX_FILE: index });
     git(['-c', 'core.safecrlf=false', 'add', '--all', '--', '.'], { GIT_INDEX_FILE: index });
+    if (!withDocs) {
+      git(['rm', '--cached', '-r', '-q', '--ignore-unmatch', '--', ...UNCHECKED_DOCS], {
+        GIT_INDEX_FILE: index,
+      });
+    }
     return git(['write-tree'], { GIT_INDEX_FILE: index });
   } finally {
     rmSync(index, { force: true });
@@ -96,7 +112,7 @@ if (command === 'fingerprint') {
   const tree = fingerprint();
   const record = readRecord();
   print(`tree: ${tree.slice(0, 12)}`);
-  print(`docs-only: ${docsOnly(tree) ? 'yes' : 'no'}`);
+  print(`docs-only: ${docsOnly(fingerprint({ withDocs: true })) ? 'yes' : 'no'}`);
   for (const check of checks) {
     const entry = record[check];
     print(entry?.tree === tree ? `${check}: recorded (passed ${entry.at})` : `${check}: needed`);
