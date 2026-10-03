@@ -52,6 +52,7 @@ import {
   MessagesSquareIcon,
   PaletteIcon,
   PencilIcon,
+  ReceiptTextIcon,
   RepeatIcon,
   ShareIcon,
   ShieldAlertIcon,
@@ -73,7 +74,9 @@ import { ClientApprovalsTab } from '../approvals/client-approvals-tab';
 import { ClientContentTab } from '../content/client-content-tab';
 import { ClientFilesTab } from '../files/client-files-tab';
 import { type FileLibrarySearch, parseFileLibrarySearch } from '../files/library-search';
+import { ClientInvoicesTab } from '../invoices/client-invoices-tab';
 import { ClientProjectsTab } from '../projects/client-projects-tab';
+import { hasMoneyAccess } from '../projects/project-access';
 import { ClientQuotesTab } from '../quotes/client-quotes-tab';
 import { ClientRetainersTab, EndedClientWorkCallout } from '../retainers/client-retainers-tab';
 import { ClientTasksTab } from '../tasks/client-tasks-tab';
@@ -101,6 +104,7 @@ const CLIENT_TABS = [
   'projects',
   'retainers',
   'quotes',
+  'invoices',
   'tasks',
   'content',
   'files',
@@ -174,6 +178,8 @@ function Profile({
   const scopeAll = canAll(me, 'clients.manage');
   // Quotes are confidential to quote readers (F04 screen 7).
   const quoteReader = can(me, 'quotes.read');
+  // Invoices, balances and statements need `invoices.read` covering the client (F13 screen 5).
+  const invoiceReader = hasMoneyAccess(me, client.accountManager.id);
   const archived = client.archivedAt !== null;
   // Archived clients are read-only (rule 7); the API refuses every change but restore.
   const editable = client.canManage && !archived;
@@ -245,6 +251,12 @@ function Profile({
               {t('clients.profile.tabs.quotes')}
             </TabsTrigger>
           )}
+          {invoiceReader && (
+            <TabsTrigger value="invoices">
+              <ReceiptTextIcon />
+              {t('clients.profile.tabs.invoices')}
+            </TabsTrigger>
+          )}
           <TabsTrigger value="tasks">
             <ListTodoIcon />
             {t('clients.profile.tabs.tasks')}
@@ -292,6 +304,11 @@ function Profile({
         {quoteReader && (
           <TabsContent value="quotes">
             <ClientQuotesTab client={client} />
+          </TabsContent>
+        )}
+        {invoiceReader && (
+          <TabsContent value="invoices">
+            <ClientInvoicesTab client={client} />
           </TabsContent>
         )}
         <TabsContent value="tasks">

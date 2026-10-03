@@ -167,7 +167,7 @@ const cardClass =
 const cardLinkClass =
   'transition-colors duration-150 ease-out hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring';
 
-/** A key date opens its project or retainer for those who may read them. */
+/** A key date opens its project, retainer or invoice for those who may read them. */
 function KeyDateLink({
   keyDate,
   className,
@@ -177,6 +177,17 @@ function KeyDateLink({
   className?: string;
   children: ReactNode;
 }) {
+  if (keyDate.kind === 'invoice_due') {
+    return (
+      <Link
+        to="/invoices/$invoiceId"
+        params={{ invoiceId: keyDate.targetId }}
+        className={className}
+      >
+        {children}
+      </Link>
+    );
+  }
   if (keyDate.kind === 'renewal') {
     return (
       <Link
@@ -209,8 +220,9 @@ function KeyDateChip({ keyDate, me }: { keyDate: KeyDate; me: MeResponse }) {
   );
   const className =
     'flex min-w-0 items-center gap-1 rounded-sm bg-status-gold px-1.5 py-0.5 text-xs font-medium text-status-gold-foreground';
-  // The invoice page arrives with the invoice screens; until then its due date is not a link.
-  return keyDate.kind !== 'invoice_due' && can(me, 'projects.read') ? (
+  // Invoice due dates reach invoice readers only (F13 screen 8), who may open the invoice.
+  const linked = keyDate.kind === 'invoice_due' || can(me, 'projects.read');
+  return linked ? (
     <KeyDateLink
       keyDate={keyDate}
       className={cn(

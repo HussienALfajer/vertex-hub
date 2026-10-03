@@ -32,6 +32,7 @@ import {
   ListTodoIcon,
   MilestoneIcon,
   ReceiptTextIcon,
+  WalletIcon,
 } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -41,6 +42,7 @@ import { formatCalendarDate, formatDateTime, formatNumber } from '../../lib/form
 import { formatMoney } from '../../lib/money';
 import { idParam } from '../../lib/search-params';
 import { OwnerDocumentsTab } from '../files/owner-documents-tab';
+import { ProjectBillingTab } from '../invoices/project-billing-tab';
 import { SourceQuotes } from '../quotes/source-quotes';
 import { ProjectTasksTab } from '../tasks/project-tasks-tab';
 import { ExtraWorkTab } from './extra-work-tab';
@@ -56,7 +58,7 @@ import {
 import { projectQuery, useRestoreProject } from './projects.queries';
 import { scheduleOf } from './schedule';
 
-const PROJECT_TABS = ['milestones', 'tasks', 'extra-work', 'documents'] as const;
+const PROJECT_TABS = ['milestones', 'tasks', 'extra-work', 'billing', 'documents'] as const;
 
 type ProjectTab = (typeof PROJECT_TABS)[number];
 
@@ -162,6 +164,12 @@ function ProjectView({
             <ReceiptTextIcon />
             {t('projects.page.tabs.extraWork')}
           </TabsTrigger>
+          {project.permissions.canSeeMoney && (
+            <TabsTrigger value="billing">
+              <WalletIcon />
+              {t('projects.page.tabs.billing')}
+            </TabsTrigger>
+          )}
           <TabsTrigger value="documents">
             <FileTextIcon />
             {t('files.documents.title')}
@@ -197,6 +205,11 @@ function ProjectView({
             }}
           />
         </TabsContent>
+        {project.permissions.canSeeMoney && (
+          <TabsContent value="billing">
+            <ProjectBillingTab project={project} />
+          </TabsContent>
+        )}
         <TabsContent value="documents">
           <OwnerDocumentsTab owner={{ type: 'project', id: project.id }} />
         </TabsContent>

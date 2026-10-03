@@ -23,10 +23,14 @@ const declared = Object.entries(openapi.paths as Record<string, Record<string, u
   }),
 );
 
-/** Whether the real API has this route (Better Auth's own routes are outside its document). */
+/**
+ * Whether the real API has this route (Better Auth's own routes are outside its document). Express
+ * answers `HEAD` on every `GET` route, without the body.
+ */
 export function isDeclaredEndpoint(method: string, path: string): boolean {
   if (path.startsWith('/api/auth/')) return true;
-  return declared.some((route) => route.pattern.test(path) && route.methods.has(method));
+  const asked = method === 'HEAD' ? 'GET' : method;
+  return declared.some((route) => route.pattern.test(path) && route.methods.has(asked));
 }
 
 export const test = base.extend({

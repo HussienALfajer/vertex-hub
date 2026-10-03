@@ -23,6 +23,7 @@ import {
   HistoryIcon,
   ReceiptTextIcon,
   TriangleAlertIcon,
+  WalletIcon,
 } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -31,6 +32,7 @@ import { isMissing, LoadError } from '../../components/load-error';
 import { formatCalendarDate, formatMonth, formatNumber } from '../../lib/format';
 import { formatMoney } from '../../lib/money';
 import { OwnerDocumentsTab } from '../files/owner-documents-tab';
+import { RetainerBillingTab } from '../invoices/retainer-billing-tab';
 import { ExtraWorkTab } from '../projects/extra-work-tab';
 import { ArchivedBadge, DepartmentChips, PersonName } from '../projects/project-badges';
 import { SourceQuotes } from '../quotes/source-quotes';
@@ -40,7 +42,7 @@ import { RetainerActions } from './retainer-actions';
 import { BehindBadge, DeliveryRate, RenewalBadge, RetainerStatusBadge } from './retainer-badges';
 import { retainerQuery, useRestoreRetainer } from './retainers.queries';
 
-const RETAINER_TABS = ['this-month', 'history', 'extra-work', 'documents'] as const;
+const RETAINER_TABS = ['this-month', 'history', 'extra-work', 'billing', 'documents'] as const;
 
 type RetainerTab = (typeof RETAINER_TABS)[number];
 
@@ -118,6 +120,12 @@ function RetainerView({ retainer, tab }: { retainer: RetainerDetail; tab: Retain
             <ReceiptTextIcon />
             {t('projects.page.tabs.extraWork')}
           </TabsTrigger>
+          {permissions.canSeeMoney && (
+            <TabsTrigger value="billing">
+              <WalletIcon />
+              {t('projects.page.tabs.billing')}
+            </TabsTrigger>
+          )}
           <TabsTrigger value="documents">
             <FileTextIcon />
             {t('files.documents.title')}
@@ -143,6 +151,11 @@ function RetainerView({ retainer, tab }: { retainer: RetainerDetail; tab: Retain
             }}
           />
         </TabsContent>
+        {permissions.canSeeMoney && (
+          <TabsContent value="billing">
+            <RetainerBillingTab retainer={retainer} />
+          </TabsContent>
+        )}
         <TabsContent value="documents">
           <OwnerDocumentsTab owner={{ type: 'retainer', id: retainer.id }} />
         </TabsContent>

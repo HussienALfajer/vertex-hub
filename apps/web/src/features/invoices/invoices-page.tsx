@@ -406,7 +406,16 @@ function Filters({
   );
 }
 
-function InvoicesTable({ invoices }: { invoices: Invoice[] }) {
+/** The invoice table; on a client's or an engagement's page the columns it already names are left out. */
+export function InvoicesTable({
+  invoices,
+  showClient = true,
+  showEngagement = true,
+}: {
+  invoices: Invoice[];
+  showClient?: boolean;
+  showEngagement?: boolean;
+}) {
   const { t } = useTranslation();
   const none = <span className="text-muted-foreground">{t('common.none')}</span>;
   return (
@@ -414,8 +423,8 @@ function InvoicesTable({ invoices }: { invoices: Invoice[] }) {
       <TableHeader>
         <TableRow>
           <TableHead>{t('invoices.columns.number')}</TableHead>
-          <TableHead>{t('invoices.columns.client')}</TableHead>
-          <TableHead>{t('invoices.columns.engagement')}</TableHead>
+          {showClient && <TableHead>{t('invoices.columns.client')}</TableHead>}
+          {showEngagement && <TableHead>{t('invoices.columns.engagement')}</TableHead>}
           <TableHead>{t('invoices.columns.status')}</TableHead>
           <TableHead className="text-end">{t('invoices.columns.total')}</TableHead>
           <TableHead className="text-end">{t('invoices.columns.paid')}</TableHead>
@@ -443,15 +452,21 @@ function InvoicesTable({ invoices }: { invoices: Invoice[] }) {
               </Link>
               <OriginBadge origin={invoice.origin} />
             </TableCell>
-            <TableCell className="whitespace-normal">
-              <span className="flex flex-col">
-                <span>{invoice.client.name}</span>
-                <span className="text-xs text-muted-foreground">
-                  <PersonName name={invoice.accountManager.name} />
+            {showClient && (
+              <TableCell className="whitespace-normal">
+                <span className="flex flex-col">
+                  <span>{invoice.client.name}</span>
+                  <span className="text-xs text-muted-foreground">
+                    <PersonName name={invoice.accountManager.name} />
+                  </span>
                 </span>
-              </span>
-            </TableCell>
-            <TableCell className="whitespace-normal">{invoice.engagement?.name ?? none}</TableCell>
+              </TableCell>
+            )}
+            {showEngagement && (
+              <TableCell className="whitespace-normal">
+                {invoice.engagement?.name ?? none}
+              </TableCell>
+            )}
             <TableCell>
               <InvoiceStatusBadge status={invoice.status} />
             </TableCell>
@@ -482,7 +497,7 @@ function InvoicesTable({ invoices }: { invoices: Invoice[] }) {
   );
 }
 
-function TableSkeleton() {
+export function TableSkeleton() {
   return (
     <div className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-4">
       {['a', 'b', 'c', 'd', 'e'].map((row) => (

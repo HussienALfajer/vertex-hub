@@ -46,10 +46,10 @@ import {
   useVoidPayment,
 } from './invoices.queries';
 
-const validRate = (rate: string) => exchangeRateSchema.safeParse(rate).success;
+export const validRate = (rate: string) => exchangeRateSchema.safeParse(rate).success;
 
 /** The rate's date and author, and the stale warning of rule 10. */
-function RateHint({ settings }: { settings: InvoiceSettings | undefined }) {
+export function RateHint({ settings }: { settings: InvoiceSettings | undefined }) {
   const { t } = useTranslation();
   if (!settings?.rateUpdatedAt) return null;
   return (
