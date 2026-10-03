@@ -28,6 +28,7 @@ Short records of decisions that shape the system. Each has a status: **Accepted*
 | [0022](0022-shoots-meetings-and-company-calendar.md) | Shoots tied to tasks, warned conflicts and one company calendar | Accepted |
 | [0023](0023-quotes-versions-discounts-and-acceptance.md) | Quotes: catalog-priced sections, versions, discount approval and acceptance into engagements | Accepted |
 | [0024](0024-invoices-payments-and-collection.md) | Invoices: automatic drafts, numbering at issue, voids, and payments with their own rate | Accepted |
+| [0025](0025-ad-budget-wallet-and-campaigns.md) | Client ad budgets in a USD wallet apart from invoices; campaigns with manual periodic updates | Accepted |
 
 Template:
 
