@@ -31,6 +31,7 @@ export const quotesKeys = {
   list: (filters: QuoteListFilters) => ['quotes', 'list', filters] as const,
   detail: (id: string) => ['quotes', 'detail', id] as const,
   settings: ['quotes', 'settings'] as const,
+  byLead: (leadId: string) => ['quotes', 'by-lead', leadId] as const,
   acceptPlan: (id: string, filters: AcceptPlanFilters) =>
     ['quotes', 'accept-plan', id, filters] as const,
 };
@@ -54,6 +55,13 @@ export const quoteQuery = (id: string) =>
       const rendering = quote?.pdf?.state === 'pending' || quote?.draftPdf?.state === 'pending';
       return rendering ? PDF_POLL_MS : false;
     },
+  });
+
+/** A lead's quotes (F03 screen 3): nets only where `quotes.read` covers them. */
+export const leadQuotesQuery = (leadId: string) =>
+  queryOptions({
+    queryKey: quotesKeys.byLead(leadId),
+    queryFn: () => call(api.GET('/api/quotes/by-lead/{leadId}', { params: { path: { leadId } } })),
   });
 
 export const acceptPlanQuery = (id: string, filters: AcceptPlanFilters) =>
@@ -82,10 +90,17 @@ function useSaveQuote() {
   const queryClient = useQueryClient();
   return (quote: QuoteDetail) => {
     queryClient.setQueryData(quotesKeys.detail(quote.id), quote);
-    return queryClient.invalidateQueries({
-      queryKey: quotesKeys.all,
-      predicate: (query) => query.queryKey[1] !== 'accept-plan',
-    });
+    return Promise.all([
+      queryClient.invalidateQueries({
+        queryKey: quotesKeys.all,
+        predicate: (query) => query.queryKey[1] !== 'accept-plan',
+      }),
+      // A lead quote moves its lead: sending to Quote sent, accepting to Won with a new client
+      // (F03 rules 11 and 14).
+      ...(quote.lead
+        ? [['leads'], ['clients']].map((queryKey) => queryClient.invalidateQueries({ queryKey }))
+        : []),
+    ]);
   };
 }
 

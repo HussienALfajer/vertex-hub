@@ -6,6 +6,7 @@ import {
   type CreateQuoteInput,
   CURRENCIES,
   createQuoteSchema,
+  OPEN_LEAD_STAGES,
 } from '@vertex-hub/contracts';
 import {
   Button,
@@ -21,45 +22,65 @@ import {
   FieldError,
   FieldLabel,
   Input,
+  ToggleGroup,
+  ToggleGroupItem,
 } from '@vertex-hub/ui';
 import { useId, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { FormAlert } from '../../components/form-alert';
-import { canAll, useMe } from '../../lib/auth';
+import { can, canAll, useMe } from '../../lib/auth';
 import { errorMessage } from '../../lib/errors';
 import { clientListQuery, clientQuery } from '../clients/clients.queries';
+import { leadListQuery } from '../leads/leads.queries';
 import { ChoiceSelect } from './choice-select';
 import { useCreateQuote } from './quotes.queries';
 
 const NONE = 'none';
 
+type Recipient = 'client' | 'lead';
+
 /**
- * Spec screen 3: a new draft for a client (rule 1: active or paused), opened in the builder once
- * created. From a client's Quotes tab the client is fixed.
+ * Spec screen 3: a new draft for a client (rule 1: active or paused) or an open lead (F03 rule
+ * 14), opened in the builder once created. From a client's Quotes tab or a lead's page the
+ * recipient is fixed.
  */
 export function NewQuoteDialog({
   open,
   onClose,
   clientId,
+  leadId,
 }: {
   open: boolean;
   onClose: () => void;
   /** The client the quote is for, when the dialog opens from its profile. */
   clientId?: string;
+  /** The lead the quote is for, when the dialog opens from its page (F03 screen 3). */
+  leadId?: string;
 }) {
   const { t } = useTranslation();
   const me = useMe();
   const navigate = useNavigate();
-  const ids = { client: useId(), currency: useId(), contact: useId() };
+  const ids = {
+    client: useId(),
+    lead: useId(),
+    recipient: useId(),
+    currency: useId(),
+    contact: useId(),
+  };
   const create = useCreateQuote();
   const [failure, setFailure] = useState<string | null>(null);
-  const empty: CreateQuoteInput = {
-    clientId: clientId ?? '',
+  const fixed = !!clientId || !!leadId;
+  // Leads are offered to those who can read them (F03 screen 6).
+  const offersLeads = !fixed && can(me, 'leads.read');
+  const emptyFor = (recipient: Recipient): CreateQuoteInput => ({
+    ...(recipient === 'lead' ? { leadId: leadId ?? '' } : { clientId: clientId ?? '' }),
     title: '',
     currency: 'USD',
     contactId: null,
-  };
+  });
+  const [recipient, setRecipient] = useState<Recipient>(leadId ? 'lead' : 'client');
+  const empty = emptyFor(leadId ? 'lead' : 'client');
   const form = useForm<CreateQuoteInput, unknown, CreateQuote>({
     resolver: standardSchemaResolver(createQuoteSchema),
     defaultValues: empty,
@@ -76,11 +97,26 @@ export function NewQuoteDialog({
     enabled: open && !clientId,
   });
   const client = useQuery({ ...clientQuery(chosenClient ?? ''), enabled: open && !!chosenClient });
+  // Account managers quote the leads they own only (F03 "Quote scope on lead quotes").
+  const leads = useQuery({
+    ...leadListQuery({
+      stage: [...OPEN_LEAD_STAGES],
+      ownerId: canAll(me, 'quotes.manage') ? undefined : me.user.id,
+      pageSize: 100,
+    }),
+    enabled: open && offersLeads && recipient === 'lead',
+  });
 
   function close() {
     setFailure(null);
+    setRecipient(leadId ? 'lead' : 'client');
     form.reset(empty);
     onClose();
+  }
+
+  function pickRecipient(next: Recipient) {
+    setRecipient(next);
+    form.reset(emptyFor(next));
   }
 
   const submit = form.handleSubmit(async (values) => {
@@ -94,6 +130,10 @@ export function NewQuoteDialog({
     }
   });
 
+  const leadItems = (leads.data?.items ?? []).map((item) => ({
+    value: item.id,
+    label: item.displayName,
+  }));
   const clientItems = (clients.data?.items ?? []).map((item) => ({
     value: item.id,
     label: item.tradeName,
@@ -118,7 +158,48 @@ export function NewQuoteDialog({
             <DialogTitle>{t('quotes.new.title')}</DialogTitle>
             <DialogDescription>{t('quotes.new.hint')}</DialogDescription>
           </DialogHeader>
-          {!clientId && (
+          {offersLeads && (
+            <Field>
+              <FieldLabel id={ids.recipient} render={<span />}>
+                {t('quotes.form.for')}
+              </FieldLabel>
+              <ToggleGroup
+                aria-labelledby={ids.recipient}
+                value={[recipient]}
+                onValueChange={(next: Recipient[]) => {
+                  if (next[0]) pickRecipient(next[0]);
+                }}
+              >
+                <ToggleGroupItem value="client">{t('quotes.form.forClient')}</ToggleGroupItem>
+                <ToggleGroupItem value="lead">{t('quotes.form.forLead')}</ToggleGroupItem>
+              </ToggleGroup>
+            </Field>
+          )}
+          {!fixed && recipient === 'lead' && (
+            <Controller
+              control={form.control}
+              name="leadId"
+              render={({ field }) => (
+                <Field invalid={!!errors.leadId || !!errors.clientId}>
+                  <FieldLabel id={ids.lead} render={<span />}>
+                    {t('quotes.form.lead')}
+                  </FieldLabel>
+                  <ChoiceSelect
+                    labelledBy={ids.lead}
+                    items={leadItems}
+                    value={field.value || null}
+                    placeholder={t('quotes.form.pickLead')}
+                    onChange={field.onChange}
+                  />
+                  <FieldDescription>{t('quotes.form.leadHint')}</FieldDescription>
+                  <FieldError match={!!errors.leadId || !!errors.clientId}>
+                    {t('quotes.form.errors.lead')}
+                  </FieldError>
+                </Field>
+              )}
+            />
+          )}
+          {!fixed && recipient === 'client' && (
             <Controller
               control={form.control}
               name="clientId"
@@ -168,24 +249,26 @@ export function NewQuoteDialog({
                 </Field>
               )}
             />
-            <Controller
-              control={form.control}
-              name="contactId"
-              render={({ field }) => (
-                <Field>
-                  <FieldLabel id={ids.contact} render={<span />}>
-                    {t('quotes.form.addressee')}
-                  </FieldLabel>
-                  <ChoiceSelect
-                    labelledBy={ids.contact}
-                    items={contactItems}
-                    value={field.value ?? NONE}
-                    disabled={!chosenClient}
-                    onChange={(next) => field.onChange(next === NONE ? null : next)}
-                  />
-                </Field>
-              )}
-            />
+            {recipient === 'client' && (
+              <Controller
+                control={form.control}
+                name="contactId"
+                render={({ field }) => (
+                  <Field>
+                    <FieldLabel id={ids.contact} render={<span />}>
+                      {t('quotes.form.addressee')}
+                    </FieldLabel>
+                    <ChoiceSelect
+                      labelledBy={ids.contact}
+                      items={contactItems}
+                      value={field.value ?? NONE}
+                      disabled={!chosenClient}
+                      onChange={(next) => field.onChange(next === NONE ? null : next)}
+                    />
+                  </Field>
+                )}
+              />
+            )}
           </div>
           {failure && <FormAlert>{failure}</FormAlert>}
           <DialogFooter>

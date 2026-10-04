@@ -46,6 +46,16 @@ import { formatCalendarDate, formatNumber } from '../../lib/format';
 import { clientQuery } from '../clients/clients.queries';
 import { departmentListQuery } from '../departments/departments.queries';
 import { type Proof, ProofField } from '../files/proof-field';
+import {
+  ConversionFields,
+  type ConversionProblems,
+  ConversionSummary,
+  type ConversionValues,
+  conversionProblems,
+  toConversion,
+  useConversionValues,
+} from '../leads/conversion-fields';
+import { conversionRefusal } from '../leads/lead-dialogs';
 import { DepartmentChips } from '../projects/project-badges';
 import { useProjectManagerOptions } from '../projects/project-form';
 import { DeliverableIcon, lineName, RetainerStatusBadge } from '../retainers/retainer-badges';
@@ -61,7 +71,7 @@ import {
 
 const NONE = 'none';
 
-type Step = 'response' | 'project' | 'retainer' | 'summary';
+type Step = 'client' | 'response' | 'project' | 'retainer' | 'summary';
 
 /** The dialog's fields; turned into the accept request by `toRequest`. */
 interface AcceptValues {
@@ -121,9 +131,16 @@ function defaultsOf(plan: AcceptPlan, today: string): AcceptValues {
   };
 }
 
-function toRequest(values: AcceptValues, plan: AcceptPlan, proof: Proof | null): AcceptQuoteInput {
+function toRequest(
+  values: AcceptValues,
+  plan: AcceptPlan,
+  proof: Proof | null,
+  conversion: ConversionValues | null,
+): AcceptQuoteInput {
   const { project, retainer } = values;
   return {
+    // Step 0 of a lead quote (F03 rule 11).
+    conversion: plan.conversion && conversion ? toConversion(conversion) : null,
     respondedOn: values.respondedOn,
     contactId: values.contactId,
     note: values.note.trim() || null,
@@ -182,7 +199,9 @@ export function AcceptDialog({
 function AcceptFlow({ quote, onClose }: { quote: QuoteDetail; onClose: () => void }) {
   const { t } = useTranslation();
   const [choices, setChoices] = useState<AcceptPlanFilters>({});
-  const plan = useQuery(acceptPlanQuery(quote.id, choices));
+  // Step 0's existing client: the plan then offers its retainers to renew (F03 rule 11).
+  const [clientId, setClientId] = useState<string | undefined>();
+  const plan = useQuery(acceptPlanQuery(quote.id, { ...choices, ...(clientId && { clientId }) }));
   const refresh = useRefreshAfterRefusal(quote.id);
   useEffect(() => {
     if (plan.error) refresh(plan.error);
@@ -213,6 +232,7 @@ function AcceptFlow({ quote, onClose }: { quote: QuoteDetail; onClose: () => voi
       plan={plan.data}
       planning={plan.isFetching}
       onChoices={setChoices}
+      onClient={setClientId}
       onClose={onClose}
     />
   );
@@ -223,6 +243,7 @@ function AcceptSteps({
   plan,
   planning,
   onChoices,
+  onClient,
   onClose,
 }: {
   quote: QuoteDetail;
@@ -230,6 +251,7 @@ function AcceptSteps({
   /** A new plan for the latest choices is on its way: milestones may still change. */
   planning: boolean;
   onChoices: (choices: AcceptPlanFilters) => void;
+  onClient: (clientId: string | undefined) => void;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
@@ -239,17 +261,25 @@ function AcceptSteps({
   const form = useForm<AcceptValues>({ defaultValues: defaultsOf(plan, today) });
   const [proof, setProof] = useState<Proof | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
+  const [conversion, setConversion] = useConversionValues(plan.conversion);
+  const [conversionIssues, setConversionIssues] = useState<ConversionProblems>({});
   const steps: Step[] = [
+    ...(plan.conversion ? (['client'] as const) : []),
     'response',
     ...(plan.project ? (['project'] as const) : []),
     ...(plan.retainer ? (['retainer'] as const) : []),
     'summary',
   ];
-  const [step, setStep] = useState<Step>('response');
+  const [step, setStep] = useState<Step>(plan.conversion ? 'client' : 'response');
   const index = steps.indexOf(step);
 
   // Dates the user typed stay; the rest follows the plan of the current choices (A2, A3, A5).
-  const edited = useRef({ dueDate: false, renewalDate: false, templates: false });
+  const edited = useRef({
+    dueDate: false,
+    renewalDate: false,
+    templates: false,
+    projectManager: false,
+  });
   const first = useRef(plan);
   const latestPlan = useRef(plan);
   useEffect(() => {
@@ -288,13 +318,19 @@ function AcceptSteps({
 
   /** Puts the step's problems on its fields; true when it may be left forward. */
   function check(current: Step): boolean {
+    if (current === 'client') {
+      const found = conversion ? conversionProblems(conversion) : {};
+      setConversionIssues(found);
+      return Object.keys(found).length === 0;
+    }
     form.clearErrors();
     const values = form.getValues();
     const problems: [FieldPath<AcceptValues>, string | undefined][] = [];
-    const parsed = acceptQuoteSchema.safeParse(toRequest(values, plan, proof));
+    const parsed = acceptQuoteSchema.safeParse(toRequest(values, plan, proof, conversion));
     if (!parsed.success) {
       for (const issue of parsed.error.issues) {
         const [first, second] = issue.path;
+        if (first === 'conversion') continue;
         const section = first === 'project' || first === 'retainer' ? first : 'response';
         if (section !== current) continue;
         const path = (section === 'response' ? first : `${String(first)}.${String(second)}`) as
@@ -337,18 +373,30 @@ function AcceptSteps({
   }
 
   function next() {
-    if (check(step)) setStep(steps[index + 1] ?? 'summary');
+    if (!check(step)) return;
+    // A2: the project manager defaults to the account manager of the client step 0 creates or
+    // links, until the user picks one.
+    if (step === 'client' && conversion && !edited.current.projectManager) {
+      const manager =
+        conversion.mode === 'new'
+          ? conversion.accountManagerId
+          : plan.conversion?.existingClient?.accountManager.id;
+      if (manager) form.setValue('project.projectManagerId', manager);
+    }
+    setStep(steps[index + 1] ?? 'summary');
   }
 
   function back() {
     form.clearErrors();
     setFailure(null);
-    setStep(steps[index - 1] ?? 'response');
+    setStep(steps[index - 1] ?? steps[0] ?? 'response');
   }
 
   async function submit() {
     setFailure(null);
-    const parsed = acceptQuoteSchema.safeParse(toRequest(form.getValues(), plan, proof));
+    const parsed = acceptQuoteSchema.safeParse(
+      toRequest(form.getValues(), plan, proof, conversion),
+    );
     if (!parsed.success) {
       setFailure(t('quotes.accept.errors.review'));
       return;
@@ -366,7 +414,13 @@ function AcceptSteps({
         });
       }
     } catch (error) {
-      // A9: nothing was created; every input stays for another try.
+      // A9: nothing was created, the client neither; every input stays for another try.
+      const field = plan.conversion ? conversionRefusal(t, error) : null;
+      if (field) {
+        setConversionIssues(field);
+        setStep('client');
+        return;
+      }
       setFailure(errorMessage(t, error));
     }
   }
@@ -374,6 +428,18 @@ function AcceptSteps({
   return (
     <div className="grid gap-5">
       <Stepper steps={steps} current={step} />
+      {step === 'client' && plan.conversion && conversion && (
+        <ConversionFields
+          plan={plan.conversion}
+          values={conversion}
+          onChange={(next) => {
+            setConversion(next);
+            setConversionIssues({});
+          }}
+          problems={conversionIssues}
+          onClient={onClient}
+        />
+      )}
       {step === 'response' && (
         <ResponseStep quote={quote} plan={plan} form={form} proof={proof} onProof={setProof} />
       )}
@@ -397,7 +463,9 @@ function AcceptSteps({
           }}
         />
       )}
-      {step === 'summary' && <Summary plan={plan} form={form} proof={proof} />}
+      {step === 'summary' && (
+        <Summary plan={plan} form={form} proof={proof} conversion={conversion} />
+      )}
       {planning && step !== 'response' && (
         <p className="text-sm text-muted-foreground" aria-live="polite">
           {t('quotes.accept.planning')}
@@ -573,7 +641,7 @@ function ProjectStep({
   currency: Currency;
   project: NonNullable<AcceptPlan['project']>;
   form: AcceptForm;
-  onEdited: (field: 'dueDate' | 'templates') => void;
+  onEdited: (field: 'dueDate' | 'templates' | 'projectManager') => void;
 }) {
   const { t } = useTranslation();
   const ids = {
@@ -614,7 +682,10 @@ function ProjectStep({
                 items={managers}
                 value={field.value || null}
                 placeholder={t('projects.form.projectManagerPlaceholder')}
-                onChange={field.onChange}
+                onChange={(next) => {
+                  onEdited('projectManager');
+                  field.onChange(next);
+                }}
               />
               <FieldError match={!!errors?.projectManagerId}>
                 {t('projects.form.errors.projectManager')}
@@ -1022,10 +1093,12 @@ function Summary({
   plan,
   form,
   proof,
+  conversion,
 }: {
   plan: AcceptPlan;
   form: AcceptForm;
   proof: Proof | null;
+  conversion: ConversionValues | null;
 }) {
   const { t } = useTranslation();
   const values = form.getValues();
@@ -1049,6 +1122,13 @@ function Summary({
 
   return (
     <div className="grid gap-4">
+      {plan.conversion && conversion && (
+        <SummaryBlock title={t('quotes.accept.steps.client')}>
+          <Fact label={t('quotes.accept.summary.client')}>
+            <ConversionSummary plan={plan.conversion} values={conversion} />
+          </Fact>
+        </SummaryBlock>
+      )}
       <SummaryBlock title={t('quotes.accept.steps.response')}>
         <Fact label={t('quotes.response.respondedOn')}>
           {formatCalendarDate(values.respondedOn)}

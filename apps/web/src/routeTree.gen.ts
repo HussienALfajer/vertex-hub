@@ -33,6 +33,8 @@ import { Route as AppDepartmentsDepartmentIdRouteImport } from './routes/_app/de
 import { Route as AppInvoicesIndexRouteImport } from './routes/_app/invoices/index'
 import { Route as AppInvoicesInvoiceIdRouteImport } from './routes/_app/invoices/$invoiceId'
 import { Route as AppInvoicesSettingsRouteImport } from './routes/_app/invoices/settings'
+import { Route as AppLeadsIndexRouteImport } from './routes/_app/leads/index'
+import { Route as AppLeadsLeadIdRouteImport } from './routes/_app/leads/$leadId'
 import { Route as AppMeetingsMeetingIdRouteImport } from './routes/_app/meetings/$meetingId'
 import { Route as AppNotificationsIndexRouteImport } from './routes/_app/notifications/index'
 import { Route as AppNotificationsSettingsRouteImport } from './routes/_app/notifications/settings'
@@ -180,6 +182,16 @@ const AppInvoicesInvoiceIdRoute = AppInvoicesInvoiceIdRouteImport.update({
 const AppInvoicesSettingsRoute = AppInvoicesSettingsRouteImport.update({
   id: '/invoices/settings',
   path: '/invoices/settings',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppLeadsIndexRoute = AppLeadsIndexRouteImport.update({
+  id: '/leads/',
+  path: '/leads/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppLeadsLeadIdRoute = AppLeadsLeadIdRouteImport.update({
+  id: '/leads/$leadId',
+  path: '/leads/$leadId',
   getParentRoute: () => AppRoute,
 } as any)
 const AppMeetingsMeetingIdRoute = AppMeetingsMeetingIdRouteImport.update({
@@ -341,6 +353,7 @@ export interface FileRoutesByFullPath {
   '/departments/$departmentId': typeof AppDepartmentsDepartmentIdRoute
   '/invoices/$invoiceId': typeof AppInvoicesInvoiceIdRoute
   '/invoices/settings': typeof AppInvoicesSettingsRoute
+  '/leads/$leadId': typeof AppLeadsLeadIdRoute
   '/meetings/$meetingId': typeof AppMeetingsMeetingIdRoute
   '/notifications/settings': typeof AppNotificationsSettingsRoute
   '/projects/$projectId': typeof AppProjectsProjectIdRoute
@@ -366,6 +379,7 @@ export interface FileRoutesByFullPath {
   '/content/': typeof AppContentIndexRoute
   '/departments/': typeof AppDepartmentsIndexRoute
   '/invoices/': typeof AppInvoicesIndexRoute
+  '/leads/': typeof AppLeadsIndexRoute
   '/notifications/': typeof AppNotificationsIndexRoute
   '/projects/': typeof AppProjectsIndexRoute
   '/quotes/': typeof AppQuotesIndexRoute
@@ -394,6 +408,7 @@ export interface FileRoutesByTo {
   '/departments/$departmentId': typeof AppDepartmentsDepartmentIdRoute
   '/invoices/$invoiceId': typeof AppInvoicesInvoiceIdRoute
   '/invoices/settings': typeof AppInvoicesSettingsRoute
+  '/leads/$leadId': typeof AppLeadsLeadIdRoute
   '/meetings/$meetingId': typeof AppMeetingsMeetingIdRoute
   '/notifications/settings': typeof AppNotificationsSettingsRoute
   '/projects/$projectId': typeof AppProjectsProjectIdRoute
@@ -419,6 +434,7 @@ export interface FileRoutesByTo {
   '/content': typeof AppContentIndexRoute
   '/departments': typeof AppDepartmentsIndexRoute
   '/invoices': typeof AppInvoicesIndexRoute
+  '/leads': typeof AppLeadsIndexRoute
   '/notifications': typeof AppNotificationsIndexRoute
   '/projects': typeof AppProjectsIndexRoute
   '/quotes': typeof AppQuotesIndexRoute
@@ -449,6 +465,7 @@ export interface FileRoutesById {
   '/_app/departments/$departmentId': typeof AppDepartmentsDepartmentIdRoute
   '/_app/invoices/$invoiceId': typeof AppInvoicesInvoiceIdRoute
   '/_app/invoices/settings': typeof AppInvoicesSettingsRoute
+  '/_app/leads/$leadId': typeof AppLeadsLeadIdRoute
   '/_app/meetings/$meetingId': typeof AppMeetingsMeetingIdRoute
   '/_app/notifications/settings': typeof AppNotificationsSettingsRoute
   '/_app/projects/$projectId': typeof AppProjectsProjectIdRoute
@@ -474,6 +491,7 @@ export interface FileRoutesById {
   '/_app/content/': typeof AppContentIndexRoute
   '/_app/departments/': typeof AppDepartmentsIndexRoute
   '/_app/invoices/': typeof AppInvoicesIndexRoute
+  '/_app/leads/': typeof AppLeadsIndexRoute
   '/_app/notifications/': typeof AppNotificationsIndexRoute
   '/_app/projects/': typeof AppProjectsIndexRoute
   '/_app/quotes/': typeof AppQuotesIndexRoute
@@ -504,6 +522,7 @@ export interface FileRouteTypes {
     | '/departments/$departmentId'
     | '/invoices/$invoiceId'
     | '/invoices/settings'
+    | '/leads/$leadId'
     | '/meetings/$meetingId'
     | '/notifications/settings'
     | '/projects/$projectId'
@@ -529,6 +548,7 @@ export interface FileRouteTypes {
     | '/content/'
     | '/departments/'
     | '/invoices/'
+    | '/leads/'
     | '/notifications/'
     | '/projects/'
     | '/quotes/'
@@ -557,6 +577,7 @@ export interface FileRouteTypes {
     | '/departments/$departmentId'
     | '/invoices/$invoiceId'
     | '/invoices/settings'
+    | '/leads/$leadId'
     | '/meetings/$meetingId'
     | '/notifications/settings'
     | '/projects/$projectId'
@@ -582,6 +603,7 @@ export interface FileRouteTypes {
     | '/content'
     | '/departments'
     | '/invoices'
+    | '/leads'
     | '/notifications'
     | '/projects'
     | '/quotes'
@@ -611,6 +633,7 @@ export interface FileRouteTypes {
     | '/_app/departments/$departmentId'
     | '/_app/invoices/$invoiceId'
     | '/_app/invoices/settings'
+    | '/_app/leads/$leadId'
     | '/_app/meetings/$meetingId'
     | '/_app/notifications/settings'
     | '/_app/projects/$projectId'
@@ -636,6 +659,7 @@ export interface FileRouteTypes {
     | '/_app/content/'
     | '/_app/departments/'
     | '/_app/invoices/'
+    | '/_app/leads/'
     | '/_app/notifications/'
     | '/_app/projects/'
     | '/_app/quotes/'
@@ -825,6 +849,20 @@ declare module '@tanstack/react-router' {
       path: '/invoices/settings'
       fullPath: '/invoices/settings'
       preLoaderRoute: typeof AppInvoicesSettingsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/leads/': {
+      id: '/_app/leads/'
+      path: '/leads'
+      fullPath: '/leads/'
+      preLoaderRoute: typeof AppLeadsIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/leads/$leadId': {
+      id: '/_app/leads/$leadId'
+      path: '/leads/$leadId'
+      fullPath: '/leads/$leadId'
+      preLoaderRoute: typeof AppLeadsLeadIdRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/meetings/$meetingId': {
@@ -1038,6 +1076,7 @@ interface AppRouteChildren {
   AppDepartmentsDepartmentIdRoute: typeof AppDepartmentsDepartmentIdRoute
   AppInvoicesInvoiceIdRoute: typeof AppInvoicesInvoiceIdRoute
   AppInvoicesSettingsRoute: typeof AppInvoicesSettingsRoute
+  AppLeadsLeadIdRoute: typeof AppLeadsLeadIdRoute
   AppMeetingsMeetingIdRoute: typeof AppMeetingsMeetingIdRoute
   AppNotificationsSettingsRoute: typeof AppNotificationsSettingsRoute
   AppProjectsProjectIdRoute: typeof AppProjectsProjectIdRoute
@@ -1063,6 +1102,7 @@ interface AppRouteChildren {
   AppContentIndexRoute: typeof AppContentIndexRoute
   AppDepartmentsIndexRoute: typeof AppDepartmentsIndexRoute
   AppInvoicesIndexRoute: typeof AppInvoicesIndexRoute
+  AppLeadsIndexRoute: typeof AppLeadsIndexRoute
   AppNotificationsIndexRoute: typeof AppNotificationsIndexRoute
   AppProjectsIndexRoute: typeof AppProjectsIndexRoute
   AppQuotesIndexRoute: typeof AppQuotesIndexRoute
@@ -1088,6 +1128,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppDepartmentsDepartmentIdRoute: AppDepartmentsDepartmentIdRoute,
   AppInvoicesInvoiceIdRoute: AppInvoicesInvoiceIdRoute,
   AppInvoicesSettingsRoute: AppInvoicesSettingsRoute,
+  AppLeadsLeadIdRoute: AppLeadsLeadIdRoute,
   AppMeetingsMeetingIdRoute: AppMeetingsMeetingIdRoute,
   AppNotificationsSettingsRoute: AppNotificationsSettingsRoute,
   AppProjectsProjectIdRoute: AppProjectsProjectIdRoute,
@@ -1113,6 +1154,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppContentIndexRoute: AppContentIndexRoute,
   AppDepartmentsIndexRoute: AppDepartmentsIndexRoute,
   AppInvoicesIndexRoute: AppInvoicesIndexRoute,
+  AppLeadsIndexRoute: AppLeadsIndexRoute,
   AppNotificationsIndexRoute: AppNotificationsIndexRoute,
   AppProjectsIndexRoute: AppProjectsIndexRoute,
   AppQuotesIndexRoute: AppQuotesIndexRoute,

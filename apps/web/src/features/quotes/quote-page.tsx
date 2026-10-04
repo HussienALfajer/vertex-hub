@@ -26,8 +26,10 @@ import {
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { isMissing, LoadError } from '../../components/load-error';
+import { can, useMe } from '../../lib/auth';
 import { errorMessage } from '../../lib/errors';
 import { formatCalendarDate, formatDateTime, formatNumber } from '../../lib/format';
+import { LeadBadge } from '../leads/lead-badges';
 import { AcceptDialog } from './accept-dialog';
 import {
   ApprovalBadge,
@@ -82,6 +84,7 @@ export function QuotePage({ quoteId }: { quoteId: string }) {
 
 function QuoteHeader({ quote }: { quote: QuoteDetail }) {
   const { t } = useTranslation();
+  const me = useMe();
   return (
     <PageHeader
       title={
@@ -106,9 +109,18 @@ function QuoteHeader({ quote }: { quote: QuoteDetail }) {
             >
               {quote.client.name}
             </Link>
+          ) : quote.lead && can(me, 'leads.read') ? (
+            <Link
+              to="/leads/$leadId"
+              params={{ leadId: quote.lead.id }}
+              className="hover:underline"
+            >
+              {quote.recipient.name}
+            </Link>
           ) : (
             <span>{quote.recipient.name}</span>
           )}
+          {!quote.client && quote.lead && <LeadBadge />}
           {quote.contact && <span>{t('quotes.addressedTo', { name: quote.contact.name })}</span>}
           <span>{t('quotes.accountManagerIs', { name: quote.accountManager.name })}</span>
         </span>

@@ -40,6 +40,7 @@ import {
   StampIcon,
   SunIcon,
   SwatchBookIcon,
+  TargetIcon,
   UsersIcon,
 } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
@@ -55,6 +56,7 @@ interface NavItem {
   to: LinkProps['to'];
   label:
     | 'nav.clients'
+    | 'nav.leads'
     | 'nav.tasks'
     | 'nav.approvals'
     | 'nav.content'
@@ -110,6 +112,7 @@ const navItems: NavItem[] = [
   },
   { to: '/content', label: 'nav.content', icon: CalendarDaysIcon, permission: 'content.read' },
   { to: '/calendar', label: 'nav.calendar', icon: CalendarRangeIcon, permission: 'calendar.read' },
+  { to: '/leads', label: 'nav.leads', icon: TargetIcon, permission: 'leads.read' },
   { to: '/clients', label: 'nav.clients', icon: BriefcaseBusinessIcon, permission: 'clients.read' },
   { to: '/projects', label: 'nav.projects', icon: FolderKanbanIcon, permission: 'projects.read' },
   { to: '/retainers', label: 'nav.retainers', icon: RepeatIcon, permission: 'projects.read' },

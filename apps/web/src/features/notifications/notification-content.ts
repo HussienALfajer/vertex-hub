@@ -52,8 +52,7 @@ export function notificationLink(notification: Notification): ToOptions {
       // The invoice page arrives with the invoice screens (F13 PR 6).
       return { to: '/' };
     case 'lead':
-      // The lead page arrives with the Leads screens (F03 PR 3).
-      return { to: '/' };
+      return { to: '/leads/$leadId', params: { leadId: subject.id } };
     default:
       return { to: '/tasks/$taskId', params: { taskId: subject.id } };
   }

@@ -24,6 +24,7 @@ import {
   type LeadDuplicateQuery,
   type LeadDuplicates,
   type LeadInterest,
+  type LeadInterestOptions,
   type LeadListQuery,
   type LeadOwnerOptions,
   type LeadPage,
@@ -354,6 +355,11 @@ export class LeadsService implements OnModuleInit {
         accountManager: person(client.accountManagerId),
       })),
     };
+  }
+
+  /** The interest picker: names only, so lead managers need no `catalog.read`. */
+  interestOptions(): Promise<LeadInterestOptions> {
+    return this.catalog.activeNames();
   }
 
   /** Rule 1: active users holding `leads.manage`, by name. */

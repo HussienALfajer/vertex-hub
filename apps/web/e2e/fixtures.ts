@@ -54,6 +54,7 @@ import {
   type CloseShoot,
   type Contact,
   type ContentCalendar,
+  type ConvertLead,
   type CreateApprovalRequest,
   type CreateCampaign,
   type CreateCycleAdjustment,
@@ -77,10 +78,13 @@ import {
   calendarDay,
   canChangeCampaignStatus,
   changeInvoiceDueDateSchema,
+  convertLeadSchema,
   costPerResult,
   createCatalogPackageSchema,
   createCatalogServiceSchema,
   createInvoiceSchema,
+  createLeadNoteSchema,
+  createLeadSchema,
   createProjectExpenseSchema,
   createQuoteSchema,
   createTemplateSchema,
@@ -89,6 +93,7 @@ import {
   type DepartmentDetailResponse,
   type DepartmentResponse,
   type DuplicatePost,
+  daysInStage,
   daysWithoutUpdate,
   defaultInstallmentMilestones,
   type ErrorCode,
@@ -103,6 +108,8 @@ import {
   type FileVersion,
   fileTypeOf,
   firstOfMonth,
+  followUpDateInRange,
+  followUpFilterRange,
   grantedPermissions,
   type HealthResponse,
   type Invoice,
@@ -122,6 +129,7 @@ import {
   isInlineMimeType,
   isLineBehind,
   isLowBalance,
+  isOpenLeadStage,
   isPostContentEditable,
   isPostOverdue,
   isProjectClosed,
@@ -131,8 +139,29 @@ import {
   isTaskOpen,
   isTaskOverdue,
   type KeyDate,
+  LEAD_LIMITS,
+  type LEAD_SORTS,
+  LEAD_STAGES,
+  type Lead,
+  type LeadBoard,
+  type LeadConversionPlan,
+  type LeadDetail,
+  type LeadFollowUpFilter,
+  type LeadLossReason,
+  type LeadQuotes,
+  type LeadSource,
+  type LeadStage,
   type LinkableTask,
   lastOfMonth,
+  leadDisplayName,
+  leadDuplicateQuerySchema,
+  leadHasContactMethod,
+  leadOwnerChangeSchema,
+  leadSourceDetailMissing,
+  leadStageChangeSchema,
+  loseLeadSchema,
+  lossRejectionReason,
+  MANUAL_LEAD_STAGES,
   type MedicalReview,
   type Meeting,
   type MeetingDetail,
@@ -141,6 +170,7 @@ import {
   type MilestoneStatus,
   type MyContentSummary,
   type MyTaskSummary,
+  manualLeadMoveRefusal,
   mentionedUserIds,
   mergeDeliverableLines,
   NOTIFICATION_CATALOG,
@@ -152,6 +182,7 @@ import {
   needsDiscountApproval,
   OPEN_AD_CAMPAIGN_STATUSES,
   OPEN_INVOICE_STATUSES,
+  OPEN_LEAD_STAGES,
   OPEN_TASK_STATUSES,
   type PatchCampaignUpdate,
   type Payment,
@@ -220,6 +251,7 @@ import {
   recordPaymentSchema,
   rejectQuoteSchema,
   renewalState,
+  reopenLeadSchema,
   repeatedStepFor,
   revisionSourceOf,
   type ScheduleConflict,
@@ -273,6 +305,8 @@ import {
   updateCatalogPackageSchema,
   updateCatalogServiceSchema,
   updateInvoiceSettingsSchema,
+  updateLeadNoteSchema,
+  updateLeadSchema,
   updateProjectExpenseSchema,
   updateQuoteSettingsSchema,
   updateTemplateSchema,
@@ -375,6 +409,18 @@ export const accountManagerMe: MeResponse = {
     ],
   }),
   twoFactor: { enabled: false, required: false },
+};
+
+/** Omar: the Internal Operations manager, who reads leads and quotes them (F03, F04). */
+export const operationsManagerMe: MeResponse = {
+  user: { id: id(2), name: 'عمر حداد', email: 'omar@vertex.example', image: null },
+  roles: ['department_manager', 'employee'],
+  departments: [{ ...operations, isPrimary: true, isManager: true }],
+  permissions: grantedPermissions({
+    roles: ['department_manager', 'employee'],
+    departments: [{ code: 'internal_operations', isManager: true }],
+  }),
+  twoFactor: { enabled: true, required: true },
 };
 
 /** Karim: an employee with no role beyond the default one. */
@@ -993,8 +1039,21 @@ export async function mockApi(page: Page, options: MockOptions): Promise<MockedA
   const templatesApi = templateRoutes({ users, clients, retainers, templates, me: () => me });
   const catalog = catalogSeed();
   const catalogApi = catalogRoutes({ catalog, templates, me: () => me });
+  const quoting = quotesSeed();
+  const leadState = {
+    leads: leadsSeed(),
+    quotes: quoting.quotes,
+    clients,
+    users,
+    catalog,
+    me: () => me,
+  };
+  const rulesOfLeads = leadRules(leadState);
+  const leadsApi = leadRoutes({ ...leadState, rules: rulesOfLeads });
   const quotesApi = quoteRoutes({
-    quoting: quotesSeed(),
+    quoting,
+    leads: leadState.leads,
+    leadRules: rulesOfLeads,
     catalog,
     clients,
     users,
@@ -1302,6 +1361,10 @@ export async function mockApi(page: Page, options: MockOptions): Promise<MockedA
     // Service catalog (F04).
     const cataloged = catalogApi(route, method, url, request);
     if (cataloged) return cataloged;
+
+    // Leads (F03), with a lead's quotes.
+    const led = leadsApi(route, method, url, request);
+    if (led) return led;
 
     // Quotes (F04).
     const quoted = quotesApi(route, method, url, request);
@@ -8829,7 +8892,9 @@ interface QuoteRecord
     | 'versions'
     | 'permissions'
   > {
-  clientId: string;
+  /** Null for a lead quote until its lead is converted (F03). */
+  clientId: string | null;
+  leadId: string | null;
   contactId: string | null;
   sentById: string | null;
   createdById: string;
@@ -8910,6 +8975,7 @@ export function quotesSeed(): QuoteRecords {
     id: id(n),
     year: 2026,
     version: 1,
+    leadId: null,
     contactId: null,
     currency: 'USD',
     status: 'draft',
@@ -8991,6 +9057,21 @@ export function quotesSeed(): QuoteRecords {
         pdf: { state: 'ready' },
         lines: seedQuoteLines(920400).slice(0, 1),
       }),
+      // F03: a sent quote on the Rashaqa lead, not converted yet.
+      quote(9205, {
+        number: 5,
+        title: 'باقة سوشال صالة رشاقة',
+        clientId: null,
+        leadId: id(9704),
+        createdById: id(1),
+        status: 'sent',
+        sentAt: `${addDays(today, -1)}T09:00:00.000Z`,
+        sentById: id(1),
+        validUntil: addDays(today, 13),
+        pdf: { state: 'ready' },
+        lines: seedQuoteLines(920500).slice(1),
+        installments: [],
+      }),
     ],
   };
 }
@@ -9003,6 +9084,8 @@ interface QuoteState {
   projects: ProjectRecord[];
   retainers: RetainerRecord[];
   templates: TemplateRecord[];
+  leads: LeadRecord[];
+  leadRules: LeadRuleSet;
   me: () => MeResponse;
 }
 
@@ -9015,6 +9098,8 @@ function quoteRoutes({
   projects,
   retainers,
   templates,
+  leads,
+  leadRules,
   me,
 }: QuoteState) {
   const { quotes, settings } = quoting;
@@ -9027,13 +9112,20 @@ function quoteRoutes({
   const scopes = (permission: Permission) =>
     me().permissions.find((g) => g.permission === permission)?.scopes ?? [];
   const holds = (permission: Permission) => scopes(permission).length > 0;
-  const covers = (permission: Permission, clientId: string) => {
+  const coversClient = (permission: Permission, clientId: string) => {
     const granted = scopes(permission);
     const client = clients.find((c) => c.id === clientId);
     return (
       granted.includes('all') ||
       (granted.includes('own_clients') && client?.accountManagerId === me().user.id)
     );
+  };
+  const leadOf = (q: Pick<QuoteRecord, 'leadId'>) => leads.find((l) => l.id === q.leadId);
+  /** A client quote by its client; a lead quote, until converted, by the lead's owner (F03). */
+  const covers = (permission: Permission, q: Pick<QuoteRecord, 'clientId' | 'leadId'>) => {
+    if (q.clientId) return coversClient(permission, q.clientId);
+    const lead = leadOf(q);
+    return !!lead && leadRules.covers(permission, lead);
   };
   const person = (userId: string) => {
     const user = users.find((u) => u.id === userId);
@@ -9063,9 +9155,10 @@ function quoteRoutes({
 
   const detailOf = (q: QuoteRecord): QuoteDetail => {
     const client = clients.find((c) => c.id === q.clientId);
+    const lead = leadOf(q);
     const contact = client?.contacts.find((c) => c.id === q.contactId);
     const totals = totalsOf(q);
-    const manages = covers('quotes.manage', q.clientId) && !q.archivedAt;
+    const manages = covers('quotes.manage', q) && !q.archivedAt;
     const draft = q.status === 'draft';
     const needs = needsDiscountApproval(totals, settings.discountThresholdPercent);
     const approver = holds('quotes.approve_discount');
@@ -9080,11 +9173,13 @@ function quoteRoutes({
     return {
       ...q,
       displayNumber: quoteDisplayNumber(q),
-      client: { id: q.clientId, name: client?.tradeName ?? '' },
-      recipient: { kind: 'client', id: q.clientId, name: client?.tradeName ?? '' },
-      accountManager: person(client?.accountManagerId ?? id(1)),
+      client: client ? { id: client.id, name: client.tradeName } : null,
+      recipient: client
+        ? { kind: 'client', id: client.id, name: client.tradeName }
+        : { kind: 'lead', id: lead?.id ?? '', name: lead ? leadDisplayName(lead) : '' },
+      accountManager: person(client?.accountManagerId ?? lead?.ownerId ?? id(1)),
       contact: contact ? { id: contact.id, name: contact.name, archived: contact.archived } : null,
-      lead: null,
+      lead: lead ? { id: lead.id, displayName: leadDisplayName(lead), stage: lead.stage } : null,
       oneOffNetMinor: totals.oneOff.netMinor,
       monthlyNetMinor: totals.monthly.netMinor,
       expiresSoon:
@@ -9125,7 +9220,7 @@ function quoteRoutes({
         canCreateVersion:
           manages && latest && !newerDraft && ['sent', 'expired', 'rejected'].includes(q.status),
         canArchive: manages && draft,
-        canAccept: manages && covers('projects.manage', q.clientId) && q.status === 'sent',
+        canAccept: manages && covers('projects.manage', q) && q.status === 'sent',
         canRenderPdf: draft ? manages : q.pdf?.state === 'failed',
       },
     };
@@ -9134,7 +9229,10 @@ function quoteRoutes({
   const acceptPlanOf = (q: QuoteRecord, query: URLSearchParams): AcceptPlan => {
     const detail = detailOf(q);
     const today = businessDate();
-    const client = clients.find((c) => c.id === q.clientId);
+    const lead = !q.clientId ? leadOf(q) : undefined;
+    const linked = lead ? query.get('clientId') : null;
+    const conversion = lead ? leadRules.conversionPlan(lead, linked) : null;
+    const client = clients.find((c) => c.id === (q.clientId ?? linked));
     const departmentsOf = (lines: QuoteLineRecord[]) => [
       ...new Set(
         lines
@@ -9178,7 +9276,12 @@ function quoteRoutes({
       const defaults = defaultInstallmentMilestones(detail.installments.length, milestones.length);
       project = {
         name: q.title,
-        projectManager: person(client?.accountManagerId ?? id(1)),
+        // A new client's account manager is chosen at step 0 (F03 rule 11).
+        projectManager: client
+          ? person(client.accountManagerId)
+          : conversion?.client.accountManagerId
+            ? person(conversion.client.accountManagerId)
+            : null,
         departments: departmentsOf(oneOff),
         startDate,
         dueDate: milestones.at(-1)?.dueDate ?? addDays(startDate, 30),
@@ -9250,7 +9353,7 @@ function quoteRoutes({
         renewable: retainers
           .filter(
             (r) =>
-              r.clientId === q.clientId &&
+              r.clientId === client?.id &&
               !r.archived &&
               r.status !== 'ended' &&
               r.currency === q.currency,
@@ -9264,7 +9367,7 @@ function quoteRoutes({
       project,
       retainer,
       archivedTemplates: used.filter((t) => t.archived).map((t) => ({ id: t.id, name: t.name })),
-      conversion: null,
+      conversion,
     };
   };
   const listItemOf = (q: QuoteRecord): Quote => {
@@ -9379,6 +9482,7 @@ function quoteRoutes({
       const statuses = url.searchParams.getAll('status');
       const archived = url.searchParams.get('archived') === 'true';
       const clientId = url.searchParams.get('clientId');
+      const leadId = url.searchParams.get('leadId');
       const accountManagerId = url.searchParams.get('accountManagerId');
       const approval = url.searchParams.get('approval');
       const projectId = url.searchParams.get('projectId');
@@ -9388,15 +9492,15 @@ function quoteRoutes({
       const items = quotes
         .filter(
           (q) =>
-            covers('quotes.read', q.clientId) &&
+            covers('quotes.read', q) &&
             !!q.archivedAt === archived &&
             (archived || !latestOnly || latestOf(q).id === q.id) &&
             (!projectId || q.project?.id === projectId) &&
             (!retainerId || q.retainer?.id === retainerId) &&
             (statuses.length === 0 || statuses.includes(q.status)) &&
             (!clientId || q.clientId === clientId) &&
-            (!accountManagerId ||
-              clients.find((c) => c.id === q.clientId)?.accountManagerId === accountManagerId) &&
+            (!leadId || q.leadId === leadId) &&
+            (!accountManagerId || detailOf(q).accountManager.id === accountManagerId) &&
             (!approval || q.discountApproval === approval),
         )
         .map(listItemOf)
@@ -9412,12 +9516,18 @@ function quoteRoutes({
     }
     if (path === '/api/quotes' && method === 'POST') {
       const input = createQuoteSchema.parse(request.postDataJSON());
-      // Lead quotes are mocked with the lead screens (F03 PR 3).
-      const clientId = input.clientId ?? '';
-      if (!covers('quotes.manage', clientId)) return fail(route, 403, null);
-      const client = clients.find((c) => c.id === clientId);
-      if (!client || client.archived) return fail(route, 409, 'CLIENT_ARCHIVED');
-      if (client.status === 'ended') return fail(route, 409, 'CLIENT_ENDED');
+      const clientId = input.clientId ?? null;
+      const leadId = input.leadId ?? null;
+      if (!covers('quotes.manage', { clientId, leadId })) return fail(route, 403, null);
+      if (clientId) {
+        const client = clients.find((c) => c.id === clientId);
+        if (!client || client.archived) return fail(route, 409, 'CLIENT_ARCHIVED');
+        if (client.status === 'ended') return fail(route, 409, 'CLIENT_ENDED');
+      } else {
+        const lead = leadOf({ leadId });
+        if (lead?.archivedAt) return fail(route, 409, 'LEAD_ARCHIVED');
+        if (!lead || !isOpenLeadStage(lead.stage)) return fail(route, 409, 'LEAD_CLOSED');
+      }
       const at = now();
       const created: QuoteRecord = {
         id: id(nextId++),
@@ -9426,6 +9536,7 @@ function quoteRoutes({
         version: 1,
         title: input.title,
         clientId,
+        leadId,
         contactId: input.contactId,
         currency: input.currency,
         status: 'draft',
@@ -9459,7 +9570,7 @@ function quoteRoutes({
     const match = path.match(/^\/api\/quotes\/([^/]+)(?:\/(.+))?$/);
     if (!match) return undefined;
     const q = quotes.find((x) => x.id === match[1]);
-    if (!q || !covers('quotes.read', q.clientId)) return fail(route, 404, null);
+    if (!q || !covers('quotes.read', q)) return fail(route, 404, null);
     const action = match[2];
     if (!action && method === 'GET') {
       // The worker renders between two reads.
@@ -9471,7 +9582,7 @@ function quoteRoutes({
     }
     if (action === 'pdf' && method === 'POST') {
       if (q.status === 'draft') {
-        if (!covers('quotes.manage', q.clientId)) return fail(route, 403, null);
+        if (!covers('quotes.manage', q)) return fail(route, 403, null);
         q.draftPdf = { state: 'pending', renderedAt: null, outdated: false };
       } else if (q.pdf?.state === 'failed') {
         q.pdf = { state: 'pending' };
@@ -9487,7 +9598,7 @@ function quoteRoutes({
       q.updatedAt = now();
       return json(route, detailOf(q));
     }
-    if (!covers('quotes.manage', q.clientId)) return fail(route, 403, null);
+    if (!covers('quotes.manage', q)) return fail(route, 403, null);
     const totals = totalsOf(q);
     const needs = needsDiscountApproval(totals, settings.discountThresholdPercent);
 
@@ -9543,6 +9654,9 @@ function quoteRoutes({
     if (action === 'send') {
       const { confirmZeroPrice } = sendQuoteSchema.parse(request.postDataJSON());
       if (q.status !== 'draft') return fail(route, 409, 'INVALID_TRANSITION');
+      const lead = !q.clientId ? leadOf(q) : undefined;
+      if (lead?.archivedAt) return fail(route, 409, 'LEAD_ARCHIVED');
+      if (lead && !isOpenLeadStage(lead.stage)) return fail(route, 409, 'LEAD_CLOSED');
       if (q.discountApproval === 'pending') return fail(route, 409, 'APPROVAL_PENDING');
       if (q.lines.length === 0) return fail(route, 409, 'QUOTE_EMPTY');
       const hasOneOff = q.lines.some((line) => line.section === 'one_off');
@@ -9576,6 +9690,7 @@ function quoteRoutes({
         draftPdf: null,
         updatedAt: now(),
       });
+      if (lead) leadRules.quoteSent(lead.id);
       return json(route, detailOf(q));
     }
     if (action === 'extend') {
@@ -9613,6 +9728,8 @@ function quoteRoutes({
     }
     if (action === 'accept' && method === 'POST') {
       const input = acceptQuoteSchema.parse(request.postDataJSON());
+      const lead = !q.clientId ? leadOf(q) : undefined;
+      if (!!lead !== !!input.conversion) return fail(route, 400, null);
       const choices: string[][] = [];
       if (input.project) {
         choices.push(['projectStartDate', input.project.startDate], ['chooseTemplates', 'true']);
@@ -9622,17 +9739,25 @@ function quoteRoutes({
       if (input.retainer?.mode === 'new') {
         choices.push(['retainerStartDate', input.retainer.startDate]);
       }
+      if (input.conversion?.mode === 'existing')
+        choices.push(['clientId', input.conversion.clientId]);
       const plan = acceptPlanOf(q, new URLSearchParams(choices));
       if (input.respondedOn > businessDate() || input.respondedOn < plan.sentOn) {
         return fail(route, 400, 'INVALID_DATES');
       }
+      // F03 rule 11: step 0 converts the lead first; the quote is then a client quote.
+      if (lead && input.conversion) {
+        const converted = leadRules.convert(lead, input.conversion);
+        if ('error' in converted) return fail(route, ...converted.error);
+      }
+      const clientId = q.clientId ?? '';
       let project: QuoteRecord['project'] = null;
       if (input.project && plan.project) {
         const { installments, milestones } = plan.project;
         const chosen = input.project.installmentMilestones;
         const created: ProjectRecord = {
           id: id(nextId++),
-          clientId: q.clientId,
+          clientId,
           name: input.project.name,
           description: null,
           projectManagerId: input.project.projectManagerId,
@@ -9685,7 +9810,7 @@ function quoteRoutes({
         } else {
           const created: RetainerRecord = {
             id: id(nextId++),
-            clientId: q.clientId,
+            clientId,
             name: input.retainer.name,
             departments: input.retainer.departments,
             status: 'active',
@@ -9759,6 +9884,860 @@ function quoteRoutes({
   };
 }
 
+// Leads (F03)
+
+interface LeadNoteRecord {
+  id: string;
+  occurredAt: string;
+  channel: NoteChannel;
+  summary: string;
+  authorId: string;
+  archived: boolean;
+}
+
+interface LeadRecord {
+  id: string;
+  contactName: string;
+  companyName: string | null;
+  phone: string | null;
+  email: string | null;
+  socialHandle: string | null;
+  source: LeadSource;
+  sourceDetail: string | null;
+  request: string | null;
+  budgetMinor: number | null;
+  budgetCurrency: Currency | null;
+  sector: string | null;
+  isHealthcare: boolean;
+  stage: LeadStage;
+  stageChangedAt: string;
+  ownerId: string;
+  nextFollowUpOn: string | null;
+  lostReason: LeadLossReason | null;
+  lostNote: string | null;
+  closedAt: string | null;
+  clientId: string | null;
+  convertedById: string | null;
+  createdById: string;
+  createdAt: string;
+  updatedAt: string;
+  archivedAt: string | null;
+  interests: { kind: 'service' | 'package'; id: string }[];
+  notes: LeadNoteRecord[];
+}
+
+const daysAgo = (days: number) => new Date(Date.now() - days * 86_400_000).toISOString();
+
+/**
+ * The pipeline: Al-Noor (Layan's, due today), Sindyan (Sara's, overdue), Lamsa (a meeting),
+ * Rashaqa (a sent lead quote), Jasmine (won), Abtal (lost) and an archived duplicate.
+ */
+export function leadsSeed(): LeadRecord[] {
+  const today = businessDate();
+  const lead = (
+    n: number,
+    fields: Partial<LeadRecord> & Pick<LeadRecord, 'contactName' | 'source' | 'stage' | 'ownerId'>,
+  ): LeadRecord => ({
+    id: id(n),
+    companyName: null,
+    phone: null,
+    email: null,
+    socialHandle: null,
+    sourceDetail: null,
+    request: null,
+    budgetMinor: null,
+    budgetCurrency: null,
+    sector: null,
+    isHealthcare: false,
+    stageChangedAt: daysAgo(3),
+    nextFollowUpOn: addDays(today, 3),
+    lostReason: null,
+    lostNote: null,
+    closedAt: null,
+    clientId: null,
+    convertedById: null,
+    createdById: id(1),
+    createdAt: daysAgo(12),
+    updatedAt: daysAgo(3),
+    archivedAt: null,
+    interests: [],
+    notes: [],
+    ...fields,
+  });
+  return [
+    lead(9701, {
+      contactName: 'أحمد سليمان',
+      companyName: 'عيادة النور لطب الأسنان',
+      phone: '+963944111222',
+      email: 'ahmad@alnoor.example',
+      socialHandle: '@alnoor.dental',
+      source: 'instagram',
+      request: 'إدارة حسابات التواصل وتصوير شهري للعيادة.',
+      budgetMinor: 40000,
+      budgetCurrency: 'USD',
+      sector: 'رعاية صحية',
+      isHealthcare: true,
+      stage: 'contacted',
+      ownerId: id(3),
+      nextFollowUpOn: today,
+      interests: [{ kind: 'package', id: id(9051) }],
+      notes: [
+        {
+          id: id(9711),
+          occurredAt: daysAgo(2),
+          channel: 'whatsapp',
+          summary: 'أرسل صور العيادة وطلب عرضاً للباقة الذهبية.',
+          authorId: id(3),
+          archived: false,
+        },
+        {
+          id: id(9712),
+          occurredAt: daysAgo(4),
+          channel: 'call',
+          summary: 'اتصال أول: يريد البدء الشهر القادم.',
+          authorId: id(3),
+          archived: false,
+        },
+      ],
+    }),
+    lead(9702, {
+      contactName: 'رامي العلي',
+      companyName: 'مطعم السنديان',
+      phone: '+963933777888',
+      source: 'whatsapp',
+      stage: 'new',
+      ownerId: id(1),
+      nextFollowUpOn: addDays(today, -3),
+      stageChangedAt: daysAgo(6),
+    }),
+    lead(9703, {
+      contactName: 'لمى حسن',
+      companyName: 'متجر لمسة',
+      email: 'lama@lamsa.example',
+      source: 'referral',
+      sourceDetail: 'توصية من مطعم الياسمين',
+      budgetMinor: 1500000,
+      budgetCurrency: 'SYP',
+      stage: 'meeting',
+      ownerId: id(3),
+      interests: [
+        { kind: 'service', id: id(9004) },
+        { kind: 'service', id: id(9001) },
+        { kind: 'package', id: id(9051) },
+      ],
+    }),
+    lead(9704, {
+      contactName: 'سامر خليل',
+      companyName: 'صالة رشاقة',
+      phone: '+963955123456',
+      source: 'paid_ad',
+      stage: 'quote_sent',
+      ownerId: id(1),
+      nextFollowUpOn: addDays(today, 5),
+      stageChangedAt: daysAgo(1),
+    }),
+    lead(9705, {
+      contactName: 'هالة الشامي',
+      companyName: 'مطعم الياسمين',
+      phone: '+963944555666',
+      source: 'walk_in',
+      stage: 'won',
+      ownerId: id(3),
+      nextFollowUpOn: null,
+      clientId: id(601),
+      closedAt: daysAgo(10),
+      convertedById: id(3),
+      stageChangedAt: daysAgo(10),
+    }),
+    lead(9706, {
+      contactName: 'مازن قاسم',
+      companyName: 'نادي الأبطال',
+      socialHandle: '@abtal.gym',
+      source: 'tiktok',
+      stage: 'lost',
+      ownerId: id(1),
+      nextFollowUpOn: null,
+      lostReason: 'price',
+      lostNote: 'الميزانية أقل من نصف العرض.',
+      closedAt: daysAgo(5),
+      stageChangedAt: daysAgo(5),
+    }),
+    lead(9707, {
+      contactName: 'رسالة مكررة',
+      phone: '+963944111222',
+      source: 'instagram',
+      stage: 'new',
+      ownerId: id(1),
+      archivedAt: daysAgo(1),
+    }),
+  ];
+}
+
+interface LeadState {
+  leads: LeadRecord[];
+  quotes: QuoteRecord[];
+  clients: ClientRecord[];
+  users: UserResponse[];
+  catalog: CatalogRecords;
+  me: () => MeResponse;
+}
+
+/** The lead rules both mocks share: scopes, the conversion plan and the conversion (rule 10). */
+function leadRules({ leads, quotes, clients, users, me }: LeadState) {
+  let nextId = 9800;
+  const scopes = (permission: Permission) =>
+    me().permissions.find((g) => g.permission === permission)?.scopes ?? [];
+  const person = (userId: string) => ({
+    id: userId,
+    name: users.find((u) => u.id === userId)?.name ?? '',
+  });
+  /** `leads.*` covering the lead (scope `assigned`: its owner), or the quote scopes (F03). */
+  const covers = (permission: Permission, lead: LeadRecord) => {
+    const granted = scopes(permission);
+    return (
+      granted.includes('all') ||
+      ((granted.includes('assigned') || granted.includes('own_clients')) &&
+        lead.ownerId === me().user.id)
+    );
+  };
+  const isOpen = (lead: LeadRecord) => isOpenLeadStage(lead.stage) && !lead.archivedAt;
+  const sameContact = (
+    a: { phone: string | null; email: string | null },
+    b: { phone: string | null; email: string | null },
+  ) => (!!a.phone && a.phone === b.phone) || (!!a.email && a.email === b.email);
+  const duplicateClientOf = (client: ClientRecord) => ({
+    id: client.id,
+    tradeName: client.tradeName,
+    status: client.status,
+    accountManager: person(client.accountManagerId),
+  });
+  const duplicateClients = (
+    names: string[],
+    match: { phone: string | null; email: string | null },
+  ) =>
+    clients
+      .filter(
+        (client) =>
+          !client.archived &&
+          (names.some((name) => name.toLowerCase() === client.tradeName.toLowerCase()) ||
+            client.contacts.some((c) => !c.archived && sameContact(match, c))),
+      )
+      .map(duplicateClientOf);
+  const leadQuotes = (lead: LeadRecord) =>
+    quotes.filter((q) => q.leadId === lead.id && !q.archivedAt);
+
+  const conversionPlan = (lead: LeadRecord, clientId: string | null): LeadConversionPlan => {
+    const owner = users.find((u) => u.id === lead.ownerId);
+    const existing = clientId ? clients.find((c) => c.id === clientId) : undefined;
+    return {
+      client: {
+        tradeName: leadDisplayName(lead),
+        sector: lead.sector,
+        isHealthcare: lead.isHealthcare,
+        accountManagerId: owner?.roles?.includes('account_manager') ? owner.id : null,
+      },
+      contact: { name: lead.contactName, phone: lead.phone, email: lead.email },
+      accountManagers: users
+        .filter((u) => u.status === 'active' && u.roles?.includes('account_manager'))
+        .map((u) => person(u.id)),
+      duplicateClients: duplicateClients(
+        [lead.companyName, lead.contactName].filter((name): name is string => !!name),
+        lead,
+      ),
+      noteCount: lead.notes.filter((note) => !note.archived).length,
+      quoteCount: leadQuotes(lead).length,
+      existingClient: existing
+        ? {
+            ...duplicateClientOf(existing),
+            hasContact: existing.contacts.some((c) => !c.archived && sameContact(lead, c)),
+          }
+        : null,
+    };
+  };
+
+  /** Rule 10 in one go; refusals leave everything as it was. */
+  const convert = (
+    lead: LeadRecord,
+    input: ConvertLead,
+  ): { client: ClientRecord } | { error: readonly [number, ErrorCode] } => {
+    if (lead.archivedAt) return { error: [409, 'LEAD_ARCHIVED'] };
+    if (!isOpenLeadStage(lead.stage)) return { error: [409, 'INVALID_TRANSITION'] };
+    let client: ClientRecord;
+    if (input.mode === 'new') {
+      const name = input.client.tradeName.toLowerCase();
+      if (clients.some((c) => !c.archived && c.tradeName.toLowerCase() === name)) {
+        return { error: [409, 'CLIENT_NAME_TAKEN'] };
+      }
+      const manager = users.find((u) => u.id === input.client.accountManagerId);
+      if (!manager?.roles?.includes('account_manager')) {
+        return { error: [400, 'INVALID_ACCOUNT_MANAGER'] };
+      }
+      client = {
+        id: id(nextId++),
+        tradeName: input.client.tradeName,
+        sector: input.client.sector,
+        status: 'active',
+        isHealthcare: input.client.isHealthcare,
+        accountManagerId: manager.id,
+        brandKit: structuredClone(emptyKit),
+        archived: false,
+        contacts: [],
+        platformAccounts: [],
+        notes: [],
+      };
+      clients.push(client);
+    } else {
+      const found = clients.find((c) => c.id === input.clientId && !c.archived);
+      if (!found) return { error: [409, 'CLIENT_ARCHIVED'] };
+      client = found;
+      if (client.status === 'ended') client.status = 'active';
+    }
+    const added =
+      input.contact.add === true
+        ? contact(nextId++, client.id, input.contact.name, {
+            jobTitle: input.contact.jobTitle ?? null,
+            phone: input.contact.phone ?? null,
+            email: input.contact.email ?? null,
+            hasFinalApproval: input.contact.hasFinalApproval ?? false,
+          })
+        : null;
+    if (added) client.contacts.push(added);
+    for (const note of lead.notes.filter((n) => !n.archived)) {
+      client.notes.push({
+        id: id(nextId++),
+        occurredAt: note.occurredAt,
+        channel: note.channel,
+        summary: note.summary,
+        authorId: note.authorId,
+        contactId: added?.id ?? null,
+        archived: false,
+      });
+    }
+    for (const q of quotes.filter((x) => x.leadId === lead.id)) {
+      q.clientId = client.id;
+      q.contactId ??= added?.id ?? null;
+    }
+    const at = new Date().toISOString();
+    Object.assign(lead, {
+      stage: 'won',
+      stageChangedAt: at,
+      clientId: client.id,
+      closedAt: at,
+      convertedById: me().user.id,
+      nextFollowUpOn: null,
+      updatedAt: at,
+    });
+    return { client };
+  };
+
+  /** Rule 14: sending a lead's quote moves the open lead to Quote sent. */
+  const quoteSent = (leadId: string) => {
+    const lead = leads.find((l) => l.id === leadId);
+    if (lead && ['new', 'contacted', 'meeting'].includes(lead.stage)) {
+      lead.stage = 'quote_sent';
+      lead.stageChangedAt = new Date().toISOString();
+    }
+  };
+
+  return {
+    covers,
+    isOpen,
+    person,
+    sameContact,
+    duplicateClients,
+    conversionPlan,
+    convert,
+    quoteSent,
+  };
+}
+
+type LeadRuleSet = ReturnType<typeof leadRules>;
+
+/** The leads API over the in-memory records, with the F03 rules the screens rely on. */
+function leadRoutes(state: LeadState & { rules: LeadRuleSet }) {
+  const { leads, quotes, users, catalog, me, rules } = state;
+  const { covers, isOpen, person } = rules;
+  let nextId = 9900;
+  const now = () => new Date().toISOString();
+  const scopes = (permission: Permission) =>
+    me().permissions.find((g) => g.permission === permission)?.scopes ?? [];
+  const manageAll = () => scopes('leads.manage').includes('all');
+  const owner = (userId: string) => {
+    const user = users.find((u) => u.id === userId);
+    return { id: userId, name: user?.name ?? '', archived: user?.status === 'archived' };
+  };
+  const eligibleOwners = () =>
+    users.filter(
+      (u) =>
+        u.status === 'active' &&
+        (u.roles?.includes('general_manager') ||
+          u.roles?.includes('account_manager') ||
+          u.departments.some((d) => d.code === 'general_communication' || d.code === 'marketing')),
+    );
+  const interestName = (interest: LeadRecord['interests'][number]) =>
+    interest.kind === 'service'
+      ? catalog.services.find((s) => s.id === interest.id)
+      : catalog.packages.find((p) => p.id === interest.id);
+  const latestQuotes = (lead: LeadRecord) =>
+    quotes.filter(
+      (q) =>
+        q.leadId === lead.id &&
+        !q.archivedAt &&
+        !quotes.some((x) => x.number === q.number && x.version > q.version && !x.archivedAt),
+    );
+
+  /** A quote's nets, for `quotes.read` covering it (its client's, or the lead's owner). */
+  const netsOf = (q: QuoteRecord, lead: LeadRecord) => {
+    const granted = scopes('quotes.read');
+    const client = q.clientId ? state.clients.find((c) => c.id === q.clientId) : undefined;
+    const ownerId = client ? client.accountManagerId : lead.ownerId;
+    if (
+      !granted.includes('all') &&
+      !(granted.includes('own_clients') && ownerId === me().user.id)
+    ) {
+      return null;
+    }
+    const totals = quoteTotals({
+      lines: q.lines,
+      oneOffDiscountMinor: q.oneOffDiscountMinor,
+      monthlyDiscountMinor: q.monthlyDiscountMinor,
+      installments: q.installments,
+      monthlyTermMonths: q.monthlyTermMonths,
+    });
+    return { oneOff: totals.oneOff.netMinor, monthly: totals.monthly.netMinor };
+  };
+
+  const itemOf = (lead: LeadRecord): Lead => {
+    const today = businessDate();
+    const client = lead.clientId ? state.clients.find((c) => c.id === lead.clientId) : undefined;
+    return {
+      id: lead.id,
+      displayName: leadDisplayName(lead),
+      contactName: lead.contactName,
+      companyName: lead.companyName,
+      source: lead.source,
+      stage: lead.stage,
+      stageChangedAt: lead.stageChangedAt,
+      daysInStage: daysInStage(businessDate(new Date(lead.stageChangedAt)), today),
+      owner: owner(lead.ownerId),
+      nextFollowUpOn: lead.nextFollowUpOn,
+      followUpOverdue: !!lead.nextFollowUpOn && lead.nextFollowUpOn < today,
+      followUpDueToday: lead.nextFollowUpOn === today,
+      budgetMinor: lead.budgetMinor,
+      budgetCurrency: lead.budgetCurrency,
+      interests: lead.interests.map((interest) => interestName(interest)?.name ?? ''),
+      quoteCount: latestQuotes(lead).length,
+      client: client ? { id: client.id, name: client.tradeName } : null,
+      closedAt: lead.closedAt,
+      createdAt: lead.createdAt,
+      updatedAt: lead.updatedAt,
+      archivedAt: lead.archivedAt,
+    };
+  };
+
+  const detailOf = (lead: LeadRecord): LeadDetail => {
+    const manages = covers('leads.manage', lead);
+    const open = isOpen(lead);
+    const hasSent = quotes.some((q) => q.leadId === lead.id && q.status === 'sent');
+    const ownerUser = eligibleOwners().some((u) => u.id === lead.ownerId);
+    return {
+      ...itemOf(lead),
+      phone: lead.phone,
+      email: lead.email,
+      socialHandle: lead.socialHandle,
+      sourceDetail: lead.sourceDetail,
+      request: lead.request,
+      sector: lead.sector,
+      isHealthcare: lead.isHealthcare,
+      interests: lead.interests.map((interest) => {
+        const item = interestName(interest);
+        return { ...interest, name: item?.name ?? '', archived: !!item?.archivedAt };
+      }),
+      ownerCanManage: ownerUser,
+      lostReason: lead.lostReason,
+      lostNote: lead.lostNote,
+      convertedBy: lead.convertedById ? person(lead.convertedById) : null,
+      createdBy: person(lead.createdById),
+      notes: lead.notes
+        .filter((note) => !note.archived)
+        .sort((a, b) => b.occurredAt.localeCompare(a.occurredAt))
+        .map((note) => ({
+          id: note.id,
+          leadId: lead.id,
+          occurredAt: note.occurredAt,
+          channel: note.channel,
+          summary: note.summary,
+          author: person(note.authorId),
+          canEdit: open && manages && note.authorId === me().user.id,
+          canArchive: open && manages && (note.authorId === me().user.id || manageAll()),
+        })),
+      permissions: {
+        canEdit: manages && open,
+        moves:
+          manages && open
+            ? MANUAL_LEAD_STAGES.filter(
+                (to) => manualLeadMoveRefusal(lead.stage, to, hasSent) === null,
+              )
+            : [],
+        canChangeOwner: manages && open,
+        canLogActivity: manages && open,
+        canLose: manages && open,
+        canReopen: manages && lead.stage === 'lost' && !lead.archivedAt,
+        canConvert: manages && open,
+        canArchive: manageAll() && !lead.archivedAt && lead.stage !== 'won',
+        canRestore: manageAll() && !!lead.archivedAt,
+        canNewQuote: covers('quotes.manage', lead) && open,
+      },
+    };
+  };
+
+  /** The list and board filters shared by both endpoints. */
+  const matches = (lead: LeadRecord, query: URLSearchParams) => {
+    const search = query.get('search')?.toLowerCase();
+    const ownerId = query.get('ownerId');
+    const sources = query.getAll('source');
+    const followUp = query.get('followUp') as LeadFollowUpFilter | null;
+    const range = followUp ? followUpFilterRange(followUp, businessDate()) : null;
+    return (
+      covers('leads.read', lead) &&
+      (!search ||
+        [lead.contactName, lead.companyName, lead.phone, lead.email].some((text) =>
+          text?.toLowerCase().includes(search),
+        )) &&
+      (!ownerId || lead.ownerId === ownerId) &&
+      (sources.length === 0 || sources.includes(lead.source)) &&
+      (!range ||
+        (!!lead.nextFollowUpOn &&
+          (!range.from || lead.nextFollowUpOn >= range.from) &&
+          lead.nextFollowUpOn <= range.to))
+    );
+  };
+  const byFollowUp = (a: Lead, b: Lead) =>
+    (a.nextFollowUpOn ?? '9999').localeCompare(b.nextFollowUpOn ?? '9999');
+
+  const ownerFails = (ownerId: string) =>
+    !eligibleOwners().some((u) => u.id === ownerId) || (!manageAll() && ownerId !== me().user.id);
+  const followUpFails = (date: string) => !followUpDateInRange(date, businessDate());
+
+  return (route: Route, method: string, url: URL, request: Request): Promise<void> | undefined => {
+    const path = url.pathname;
+    if (path.startsWith('/api/quotes/by-lead/')) {
+      const lead = leads.find((l) => l.id === path.split('/').at(-1));
+      if (!lead || !covers('leads.read', lead)) return fail(route, 404, null);
+      const body: LeadQuotes = {
+        items: latestQuotes(lead)
+          .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+          .map((q) => {
+            const nets = netsOf(q, lead);
+            return {
+              id: q.id,
+              displayNumber: quoteDisplayNumber(q),
+              version: q.version,
+              title: q.title,
+              status: q.status,
+              currency: q.currency,
+              sentAt: q.sentAt,
+              validUntil: q.validUntil,
+              oneOffNetMinor: nets?.oneOff ?? null,
+              monthlyNetMinor: nets?.monthly ?? null,
+              versions: quotes
+                .filter((x) => x.number === q.number && !x.archivedAt)
+                .sort((a, b) => a.version - b.version)
+                .map((x) => ({ id: x.id, version: x.version, status: x.status })),
+            };
+          }),
+      };
+      return json(route, body);
+    }
+    if (!path.startsWith('/api/leads')) return undefined;
+    if (scopes('leads.read').length === 0) return fail(route, 403, null);
+
+    if (path === '/api/leads' && method === 'GET') {
+      const query = url.searchParams;
+      const stages = query.getAll('stage');
+      const archived = query.get('archived') === 'true';
+      if (archived && !manageAll()) return fail(route, 403, null);
+      const clientId = query.get('clientId');
+      const shown = stages.length > 0 ? stages : [...OPEN_LEAD_STAGES];
+      const sort = (query.get('sort') ?? 'nextFollowUpOn') as (typeof LEAD_SORTS)[number];
+      const desc = query.get('order') === 'desc';
+      const items = leads
+        .filter(
+          (lead) =>
+            matches(lead, query) &&
+            !!lead.archivedAt === archived &&
+            (archived || clientId || shown.includes(lead.stage)) &&
+            (!clientId || lead.clientId === clientId),
+        )
+        .map(itemOf)
+        .sort((a, b) => {
+          const order =
+            sort === 'nextFollowUpOn' ? byFollowUp(a, b) : a[sort].localeCompare(b[sort]);
+          return desc ? -order : order;
+        });
+      const page = Number(query.get('page') ?? 1);
+      const pageSize = Number(query.get('pageSize') ?? 20);
+      return json(route, {
+        items: items.slice((page - 1) * pageSize, page * pageSize),
+        total: items.length,
+        page,
+        pageSize,
+      });
+    }
+    if (path === '/api/leads/board' && method === 'GET') {
+      const since = daysAgo(LEAD_LIMITS.boardClosedDays);
+      const board: LeadBoard = {
+        columns: LEAD_STAGES.map((stage) => {
+          const items = leads
+            .filter(
+              (lead) =>
+                lead.stage === stage &&
+                !lead.archivedAt &&
+                matches(lead, url.searchParams) &&
+                (isOpenLeadStage(stage) || (lead.closedAt ?? '') >= since),
+            )
+            .map(itemOf)
+            .sort(byFollowUp);
+          return { stage, count: items.length, truncated: false, items };
+        }),
+      };
+      return json(route, board);
+    }
+    if (path === '/api/leads/owners') {
+      if (scopes('leads.manage').length === 0) return fail(route, 403, null);
+      return json(route, {
+        items: eligibleOwners().map((u) => ({
+          id: u.id,
+          name: u.name,
+          departments: u.departments.map((d) => d.code),
+        })),
+      });
+    }
+    if (path === '/api/leads/interest-options') {
+      if (scopes('leads.manage').length === 0) return fail(route, 403, null);
+      const named = (items: { id: string; name: string; archivedAt: string | null }[]) =>
+        items
+          .filter((item) => !item.archivedAt)
+          .map(({ id: itemId, name }) => ({ id: itemId, name }));
+      return json(route, { services: named(catalog.services), packages: named(catalog.packages) });
+    }
+    if (path === '/api/leads/duplicates') {
+      const query = leadDuplicateQuerySchema.parse(request.postDataJSON());
+      return json(route, {
+        leads: leads
+          .filter(
+            (lead) =>
+              lead.id !== query.excludeLeadId && isOpen(lead) && rules.sameContact(query, lead),
+          )
+          .map((lead) => ({
+            id: lead.id,
+            displayName: leadDisplayName(lead),
+            owner: person(lead.ownerId),
+            stage: lead.stage,
+            readable: covers('leads.read', lead),
+          })),
+        clients: rules.duplicateClients(query.names, query),
+      });
+    }
+    if (path === '/api/leads' && method === 'POST') {
+      if (scopes('leads.manage').length === 0) return fail(route, 403, null);
+      const input = createLeadSchema.parse(request.postDataJSON());
+      if (!leadHasContactMethod(input)) return fail(route, 400, 'CONTACT_REQUIRED');
+      if (leadSourceDetailMissing(input)) return fail(route, 400, 'NOTE_REQUIRED');
+      if (ownerFails(input.ownerId)) return fail(route, 400, 'INVALID_LEAD_OWNER');
+      if (followUpFails(input.nextFollowUpOn)) return fail(route, 400, 'INVALID_DATES');
+      const at = now();
+      const created: LeadRecord = {
+        ...input,
+        id: id(nextId++),
+        interests: input.interests.map((interest) =>
+          interest.serviceId
+            ? { kind: 'service' as const, id: interest.serviceId }
+            : { kind: 'package' as const, id: interest.packageId ?? '' },
+        ),
+        stage: 'new',
+        stageChangedAt: at,
+        lostReason: null,
+        lostNote: null,
+        closedAt: null,
+        clientId: null,
+        convertedById: null,
+        createdById: me().user.id,
+        createdAt: at,
+        updatedAt: at,
+        archivedAt: null,
+        notes: [],
+      };
+      leads.push(created);
+      return json(route, detailOf(created), 201);
+    }
+
+    const match = path.match(/^\/api\/leads\/([^/]+)(?:\/(.+))?$/);
+    if (!match) return undefined;
+    const lead = leads.find((l) => l.id === match[1]);
+    if (!lead || !covers('leads.read', lead)) return fail(route, 404, null);
+    const action = match[2];
+    if (!action && method === 'GET') return json(route, detailOf(lead));
+    if (!covers('leads.manage', lead)) return fail(route, 403, null);
+    const touch = () => {
+      lead.updatedAt = now();
+    };
+
+    if (!action && method === 'PATCH') {
+      const { updatedAt, interests, ...input } = updateLeadSchema.parse(request.postDataJSON());
+      if (lead.archivedAt) return fail(route, 409, 'LEAD_ARCHIVED');
+      if (!isOpenLeadStage(lead.stage)) return fail(route, 409, 'LEAD_CLOSED');
+      if (updatedAt !== lead.updatedAt) return fail(route, 409, 'STALE_LEAD');
+      if (input.nextFollowUpOn && followUpFails(input.nextFollowUpOn)) {
+        return fail(route, 400, 'INVALID_DATES');
+      }
+      Object.assign(lead, definedFields(input));
+      if (interests) {
+        lead.interests = interests.map((interest) =>
+          interest.serviceId
+            ? { kind: 'service' as const, id: interest.serviceId }
+            : { kind: 'package' as const, id: interest.packageId ?? '' },
+        );
+      }
+      if (!leadHasContactMethod(lead)) return fail(route, 400, 'CONTACT_REQUIRED');
+      touch();
+      return json(route, detailOf(lead));
+    }
+    if (action === 'conversion-plan') {
+      if (!isOpen(lead)) return fail(route, 409, 'INVALID_TRANSITION');
+      const clientId = url.searchParams.get('clientId');
+      if (clientId && !state.clients.some((c) => c.id === clientId && !c.archived)) {
+        return fail(route, 409, 'CLIENT_ARCHIVED');
+      }
+      return json(route, rules.conversionPlan(lead, clientId));
+    }
+    if (action === 'convert') {
+      const done = rules.convert(lead, convertLeadSchema.parse(request.postDataJSON()));
+      if ('error' in done) return fail(route, ...done.error);
+      return json(route, detailOf(lead));
+    }
+    if (action === 'stage') {
+      const input = leadStageChangeSchema.parse(request.postDataJSON());
+      if (lead.archivedAt) return fail(route, 409, 'LEAD_ARCHIVED');
+      const hasSent = quotes.some((q) => q.leadId === lead.id && q.status === 'sent');
+      const refusal = manualLeadMoveRefusal(lead.stage, input.stage, hasSent);
+      if (refusal) return fail(route, 409, refusal);
+      Object.assign(lead, { stage: input.stage, stageChangedAt: now() });
+      if (input.nextFollowUpOn) lead.nextFollowUpOn = input.nextFollowUpOn;
+      touch();
+      return json(route, detailOf(lead));
+    }
+    if (action === 'owner') {
+      const { ownerId } = leadOwnerChangeSchema.parse(request.postDataJSON());
+      if (!isOpen(lead)) return fail(route, 409, 'LEAD_CLOSED');
+      if (!eligibleOwners().some((u) => u.id === ownerId)) {
+        return fail(route, 400, 'INVALID_LEAD_OWNER');
+      }
+      lead.ownerId = ownerId;
+      touch();
+      return json(route, detailOf(lead));
+    }
+    if (action === 'lose') {
+      const input = loseLeadSchema.parse(request.postDataJSON());
+      if (!isOpen(lead)) return fail(route, 409, 'INVALID_TRANSITION');
+      if (input.reason === 'other' && !input.note) return fail(route, 400, 'NOTE_REQUIRED');
+      const rejected = latestQuotes(lead).filter((q) => ['sent', 'expired'].includes(q.status));
+      for (const q of rejected) {
+        Object.assign(q, {
+          status: 'rejected',
+          response: {
+            respondedOn: businessDate(),
+            contact: null,
+            note: input.note,
+            by: person(me().user.id),
+            rejectionReason: lossRejectionReason(input.reason),
+          },
+          updatedAt: now(),
+        });
+      }
+      Object.assign(lead, {
+        stage: 'lost',
+        stageChangedAt: now(),
+        lostReason: input.reason,
+        lostNote: input.note,
+        closedAt: now(),
+        nextFollowUpOn: null,
+      });
+      touch();
+      return json(route, {
+        ...detailOf(lead),
+        rejectedQuotes: rejected.map((q) => quoteDisplayNumber(q)),
+      });
+    }
+    if (action === 'reopen') {
+      const input = reopenLeadSchema.parse(request.postDataJSON());
+      if (lead.stage !== 'lost' || lead.archivedAt) return fail(route, 409, 'INVALID_TRANSITION');
+      if (followUpFails(input.nextFollowUpOn)) return fail(route, 400, 'INVALID_DATES');
+      const ownerId = input.ownerId ?? lead.ownerId;
+      if (!eligibleOwners().some((u) => u.id === ownerId)) {
+        return fail(route, 400, 'INVALID_LEAD_OWNER');
+      }
+      Object.assign(lead, {
+        stage: input.stage,
+        stageChangedAt: now(),
+        nextFollowUpOn: input.nextFollowUpOn,
+        ownerId,
+        lostReason: null,
+        lostNote: null,
+        closedAt: null,
+      });
+      touch();
+      return json(route, detailOf(lead));
+    }
+    if (action === 'archive' || action === 'restore') {
+      if (!manageAll()) return fail(route, 403, null);
+      if (lead.stage === 'won') return fail(route, 409, 'INVALID_TRANSITION');
+      if (action === 'archive' && quotes.some((q) => q.leadId === lead.id && !q.archivedAt)) {
+        return fail(route, 409, 'LEAD_HAS_QUOTES');
+      }
+      lead.archivedAt = action === 'archive' ? now() : null;
+      touch();
+      return route.fulfill({ status: 204 });
+    }
+    if (action === 'notes' && method === 'POST') {
+      const input = createLeadNoteSchema.parse(request.postDataJSON());
+      if (lead.archivedAt) return fail(route, 409, 'LEAD_ARCHIVED');
+      if (!isOpenLeadStage(lead.stage)) return fail(route, 409, 'LEAD_CLOSED');
+      if (followUpFails(input.nextFollowUpOn)) return fail(route, 400, 'INVALID_DATES');
+      const note: LeadNoteRecord = {
+        id: id(nextId++),
+        occurredAt: input.occurredAt ?? now(),
+        channel: input.channel,
+        summary: input.summary,
+        authorId: me().user.id,
+        archived: false,
+      };
+      lead.notes.push(note);
+      lead.nextFollowUpOn = input.nextFollowUpOn;
+      touch();
+      const created = detailOf(lead).notes.find((n) => n.id === note.id);
+      return json(route, created, 201);
+    }
+    const noteMatch = action?.match(/^notes\/([^/]+)(\/archive)?$/);
+    if (noteMatch) {
+      const note = lead.notes.find((n) => n.id === noteMatch[1] && !n.archived);
+      if (!note) return fail(route, 404, null);
+      if (!isOpen(lead)) return fail(route, 409, 'LEAD_CLOSED');
+      if (noteMatch[2]) {
+        if (note.authorId !== me().user.id && !manageAll()) return fail(route, 403, null);
+        note.archived = true;
+        return route.fulfill({ status: 204 });
+      }
+      if (note.authorId !== me().user.id) return fail(route, 403, null);
+      Object.assign(note, definedFields(updateLeadNoteSchema.parse(request.postDataJSON())));
+      return json(
+        route,
+        detailOf(lead).notes.find((n) => n.id === note.id),
+      );
+    }
+    return undefined;
+  };
+}
 // Invoices (F13)
 
 interface PaymentRecord extends Omit<Payment, 'receiptNumber' | 'recordedBy' | 'voided'> {
@@ -11607,6 +12586,16 @@ export const seedIds = {
   pendingQuote: id(9202),
   shifaDraft: id(9203),
   expiredQuote: id(9204),
+  leadQuote: id(9205),
+  // Leads (F03).
+  noorLead: id(9701),
+  sindyanLead: id(9702),
+  lamsaLead: id(9703),
+  rashaqaLead: id(9704),
+  wonLead: id(9705),
+  lostLead: id(9706),
+  archivedLead: id(9707),
+  nukhba: id(603),
   // Ad campaigns (F12).
   autumnCampaign: id(9601),
   menuCampaign: id(9602),

@@ -25,6 +25,7 @@ import {
   type LeadDetail,
   type LeadDuplicateQuery,
   type LeadDuplicates,
+  type LeadInterestOptions,
   type LeadListQuery,
   type LeadNote,
   type LeadOwnerChange,
@@ -40,6 +41,7 @@ import {
   leadDetailSchema,
   leadDuplicateQuerySchema,
   leadDuplicatesSchema,
+  leadInterestOptionsSchema,
   leadListQuerySchema,
   leadNoteSchema,
   leadOwnerChangeSchema,
@@ -103,6 +105,17 @@ export class LeadsController {
   @ApiOkResponse({ description: 'Users who may own leads', standardSchema: leadOwnerOptionsSchema })
   owners(): Promise<LeadOwnerOptions> {
     return this.leads.owners();
+  }
+
+  @Get('interest-options')
+  @RequirePermissions('leads.manage')
+  @SerializeOptions({ schema: leadInterestOptionsSchema })
+  @ApiOkResponse({
+    description: 'Services and packages a lead may ask for',
+    standardSchema: leadInterestOptionsSchema,
+  })
+  interestOptions(): Promise<LeadInterestOptions> {
+    return this.leads.interestOptions();
   }
 
   @Post('duplicates')
