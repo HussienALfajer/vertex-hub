@@ -1,7 +1,14 @@
 import { randomUUID } from 'node:crypto';
 import { Controller, type INestApplication, type OnModuleInit } from '@nestjs/common';
-import { NOTIFICATIONS_DAILY_JOB, RETAINER_CYCLES_JOB } from '@vertex-hub/contracts';
+import {
+  EMAIL_PURGE_JOB,
+  EMAIL_RESULT_JOB,
+  NOTIFICATIONS_DAILY_JOB,
+  RETAINER_CYCLES_JOB,
+} from '@vertex-hub/contracts';
+import { createDatabase } from '@vertex-hub/db';
 import { testDatabaseUrl } from '@vertex-hub/db/testing';
+import { sql } from 'drizzle-orm';
 import { PgBoss } from 'pg-boss';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { ENV, parseEnv } from '../src/core/config/env.js';
@@ -14,6 +21,7 @@ import { startApp } from './start-app.js';
  */
 
 const probeQueue = `test.probe.${randomUUID().slice(0, 8)}`;
+const txQueue = `test.tx.${randomUUID().slice(0, 8)}`;
 let probeRan: () => void = () => {};
 const probe = new Promise<void>((resolve) => {
   probeRan = resolve;
@@ -32,6 +40,8 @@ class ProbeJob implements OnModuleInit {
 describe('job queue', () => {
   let app: INestApplication;
   const boss = new PgBoss(testDatabaseUrl());
+  const connection = createDatabase(testDatabaseUrl());
+  const db = connection.db;
 
   beforeAll(async () => {
     ({ app } = await startApp({
@@ -45,7 +55,9 @@ describe('job queue', () => {
   afterAll(async () => {
     await app?.close();
     await boss.deleteQueue(probeQueue).catch(() => {});
+    await boss.deleteQueue(txQueue).catch(() => {});
     await boss.stop({ graceful: false });
+    await connection.close();
   });
 
   it('works the queues the worker schedules', async () => {
@@ -54,6 +66,8 @@ describe('job queue', () => {
       expect.arrayContaining([
         RETAINER_CYCLES_JOB.queue,
         NOTIFICATIONS_DAILY_JOB.queue,
+        EMAIL_RESULT_JOB.queue,
+        EMAIL_PURGE_JOB.queue,
         probeQueue,
       ]),
     );
@@ -68,4 +82,37 @@ describe('job queue', () => {
       ]),
     ).resolves.toBe('ran');
   }, 20_000);
+
+  describe('sendInTransaction (ADR 0028: an email and its job commit together)', () => {
+    const jobsWith = async (marker: string) => {
+      const result = await db.execute<{ count: string }>(
+        sql`select count(*) as count from pgboss.job where name = ${txQueue} and data->>'marker' = ${marker}`,
+      );
+      return Number(result.rows[0]?.count);
+    };
+
+    it('commits the job with the transaction', async () => {
+      const jobs = app.get(JobQueue);
+      await db.transaction((tx) =>
+        jobs.sendInTransaction(
+          tx,
+          txQueue,
+          { marker: 'kept', list: ['a', 'b'] },
+          { retryLimit: 3 },
+        ),
+      );
+      expect(await jobsWith('kept')).toBe(1);
+    });
+
+    it('drops the job when the transaction rolls back', async () => {
+      const jobs = app.get(JobQueue);
+      await expect(
+        db.transaction(async (tx) => {
+          await jobs.sendInTransaction(tx, txQueue, { marker: 'dropped' });
+          throw new Error('change failed');
+        }),
+      ).rejects.toThrow('change failed');
+      expect(await jobsWith('dropped')).toBe(0);
+    });
+  });
 });

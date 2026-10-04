@@ -1,41 +1,45 @@
-# TASKS — F15 Dashboards and basic reports
+# TASKS — F14 Email and daily digest
 
-Spec: `docs/specs/F15-dashboards-reports.md` · ADRs 0006, 0008, 0013, 0014, 0015, 0016, 0021, 0022, 0024, 0025, 0026, 0027 · Three PRs (owner decision: web in one PR; `exceljs` approved for Excel), each leaves `main` green and fully wired.
+Spec: `docs/specs/F14-email-digest.md` · ADRs 0006, 0008, 0013, 0014, 0018, 0020, 0023, 0024, 0025, 0027, 0028 · Four PRs, each leaves `main` green and fully wired. New dependencies (ADR 0028): `nodemailer`, `@react-email/components` + `@react-email/render` (worker); `smtp-server` (worker dev, one SMTP integration test). The device key parser is written by hand (no user-agent library).
 
-## PR 1 — `feat/f15-dashboard-api`: dashboard API and invoice line services
-- [x] contracts: `reports.ts` dashboard schemas (company, finance, departments, my clients) with `.meta({ id })`; rules `reportMonths`, `conversionRate`, `isApprovalWaiting` with unit tests (cycle completion reuses `deliveryRate`, R13, so the dashboard matches the retainer page; the largest-remainder split arrives in PR 2 with revenue); `reports.finance` `all` for the Operations manager with a `permissions.test.ts` case; `invoices.ts` optional `serviceId` on draft lines, detail line `service`, `canEditServices`, `updateInvoiceServicesSchema`; error code `INVALID_SERVICE`; audit action `invoice.services_changed`; `ar.json` keys. Root typecheck waits for the api layer (invoice line `service`, `canEditServices`)
-- [x] db (`/db-migration`, 0040, additive): `invoice_lines.service_id` (nullable, indexed, → `catalog_services`); indexes `tasks.delivered_at`, `payments.paid_on`, `invoices.issued_on`; drift clean
-- [x] api report exports used by the dashboard: `TaskReports` (department counts, department section, `personCounts` shared with F06 Workload), `EngagementReports` (active counts, open projects, retainer progress through `RetainerCyclesService.openOf`), `InvoiceReports` (invoiced, collected, outstanding), `LeadReports`, `CampaignReports` (low wallets), `ApprovalReports` (waiting, pending by client); `ClientDirectory.managed`; `ReportClients` scope type in contracts; `businessDateSql` in `core/database`
-- [x] api `reports` module: `GET /api/dashboard/company|finance|departments|clients` (rules 1–7, 23); `app.module.ts`; architecture test: no module imports `reports`; `docs/architecture.md` and module comments
-- [x] api `invoices`: draft lines accept `serviceId` (rule 21), `PUT /api/invoices/:id/services` (rule 22, audit), `canEditServices`; `CatalogModule` imported
-- [x] api tests: `test/dashboard.test.ts` (401, 403 per role, out of scope department, rules 1–4 with deltas on seeded data, voids, SYP rates, last month, expired and revoked approval links, time budget); line services in `test/invoices.test.ts` (an out-of-scope 404 cannot happen: only holders of `invoices.manage` reach the route and they cover all clients)
-- [x] bridge: build, `openapi:export`, `api:generate`; web typecheck (invoice mocks gain `service` and `canEditServices`; the draft editor keeps line services on save)
-- [x] wiring checklist (spec: completion rounds down as R13; department default)
-- [x] full checks (lint, typecheck, build, test, E2E pass; drift clean: `db:generate` reports nothing to migrate — the checker's `git status` probe flagged the uncommitted 0040 files), reviewer (no blocking issues)
-- [x] owner acceptance (approved), dev database migrated (0040)
+## PR 1 — `feat/f14-email-core`: outbox, `email` module, worker sending, `packages/messages`
+- [x] contracts: `emails.ts` (`EMAIL_KINDS` with audience, recipient and attachment schemas, per-kind data schema for `test`, `emailSummarySchema`, `emailListQuerySchema`, `emailPageSchema`, `.meta({ id })`); jobs `email.send`, `email.result`, `email.purge` in `jobs.ts`; unit tests (no `ar.json` keys: the log screen is PR 4)
+- [x] `packages/messages`: new framework-free package (`CLAUDE.md`) with the sender names, the layout texts and the `test` email content
+- [x] db (`/db-migration`, 0042 + 0043 `sender_name`, additive): `email_messages` with its enums and indexes, conventions exception; `TABLE_OWNERS`; drift
+- [x] api `email` module: `Mailer.queue(tx, …)` (row + `email.send` job in the same transaction), `email.result` handler (`sent` / `failed`), `email.purge` (rule 25, staff only), `GET /api/emails` (`audit.read`), `POST /api/emails/test` (`users.manage`); `app.module.ts`; architecture test: `email` imports no other module
+- [x] worker: `email-send.job.ts` (render, send, retry 3, `email.result`), transports `smtp` (Nodemailer) and `log` (`.eml` under `.data/emails/`), React Email layout (RTL, logo, footer, plain text) and the `test` template; SMTP integration test, `log` test, snapshot of `test`
+- [x] api tests: `test/email.test.ts` and `test/job-queue.test.ts` (transactional enqueue against real pg-boss) (queue commits / rolls back, result, purge, log filters, test email, 401/403)
+- [x] `.env.example`: moved to PR 2 (`.env*` files are outside the session's permissions; the owner adds the lines)
+- [x] `docs/deployment.md` (F14 email configuration), `docs/architecture.md` (module, package), `AGENTS.md`, worker `CLAUDE.md`, spec details settled (`sender_name`, `EMAIL_LOG_DIR`, idempotency)
+- [x] bridge: build, `openapi:export`, `api:generate`; web typecheck
+- [x] wiring checklist, full checks (lint, typecheck, build, test, drift, OpenAPI current), reviewer (one blocking issue fixed: no SMTP error objects in the worker log)
+- [x] owner acceptance (approved), dev database migrated (0042, 0043)
 - [x] /ship
 
-## PR 2 — `feat/f15-reports-api`: reports, Excel and the monthly client report PDF
-- [x] contracts: productivity, revenue, overdue invoices, monthly client report schemas and queries; rules (on-time, aging buckets, revenue split by line, quote and payment, period ≤ 366 days, month validation) with unit tests; error codes `INVALID_DATES` / `INVALID_MONTH` if missing; audit action and entity `client_report.summary_changed`; `reports.pdf` queue in `jobs.ts`; `ar.json` keys
-- [x] db (`/db-migration`, 0041, additive): `client_report_notes` (exception in `conventions.test.ts`), `client_report_pdfs`; `TABLE_OWNERS`; `content_posts.published_at` index if missing; drift
-- [x] api exports extended (also `QuoteDirectory.acceptedLines`, `RetainerCyclesService.ofMonth`, `UserDirectory.departmentNames`, `contentDisposition` from `files`): `TaskReports` (productivity), `InvoiceReports` (revenue split through `quotes` exports, overdue), `EngagementReports` (cycles, projects), `ContentReports`, `ShootReports`, `CampaignReports` (campaign updates, wallet), `ApprovalReports` (closed items)
-- [x] api `reports`: productivity, revenue, overdue invoices (rules 8–16), monthly client report and summary (rules 17–19), Excel builder (rule 24; `exceljs`, approved by the owner), PDF request / download (rule 20) with the `files.purge-uploads` cleanup
-- [x] worker (with `test/reports-pdf.test.ts`; shared Arabic labels in `contracts/report-labels.ts`): `reports-pdf.job.ts` and the Arabic client report template (ADR 0008 pipeline)
-- [x] api tests: `test/reports.test.ts`, `test/client-report.test.ts` (rules 8–20, Excel contents, PDF queued once per payload, audit)
-- [x] bridge; web typecheck
-- [x] wiring checklist (`docs/architecture.md`, spec details settled), full checks (incl. drift), reviewer (no blocking issues; period filters made index-friendly with `inBusinessPeriod`)
-- [x] owner acceptance (approved, with the spec details settled in this PR), dev database migrated (0041)
-- [x] /ship
+## PR 2 — `feat/f14-staff-emails`: notification emails, digest, account emails (API + worker)
+- [ ] `packages/messages`: move `notification-content.ts`, its strings and the formatters it uses from `apps/web`, with their tests; links as paths; web keeps the router glue
+- [ ] contracts: catalog `emailByDefault`, settings schemas + `emailTypes`, `digestEnabled`, per-type `email`, `emailLocked`; jobs `email.notifications`, `email.digest`; staff kinds' data schemas; batch window rules with unit tests; device key parsing with unit tests
+- [ ] db (`/db-migration`, additive): `notifications.email_state`, `email_after`, `email_id` + partial index; `notification_settings.email_types`, `digest_enabled`; `email_digests`; `user_devices` (auth)
+- [ ] api `notifications`: marking in `notify` (rules 3–4), merge re-pending (rule 8), batch job (rules 5–7, 9), digest with registered sources (rules 10–12; `tasks` registers its source), settings round-trip; `email:run-notifications [--at]` and `email:run-digest [--date]` scripts
+- [ ] `.env.example`: the worker email variables from PR 1 (`EMAIL_TRANSPORT`, `EMAIL_FROM`, `EMAIL_LOG_DIR`, `SMTP_*`) and `EMAIL_SECRET_KEY`, if the owner has not added them
+- [ ] token links (first use): AES-256-GCM encryption in the job under `EMAIL_SECRET_KEY` (api and worker config, `.env.example`), redacted in the row, decrypted by the worker; tests
+- [ ] api `auth`: links emailed on create, restore, new link; `POST /api/password-links/request` (rule 13); security notices (rule 14); `user_devices` and new-device email (rule 15)
+- [ ] worker templates: `notification_batch`, `digest`, `account_activation`, `password_reset`, `security_notice`, `new_device` with snapshots
+- [ ] api tests: batches and digest with a fixed clock, settings, auth emails, forgot password (204 always, 3 per hour)
+- [ ] emails queued while pg-boss is off (CLI: `user:create`, `email:run-notifications`, `email:run-digest`) must still be sent: start pg-boss in those scripts, or have the worker pick up `queued` rows without a job (PR 1 reviewer note)
+- [ ] bridge; web typecheck; `AGENTS.md` commands for the two scripts
+- [ ] wiring checklist, full checks, reviewer, owner acceptance, /ship
 
-## PR 3 — `feat/f15-web`: home dashboard, invoice services, reports screens and the monthly client report
-- [x] web `features/dashboard/`: home `/` with the five sections (rules 1–7), each with loading, empty and error states, refresh, collapsible sections (new `Collapsible` in `packages/ui`, on the design-system page); navigation: "Home" first
-- [x] web invoices: Service column in the draft editor and the issued invoice page, "Services" dialog
-- [x] web: a report period error message (`INVALID_DATES` from the reports means "to before from, or over 366 days"; today's `errors.INVALID_DATES` text speaks of a project's dates)
-- [x] web `features/reports/`: `/reports` index, productivity, revenue, overdue invoices (period pickers, filters, Excel download); navigation "Reports"
-- [x] web monthly client report `/clients/$clientId/report` (sections, preliminary badge, summary editor, PDF and Excel) and the client profile action
-- [x] e2e: mocks, `f15.spec.ts` (role sections, reports, summary), screenshots (home for General Manager, department manager, account manager, Finance, employee; phone; Services dialog; each report screen; monthly client report), both themes
-- [x] wiring checklist (`Collapsible` on the design-system page; `/clients/$clientId` moved to `$clientId/index.tsx` for the report route; spec acceptance step 1 settled: the General Manager also sees Departments)
-- [x] full checks: lint, typecheck, build, E2E (324) pass; `pnpm test` fails only in apps/api files untouched here, each of which passes alone (cross-file interference in the local full run)
-- [x] reviewer: three blocking findings fixed (PDF link after a summary save, heading inside the fold button, home screenshots for a plain department manager and account manager)
-- [x] owner acceptance (approved)
-- [x] /ship
+## PR 3 — `feat/f14-client-emails`: client emails from each document (API + worker)
+- [ ] contracts: `clientEmailSchema`, client kinds' data schemas and prefilled Arabic templates, permission `invoices.send` (+ `permissions.test.ts`), notification type `email_failed` with its text in `packages/messages`, error codes (`QUOTE_NOT_SENT`, `QUOTE_EXPIRED`, `INVOICE_NOT_ISSUED`, `INVOICE_NOT_OVERDUE`, `PAYMENT_VOIDED`, `ENTRY_VOIDED`, `BUDGET_NOT_LOW`, `PDF_NOT_READY`, `CLIENT_ARCHIVED`, `INVALID_RECIPIENT`, `CONTACT_NO_EMAIL` as missing, `ATTACHMENT_TOO_LARGE`), audit action `<entity>.emailed`; `ar.json` keys
+- [ ] api `email`: attachments (10 MB cap), `Mailer.history(record)`, recipient resolution helper input, attachment copy for temporary renders (rule 21), `email_failed` to the sender (rule 23)
+- [ ] api routes: quotes (email, history), approvals (`email` on create / reissue, email reminder, history), invoices and payments (email, history), statement (email, history), monthly report (email, history), ad wallet entries and budget low (email, history); audit on each record (rule 22)
+- [ ] worker templates for the eleven client kinds with snapshots
+- [ ] api tests per route: success, 401, 403, out of scope, each 409 code
+- [ ] bridge; web typecheck
+- [ ] wiring checklist, full checks, reviewer, owner acceptance, /ship
+
+## PR 4 — `feat/f14-email-web`: screens and E2E
+- [ ] web: notification settings email column and digest switch; `/forgot-password` and the sign-in link; shared "Send by email" dialog and email history; wired into quotes, invoices, receipts, statement, monthly report, ad receipts and budget notice, approval dialogs and request page; `/emails` log with test email and navigation; team profile "Sent to …"
+- [ ] e2e: mocks, `f14-email.spec.ts`, screenshots light and dark (settings, forgot password, dialog, history, log)
+- [ ] wiring checklist, full checks, reviewer, owner acceptance (browser steps of the spec's Acceptance), /ship; `docs/ROADMAP.md`

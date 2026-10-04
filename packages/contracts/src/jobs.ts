@@ -8,6 +8,12 @@ import { z } from 'zod';
 import { adDepositReceiptSnapshotSchema } from './campaigns.js';
 import { BUSINESS_TIME_ZONE } from './dates.js';
 import {
+  EMAIL_LIMITS,
+  emailAddressSchema,
+  emailAttachmentSchema,
+  emailKindSchema,
+} from './emails.js';
+import {
   invoiceDraftSnapshotSchema,
   invoiceSnapshotSchema,
   receiptSnapshotSchema,
@@ -244,3 +250,60 @@ export const reportPdfReadyJobSchema = reportPdfJobSchema
   .extend({ file: renderedFileSchema });
 
 export type ReportPdfReadyJob = z.infer<typeof reportPdfReadyJobSchema>;
+
+/**
+ * F14 email (ADR 0028): sends one email of the outbox. Queued by `Mailer.queue` in the
+ * transaction of the change, worked by the worker (render, SMTP). As the render jobs, it carries
+ * everything the email needs, so the worker reads no table; the outcome goes back to the API
+ * (`email.result`), which changes only a `queued` row.
+ */
+export const EMAIL_SEND_JOB = {
+  queue: 'email.send',
+  retryLimit: 3,
+  /** Seconds before the first retry, doubled for each next one. */
+  retryDelay: 60,
+  retryBackoff: true,
+} as const;
+
+export const emailSendJobSchema = z.object({
+  id: z.uuid(),
+  kind: emailKindSchema,
+  to: z.array(emailAddressSchema).min(1).max(EMAIL_LIMITS.to),
+  cc: z.array(emailAddressSchema).max(EMAIL_LIMITS.cc),
+  replyTo: z.email().nullable(),
+  subject: z.string().min(1).max(EMAIL_LIMITS.subject),
+  message: z.string().max(EMAIL_LIMITS.message).nullable(),
+  /** Validated by the worker with the kind's schema in `EMAIL_DATA_SCHEMAS`. */
+  data: z.record(z.string(), z.unknown()),
+  attachments: z.array(emailAttachmentSchema),
+});
+
+export type EmailSendJob = z.infer<typeof emailSendJobSchema>;
+
+/** The outcome of an `email.send`, worked by the API: `sent`, or `failed` after the last retry. */
+export const EMAIL_RESULT_JOB = { queue: 'email.result' } as const;
+
+export const emailResultJobSchema = z.discriminatedUnion('status', [
+  z.object({
+    id: z.uuid(),
+    status: z.literal('sent'),
+    attempts: z.number().int().min(1),
+    providerMessageId: z.string().nullable(),
+    sentAt: z.iso.datetime(),
+  }),
+  z.object({
+    id: z.uuid(),
+    status: z.literal('failed'),
+    attempts: z.number().int().min(1),
+    error: z.string().max(EMAIL_LIMITS.error),
+  }),
+]);
+
+export type EmailResultJob = z.infer<typeof emailResultJobSchema>;
+
+/** F14 rule 25: deletes staff emails older than 90 days, daily at 03:30. */
+export const EMAIL_PURGE_JOB = {
+  queue: 'email.purge',
+  cron: '30 3 * * *',
+  tz: BUSINESS_TIME_ZONE,
+} as const;

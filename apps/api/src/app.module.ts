@@ -19,6 +19,7 @@ import { CampaignsModule } from './modules/campaigns/index.js';
 import { CatalogModule } from './modules/catalog/index.js';
 import { ClientsModule } from './modules/clients/index.js';
 import { ContentModule } from './modules/content/index.js';
+import { EmailModule } from './modules/email/index.js';
 import { FilesModule } from './modules/files/index.js';
 import { HealthModule } from './modules/health/index.js';
 import { InvoicesModule } from './modules/invoices/index.js';
@@ -48,6 +49,7 @@ import { TemplatesModule } from './modules/templates/index.js';
     DatabaseModule,
     JobsModule,
     AuditModule,
+    EmailModule,
     AuthModule,
     NotificationsModule,
     FilesModule,

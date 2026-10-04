@@ -79,6 +79,7 @@ New module `email` (`apps/api/src/modules/email`), tables in `packages/db/src/sc
 | `data` | jsonb | required; the template data validated by the kind's schema in contracts, with token links redacted (ADR 0028) |
 | `attachments` | jsonb | required, default `[]`; `[{ fileName, storageKey, sizeBytes, sha256 }]` |
 | `sender_id` | uuid → `users.id` | optional; null for system emails |
+| `sender_name` | text | optional, set with `sender_id`; the sender's name when queued, so `email` reads no other module's table (as `audit_entries.actor_name`) |
 | `client_id` | uuid → `clients.id` | optional; set for client emails |
 | `record_type` | enum (`quote`, `invoice`, `payment`, `approval_request`, `client`, `ad_wallet_entry`) | optional; the record a client email belongs to |
 | `record_id` | uuid | optional, with `record_type` |
@@ -170,7 +171,7 @@ An email is `queued`, then `sent` or `failed`; nothing moves it back. A notifica
 23. **Failure.** A client email that fails for good notifies its sender with `email_failed` (in the app, and by email only if they switched it on), opening the document; the history shows the error. The sender sends again from the same dialog; there is no automatic resend.
 
 ### Operations
-24. **Configuration.** The worker reads `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASSWORD`, `EMAIL_FROM` and `EMAIL_TRANSPORT` (`smtp` or `log`; `log` is the default outside production and writes `.eml` files under `.data/emails/`). The API and the worker read `EMAIL_SECRET_KEY` (32 bytes, base64). Links use `APP_URL`. Production values live in the server's git-ignored `.env`; `.env.example` gets fake ones.
+24. **Configuration.** The worker reads `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASSWORD`, `EMAIL_FROM` and `EMAIL_TRANSPORT` (`smtp` or `log`; `log` is the default outside production and writes `.eml` files under `EMAIL_LOG_DIR`, default `.data/emails/`). The worker refuses to start with `smtp` without `SMTP_HOST`, `SMTP_USER` and `SMTP_PASSWORD`. The API and the worker read `EMAIL_SECRET_KEY` (32 bytes, base64). Links use `APP_URL`. Production values live in the server's git-ignored `.env`; `.env.example` gets fake ones.
 25. **Purge.** `email.purge` deletes staff emails (`audience = staff`) created more than 90 days ago, after clearing their references from `notifications` and `email_digests`. Client emails and their copied attachments are kept.
 26. **Test email.** An administrator can send a `test` email to their own address from the email log, to check the configuration; it shows in the log with its status.
 
@@ -226,7 +227,7 @@ The emails themselves (rendered in the worker): RTL Arabic layout, logo header, 
 ## Audit, notifications and jobs
 - Audit: each client email on its record (rule 22). Account emails are not audited themselves; the changes behind them already are (F01). Settings changes are personal: not audited.
 - Notifications: `email_failed` (rule 23).
-- Jobs: `email.send` (worker, retry 3 with backoff), `email.result` (API), `email.notifications` (every 5 minutes, acts 08:10–20:00 on work days), `email.digest` (08:00 on work days), `email.purge` (03:30 daily). All handlers are idempotent: `email.send` sends only a `queued` row whose attempts are below the limit and records the outcome by id; batches lock their notifications; digests key on `email_digests`.
+- Jobs: `email.send` (worker, retry 3 with backoff), `email.result` (API), `email.notifications` (every 5 minutes, acts 08:10–20:00 on work days), `email.digest` (08:00 on work days), `email.purge` (03:30 daily). All handlers are idempotent: `email.send` carries the whole email (as the PDF render jobs, so the worker reads no table) and `email.result` changes only a `queued` row, so a repeated outcome changes nothing; batches lock their notifications; digests key on `email_digests`.
 
 ## Edge cases
 1. **SMTP down or credentials wrong:** each email retries three times with backoff, then `failed` with the error; staff emails are not retried after that (the in-app notification is still there); client emails notify the sender (rule 23). The email log shows the failures.

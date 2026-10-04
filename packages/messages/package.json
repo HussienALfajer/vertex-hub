@@ -1,0 +1,30 @@
+{
+  "name": "@vertex-hub/messages",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "tsc -p tsconfig.build.json --watch --preserveWatchOutput",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@vertex-hub/contracts": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.0",
+    "@vertex-hub/config": "workspace:*",
+    "typescript": "~6.0.3",
+    "vitest": "^5.0.2"
+  }
+}

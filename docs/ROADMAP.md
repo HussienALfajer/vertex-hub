@@ -49,7 +49,7 @@ Build order (owner, 2026-09-30): F10 → F09 → F08 → F11. F09 approves exact
 
 ## Phase 4 — Visibility
 - [x] F15 Dashboards and reports (incl. monthly client report) (spec: `docs/specs/F15-dashboards-reports.md`, ADR 0027): the dashboard API (Company, Finance, Departments and My clients sections through the modules' read-only report services and the new `reports` module), invoice line services (`PUT /api/invoices/:id/services`) and `reports.finance` for the Operations manager (PR 1); the reports API (department productivity, revenue by client and service, overdue invoices, the monthly client report with its summary) with Excel files and the monthly client report PDF rendered by the worker (PR 2); the home dashboard by role, the Reports screens, the monthly client report screen and the invoice line Service column and dialog (PR 3)
-- [~] F14 Email and daily digest (spec: `docs/specs/F14-email-digest.md`, ADR 0028)
+- [~] F14 Email and daily digest (spec: `docs/specs/F14-email-digest.md`, ADR 0028): the outbox (`email_messages`, `Mailer.queue` in the change's transaction), the worker's SMTP and `log` sending with the RTL layout, the email log API and the test email, and `packages/messages` (PR 1); next: staff emails, client emails, screens
 - [ ] Production deploy of Phase 4
 
 ## Launch checklist

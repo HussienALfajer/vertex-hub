@@ -12,7 +12,7 @@ This project is independent. Do not read or reuse other folders on this machine 
 |---|---|
 | `docs/product/v1-scope.md` | What V1 includes and excludes. Anything not in it is out of scope: ask before adding. |
 | `docs/decisions/` | Architecture and business decisions (ADRs). Follow them; propose a new ADR to change one. ADR 0013 is the code shape: layout, module anatomy, naming, errors, lists, tests. |
-| `<app or package>/CLAUDE.md` | Local rules and the pattern to copy for `apps/api`, `apps/web`, `apps/worker`, `packages/{contracts,db,ui}` and `deploy`. Any agent reads it before editing in that folder (Claude Code loads it on its own). |
+| `<app or package>/CLAUDE.md` | Local rules and the pattern to copy for `apps/api`, `apps/web`, `apps/worker`, `packages/{contracts,db,messages,ui}` and `deploy`. Any agent reads it before editing in that folder (Claude Code loads it on its own). |
 | `docs/architecture.md` | Stack, repo layout, module map, data conventions, deployment topology. |
 | `docs/ROADMAP.md` | Phase and feature status. Update it when a feature ships. |
 | `docs/specs/<feature>.md` | Detailed spec per feature, written before implementation. |
@@ -33,6 +33,7 @@ pnpm workspaces + Turborepo · TypeScript (strict) · Node 24 · PostgreSQL 17
 - `packages/ui` — Vertex design system: shadcn/ui on Base UI + Tailwind CSS v4 tokens (RTL)
 - `packages/contracts` — Zod schemas, shared types, permission map
 - `packages/db` — Drizzle schema and migrations
+- `packages/messages` — Arabic texts shared by web and worker (emails, notification texts; ADR 0028)
 - Tests: Vitest (unit, API integration) and Playwright (E2E, RTL screenshots) · Lint/format: Biome · CI: GitHub Actions
 
 ## Commands

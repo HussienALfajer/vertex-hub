@@ -199,6 +199,17 @@ describe('module boundaries', () => {
     expect(offenders).toEqual([]);
   });
 
+  it('keeps email independent of every other module (ADR 0028)', () => {
+    const offenders = imports
+      .filter(({ file, specifier }) => moduleOf(file) === 'email' && specifier.startsWith('.'))
+      .filter(({ file, specifier }) => {
+        const target = moduleOf(resolve(dirname(file), specifier));
+        return target !== null && target !== 'email';
+      })
+      .map(({ file, specifier }) => `${display(file)} -> ${specifier}`);
+    expect(offenders).toEqual([]);
+  });
+
   it('keeps files independent of the modules that own files (ADR 0019)', () => {
     const owners = ['tasks', 'clients', 'projects', 'content', 'quotes', 'invoices'];
     const offenders = imports
@@ -298,6 +309,7 @@ describe('module boundaries', () => {
     catalog: 'catalog',
     clients: 'clients',
     content: 'content',
+    email: 'email',
     files: 'files',
     invoices: 'invoices',
     leads: 'leads',

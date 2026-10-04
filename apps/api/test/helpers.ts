@@ -22,6 +22,7 @@ import {
   type Database,
   departmentMembers,
   departments,
+  emailMessages,
   extraWorkItems,
   fileItems,
   fileUploads,
@@ -164,6 +165,8 @@ export async function seedUser(db: Database, input: SeedUser = {}): Promise<Seed
 /** Removes seeded users with everything that points at them (test cleanup only). */
 export async function removeUsers(db: Database, ids: string[]): Promise<void> {
   if (ids.length === 0) return;
+  // Emails point at their sender (F14 email).
+  await db.delete(emailMessages).where(inArray(emailMessages.senderId, ids));
   // Payments point at their recorder and their proof document (F13): they go first.
   const userPayments = (
     await db

@@ -5,7 +5,9 @@ import {
   type OnApplicationBootstrap,
   type OnApplicationShutdown,
 } from '@nestjs/common';
-import { PgBoss } from 'pg-boss';
+import type { Transaction } from '@vertex-hub/db';
+import { type SQL, sql } from 'drizzle-orm';
+import { PgBoss, type SendOptions } from 'pg-boss';
 import { ENV, type Env } from '../config/env.js';
 
 /**
@@ -44,15 +46,36 @@ export class JobQueue implements OnApplicationBootstrap, OnApplicationShutdown {
   ): Promise<void> {
     if (!this.boss) return;
     try {
-      if (!this.handlers.has(queue) && !this.created.has(queue)) {
-        // A queue the worker works (F04 `quotes.pdf`) may not exist yet when the worker is down.
-        await this.boss.createQueue(queue);
-        this.created.add(queue);
-      }
+      await this.ensureQueue(this.boss, queue);
       await this.boss.send(queue, data, options);
     } catch (error) {
       this.logger.error(error, `Could not queue ${queue}`);
     }
+  }
+
+  /**
+   * Queues a job inside `tx`, so it commits or rolls back with the change (ADR 0028: an email and
+   * its `email.send` job). A failure fails the transaction. A no-op while pg-boss is off, as `send`.
+   */
+  async sendInTransaction(
+    tx: Transaction,
+    queue: string,
+    data: object,
+    options: Pick<SendOptions, 'retryLimit' | 'retryDelay' | 'retryBackoff'> = {},
+  ): Promise<void> {
+    if (!this.boss) return;
+    await this.ensureQueue(this.boss, queue);
+    await this.boss.send(queue, data, {
+      ...options,
+      db: { executeSql: (text, values = []) => tx.execute(positionalSql(text, values)) },
+    });
+  }
+
+  private async ensureQueue(boss: PgBoss, queue: string): Promise<void> {
+    if (this.handlers.has(queue) || this.created.has(queue)) return;
+    // A queue the worker works (F04 `quotes.pdf`) may not exist yet when the worker is down.
+    await boss.createQueue(queue);
+    this.created.add(queue);
   }
 
   async onApplicationBootstrap(): Promise<void> {
@@ -71,4 +94,17 @@ export class JobQueue implements OnApplicationBootstrap, OnApplicationShutdown {
   async onApplicationShutdown(): Promise<void> {
     await this.boss?.stop({ graceful: true });
   }
+}
+
+/** pg-boss's `$1`-style statement as a Drizzle query, so it runs on a transaction's connection. */
+function positionalSql(text: string, values: unknown[]): SQL {
+  const chunks: SQL[] = [];
+  let rest = 0;
+  for (const match of text.matchAll(/\$(\d+)/g)) {
+    chunks.push(sql.raw(text.slice(rest, match.index)));
+    chunks.push(sql`${sql.param(values[Number(match[1]) - 1])}`);
+    rest = match.index + match[0].length;
+  }
+  chunks.push(sql.raw(text.slice(rest)));
+  return sql.join(chunks);
 }
