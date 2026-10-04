@@ -1,6 +1,13 @@
 import type { Page, Route, TestInfo } from '@playwright/test';
 import {
   type AcceptPlan,
+  AD_CAMPAIGN_STATUSES,
+  type AdCampaignStatus,
+  type AdFunding,
+  type AdObjective,
+  type AdPlatform,
+  type AdWallet,
+  type AdWalletEntryKind,
   APPROVAL_LIMITS,
   type ApprovalItem,
   type ApprovalItemStatus,
@@ -10,8 +17,11 @@ import {
   type ApprovalWithdrawnReason,
   type AuditEntry,
   acceptQuoteSchema,
+  acceptsUpdates,
+  adDepositDisplayNumber,
   addDays,
   addMonths,
+  adWalletBalance,
   allowedPostTransitions,
   allowedTaskTransitions,
   applyPayment,
@@ -21,8 +31,14 @@ import {
   BOARD_STATUSES,
   type BrandFileKind,
   type BrandKit,
+  budgetUsed,
   businessDate,
+  CAMPAIGN_LIMITS,
   type Calendar,
+  type Campaign,
+  type CampaignDetail,
+  type CampaignStatusChange,
+  type CampaignUpdateInput,
   type CancelMeeting,
   type CancelShoot,
   type CatalogBilling,
@@ -39,6 +55,7 @@ import {
   type Contact,
   type ContentCalendar,
   type CreateApprovalRequest,
+  type CreateCampaign,
   type CreateCycleAdjustment,
   type CreateCycleLine,
   type CreateExtraWork,
@@ -58,7 +75,9 @@ import {
   type CycleDetail,
   type CycleStatus,
   calendarDay,
+  canChangeCampaignStatus,
   changeInvoiceDueDateSchema,
+  costPerResult,
   createCatalogPackageSchema,
   createCatalogServiceSchema,
   createInvoiceSchema,
@@ -70,6 +89,7 @@ import {
   type DepartmentDetailResponse,
   type DepartmentResponse,
   type DuplicatePost,
+  daysWithoutUpdate,
   defaultInstallmentMilestones,
   type ErrorCode,
   type ExtraWork,
@@ -101,6 +121,7 @@ import {
   invoiceTotal,
   isInlineMimeType,
   isLineBehind,
+  isLowBalance,
   isPostContentEditable,
   isPostOverdue,
   isProjectClosed,
@@ -129,8 +150,10 @@ import {
   type Notification,
   type NotificationType,
   needsDiscountApproval,
+  OPEN_AD_CAMPAIGN_STATUSES,
   OPEN_INVOICE_STATUSES,
   OPEN_TASK_STATUSES,
+  type PatchCampaignUpdate,
   type Payment,
   type Permission,
   type PlatformAccount,
@@ -160,6 +183,8 @@ import {
   type PublicResponse,
   type PublishedLink,
   packageIssues,
+  periodInOneMonth,
+  periodsOverlap,
   planTemplateRun,
   postMove,
   postTaskDueDate,
@@ -175,6 +200,7 @@ import {
   quoteDisplayNumber,
   quoteDraftSchema,
   quoteTotals,
+  type RecordWalletEntry,
   type ReopenShoot,
   type RequestScope,
   type Retainer,
@@ -207,6 +233,7 @@ import {
   serviceIssues,
   setRetainerTemplateSchema,
   shootTaskTitle,
+  spendCountsInWallet,
   statementRows,
   TASK_PRIORITIES,
   type Task,
@@ -234,12 +261,14 @@ import {
   taskMove,
   templateRunInputSchema,
   toUsdMinor,
+  type UpdateCampaign,
   type UpdateCycleLine,
   type UpdateExtraWork,
   type UpdateMeeting,
   type UpdatePost,
   type UpdateShoot,
   type UpdateTaskInput,
+  type UpdateWalletThreshold,
   type UserResponse,
   updateCatalogPackageSchema,
   updateCatalogServiceSchema,
@@ -247,8 +276,11 @@ import {
   updateProjectExpenseSchema,
   updateQuoteSettingsSchema,
   updateTemplateSchema,
+  type VoidWalletEntry,
   voidInvoiceSchema,
   voidPaymentSchema,
+  type WalletEntry,
+  walletLedger,
   weekOf,
 } from '@vertex-hub/contracts';
 import { isDeclaredEndpoint, reportApiProblem } from './test';
@@ -319,6 +351,12 @@ export const financeWithoutTwoFactor: MeResponse = {
   roles: ['employee', 'finance'],
   permissions: grantedPermissions({ roles: ['employee', 'finance'], departments: [] }),
   twoFactor: { enabled: false, required: true },
+};
+
+/** Rana: Finance with two-factor sign-in set up; reads every client's money (F12, F13). */
+export const financeMe: MeResponse = {
+  ...financeWithoutTwoFactor,
+  twoFactor: { enabled: true, required: true },
 };
 
 /** Layan: a department manager who is also an Account Manager (F02 own_clients scope). */
@@ -973,6 +1011,15 @@ export async function mockApi(page: Page, options: MockOptions): Promise<MockedA
     retainers,
     me: () => me,
   });
+  const campaignsApi = campaignRoutes({
+    records: campaignsSeed(),
+    clients,
+    users,
+    projects,
+    retainers,
+    tasks,
+    me: () => me,
+  });
   const notificationsApi = notificationRoutes({
     notifications: options.notifications ?? notificationsSeed(),
     streamed: options.streamed ?? [],
@@ -1209,6 +1256,12 @@ export async function mockApi(page: Page, options: MockOptions): Promise<MockedA
       if (listed) return listed;
     }
 
+    // A client's ad wallet (F12) belongs to the campaigns mock.
+    if (/^\/api\/clients\/[^/]+\/ad-wallet/.test(path)) {
+      const funded = campaignsApi(route, method, url, request);
+      if (funded) return funded;
+    }
+
     // Billing summaries, statements and expenses (F13) belong to the invoices mock.
     if (
       /^\/api\/(clients|projects|retainers)\/[^/]+\/(billing|statement|statement\/pdf|expenses)$/.test(
@@ -1257,6 +1310,10 @@ export async function mockApi(page: Page, options: MockOptions): Promise<MockedA
     // Invoices (F13).
     const invoiced = invoicesApi(route, method, url, request);
     if (invoiced) return invoiced;
+
+    // Ad campaigns and wallets (F12).
+    const campaigned = campaignsApi(route, method, url, request);
+    if (campaigned) return campaigned;
 
     // Notifications (F14).
     const notified = notificationsApi(route, method, url);
@@ -10728,6 +10785,759 @@ function invoiceRoutes({ billing, clients, users, projects, retainers, me }: Inv
     return undefined;
   };
 }
+// Ad campaigns and wallets (F12).
+
+interface CampaignUpdateRecord {
+  id: string;
+  campaignId: string;
+  periodStart: string;
+  periodEnd: string;
+  spendMinor: number;
+  reach: number;
+  clicks: number;
+  results: number;
+  note: string;
+  enteredById: string;
+  createdAt: string;
+  updatedAt: string;
+  archived: boolean;
+}
+
+interface CampaignRecord {
+  id: string;
+  clientId: string;
+  name: string;
+  platform: AdPlatform;
+  objective: AdObjective;
+  funding: AdFunding;
+  budgetMinor: number;
+  startsOn: string;
+  endsOn: string | null;
+  ownerId: string;
+  status: AdCampaignStatus;
+  projectId: string | null;
+  retainerId: string | null;
+  taskId: string | null;
+  notes: string;
+  cancelReason: string | null;
+  createdById: string;
+  createdAt: string;
+  updatedAt: string;
+  archivedAt: string | null;
+}
+
+interface WalletEntryRecord
+  extends Omit<WalletEntry, 'receiptNumber' | 'recordedBy' | 'voided' | 'proof'> {
+  clientId: string;
+  year: number | null;
+  number: number | null;
+  recordedById: string;
+  voided: { at: string; byId: string; reason: string } | null;
+}
+
+interface CampaignRecords {
+  campaigns: CampaignRecord[];
+  updates: CampaignUpdateRecord[];
+  entries: WalletEntryRecord[];
+  /** Client id → threshold; absent means the default 100 USD. */
+  thresholds: Map<string, number | null>;
+}
+
+/** Dates relative to today, so the "no update for N days" and period rules hold on any run. */
+export function campaignsSeed(): CampaignRecords {
+  const today = businessDate();
+  const daysAgo = (days: number) => addDays(today, -days);
+  const at = (day: string) => `${day}T09:00:00.000Z`;
+  const entry = (
+    n: number,
+    clientId: string,
+    kind: AdWalletEntryKind,
+    occurredOn: string,
+    amount: { amountMinor: number; currency: Currency; usdMinor: number },
+    number: number | null,
+  ): WalletEntryRecord => ({
+    id: id(n),
+    clientId,
+    kind,
+    occurredOn,
+    ...amount,
+    sypPerUsd: '118.5000',
+    method: 'bank_transfer',
+    reference: kind === 'deposit' ? 'بنك البركة 7710' : null,
+    note: null,
+    receiptPdf: kind === 'deposit' ? { state: 'ready' } : null,
+    year: number === null ? null : Number(occurredOn.slice(0, 4)),
+    number,
+    recordedById: id(1),
+    createdAt: at(occurredOn),
+    voided: null,
+  });
+  const update = (
+    n: number,
+    campaignId: string,
+    day: string,
+    metrics: Pick<CampaignUpdateRecord, 'spendMinor' | 'reach' | 'clicks' | 'results'>,
+  ): CampaignUpdateRecord => ({
+    id: id(n),
+    campaignId,
+    periodStart: day,
+    periodEnd: day,
+    ...metrics,
+    note: '',
+    enteredById: id(3),
+    createdAt: at(day),
+    updatedAt: at(day),
+    archived: false,
+  });
+  const campaign = (
+    n: number,
+    fields: Pick<
+      CampaignRecord,
+      | 'clientId'
+      | 'name'
+      | 'platform'
+      | 'objective'
+      | 'funding'
+      | 'budgetMinor'
+      | 'startsOn'
+      | 'ownerId'
+      | 'status'
+    > &
+      Partial<CampaignRecord>,
+  ): CampaignRecord => ({
+    id: id(n),
+    endsOn: null,
+    projectId: null,
+    retainerId: null,
+    taskId: null,
+    notes: '',
+    cancelReason: null,
+    createdById: id(3),
+    createdAt: at(fields.startsOn),
+    updatedAt: at(fields.startsOn),
+    archivedAt: null,
+    ...fields,
+  });
+  return {
+    campaigns: [
+      campaign(9601, {
+        clientId: id(601),
+        name: 'حملة رسائل الخريف',
+        platform: 'meta',
+        objective: 'messages',
+        funding: 'wallet',
+        budgetMinor: 60_000,
+        startsOn: daysAgo(20),
+        endsOn: addDays(today, 40),
+        ownerId: id(3),
+        status: 'active',
+        retainerId: id(901),
+        notes: 'استهداف دمشق، الفئة 25–45.',
+      }),
+      campaign(9602, {
+        clientId: id(601),
+        name: 'زيارات قائمة الطعام',
+        platform: 'google',
+        objective: 'traffic',
+        funding: 'client_direct',
+        budgetMinor: 30_000,
+        startsOn: addDays(today, 5),
+        ownerId: id(3),
+        status: 'planned',
+      }),
+      campaign(9603, {
+        clientId: id(602),
+        name: 'التعريف بالعيادة',
+        platform: 'tiktok',
+        objective: 'awareness',
+        funding: 'wallet',
+        budgetMinor: 20_000,
+        startsOn: daysAgo(30),
+        endsOn: daysAgo(2),
+        ownerId: id(1),
+        status: 'active',
+      }),
+    ],
+    updates: [
+      update(9611, id(9601), daysAgo(9), {
+        spendMinor: 20_000,
+        reach: 15_000,
+        clicks: 900,
+        results: 45,
+      }),
+      update(9612, id(9603), daysAgo(12), {
+        spendMinor: 12_000,
+        reach: 40_000,
+        clicks: 1_200,
+        results: 40_000,
+      }),
+    ],
+    entries: [
+      entry(
+        9621,
+        id(601),
+        'deposit',
+        daysAgo(25),
+        { amountMinor: 50_000, currency: 'USD', usdMinor: 50_000 },
+        1,
+      ),
+      entry(
+        9622,
+        id(601),
+        'deposit',
+        daysAgo(15),
+        { amountMinor: 3_555_000, currency: 'SYP', usdMinor: 30_000 },
+        2,
+      ),
+      entry(
+        9623,
+        id(602),
+        'deposit',
+        daysAgo(31),
+        { amountMinor: 15_000, currency: 'USD', usdMinor: 15_000 },
+        3,
+      ),
+    ],
+    thresholds: new Map(),
+  };
+}
+
+interface CampaignState {
+  records: CampaignRecords;
+  clients: ClientRecord[];
+  users: UserResponse[];
+  projects: ProjectRecord[];
+  retainers: RetainerRecord[];
+  tasks: TaskRecord[];
+  me: () => MeResponse;
+}
+
+/** The campaigns and wallets API over the in-memory records, with the F12 rules the screens use. */
+function campaignRoutes({
+  records,
+  clients,
+  users,
+  projects,
+  retainers,
+  tasks,
+  me,
+}: CampaignState) {
+  const { campaigns, updates, entries, thresholds } = records;
+  let nextId = 9700;
+  let clock = Date.parse('2026-10-02T09:00:00.000Z');
+  const now = () => {
+    clock += 60_000;
+    return new Date(clock).toISOString();
+  };
+  const today = () => businessDate();
+  const scopes = (permission: Permission) =>
+    me().permissions.find((g) => g.permission === permission)?.scopes ?? [];
+  const covers = (permission: Permission, clientId: string) => {
+    const granted = scopes(permission);
+    const client = clients.find((c) => c.id === clientId);
+    return (
+      granted.includes('all') ||
+      (granted.includes('own_clients') && client?.accountManagerId === me().user.id)
+    );
+  };
+  const person = (userId: string) => ({
+    id: userId,
+    name: users.find((u) => u.id === userId)?.name ?? '',
+  });
+  const clientName = (clientId: string) => clients.find((c) => c.id === clientId)?.tradeName ?? '';
+
+  const metrics = (
+    rows: Pick<CampaignUpdateRecord, 'spendMinor' | 'reach' | 'clicks' | 'results'>[],
+  ) => {
+    const sum = (key: 'spendMinor' | 'reach' | 'clicks' | 'results') =>
+      rows.reduce((total, row) => total + row[key], 0);
+    const spendMinor = sum('spendMinor');
+    const results = sum('results');
+    return {
+      spendMinor,
+      reach: sum('reach'),
+      clicks: sum('clicks'),
+      results,
+      costPerResultMinor: costPerResult(spendMinor, results),
+    };
+  };
+  const liveUpdates = (campaignId: string) =>
+    updates
+      .filter((u) => u.campaignId === campaignId && !u.archived)
+      .sort((a, b) => (a.periodStart < b.periodStart ? 1 : -1));
+
+  const balanceOf = (clientId: string) =>
+    adWalletBalance(
+      entries
+        .filter((e) => e.clientId === clientId)
+        .map((e) => ({ kind: e.kind, usdMinor: e.usdMinor, voided: e.voided !== null })),
+      updates.flatMap((u) => {
+        const c = campaigns.find((x) => x.id === u.campaignId);
+        return c?.clientId === clientId
+          ? [
+              {
+                spendMinor: u.spendMinor,
+                archived: u.archived,
+                funding: c.funding,
+                campaignArchived: c.archivedAt !== null,
+              },
+            ]
+          : [];
+      }),
+    );
+
+  const listItemOf = (c: CampaignRecord): Campaign => {
+    const rows = liveUpdates(c.id);
+    const totals = metrics(rows);
+    const lastUpdateEnd = rows.reduce<string | null>(
+      (last, row) => (last === null || row.periodEnd > last ? row.periodEnd : last),
+      null,
+    );
+    const owner = users.find((u) => u.id === c.ownerId);
+    return {
+      id: c.id,
+      name: c.name,
+      client: { id: c.clientId, name: clientName(c.clientId) },
+      platform: c.platform,
+      objective: c.objective,
+      funding: c.funding,
+      status: c.status,
+      startsOn: c.startsOn,
+      endsOn: c.endsOn,
+      owner: { id: c.ownerId, name: owner?.name ?? '', archived: owner?.status === 'archived' },
+      budgetMinor: c.budgetMinor,
+      spendMinor: totals.spendMinor,
+      budgetUsed: budgetUsed(totals.spendMinor, c.budgetMinor),
+      results: totals.results,
+      costPerResultMinor: totals.costPerResultMinor,
+      lastUpdateEnd,
+      daysWithoutUpdate: daysWithoutUpdate({
+        status: c.status,
+        startsOn: c.startsOn,
+        lastUpdateEnd,
+        today: today(),
+      }),
+      endPassed: c.status === 'active' && c.endsOn !== null && c.endsOn < today(),
+      updatedAt: c.updatedAt,
+      archivedAt: c.archivedAt,
+    };
+  };
+
+  const detailOf = (c: CampaignRecord): CampaignDetail => {
+    const rows = liveUpdates(c.id);
+    const totals = metrics(rows);
+    const manages = covers('campaigns.manage', c.clientId);
+    const archived = c.archivedAt !== null;
+    const months = [...new Set(rows.map((row) => row.periodStart.slice(0, 7)))].sort();
+    const project = projects.find((p) => p.id === c.projectId);
+    const retainer = retainers.find((r) => r.id === c.retainerId);
+    const task = tasks.find((t) => t.id === c.taskId);
+    return {
+      ...listItemOf(c),
+      engagement: project
+        ? { type: 'project', id: project.id, name: project.name, archived: project.archived }
+        : retainer
+          ? { type: 'retainer', id: retainer.id, name: retainer.name, archived: retainer.archived }
+          : null,
+      task: task
+        ? { id: task.id, name: task.title, archived: task.archived, status: task.status }
+        : null,
+      notes: c.notes,
+      cancelReason: c.cancelReason,
+      totals: { ...totals, budgetUsed: budgetUsed(totals.spendMinor, c.budgetMinor) },
+      months: months.map((month) => ({
+        month,
+        ...metrics(rows.filter((row) => row.periodStart.startsWith(month))),
+      })),
+      updates: rows.map((row) => ({
+        id: row.id,
+        periodStart: row.periodStart,
+        periodEnd: row.periodEnd,
+        note: row.note,
+        enteredBy: person(row.enteredById),
+        createdAt: row.createdAt,
+        updatedAt: row.updatedAt,
+        ...metrics([row]),
+      })),
+      walletBalanceMinor: c.funding === 'wallet' ? balanceOf(c.clientId) : null,
+      createdBy: person(c.createdById),
+      createdAt: c.createdAt,
+      permissions: {
+        canEdit: manages && !archived && c.status !== 'cancelled',
+        canChangeFunding: manages && !archived && rows.length === 0,
+        transitions:
+          manages && !archived
+            ? AD_CAMPAIGN_STATUSES.filter((to) => canChangeCampaignStatus(c.status, to))
+            : [],
+        canAddUpdate: manages && !archived && acceptsUpdates(c.status),
+        canEditUpdates: manages && !archived,
+        canArchive:
+          manages &&
+          !archived &&
+          (c.status === 'planned' || c.status === 'cancelled') &&
+          rows.length === 0,
+        canRestore: manages && archived,
+      },
+    };
+  };
+
+  const usesWallet = (clientId: string) =>
+    entries.some((e) => e.clientId === clientId && e.kind === 'deposit' && e.voided === null);
+  const thresholdOf = (clientId: string) =>
+    thresholds.has(clientId)
+      ? (thresholds.get(clientId) ?? null)
+      : CAMPAIGN_LIMITS.lowBalanceThresholdMinor;
+  const totalsOf = (clientId: string) => {
+    const counted = entries.filter((e) => e.clientId === clientId && e.voided === null);
+    const sum = (kind: AdWalletEntryKind) =>
+      counted.filter((e) => e.kind === kind).reduce((total, e) => total + e.usdMinor, 0);
+    const balanceMinor = balanceOf(clientId);
+    const lowBalanceThresholdMinor = thresholdOf(clientId);
+    return {
+      depositedMinor: sum('deposit'),
+      refundedMinor: sum('refund'),
+      spentMinor: sum('deposit') - sum('refund') - balanceMinor,
+      balanceMinor,
+      lowBalanceThresholdMinor,
+      low: isLowBalance(balanceMinor, lowBalanceThresholdMinor, usesWallet(clientId)),
+    };
+  };
+  const entryOf = (e: WalletEntryRecord): WalletEntry => ({
+    id: e.id,
+    kind: e.kind,
+    receiptNumber:
+      e.year !== null && e.number !== null
+        ? adDepositDisplayNumber({ year: e.year, number: e.number })
+        : null,
+    occurredOn: e.occurredOn,
+    amountMinor: e.amountMinor,
+    currency: e.currency,
+    sypPerUsd: e.sypPerUsd,
+    usdMinor: e.usdMinor,
+    method: e.method,
+    reference: e.reference,
+    note: e.note,
+    proof: null,
+    receiptPdf: e.receiptPdf,
+    recordedBy: person(e.recordedById),
+    createdAt: e.createdAt,
+    voided: e.voided
+      ? { at: e.voided.at, by: person(e.voided.byId), reason: e.voided.reason }
+      : null,
+  });
+  const walletOf = (clientId: string): AdWallet => {
+    const client = clients.find((c) => c.id === clientId);
+    const own = entries.filter((e) => e.clientId === clientId);
+    const spend = updates.flatMap((u) => {
+      const c = campaigns.find((x) => x.id === u.campaignId);
+      return c &&
+        c.clientId === clientId &&
+        spendCountsInWallet({
+          spendMinor: u.spendMinor,
+          archived: u.archived,
+          funding: c.funding,
+          campaignArchived: c.archivedAt !== null,
+        })
+        ? [{ update: u, campaign: c }]
+        : [];
+    });
+    const ledger = walletLedger([
+      ...own.map((e) => ({
+        kind: e.kind,
+        id: e.id,
+        date: e.occurredOn,
+        usdMinor: e.usdMinor,
+        voided: e.voided !== null,
+        entry: {
+          receiptNumber: entryOf(e).receiptNumber,
+          amountMinor: e.amountMinor,
+          currency: e.currency,
+        },
+        spend: null,
+      })),
+      ...spend.map(({ update: u, campaign: c }) => ({
+        kind: 'spend' as const,
+        id: u.id,
+        date: u.periodEnd,
+        usdMinor: u.spendMinor,
+        voided: false,
+        entry: null,
+        spend: {
+          campaign: { id: c.id, name: c.name },
+          periodStart: u.periodStart,
+          periodEnd: u.periodEnd,
+        },
+      })),
+    ]);
+    const canFund = scopes('campaigns.fund').length > 0;
+    return {
+      ...totalsOf(clientId),
+      client: { id: clientId, name: client?.tradeName ?? '', archived: client?.archived ?? false },
+      usesWallet: usesWallet(clientId),
+      from: null,
+      to: null,
+      openingMinor: ledger.openingMinor,
+      ledger: ledger.rows,
+      entries: own.sort((a, b) => (a.occurredOn < b.occurredOn ? 1 : -1)).map(entryOf),
+      permissions: {
+        canFund,
+        canDeposit: canFund && !client?.archived,
+        canEditThreshold: covers('campaigns.manage', clientId),
+      },
+    };
+  };
+
+  const checkLinks = (clientId: string, body: Partial<CreateCampaign>) => {
+    if (body.ownerId && users.find((u) => u.id === body.ownerId)?.status !== 'active') {
+      return 'INVALID_OWNER' as const;
+    }
+    if (body.endsOn && body.startsOn && body.endsOn < body.startsOn)
+      return 'INVALID_DATES' as const;
+    const project = body.projectId && projects.find((p) => p.id === body.projectId);
+    const retainer = body.retainerId && retainers.find((r) => r.id === body.retainerId);
+    const task = body.taskId && tasks.find((t) => t.id === body.taskId);
+    if (
+      (body.projectId && (!project || project.clientId !== clientId)) ||
+      (body.retainerId && (!retainer || retainer.clientId !== clientId)) ||
+      (body.taskId && (!task || task.clientId !== clientId))
+    ) {
+      return 'INVALID_ENGAGEMENT' as const;
+    }
+    return null;
+  };
+
+  return (route: Route, method: string, url: URL, request: Request) => {
+    const path = url.pathname;
+    const readable = (clientId: string) => covers('campaigns.read', clientId);
+
+    if (path === '/api/campaigns' && method === 'GET') {
+      if (scopes('campaigns.read').length === 0) return fail(route, 403, null);
+      const q = url.searchParams;
+      const statuses = q.getAll('status');
+      const shown = statuses.length > 0 ? statuses : [...OPEN_AD_CAMPAIGN_STATUSES];
+      const search = q.get('search')?.toLowerCase();
+      const items = campaigns
+        .filter(
+          (c) =>
+            !c.archivedAt &&
+            readable(c.clientId) &&
+            shown.includes(c.status) &&
+            (!q.get('clientId') || c.clientId === q.get('clientId')) &&
+            (!q.get('platform') || c.platform === q.get('platform')) &&
+            (!q.get('funding') || c.funding === q.get('funding')) &&
+            (!q.get('ownerId') || c.ownerId === q.get('ownerId')) &&
+            (q.get('mine') !== 'true' || c.ownerId === me().user.id) &&
+            (!q.get('accountManagerId') ||
+              clients.find((x) => x.id === c.clientId)?.accountManagerId ===
+                q.get('accountManagerId')) &&
+            (!search ||
+              c.name.toLowerCase().includes(search) ||
+              clientName(c.clientId).toLowerCase().includes(search)),
+        )
+        .sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1))
+        .map(listItemOf);
+      return json(route, { items, total: items.length, page: 1, pageSize: 25 });
+    }
+    if (path === '/api/campaigns' && method === 'POST') {
+      const body = request.postDataJSON() as CreateCampaign;
+      if (!covers('campaigns.manage', body.clientId)) return fail(route, 403, null);
+      const problem = checkLinks(body.clientId, body);
+      if (problem) return fail(route, 400, problem);
+      const created: CampaignRecord = {
+        ...body,
+        id: id(nextId++),
+        status: 'planned',
+        cancelReason: null,
+        createdById: me().user.id,
+        createdAt: now(),
+        updatedAt: now(),
+        archivedAt: null,
+      };
+      campaigns.push(created);
+      return json(route, detailOf(created), 201);
+    }
+
+    const campaignMatch = path.match(
+      /^\/api\/campaigns\/([^/]+)(?:\/(status|archive|restore|updates))?$/,
+    );
+    if (campaignMatch) {
+      const c = campaigns.find((x) => x.id === campaignMatch[1]);
+      if (!c || !readable(c.clientId)) return fail(route, 404, null);
+      const action = campaignMatch[2];
+      if (!action && method === 'GET') return json(route, detailOf(c));
+      if (!covers('campaigns.manage', c.clientId)) return fail(route, 403, null);
+      if (!action && method === 'PUT') {
+        const body = request.postDataJSON() as UpdateCampaign;
+        if (body.updatedAt !== c.updatedAt) return fail(route, 409, 'CONCURRENT_CHANGE');
+        if (c.status === 'cancelled') return fail(route, 409, 'INVALID_TRANSITION');
+        if (body.funding !== c.funding && liveUpdates(c.id).length > 0) {
+          return fail(route, 409, 'FUNDING_LOCKED');
+        }
+        const problem = checkLinks(c.clientId, body);
+        if (problem) return fail(route, 400, problem);
+        const { updatedAt: _loaded, ...fields } = body;
+        Object.assign(c, fields, { updatedAt: now() });
+        return json(route, detailOf(c));
+      }
+      if (action === 'status') {
+        const body = request.postDataJSON() as CampaignStatusChange;
+        if (!canChangeCampaignStatus(c.status, body.to)) {
+          return fail(route, 409, 'INVALID_TRANSITION');
+        }
+        if (body.to === 'cancelled' && !body.reason) return fail(route, 400, 'NOTE_REQUIRED');
+        c.status = body.to;
+        c.cancelReason = body.to === 'cancelled' ? (body.reason ?? null) : null;
+        c.updatedAt = now();
+        return json(route, detailOf(c));
+      }
+      if (action === 'archive') {
+        if (liveUpdates(c.id).length > 0) return fail(route, 409, 'CAMPAIGN_HAS_UPDATES');
+        c.archivedAt = now();
+        return json(route, detailOf(c));
+      }
+      if (action === 'restore') {
+        c.archivedAt = null;
+        return json(route, detailOf(c));
+      }
+      if (action === 'updates' && method === 'POST') {
+        if (!acceptsUpdates(c.status)) return fail(route, 409, 'INVALID_TRANSITION');
+        const body = request.postDataJSON() as CampaignUpdateInput;
+        if (!periodInOneMonth(body)) return fail(route, 400, 'PERIOD_CROSSES_MONTH');
+        if (liveUpdates(c.id).some((u) => periodsOverlap(u, body))) {
+          return fail(route, 409, 'PERIOD_OVERLAP');
+        }
+        updates.push({
+          ...body,
+          id: id(nextId++),
+          campaignId: c.id,
+          enteredById: me().user.id,
+          createdAt: now(),
+          updatedAt: now(),
+          archived: false,
+        });
+        c.updatedAt = now();
+        return json(route, detailOf(c), 201);
+      }
+    }
+
+    const updateMatch = path.match(/^\/api\/campaign-updates\/([^/]+)(\/archive)?$/);
+    if (updateMatch) {
+      const u = updates.find((x) => x.id === updateMatch[1] && !x.archived);
+      const c = u && campaigns.find((x) => x.id === u.campaignId);
+      if (!u || !c || !readable(c.clientId)) return fail(route, 404, null);
+      if (!covers('campaigns.manage', c.clientId)) return fail(route, 403, null);
+      if (updateMatch[2]) {
+        u.archived = true;
+      } else {
+        const body = request.postDataJSON() as PatchCampaignUpdate;
+        const next = { ...u, ...body };
+        if (!periodInOneMonth(next)) return fail(route, 400, 'PERIOD_CROSSES_MONTH');
+        if (liveUpdates(c.id).some((x) => x.id !== u.id && periodsOverlap(x, next))) {
+          return fail(route, 409, 'PERIOD_OVERLAP');
+        }
+        Object.assign(u, body, { updatedAt: now() });
+      }
+      c.updatedAt = now();
+      return json(route, detailOf(c));
+    }
+
+    if (path === '/api/ad-wallets' && method === 'GET') {
+      if (scopes('campaigns.read').length === 0) return fail(route, 403, null);
+      const q = url.searchParams;
+      const search = q.get('search')?.toLowerCase();
+      const items = clients
+        .filter(
+          (client) =>
+            readable(client.id) &&
+            (usesWallet(client.id) ||
+              campaigns.some(
+                (c) => c.clientId === client.id && c.funding === 'wallet' && !c.archivedAt,
+              )) &&
+            (!search || client.tradeName.toLowerCase().includes(search)) &&
+            (!q.get('accountManagerId') || client.accountManagerId === q.get('accountManagerId')),
+        )
+        .map((client) => ({
+          ...totalsOf(client.id),
+          client: { id: client.id, name: client.tradeName },
+          accountManager: person(client.accountManagerId),
+          lastDepositOn:
+            entries
+              .filter((e) => e.clientId === client.id && e.kind === 'deposit' && !e.voided)
+              .map((e) => e.occurredOn)
+              .sort()
+              .at(-1) ?? null,
+        }))
+        .filter((wallet) => q.get('low') !== 'true' || wallet.low)
+        .sort((a, b) => a.balanceMinor - b.balanceMinor);
+      return json(route, { items, total: items.length, page: 1, pageSize: 25 });
+    }
+
+    const walletMatch = path.match(/^\/api\/clients\/([^/]+)\/ad-wallet(\/entries)?$/);
+    if (walletMatch) {
+      const clientId = walletMatch[1] ?? '';
+      if (!clients.some((c) => c.id === clientId) || !readable(clientId)) {
+        return fail(route, 404, null);
+      }
+      if (!walletMatch[2] && method === 'GET') return json(route, walletOf(clientId));
+      if (!walletMatch[2] && method === 'PATCH') {
+        if (!covers('campaigns.manage', clientId)) return fail(route, 403, null);
+        const body = request.postDataJSON() as UpdateWalletThreshold;
+        thresholds.set(clientId, body.lowBalanceThresholdMinor);
+        return json(route, walletOf(clientId));
+      }
+      if (walletMatch[2] && method === 'POST') {
+        if (scopes('campaigns.fund').length === 0) return fail(route, 403, null);
+        const body = request.postDataJSON() as RecordWalletEntry;
+        const rate = body.sypPerUsd ?? '118.5000';
+        const usdMinor = toUsdMinor(body.amountMinor, body.currency, rate);
+        if (body.kind === 'refund' && usdMinor > balanceOf(clientId)) {
+          return fail(route, 409, 'REFUND_EXCEEDS_BALANCE');
+        }
+        const year = Number(today().slice(0, 4));
+        const numbered = entries.filter((e) => e.year === year).length;
+        entries.push({
+          id: id(nextId++),
+          clientId,
+          kind: body.kind,
+          occurredOn: body.occurredOn,
+          amountMinor: body.amountMinor,
+          currency: body.currency,
+          sypPerUsd: rate,
+          usdMinor,
+          method: body.method,
+          reference: body.reference,
+          note: body.note,
+          receiptPdf: body.kind === 'deposit' ? { state: 'ready' } : null,
+          year: body.kind === 'deposit' ? year : null,
+          number: body.kind === 'deposit' ? numbered + 1 : null,
+          recordedById: me().user.id,
+          createdAt: now(),
+          voided: null,
+        });
+        return json(route, walletOf(clientId), 201);
+      }
+    }
+
+    const entryMatch = path.match(/^\/api\/ad-wallet-entries\/([^/]+)\/(void|receipt)$/);
+    if (entryMatch) {
+      const e = entries.find((x) => x.id === entryMatch[1]);
+      if (!e || !readable(e.clientId)) return fail(route, 404, null);
+      if (entryMatch[2] === 'void') {
+        if (scopes('campaigns.fund').length === 0) return fail(route, 403, null);
+        if (e.voided) return fail(route, 409, 'INVALID_TRANSITION');
+        const { reason } = request.postDataJSON() as VoidWalletEntry;
+        e.voided = { at: now(), byId: me().user.id, reason };
+        return json(route, walletOf(e.clientId));
+      }
+      if (method === 'GET') {
+        return route.fulfill({ status: 200, contentType: 'application/pdf', body: MOCK_PDF });
+      }
+      return json(route, { state: 'pending' });
+    }
+    return undefined;
+  };
+}
+
 export const seedIds = {
   sara: id(1),
   omar: id(2),
@@ -10789,6 +11599,10 @@ export const seedIds = {
   pendingQuote: id(9202),
   shifaDraft: id(9203),
   expiredQuote: id(9204),
+  // Ad campaigns (F12).
+  autumnCampaign: id(9601),
+  menuCampaign: id(9602),
+  clinicCampaign: id(9603),
   // Invoices (F13).
   designDraft: id(9401),
   octoberDraft: id(9402),

@@ -62,7 +62,7 @@ export function RateHint({ settings }: { settings: InvoiceSettings | undefined }
   );
 }
 
-function StaleRate({ settings }: { settings: InvoiceSettings | undefined }) {
+export function StaleRate({ settings }: { settings: InvoiceSettings | undefined }) {
   const { t } = useTranslation();
   if (!settings?.rateStale) return null;
   return (
@@ -461,7 +461,7 @@ export function PaymentDialog({
 }
 
 /** A dialog asking for a reason (≤ 500 characters) before an action. */
-function ReasonDialog({
+export function ReasonDialog({
   open,
   onClose,
   title,

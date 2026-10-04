@@ -49,6 +49,7 @@ import {
   FolderKanbanIcon,
   FolderOpenIcon,
   ListTodoIcon,
+  MegaphoneIcon,
   MessagesSquareIcon,
   PaletteIcon,
   PencilIcon,
@@ -71,6 +72,7 @@ import { can, canAll, useMe } from '../../lib/auth';
 import { errorMessage } from '../../lib/errors';
 import { formatNumber } from '../../lib/format';
 import { ClientApprovalsTab } from '../approvals/client-approvals-tab';
+import { ClientAdsTab, hasCampaignAccess } from '../campaigns/client-ads-tab';
 import { ClientContentTab } from '../content/client-content-tab';
 import { ClientFilesTab } from '../files/client-files-tab';
 import { type FileLibrarySearch, parseFileLibrarySearch } from '../files/library-search';
@@ -105,6 +107,7 @@ const CLIENT_TABS = [
   'retainers',
   'quotes',
   'invoices',
+  'ads',
   'tasks',
   'content',
   'files',
@@ -180,6 +183,15 @@ function Profile({
   const quoteReader = can(me, 'quotes.read');
   // Invoices, balances and statements need `invoices.read` covering the client (F13 screen 5).
   const invoiceReader = hasMoneyAccess(me, client.accountManager.id);
+  // The ad wallet and campaigns need `campaigns.read` covering the client (F12 screen 4).
+  const adsReader = hasCampaignAccess(me, client.accountManager.id);
+  // A link to a tab the user cannot see (an `ad_budget_low` for a campaign owner without
+  // `campaigns.read`) opens the first tab instead of an empty one.
+  const hidden =
+    (tab === 'quotes' && !quoteReader) ||
+    (tab === 'invoices' && !invoiceReader) ||
+    (tab === 'ads' && !adsReader);
+  const shownTab: ClientTab = hidden ? 'contacts' : tab;
   const archived = client.archivedAt !== null;
   // Archived clients are read-only (rule 7); the API refuses every change but restore.
   const editable = client.canManage && !archived;
@@ -230,7 +242,7 @@ function Profile({
 
       <EndedClientWorkCallout client={client} />
 
-      <Tabs value={tab} onValueChange={(value: ClientTab) => openTab(value)}>
+      <Tabs value={shownTab} onValueChange={(value: ClientTab) => openTab(value)}>
         <TabsList aria-label={t('clients.title')}>
           <TabsTrigger value="contacts">
             <UsersRoundIcon />
@@ -255,6 +267,12 @@ function Profile({
             <TabsTrigger value="invoices">
               <ReceiptTextIcon />
               {t('clients.profile.tabs.invoices')}
+            </TabsTrigger>
+          )}
+          {adsReader && (
+            <TabsTrigger value="ads">
+              <MegaphoneIcon />
+              {t('clients.profile.tabs.ads')}
             </TabsTrigger>
           )}
           <TabsTrigger value="tasks">
@@ -309,6 +327,11 @@ function Profile({
         {invoiceReader && (
           <TabsContent value="invoices">
             <ClientInvoicesTab client={client} />
+          </TabsContent>
+        )}
+        {adsReader && (
+          <TabsContent value="ads">
+            <ClientAdsTab client={client} />
           </TabsContent>
         )}
         <TabsContent value="tasks">
