@@ -11,4 +11,5 @@ export {
 export type { ConversionResult } from './lead-conversion.service.js';
 export { LeadDirectory, type LeadSummary } from './lead-directory.js';
 export { LeadPipeline } from './lead-pipeline.js';
+export { LeadReports } from './lead-reports.js';
 export { LeadsModule } from './leads.module.js';

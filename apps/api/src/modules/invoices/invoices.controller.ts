@@ -42,6 +42,8 @@ import {
   issueInvoiceSchema,
   type QuotePdfRender,
   quotePdfRenderSchema,
+  type UpdateInvoiceServices,
+  updateInvoiceServicesSchema,
   type VoidInvoice,
   voidInvoiceSchema,
 } from '@vertex-hub/contracts';
@@ -165,6 +167,22 @@ export class InvoicesController {
     @Body({ schema: voidInvoiceSchema }) input: VoidInvoice,
   ): Promise<InvoiceDetail> {
     return this.workflow.void(actor, id, input);
+  }
+
+  @Put(':id/services')
+  @RequirePermissions('invoices.manage')
+  @SerializeOptions({ schema: invoiceDetailSchema })
+  @ApiOkResponse({
+    description: 'The invoice with the services of its lines (F15 rule 22)',
+    standardSchema: invoiceDetailSchema,
+  })
+  @ApiNotFoundResponse({ description: 'No such invoice in your scope' })
+  updateServices(
+    @CurrentUser() actor: CurrentUserInfo,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body({ schema: updateInvoiceServicesSchema }) input: UpdateInvoiceServices,
+  ): Promise<InvoiceDetail> {
+    return this.workflow.updateServices(actor, id, input);
   }
 
   @Post(':id/archive')

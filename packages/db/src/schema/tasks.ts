@@ -108,6 +108,7 @@ export const tasks = pgTable(
     index('tasks_assignee_id_idx').on(table.assigneeId, table.status, table.dueDate),
     index('tasks_status_idx').on(table.status),
     index('tasks_due_date_idx').on(table.dueDate),
+    index('tasks_delivered_at_idx').on(table.deliveredAt),
     index('tasks_client_id_idx').on(table.clientId),
     index('tasks_project_id_idx').on(table.projectId),
     index('tasks_milestone_id_idx').on(table.milestoneId),

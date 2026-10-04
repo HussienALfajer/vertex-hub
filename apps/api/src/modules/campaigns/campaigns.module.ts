@@ -12,6 +12,7 @@ import { AdWalletBalances } from './ad-wallet-balances.js';
 import { AdWalletEntryFileOwner } from './ad-wallet-entry-file-owner.js';
 import { AdWalletsController } from './ad-wallets.controller.js';
 import { AdWalletsService } from './ad-wallets.service.js';
+import { CampaignReports } from './campaign-reports.js';
 import { CampaignUpdatesService } from './campaign-updates.service.js';
 import { CampaignsController } from './campaigns.controller.js';
 import { CampaignsService } from './campaigns.service.js';
@@ -26,8 +27,8 @@ import { CampaignsService } from './campaigns.service.js';
  * rate from `invoices`' `DocumentNumbers`, the company details printed on deposit receipts from
  * `quotes`' `QuoteDirectory`, and keeps entry proofs and receipts as documents of the entry
  * (`files`' `GeneratedFiles`, owner type `ad_wallet_entry`). Receipts are rendered by the worker
- * (`campaigns.pdf`) and attached by `AdReceiptsService` (`campaigns.pdf-ready`). No module
- * imports it.
+ * (`campaigns.pdf`) and attached by `AdReceiptsService` (`campaigns.pdf-ready`). Exports
+ * `CampaignReports` for `reports`, its only importer.
  */
 @Module({
   imports: [
@@ -48,6 +49,8 @@ import { CampaignsService } from './campaigns.service.js';
     AdWalletsService,
     AdReceiptsService,
     AdWalletEntryFileOwner,
+    CampaignReports,
   ],
+  exports: [CampaignReports],
 })
 export class CampaignsModule {}

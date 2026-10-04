@@ -21,7 +21,7 @@ Run from the repository root. Use only the checks the request asks for; with no 
 | Tests | `pnpm turbo run test --output-logs=errors-only` | `pnpm --filter @vertex-hub/<name> exec vitest run [file] --reporter=dot` |
 | Build | `pnpm turbo run build --output-logs=errors-only` | `pnpm --filter @vertex-hub/<name> build` |
 | E2E | `pnpm test:e2e` | — |
-| Migration drift | `pnpm db:generate`, then `git status --porcelain -- packages/db/migrations` (must print nothing) | — |
+| Migration drift | `git status --porcelain -- packages/db/migrations` before and after `pnpm db:generate`: the two must match (a migration the branch has not committed yet is not drift; a file `db:generate` writes is), and `db:generate` reports nothing to migrate | — |
 
 Package names: `api`, `worker`, `web`, `contracts`, `db`, `ui`, `config`.
 

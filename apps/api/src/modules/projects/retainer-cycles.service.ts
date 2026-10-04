@@ -529,6 +529,25 @@ export class RetainerCyclesService implements OnModuleInit {
     return cycle ?? null;
   }
 
+  /** The open cycles of active retainers as their pages show them on `today` (F15 dashboards). */
+  async openOf(
+    retainerIds: readonly string[],
+    today: CalendarDate = businessDate(),
+  ): Promise<Cycle[]> {
+    if (retainerIds.length === 0) return [];
+    const rows = await this.db
+      .select(cycleColumns)
+      .from(retainerCycles)
+      .where(
+        and(
+          inArray(retainerCycles.retainerId, [...retainerIds]),
+          eq(retainerCycles.status, 'open'),
+        ),
+      );
+    const active = new Map(retainerIds.map((id): [string, RetainerStatus] => [id, 'active']));
+    return this.present(rows, active, this.db, today);
+  }
+
   /** Cycles as the API returns them, with the counter (R7, R8, R11, R13). */
   private async present(
     cycles: CycleRow[],

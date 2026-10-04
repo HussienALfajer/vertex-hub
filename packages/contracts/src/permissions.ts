@@ -160,6 +160,7 @@ export const DEPARTMENT_CAPABILITIES: Readonly<
       'payments.manage': 'all',
       'expenses.manage': 'all',
       'reports.read': 'all',
+      'reports.finance': 'all',
     },
   },
   content_management: {

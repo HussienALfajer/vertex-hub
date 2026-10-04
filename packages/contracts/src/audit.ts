@@ -165,6 +165,7 @@ export const AUDIT_ACTIONS = [
   'invoice.due_date_changed',
   'invoice.voided',
   'invoice.overdue',
+  'invoice.services_changed',
   'payment.recorded',
   'payment.voided',
   'project_expense.created',

@@ -177,6 +177,7 @@ export const ERROR_CODES = [
   'LEAD_ARCHIVED',
   'LEAD_HAS_SENT_QUOTE',
   'LEAD_HAS_QUOTES',
+  'INVALID_SERVICE',
 ] as const;
 
 export const errorCodeSchema = z.enum(ERROR_CODES).meta({ id: 'ErrorCode' });

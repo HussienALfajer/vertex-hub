@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/index.js';
+import { CatalogModule } from '../catalog/index.js';
 import { ClientsModule } from '../clients/index.js';
 import { FilesModule } from '../files/index.js';
 import { NotificationsModule } from '../notifications/index.js';
@@ -13,6 +14,7 @@ import { InvoiceDueDates } from './invoice-due-dates.js';
 import { InvoiceFileOwner } from './invoice-file-owner.js';
 import { InvoiceOverdueService } from './invoice-overdue.service.js';
 import { InvoicePdfService } from './invoice-pdf.service.js';
+import { InvoiceReports } from './invoice-reports.js';
 import { InvoiceSettingsController } from './invoice-settings.controller.js';
 import { InvoiceSettingsService } from './invoice-settings.service.js';
 import { InvoiceSnapshots } from './invoice-snapshots.js';
@@ -36,11 +38,13 @@ import { ProjectExpensesService } from './project-expenses.service.js';
  * `notifications.daily`. Owns `project_expenses` and serves client balances and statements, and the
  * billing summaries of projects (with their margin) and retainers; exports `InvoiceDueDates` for
  * the company calendar, and `DocumentNumbers` (ad deposit receipt numbers and the current rate)
- * for `campaigns` (F12).
+ * for `campaigns` (F12), and `InvoiceReports` for `reports` (F15). Invoice lines may name a catalog
+ * service, checked through `catalog`'s `CatalogDirectory` (F15).
  */
 @Module({
   imports: [
     AuthModule,
+    CatalogModule,
     ClientsModule,
     FilesModule,
     NotificationsModule,
@@ -67,7 +71,8 @@ import { ProjectExpensesService } from './project-expenses.service.js';
     InvoiceBillingService,
     ProjectExpensesService,
     DocumentNumbers,
+    InvoiceReports,
   ],
-  exports: [InvoiceDueDates, DocumentNumbers],
+  exports: [InvoiceDueDates, DocumentNumbers, InvoiceReports],
 })
 export class InvoicesModule {}

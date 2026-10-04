@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import {
   addDays,
   businessDate,
@@ -8,6 +8,7 @@ import {
   type IssueInvoice,
   invoiceDisplayNumber,
   invoiceStatus,
+  type UpdateInvoiceServices,
   type VoidInvoice,
 } from '@vertex-hub/contracts';
 import { type Database, invoiceLines, invoices } from '@vertex-hub/db';
@@ -26,7 +27,7 @@ import { type InvoiceRow, InvoicesService, identity, NO_DRAFT_PDF } from './invo
 
 const OPEN = ['sent', 'partially_paid', 'overdue'];
 
-/** Issued invoices (F13): issue, change the due date, void. */
+/** Issued invoices (F13): issue, change the due date, void; line services (F15). */
 @Injectable()
 export class InvoiceWorkflowService {
   constructor(
@@ -208,6 +209,65 @@ export class InvoiceWorkflowService {
         actorOf(actor),
       );
       return this.invoices.toDetail(actor, voided, client, tx);
+    });
+  }
+
+  /**
+   * F15 rule 22: sets or clears the services of an issued, non-void invoice's lines. Nothing it
+   * prints changes, so the PDF stays; a void invoice is `INVALID_TRANSITION`.
+   */
+  async updateServices(
+    actor: CurrentUserInfo,
+    id: string,
+    input: UpdateInvoiceServices,
+  ): Promise<InvoiceDetail> {
+    return this.db.transaction(async (tx) => {
+      const { invoice, client } = await this.invoices.lockForChange(tx, actor, id);
+      if (invoice.archivedAt || invoice.status === 'draft' || invoice.status === 'void') {
+        throw new CodedException(409, 'INVALID_TRANSITION', 'Only an issued, non-void invoice');
+      }
+      const lines = await this.invoices.lines(tx, id);
+      const byId = new Map(lines.map((line) => [line.id, line]));
+      const wanted = new Map(input.lines.map((line) => [line.lineId, line.serviceId]));
+      for (const lineId of wanted.keys()) {
+        if (!byId.has(lineId)) throw new BadRequestException(`Unknown line ${lineId}`);
+      }
+      const changed = [...wanted].filter(
+        ([lineId, serviceId]) => byId.get(lineId)?.serviceId !== serviceId,
+      );
+      await this.invoices.assertServices(
+        tx,
+        changed.map(([, serviceId]) => serviceId),
+        [],
+      );
+      if (changed.length === 0) return this.invoices.toDetail(actor, invoice, client, tx);
+      for (const [lineId, serviceId] of changed) {
+        await tx.update(invoiceLines).set({ serviceId }).where(eq(invoiceLines.id, lineId));
+      }
+      const [updated] = await tx
+        .update(invoices)
+        .set({ updatedAt: new Date() })
+        .where(eq(invoices.id, id))
+        .returning();
+      if (!updated) throw new Error('The invoice was not updated');
+      await recordAudit(tx, {
+        actor: actorOf(actor),
+        action: 'invoice.services_changed',
+        entityType: 'invoice',
+        entityId: id,
+        before: {
+          ...identity(invoice),
+          lines: changed.map(([lineId]) => ({
+            lineId,
+            serviceId: byId.get(lineId)?.serviceId ?? null,
+          })),
+        },
+        after: {
+          ...identity(updated),
+          lines: changed.map(([lineId, serviceId]) => ({ lineId, serviceId })),
+        },
+      });
+      return this.invoices.toDetail(actor, updated, client, tx);
     });
   }
 

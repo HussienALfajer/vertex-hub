@@ -7,6 +7,7 @@ import { NotificationsModule } from '../notifications/index.js';
 import { TasksModule } from '../tasks/index.js';
 import { ApprovalNotices } from './approval-notices.js';
 import { ApprovalReminders } from './approval-reminders.js';
+import { ApprovalReports } from './approval-reports.js';
 import { ApprovalsController } from './approvals.controller.js';
 import { ApprovalsService } from './approvals.service.js';
 import { ClientApprovalsController } from './client-approvals.controller.js';
@@ -20,7 +21,7 @@ import { PublicApprovalsService } from './public-approvals.service.js';
  * through `content`'s `PostApprovals` and `PostReviewHooks`; reads snapshot versions and serves them
  * to the holder of a link through `files`' `FileVersions`; reads clients and contacts through
  * `ClientDirectory` and users through `UserDirectory`; notifies through `notifications`. Works
- * the `approvals.reminders` job. Nothing imports it.
+ * the `approvals.reminders` job. Exports `ApprovalReports` for `reports`, its only importer.
  */
 @Module({
   imports: [
@@ -32,6 +33,13 @@ import { PublicApprovalsService } from './public-approvals.service.js';
     ContentModule,
   ],
   controllers: [ApprovalsController, ClientApprovalsController, PublicApprovalsController],
-  providers: [ApprovalsService, PublicApprovalsService, ApprovalReminders, ApprovalNotices],
+  providers: [
+    ApprovalsService,
+    PublicApprovalsService,
+    ApprovalReminders,
+    ApprovalNotices,
+    ApprovalReports,
+  ],
+  exports: [ApprovalReports],
 })
 export class ApprovalsModule {}

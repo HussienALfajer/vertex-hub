@@ -21,6 +21,7 @@ import { TaskNotices } from './task-notices.js';
 import { TaskPartsController } from './task-parts.controller.js';
 import { TaskPartsService } from './task-parts.service.js';
 import { TaskReminders } from './task-reminders.js';
+import { TaskReports } from './task-reports.js';
 import { TaskReviewsController } from './task-reviews.controller.js';
 import { TaskReviews } from './task-reviews.js';
 import { TaskReviewsService } from './task-reviews.service.js';
@@ -44,7 +45,7 @@ import { TasksService } from './tasks.service.js';
  * link of a task to a post (F08, ADR 0021): exports `PostTasks` and the `PostTaskHooks` registry
  * for the `content` module, which it never imports either. Exports `ShootTasks` and the
  * `TaskGuards` registry for the `calendar` module (F11, ADR 0022), which it never imports, and
- * `TaskLinks` (task summaries) for the `campaigns` module (F12).
+ * `TaskLinks` (task summaries) for the `campaigns` module (F12), and `TaskReports` for `reports` (F15).
  */
 @Module({
   imports: [AuthModule, ClientsModule, ProjectsModule, NotificationsModule, FilesModule],
@@ -77,6 +78,7 @@ import { TasksService } from './tasks.service.js';
     ShootTasks,
     TaskGuards,
     TaskLinks,
+    TaskReports,
   ],
   exports: [
     TaskGenerator,
@@ -87,6 +89,7 @@ import { TasksService } from './tasks.service.js';
     ShootTasks,
     TaskGuards,
     TaskLinks,
+    TaskReports,
   ],
 })
 export class TasksModule {}

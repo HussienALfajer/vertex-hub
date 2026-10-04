@@ -9,6 +9,7 @@ import { CycleOpenedHooks } from './cycle-opened-hooks.js';
 import { EngagementDirectory } from './engagement-directory.js';
 import { EngagementFactory } from './engagement-factory.js';
 import { EngagementFileOwners } from './engagement-file-owners.js';
+import { EngagementReports } from './engagement-reports.js';
 import { ExtraWorkController } from './extra-work.controller.js';
 import { ExtraWorkService } from './extra-work.service.js';
 import { MilestoneDoneHooks } from './milestone-done-hooks.js';
@@ -33,7 +34,8 @@ import { WorkProgress } from './work-progress.js';
  * the `tasks` and `templates` modules, `CycleOpenedHooks` for `templates` (F07 rule 16) and
  * `EngagementFactory` for `quotes` (F04 A01), and `BillingSources`, `BillingLocks`,
  * `MilestoneDoneHooks` and `CycleOpenedHooks` for `invoices` (F13).
- * Registers the `project` and `retainer` owner policies in `files` (F10).
+ * Registers the `project` and `retainer` owner policies in `files` (F10). Exports
+ * `EngagementReports` for `reports` (F15).
  */
 @Module({
   imports: [AuthModule, ClientsModule, NotificationsModule, FilesModule],
@@ -60,6 +62,7 @@ import { WorkProgress } from './work-progress.js';
     RetainerRenewals,
     RetainerBehindAlerts,
     EngagementFileOwners,
+    EngagementReports,
   ],
   exports: [
     WorkProgress,
@@ -69,6 +72,7 @@ import { WorkProgress } from './work-progress.js';
     BillingLocks,
     CycleOpenedHooks,
     MilestoneDoneHooks,
+    EngagementReports,
   ],
 })
 export class ProjectsModule {}

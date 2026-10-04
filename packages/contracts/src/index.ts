@@ -23,6 +23,7 @@ export * from './permissions.js';
 export * from './post-values.js';
 export * from './projects.js';
 export * from './quotes.js';
+export * from './reports.js';
 export * from './retainers.js';
 export * from './roles.js';
 export * from './tasks.js';

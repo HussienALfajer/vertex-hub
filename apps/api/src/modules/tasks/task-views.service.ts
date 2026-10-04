@@ -20,6 +20,7 @@ import { DATABASE } from '../../core/database/database.module.js';
 import { type CurrentUserInfo, UserDirectory } from '../auth/index.js';
 import { accessColumns } from './task-access.js';
 import { blockedSql } from './task-dependencies.js';
+import { TaskReports } from './task-reports.js';
 import { openSql, overdueSql } from './task-sql.js';
 import { TasksService } from './tasks.service.js';
 
@@ -39,6 +40,7 @@ export class TaskViewsService {
     @Inject(DATABASE) private readonly db: Database,
     private readonly users: UserDirectory,
     private readonly tasks: TasksService,
+    private readonly reports: TaskReports,
   ) {}
 
   /** Columns by status; `delivered` holds the last 14 days, `cancelled` is not shown. */
@@ -96,19 +98,8 @@ export class TaskViewsService {
     const now = new Date();
     const people = await this.users.activeMembers(departments);
     const ids = people.map((person) => person.id);
-    const [counts, unassigned] = await Promise.all([
-      ids.length === 0
-        ? []
-        : this.db
-            .select({
-              assigneeId: tasks.assigneeId,
-              open: count(),
-              overdue: countWhere(overdueSql(now)),
-              dueThisWeek: countWhere(sql`${tasks.dueDate} between ${week.from} and ${week.to}`),
-            })
-            .from(tasks)
-            .where(and(this.tasks.visibleSql(), openSql, inArray(tasks.assigneeId, ids)))
-            .groupBy(tasks.assigneeId),
+    const [byPerson, unassigned] = await Promise.all([
+      this.reports.personCounts(ids, week, now),
       this.db
         .select({ department: tasks.department, count: count() })
         .from(tasks)
@@ -122,7 +113,6 @@ export class TaskViewsService {
         )
         .groupBy(tasks.department),
     ]);
-    const byPerson = new Map(counts.map((row) => [row.assigneeId, row]));
     const byDepartment = new Map(unassigned.map((row) => [row.department, row.count]));
     return {
       week,

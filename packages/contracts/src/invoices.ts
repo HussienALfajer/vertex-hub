@@ -176,6 +176,8 @@ const invoiceLineInputSchema = z.object({
   quantity: z.number().int().min(1).max(INVOICE_LIMITS.quantity),
   unitPriceMinor: minorAmountSchema,
   source: invoiceSourceSchema.nullable().default(null),
+  /** The catalog service the line bills, for revenue by service (F15 rule 21); never printed. */
+  serviceId: z.uuid().nullable().default(null),
 });
 
 export type InvoiceLineInput = z.infer<typeof invoiceLineInputSchema>;
@@ -218,6 +220,21 @@ export type IssueInvoice = z.infer<typeof issueInvoiceSchema>;
 export type IssueInvoiceInput = z.input<typeof issueInvoiceSchema>;
 
 const reasonSchema = z.string().trim().min(1).max(500);
+
+/**
+ * F15 rule 22: set or clear the services of an issued, non-void invoice's lines. Lines left out
+ * keep theirs; an archived service cannot be newly chosen (`INVALID_SERVICE`).
+ */
+export const updateInvoiceServicesSchema = z
+  .object({
+    lines: z
+      .array(z.object({ lineId: z.uuid(), serviceId: z.uuid().nullable() }))
+      .min(1)
+      .max(INVOICE_LIMITS.lines),
+  })
+  .meta({ id: 'UpdateInvoiceServices' });
+
+export type UpdateInvoiceServices = z.infer<typeof updateInvoiceServicesSchema>;
 
 /** Rule 13: a date ≥ today (`INVALID_DATES`). */
 export const changeInvoiceDueDateSchema = z
@@ -358,6 +375,8 @@ export const invoiceLineSchema = z
         retainer: namedSchema.nullable(),
       })
       .nullable(),
+    /** The catalog service set on the line (F15), archived ones included. */
+    service: namedSchema.extend({ archived: z.boolean() }).nullable(),
   })
   .meta({ id: 'InvoiceLine' });
 
@@ -407,6 +426,8 @@ export const invoicePermissionsSchema = z
     canVoidPayments: z.boolean(),
     /** A draft: "Preview PDF" (managers); an issued invoice whose PDF is not ready: "Render again". */
     canRenderPdf: z.boolean(),
+    /** `invoices.manage` on an issued, non-void invoice: the "Services" dialog (F15 rule 22). */
+    canEditServices: z.boolean(),
   })
   .meta({ id: 'InvoicePermissions', description: 'What the caller may do, for the UI' });
 

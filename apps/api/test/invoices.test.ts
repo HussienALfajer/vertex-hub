@@ -4,6 +4,7 @@ import {
   addDays,
   billableItemsSchema,
   businessDate,
+  catalogServiceSchema,
   clientDetailResponseSchema,
   type InvoiceDetail,
   type InvoiceDraftInput,
@@ -16,6 +17,7 @@ import {
 } from '@vertex-hub/contracts';
 import {
   auditEntries,
+  catalogServices,
   createDatabase,
   extraWorkItems,
   invoiceSettings,
@@ -27,7 +29,7 @@ import { testDatabaseUrl } from '@vertex-hub/db/testing';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { expectError, seedClientCast } from './client-cast.js';
-import { api } from './helpers.js';
+import { api, removeCatalog } from './helpers.js';
 import { startApp } from './start-app.js';
 
 describe('invoices', () => {
@@ -43,6 +45,7 @@ describe('invoices', () => {
   let project: ProjectDetail;
   let retainer: RetainerDetail;
   let extraWorkId: string;
+  const serviceIds: string[] = [];
   const today = businessDate();
   const year = Number(today.slice(0, 4));
 
@@ -149,6 +152,7 @@ describe('invoices', () => {
     if (savedSettings) await db.update(invoiceSettings).set(savedSettings);
     await db.delete(auditEntries).where(eq(auditEntries.entityType, 'invoice_settings'));
     await cast?.cleanup();
+    await removeCatalog(db, serviceIds, []);
     await connection.close();
   });
 
@@ -719,6 +723,131 @@ describe('invoices', () => {
         'CLIENT_ARCHIVED',
       );
       await expectError(await issue(draft), 409, 'CLIENT_ARCHIVED');
+    });
+  });
+
+  describe('line services (F15 rules 21–22)', () => {
+    async function service(archived = false) {
+      const response = await client.post('/api/catalog/services', cast.gm.cookie, {
+        name: `خدمة ${randomUUID().slice(0, 8)}`,
+        department: 'design',
+        billing: 'one_off',
+        priceUsdMinor: 1000,
+      });
+      expect(response.status).toBe(201);
+      const created = catalogServiceSchema.parse(await response.json());
+      serviceIds.push(created.id);
+      if (archived) {
+        await db
+          .update(catalogServices)
+          .set({ archivedAt: new Date() })
+          .where(eq(catalogServices.id, created.id));
+      }
+      return created;
+    }
+
+    const setServices = (invoice: InvoiceDetail, lines: unknown, cookie = finance.cookie) =>
+      put(`/api/invoices/${invoice.id}/services`, cookie, { lines });
+
+    it('keeps a service per draft line and refuses an archived one', async () => {
+      const logo = await service();
+      const old = await service(true);
+      const draft = await ok(await create({ projectId: project.id }), 201);
+      const line = { description: 'شعار', quantity: 1, unitPriceMinor: 1000 };
+      const saved = await ok(
+        await put(
+          `/api/invoices/${draft.id}`,
+          finance.cookie,
+          draftOf(draft, { lines: [{ ...line, serviceId: logo.id }, line] }),
+        ),
+      );
+      expect(saved.lines.map((row) => row.service)).toEqual([
+        { id: logo.id, name: logo.name, archived: false },
+        null,
+      ]);
+      expect(saved.permissions.canEditServices).toBe(false);
+      await expectError(
+        await put(
+          `/api/invoices/${draft.id}`,
+          finance.cookie,
+          draftOf(saved, { lines: [{ ...line, serviceId: old.id }] }),
+        ),
+        409,
+        'INVALID_SERVICE',
+      );
+      await expectError(
+        await put(
+          `/api/invoices/${draft.id}`,
+          finance.cookie,
+          draftOf(saved, { lines: [{ ...line, serviceId: randomUUID() }] }),
+        ),
+        409,
+        'INVALID_SERVICE',
+      );
+    });
+
+    it('lets invoice managers set and clear services on an issued invoice, audited', async () => {
+      const logo = await service();
+      const issued = await ok(await issue(await freeDraft(20000)));
+      expect(issued.permissions.canEditServices).toBe(true);
+      const [line] = issued.lines;
+      if (!line) throw new Error('No line');
+      const [before] = await db.select().from(invoices).where(eq(invoices.id, issued.id));
+      const changed = await ok(
+        await setServices(issued, [{ lineId: line.id, serviceId: logo.id }]),
+      );
+      expect(changed.lines[0]?.service).toEqual({ id: logo.id, name: logo.name, archived: false });
+      expect(changed).toMatchObject({ status: 'sent', totalMinor: issued.totalMinor });
+      const [after] = await db.select().from(invoices).where(eq(invoices.id, issued.id));
+      expect(after?.snapshot).toEqual(before?.snapshot);
+      expect(after?.pdfStatus).toBe(before?.pdfStatus);
+      const entries = await auditOf(issued.id);
+      expect(entries.at(-1)).toMatchObject({
+        action: 'invoice.services_changed',
+        actorId: finance.id,
+        before: { lines: [{ lineId: line.id, serviceId: null }] },
+        after: { lines: [{ lineId: line.id, serviceId: logo.id }] },
+      });
+
+      // A service archived later stays; it cannot be chosen anew.
+      await db
+        .update(catalogServices)
+        .set({ archivedAt: new Date() })
+        .where(eq(catalogServices.id, logo.id));
+      const kept = await ok(await setServices(changed, [{ lineId: line.id, serviceId: logo.id }]));
+      expect(kept.lines[0]?.service?.archived).toBe(true);
+      const other = await ok(await issue(await freeDraft(10000)));
+      await expectError(
+        await setServices(other, [{ lineId: other.lines[0]?.id, serviceId: logo.id }]),
+        409,
+        'INVALID_SERVICE',
+      );
+      const cleared = await ok(await setServices(kept, [{ lineId: line.id, serviceId: null }]));
+      expect(cleared.lines[0]?.service).toBeNull();
+    });
+
+    it('refuses drafts, void invoices, unknown lines and other roles', async () => {
+      const draft = await freeDraft();
+      await expectError(
+        await setServices(draft, [{ lineId: draft.lines[0]?.id, serviceId: null }]),
+        409,
+        'INVALID_TRANSITION',
+      );
+      const issued = await ok(await issue(await freeDraft()));
+      const lines = [{ lineId: issued.lines[0]?.id, serviceId: null }];
+      expect((await setServices(issued, [{ lineId: randomUUID(), serviceId: null }])).status).toBe(
+        400,
+      );
+      expect((await put(`/api/invoices/${issued.id}/services`, undefined, { lines })).status).toBe(
+        401,
+      );
+      expect((await setServices(issued, lines, cast.am.cookie)).status).toBe(403);
+      expect((await setServices(issued, lines, cast.employee.cookie)).status).toBe(403);
+      const voided = await ok(
+        await client.post(`/api/invoices/${issued.id}/void`, finance.cookie, { reason: 'خطأ' }),
+      );
+      expect(voided.permissions.canEditServices).toBe(false);
+      await expectError(await setServices(voided, lines), 409, 'INVALID_TRANSITION');
     });
   });
 });

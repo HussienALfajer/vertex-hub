@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import type { ClientStatus } from '@vertex-hub/contracts';
 import { clientContacts, clients, type Database, type Transaction } from '@vertex-hub/db';
-import { and, eq, getTableName, inArray, isNull, or, type SQL, sql } from 'drizzle-orm';
+import { and, asc, eq, getTableName, inArray, isNull, or, type SQL, sql } from 'drizzle-orm';
 import type { PgColumn } from 'drizzle-orm/pg-core';
 import { DATABASE } from '../../core/database/database.module.js';
 
@@ -64,6 +64,16 @@ export class ClientDirectory {
       .from(clients)
       .where(inArray(clients.id, unique));
     return new Map(rows.map((row) => [row.id, toSummary(row)]));
+  }
+
+  /** The non-archived clients `userId` is primary account manager of, by name (F15 My clients). */
+  async managed(userId: string): Promise<ClientSummary[]> {
+    const rows = await this.db
+      .select(summaryColumns)
+      .from(clients)
+      .where(and(eq(clients.accountManagerId, userId), isNull(clients.archivedAt)))
+      .orderBy(asc(sql`lower(${clients.tradeName})`));
+    return rows.map(toSummary);
   }
 
   /** What invoices, receipts and statements print for the client (F13): billing name and address. */
