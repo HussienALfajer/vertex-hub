@@ -1,4 +1,4 @@
-import { calendarDateSchema } from '@vertex-hub/contracts';
+import { calendarDateSchema, reportMonthSchema } from '@vertex-hub/contracts';
 
 /*
  * Readers for URL search params. Each returns the value when it is well formed, else undefined,
@@ -22,6 +22,10 @@ export const idParam = (value: unknown): string | undefined =>
 /** A calendar day, `YYYY-MM-DD`. */
 export const dayParam = (value: unknown): string | undefined =>
   calendarDateSchema.safeParse(value).success ? (value as string) : undefined;
+
+/** A calendar month, `YYYY-MM`. */
+export const monthParam = (value: unknown): string | undefined =>
+  reportMonthSchema.safeParse(value).success ? (value as string) : undefined;
 
 /** An on-only flag: `true` (the router parses it) or the text "true". */
 export const flagParam = (value: unknown): true | undefined =>

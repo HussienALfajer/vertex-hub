@@ -16,6 +16,7 @@ import type {
   IssueInvoice,
   ProjectBilling,
   RecordPayment,
+  UpdateInvoiceServices,
   UpdateInvoiceSettings,
   UpdateProjectExpense,
   VoidInvoice,
@@ -27,6 +28,7 @@ import { calendarKeys } from '../calendar/calendar.queries';
 import { clientsKeys } from '../clients/clients.queries';
 import { filesKeys } from '../files/files.queries';
 import { projectsKeys } from '../projects/projects.queries';
+import { reportsKeys } from '../reports/reports.queries';
 import { retainersKeys } from '../retainers/retainers.queries';
 
 /** The list endpoint's query string as the API reads it. */
@@ -121,7 +123,7 @@ export const receiptPdfUrl = (paymentId: string) => `/api/payments/${paymentId}/
 /**
  * The changed invoice and every invoice list. Issuing, voiding and payments also change what
  * other screens show: extra work billing (rules 11 and 14), the engagements' billing, the client's
- * documents (PDFs, receipts, proofs) and the calendar's due dates.
+ * documents (PDFs, receipts, proofs), the calendar's due dates and the reports.
  */
 function useSaveInvoice({ wide }: { wide: boolean }) {
   const queryClient = useQueryClient();
@@ -135,6 +137,7 @@ function useSaveInvoice({ wide }: { wide: boolean }) {
         clientsKeys.all,
         filesKeys.all,
         calendarKeys.all,
+        reportsKeys.all,
       );
     }
     return Promise.all(keys.map((queryKey) => queryClient.invalidateQueries({ queryKey })));
@@ -182,6 +185,19 @@ export function useVoidInvoice(id: string) {
     mutationFn: (input: VoidInvoice) =>
       call(api.POST('/api/invoices/{id}/void', { params: { path: { id } }, body: input })),
     onSuccess: save,
+  });
+}
+
+/** F15 rule 22: the services of an issued invoice's lines move its revenue between services. */
+export function useSetInvoiceServices(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: UpdateInvoiceServices) =>
+      call(api.PUT('/api/invoices/{id}/services', { params: { path: { id } }, body: input })),
+    onSuccess: (invoice: InvoiceDetail) => {
+      queryClient.setQueryData(invoicesKeys.detail(invoice.id), invoice);
+      return queryClient.invalidateQueries({ queryKey: reportsKeys.all });
+    },
   });
 }
 

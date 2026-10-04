@@ -28,10 +28,14 @@ Spec: `docs/specs/F15-dashboards-reports.md` · ADRs 0006, 0008, 0013, 0014, 001
 - [x] /ship
 
 ## PR 3 — `feat/f15-web`: home dashboard, invoice services, reports screens and the monthly client report
-- [ ] web `features/dashboard/`: home `/` with the five sections (rules 1–7), each with loading, empty and error states, refresh, phone collapsible; navigation: "Home" first
-- [ ] web invoices: Service column in the draft editor and the issued invoice page, "Services" dialog
-- [ ] web: a report period error message (`INVALID_DATES` from the reports means "to before from, or over 366 days"; today's `errors.INVALID_DATES` text speaks of a project's dates)
-- [ ] web `features/reports/`: `/reports` index, productivity, revenue, overdue invoices (period pickers, filters, Excel download); navigation "Reports"
-- [ ] web monthly client report `/clients/$clientId/report` (sections, preliminary badge, summary editor, PDF and Excel) and the client profile action
-- [ ] e2e: mocks, `f15.spec.ts` (role sections, reports, summary), screenshots (home for General Manager, department manager, account manager, Finance, employee; phone; Services dialog; each report screen; monthly client report), both themes
-- [ ] wiring checklist, full checks, reviewer, owner acceptance (browser steps 1–8), /ship
+- [x] web `features/dashboard/`: home `/` with the five sections (rules 1–7), each with loading, empty and error states, refresh, collapsible sections (new `Collapsible` in `packages/ui`, on the design-system page); navigation: "Home" first
+- [x] web invoices: Service column in the draft editor and the issued invoice page, "Services" dialog
+- [x] web: a report period error message (`INVALID_DATES` from the reports means "to before from, or over 366 days"; today's `errors.INVALID_DATES` text speaks of a project's dates)
+- [x] web `features/reports/`: `/reports` index, productivity, revenue, overdue invoices (period pickers, filters, Excel download); navigation "Reports"
+- [x] web monthly client report `/clients/$clientId/report` (sections, preliminary badge, summary editor, PDF and Excel) and the client profile action
+- [x] e2e: mocks, `f15.spec.ts` (role sections, reports, summary), screenshots (home for General Manager, department manager, account manager, Finance, employee; phone; Services dialog; each report screen; monthly client report), both themes
+- [x] wiring checklist (`Collapsible` on the design-system page; `/clients/$clientId` moved to `$clientId/index.tsx` for the report route; spec acceptance step 1 settled: the General Manager also sees Departments)
+- [x] full checks: lint, typecheck, build, E2E (324) pass; `pnpm test` fails only in apps/api files untouched here, each of which passes alone (cross-file interference in the local full run)
+- [x] reviewer: three blocking findings fixed (PDF link after a summary save, heading inside the fold button, home screenshots for a plain department manager and account manager)
+- [x] owner acceptance (approved)
+- [x] /ship

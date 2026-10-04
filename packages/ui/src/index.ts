@@ -10,6 +10,7 @@ export * from './components/calendar-grid';
 export * from './components/callout';
 export * from './components/card';
 export * from './components/checkbox';
+export * from './components/collapsible';
 export * from './components/color-swatch';
 export * from './components/dialog';
 export * from './components/dropdown-menu';

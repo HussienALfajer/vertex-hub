@@ -53,6 +53,7 @@ import { BillablePicker, engagementKey, type LineSource, type PickedLine } from 
 import { IssueDialog } from './invoice-dialogs';
 import { DraftPreview } from './invoice-pdf';
 import { invoicesKeys, useArchiveInvoice, useSaveInvoiceDraft } from './invoices.queries';
+import { LineServiceField } from './line-services';
 import { SourceChip } from './source-chip';
 
 interface EditorLine {
@@ -513,6 +514,18 @@ function LineCard({
             )}
           />
         </div>
+        <Controller
+          control={form.control}
+          name={`lines.${index}.serviceId`}
+          render={({ field }) => (
+            <LineServiceField
+              value={field.value ?? null}
+              onChange={field.onChange}
+              current={invoice.lines.find((saved) => saved.id === line.id)?.service ?? null}
+              disabled={readOnly}
+            />
+          )}
+        />
       </fieldset>
     </li>
   );

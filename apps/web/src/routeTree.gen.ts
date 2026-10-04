@@ -25,7 +25,6 @@ import { Route as AppCampaignsCampaignIdRouteImport } from './routes/_app/campai
 import { Route as AppCatalogIndexRouteImport } from './routes/_app/catalog/index'
 import { Route as AppCatalogSettingsRouteImport } from './routes/_app/catalog/settings'
 import { Route as AppClientsIndexRouteImport } from './routes/_app/clients/index'
-import { Route as AppClientsClientIdRouteImport } from './routes/_app/clients/$clientId'
 import { Route as AppClientsNewRouteImport } from './routes/_app/clients/new'
 import { Route as AppContentIndexRouteImport } from './routes/_app/content/index'
 import { Route as AppDepartmentsIndexRouteImport } from './routes/_app/departments/index'
@@ -43,6 +42,10 @@ import { Route as AppProjectsProjectIdRouteImport } from './routes/_app/projects
 import { Route as AppProjectsNewRouteImport } from './routes/_app/projects/new'
 import { Route as AppQuotesIndexRouteImport } from './routes/_app/quotes/index'
 import { Route as AppQuotesQuoteIdRouteImport } from './routes/_app/quotes/$quoteId'
+import { Route as AppReportsIndexRouteImport } from './routes/_app/reports/index'
+import { Route as AppReportsOverdueInvoicesRouteImport } from './routes/_app/reports/overdue-invoices'
+import { Route as AppReportsProductivityRouteImport } from './routes/_app/reports/productivity'
+import { Route as AppReportsRevenueRouteImport } from './routes/_app/reports/revenue'
 import { Route as AppRetainersIndexRouteImport } from './routes/_app/retainers/index'
 import { Route as AppRetainersRetainerIdRouteImport } from './routes/_app/retainers/$retainerId'
 import { Route as AppRetainersNewRouteImport } from './routes/_app/retainers/new'
@@ -60,6 +63,8 @@ import { Route as AppTemplatesIndexRouteImport } from './routes/_app/templates/i
 import { Route as AppTemplatesTemplateIdRouteImport } from './routes/_app/templates/$templateId'
 import { Route as AppTemplatesNewRouteImport } from './routes/_app/templates/new'
 import { Route as AppApprovalsRequestsRequestIdRouteImport } from './routes/_app/approvals/requests/$requestId'
+import { Route as AppClientsClientIdIndexRouteImport } from './routes/_app/clients/$clientId/index'
+import { Route as AppClientsClientIdReportRouteImport } from './routes/_app/clients/$clientId/report'
 import { Route as AppContentPostsPostIdRouteImport } from './routes/_app/content/posts/$postId'
 import { Route as AppShootsShootIdIndexRouteImport } from './routes/_app/shoots/$shootId/index'
 import { Route as AppShootsShootIdEditRouteImport } from './routes/_app/shoots/$shootId/edit'
@@ -141,11 +146,6 @@ const AppCatalogSettingsRoute = AppCatalogSettingsRouteImport.update({
 const AppClientsIndexRoute = AppClientsIndexRouteImport.update({
   id: '/clients/',
   path: '/clients/',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppClientsClientIdRoute = AppClientsClientIdRouteImport.update({
-  id: '/clients/$clientId',
-  path: '/clients/$clientId',
   getParentRoute: () => AppRoute,
 } as any)
 const AppClientsNewRoute = AppClientsNewRouteImport.update({
@@ -235,6 +235,27 @@ const AppQuotesQuoteIdRoute = AppQuotesQuoteIdRouteImport.update({
   path: '/quotes/$quoteId',
   getParentRoute: () => AppRoute,
 } as any)
+const AppReportsIndexRoute = AppReportsIndexRouteImport.update({
+  id: '/reports/',
+  path: '/reports/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppReportsOverdueInvoicesRoute =
+  AppReportsOverdueInvoicesRouteImport.update({
+    id: '/reports/overdue-invoices',
+    path: '/reports/overdue-invoices',
+    getParentRoute: () => AppRoute,
+  } as any)
+const AppReportsProductivityRoute = AppReportsProductivityRouteImport.update({
+  id: '/reports/productivity',
+  path: '/reports/productivity',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppReportsRevenueRoute = AppReportsRevenueRouteImport.update({
+  id: '/reports/revenue',
+  path: '/reports/revenue',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppRetainersIndexRoute = AppRetainersIndexRouteImport.update({
   id: '/retainers/',
   path: '/retainers/',
@@ -321,6 +342,17 @@ const AppApprovalsRequestsRequestIdRoute =
     path: '/approvals/requests/$requestId',
     getParentRoute: () => AppRoute,
   } as any)
+const AppClientsClientIdIndexRoute = AppClientsClientIdIndexRouteImport.update({
+  id: '/clients/$clientId/',
+  path: '/clients/$clientId/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppClientsClientIdReportRoute =
+  AppClientsClientIdReportRouteImport.update({
+    id: '/clients/$clientId/report',
+    path: '/clients/$clientId/report',
+    getParentRoute: () => AppRoute,
+  } as any)
 const AppContentPostsPostIdRoute = AppContentPostsPostIdRouteImport.update({
   id: '/content/posts/$postId',
   path: '/content/posts/$postId',
@@ -348,7 +380,6 @@ export interface FileRoutesByFullPath {
   '/a/$token': typeof ATokenRoute
   '/campaigns/$campaignId': typeof AppCampaignsCampaignIdRoute
   '/catalog/settings': typeof AppCatalogSettingsRoute
-  '/clients/$clientId': typeof AppClientsClientIdRoute
   '/clients/new': typeof AppClientsNewRoute
   '/departments/$departmentId': typeof AppDepartmentsDepartmentIdRoute
   '/invoices/$invoiceId': typeof AppInvoicesInvoiceIdRoute
@@ -359,6 +390,9 @@ export interface FileRoutesByFullPath {
   '/projects/$projectId': typeof AppProjectsProjectIdRoute
   '/projects/new': typeof AppProjectsNewRoute
   '/quotes/$quoteId': typeof AppQuotesQuoteIdRoute
+  '/reports/overdue-invoices': typeof AppReportsOverdueInvoicesRoute
+  '/reports/productivity': typeof AppReportsProductivityRoute
+  '/reports/revenue': typeof AppReportsRevenueRoute
   '/retainers/$retainerId': typeof AppRetainersRetainerIdRoute
   '/retainers/new': typeof AppRetainersNewRoute
   '/shoots/new': typeof AppShootsNewRoute
@@ -383,13 +417,16 @@ export interface FileRoutesByFullPath {
   '/notifications/': typeof AppNotificationsIndexRoute
   '/projects/': typeof AppProjectsIndexRoute
   '/quotes/': typeof AppQuotesIndexRoute
+  '/reports/': typeof AppReportsIndexRoute
   '/retainers/': typeof AppRetainersIndexRoute
   '/tasks/': typeof AppTasksIndexRoute
   '/team/': typeof AppTeamIndexRoute
   '/templates/': typeof AppTemplatesIndexRoute
   '/approvals/requests/$requestId': typeof AppApprovalsRequestsRequestIdRoute
+  '/clients/$clientId/report': typeof AppClientsClientIdReportRoute
   '/content/posts/$postId': typeof AppContentPostsPostIdRoute
   '/shoots/$shootId/edit': typeof AppShootsShootIdEditRoute
+  '/clients/$clientId/': typeof AppClientsClientIdIndexRoute
   '/shoots/$shootId/': typeof AppShootsShootIdIndexRoute
 }
 export interface FileRoutesByTo {
@@ -403,7 +440,6 @@ export interface FileRoutesByTo {
   '/': typeof AppIndexRoute
   '/campaigns/$campaignId': typeof AppCampaignsCampaignIdRoute
   '/catalog/settings': typeof AppCatalogSettingsRoute
-  '/clients/$clientId': typeof AppClientsClientIdRoute
   '/clients/new': typeof AppClientsNewRoute
   '/departments/$departmentId': typeof AppDepartmentsDepartmentIdRoute
   '/invoices/$invoiceId': typeof AppInvoicesInvoiceIdRoute
@@ -414,6 +450,9 @@ export interface FileRoutesByTo {
   '/projects/$projectId': typeof AppProjectsProjectIdRoute
   '/projects/new': typeof AppProjectsNewRoute
   '/quotes/$quoteId': typeof AppQuotesQuoteIdRoute
+  '/reports/overdue-invoices': typeof AppReportsOverdueInvoicesRoute
+  '/reports/productivity': typeof AppReportsProductivityRoute
+  '/reports/revenue': typeof AppReportsRevenueRoute
   '/retainers/$retainerId': typeof AppRetainersRetainerIdRoute
   '/retainers/new': typeof AppRetainersNewRoute
   '/shoots/new': typeof AppShootsNewRoute
@@ -438,13 +477,16 @@ export interface FileRoutesByTo {
   '/notifications': typeof AppNotificationsIndexRoute
   '/projects': typeof AppProjectsIndexRoute
   '/quotes': typeof AppQuotesIndexRoute
+  '/reports': typeof AppReportsIndexRoute
   '/retainers': typeof AppRetainersIndexRoute
   '/tasks': typeof AppTasksIndexRoute
   '/team': typeof AppTeamIndexRoute
   '/templates': typeof AppTemplatesIndexRoute
   '/approvals/requests/$requestId': typeof AppApprovalsRequestsRequestIdRoute
+  '/clients/$clientId/report': typeof AppClientsClientIdReportRoute
   '/content/posts/$postId': typeof AppContentPostsPostIdRoute
   '/shoots/$shootId/edit': typeof AppShootsShootIdEditRoute
+  '/clients/$clientId': typeof AppClientsClientIdIndexRoute
   '/shoots/$shootId': typeof AppShootsShootIdIndexRoute
 }
 export interface FileRoutesById {
@@ -460,7 +502,6 @@ export interface FileRoutesById {
   '/_app/': typeof AppIndexRoute
   '/_app/campaigns/$campaignId': typeof AppCampaignsCampaignIdRoute
   '/_app/catalog/settings': typeof AppCatalogSettingsRoute
-  '/_app/clients/$clientId': typeof AppClientsClientIdRoute
   '/_app/clients/new': typeof AppClientsNewRoute
   '/_app/departments/$departmentId': typeof AppDepartmentsDepartmentIdRoute
   '/_app/invoices/$invoiceId': typeof AppInvoicesInvoiceIdRoute
@@ -471,6 +512,9 @@ export interface FileRoutesById {
   '/_app/projects/$projectId': typeof AppProjectsProjectIdRoute
   '/_app/projects/new': typeof AppProjectsNewRoute
   '/_app/quotes/$quoteId': typeof AppQuotesQuoteIdRoute
+  '/_app/reports/overdue-invoices': typeof AppReportsOverdueInvoicesRoute
+  '/_app/reports/productivity': typeof AppReportsProductivityRoute
+  '/_app/reports/revenue': typeof AppReportsRevenueRoute
   '/_app/retainers/$retainerId': typeof AppRetainersRetainerIdRoute
   '/_app/retainers/new': typeof AppRetainersNewRoute
   '/_app/shoots/new': typeof AppShootsNewRoute
@@ -495,13 +539,16 @@ export interface FileRoutesById {
   '/_app/notifications/': typeof AppNotificationsIndexRoute
   '/_app/projects/': typeof AppProjectsIndexRoute
   '/_app/quotes/': typeof AppQuotesIndexRoute
+  '/_app/reports/': typeof AppReportsIndexRoute
   '/_app/retainers/': typeof AppRetainersIndexRoute
   '/_app/tasks/': typeof AppTasksIndexRoute
   '/_app/team/': typeof AppTeamIndexRoute
   '/_app/templates/': typeof AppTemplatesIndexRoute
   '/_app/approvals/requests/$requestId': typeof AppApprovalsRequestsRequestIdRoute
+  '/_app/clients/$clientId/report': typeof AppClientsClientIdReportRoute
   '/_app/content/posts/$postId': typeof AppContentPostsPostIdRoute
   '/_app/shoots/$shootId/edit': typeof AppShootsShootIdEditRoute
+  '/_app/clients/$clientId/': typeof AppClientsClientIdIndexRoute
   '/_app/shoots/$shootId/': typeof AppShootsShootIdIndexRoute
 }
 export interface FileRouteTypes {
@@ -517,7 +564,6 @@ export interface FileRouteTypes {
     | '/a/$token'
     | '/campaigns/$campaignId'
     | '/catalog/settings'
-    | '/clients/$clientId'
     | '/clients/new'
     | '/departments/$departmentId'
     | '/invoices/$invoiceId'
@@ -528,6 +574,9 @@ export interface FileRouteTypes {
     | '/projects/$projectId'
     | '/projects/new'
     | '/quotes/$quoteId'
+    | '/reports/overdue-invoices'
+    | '/reports/productivity'
+    | '/reports/revenue'
     | '/retainers/$retainerId'
     | '/retainers/new'
     | '/shoots/new'
@@ -552,13 +601,16 @@ export interface FileRouteTypes {
     | '/notifications/'
     | '/projects/'
     | '/quotes/'
+    | '/reports/'
     | '/retainers/'
     | '/tasks/'
     | '/team/'
     | '/templates/'
     | '/approvals/requests/$requestId'
+    | '/clients/$clientId/report'
     | '/content/posts/$postId'
     | '/shoots/$shootId/edit'
+    | '/clients/$clientId/'
     | '/shoots/$shootId/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -572,7 +624,6 @@ export interface FileRouteTypes {
     | '/'
     | '/campaigns/$campaignId'
     | '/catalog/settings'
-    | '/clients/$clientId'
     | '/clients/new'
     | '/departments/$departmentId'
     | '/invoices/$invoiceId'
@@ -583,6 +634,9 @@ export interface FileRouteTypes {
     | '/projects/$projectId'
     | '/projects/new'
     | '/quotes/$quoteId'
+    | '/reports/overdue-invoices'
+    | '/reports/productivity'
+    | '/reports/revenue'
     | '/retainers/$retainerId'
     | '/retainers/new'
     | '/shoots/new'
@@ -607,13 +661,16 @@ export interface FileRouteTypes {
     | '/notifications'
     | '/projects'
     | '/quotes'
+    | '/reports'
     | '/retainers'
     | '/tasks'
     | '/team'
     | '/templates'
     | '/approvals/requests/$requestId'
+    | '/clients/$clientId/report'
     | '/content/posts/$postId'
     | '/shoots/$shootId/edit'
+    | '/clients/$clientId'
     | '/shoots/$shootId'
   id:
     | '__root__'
@@ -628,7 +685,6 @@ export interface FileRouteTypes {
     | '/_app/'
     | '/_app/campaigns/$campaignId'
     | '/_app/catalog/settings'
-    | '/_app/clients/$clientId'
     | '/_app/clients/new'
     | '/_app/departments/$departmentId'
     | '/_app/invoices/$invoiceId'
@@ -639,6 +695,9 @@ export interface FileRouteTypes {
     | '/_app/projects/$projectId'
     | '/_app/projects/new'
     | '/_app/quotes/$quoteId'
+    | '/_app/reports/overdue-invoices'
+    | '/_app/reports/productivity'
+    | '/_app/reports/revenue'
     | '/_app/retainers/$retainerId'
     | '/_app/retainers/new'
     | '/_app/shoots/new'
@@ -663,13 +722,16 @@ export interface FileRouteTypes {
     | '/_app/notifications/'
     | '/_app/projects/'
     | '/_app/quotes/'
+    | '/_app/reports/'
     | '/_app/retainers/'
     | '/_app/tasks/'
     | '/_app/team/'
     | '/_app/templates/'
     | '/_app/approvals/requests/$requestId'
+    | '/_app/clients/$clientId/report'
     | '/_app/content/posts/$postId'
     | '/_app/shoots/$shootId/edit'
+    | '/_app/clients/$clientId/'
     | '/_app/shoots/$shootId/'
   fileRoutesById: FileRoutesById
 }
@@ -795,13 +857,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppClientsIndexRouteImport
       parentRoute: typeof AppRoute
     }
-    '/_app/clients/$clientId': {
-      id: '/_app/clients/$clientId'
-      path: '/clients/$clientId'
-      fullPath: '/clients/$clientId'
-      preLoaderRoute: typeof AppClientsClientIdRouteImport
-      parentRoute: typeof AppRoute
-    }
     '/_app/clients/new': {
       id: '/_app/clients/new'
       path: '/clients/new'
@@ -919,6 +974,34 @@ declare module '@tanstack/react-router' {
       path: '/quotes/$quoteId'
       fullPath: '/quotes/$quoteId'
       preLoaderRoute: typeof AppQuotesQuoteIdRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/reports/': {
+      id: '/_app/reports/'
+      path: '/reports'
+      fullPath: '/reports/'
+      preLoaderRoute: typeof AppReportsIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/reports/overdue-invoices': {
+      id: '/_app/reports/overdue-invoices'
+      path: '/reports/overdue-invoices'
+      fullPath: '/reports/overdue-invoices'
+      preLoaderRoute: typeof AppReportsOverdueInvoicesRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/reports/productivity': {
+      id: '/_app/reports/productivity'
+      path: '/reports/productivity'
+      fullPath: '/reports/productivity'
+      preLoaderRoute: typeof AppReportsProductivityRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/reports/revenue': {
+      id: '/_app/reports/revenue'
+      path: '/reports/revenue'
+      fullPath: '/reports/revenue'
+      preLoaderRoute: typeof AppReportsRevenueRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/retainers/': {
@@ -1040,6 +1123,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppApprovalsRequestsRequestIdRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/clients/$clientId/': {
+      id: '/_app/clients/$clientId/'
+      path: '/clients/$clientId'
+      fullPath: '/clients/$clientId/'
+      preLoaderRoute: typeof AppClientsClientIdIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/clients/$clientId/report': {
+      id: '/_app/clients/$clientId/report'
+      path: '/clients/$clientId/report'
+      fullPath: '/clients/$clientId/report'
+      preLoaderRoute: typeof AppClientsClientIdReportRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/content/posts/$postId': {
       id: '/_app/content/posts/$postId'
       path: '/content/posts/$postId'
@@ -1071,7 +1168,6 @@ interface AppRouteChildren {
   AppIndexRoute: typeof AppIndexRoute
   AppCampaignsCampaignIdRoute: typeof AppCampaignsCampaignIdRoute
   AppCatalogSettingsRoute: typeof AppCatalogSettingsRoute
-  AppClientsClientIdRoute: typeof AppClientsClientIdRoute
   AppClientsNewRoute: typeof AppClientsNewRoute
   AppDepartmentsDepartmentIdRoute: typeof AppDepartmentsDepartmentIdRoute
   AppInvoicesInvoiceIdRoute: typeof AppInvoicesInvoiceIdRoute
@@ -1082,6 +1178,9 @@ interface AppRouteChildren {
   AppProjectsProjectIdRoute: typeof AppProjectsProjectIdRoute
   AppProjectsNewRoute: typeof AppProjectsNewRoute
   AppQuotesQuoteIdRoute: typeof AppQuotesQuoteIdRoute
+  AppReportsOverdueInvoicesRoute: typeof AppReportsOverdueInvoicesRoute
+  AppReportsProductivityRoute: typeof AppReportsProductivityRoute
+  AppReportsRevenueRoute: typeof AppReportsRevenueRoute
   AppRetainersRetainerIdRoute: typeof AppRetainersRetainerIdRoute
   AppRetainersNewRoute: typeof AppRetainersNewRoute
   AppShootsNewRoute: typeof AppShootsNewRoute
@@ -1106,13 +1205,16 @@ interface AppRouteChildren {
   AppNotificationsIndexRoute: typeof AppNotificationsIndexRoute
   AppProjectsIndexRoute: typeof AppProjectsIndexRoute
   AppQuotesIndexRoute: typeof AppQuotesIndexRoute
+  AppReportsIndexRoute: typeof AppReportsIndexRoute
   AppRetainersIndexRoute: typeof AppRetainersIndexRoute
   AppTasksIndexRoute: typeof AppTasksIndexRoute
   AppTeamIndexRoute: typeof AppTeamIndexRoute
   AppTemplatesIndexRoute: typeof AppTemplatesIndexRoute
   AppApprovalsRequestsRequestIdRoute: typeof AppApprovalsRequestsRequestIdRoute
+  AppClientsClientIdReportRoute: typeof AppClientsClientIdReportRoute
   AppContentPostsPostIdRoute: typeof AppContentPostsPostIdRoute
   AppShootsShootIdEditRoute: typeof AppShootsShootIdEditRoute
+  AppClientsClientIdIndexRoute: typeof AppClientsClientIdIndexRoute
   AppShootsShootIdIndexRoute: typeof AppShootsShootIdIndexRoute
 }
 
@@ -1123,7 +1225,6 @@ const AppRouteChildren: AppRouteChildren = {
   AppIndexRoute: AppIndexRoute,
   AppCampaignsCampaignIdRoute: AppCampaignsCampaignIdRoute,
   AppCatalogSettingsRoute: AppCatalogSettingsRoute,
-  AppClientsClientIdRoute: AppClientsClientIdRoute,
   AppClientsNewRoute: AppClientsNewRoute,
   AppDepartmentsDepartmentIdRoute: AppDepartmentsDepartmentIdRoute,
   AppInvoicesInvoiceIdRoute: AppInvoicesInvoiceIdRoute,
@@ -1134,6 +1235,9 @@ const AppRouteChildren: AppRouteChildren = {
   AppProjectsProjectIdRoute: AppProjectsProjectIdRoute,
   AppProjectsNewRoute: AppProjectsNewRoute,
   AppQuotesQuoteIdRoute: AppQuotesQuoteIdRoute,
+  AppReportsOverdueInvoicesRoute: AppReportsOverdueInvoicesRoute,
+  AppReportsProductivityRoute: AppReportsProductivityRoute,
+  AppReportsRevenueRoute: AppReportsRevenueRoute,
   AppRetainersRetainerIdRoute: AppRetainersRetainerIdRoute,
   AppRetainersNewRoute: AppRetainersNewRoute,
   AppShootsNewRoute: AppShootsNewRoute,
@@ -1158,13 +1262,16 @@ const AppRouteChildren: AppRouteChildren = {
   AppNotificationsIndexRoute: AppNotificationsIndexRoute,
   AppProjectsIndexRoute: AppProjectsIndexRoute,
   AppQuotesIndexRoute: AppQuotesIndexRoute,
+  AppReportsIndexRoute: AppReportsIndexRoute,
   AppRetainersIndexRoute: AppRetainersIndexRoute,
   AppTasksIndexRoute: AppTasksIndexRoute,
   AppTeamIndexRoute: AppTeamIndexRoute,
   AppTemplatesIndexRoute: AppTemplatesIndexRoute,
   AppApprovalsRequestsRequestIdRoute: AppApprovalsRequestsRequestIdRoute,
+  AppClientsClientIdReportRoute: AppClientsClientIdReportRoute,
   AppContentPostsPostIdRoute: AppContentPostsPostIdRoute,
   AppShootsShootIdEditRoute: AppShootsShootIdEditRoute,
+  AppClientsClientIdIndexRoute: AppClientsClientIdIndexRoute,
   AppShootsShootIdIndexRoute: AppShootsShootIdIndexRoute,
 }
 

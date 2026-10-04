@@ -41,6 +41,6 @@ test('signs out from the user menu', async ({ page }) => {
 test('ignores redirect targets outside the app', async ({ page }) => {
   await mockApi(page, { signedIn: true });
   await page.goto('/login?redirect=//evil.example');
-  // The start page: My tasks, until the F15 dashboards.
-  await expect(page).toHaveURL(/127\.0\.0\.1:4173\/tasks$/);
+  // The start page: the dashboard (F15).
+  await expect(page).toHaveURL(/127\.0\.0\.1:4173\/$/);
 });

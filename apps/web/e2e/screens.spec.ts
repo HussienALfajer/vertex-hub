@@ -2,8 +2,10 @@ import ar from '../src/i18n/locales/ar.json' with { type: 'json' };
 import {
   accountManagerMe,
   CONTENT_LINK_TOKEN,
+  departmentManagerMe,
   EXPIRED_LINK_TOKEN,
   employeeMe,
+  financeMe,
   financeWithoutTwoFactor,
   manager,
   medicalReviewerMe,
@@ -11,6 +13,7 @@ import {
   notificationFor,
   OPEN_LINK_TOKEN,
   PROJECTS_TODAY,
+  plainAccountManagerMe,
   screenshot,
   seedIds,
   VALID_LINK_TOKEN,
@@ -34,7 +37,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await mockApi(page, { signedIn: true });
       await page.goto('/');
       const nav = page.getByRole('navigation', { name: ar.nav.label });
-      await expect(nav.getByRole('link', { name: ar.nav.myTasks })).toHaveAttribute(
+      await expect(nav.getByRole('link', { name: ar.nav.home })).toHaveAttribute(
         'aria-current',
         'page',
       );
@@ -1410,6 +1413,89 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await expect(page.getByRole('link', { name: 'عرض افتتاح الفرع الثاني' })).toBeVisible();
       await expect(page.getByText(ar.content.taskPost.hint)).toBeVisible();
       await screenshot(page, testInfo, `task-post-line-${colorScheme}`);
+    });
+
+    // F15: the home page per role, the reports and the monthly client report.
+    for (const [name, me] of [
+      ['general-manager', manager],
+      ['department-manager', departmentManagerMe],
+      ['account-manager', plainAccountManagerMe],
+      ['finance', financeMe],
+      ['employee', employeeMe],
+    ] as const) {
+      test(`home page for the ${name}`, async ({ page }, testInfo) => {
+        await page.setViewportSize({ width: 1440, height: 1600 });
+        await page.clock.setFixedTime(new Date(`${PROJECTS_TODAY}T09:00:00+03:00`));
+        await mockApi(page, { signedIn: true, me });
+        await page.goto('/');
+        await expect(
+          page.getByRole('region', { name: ar.dashboard.work.title, exact: true }),
+        ).toBeVisible();
+        await expect(page.locator('[data-slot="skeleton"]')).toHaveCount(0);
+        await screenshot(page, testInfo, `home-${name}-${colorScheme}`);
+      });
+    }
+
+    test('home page on a phone', async ({ page }, testInfo) => {
+      await page.setViewportSize({ width: 390, height: 844 });
+      await page.clock.setFixedTime(new Date(`${PROJECTS_TODAY}T09:00:00+03:00`));
+      await mockApi(page, { signedIn: true, me: manager });
+      await page.goto('/');
+      const company = page.getByRole('region', { name: ar.dashboard.company.title, exact: true });
+      await company.getByRole('button', { name: ar.dashboard.company.title }).click();
+      await expect(company.getByText(ar.dashboard.company.activeRetainers)).toBeHidden();
+      await screenshot(page, testInfo, `home-phone-${colorScheme}`);
+    });
+
+    test('reports index', async ({ page }, testInfo) => {
+      await mockApi(page, { signedIn: true, me: manager });
+      await page.goto('/reports');
+      await expect(page.getByRole('heading', { name: ar.reports.client.title })).toBeVisible();
+      await screenshot(page, testInfo, `reports-${colorScheme}`);
+    });
+
+    test('department productivity report', async ({ page }, testInfo) => {
+      await page.setViewportSize({ width: 1440, height: 1200 });
+      await mockApi(page, { signedIn: true, me: accountManagerMe });
+      await page.goto('/reports/productivity');
+      await expect(page.getByRole('row', { name: /التصميم/ }).first()).toBeVisible();
+      await screenshot(page, testInfo, `report-productivity-${colorScheme}`);
+    });
+
+    test('revenue report by client and by service', async ({ page }, testInfo) => {
+      await mockApi(page, { signedIn: true, me: financeMe });
+      await page.goto('/reports/revenue');
+      await expect(page.getByRole('row', { name: /مطعم الياسمين/ })).toBeVisible();
+      await screenshot(page, testInfo, `report-revenue-client-${colorScheme}`);
+      await page.getByRole('tab', { name: ar.reports.revenue.byService }).click();
+      await expect(page.getByText(ar.reports.revenue.unclassified)).toBeVisible();
+      await screenshot(page, testInfo, `report-revenue-service-${colorScheme}`);
+    });
+
+    test('overdue invoices report', async ({ page }, testInfo) => {
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await mockApi(page, { signedIn: true, me: financeMe });
+      await page.goto('/reports/overdue-invoices');
+      await expect(page.getByRole('row', { name: /مطعم الياسمين/ })).toBeVisible();
+      await screenshot(page, testInfo, `report-overdue-invoices-${colorScheme}`);
+    });
+
+    test('monthly client report', async ({ page }, testInfo) => {
+      await page.setViewportSize({ width: 1280, height: 2400 });
+      await mockApi(page, { signedIn: true, me: accountManagerMe });
+      await page.goto(`/clients/${seedIds.jasmine}/report`);
+      await expect(
+        page.getByRole('heading', { name: ar.reports.client.sections.adBudget }),
+      ).toBeVisible();
+      await screenshot(page, testInfo, `client-report-${colorScheme}`);
+    });
+
+    test('invoice services dialog', async ({ page }, testInfo) => {
+      await mockApi(page, { signedIn: true, me: manager });
+      await page.goto(`/invoices/${seedIds.overdueInvoice}`);
+      await page.getByRole('button', { name: ar.invoices.services.action }).click();
+      await expect(page.getByRole('dialog')).toBeVisible();
+      await screenshot(page, testInfo, `invoice-services-dialog-${colorScheme}`);
     });
   });
 }

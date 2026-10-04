@@ -2,7 +2,7 @@ import ar from '../src/i18n/locales/ar.json' with { type: 'json' };
 import { mockApi } from './fixtures';
 import { expect, test } from './test';
 
-test('renders the Arabic RTL shell for a signed-in user, starting on their tasks', async ({
+test('renders the Arabic RTL shell for a signed-in user, starting on the home page', async ({
   page,
 }) => {
   await mockApi(page, { signedIn: true });
@@ -12,9 +12,9 @@ test('renders the Arabic RTL shell for a signed-in user, starting on their tasks
   await expect(html).toHaveAttribute('lang', 'ar');
   await expect(html).toHaveAttribute('dir', 'rtl');
   await expect(page).toHaveTitle(ar.app.name);
-  // Until the dashboards (F15), the start page is My tasks.
-  await expect(page).toHaveURL(/\/tasks$/);
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText(ar.tasks.my.title);
+  // The start page is the dashboard (F15 screen 1).
+  await expect(page).toHaveURL(/127\.0\.0\.1:4173\/$/);
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(ar.dashboard.title);
 });
 
 test('shows the system status on the audit log, in the business timezone', async ({ page }) => {
