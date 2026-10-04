@@ -14,6 +14,7 @@ import {
   rateIsStale,
   receiptDisplayNumber,
   recordPaymentSchema,
+  updateInvoiceServicesSchema,
   updateInvoiceSettingsSchema,
   updateProjectExpenseSchema,
   voidPaymentSchema,
@@ -138,6 +139,19 @@ describe('invoiceDraftSchema', () => {
     );
     expect(parsed.notes).toBeNull();
     expect(parsed.lines[0]?.source).toBeNull();
+    expect(parsed.lines[0]?.serviceId).toBeNull();
+  });
+
+  it('takes an optional service per line (F15 rule 21)', () => {
+    const parsed = invoiceDraftSchema.parse(
+      draft([{ description: 'Logo', quantity: 1, unitPriceMinor: 100, serviceId: id }]),
+    );
+    expect(parsed.lines[0]?.serviceId).toBe(id);
+    expect(
+      invoiceDraftSchema.safeParse(
+        draft([{ description: 'Logo', quantity: 1, unitPriceMinor: 100, serviceId: 'x' }]),
+      ).success,
+    ).toBe(false);
   });
 
   it('bounds description, quantity and price', () => {
@@ -151,6 +165,25 @@ describe('invoiceDraftSchema', () => {
     ]) {
       expect(invoiceDraftSchema.safeParse(draft([line])).success, JSON.stringify(line)).toBe(false);
     }
+  });
+});
+
+describe('updateInvoiceServicesSchema (F15 rule 22)', () => {
+  it('sets or clears services of one to 50 lines', () => {
+    expect(
+      updateInvoiceServicesSchema.parse({
+        lines: [
+          { lineId: id, serviceId: id },
+          { lineId: id, serviceId: null },
+        ],
+      }).lines,
+    ).toHaveLength(2);
+    expect(updateInvoiceServicesSchema.safeParse({ lines: [] }).success).toBe(false);
+    expect(
+      updateInvoiceServicesSchema.safeParse({
+        lines: Array.from({ length: 51 }, () => ({ lineId: id, serviceId: null })),
+      }).success,
+    ).toBe(false);
   });
 });
 

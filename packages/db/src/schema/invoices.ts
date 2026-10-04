@@ -24,6 +24,7 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 import { users } from './auth.js';
+import { catalogServices } from './catalog.js';
 import { clients } from './clients.js';
 import { archivedAt, id, minorAmount, timestamps } from './columns.js';
 import { fileItems } from './files.js';
@@ -147,6 +148,7 @@ export const invoices = pgTable(
     index('invoices_quote_id_idx').on(table.quoteId),
     index('invoices_status_idx').on(table.status),
     index('invoices_due_on_idx').on(table.dueOn),
+    index('invoices_issued_on_idx').on(table.issuedOn),
     index('invoices_updated_at_idx').on(table.updatedAt),
     index('invoices_pdf_file_item_id_idx').on(table.pdfFileItemId),
     index('invoices_issued_by_id_idx').on(table.issuedById),
@@ -183,6 +185,8 @@ export const invoiceLines = pgTable(
     extraWorkItemId: uuid('extra_work_item_id').references(() => extraWorkItems.id),
     /** True while the invoice is neither void nor archived: the source is taken. */
     holdsSource: boolean('holds_source').notNull().default(true),
+    /** The catalog service billed, for revenue by service (F15); never printed. */
+    serviceId: uuid('service_id').references(() => catalogServices.id),
     position: integer('position').notNull(),
   },
   (table) => [
@@ -190,6 +194,7 @@ export const invoiceLines = pgTable(
     index('invoice_lines_milestone_id_idx').on(table.milestoneId),
     index('invoice_lines_retainer_cycle_id_idx').on(table.retainerCycleId),
     index('invoice_lines_extra_work_item_id_idx').on(table.extraWorkItemId),
+    index('invoice_lines_service_id_idx').on(table.serviceId),
     uniqueIndex('invoice_lines_live_milestone_idx')
       .on(table.milestoneId)
       .where(sql`${table.holdsSource}`),
@@ -255,6 +260,7 @@ export const payments = pgTable(
   (table) => [
     uniqueIndex('payments_number_idx').on(table.year, table.number),
     index('payments_invoice_id_idx').on(table.invoiceId),
+    index('payments_paid_on_idx').on(table.paidOn),
     index('payments_proof_file_item_id_idx').on(table.proofFileItemId),
     index('payments_receipt_file_item_id_idx').on(table.receiptFileItemId),
     index('payments_recorded_by_id_idx').on(table.recordedById),

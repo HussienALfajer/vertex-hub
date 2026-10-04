@@ -30,4 +30,5 @@ export {
 export { type TaskDraft, TaskGenerator } from './task-generator.js';
 export { type TaskGuard, TaskGuards } from './task-guards.js';
 export { type TaskLink, TaskLinks } from './task-links.js';
+export { type DepartmentTaskCounts, TaskReports } from './task-reports.js';
 export { TasksModule } from './tasks.module.js';

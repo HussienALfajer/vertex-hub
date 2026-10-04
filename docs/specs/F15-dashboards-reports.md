@@ -89,7 +89,7 @@ The implementation adds any index the report queries need and that is missing (e
 3. **Departments** (per department in scope; a picker when the user holds `all` or manages several): open tasks by status, overdue count with the ten oldest overdue tasks, unassigned count, and per person the F06 workload numbers for this week (overdue, due this week, open), linking to the board and the workload screen.
 4. **My clients** (`own_clients`): one row per non-archived client the user is primary account manager of: active retainers with this month's overall completion and a behind flag; open projects count; approval items pending the client (count, oldest sent date); with `invoices.read`: outstanding (USD) and overdue invoices count; with `campaigns.read`: a low-wallet flag. Rows with a problem (behind, overdue, low wallet, approvals waiting over 48 hours) come first, then by client name.
 5. **My work** (everyone): my overdue tasks, tasks due today and tasks due later this week (to Friday), up to 10 each, from the F06 My tasks counts and list, linking to My tasks.
-6. "This month" is the current calendar month to today; "last month" is the whole previous month. Completion of a cycle = Σ min(delivered, committed) ÷ Σ committed over its lines (lines with 0 committed are left out), rounded to a whole percent.
+6. "This month" is the current calendar month to today; "last month" is the whole previous month. Completion of a cycle = Σ min(delivered, committed) ÷ Σ committed over its lines (lines with 0 committed are left out), rounded down to a whole percent (R13's delivery rate, so the dashboard matches the retainer page).
 7. Each section loads on its own and shows its own loading, empty and error state; the page shows when it was loaded and has a refresh action. No numbers are stored.
 
 ### Department productivity
@@ -149,7 +149,7 @@ Schemas live in `packages/contracts/src/reports.ts` (and the invoice line field 
 |---|---|---|---|---|
 | `GET /api/dashboard/company` | `reports.read` `all` | — | `companyDashboardSchema` (rule 1) | 403 |
 | `GET /api/dashboard/finance` | `reports.finance` | — | `financeDashboardSchema` (rule 2) | 403 |
-| `GET /api/dashboard/departments` | `reports.read` (`department` or `all`) | `department` (default: the first in scope) | `departmentDashboardSchema` (rule 3) plus the departments in scope | 403 (department out of scope) |
+| `GET /api/dashboard/departments` | `reports.read` (`department` or `all`) | `department` (default: the first department the caller manages, else the first in scope) | `departmentDashboardSchema` (rule 3) plus the departments in scope | 403 (department out of scope) |
 | `GET /api/dashboard/clients` | `reports.read` `own_clients` | — | `myClientsDashboardSchema` (rule 4) | 403 |
 | `GET /api/reports/productivity` · `GET /api/reports/productivity/export` | `reports.read` (`department` or `all`) | `productivityQuerySchema`: `from`, `to`, `department[]` | `productivityReportSchema` · xlsx | 403, `INVALID_DATES` |
 | `GET /api/reports/revenue` · `GET /api/reports/revenue/export` | `reports.finance` | `revenueQuerySchema`: `from`, `to` | `revenueReportSchema` · xlsx | 403, `INVALID_DATES` |

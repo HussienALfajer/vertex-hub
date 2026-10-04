@@ -11150,6 +11150,7 @@ function invoiceRoutes({ billing, clients, users, projects, retainers, me }: Inv
         ...line,
         totalMinor: line.quantity * line.unitPriceMinor,
         source: line.source ? sourceOf(line.source) : null,
+        service: null,
       })),
       payments: i.payments.map((p) => ({
         id: p.id,
@@ -11187,6 +11188,7 @@ function invoiceRoutes({ billing, clients, users, projects, retainers, me }: Inv
         canRecordPayment: pays && open,
         canVoidPayments: pays && item.status !== 'draft' && item.status !== 'void',
         canRenderPdf: draft ? manages : i.pdf?.state === 'failed',
+        canEditServices: manages && item.status !== 'draft' && item.status !== 'void',
       },
     };
   };

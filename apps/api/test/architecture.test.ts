@@ -256,6 +256,19 @@ describe('module boundaries', () => {
     expect(offenders).toEqual([]);
   });
 
+  it('lets no module import reports (ADR 0027)', () => {
+    const offenders = imports
+      .filter(({ specifier }) => specifier.startsWith('.'))
+      .filter(({ file, specifier }) => {
+        const from = moduleOf(file);
+        return (
+          !!from && from !== 'reports' && moduleOf(resolve(dirname(file), specifier)) === 'reports'
+        );
+      })
+      .map(({ file, specifier }) => `${display(file)} -> ${specifier}`);
+    expect(offenders).toEqual([]);
+  });
+
   it('keeps tasks, clients, projects and auth independent of calendar (ADR 0022)', () => {
     const independent = ['tasks', 'clients', 'projects', 'auth'];
     const offenders = imports

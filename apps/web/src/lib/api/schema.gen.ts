@@ -2196,6 +2196,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/invoices/{id}/services": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["InvoicesController_updateServices"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/invoices/{id}/archive": {
         parameters: {
             query?: never;
@@ -2398,230 +2414,6 @@ export interface paths {
         get: operations["InvoiceBillingController_retainerBilling"];
         put?: never;
         post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/quote-settings": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["QuoteSettingsController_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch: operations["QuoteSettingsController_update"];
-        trace?: never;
-    };
-    "/api/quotes": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["QuotesController_list"];
-        put?: never;
-        post: operations["QuotesController_create"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/quotes/by-lead/{leadId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["QuotesController_byLead"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/quotes/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["QuotesController_detail"];
-        put: operations["QuotesController_saveDraft"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/quotes/{id}/approval": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["QuotesController_approval"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/quotes/{id}/approval/decision": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["QuotesController_decide"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/quotes/{id}/send": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["QuotesController_send"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/quotes/{id}/extend": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["QuotesController_extend"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/quotes/{id}/reject": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["QuotesController_reject"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/quotes/{id}/accept-plan": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["QuotesController_acceptPlan"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/quotes/{id}/accept": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["QuotesController_accept"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/quotes/{id}/versions": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["QuotesController_newVersion"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/quotes/{id}/archive": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["QuotesController_archive"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/quotes/{id}/pdf": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["QuotesController_downloadPdf"];
-        put?: never;
-        post: operations["QuotesController_renderPdf"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2894,6 +2686,230 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["RetainerTemplatesController_generateMissing"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/quote-settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["QuoteSettingsController_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["QuoteSettingsController_update"];
+        trace?: never;
+    };
+    "/api/quotes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["QuotesController_list"];
+        put?: never;
+        post: operations["QuotesController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/quotes/by-lead/{leadId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["QuotesController_byLead"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/quotes/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["QuotesController_detail"];
+        put: operations["QuotesController_saveDraft"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/quotes/{id}/approval": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["QuotesController_approval"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/quotes/{id}/approval/decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["QuotesController_decide"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/quotes/{id}/send": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["QuotesController_send"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/quotes/{id}/extend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["QuotesController_extend"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/quotes/{id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["QuotesController_reject"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/quotes/{id}/accept-plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["QuotesController_acceptPlan"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/quotes/{id}/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["QuotesController_accept"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/quotes/{id}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["QuotesController_newVersion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/quotes/{id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["QuotesController_archive"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/quotes/{id}/pdf": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["QuotesController_downloadPdf"];
+        put?: never;
+        post: operations["QuotesController_renderPdf"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3572,6 +3588,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/dashboard/company": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["DashboardController_company"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/finance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["DashboardController_finance"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/departments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["DashboardController_departments"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/clients": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["DashboardController_clients"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -3595,7 +3675,7 @@ export interface components {
         /** @enum {string} */
         AuditEntityType: "user" | "department" | "client" | "client_contact" | "client_platform_account" | "client_note" | "project" | "project_milestone" | "retainer" | "retainer_cycle" | "extra_work" | "task" | "task_checklist_item" | "task_link" | "task_comment" | "template" | "template_run" | "file_item" | "approval_request" | "post" | "shoot" | "meeting" | "catalog_service" | "catalog_package" | "quote_settings" | "quote" | "invoice_settings" | "invoice" | "payment" | "project_expense" | "ad_campaign" | "ad_campaign_update" | "ad_wallet" | "ad_wallet_entry" | "lead" | "lead_note";
         /** @enum {string} */
-        AuditAction: "user.created" | "user.updated" | "user.roles_changed" | "user.departments_changed" | "user.archived" | "user.restored" | "user.link_issued" | "user.password_set" | "user.password_changed" | "user.two_factor_enabled" | "user.two_factor_disabled" | "user.two_factor_reset" | "user.profile_updated" | "department.updated" | "client.created" | "client.updated" | "client.status_changed" | "client.account_manager_changed" | "client.healthcare_changed" | "client.archived" | "client.restored" | "client.brand_kit_updated" | "client_contact.created" | "client_contact.updated" | "client_contact.archived" | "client_platform_account.created" | "client_platform_account.updated" | "client_platform_account.archived" | "client_note.created" | "client_note.updated" | "client_note.archived" | "project.created" | "project.updated" | "project.project_manager_changed" | "project.status_changed" | "project.money_updated" | "project.archived" | "project.restored" | "project_milestone.created" | "project_milestone.updated" | "project_milestone.reordered" | "project_milestone.completed" | "project_milestone.reopened" | "project_milestone.archived" | "retainer.created" | "retainer.updated" | "retainer.status_changed" | "retainer.deliverables_updated" | "retainer.money_updated" | "retainer.archived" | "retainer.restored" | "retainer_cycle.created" | "retainer_cycle.closed" | "retainer_cycle.line_updated" | "retainer_cycle.line_added" | "retainer_cycle.adjusted" | "extra_work.created" | "extra_work.updated" | "extra_work.billing_changed" | "extra_work.archived" | "task.created" | "task.updated" | "task.assigned" | "task.department_changed" | "task.status_changed" | "task.dependencies_updated" | "task.archived" | "task.restored" | "task.revision_decided" | "task.request_scope_changed" | "task.extra_work_moved" | "task.reviewed" | "task.client_text_updated" | "task.client_response_recorded" | "task_checklist_item.created" | "task_checklist_item.updated" | "task_checklist_item.reordered" | "task_checklist_item.archived" | "task_link.created" | "task_link.archived" | "task_comment.created" | "task_comment.updated" | "task_comment.archived" | "template.created" | "template.updated" | "template.assignees_updated" | "template.archived" | "template.restored" | "template_run.created" | "retainer.template_changed" | "file_item.created" | "file_item.renamed" | "file_item.confidential_changed" | "file_item.archived" | "file_item.restored" | "file_version.created" | "file_version.archived" | "file_version.restored" | "file_version.final_set" | "file_version.final_cleared" | "approval_request.created" | "approval_request.link_reissued" | "approval_request.revoked" | "approval_item.responded" | "approval_item.withdrawn" | "post.created" | "post.updated" | "post.status_changed" | "post.reviewed" | "post.client_response_recorded" | "post.task_linked" | "post.task_unlinked" | "post.task_returned" | "post.duplicated" | "post.archived" | "post.restored" | "shoot.created" | "shoot.updated" | "shoot.shots_changed" | "shoot.shot_ticked" | "shoot.shot_unticked" | "shoot.completed" | "shoot.cancelled" | "shoot.reopened" | "shoot.archived" | "shoot.restored" | "meeting.created" | "meeting.updated" | "meeting.cancelled" | "meeting.archived" | "meeting.restored" | "catalog_service.created" | "catalog_service.updated" | "catalog_service.archived" | "catalog_service.restored" | "catalog_package.created" | "catalog_package.updated" | "catalog_package.archived" | "catalog_package.restored" | "quote_settings.updated" | "quote.created" | "quote.updated" | "quote.approval_requested" | "quote.approval_withdrawn" | "quote.approval_approved" | "quote.approval_returned" | "quote.sent" | "quote.extended" | "quote.expired" | "quote.rejected" | "quote.accepted" | "quote.version_created" | "quote.superseded" | "quote.archived" | "invoice_settings.updated" | "invoice.created" | "invoice.updated" | "invoice.archived" | "invoice.issued" | "invoice.due_date_changed" | "invoice.voided" | "invoice.overdue" | "payment.recorded" | "payment.voided" | "project_expense.created" | "project_expense.updated" | "project_expense.archived" | "ad_campaign.created" | "ad_campaign.updated" | "ad_campaign.status_changed" | "ad_campaign.archived" | "ad_campaign.restored" | "ad_campaign_update.created" | "ad_campaign_update.updated" | "ad_campaign_update.archived" | "ad_wallet.threshold_changed" | "ad_wallet.low_balance" | "ad_wallet.low_balance_cleared" | "ad_wallet_entry.recorded" | "ad_wallet_entry.voided" | "lead.created" | "lead.updated" | "lead.stage_changed" | "lead.owner_changed" | "lead.follow_up_changed" | "lead.lost" | "lead.reopened" | "lead.converted" | "lead.archived" | "lead.restored" | "lead_note.created" | "lead_note.updated" | "lead_note.archived";
+        AuditAction: "user.created" | "user.updated" | "user.roles_changed" | "user.departments_changed" | "user.archived" | "user.restored" | "user.link_issued" | "user.password_set" | "user.password_changed" | "user.two_factor_enabled" | "user.two_factor_disabled" | "user.two_factor_reset" | "user.profile_updated" | "department.updated" | "client.created" | "client.updated" | "client.status_changed" | "client.account_manager_changed" | "client.healthcare_changed" | "client.archived" | "client.restored" | "client.brand_kit_updated" | "client_contact.created" | "client_contact.updated" | "client_contact.archived" | "client_platform_account.created" | "client_platform_account.updated" | "client_platform_account.archived" | "client_note.created" | "client_note.updated" | "client_note.archived" | "project.created" | "project.updated" | "project.project_manager_changed" | "project.status_changed" | "project.money_updated" | "project.archived" | "project.restored" | "project_milestone.created" | "project_milestone.updated" | "project_milestone.reordered" | "project_milestone.completed" | "project_milestone.reopened" | "project_milestone.archived" | "retainer.created" | "retainer.updated" | "retainer.status_changed" | "retainer.deliverables_updated" | "retainer.money_updated" | "retainer.archived" | "retainer.restored" | "retainer_cycle.created" | "retainer_cycle.closed" | "retainer_cycle.line_updated" | "retainer_cycle.line_added" | "retainer_cycle.adjusted" | "extra_work.created" | "extra_work.updated" | "extra_work.billing_changed" | "extra_work.archived" | "task.created" | "task.updated" | "task.assigned" | "task.department_changed" | "task.status_changed" | "task.dependencies_updated" | "task.archived" | "task.restored" | "task.revision_decided" | "task.request_scope_changed" | "task.extra_work_moved" | "task.reviewed" | "task.client_text_updated" | "task.client_response_recorded" | "task_checklist_item.created" | "task_checklist_item.updated" | "task_checklist_item.reordered" | "task_checklist_item.archived" | "task_link.created" | "task_link.archived" | "task_comment.created" | "task_comment.updated" | "task_comment.archived" | "template.created" | "template.updated" | "template.assignees_updated" | "template.archived" | "template.restored" | "template_run.created" | "retainer.template_changed" | "file_item.created" | "file_item.renamed" | "file_item.confidential_changed" | "file_item.archived" | "file_item.restored" | "file_version.created" | "file_version.archived" | "file_version.restored" | "file_version.final_set" | "file_version.final_cleared" | "approval_request.created" | "approval_request.link_reissued" | "approval_request.revoked" | "approval_item.responded" | "approval_item.withdrawn" | "post.created" | "post.updated" | "post.status_changed" | "post.reviewed" | "post.client_response_recorded" | "post.task_linked" | "post.task_unlinked" | "post.task_returned" | "post.duplicated" | "post.archived" | "post.restored" | "shoot.created" | "shoot.updated" | "shoot.shots_changed" | "shoot.shot_ticked" | "shoot.shot_unticked" | "shoot.completed" | "shoot.cancelled" | "shoot.reopened" | "shoot.archived" | "shoot.restored" | "meeting.created" | "meeting.updated" | "meeting.cancelled" | "meeting.archived" | "meeting.restored" | "catalog_service.created" | "catalog_service.updated" | "catalog_service.archived" | "catalog_service.restored" | "catalog_package.created" | "catalog_package.updated" | "catalog_package.archived" | "catalog_package.restored" | "quote_settings.updated" | "quote.created" | "quote.updated" | "quote.approval_requested" | "quote.approval_withdrawn" | "quote.approval_approved" | "quote.approval_returned" | "quote.sent" | "quote.extended" | "quote.expired" | "quote.rejected" | "quote.accepted" | "quote.version_created" | "quote.superseded" | "quote.archived" | "invoice_settings.updated" | "invoice.created" | "invoice.updated" | "invoice.archived" | "invoice.issued" | "invoice.due_date_changed" | "invoice.voided" | "invoice.overdue" | "invoice.services_changed" | "payment.recorded" | "payment.voided" | "project_expense.created" | "project_expense.updated" | "project_expense.archived" | "ad_campaign.created" | "ad_campaign.updated" | "ad_campaign.status_changed" | "ad_campaign.archived" | "ad_campaign.restored" | "ad_campaign_update.created" | "ad_campaign_update.updated" | "ad_campaign_update.archived" | "ad_wallet.threshold_changed" | "ad_wallet.low_balance" | "ad_wallet.low_balance_cleared" | "ad_wallet_entry.recorded" | "ad_wallet_entry.voided" | "lead.created" | "lead.updated" | "lead.stage_changed" | "lead.owner_changed" | "lead.follow_up_changed" | "lead.lost" | "lead.reopened" | "lead.converted" | "lead.archived" | "lead.restored" | "lead_note.created" | "lead_note.updated" | "lead_note.archived";
         /** @description Audit entries, newest first */
         AuditPage: {
             items: components["schemas"]["AuditEntry"][];
@@ -7994,6 +8074,12 @@ export interface components {
                     name: string;
                 } | null;
             } | null;
+            service: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                archived: boolean;
+            } | null;
         };
         /** @enum {string} */
         InvoiceSourceType: "milestone" | "retainer_cycle" | "extra_work";
@@ -8050,6 +8136,7 @@ export interface components {
             canRecordPayment: boolean;
             canVoidPayments: boolean;
             canRenderPdf: boolean;
+            canEditServices: boolean;
         };
         CreateInvoice: {
             /** Format: uuid */
@@ -8090,6 +8177,11 @@ export interface components {
                 unitPriceMinor: number;
                 /** @default null */
                 source: components["schemas"]["InvoiceSource"] | null;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                serviceId: string | null;
             }[];
         };
         IssueInvoice: {
@@ -8110,6 +8202,14 @@ export interface components {
         };
         VoidInvoice: {
             reason: string;
+        };
+        UpdateInvoiceServices: {
+            lines: {
+                /** Format: uuid */
+                lineId: string;
+                /** Format: uuid */
+                serviceId: string | null;
+            }[];
         };
         /** @description The PDF state after asking for a render */
         QuotePdfRender: {
@@ -8286,6 +8386,466 @@ export interface components {
                 invoice: components["schemas"]["SourceInvoice"] | null;
             }[];
             invoices: components["schemas"]["Invoice"][];
+        };
+        /** @enum {string} */
+        CatalogBilling: "one_off" | "monthly";
+        /** @description Catalog services, by name */
+        CatalogServicePage: {
+            items: components["schemas"]["CatalogService"][];
+            total: number;
+            page: number;
+            pageSize: number;
+        };
+        CatalogService: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            description: string | null;
+            department: components["schemas"]["DepartmentCode"];
+            billing: components["schemas"]["CatalogBilling"];
+            priceUsdMinor: number;
+            priceSypMinor: number | null;
+            revisionRounds: number;
+            deliverableKind: components["schemas"]["DeliverableKind"] | null;
+            deliverableLabel: string | null;
+            template: components["schemas"]["CatalogTemplate"] | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** Format: date-time */
+            archivedAt: string | null;
+        };
+        CatalogTemplate: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            kind: components["schemas"]["TemplateKind"];
+            archived: boolean;
+        };
+        /** @enum {string} */
+        TemplateKind: "project" | "retainer_cycle";
+        CreateCatalogService: {
+            name: string;
+            description?: string | null;
+            department: components["schemas"]["DepartmentCode"];
+            billing: components["schemas"]["CatalogBilling"];
+            priceUsdMinor: number;
+            /** @default null */
+            priceSypMinor: number | null;
+            /** @default 2 */
+            revisionRounds: number;
+            /** @default null */
+            deliverableKind: components["schemas"]["DeliverableKind"] | null;
+            deliverableLabel?: string | null;
+            /**
+             * Format: uuid
+             * @default null
+             */
+            templateId: string | null;
+        };
+        UpdateCatalogService: {
+            name?: string;
+            description?: string | null;
+            department?: components["schemas"]["DepartmentCode"];
+            billing?: components["schemas"]["CatalogBilling"];
+            priceUsdMinor?: number;
+            priceSypMinor?: number | null;
+            revisionRounds?: number;
+            deliverableKind?: components["schemas"]["DeliverableKind"] | null;
+            deliverableLabel?: string | null;
+            /** Format: uuid */
+            templateId?: string | null;
+        };
+        /** @description Catalog packages, by name */
+        CatalogPackagePage: {
+            items: components["schemas"]["CatalogPackage"][];
+            total: number;
+            page: number;
+            pageSize: number;
+        };
+        CatalogPackage: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            description: string | null;
+            billing: components["schemas"]["CatalogBilling"];
+            priceUsdMinor: number;
+            priceSypMinor: number | null;
+            template: components["schemas"]["CatalogTemplate"] | null;
+            items: components["schemas"]["CatalogPackageItem"][];
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** Format: date-time */
+            archivedAt: string | null;
+        };
+        CatalogPackageItem: {
+            /** Format: uuid */
+            serviceId: string;
+            name: string;
+            department: components["schemas"]["DepartmentCode"];
+            quantity: number;
+            deliverableKind: components["schemas"]["DeliverableKind"] | null;
+            deliverableLabel: string | null;
+            archived: boolean;
+        };
+        CreateCatalogPackage: {
+            name: string;
+            description?: string | null;
+            billing: components["schemas"]["CatalogBilling"];
+            priceUsdMinor: number;
+            /** @default null */
+            priceSypMinor: number | null;
+            /**
+             * Format: uuid
+             * @default null
+             */
+            templateId: string | null;
+            items: {
+                /** Format: uuid */
+                serviceId: string;
+                quantity: number;
+            }[];
+        };
+        UpdateCatalogPackage: {
+            name?: string;
+            description?: string | null;
+            billing?: components["schemas"]["CatalogBilling"];
+            priceUsdMinor?: number;
+            priceSypMinor?: number | null;
+            /** Format: uuid */
+            templateId?: string | null;
+            items?: {
+                /** Format: uuid */
+                serviceId: string;
+                quantity: number;
+            }[];
+        };
+        /** @description Work templates */
+        TemplatePage: {
+            items: components["schemas"]["TemplateListItem"][];
+            total: number;
+            page: number;
+            pageSize: number;
+        };
+        TemplateListItem: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            kind: components["schemas"]["TemplateKind"];
+            description: string | null;
+            stepCount: number;
+            departments: components["schemas"]["DepartmentCode"][];
+            warningCount: number;
+            linkedRetainerCount: number;
+            /** Format: date-time */
+            updatedAt: string;
+            /** Format: date-time */
+            archivedAt: string | null;
+        };
+        TemplateDetail: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            kind: components["schemas"]["TemplateKind"];
+            description: string | null;
+            stages: components["schemas"]["TemplateStage"][];
+            steps: components["schemas"]["TemplateStep"][];
+            assignees: components["schemas"]["TemplateAssignee"][];
+            warnings: {
+                /** @enum {string} */
+                type: "invalid_assignee";
+                department: components["schemas"]["DepartmentCode"];
+            }[];
+            linkedRetainers: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                client: {
+                    /** Format: uuid */
+                    id: string;
+                    name: string;
+                };
+            }[];
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** Format: date-time */
+            archivedAt: string | null;
+            permissions: components["schemas"]["TemplatePermissions"];
+        };
+        TemplateStage: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            position: number;
+        };
+        TemplateStep: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            stageId: string | null;
+            position: number;
+            title: string;
+            brief: string | null;
+            department: components["schemas"]["DepartmentCode"];
+            dueDay: number | null;
+            priority: components["schemas"]["TaskPriority"];
+            needsClientApproval: boolean;
+            revisionLimit: number;
+            checklist: string[];
+            repeatKind: components["schemas"]["DeliverableKind"] | null;
+            repeatLabel: string | null;
+            spreadFromDay: number | null;
+            dependsOn: string[];
+        };
+        TemplateAssignee: {
+            department: components["schemas"]["DepartmentCode"];
+            user: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                archived: boolean;
+            };
+            valid: boolean;
+        };
+        TemplatePermissions: {
+            canEdit: boolean;
+            canArchive: boolean;
+        };
+        CreateTemplate: {
+            name: string;
+            description?: string | null;
+            /** @default [] */
+            stages: {
+                key: string;
+                name: string;
+            }[];
+            steps: {
+                key: string;
+                /** @default null */
+                stageKey: string | null;
+                title: string;
+                brief?: string | null;
+                department: components["schemas"]["DepartmentCode"];
+                /** @default null */
+                dueDay: number | null;
+                /** @default normal */
+                priority: components["schemas"]["TaskPriority"];
+                /** @default true */
+                needsClientApproval: boolean;
+                /** @default 2 */
+                revisionLimit: number;
+                /** @default [] */
+                checklist: string[];
+                /** @default null */
+                repeatKind: components["schemas"]["DeliverableKind"] | null;
+                repeatLabel?: string | null;
+                /** @default null */
+                spreadFromDay: number | null;
+                dependsOn?: string[];
+            }[];
+            /** @default [] */
+            assignees: {
+                department: components["schemas"]["DepartmentCode"];
+                /** Format: uuid */
+                userId: string;
+            }[];
+            kind: components["schemas"]["TemplateKind"];
+        };
+        UpdateTemplate: {
+            name: string;
+            description?: string | null;
+            /** @default [] */
+            stages: {
+                key: string;
+                name: string;
+            }[];
+            steps: {
+                key: string;
+                /** @default null */
+                stageKey: string | null;
+                title: string;
+                brief?: string | null;
+                department: components["schemas"]["DepartmentCode"];
+                /** @default null */
+                dueDay: number | null;
+                /** @default normal */
+                priority: components["schemas"]["TaskPriority"];
+                /** @default true */
+                needsClientApproval: boolean;
+                /** @default 2 */
+                revisionLimit: number;
+                /** @default [] */
+                checklist: string[];
+                /** @default null */
+                repeatKind: components["schemas"]["DeliverableKind"] | null;
+                repeatLabel?: string | null;
+                /** @default null */
+                spreadFromDay: number | null;
+                dependsOn?: string[];
+            }[];
+            /** @default [] */
+            assignees: {
+                department: components["schemas"]["DepartmentCode"];
+                /** Format: uuid */
+                userId: string;
+            }[];
+        };
+        TemplateRunInput: {
+            /** Format: uuid */
+            projectId?: string;
+            /** Format: uuid */
+            retainerCycleId?: string;
+            /** Format: date */
+            startDate?: string;
+            revisionLimit?: number;
+            /** @default [] */
+            assignees: {
+                department: components["schemas"]["DepartmentCode"];
+                /** Format: uuid */
+                userId: string | null;
+            }[];
+        };
+        TemplateRunPlan: {
+            /** Format: date */
+            startDate: string;
+            tasks: components["schemas"]["TemplatePlannedTask"][];
+            milestonesToCreate: {
+                name: string;
+                /** Format: date */
+                dueDate: string;
+            }[];
+            warnings: components["schemas"]["TemplateRunWarning"][];
+            taskCount: number;
+        };
+        TemplatePlannedTask: {
+            key: string;
+            title: string;
+            department: components["schemas"]["DepartmentCode"];
+            assignee: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            assigneeReplaced: boolean;
+            /** Format: date */
+            dueDate: string;
+            milestone: {
+                /** Format: uuid */
+                existingId: string | null;
+                name: string;
+            } | null;
+            /** Format: uuid */
+            cycleLineId: string | null;
+            dependsOn: string[];
+        };
+        TemplateRunWarning: {
+            /** @enum {string} */
+            type: "due_after_project" | "applied_before" | "assignee_replaced" | "over_cap";
+            department: components["schemas"]["DepartmentCode"] | null;
+            count: number;
+        };
+        TemplateRun: {
+            /** Format: uuid */
+            id: string;
+            template: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                archived: boolean;
+            };
+            trigger: components["schemas"]["TemplateRunTrigger"];
+            project: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            cycle: {
+                /** Format: uuid */
+                id: string;
+                /** Format: date */
+                month: string;
+                retainer: {
+                    /** Format: uuid */
+                    id: string;
+                    name: string;
+                };
+            } | null;
+            cycleLine: {
+                /** Format: uuid */
+                id: string;
+                kind: components["schemas"]["DeliverableKind"];
+                label: string | null;
+            } | null;
+            /** Format: date */
+            startDate: string;
+            taskCount: number;
+            milestonesCreated: number;
+            createdBy: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            /** Format: date-time */
+            createdAt: string;
+            tasks?: components["schemas"]["TemplateRunTask"][];
+        };
+        /** @enum {string} */
+        TemplateRunTrigger: "manual" | "cycle_opened" | "missing_tasks";
+        TemplateRunTask: {
+            /** Format: uuid */
+            id: string;
+            title: string;
+            status: components["schemas"]["TaskStatus"];
+        };
+        /** @description Template runs, newest first */
+        TemplateRunPage: {
+            items: components["schemas"]["TemplateRun"][];
+            total: number;
+            page: number;
+            pageSize: number;
+        };
+        RetainerTemplate: {
+            template: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                archived: boolean;
+            } | null;
+            cycle: {
+                /** Format: uuid */
+                id: string;
+                /** Format: date */
+                month: string;
+                /** Format: date */
+                periodStart: string;
+                /** Format: date */
+                periodEnd: string;
+            } | null;
+            run: components["schemas"]["TemplateRun"] | null;
+            lines: components["schemas"]["RetainerTemplateLine"][];
+            permissions: {
+                canLink: boolean;
+                canGenerate: boolean;
+            };
+        };
+        RetainerTemplateLine: {
+            /** Format: uuid */
+            id: string;
+            kind: components["schemas"]["DeliverableKind"];
+            label: string | null;
+            committed: number;
+            tasks: number;
+            missing: number;
+            canGenerate: boolean;
+        };
+        SetRetainerTemplate: {
+            /** Format: uuid */
+            templateId: string | null;
         };
         QuoteSettings: {
             companyDetails: string;
@@ -8868,466 +9428,6 @@ export interface components {
                 /** @enum {boolean} */
                 add: true;
             };
-        };
-        /** @enum {string} */
-        CatalogBilling: "one_off" | "monthly";
-        /** @description Catalog services, by name */
-        CatalogServicePage: {
-            items: components["schemas"]["CatalogService"][];
-            total: number;
-            page: number;
-            pageSize: number;
-        };
-        CatalogService: {
-            /** Format: uuid */
-            id: string;
-            name: string;
-            description: string | null;
-            department: components["schemas"]["DepartmentCode"];
-            billing: components["schemas"]["CatalogBilling"];
-            priceUsdMinor: number;
-            priceSypMinor: number | null;
-            revisionRounds: number;
-            deliverableKind: components["schemas"]["DeliverableKind"] | null;
-            deliverableLabel: string | null;
-            template: components["schemas"]["CatalogTemplate"] | null;
-            /** Format: date-time */
-            createdAt: string;
-            /** Format: date-time */
-            updatedAt: string;
-            /** Format: date-time */
-            archivedAt: string | null;
-        };
-        CatalogTemplate: {
-            /** Format: uuid */
-            id: string;
-            name: string;
-            kind: components["schemas"]["TemplateKind"];
-            archived: boolean;
-        };
-        /** @enum {string} */
-        TemplateKind: "project" | "retainer_cycle";
-        CreateCatalogService: {
-            name: string;
-            description?: string | null;
-            department: components["schemas"]["DepartmentCode"];
-            billing: components["schemas"]["CatalogBilling"];
-            priceUsdMinor: number;
-            /** @default null */
-            priceSypMinor: number | null;
-            /** @default 2 */
-            revisionRounds: number;
-            /** @default null */
-            deliverableKind: components["schemas"]["DeliverableKind"] | null;
-            deliverableLabel?: string | null;
-            /**
-             * Format: uuid
-             * @default null
-             */
-            templateId: string | null;
-        };
-        UpdateCatalogService: {
-            name?: string;
-            description?: string | null;
-            department?: components["schemas"]["DepartmentCode"];
-            billing?: components["schemas"]["CatalogBilling"];
-            priceUsdMinor?: number;
-            priceSypMinor?: number | null;
-            revisionRounds?: number;
-            deliverableKind?: components["schemas"]["DeliverableKind"] | null;
-            deliverableLabel?: string | null;
-            /** Format: uuid */
-            templateId?: string | null;
-        };
-        /** @description Catalog packages, by name */
-        CatalogPackagePage: {
-            items: components["schemas"]["CatalogPackage"][];
-            total: number;
-            page: number;
-            pageSize: number;
-        };
-        CatalogPackage: {
-            /** Format: uuid */
-            id: string;
-            name: string;
-            description: string | null;
-            billing: components["schemas"]["CatalogBilling"];
-            priceUsdMinor: number;
-            priceSypMinor: number | null;
-            template: components["schemas"]["CatalogTemplate"] | null;
-            items: components["schemas"]["CatalogPackageItem"][];
-            /** Format: date-time */
-            createdAt: string;
-            /** Format: date-time */
-            updatedAt: string;
-            /** Format: date-time */
-            archivedAt: string | null;
-        };
-        CatalogPackageItem: {
-            /** Format: uuid */
-            serviceId: string;
-            name: string;
-            department: components["schemas"]["DepartmentCode"];
-            quantity: number;
-            deliverableKind: components["schemas"]["DeliverableKind"] | null;
-            deliverableLabel: string | null;
-            archived: boolean;
-        };
-        CreateCatalogPackage: {
-            name: string;
-            description?: string | null;
-            billing: components["schemas"]["CatalogBilling"];
-            priceUsdMinor: number;
-            /** @default null */
-            priceSypMinor: number | null;
-            /**
-             * Format: uuid
-             * @default null
-             */
-            templateId: string | null;
-            items: {
-                /** Format: uuid */
-                serviceId: string;
-                quantity: number;
-            }[];
-        };
-        UpdateCatalogPackage: {
-            name?: string;
-            description?: string | null;
-            billing?: components["schemas"]["CatalogBilling"];
-            priceUsdMinor?: number;
-            priceSypMinor?: number | null;
-            /** Format: uuid */
-            templateId?: string | null;
-            items?: {
-                /** Format: uuid */
-                serviceId: string;
-                quantity: number;
-            }[];
-        };
-        /** @description Work templates */
-        TemplatePage: {
-            items: components["schemas"]["TemplateListItem"][];
-            total: number;
-            page: number;
-            pageSize: number;
-        };
-        TemplateListItem: {
-            /** Format: uuid */
-            id: string;
-            name: string;
-            kind: components["schemas"]["TemplateKind"];
-            description: string | null;
-            stepCount: number;
-            departments: components["schemas"]["DepartmentCode"][];
-            warningCount: number;
-            linkedRetainerCount: number;
-            /** Format: date-time */
-            updatedAt: string;
-            /** Format: date-time */
-            archivedAt: string | null;
-        };
-        TemplateDetail: {
-            /** Format: uuid */
-            id: string;
-            name: string;
-            kind: components["schemas"]["TemplateKind"];
-            description: string | null;
-            stages: components["schemas"]["TemplateStage"][];
-            steps: components["schemas"]["TemplateStep"][];
-            assignees: components["schemas"]["TemplateAssignee"][];
-            warnings: {
-                /** @enum {string} */
-                type: "invalid_assignee";
-                department: components["schemas"]["DepartmentCode"];
-            }[];
-            linkedRetainers: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-                client: {
-                    /** Format: uuid */
-                    id: string;
-                    name: string;
-                };
-            }[];
-            /** Format: date-time */
-            createdAt: string;
-            /** Format: date-time */
-            updatedAt: string;
-            /** Format: date-time */
-            archivedAt: string | null;
-            permissions: components["schemas"]["TemplatePermissions"];
-        };
-        TemplateStage: {
-            /** Format: uuid */
-            id: string;
-            name: string;
-            position: number;
-        };
-        TemplateStep: {
-            /** Format: uuid */
-            id: string;
-            /** Format: uuid */
-            stageId: string | null;
-            position: number;
-            title: string;
-            brief: string | null;
-            department: components["schemas"]["DepartmentCode"];
-            dueDay: number | null;
-            priority: components["schemas"]["TaskPriority"];
-            needsClientApproval: boolean;
-            revisionLimit: number;
-            checklist: string[];
-            repeatKind: components["schemas"]["DeliverableKind"] | null;
-            repeatLabel: string | null;
-            spreadFromDay: number | null;
-            dependsOn: string[];
-        };
-        TemplateAssignee: {
-            department: components["schemas"]["DepartmentCode"];
-            user: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-                archived: boolean;
-            };
-            valid: boolean;
-        };
-        TemplatePermissions: {
-            canEdit: boolean;
-            canArchive: boolean;
-        };
-        CreateTemplate: {
-            name: string;
-            description?: string | null;
-            /** @default [] */
-            stages: {
-                key: string;
-                name: string;
-            }[];
-            steps: {
-                key: string;
-                /** @default null */
-                stageKey: string | null;
-                title: string;
-                brief?: string | null;
-                department: components["schemas"]["DepartmentCode"];
-                /** @default null */
-                dueDay: number | null;
-                /** @default normal */
-                priority: components["schemas"]["TaskPriority"];
-                /** @default true */
-                needsClientApproval: boolean;
-                /** @default 2 */
-                revisionLimit: number;
-                /** @default [] */
-                checklist: string[];
-                /** @default null */
-                repeatKind: components["schemas"]["DeliverableKind"] | null;
-                repeatLabel?: string | null;
-                /** @default null */
-                spreadFromDay: number | null;
-                dependsOn?: string[];
-            }[];
-            /** @default [] */
-            assignees: {
-                department: components["schemas"]["DepartmentCode"];
-                /** Format: uuid */
-                userId: string;
-            }[];
-            kind: components["schemas"]["TemplateKind"];
-        };
-        UpdateTemplate: {
-            name: string;
-            description?: string | null;
-            /** @default [] */
-            stages: {
-                key: string;
-                name: string;
-            }[];
-            steps: {
-                key: string;
-                /** @default null */
-                stageKey: string | null;
-                title: string;
-                brief?: string | null;
-                department: components["schemas"]["DepartmentCode"];
-                /** @default null */
-                dueDay: number | null;
-                /** @default normal */
-                priority: components["schemas"]["TaskPriority"];
-                /** @default true */
-                needsClientApproval: boolean;
-                /** @default 2 */
-                revisionLimit: number;
-                /** @default [] */
-                checklist: string[];
-                /** @default null */
-                repeatKind: components["schemas"]["DeliverableKind"] | null;
-                repeatLabel?: string | null;
-                /** @default null */
-                spreadFromDay: number | null;
-                dependsOn?: string[];
-            }[];
-            /** @default [] */
-            assignees: {
-                department: components["schemas"]["DepartmentCode"];
-                /** Format: uuid */
-                userId: string;
-            }[];
-        };
-        TemplateRunInput: {
-            /** Format: uuid */
-            projectId?: string;
-            /** Format: uuid */
-            retainerCycleId?: string;
-            /** Format: date */
-            startDate?: string;
-            revisionLimit?: number;
-            /** @default [] */
-            assignees: {
-                department: components["schemas"]["DepartmentCode"];
-                /** Format: uuid */
-                userId: string | null;
-            }[];
-        };
-        TemplateRunPlan: {
-            /** Format: date */
-            startDate: string;
-            tasks: components["schemas"]["TemplatePlannedTask"][];
-            milestonesToCreate: {
-                name: string;
-                /** Format: date */
-                dueDate: string;
-            }[];
-            warnings: components["schemas"]["TemplateRunWarning"][];
-            taskCount: number;
-        };
-        TemplatePlannedTask: {
-            key: string;
-            title: string;
-            department: components["schemas"]["DepartmentCode"];
-            assignee: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            } | null;
-            assigneeReplaced: boolean;
-            /** Format: date */
-            dueDate: string;
-            milestone: {
-                /** Format: uuid */
-                existingId: string | null;
-                name: string;
-            } | null;
-            /** Format: uuid */
-            cycleLineId: string | null;
-            dependsOn: string[];
-        };
-        TemplateRunWarning: {
-            /** @enum {string} */
-            type: "due_after_project" | "applied_before" | "assignee_replaced" | "over_cap";
-            department: components["schemas"]["DepartmentCode"] | null;
-            count: number;
-        };
-        TemplateRun: {
-            /** Format: uuid */
-            id: string;
-            template: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-                archived: boolean;
-            };
-            trigger: components["schemas"]["TemplateRunTrigger"];
-            project: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            } | null;
-            cycle: {
-                /** Format: uuid */
-                id: string;
-                /** Format: date */
-                month: string;
-                retainer: {
-                    /** Format: uuid */
-                    id: string;
-                    name: string;
-                };
-            } | null;
-            cycleLine: {
-                /** Format: uuid */
-                id: string;
-                kind: components["schemas"]["DeliverableKind"];
-                label: string | null;
-            } | null;
-            /** Format: date */
-            startDate: string;
-            taskCount: number;
-            milestonesCreated: number;
-            createdBy: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            } | null;
-            /** Format: date-time */
-            createdAt: string;
-            tasks?: components["schemas"]["TemplateRunTask"][];
-        };
-        /** @enum {string} */
-        TemplateRunTrigger: "manual" | "cycle_opened" | "missing_tasks";
-        TemplateRunTask: {
-            /** Format: uuid */
-            id: string;
-            title: string;
-            status: components["schemas"]["TaskStatus"];
-        };
-        /** @description Template runs, newest first */
-        TemplateRunPage: {
-            items: components["schemas"]["TemplateRun"][];
-            total: number;
-            page: number;
-            pageSize: number;
-        };
-        RetainerTemplate: {
-            template: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-                archived: boolean;
-            } | null;
-            cycle: {
-                /** Format: uuid */
-                id: string;
-                /** Format: date */
-                month: string;
-                /** Format: date */
-                periodStart: string;
-                /** Format: date */
-                periodEnd: string;
-            } | null;
-            run: components["schemas"]["TemplateRun"] | null;
-            lines: components["schemas"]["RetainerTemplateLine"][];
-            permissions: {
-                canLink: boolean;
-                canGenerate: boolean;
-            };
-        };
-        RetainerTemplateLine: {
-            /** Format: uuid */
-            id: string;
-            kind: components["schemas"]["DeliverableKind"];
-            label: string | null;
-            committed: number;
-            tasks: number;
-            missing: number;
-            canGenerate: boolean;
-        };
-        SetRetainerTemplate: {
-            /** Format: uuid */
-            templateId: string | null;
         };
         /** @enum {string} */
         LeadSource: "instagram" | "facebook" | "tiktok" | "whatsapp" | "website" | "referral" | "paid_ad" | "event" | "walk_in" | "other";
@@ -10504,6 +10604,168 @@ export interface components {
         };
         VoidWalletEntry: {
             reason: string;
+        };
+        CompanyDashboard: {
+            months: components["schemas"]["ReportMonths"];
+            activeEngagements: {
+                projects: {
+                    status: components["schemas"]["ProjectStatus"];
+                    count: number;
+                }[];
+                retainers: number;
+            };
+            departments: {
+                department: components["schemas"]["DepartmentCode"];
+                open: number;
+                dueThisWeek: number;
+                overdue: number;
+                unassigned: number;
+            }[];
+            retainersBehind: {
+                client: {
+                    /** Format: uuid */
+                    id: string;
+                    name: string;
+                };
+                retainer: {
+                    /** Format: uuid */
+                    id: string;
+                    name: string;
+                };
+                /** Format: uuid */
+                cycleId: string;
+                linesBehind: number;
+                completion: number | null;
+            }[];
+            approvalsWaiting: {
+                count: number;
+                oldest: {
+                    /** Format: uuid */
+                    itemId: string;
+                    title: string;
+                    client: {
+                        /** Format: uuid */
+                        id: string;
+                        name: string;
+                    };
+                    /** Format: date-time */
+                    sentAt: string;
+                    expired: boolean;
+                } | null;
+            };
+            lowWallets: {
+                client: {
+                    /** Format: uuid */
+                    id: string;
+                    name: string;
+                };
+                balanceUsdMinor: number;
+            }[];
+            leads: {
+                thisMonth: {
+                    new: number;
+                    won: number;
+                    lost: number;
+                    conversionRate: number | null;
+                };
+                lastMonth: {
+                    new: number;
+                    won: number;
+                    lost: number;
+                    conversionRate: number | null;
+                };
+            };
+        };
+        ReportMonths: {
+            thisMonth: components["schemas"]["ReportPeriod"];
+            lastMonth: components["schemas"]["ReportPeriod"];
+        };
+        ReportPeriod: {
+            /** Format: date */
+            from: string;
+            /** Format: date */
+            to: string;
+        };
+        FinanceDashboard: {
+            months: components["schemas"]["ReportMonths"];
+            invoicedUsdMinor: {
+                thisMonth: number;
+                lastMonth: number;
+            };
+            collectedUsdMinor: {
+                thisMonth: number;
+                lastMonth: number;
+            };
+            outstanding: {
+                byCurrency: {
+                    currency: components["schemas"]["Currency"];
+                    amountMinor: number;
+                }[];
+                usdMinor: number;
+            };
+            overdue: {
+                count: number;
+                byCurrency: {
+                    currency: components["schemas"]["Currency"];
+                    amountMinor: number;
+                }[];
+                usdMinor: number;
+            };
+        };
+        DepartmentDashboard: {
+            departments: components["schemas"]["DepartmentCode"][];
+            department: components["schemas"]["DepartmentCode"];
+            week: components["schemas"]["ReportPeriod"];
+            byStatus: {
+                status: components["schemas"]["TaskStatus"];
+                count: number;
+            }[];
+            overdue: {
+                count: number;
+                oldest: components["schemas"]["Task"][];
+            };
+            unassigned: number;
+            people: {
+                user: {
+                    /** Format: uuid */
+                    id: string;
+                    name: string;
+                };
+                overdue: number;
+                dueThisWeek: number;
+                open: number;
+            }[];
+        };
+        MyClientsDashboard: {
+            clients: {
+                client: {
+                    /** Format: uuid */
+                    id: string;
+                    name: string;
+                };
+                retainers: {
+                    retainer: {
+                        /** Format: uuid */
+                        id: string;
+                        name: string;
+                    };
+                    completion: number | null;
+                    behind: boolean;
+                }[];
+                openProjects: number;
+                approvals: {
+                    pending: number;
+                    /** Format: date-time */
+                    oldestSentAt: string | null;
+                    waiting: boolean;
+                };
+                invoices: {
+                    outstandingUsdMinor: number;
+                    overdue: number;
+                } | null;
+                lowWallet: boolean | null;
+                hasProblem: boolean;
+            }[];
         };
         /** @description Liveness of the API and its dependencies */
         HealthResponse: {
@@ -15148,6 +15410,39 @@ export interface operations {
             };
         };
     };
+    InvoicesController_updateServices: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateInvoiceServices"];
+            };
+        };
+        responses: {
+            /** @description The invoice with the services of its lines (F15 rule 22) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvoiceDetail"];
+                };
+            };
+            /** @description No such invoice in your scope */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     InvoicesController_archive: {
         parameters: {
             query?: never;
@@ -15539,456 +15834,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RetainerBilling"];
-                };
-            };
-        };
-    };
-    QuoteSettingsController_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description The quote settings */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["QuoteSettings"];
-                };
-            };
-        };
-    };
-    QuoteSettingsController_update: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["UpdateQuoteSettings"];
-            };
-        };
-        responses: {
-            /** @description The settings after the change. Texts and validity need `catalog.manage`; the threshold `quotes.approve_discount` */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["QuoteSettings"];
-                };
-            };
-        };
-    };
-    QuotesController_list: {
-        parameters: {
-            query?: {
-                page?: number;
-                pageSize?: number;
-                search?: string;
-                status?: components["schemas"]["QuoteStatus"] | components["schemas"]["QuoteStatus"][];
-                clientId?: string;
-                leadId?: string;
-                accountManagerId?: string;
-                approval?: "pending";
-                projectId?: string;
-                retainerId?: string;
-                archived?: "true" | "false";
-                latestOnly?: "true" | "false";
-                sort?: "updatedAt" | "number" | "validUntil";
-                order?: components["schemas"]["SortOrder"];
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Quotes of the clients in scope; the latest open versions by default */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["QuotePage"];
-                };
-            };
-        };
-    };
-    QuotesController_create: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CreateQuote"];
-            };
-        };
-        responses: {
-            /** @description The new draft */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["QuoteDetail"];
-                };
-            };
-        };
-    };
-    QuotesController_byLead: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                leadId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description A lead's quotes for its page (F03); nets only where quotes.read covers them */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LeadQuotes"];
-                };
-            };
-        };
-    };
-    QuotesController_detail: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description A quote version */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["QuoteDetail"];
-                };
-            };
-        };
-    };
-    QuotesController_saveDraft: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["QuoteDraft"];
-            };
-        };
-        responses: {
-            /** @description The saved draft */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["QuoteDetail"];
-                };
-            };
-        };
-    };
-    QuotesController_approval: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["QuoteApprovalAction"];
-            };
-        };
-        responses: {
-            /** @description The draft after requesting or withdrawing discount approval */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["QuoteDetail"];
-                };
-            };
-        };
-    };
-    QuotesController_decide: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["QuoteApprovalDecision"];
-            };
-        };
-        responses: {
-            /** @description The draft after the discount was approved or returned */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["QuoteDetail"];
-                };
-            };
-        };
-    };
-    QuotesController_send: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SendQuote"];
-            };
-        };
-        responses: {
-            /** @description The sent quote */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["QuoteDetail"];
-                };
-            };
-        };
-    };
-    QuotesController_extend: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ExtendQuote"];
-            };
-        };
-        responses: {
-            /** @description The quote, sent again */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["QuoteDetail"];
-                };
-            };
-        };
-    };
-    QuotesController_reject: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["RejectQuote"];
-            };
-        };
-        responses: {
-            /** @description The rejected quote */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["QuoteDetail"];
-                };
-            };
-        };
-    };
-    QuotesController_acceptPlan: {
-        parameters: {
-            query?: {
-                projectStartDate?: string;
-                chooseTemplates?: "true" | "false";
-                templateIds?: string | string[];
-                retainerStartDate?: string;
-                clientId?: string;
-            };
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description The accept dialog's defaults for its current choices (A2–A6) */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AcceptPlan"];
-                };
-            };
-        };
-    };
-    QuotesController_accept: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["AcceptQuote"];
-            };
-        };
-        responses: {
-            /** @description The accepted quote, with the project and retainer it created or renewed (A01) */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["QuoteDetail"];
-                };
-            };
-        };
-    };
-    QuotesController_newVersion: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description The new draft version */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["QuoteDetail"];
-                };
-            };
-        };
-    };
-    QuotesController_archive: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description The draft was discarded */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    QuotesController_downloadPdf: {
-        parameters: {
-            query?: {
-                draft?: "true";
-            };
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description The PDF of the version, or the draft preview with draft=true */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description No such quote, or its PDF is not ready */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    QuotesController_renderPdf: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Queues the draft preview (client scope) or renders a sent version again when its PDF is not ready */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["QuotePdfRender"];
                 };
             };
         };
@@ -16547,6 +16392,456 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TemplateRun"];
+                };
+            };
+        };
+    };
+    QuoteSettingsController_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The quote settings */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuoteSettings"];
+                };
+            };
+        };
+    };
+    QuoteSettingsController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateQuoteSettings"];
+            };
+        };
+        responses: {
+            /** @description The settings after the change. Texts and validity need `catalog.manage`; the threshold `quotes.approve_discount` */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuoteSettings"];
+                };
+            };
+        };
+    };
+    QuotesController_list: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+                search?: string;
+                status?: components["schemas"]["QuoteStatus"] | components["schemas"]["QuoteStatus"][];
+                clientId?: string;
+                leadId?: string;
+                accountManagerId?: string;
+                approval?: "pending";
+                projectId?: string;
+                retainerId?: string;
+                archived?: "true" | "false";
+                latestOnly?: "true" | "false";
+                sort?: "updatedAt" | "number" | "validUntil";
+                order?: components["schemas"]["SortOrder"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Quotes of the clients in scope; the latest open versions by default */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuotePage"];
+                };
+            };
+        };
+    };
+    QuotesController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateQuote"];
+            };
+        };
+        responses: {
+            /** @description The new draft */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuoteDetail"];
+                };
+            };
+        };
+    };
+    QuotesController_byLead: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                leadId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A lead's quotes for its page (F03); nets only where quotes.read covers them */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeadQuotes"];
+                };
+            };
+        };
+    };
+    QuotesController_detail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A quote version */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuoteDetail"];
+                };
+            };
+        };
+    };
+    QuotesController_saveDraft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QuoteDraft"];
+            };
+        };
+        responses: {
+            /** @description The saved draft */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuoteDetail"];
+                };
+            };
+        };
+    };
+    QuotesController_approval: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QuoteApprovalAction"];
+            };
+        };
+        responses: {
+            /** @description The draft after requesting or withdrawing discount approval */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuoteDetail"];
+                };
+            };
+        };
+    };
+    QuotesController_decide: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QuoteApprovalDecision"];
+            };
+        };
+        responses: {
+            /** @description The draft after the discount was approved or returned */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuoteDetail"];
+                };
+            };
+        };
+    };
+    QuotesController_send: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SendQuote"];
+            };
+        };
+        responses: {
+            /** @description The sent quote */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuoteDetail"];
+                };
+            };
+        };
+    };
+    QuotesController_extend: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExtendQuote"];
+            };
+        };
+        responses: {
+            /** @description The quote, sent again */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuoteDetail"];
+                };
+            };
+        };
+    };
+    QuotesController_reject: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RejectQuote"];
+            };
+        };
+        responses: {
+            /** @description The rejected quote */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuoteDetail"];
+                };
+            };
+        };
+    };
+    QuotesController_acceptPlan: {
+        parameters: {
+            query?: {
+                projectStartDate?: string;
+                chooseTemplates?: "true" | "false";
+                templateIds?: string | string[];
+                retainerStartDate?: string;
+                clientId?: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The accept dialog's defaults for its current choices (A2–A6) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AcceptPlan"];
+                };
+            };
+        };
+    };
+    QuotesController_accept: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AcceptQuote"];
+            };
+        };
+        responses: {
+            /** @description The accepted quote, with the project and retainer it created or renewed (A01) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuoteDetail"];
+                };
+            };
+        };
+    };
+    QuotesController_newVersion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The new draft version */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuoteDetail"];
+                };
+            };
+        };
+    };
+    QuotesController_archive: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The draft was discarded */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    QuotesController_downloadPdf: {
+        parameters: {
+            query?: {
+                draft?: "true";
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The PDF of the version, or the draft preview with draft=true */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such quote, or its PDF is not ready */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    QuotesController_renderPdf: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Queues the draft preview (client scope) or renders a sent version again when its PDF is not ready */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuotePdfRender"];
                 };
             };
         };
@@ -17890,6 +18185,109 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["QuotePdfRender"];
                 };
+            };
+        };
+    };
+    DashboardController_company: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The Company section of the home page (F15 rule 1) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompanyDashboard"];
+                };
+            };
+            /** @description Needs `reports.read` under `all` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    DashboardController_finance: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The Finance section of the home page (F15 rule 2) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FinanceDashboard"];
+                };
+            };
+        };
+    };
+    DashboardController_departments: {
+        parameters: {
+            query?: {
+                department?: components["schemas"]["DepartmentCode"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The Departments section of the home page for one department (F15 rule 3) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DepartmentDashboard"];
+                };
+            };
+            /** @description The department is not in your `reports.read` scope */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    DashboardController_clients: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The My clients section of the home page (F15 rule 4) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyClientsDashboard"];
+                };
+            };
+            /** @description Needs `reports.read` under `own_clients` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

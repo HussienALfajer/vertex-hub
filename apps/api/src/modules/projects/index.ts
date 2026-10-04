@@ -26,6 +26,10 @@ export {
   type RenewableRetainer,
   type RetainerRenewal,
 } from './engagement-factory.js';
+export {
+  EngagementReports,
+  type RetainerProgress,
+} from './engagement-reports.js';
 export { type MilestoneDone, MilestoneDoneHooks } from './milestone-done-hooks.js';
 export { ProjectsModule } from './projects.module.js';
 export { type CycleLineCounts, WorkProgress, type WorkProgressSource } from './work-progress.js';

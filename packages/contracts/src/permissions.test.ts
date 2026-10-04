@@ -303,16 +303,18 @@ describe('tasks (F06)', () => {
     expect(permissionScopes(designManager, 'tasks.manage')).toEqual(['department', 'assigned']);
   });
 
-  it('lets the Operations manager manage every task and read operational reports', () => {
+  it('lets the Operations manager manage every task and read operational and financial reports', () => {
     expect(permissionScopes(operationsManager, 'tasks.manage')).toEqual([
       'all',
       'department',
       'assigned',
     ]);
     expect(permissionScopes(operationsManager, 'reports.read')).toEqual(['all', 'department']);
+    expect(permissionScopes(operationsManager, 'reports.finance')).toEqual(['all']);
     const member = access(['employee'], [{ code: 'internal_operations', isManager: false }]);
     expect(permissionScopes(member, 'tasks.manage')).toEqual(['assigned']);
     expect(hasPermission(member, 'reports.read')).toBe(false);
+    expect(hasPermission(member, 'reports.finance')).toBe(false);
   });
 });
 

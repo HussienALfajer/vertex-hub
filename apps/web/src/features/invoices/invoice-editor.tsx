@@ -62,6 +62,8 @@ interface EditorLine {
   quantity: number;
   unitPriceMinor: number;
   source: LineSource | null;
+  /** The catalog service (F15); kept on save, none for a new line. */
+  serviceId?: string | null;
 }
 
 interface EditorValues {
@@ -87,6 +89,7 @@ function editorValues(invoice: InvoiceDetail): EditorValues {
       quantity: line.quantity,
       unitPriceMinor: line.unitPriceMinor,
       source: line.source,
+      serviceId: line.service?.id ?? null,
     })),
   };
 }
@@ -105,6 +108,7 @@ function draftInput(values: EditorValues, updatedAt: string): InvoiceDraftInput 
       quantity: line.quantity,
       unitPriceMinor: line.unitPriceMinor,
       source: line.source ? { type: line.source.type, id: line.source.id } : null,
+      serviceId: line.serviceId ?? null,
     })),
   };
 }

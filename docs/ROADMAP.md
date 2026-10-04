@@ -48,7 +48,7 @@ Build order (owner, 2026-09-30): F10 → F09 → F08 → F11. F09 approves exact
 - [ ] Production deploy of Phase 3
 
 ## Phase 4 — Visibility
-- [~] F15 Dashboards and reports (incl. monthly client report) (spec: `docs/specs/F15-dashboards-reports.md`, ADR 0027)
+- [~] F15 Dashboards and reports (incl. monthly client report) (spec: `docs/specs/F15-dashboards-reports.md`, ADR 0027): the dashboard API (Company, Finance, Departments and My clients sections through the modules' read-only report services and the new `reports` module), invoice line services (`PUT /api/invoices/:id/services`) and `reports.finance` for the Operations manager (PR 1); next the reports API with Excel and the monthly client report PDF (PR 2), then the screens (PR 3)
 - [ ] F14 Email and daily digest
 - [ ] Production deploy of Phase 4
 

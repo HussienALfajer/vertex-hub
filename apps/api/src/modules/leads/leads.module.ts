@@ -10,6 +10,7 @@ import { LeadNotesService } from './lead-notes.service.js';
 import { LeadPipeline } from './lead-pipeline.js';
 import { LeadPipelineService } from './lead-pipeline.service.js';
 import { LeadReminders } from './lead-reminders.js';
+import { LeadReports } from './lead-reports.js';
 import { LeadsController } from './leads.controller.js';
 import { LeadsService } from './leads.service.js';
 
@@ -20,7 +21,7 @@ import { LeadsService } from './leads.service.js';
  * clients through `ClientDirectory` and catalog items through `CatalogDirectory`; creates clients
  * through `ClientFactory`; blocks archiving a user who owns open leads (`ResponsibilityRegistry`).
  * Exports `LeadDirectory` and `LeadPipeline` to `quotes`, which registers into `LeadClosedHooks`
- * and `LeadQuoteChecks`; `leads` never imports `quotes`.
+ * and `LeadQuoteChecks`; `leads` never imports `quotes`. Exports `LeadReports` for `reports` (F15).
  */
 @Module({
   imports: [AuthModule, CatalogModule, ClientsModule, NotificationsModule],
@@ -35,7 +36,8 @@ import { LeadsService } from './leads.service.js';
     LeadConversionService,
     LeadDirectory,
     LeadPipeline,
+    LeadReports,
   ],
-  exports: [LeadDirectory, LeadPipeline, LeadClosedHooks, LeadQuoteChecks],
+  exports: [LeadDirectory, LeadPipeline, LeadClosedHooks, LeadQuoteChecks, LeadReports],
 })
 export class LeadsModule {}

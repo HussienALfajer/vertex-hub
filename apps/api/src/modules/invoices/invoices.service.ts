@@ -50,6 +50,7 @@ import { DATABASE } from '../../core/database/database.module.js';
 import { CodedException } from '../../core/errors/index.js';
 import { changedFields, recordAudit } from '../audit/index.js';
 import { type CurrentUserInfo, UserDirectory } from '../auth/index.js';
+import { CatalogDirectory } from '../catalog/index.js';
 import { ClientDirectory, type ClientSummary } from '../clients/index.js';
 import { GeneratedFiles } from '../files/index.js';
 import {
@@ -138,6 +139,7 @@ export class InvoicesService {
     private readonly settings: InvoiceSettingsService,
     private readonly files: GeneratedFiles,
     private readonly snapshots: InvoiceSnapshots,
+    private readonly catalog: CatalogDirectory,
   ) {}
 
   private readonly logger = new Logger(InvoicesService.name);
@@ -295,6 +297,11 @@ export class InvoicesService {
         throw new CodedException(409, 'LIMIT_REACHED', 'An invoice has at most 50 lines');
       }
       const before = await this.lines(tx, id);
+      await this.assertServices(
+        tx,
+        input.lines.map((line) => line.serviceId),
+        before.map((line) => line.serviceId),
+      );
       const prepared = await this.prepareLines(
         tx,
         client,
@@ -393,6 +400,27 @@ export class InvoicesService {
     return { invoice, client };
   }
 
+  /**
+   * F15 rules 21–22: each chosen service exists, and is not archived unless a line already had it
+   * (`INVALID_SERVICE`).
+   */
+  async assertServices(
+    executor: Database | Transaction,
+    chosen: readonly (string | null)[],
+    kept: readonly (string | null)[],
+  ): Promise<void> {
+    const ids = chosen.filter((serviceId): serviceId is string => !!serviceId);
+    const services = await this.catalog.services(ids, executor);
+    for (const serviceId of ids) {
+      const service = services.get(serviceId);
+      if (!service || (service.archived && !kept.includes(serviceId))) {
+        throw new CodedException(409, 'INVALID_SERVICE', 'Choose a non-archived catalog service', [
+          serviceId,
+        ]);
+      }
+    }
+  }
+
   async lines(executor: Database | Transaction, invoiceId: string): Promise<InvoiceLineRow[]> {
     return executor
       .select()
@@ -410,6 +438,10 @@ export class InvoicesService {
     const lines = await this.lines(executor, row.id);
     const sources = await this.sources.resolve(
       lines.flatMap((line) => lineSource(line) ?? []),
+      executor,
+    );
+    const services = await this.catalog.services(
+      lines.flatMap((line) => line.serviceId ?? []),
       executor,
     );
     const [summary] = await this.summaries([row], executor);
@@ -479,6 +511,7 @@ export class InvoicesService {
       lines: lines.map((line) => {
         const ref = lineSource(line);
         const source = ref ? sources.get(sourceKey(ref)) : undefined;
+        const service = line.serviceId ? services.get(line.serviceId) : undefined;
         return {
           id: line.id,
           description: line.description,
@@ -500,6 +533,9 @@ export class InvoicesService {
                       : null,
                 }
               : null,
+          service: service
+            ? { id: service.id, name: service.name, archived: service.archived }
+            : null,
         };
       }),
       payments: paymentRows.map(
@@ -555,6 +591,7 @@ export class InvoicesService {
         canRecordPayment: takesPayments && OPEN_STATUSES.includes(row.status),
         canVoidPayments: takesPayments && row.status !== 'draft' && row.status !== 'void',
         canRenderPdf: isDraft ? manages : row.status !== 'draft' && row.pdfStatus !== 'ready',
+        canEditServices: manages && row.status !== 'draft' && row.status !== 'void',
       },
     };
   }
@@ -625,6 +662,7 @@ export class InvoicesService {
       quantity?: number;
       unitPriceMinor?: number;
       source?: InvoiceSource | null;
+      serviceId?: string | null;
     }[],
     named: { projectId: string | null; retainerId: string | null },
     invoiceId: string | null,
@@ -685,6 +723,7 @@ export class InvoicesService {
         quantity: input.quantity ?? 1,
         unitPriceMinor: input.unitPriceMinor ?? source?.amountMinor ?? 0,
         ...sourceColumns(input.source ?? null),
+        serviceId: input.serviceId ?? null,
       };
     });
     return { lines, engagement };
