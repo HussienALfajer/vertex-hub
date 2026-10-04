@@ -18,13 +18,7 @@ import {
   type SectorListResponse,
   type UpdateClient,
 } from '@vertex-hub/contracts';
-import {
-  clientContacts,
-  clientPlatformAccounts,
-  clients,
-  type Database,
-  type Transaction,
-} from '@vertex-hub/db';
+import { clientContacts, clientPlatformAccounts, clients, type Database } from '@vertex-hub/db';
 import {
   and,
   asc,
@@ -35,7 +29,6 @@ import {
   inArray,
   isNotNull,
   isNull,
-  ne,
   type SQL,
   sql,
 } from 'drizzle-orm';
@@ -49,7 +42,6 @@ import {
   UserDirectory,
   type UserSummary,
 } from '../auth/index.js';
-import { NotificationCenter } from '../notifications/index.js';
 import {
   actorOf,
   covers,
@@ -58,9 +50,8 @@ import {
   readableClient,
   readableClients,
 } from './client-access.js';
+import { ClientFactory, LIVE_STATUSES } from './client-factory.js';
 import { ClientFlagHooks } from './client-flag-hooks.js';
-
-type Executor = Database | Transaction;
 
 type Change = { before: Record<string, unknown>; after: Record<string, unknown> };
 
@@ -96,9 +87,6 @@ type SummaryRow = {
   hasApprovalContact: boolean;
 };
 
-/** Statuses in which a client needs a valid account manager (rules 3 and 8). */
-const LIVE_STATUSES: ClientStatus[] = ['active', 'paused'];
-
 /** Client basics, archive and restore, and the brand kit (F02). */
 @Injectable()
 export class ClientsService implements OnModuleInit {
@@ -106,7 +94,7 @@ export class ClientsService implements OnModuleInit {
     @Inject(DATABASE) private readonly db: Database,
     private readonly users: UserDirectory,
     private readonly responsibilities: ResponsibilityRegistry,
-    private readonly notifications: NotificationCenter,
+    private readonly factory: ClientFactory,
     private readonly flagHooks: ClientFlagHooks,
   ) {}
 
@@ -240,34 +228,7 @@ export class ClientsService implements OnModuleInit {
     const id = await this.db.transaction(async (tx) => {
       // Serialized with archiving users and removing roles (rule 14).
       await lockAccessChanges(tx);
-      const manager = await this.validAccountManager(tx, input.accountManagerId);
-      await this.assertNameFree(tx, input.tradeName);
-      const [created] = await tx
-        .insert(clients)
-        .values({
-          tradeName: input.tradeName,
-          sector: input.sector ?? null,
-          accountManagerId: manager.id,
-          status: input.status,
-          isHealthcare: input.isHealthcare,
-        })
-        .returning({ id: clients.id });
-      if (!created) throw new Error('Client insert returned no row');
-      await recordAudit(tx, {
-        actor: actorOf(actor),
-        action: 'client.created',
-        entityType: 'client',
-        entityId: created.id,
-        after: {
-          tradeName: input.tradeName,
-          sector: input.sector ?? null,
-          accountManager: { id: manager.id, name: manager.name },
-          status: input.status,
-          isHealthcare: input.isHealthcare,
-        },
-      });
-      await this.notifyManager(tx, actor, created.id, manager.id, input.tradeName);
-      return created.id;
+      return this.factory.create(tx, actorOf(actor), { ...input, sector: input.sector ?? null });
     });
     return this.detail(actor, id);
   }
@@ -309,13 +270,13 @@ export class ClientsService implements OnModuleInit {
       const reactivates = current.status === 'ended' && LIVE_STATUSES.includes(status);
       let manager: UserSummary | undefined;
       if (managerChanges || reactivates) {
-        manager = await this.validAccountManager(
+        manager = await this.factory.validAccountManager(
           tx,
           input.accountManagerId ?? current.accountManagerId,
         );
       }
       if (input.tradeName !== undefined && input.tradeName !== current.tradeName) {
-        await this.assertNameFree(tx, input.tradeName, id);
+        await this.factory.assertNameFree(tx, input.tradeName, id);
       }
 
       const audit = async (action: AuditAction, change: Change | null) => {
@@ -383,7 +344,7 @@ export class ClientsService implements OnModuleInit {
       }
       if (managerChange && manager) {
         const tradeName = input.tradeName ?? current.tradeName;
-        await this.notifyManager(tx, actor, id, manager.id, tradeName);
+        await this.factory.notifyManager(tx, actorOf(actor), id, manager.id, tradeName);
       }
     });
     return this.detail(actor, id);
@@ -422,9 +383,9 @@ export class ClientsService implements OnModuleInit {
         .from(clients)
         .where(eq(clients.id, id));
       if (!current) throw new NotFoundException();
-      await this.assertNameFree(tx, current.tradeName, id);
+      await this.factory.assertNameFree(tx, current.tradeName, id);
       if (LIVE_STATUSES.includes(current.status)) {
-        await this.validAccountManager(tx, client.accountManagerId);
+        await this.factory.validAccountManager(tx, client.accountManagerId);
       }
       await tx.update(clients).set({ archivedAt: null }).where(eq(clients.id, id));
       await recordAudit(tx, {
@@ -462,53 +423,6 @@ export class ClientsService implements OnModuleInit {
       }
       return kit;
     });
-  }
-
-  /** Rule 2: a non-archived user with the Account Manager role. */
-  private async validAccountManager(tx: Transaction, userId: string): Promise<UserSummary> {
-    const manager = await this.users.accountManager(userId, tx);
-    if (!manager) {
-      throw new CodedException(
-        400,
-        'INVALID_ACCOUNT_MANAGER',
-        'The account manager must be a non-archived user with the Account Manager role',
-      );
-    }
-    return manager;
-  }
-
-  /** Rule 6: unique case-insensitively among non-archived clients. */
-  /** F14: the new primary account manager learns about the client. */
-  private notifyManager(
-    tx: Transaction,
-    actor: CurrentUserInfo,
-    clientId: string,
-    managerId: string,
-    tradeName: string,
-  ) {
-    return this.notifications.notify(tx, {
-      type: 'client_account_manager_assigned',
-      recipients: [managerId],
-      actorId: actor.id,
-      subjectId: clientId,
-      data: { client: tradeName },
-    });
-  }
-
-  private async assertNameFree(executor: Executor, tradeName: string, exceptId?: string) {
-    const [taken] = await executor
-      .select({ id: clients.id })
-      .from(clients)
-      .where(
-        and(
-          sql`lower(${clients.tradeName}) = lower(${tradeName})`,
-          isNull(clients.archivedAt),
-          exceptId ? ne(clients.id, exceptId) : undefined,
-        ),
-      );
-    if (taken) {
-      throw new CodedException(409, 'CLIENT_NAME_TAKEN', 'Another client has this trade name');
-    }
   }
 }
 

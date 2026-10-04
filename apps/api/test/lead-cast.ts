@@ -10,12 +10,12 @@ import {
 import type { Database } from '@vertex-hub/db';
 import { ok } from './campaign-cast.js';
 import { seedClientCast } from './client-cast.js';
-import { type api, removeCatalog, removeLeads, uniqueEmail } from './helpers.js';
+import { type api, removeCatalog, removeLeads, removeQuotes, uniqueEmail } from './helpers.js';
 
 /*
  * The people the F03 tests act as, on top of the client cast: a General Communication member and
  * a Marketing member (lead managers with scope all); lead and catalog factories. Cleanup removes
- * leads, then catalog items, then clients and users.
+ * leads, then client quotes and catalog items, then clients and users.
  */
 
 type Api = ReturnType<typeof api>;
@@ -86,6 +86,8 @@ export async function seedLeadCast(db: Database, client: Api) {
     trackLead: (id: string) => leadIds.push(id),
     async cleanup() {
       await removeLeads(db, leadIds);
+      // Client quotes copy catalog items: they go before the catalog.
+      await removeQuotes(db, cast.clientIds());
       await removeCatalog(db, serviceIds, []);
       await cast.cleanup();
     },

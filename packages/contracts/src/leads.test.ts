@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  convertLeadSchema,
   createLeadNoteSchema,
   createLeadSchema,
   daysInStage,
@@ -266,5 +267,47 @@ describe('list query', () => {
       email: null,
       names: ['Al-Noor'],
     });
+  });
+});
+
+describe('convertLeadSchema', () => {
+  const client = {
+    tradeName: ' Dental Clinic Al-Noor ',
+    sector: 'Healthcare',
+    isHealthcare: true,
+    accountManagerId: id,
+  };
+
+  it('creates a client with the lead contact, normalized', () => {
+    const parsed = convertLeadSchema.parse({
+      mode: 'new',
+      client,
+      contact: { add: true, name: 'Ahmad', phone: '0096 3933 123 456', email: 'A@Noor.SY' },
+    });
+    expect(parsed).toEqual({
+      mode: 'new',
+      client: { ...client, tradeName: 'Dental Clinic Al-Noor' },
+      contact: { add: true, name: 'Ahmad', phone: '+963933123456', email: 'a@noor.sy' },
+    });
+  });
+
+  it('links an existing client, with or without the contact', () => {
+    expect(
+      convertLeadSchema.safeParse({ mode: 'existing', clientId: other, contact: { add: false } })
+        .success,
+    ).toBe(true);
+    expect(convertLeadSchema.safeParse({ mode: 'existing', contact: { add: false } }).success).toBe(
+      false,
+    );
+  });
+
+  it('needs a contact name when adding one, and the client of its mode', () => {
+    expect(
+      convertLeadSchema.safeParse({ mode: 'new', client, contact: { add: true } }).success,
+    ).toBe(false);
+    expect(
+      convertLeadSchema.safeParse({ mode: 'new', clientId: other, contact: { add: false } })
+        .success,
+    ).toBe(false);
   });
 });

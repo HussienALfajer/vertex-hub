@@ -112,6 +112,8 @@ export async function seedClientCast(db: Database, client: Api) {
     createRetainer,
     /** Tracks a client created some other way, for cleanup. */
     trackClient: (id: string) => clients.push(id),
+    /** The clients cleanup will remove. */
+    clientIds: () => [...clients],
     trackUser: (id: string) => users.push(id),
     async cleanup() {
       await removeClients(db, clients);

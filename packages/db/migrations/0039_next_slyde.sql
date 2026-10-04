@@ -1,0 +1,1 @@
+ALTER TABLE "quotes" DROP COLUMN "pdf_object_key";

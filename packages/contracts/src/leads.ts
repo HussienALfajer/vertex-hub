@@ -1,10 +1,12 @@
 import { z } from 'zod';
 import {
   clientStatusSchema,
+  createContactSchema,
   noteChannelSchema,
   noteOccurredAtSchema,
   optionalEmailSchema,
   sectorSchema,
+  tradeNameSchema,
 } from './clients.js';
 import {
   addDays,
@@ -325,6 +327,48 @@ export const reopenLeadSchema = z
 
 export type ReopenLead = z.infer<typeof reopenLeadSchema>;
 
+/** Rule 10: the lead's contact added to the client, or not. */
+const conversionContactSchema = z.discriminatedUnion('add', [
+  z.object({ add: z.literal(false) }),
+  createContactSchema.omit({ notes: true }).extend({ add: z.literal(true) }),
+]);
+
+/**
+ * Rule 10: a new client from the lead, or a link to an existing one; also step 0 of accepting a
+ * lead's quote (rule 11).
+ */
+export const convertLeadSchema = z
+  .discriminatedUnion('mode', [
+    z.object({
+      mode: z.literal('new'),
+      client: z.object({
+        /** Unique among non-archived clients (`CLIENT_NAME_TAKEN`). */
+        tradeName: tradeNameSchema,
+        sector: sectorSchema,
+        isHealthcare: z.boolean(),
+        /** A user with the Account Manager role (`INVALID_ACCOUNT_MANAGER`). */
+        accountManagerId: z.uuid(),
+      }),
+      contact: conversionContactSchema,
+    }),
+    z.object({
+      mode: z.literal('existing'),
+      /** A non-archived client (`CLIENT_ARCHIVED`); an ended one becomes active. */
+      clientId: z.uuid(),
+      contact: conversionContactSchema,
+    }),
+  ])
+  .meta({ id: 'ConvertLead' });
+
+export type ConvertLead = z.infer<typeof convertLeadSchema>;
+
+export type ConvertLeadInput = z.input<typeof convertLeadSchema>;
+
+/** The dialog's tab: without `clientId` the new-client defaults, with it the existing client. */
+export const leadConversionPlanQuerySchema = z.object({ clientId: z.uuid().optional() });
+
+export type LeadConversionPlanQuery = z.infer<typeof leadConversionPlanQuerySchema>;
+
 const leadNoteFieldsSchema = z.object({
   occurredAt: noteOccurredAtSchema,
   channel: noteChannelSchema,
@@ -371,6 +415,8 @@ export const leadSchema = z
     budgetCurrency: currencySchema.nullable(),
     /** Names of the requested services and packages, in the order added. */
     interests: z.array(z.string()),
+    /** Quote numbers written on the lead (non-archived latest versions). */
+    quoteCount: z.number().int().min(0),
     /** The created or linked client of a won lead. */
     client: personSchema.nullable(),
     closedAt: z.iso.datetime().nullable(),
@@ -527,6 +573,13 @@ export type LeadDuplicateQuery = z.infer<typeof leadDuplicateQuerySchema>;
 
 export type LeadDuplicateQueryInput = z.input<typeof leadDuplicateQuerySchema>;
 
+const duplicateClientSchema = z.object({
+  id: z.uuid(),
+  tradeName: z.string(),
+  status: clientStatusSchema,
+  accountManager: personSchema,
+});
+
 export const leadDuplicatesSchema = z
   .object({
     /** Open, non-archived leads with the same phone or email. */
@@ -541,14 +594,7 @@ export const leadDuplicatesSchema = z
       }),
     ),
     /** Non-archived clients with the same trade name, or a contact with the same phone or email. */
-    clients: z.array(
-      z.object({
-        id: z.uuid(),
-        tradeName: z.string(),
-        status: clientStatusSchema,
-        accountManager: personSchema,
-      }),
-    ),
+    clients: z.array(duplicateClientSchema),
   })
   .meta({ id: 'LeadDuplicates' });
 
@@ -564,3 +610,37 @@ export const leadOwnerOptionsSchema = z
   });
 
 export type LeadOwnerOptions = z.infer<typeof leadOwnerOptionsSchema>;
+
+export const leadConversionPlanSchema = z
+  .object({
+    /** New-client defaults (rule 10): the display name, the lead's sector and healthcare flag. */
+    client: z.object({
+      tradeName: z.string(),
+      sector: z.string().nullable(),
+      isHealthcare: z.boolean(),
+      /** The owner when they hold the Account Manager role; otherwise chosen. */
+      accountManagerId: z.uuid().nullable(),
+    }),
+    /** The contact block's defaults, from the lead. */
+    contact: z.object({
+      name: z.string(),
+      phone: z.string().nullable(),
+      email: z.string().nullable(),
+    }),
+    /** Users with the Account Manager role, by name. */
+    accountManagers: z.array(personSchema),
+    /** Clients matching the lead (rule 2): suggested links. */
+    duplicateClients: z.array(duplicateClientSchema),
+    /** Non-archived activities copied into the client's log. */
+    noteCount: z.number().int().min(0),
+    /** Quotes that move to the client. */
+    quoteCount: z.number().int().min(0),
+    /** With `clientId`: the client to link and whether a contact has the lead's phone or email. */
+    existingClient: duplicateClientSchema.extend({ hasContact: z.boolean() }).nullable(),
+  })
+  .meta({
+    id: 'LeadConversionPlan',
+    description: 'The convert dialog (and accept step 0) defaults',
+  });
+
+export type LeadConversionPlan = z.infer<typeof leadConversionPlanSchema>;

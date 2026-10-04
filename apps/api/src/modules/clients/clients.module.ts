@@ -5,6 +5,7 @@ import { NotificationsModule } from '../notifications/index.js';
 import { ClientContactsController } from './client-contacts.controller.js';
 import { ClientContactsService } from './client-contacts.service.js';
 import { ClientDirectory } from './client-directory.js';
+import { ClientFactory } from './client-factory.js';
 import { ClientFileOwner } from './client-file-owner.js';
 import { ClientFlagHooks } from './client-flag-hooks.js';
 import { ClientNotesController } from './client-notes.controller.js';
@@ -20,7 +21,8 @@ import { ClientsService } from './clients.service.js';
  * responsibility (rule 8) in its `ResponsibilityRegistry`. Notifies new account managers
  * through `notifications` (F14). Exports `ClientDirectory` for modules
  * that attach work to clients (F05). Registers the `client` owner policy in `files` (F10).
- * Exports `ClientFlagHooks`, which `tasks` registers into for healthcare flag changes (F09).
+ * Exports `ClientFlagHooks`, which `tasks` registers into for healthcare flag changes (F09), and
+ * `ClientFactory`, which the lead conversion creates clients, contacts and log entries with (F03).
  */
 @Module({
   imports: [AuthModule, NotificationsModule, FilesModule],
@@ -36,9 +38,10 @@ import { ClientsService } from './clients.service.js';
     ClientPlatformAccountsService,
     ClientNotesService,
     ClientDirectory,
+    ClientFactory,
     ClientFileOwner,
     ClientFlagHooks,
   ],
-  exports: [ClientDirectory, ClientFlagHooks],
+  exports: [ClientDirectory, ClientFactory, ClientFlagHooks],
 })
 export class ClientsModule {}

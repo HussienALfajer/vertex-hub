@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   acceptPlanQuerySchema,
   acceptQuoteSchema,
+  createQuoteSchema,
   defaultInstallmentMilestones,
   installmentsValid,
   mergeDeliverableLines,
@@ -310,6 +311,51 @@ describe('acceptQuoteSchema', () => {
     expect(acceptPlanQuerySchema.parse({ chooseTemplates: 'true', templateIds: pkg })).toEqual({
       chooseTemplates: true,
       templateIds: [pkg],
+    });
+  });
+});
+
+describe('createQuoteSchema', () => {
+  it('takes exactly one of a client and a lead (F03 rule 14)', () => {
+    expect(createQuoteSchema.parse({ clientId: service, title: 'Brand' })).toMatchObject({
+      clientId: service,
+      contactId: null,
+      currency: 'USD',
+    });
+    expect(createQuoteSchema.safeParse({ leadId: pkg, title: 'Brand' }).success).toBe(true);
+    expect(createQuoteSchema.safeParse({ title: 'Brand' }).success).toBe(false);
+    expect(
+      createQuoteSchema.safeParse({ clientId: service, leadId: pkg, title: 'Brand' }).success,
+    ).toBe(false);
+  });
+
+  it('takes a contact only with a client', () => {
+    expect(
+      createQuoteSchema.safeParse({ clientId: service, contactId: pkg, title: 'Brand' }).success,
+    ).toBe(true);
+    expect(
+      createQuoteSchema.safeParse({ leadId: pkg, contactId: service, title: 'Brand' }).success,
+    ).toBe(false);
+  });
+});
+
+describe('acceptQuoteSchema conversion (F03 rule 11)', () => {
+  it('carries step 0, null by default', () => {
+    expect(acceptQuoteSchema.parse({ respondedOn: '2026-10-02' }).conversion).toBeNull();
+    const parsed = acceptQuoteSchema.parse({
+      respondedOn: '2026-10-02',
+      conversion: { mode: 'existing', clientId: service, contact: { add: false } },
+    });
+    expect(parsed.conversion).toEqual({
+      mode: 'existing',
+      clientId: service,
+      contact: { add: false },
+    });
+  });
+
+  it('reads the existing client of the plan', () => {
+    expect(acceptPlanQuerySchema.parse({ clientId: service })).toMatchObject({
+      clientId: service,
     });
   });
 });

@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { CATALOG_BILLINGS, CATALOG_LIMITS } from './catalog.js';
 import { addDays, calendarDateSchema } from './dates.js';
 import { departmentCodeSchema } from './departments.js';
+import { convertLeadSchema, leadConversionPlanSchema, leadStageSchema } from './leads.js';
 import {
   pageQuerySchema,
   pageSchema,
@@ -21,7 +22,7 @@ import { TASK_LIMITS } from './tasks.js';
 import { optionalText } from './text.js';
 
 /*
- * Quotes (spec F04): a quote for a client in one currency with a one-off and a monthly section,
+ * Quotes (spec F04): a quote for a client (or a lead, spec F03) in one currency with a one-off and a monthly section,
  * built from the catalog, approved when its discount crosses the threshold, sent, versioned and
  * expired. One row per version.
  */
@@ -225,13 +226,23 @@ export type QuoteSettings = z.infer<typeof quoteSettingsSchema>;
 
 const quoteTitleSchema = z.string().trim().min(1).max(120);
 
+/** For exactly one of a client and an open lead (F03 rule 14). */
 export const createQuoteSchema = z
   .object({
-    clientId: z.uuid(),
-    /** The addressee: a non-archived contact of the client (`UNKNOWN_CONTACT`). */
+    clientId: z.uuid().optional(),
+    leadId: z.uuid().optional(),
+    /** The addressee: a non-archived contact of the client (`UNKNOWN_CONTACT`); none for a lead. */
     contactId: z.uuid().nullable().default(null),
     title: quoteTitleSchema,
     currency: currencySchema.default('USD'),
+  })
+  .refine((quote) => !quote.clientId !== !quote.leadId, {
+    message: 'Exactly one of clientId and leadId',
+    path: ['clientId'],
+  })
+  .refine((quote) => !quote.contactId || !!quote.clientId, {
+    message: 'A lead quote has no contact',
+    path: ['contactId'],
   })
   .meta({ id: 'CreateQuote' });
 
@@ -467,7 +478,11 @@ export const quoteSchema = z
     number: z.number().int().min(1),
     version: z.number().int().min(1),
     title: z.string(),
-    client: z.object({ id: z.uuid(), name: z.string() }),
+    /** Null for a quote on a lead not converted yet. */
+    client: z.object({ id: z.uuid(), name: z.string() }).nullable(),
+    /** The client, or the lead (its display name) until it is converted (F03 rule 16). */
+    recipient: z.object({ kind: z.enum(['client', 'lead']), id: z.uuid(), name: z.string() }),
+    /** The client's account manager, or the lead's owner. */
     accountManager: personSchema,
     currency: currencySchema,
     status: quoteStatusSchema,
@@ -488,6 +503,8 @@ export type Quote = z.infer<typeof quoteSchema>;
 export const quoteDetailSchema = quoteSchema
   .extend({
     contact: z.object({ id: z.uuid(), name: z.string(), archived: z.boolean() }).nullable(),
+    /** The lead the quote was written on; kept after conversion (F03). */
+    lead: z.object({ id: z.uuid(), displayName: z.string(), stage: leadStageSchema }).nullable(),
     discountDecision: z
       .object({ by: personSchema, at: z.iso.datetime(), note: z.string().nullable() })
       .nullable(),
@@ -557,10 +574,13 @@ export type QuoteDetail = z.infer<typeof quoteDetailSchema>;
 export const QUOTE_SORTS = ['updatedAt', 'number', 'validUntil'] as const;
 
 export const quoteListQuerySchema = pageQuerySchema.extend({
-  /** Matches the number (`Q-2026-0007` or `7`), the title or the client's trade name. */
+  /** Matches the number (`Q-2026-0007` or `7`), the title, the client's or the lead's name. */
   search: z.string().trim().min(1).max(100).optional(),
   status: queryListSchema(quoteStatusSchema).default([...OPEN_QUOTE_STATUSES]),
   clientId: z.uuid().optional(),
+  /** Quotes written on the lead, converted since or not. */
+  leadId: z.uuid().optional(),
+  /** The client's account manager, or the owner of a lead not converted yet. */
   accountManagerId: z.uuid().optional(),
   approval: z.enum(['pending']).optional(),
   /** Accepted quotes that created this project or created or renewed this retainer. */
@@ -579,6 +599,33 @@ export type QuoteListQuery = z.infer<typeof quoteListQuerySchema>;
 export const quotePageSchema = pageSchema(quoteSchema).meta({ id: 'QuotePage' });
 
 export type QuotePage = z.infer<typeof quotePageSchema>;
+
+/** `GET /api/quotes/by-lead/:leadId`: the lead page's Quotes section (F03 screen 3). */
+export const leadQuotesSchema = z
+  .object({
+    items: z.array(
+      z.object({
+        id: z.uuid(),
+        displayNumber: z.string(),
+        version: z.number().int().min(1),
+        title: z.string(),
+        status: quoteStatusSchema,
+        currency: currencySchema,
+        sentAt: z.iso.datetime().nullable(),
+        validUntil: calendarDateSchema.nullable(),
+        /** Null when the caller's `quotes.read` does not cover the quote. */
+        oneOffNetMinor: minorAmountSchema.nullable(),
+        monthlyNetMinor: minorAmountSchema.nullable(),
+        /** Every non-archived version of the number, oldest first. */
+        versions: z.array(
+          z.object({ id: z.uuid(), version: z.number().int(), status: quoteStatusSchema }),
+        ),
+      }),
+    ),
+  })
+  .meta({ id: 'LeadQuotes', description: "The lead's quotes: latest versions, newest first" });
+
+export type LeadQuotes = z.infer<typeof leadQuotesSchema>;
 
 // The frozen render payload of a sent version (rule 12): no list prices (rule 14)
 
@@ -687,6 +734,8 @@ export const acceptPlanQuerySchema = z.object({
   templateIds: queryListSchema(z.uuid()).default([]),
   /** Default today. */
   retainerStartDate: calendarDateSchema.optional(),
+  /** A lead quote's step 0 (F03 rule 11): the existing client to link; new client otherwise. */
+  clientId: z.uuid().optional(),
 });
 
 export type AcceptPlanQuery = z.infer<typeof acceptPlanQuerySchema>;
@@ -701,8 +750,11 @@ export const acceptPlanSchema = z
     project: z
       .object({
         name: z.string(),
-        /** The client's account manager. */
-        projectManager: acceptPersonSchema,
+        /**
+         * The client's account manager; for a lead quote the conversion's default account
+         * manager, null when it is still to be chosen.
+         */
+        projectManager: acceptPersonSchema.nullable(),
         departments: z.array(departmentCodeSchema),
         startDate: calendarDateSchema,
         /** The latest due date of the selected templates' plans, or start + 30 days. */
@@ -756,6 +808,8 @@ export const acceptPlanSchema = z
       .nullable(),
     /** Templates of the quote archived since: skipped, with a warning (C3, edge case 8). */
     archivedTemplates: z.array(acceptPersonSchema),
+    /** Step 0 of a lead quote (F03 rule 11); null for a client quote. */
+    conversion: leadConversionPlanSchema.nullable(),
   })
   .meta({ id: 'AcceptPlan' });
 
@@ -808,6 +862,11 @@ export const acceptQuoteSchema = z
       .nullable()
       .default(null),
     retainer: acceptRetainerSchema.nullable().default(null),
+    /**
+     * Step 0 (F03 rule 11): required for a lead quote, refused for a client quote. Without
+     * `contactId`, the contact it adds is recorded as the one who answered.
+     */
+    conversion: convertLeadSchema.nullable().default(null),
   })
   .meta({ id: 'AcceptQuote' });
 

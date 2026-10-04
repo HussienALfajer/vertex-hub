@@ -98,9 +98,10 @@ export function totalsOf(
 /** The effective discount as a percentage with two decimals, as the audit log records it. */
 export const percentOf = (basisPoints: number) => basisPoints / 100;
 
-/** What every quote audit entry carries: the client, the number and the version. */
+/** What every quote audit entry carries: the client (or lead), the number and the version. */
 export const identity = (quote: QuoteRow) => ({
   clientId: quote.clientId,
+  ...(quote.leadId ? { leadId: quote.leadId } : {}),
   displayNumber: quoteDisplayNumber(quote),
 });
 

@@ -386,7 +386,7 @@ function QuotesTable({ quotes }: { quotes: Quote[] }) {
                 </span>
               </Link>
             </TableCell>
-            <TableCell>{quote.client.name}</TableCell>
+            <TableCell>{quote.recipient.name}</TableCell>
             <TableCell>
               <PersonName name={quote.accountManager.name} />
             </TableCell>

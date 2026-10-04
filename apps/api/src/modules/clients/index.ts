@@ -6,6 +6,7 @@ export {
   type ContactDetail,
   type ContactSummary,
 } from './client-directory.js';
+export { ClientFactory, type CopiedNote } from './client-factory.js';
 export {
   type ClientFlagHook,
   ClientFlagHooks,

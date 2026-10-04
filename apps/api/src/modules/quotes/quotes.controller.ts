@@ -32,6 +32,8 @@ import {
   createQuoteSchema,
   type ExtendQuote,
   extendQuoteSchema,
+  type LeadQuotes,
+  leadQuotesSchema,
   type QuoteApprovalAction,
   type QuoteApprovalDecision,
   type QuoteDetail,
@@ -80,6 +82,20 @@ export class QuotesController {
     @Query({ schema: quoteListQuerySchema }) query: QuoteListQuery,
   ): Promise<QuotePage> {
     return this.quotes.list(actor, query);
+  }
+
+  @Get('by-lead/:leadId')
+  @RequirePermissions('leads.read')
+  @SerializeOptions({ schema: leadQuotesSchema })
+  @ApiOkResponse({
+    description: "A lead's quotes for its page (F03); nets only where quotes.read covers them",
+    standardSchema: leadQuotesSchema,
+  })
+  byLead(
+    @CurrentUser() actor: CurrentUserInfo,
+    @Param('leadId', ParseUUIDPipe) leadId: string,
+  ): Promise<LeadQuotes> {
+    return this.quotes.byLead(actor, leadId);
   }
 
   @Get(':id')

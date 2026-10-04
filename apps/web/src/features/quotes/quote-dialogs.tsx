@@ -217,7 +217,11 @@ export function RejectDialog({
   const { t } = useTranslation();
   const ids = { contact: useId(), reason: useId() };
   const reject = useRejectQuote(quote.id);
-  const client = useQuery({ ...clientQuery(quote.client.id), enabled: open });
+  // A lead quote has no client contacts until its lead is converted (F03).
+  const client = useQuery({
+    ...clientQuery(quote.client?.id ?? ''),
+    enabled: open && !!quote.client,
+  });
   const [failure, setFailure] = useState<string | null>(null);
   const today = businessDate();
   const form = useForm<RejectQuoteInput, unknown, RejectQuote>({

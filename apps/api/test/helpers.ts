@@ -327,10 +327,28 @@ export async function removeLeftoverUsers(db: Database): Promise<number> {
     .select({ id: users.id })
     .from(users)
     .where(like(users.email, `%${TEST_EMAIL_DOMAIN}`));
-  await removeUsers(
+  const ids = leftovers.map((row) => row.id);
+  if (ids.length === 0) return 0;
+  // The clients they manage go too, after the leads that may point at them (F03 conversions).
+  await removeLeads(
     db,
-    leftovers.map((row) => row.id),
+    (
+      await db
+        .select({ id: leads.id })
+        .from(leads)
+        .where(or(inArray(leads.ownerId, ids), inArray(leads.createdById, ids)))
+    ).map((row) => row.id),
   );
+  await removeClients(
+    db,
+    (
+      await db
+        .select({ id: clients.id })
+        .from(clients)
+        .where(inArray(clients.accountManagerId, ids))
+    ).map((row) => row.id),
+  );
+  await removeUsers(db, ids);
   return leftovers.length;
 }
 
@@ -763,6 +781,8 @@ export async function removeAdWallets(db: Database, clientIds: string[]): Promis
 export async function removeLeads(db: Database, ids: string[]): Promise<void> {
   const unique = [...new Set(ids)];
   if (unique.length === 0) return;
+  // Quotes written on the leads (F03), converted since or not.
+  await removeQuoteRows(db, inArray(quotes.leadId, unique));
   const notes = await db
     .delete(leadNotes)
     .where(inArray(leadNotes.leadId, unique))
@@ -793,9 +813,13 @@ export async function removePayments(db: Database, clientIds: string[]): Promise
 /** Removes the quotes of the clients with their lines, items, installments and audit (F04). */
 export async function removeQuotes(db: Database, clientIds: string[]): Promise<void> {
   if (clientIds.length === 0) return;
-  const ids = (
-    await db.select({ id: quotes.id }).from(quotes).where(inArray(quotes.clientId, clientIds))
-  ).map((row) => row.id);
+  await removeQuoteRows(db, inArray(quotes.clientId, clientIds));
+}
+
+async function removeQuoteRows(db: Database, where: SQL): Promise<void> {
+  // Converted lead quotes point at their PDF document (F03): unlinked before the file items go.
+  await db.update(quotes).set({ pdfFileItemId: null }).where(where);
+  const ids = (await db.select({ id: quotes.id }).from(quotes).where(where)).map((row) => row.id);
   if (ids.length === 0) return;
   const lineIds = (
     await db.select({ id: quoteLines.id }).from(quoteLines).where(inArray(quoteLines.quoteId, ids))

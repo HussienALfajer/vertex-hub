@@ -10,6 +10,7 @@ import {
   businessDate,
   type CreateQuote,
   installmentsValid,
+  type LeadQuotes,
   needsDiscountApproval,
   QUOTE_LIMITS,
   type Quote,
@@ -55,19 +56,26 @@ import {
   CatalogUsage,
   catalogPrice,
 } from '../catalog/index.js';
-import { ClientDirectory, type ClientSummary } from '../clients/index.js';
+import { ClientDirectory } from '../clients/index.js';
+import { LeadDirectory } from '../leads/index.js';
 import { EngagementDirectory } from '../projects/index.js';
 import {
   actorOf,
   approvesDiscounts,
   assertCanManage,
-  assertClientTakesQuotes,
+  assertTakesQuotes,
   canManage,
   canRead,
+  clientRecipient,
+  covers,
   coversEngagements,
   holdsAll,
+  leadRecipient,
+  type Recipient,
+  snapshotParty,
 } from './quote-access.js';
 import { QuotePdfService } from './quote-pdf.service.js';
+import { QuoteRecipients } from './quote-recipients.js';
 import {
   amounts,
   draftSnapshot,
@@ -106,11 +114,13 @@ export class QuotesService {
   constructor(
     @Inject(DATABASE) private readonly db: Database,
     private readonly clients: ClientDirectory,
+    private readonly leads: LeadDirectory,
     private readonly users: UserDirectory,
     private readonly catalog: CatalogDirectory,
     private readonly settings: QuoteSettingsService,
     private readonly pdf: QuotePdfService,
     private readonly engagements: EngagementDirectory,
+    private readonly recipientsOf: QuoteRecipients,
     usage: CatalogUsage,
   ) {
     // SERVICE_IN_USE: an item on any quote version keeps its billing.
@@ -136,13 +146,13 @@ export class QuotesService {
 
   async list(actor: CurrentUserInfo, query: QuoteListQuery): Promise<QuotePage> {
     if (query.archived && !holdsAll(actor, 'quotes.read')) throw new ForbiddenException();
+    // A lead quote has no client until its lead is converted (F03).
+    const live = or(isNull(quotes.clientId), this.clients.isLive(quotes.clientId));
     const filters: (SQL | undefined)[] = [
       query.archived
-        ? and(isNotNull(quotes.archivedAt), this.clients.isLive(quotes.clientId))
-        : and(isNull(quotes.archivedAt), this.clients.isLive(quotes.clientId)),
-      holdsAll(actor, 'quotes.read')
-        ? undefined
-        : this.clients.managedBy(quotes.clientId, actor.id),
+        ? and(isNotNull(quotes.archivedAt), live)
+        : and(isNull(quotes.archivedAt), live),
+      holdsAll(actor, 'quotes.read') ? undefined : this.managedBy(actor.id),
       inArray(quotes.status, query.status),
     ];
     if (query.latestOnly && !query.archived) filters.push(isLatest);
@@ -152,13 +162,13 @@ export class QuotesService {
           numberSearch(query.search),
           ilike(quotes.title, `%${escapeLike(query.search)}%`),
           this.clients.nameContains(quotes.clientId, query.search),
+          and(isNull(quotes.clientId), this.leads.nameContains(quotes.leadId, query.search)),
         ),
       );
     }
     if (query.clientId) filters.push(eq(quotes.clientId, query.clientId));
-    if (query.accountManagerId) {
-      filters.push(this.clients.managedBy(quotes.clientId, query.accountManagerId));
-    }
+    if (query.leadId) filters.push(eq(quotes.leadId, query.leadId));
+    if (query.accountManagerId) filters.push(this.managedBy(query.accountManagerId));
     if (query.approval) filters.push(eq(quotes.discountApproval, query.approval));
     if (query.projectId) filters.push(eq(quotes.projectId, query.projectId));
     if (query.retainerId) filters.push(eq(quotes.retainerId, query.retainerId));
@@ -184,14 +194,16 @@ export class QuotesService {
       this.db,
       rows.map((row) => row.id),
     );
-    const clients = await this.clients.summaries(rows.map((row) => row.clientId));
-    const people = await this.users.summaries([...clients.values()].map((c) => c.accountManagerId));
+    const recipients = await this.recipientsOf.byQuote(rows);
+    const people = await this.users.summaries(
+      [...recipients.values()].map((recipient) => recipient.accountManagerId),
+    );
     const today = businessDate();
     return {
       items: rows.flatMap((row) => {
-        const client = clients.get(row.clientId);
+        const recipient = recipients.get(row.id);
         const kids = children.get(row.id);
-        return client && kids ? [this.toSummary(row, client, kids, people, today)] : [];
+        return recipient && kids ? [this.toSummary(row, recipient, kids, people, today)] : [];
       }),
       total: total?.value ?? 0,
       page: query.page,
@@ -205,19 +217,67 @@ export class QuotesService {
     executor: Database | Transaction = this.db,
   ): Promise<QuoteDetail> {
     const [row] = await executor.select().from(quotes).where(eq(quotes.id, id));
-    const client = row ? await this.clients.summary(row.clientId, executor) : null;
-    if (!row || !client || !canRead(actor, client, row)) throw new NotFoundException();
-    return this.toDetail(actor, row, client, executor);
+    const recipient = row ? await this.recipientsOf.of(row, executor) : null;
+    if (!row || !recipient || !canRead(actor, recipient, row)) throw new NotFoundException();
+    return this.toDetail(actor, row, recipient, executor);
+  }
+
+  /**
+   * `GET /api/quotes/by-lead/:leadId` (F03 screen 3): every quote written on a lead the caller
+   * reads, latest versions newest first; nets only where `quotes.read` covers the quote.
+   */
+  async byLead(actor: CurrentUserInfo, leadId: string): Promise<LeadQuotes> {
+    const lead = await this.leads.summary(leadId);
+    if (!lead || !this.leads.readable(actor, lead)) throw new NotFoundException();
+    const rows = await this.db
+      .select()
+      .from(quotes)
+      .where(and(eq(quotes.leadId, leadId), isNull(quotes.archivedAt)))
+      .orderBy(desc(quotes.year), desc(quotes.number), asc(quotes.version));
+    const latest = new Map<string, QuoteRow>();
+    for (const row of rows) latest.set(`${row.year}-${row.number}`, row);
+    const shown = [...latest.values()];
+    const recipients = await this.recipientsOf.byQuote(shown);
+    const children = await quoteChildren(
+      this.db,
+      shown.map((row) => row.id),
+    );
+    return {
+      items: shown.map((row) => {
+        const recipient = recipients.get(row.id);
+        const kids = children.get(row.id);
+        const totals =
+          recipient && kids && covers(actor, 'quotes.read', recipient) ? totalsOf(row, kids) : null;
+        return {
+          id: row.id,
+          displayNumber: quoteDisplayNumber(row),
+          version: row.version,
+          title: row.title,
+          status: row.status,
+          currency: row.currency,
+          sentAt: row.sentAt?.toISOString() ?? null,
+          validUntil: row.validUntil,
+          oneOffNetMinor: totals?.oneOff.netMinor ?? null,
+          monthlyNetMinor: totals?.monthly.netMinor ?? null,
+          versions: rows
+            .filter((version) => version.year === row.year && version.number === row.number)
+            .map((version) => ({
+              id: version.id,
+              version: version.version,
+              status: version.status,
+            })),
+        };
+      }),
+    };
   }
 
   /** Rules 1 and 2: version 1 of the next number of the year, with the default validity and terms. */
   async create(actor: CurrentUserInfo, input: CreateQuote): Promise<QuoteDetail> {
     return this.db.transaction(async (tx) => {
-      const client = await this.clients.summary(input.clientId, tx);
-      if (!client) throw new NotFoundException();
-      assertCanManage(actor, client);
-      assertClientTakesQuotes(client);
-      if (input.contactId) await this.assertContact(tx, client.id, input.contactId);
+      const recipient = await this.newRecipient(tx, actor, input);
+      assertCanManage(actor, recipient);
+      assertTakesQuotes(recipient);
+      if (input.contactId) await this.assertContact(tx, recipient, input.contactId);
       const settings = await this.settings.row(tx);
       const year = Number(businessDate().slice(0, 4));
       const number = await this.nextNumber(tx, year);
@@ -227,7 +287,8 @@ export class QuotesService {
           year,
           number,
           version: 1,
-          clientId: client.id,
+          clientId: recipient.kind === 'client' ? recipient.id : null,
+          leadId: recipient.kind === 'lead' ? recipient.id : null,
           contactId: input.contactId,
           title: input.title,
           currency: input.currency,
@@ -244,7 +305,7 @@ export class QuotesService {
         entityId: row.id,
         after: { ...identity(row), title: row.title, currency: row.currency },
       });
-      return this.toDetail(actor, row, client, tx);
+      return this.toDetail(actor, row, recipient, tx);
     });
   }
 
@@ -254,7 +315,7 @@ export class QuotesService {
    */
   async saveDraft(actor: CurrentUserInfo, id: string, input: QuoteDraft): Promise<QuoteDetail> {
     return this.db.transaction(async (tx) => {
-      const { quote, client } = await this.lockForChange(tx, actor, id);
+      const { quote, recipient } = await this.lockForChange(tx, actor, id);
       assertEditable(quote);
       if (quote.updatedAt.getTime() !== new Date(input.updatedAt).getTime()) {
         throw new CodedException(409, 'STALE_QUOTE', 'The draft changed since it was loaded');
@@ -263,7 +324,7 @@ export class QuotesService {
         throw new CodedException(409, 'LIMIT_REACHED', 'A quote has at most 50 lines');
       }
       if (input.contactId && input.contactId !== quote.contactId) {
-        await this.assertContact(tx, client.id, input.contactId);
+        await this.assertContact(tx, recipient, input.contactId);
       }
       const before = (await quoteChildren(tx, [id])).get(id) ?? { lines: [], installments: [] };
       const lines = await this.buildLines(tx, quote, input, before.lines);
@@ -332,7 +393,7 @@ export class QuotesService {
         before: { ...identity(quote), ...changes?.before },
         after: { ...identity(updated), ...changes?.after },
       });
-      return this.toDetail(actor, updated, client, tx);
+      return this.toDetail(actor, updated, recipient, tx);
     });
   }
 
@@ -342,7 +403,7 @@ export class QuotesService {
    */
   async newVersion(actor: CurrentUserInfo, id: string): Promise<QuoteDetail> {
     return this.db.transaction(async (tx) => {
-      const { quote, client } = await this.lockForChange(tx, actor, id);
+      const { quote, recipient } = await this.lockForChange(tx, actor, id);
       if (quote.archivedAt || !['sent', 'expired', 'rejected'].includes(quote.status)) {
         throw new CodedException(
           409,
@@ -366,6 +427,7 @@ export class QuotesService {
           number: quote.number,
           version,
           clientId: quote.clientId,
+          leadId: quote.leadId,
           contactId: quote.contactId,
           title: quote.title,
           currency: quote.currency,
@@ -414,7 +476,7 @@ export class QuotesService {
         entityId: row.id,
         after: { ...identity(row), fromQuoteId: quote.id },
       });
-      return this.toDetail(actor, row, client, tx);
+      return this.toDetail(actor, row, recipient, tx);
     });
   }
 
@@ -446,18 +508,52 @@ export class QuotesService {
 
   /**
    * Locks a quote for a change by a client-scope holder: 404 outside read access, 403 without
-   * `quotes.manage` over the client, `CLIENT_ARCHIVED` for an archived client.
+   * `quotes.manage` over the client, `CLIENT_ARCHIVED` for an archived client (`LEAD_ARCHIVED`
+   * for a lead). A lead quote's lead is locked first, as losing and converting the lead do
+   * (F03 edge case 2), so the two never wait on each other in opposite orders.
    */
   async lockForChange(
     tx: Transaction,
     actor: CurrentUserInfo,
     id: string,
-  ): Promise<{ quote: QuoteRow; client: ClientSummary }> {
+  ): Promise<{ quote: QuoteRow; recipient: Recipient }> {
+    const [peek] = await tx
+      .select({ clientId: quotes.clientId, leadId: quotes.leadId })
+      .from(quotes)
+      .where(eq(quotes.id, id));
+    if (peek?.leadId && !peek.clientId) {
+      await this.leads.summary(peek.leadId, tx, { forUpdate: true });
+    }
     const [quote] = await tx.select().from(quotes).where(eq(quotes.id, id)).for('update');
-    const client = quote ? await this.clients.summary(quote.clientId, tx) : null;
-    if (!quote || !client || !canRead(actor, client, quote)) throw new NotFoundException();
-    assertCanManage(actor, client);
-    return { quote, client };
+    const recipient = quote ? await this.recipientsOf.of(quote, tx) : null;
+    if (!quote || !recipient || !canRead(actor, recipient, quote)) throw new NotFoundException();
+    assertCanManage(actor, recipient);
+    return { quote, recipient };
+  }
+
+  /** Quotes of clients `userId` manages, and of leads not converted yet that they own. */
+  private managedBy(userId: string): SQL | undefined {
+    return or(
+      this.clients.managedBy(quotes.clientId, userId),
+      and(isNull(quotes.clientId), this.leads.ownedBy(quotes.leadId, userId)),
+    );
+  }
+
+  /** The recipient of a new quote: 404 for an unknown client or a lead the caller cannot read. */
+  private async newRecipient(
+    tx: Transaction,
+    actor: CurrentUserInfo,
+    input: CreateQuote,
+  ): Promise<Recipient> {
+    if (input.leadId) {
+      // Locked so a concurrent loss or conversion waits (F03 edge case 2).
+      const lead = await this.leads.summary(input.leadId, tx, { forUpdate: true });
+      if (!lead || !this.leads.readable(actor, lead)) throw new NotFoundException();
+      return leadRecipient(lead);
+    }
+    const client = input.clientId ? await this.clients.summary(input.clientId, tx) : null;
+    if (!client) throw new NotFoundException();
+    return clientRecipient(client);
   }
 
   /** Every version of the quote's number, archived ones included, oldest first. */
@@ -472,7 +568,7 @@ export class QuotesService {
   async toDetail(
     actor: CurrentUserInfo,
     row: QuoteRow,
-    client: ClientSummary,
+    client: Recipient,
     executor: Database | Transaction = this.db,
   ): Promise<QuoteDetail> {
     const children = (await quoteChildren(executor, [row.id])).get(row.id) ?? {
@@ -517,8 +613,7 @@ export class QuotesService {
         ? renderHash(
             draftSnapshot(row, children, {
               companyDetails: settings.companyDetails,
-              client: client.name,
-              addressee: contact?.name ?? null,
+              ...snapshotParty(client, contact?.name ?? null),
             }),
             true,
           ) !== row.draftPdfHash
@@ -530,9 +625,13 @@ export class QuotesService {
     const retainer = row.retainerId
       ? (await this.engagements.retainers([row.retainerId], executor)).get(row.retainerId)
       : undefined;
+    const lead = row.leadId ? await this.leads.summary(row.leadId, executor) : null;
+    // F03 rule 14: a lead quote is sent and accepted only while its lead is open.
+    const takesQuotes = client.kind === 'client' || client.open;
     return {
       ...this.toSummary(row, client, children, people, businessDate()),
       contact: contact ?? null,
+      lead: lead && { id: lead.id, displayName: lead.displayName, stage: lead.stage },
       discountDecision:
         row.discountDecidedAt && decidedBy
           ? { by: decidedBy, at: row.discountDecidedAt.toISOString(), note: row.discountNote }
@@ -625,13 +724,14 @@ export class QuotesService {
           !client.archived &&
           isDraft &&
           row.discountApproval === 'pending',
-        canSend: editable && children.lines.length > 0,
+        canSend: editable && takesQuotes && children.lines.length > 0,
         canExtend: manages && row.status === 'expired',
         canReject: manages && ['sent', 'expired'].includes(row.status),
         canCreateVersion:
           manages && ['sent', 'expired', 'rejected'].includes(row.status) && newer.length === 0,
         canArchive: manages && isDraft,
-        canAccept: manages && row.status === 'sent' && coversEngagements(actor, client),
+        canAccept:
+          manages && takesQuotes && row.status === 'sent' && coversEngagements(actor, client),
         canRenderPdf: isDraft ? manages : row.status !== 'draft' && row.pdfStatus !== 'ready',
       },
     };
@@ -639,7 +739,7 @@ export class QuotesService {
 
   private toSummary(
     row: QuoteRow,
-    client: ClientSummary,
+    client: Recipient,
     children: QuoteChildren,
     people: Map<string, { id: string; name: string }>,
     today: string,
@@ -653,7 +753,8 @@ export class QuotesService {
       number: row.number,
       version: row.version,
       title: row.title,
-      client: { id: client.id, name: client.name },
+      client: client.kind === 'client' ? { id: client.id, name: client.name } : null,
+      recipient: { kind: client.kind, id: client.id, name: client.name },
       accountManager: { id: client.accountManagerId, name: manager?.name ?? '' },
       currency: row.currency,
       status: row.status,
@@ -684,8 +785,12 @@ export class QuotesService {
     return row.lastNumber;
   }
 
-  private async assertContact(tx: Transaction, clientId: string, contactId: string) {
-    if (!(await this.clients.isActiveContact(clientId, contactId, tx))) {
+  /** A non-archived contact of the client; a lead quote has none (F03). */
+  private async assertContact(tx: Transaction, recipient: Recipient, contactId: string) {
+    if (
+      recipient.kind !== 'client' ||
+      !(await this.clients.isActiveContact(recipient.id, contactId, tx))
+    ) {
       throw new CodedException(400, 'UNKNOWN_CONTACT', 'Not a contact of the client');
     }
   }

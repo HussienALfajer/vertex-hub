@@ -22,10 +22,19 @@ import { CodedException } from '../../core/errors/index.js';
 import { JobQueue, runEach } from '../../core/jobs/index.js';
 import { recordAudit } from '../audit/index.js';
 import { type CurrentUserInfo, UserDirectory } from '../auth/index.js';
-import { ClientDirectory, type ClientSummary } from '../clients/index.js';
+import { ClientDirectory } from '../clients/index.js';
+import { LeadPipeline } from '../leads/index.js';
 import { NotificationCenter } from '../notifications/index.js';
-import { actorOf, approvesDiscounts, assertClientTakesQuotes } from './quote-access.js';
+import {
+  actorOf,
+  approvesDiscounts,
+  archivedError,
+  assertTakesQuotes,
+  type Recipient,
+  snapshotParty,
+} from './quote-access.js';
 import { QuotePdfService } from './quote-pdf.service.js';
+import { QuoteRecipients } from './quote-recipients.js';
 import {
   buildSnapshot,
   identity,
@@ -52,6 +61,8 @@ export class QuoteWorkflowService implements OnModuleInit {
     private readonly notifications: NotificationCenter,
     private readonly jobs: JobQueue,
     private readonly pdf: QuotePdfService,
+    private readonly leadPipeline: LeadPipeline,
+    private readonly recipients: QuoteRecipients,
   ) {}
 
   onModuleInit(): void {
@@ -69,7 +80,7 @@ export class QuoteWorkflowService implements OnModuleInit {
     input: QuoteApprovalAction,
   ): Promise<QuoteDetail> {
     return this.db.transaction(async (tx) => {
-      const { quote, client } = await this.quotes.lockForChange(tx, actor, id);
+      const { quote, recipient: client } = await this.quotes.lockForChange(tx, actor, id);
       if (quote.archivedAt || quote.status !== 'draft') {
         throw new CodedException(409, 'QUOTE_LOCKED', 'Only a draft asks for approval');
       }
@@ -117,11 +128,9 @@ export class QuoteWorkflowService implements OnModuleInit {
   ): Promise<QuoteDetail> {
     return this.db.transaction(async (tx) => {
       const [quote] = await tx.select().from(quotes).where(eq(quotes.id, id)).for('update');
-      const client = quote ? await this.clients.summary(quote.clientId, tx) : null;
+      const client = quote ? await this.recipients.of(quote, tx) : null;
       if (!quote || !client) throw new NotFoundException();
-      if (client.archived) {
-        throw new CodedException(409, 'CLIENT_ARCHIVED', 'The client is archived');
-      }
+      if (client.archived) throw archivedError(client);
       if (quote.archivedAt || quote.status !== 'draft' || quote.discountApproval !== 'pending') {
         throw new CodedException(409, 'INVALID_TRANSITION', 'No approval is pending');
       }
@@ -158,14 +167,14 @@ export class QuoteWorkflowService implements OnModuleInit {
    */
   async send(actor: CurrentUserInfo, id: string, input: SendQuote): Promise<QuoteDetail> {
     const { detail, sent, previewKey } = await this.db.transaction(async (tx) => {
-      const { quote, client } = await this.quotes.lockForChange(tx, actor, id);
+      const { quote, recipient: client } = await this.quotes.lockForChange(tx, actor, id);
       if (quote.archivedAt || quote.status !== 'draft') {
         throw new CodedException(409, 'INVALID_TRANSITION', 'Only a draft is sent');
       }
       if (quote.discountApproval === 'pending') {
         throw new CodedException(409, 'APPROVAL_PENDING', 'The discount awaits approval');
       }
-      assertClientTakesQuotes(client);
+      assertTakesQuotes(client);
       const children = await this.children(tx, quote);
       if (children.lines.length === 0) {
         throw new CodedException(409, 'QUOTE_EMPTY', 'A quote needs a line');
@@ -207,8 +216,10 @@ export class QuoteWorkflowService implements OnModuleInit {
       );
       const snapshot = buildSnapshot(quote, children, {
         companyDetails: settings.companyDetails,
-        client: client.name,
-        addressee: quote.contactId ? (contacts.get(quote.contactId)?.name ?? null) : null,
+        ...snapshotParty(
+          client,
+          quote.contactId ? (contacts.get(quote.contactId)?.name ?? null) : null,
+        ),
         sentOn,
         validUntil,
       });
@@ -256,6 +267,13 @@ export class QuoteWorkflowService implements OnModuleInit {
           after: { ...identity(older), status: 'superseded', byQuoteId: quote.id },
         });
       }
+      // F03 rule 14: sending a lead quote moves the lead to Quote sent.
+      if (client.kind === 'lead') {
+        await this.leadPipeline.markQuoteSent(tx, actorOf(actor), client.id, {
+          id: quote.id,
+          displayNumber: quoteDisplayNumber(quote),
+        });
+      }
       const detail = await this.quotes.toDetail(actor, updated, client, tx);
       return { detail, sent: updated, previewKey: quote.draftPdfObjectKey };
     });
@@ -267,7 +285,7 @@ export class QuoteWorkflowService implements OnModuleInit {
   /** Rule 10: an expired quote is sent again until a new last valid day. */
   async extend(actor: CurrentUserInfo, id: string, input: ExtendQuote): Promise<QuoteDetail> {
     return this.db.transaction(async (tx) => {
-      const { quote, client } = await this.quotes.lockForChange(tx, actor, id);
+      const { quote, recipient: client } = await this.quotes.lockForChange(tx, actor, id);
       if (quote.archivedAt || quote.status !== 'expired') {
         throw new CodedException(409, 'INVALID_TRANSITION', 'Only an expired quote is extended');
       }
@@ -284,6 +302,13 @@ export class QuoteWorkflowService implements OnModuleInit {
         .where(eq(quotes.id, id))
         .returning();
       if (!updated) throw new Error('The quote was not extended');
+      // F03 rule 14: sent again, the lead is back in Quote sent.
+      if (client.kind === 'lead') {
+        await this.leadPipeline.markQuoteSent(tx, actorOf(actor), client.id, {
+          id: quote.id,
+          displayNumber: quoteDisplayNumber(quote),
+        });
+      }
       await recordAudit(tx, {
         actor: actorOf(actor),
         action: 'quote.extended',
@@ -299,7 +324,7 @@ export class QuoteWorkflowService implements OnModuleInit {
   /** Rule 11: the client's no, final. */
   async reject(actor: CurrentUserInfo, id: string, input: RejectQuote): Promise<QuoteDetail> {
     return this.db.transaction(async (tx) => {
-      const { quote, client } = await this.quotes.lockForChange(tx, actor, id);
+      const { quote, recipient: client } = await this.quotes.lockForChange(tx, actor, id);
       if (quote.archivedAt || !['sent', 'expired'].includes(quote.status)) {
         throw new CodedException(409, 'INVALID_TRANSITION', 'Only a sent or expired quote');
       }
@@ -309,7 +334,8 @@ export class QuoteWorkflowService implements OnModuleInit {
       }
       if (
         input.contactId &&
-        !(await this.clients.isActiveContact(client.id, input.contactId, tx))
+        (client.kind !== 'client' ||
+          !(await this.clients.isActiveContact(client.id, input.contactId, tx)))
       ) {
         throw new CodedException(400, 'UNKNOWN_CONTACT', 'Not a contact of the client');
       }
@@ -437,7 +463,7 @@ export class QuoteWorkflowService implements OnModuleInit {
   }
 }
 
-const noticeOf = (quote: QuoteRow, client: ClientSummary) => ({
+const noticeOf = (quote: QuoteRow, client: Recipient) => ({
   displayNumber: quoteDisplayNumber(quote),
   title: quote.title,
   client: client.name,
