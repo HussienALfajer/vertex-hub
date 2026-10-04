@@ -5,6 +5,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Injectable } from '@nestjs/common';
 import type {
+  AdDepositReceiptSnapshot,
   InvoiceDraftSnapshot,
   InvoiceSnapshot,
   QuoteSnapshot,
@@ -12,6 +13,7 @@ import type {
   StatementSnapshot,
 } from '@vertex-hub/contracts';
 import { chromium } from 'playwright';
+import { adDepositReceiptHtml } from './campaign-templates.js';
 import type { TemplateAssets } from './document.js';
 import { invoiceHtml, receiptHtml, statementHtml } from './invoice-templates.js';
 import { quoteHtml } from './quote-template.js';
@@ -87,6 +89,11 @@ export class PdfRenderer {
 
   statement(snapshot: StatementSnapshot): Promise<Buffer> {
     return this.render((assets) => statementHtml(snapshot, assets));
+  }
+
+  /** An ad budget deposit (F12 rule 19). */
+  adDepositReceipt(snapshot: AdDepositReceiptSnapshot): Promise<Buffer> {
+    return this.render((assets) => adDepositReceiptHtml(snapshot, assets));
   }
 
   private async render(html: (assets: TemplateAssets) => string): Promise<Buffer> {

@@ -5,7 +5,9 @@ import { FilesModule } from '../files/index.js';
 import { InvoicesModule } from '../invoices/index.js';
 import { NotificationsModule } from '../notifications/index.js';
 import { ProjectsModule } from '../projects/index.js';
+import { QuotesModule } from '../quotes/index.js';
 import { TasksModule } from '../tasks/index.js';
+import { AdReceiptsService } from './ad-receipts.service.js';
 import { AdWalletBalances } from './ad-wallet-balances.js';
 import { AdWalletEntryFileOwner } from './ad-wallet-entry-file-owner.js';
 import { AdWalletsController } from './ad-wallets.controller.js';
@@ -21,8 +23,11 @@ import { CampaignsService } from './campaigns.service.js';
  * repeated as a source of `notifications.daily`). Reads clients through `ClientDirectory`, users
  * through `UserDirectory`, the linked project or retainer through `projects`' `EngagementDirectory`
  * and the linked task through `tasks`' `TaskLinks`; takes deposit receipt numbers and the current
- * rate from `invoices`' `DocumentNumbers`, and keeps entry proofs as documents of the entry
- * (`files`' `GeneratedFiles`, owner type `ad_wallet_entry`). No module imports it.
+ * rate from `invoices`' `DocumentNumbers`, the company details printed on deposit receipts from
+ * `quotes`' `QuoteDirectory`, and keeps entry proofs and receipts as documents of the entry
+ * (`files`' `GeneratedFiles`, owner type `ad_wallet_entry`). Receipts are rendered by the worker
+ * (`campaigns.pdf`) and attached by `AdReceiptsService` (`campaigns.pdf-ready`). No module
+ * imports it.
  */
 @Module({
   imports: [
@@ -32,6 +37,7 @@ import { CampaignsService } from './campaigns.service.js';
     InvoicesModule,
     NotificationsModule,
     ProjectsModule,
+    QuotesModule,
     TasksModule,
   ],
   controllers: [CampaignsController, AdWalletsController],
@@ -40,6 +46,7 @@ import { CampaignsService } from './campaigns.service.js';
     CampaignUpdatesService,
     AdWalletBalances,
     AdWalletsService,
+    AdReceiptsService,
     AdWalletEntryFileOwner,
   ],
 })

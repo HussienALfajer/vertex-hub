@@ -62,7 +62,8 @@ const LABELS = {
   noRows: 'لا توجد حركات في هذه الفترة.',
 } as const;
 
-const METHODS: Record<PaymentMethod, string> = {
+/** Also printed on the ad deposit receipts (F12). */
+export const METHODS: Record<PaymentMethod, string> = {
   cash: 'نقداً',
   bank_transfer: 'تحويل مصرفي',
   e_wallet: 'محفظة إلكترونية',

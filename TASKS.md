@@ -21,12 +21,12 @@ Spec: `docs/specs/F12-ad-campaigns.md` · ADRs 0006, 0007, 0008, 0013, 0014, 001
 - [x] wiring checklist, full checks (lint, typecheck, build, test, drift pass), reviewer (one finding fixed: concurrent update and refund test), owner acceptance (approved), dev database migrated, /ship
 
 ## PR 3 — `feat/f12-ad-receipts-pdf`: deposit receipt PDFs
-- [ ] contracts: jobs `campaigns.pdf`, `campaigns.pdf-ready`, kind `ad_deposit_receipt`, `adDepositReceiptSnapshotSchema`; entry `receiptPdf` state
-- [ ] db (`/db-migration`): `receipt_snapshot`, `receipt_pdf_status`, `receipt_file_item_id` on `ad_wallet_entries` (first use here); drift
-- [ ] worker: Arabic RTL receipt template (F13 document styles), idempotent per payload hash; worker test with text extraction
-- [ ] api: snapshot and queue on deposit, ready handler attaching once, receipt archived on void, `POST` / `GET` receipt endpoints; `test/ad-receipts.test.ts`
-- [ ] bridge; web typecheck
-- [ ] wiring checklist, full checks (+ drift), reviewer, owner acceptance, /ship
+- [x] contracts: jobs `campaigns.pdf`, `campaigns.pdf-ready`, kind `ad_deposit_receipt`, `adDepositReceiptSnapshotSchema`; entry `receiptPdf` state
+- [x] db (`/db-migration`, 0035): `receipt_snapshot`, `receipt_pdf_status`, `receipt_file_item_id` on `ad_wallet_entries` (first use here); drift
+- [x] worker: Arabic RTL receipt template (F13 document styles), idempotent per payload hash; worker test with text extraction
+- [x] api: `AdReceiptsService` (snapshot and queue on deposit, ready handler attaching once, receipt archived on void, `POST` / `GET` receipt endpoints; "Render again" on a void deposit is `INVALID_TRANSITION`); `campaigns` imports `quotes` for the company details; `test/ad-receipts.test.ts`; `removeClients` unlinks receipts; spec and `docs/architecture.md`
+- [x] bridge; web typecheck
+- [x] wiring checklist, full checks (lint, typecheck, build, test, drift pass), reviewer (no blocking findings), owner acceptance (approved, incl. `INVALID_TRANSITION` on a void deposit's "Render again"), dev database migrated, /ship
 
 ## PR 4 — `feat/f12-web`: campaign, wallet and Ads screens
 - [ ] web `features/campaigns/`: Campaigns page (Campaigns and Ad budgets tabs), campaign dialog, campaign page (cards, monthly totals, updates, status actions with dialogs, start warning), add / edit update dialog with warnings; client Ads tab (wallet cards, threshold edit, ledger, campaigns, new campaign), deposit / refund dialog (SYP rate, live USD, balance after, proof), void dialog, receipt links; `ad_budget_low` notification opens the Ads tab; routes; nav item; `ar.json` `campaigns` namespace; loading, empty, error states

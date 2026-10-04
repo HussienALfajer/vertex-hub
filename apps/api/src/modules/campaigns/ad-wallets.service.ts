@@ -40,6 +40,7 @@ import { type CurrentUserInfo, UserDirectory } from '../auth/index.js';
 import { ClientDirectory, type ClientSummary } from '../clients/index.js';
 import { GeneratedFiles } from '../files/index.js';
 import { DocumentNumbers } from '../invoices/index.js';
+import { AdReceiptsService } from './ad-receipts.service.js';
 import { AdWalletBalances, type WalletRow } from './ad-wallet-balances.js';
 import { actorOf, covers, readsAll } from './campaign-access.js';
 
@@ -77,6 +78,7 @@ export class AdWalletsService {
     private readonly balances: AdWalletBalances,
     private readonly numbers: DocumentNumbers,
     private readonly files: GeneratedFiles,
+    private readonly receipts: AdReceiptsService,
   ) {}
 
   /**
@@ -221,7 +223,8 @@ export class AdWalletsService {
 
   /**
    * Rules 16, 17 and 19 under the wallet lock (edge case 2): the rate, the USD amount, the refund
-   * limit, the deposit's receipt number, the proof as a document of the entry, then A11.
+   * limit, the deposit's receipt number, the proof as a document of the entry, then A11; the
+   * deposit's receipt is frozen with the balance after it and queued once committed.
    */
   async record(
     actor: CurrentUserInfo,
@@ -229,6 +232,7 @@ export class AdWalletsService {
     input: RecordWalletEntry,
   ): Promise<AdWallet> {
     let preview = false;
+    let recorded: EntryRow | null = null;
     const wallet = await this.db.transaction(async (tx) => {
       const client = await this.readableClient(tx, actor, clientId);
       if (!covers(actor, 'campaigns.fund', client)) throw new ForbiddenException();
@@ -291,6 +295,7 @@ export class AdWalletsService {
         entry = withProof;
       }
       const after = await this.balances.settle(tx, actorOf(actor), locked, client);
+      recorded = await this.receipts.freeze(tx, entry, client, after.balanceMinor);
       await recordAudit(tx, {
         actor: actorOf(actor),
         action: 'ad_wallet_entry.recorded',
@@ -310,10 +315,14 @@ export class AdWalletsService {
       return this.toWallet(tx, actor, client, {});
     });
     if (preview) await this.files.queuePreviews();
+    if (recorded) await this.receipts.queue(recorded);
     return wallet;
   }
 
-  /** Rule 18: an entry recorded by mistake stays visible as void; there is no un-void. */
+  /**
+   * Rule 18: an entry recorded by mistake stays visible as void, a deposit keeping its receipt
+   * number with its receipt archived; there is no un-void.
+   */
   async void(actor: CurrentUserInfo, entryId: string, input: VoidWalletEntry): Promise<AdWallet> {
     return this.db.transaction(async (tx) => {
       const [found] = await tx
@@ -338,6 +347,7 @@ export class AdWalletsService {
         .update(adWalletEntries)
         .set({ voidedAt: new Date(), voidedById: actor.id, voidReason: input.reason })
         .where(eq(adWalletEntries.id, entryId));
+      await this.receipts.archive(tx, entry, actorOf(actor));
       const after = await this.balances.settle(tx, actorOf(actor), locked, client);
       await recordAudit(tx, {
         actor: actorOf(actor),
@@ -489,6 +499,7 @@ export class AdWalletsService {
           proof: entry.proofFileItemId
             ? { id: entry.proofFileItemId, name: proofs.get(entry.proofFileItemId) ?? '' }
             : null,
+          receiptPdf: entry.receiptPdfStatus ? { state: entry.receiptPdfStatus } : null,
           recordedBy: person(entry.recordedById),
           createdAt: entry.createdAt.toISOString(),
           voided:

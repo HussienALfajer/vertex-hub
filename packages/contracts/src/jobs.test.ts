@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  campaignPdfJobSchema,
+  campaignPdfReadyJobSchema,
+  campaignPdfStorageKey,
   invoicePdfJobSchema,
   invoicePdfReadyJobSchema,
   invoicePdfStorageKey,
@@ -81,5 +84,40 @@ describe('invoice PDF jobs', () => {
     expect(
       invoicePdfReadyJobSchema.safeParse({ kind: 'other', id, hash, file: null }).success,
     ).toBe(false);
+  });
+});
+
+describe('campaign PDF jobs', () => {
+  const id = '0190a3c2-0000-7000-8000-000000000003';
+  const snapshot = {
+    displayNumber: 'AD-2026-0001',
+    companyDetails: '',
+    billingName: 'Client',
+    receivedOn: '2026-10-04',
+    amountMinor: 5_900_000_000,
+    currency: 'SYP',
+    conversion: { sypPerUsd: '11800.0000', usdMinor: 50_000 },
+    method: 'bank_transfer',
+    reference: null,
+    balanceAfterMinor: -1_000,
+  };
+
+  it('names the output by entry and payload hash', () => {
+    expect(campaignPdfStorageKey({ id, hash })).toBe(`objects/ad-receipts/${id}/${hash}.pdf`);
+  });
+
+  it('takes a deposit receipt, with a negative balance after it', () => {
+    const job = { kind: 'ad_deposit_receipt', id, hash, snapshot };
+    expect(campaignPdfJobSchema.safeParse(job).success).toBe(true);
+    expect(campaignPdfJobSchema.safeParse({ ...job, kind: 'receipt' }).success).toBe(false);
+    expect(
+      campaignPdfJobSchema.safeParse({ ...job, snapshot: { ...snapshot, conversion: {} } }).success,
+    ).toBe(false);
+  });
+
+  it('reports a stored file or a failure', () => {
+    const ready = { kind: 'ad_deposit_receipt', id, hash, file: null };
+    expect(campaignPdfReadyJobSchema.safeParse(ready).success).toBe(true);
+    expect(campaignPdfReadyJobSchema.safeParse({ ...ready, hash: 'x' }).success).toBe(false);
   });
 });

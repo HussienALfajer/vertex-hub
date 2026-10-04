@@ -5,6 +5,7 @@
  */
 
 import { z } from 'zod';
+import { adDepositReceiptSnapshotSchema } from './campaigns.js';
 import { BUSINESS_TIME_ZONE } from './dates.js';
 import {
   invoiceDraftSnapshotSchema,
@@ -183,3 +184,34 @@ export const invoicePdfReadyJobSchema = z.object({
 });
 
 export type InvoicePdfReadyJob = z.infer<typeof invoicePdfReadyJobSchema>;
+
+/**
+ * F12 rule 19: renders the receipt PDF of an ad budget deposit, as `invoices.pdf` does. `id` is
+ * the wallet entry the result goes back to.
+ */
+export const CAMPAIGNS_PDF_JOB = { queue: 'campaigns.pdf', retryLimit: 3 } as const;
+
+export const campaignPdfJobSchema = z.object({
+  kind: z.literal('ad_deposit_receipt'),
+  id: z.uuid(),
+  hash: renderHashSchema,
+  snapshot: adDepositReceiptSnapshotSchema,
+});
+
+export type CampaignPdfJob = z.infer<typeof campaignPdfJobSchema>;
+
+/** Where the worker writes the PDF of a `campaigns.pdf` render, under `FILES_ROOT`. */
+export const campaignPdfStorageKey = (job: Pick<CampaignPdfJob, 'id' | 'hash'>) =>
+  `objects/ad-receipts/${job.id}/${job.hash}.pdf`;
+
+/**
+ * The result of a `campaigns.pdf` render, worked by the API: attached once as a document of the
+ * wallet entry, or marked failed after the last retry.
+ */
+export const CAMPAIGNS_PDF_READY_JOB = { queue: 'campaigns.pdf-ready' } as const;
+
+export const campaignPdfReadyJobSchema = campaignPdfJobSchema
+  .pick({ kind: true, id: true, hash: true })
+  .extend({ file: renderedFileSchema });
+
+export type CampaignPdfReadyJob = z.infer<typeof campaignPdfReadyJobSchema>;

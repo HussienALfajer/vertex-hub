@@ -14,6 +14,7 @@ import {
   minorAmountSchema,
   signedMinorAmountSchema,
 } from './money.js';
+import { quotePdfStateSchema } from './quotes.js';
 import { taskStatusSchema } from './tasks.js';
 import { optionalText } from './text.js';
 
@@ -537,6 +538,28 @@ export const adWalletQuerySchema = z.object({
 
 export type AdWalletQuery = z.infer<typeof adWalletQuerySchema>;
 
+/**
+ * Rule 19: the frozen render payload of a deposit's receipt, taken when it is recorded. The
+ * template prints the fixed line that the money is the client's ad budget, not an agency fee.
+ */
+export const adDepositReceiptSnapshotSchema = z.object({
+  /** `AD-2026-0001`. */
+  displayNumber: z.string(),
+  companyDetails: z.string(),
+  billingName: z.string(),
+  receivedOn: calendarDateSchema,
+  amountMinor: minorAmountSchema,
+  currency: currencySchema,
+  /** A deposit in SYP: its rate and its USD amount. */
+  conversion: z.object({ sypPerUsd: exchangeRateSchema, usdMinor: minorAmountSchema }).nullable(),
+  method: paymentMethodSchema,
+  reference: z.string().nullable(),
+  /** The wallet balance right after the deposit, in USD; negative when the client owes. */
+  balanceAfterMinor: signedMinorAmountSchema,
+});
+
+export type AdDepositReceiptSnapshot = z.infer<typeof adDepositReceiptSnapshotSchema>;
+
 export const walletEntrySchema = z
   .object({
     id: z.uuid(),
@@ -553,6 +576,11 @@ export const walletEntrySchema = z
     note: z.string().nullable(),
     /** The proof, a document of the entry. */
     proof: z.object({ id: z.uuid(), name: z.string() }).nullable(),
+    /**
+     * A deposit's receipt PDF (rule 19), archived with a void deposit; null for refunds and for
+     * deposits recorded before receipts were rendered.
+     */
+    receiptPdf: z.object({ state: quotePdfStateSchema }).nullable(),
     recordedBy: personSchema,
     createdAt: z.iso.datetime(),
     voided: z.object({ at: z.iso.datetime(), by: personSchema, reason: z.string() }).nullable(),

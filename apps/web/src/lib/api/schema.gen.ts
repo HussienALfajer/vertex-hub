@@ -3268,6 +3268,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/ad-wallet-entries/{id}/receipt": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["AdWalletsController_downloadReceipt"];
+        put?: never;
+        post: operations["AdWalletsController_renderReceipt"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -9551,6 +9567,9 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+            } | null;
+            receiptPdf: {
+                state: components["schemas"]["QuotePdfState"];
             } | null;
             recordedBy: {
                 /** Format: uuid */
@@ -16451,6 +16470,55 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AdWallet"];
+                };
+            };
+        };
+    };
+    AdWalletsController_downloadReceipt: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The receipt PDF of the deposit */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such deposit, its receipt is not ready, or it is void */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AdWalletsController_renderReceipt: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Renders a deposit's receipt again when its PDF is not ready */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuotePdfRender"];
                 };
             };
         };

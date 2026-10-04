@@ -1,3 +1,4 @@
+import type { IncomingMessage, ServerResponse } from 'node:http';
 import {
   Body,
   Controller,
@@ -8,14 +9,18 @@ import {
   Patch,
   Post,
   Query,
+  Req,
+  Res,
   SerializeOptions,
 } from '@nestjs/common';
-import { ApiCreatedResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
+import { ApiCreatedResponse, ApiNotFoundResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import {
   type AdWallet,
   type AdWalletQuery,
   adWalletQuerySchema,
   adWalletSchema,
+  type QuotePdfRender,
+  quotePdfRenderSchema,
   type RecordWalletEntry,
   recordWalletEntrySchema,
   type UpdateWalletThreshold,
@@ -29,12 +34,16 @@ import {
 } from '@vertex-hub/contracts';
 import { RequirePermissions } from '../../core/access/index.js';
 import { CurrentUser, type CurrentUserInfo } from '../auth/index.js';
+import { AdReceiptsService } from './ad-receipts.service.js';
 import { AdWalletsService } from './ad-wallets.service.js';
 
 @ApiTags('campaigns')
 @Controller()
 export class AdWalletsController {
-  constructor(private readonly wallets: AdWalletsService) {}
+  constructor(
+    private readonly wallets: AdWalletsService,
+    private readonly receipts: AdReceiptsService,
+  ) {}
 
   @Get('ad-wallets')
   @RequirePermissions('campaigns.read')
@@ -106,5 +115,33 @@ export class AdWalletsController {
     @Body({ schema: voidWalletEntrySchema }) input: VoidWalletEntry,
   ): Promise<AdWallet> {
     return this.wallets.void(actor, id, input);
+  }
+
+  @Post('ad-wallet-entries/:id/receipt')
+  @HttpCode(200)
+  @RequirePermissions('campaigns.read')
+  @SerializeOptions({ schema: quotePdfRenderSchema })
+  @ApiOkResponse({
+    description: "Renders a deposit's receipt again when its PDF is not ready",
+    standardSchema: quotePdfRenderSchema,
+  })
+  renderReceipt(
+    @CurrentUser() actor: CurrentUserInfo,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<QuotePdfRender> {
+    return this.receipts.render(actor, id);
+  }
+
+  @Get('ad-wallet-entries/:id/receipt')
+  @RequirePermissions('campaigns.read')
+  @ApiOkResponse({ description: 'The receipt PDF of the deposit' })
+  @ApiNotFoundResponse({ description: 'No such deposit, its receipt is not ready, or it is void' })
+  async downloadReceipt(
+    @CurrentUser() actor: CurrentUserInfo,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Req() request: IncomingMessage,
+    @Res() response: ServerResponse,
+  ): Promise<void> {
+    await this.receipts.serve(actor, id, request, response);
   }
 }

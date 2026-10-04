@@ -320,10 +320,10 @@ export async function removeClients(db: Database, ids: string[]): Promise<void> 
   // removed before the file items go.
   await db.update(invoices).set({ pdfFileItemId: null }).where(inArray(invoices.clientId, ids));
   await removePayments(db, ids);
-  // Ad wallet entries point at their proof (F12): unlinked before the file items go.
+  // Ad wallet entries point at their proof and receipt (F12): unlinked before the file items go.
   await db
     .update(adWalletEntries)
-    .set({ proofFileItemId: null })
+    .set({ proofFileItemId: null, receiptFileItemId: null })
     .where(inArray(adWalletEntries.clientId, ids));
   await db.delete(statementPdfs).where(inArray(statementPdfs.clientId, ids));
   await removeFileItems(db, inArray(fileItems.clientId, ids));
