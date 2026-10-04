@@ -88,6 +88,7 @@ export const contentPosts = pgTable(
     index('content_posts_client_id_idx').on(table.clientId, table.publishDate),
     index('content_posts_publish_date_idx').on(table.publishDate),
     index('content_posts_status_idx').on(table.status),
+    index('content_posts_published_at_idx').on(table.publishedAt),
     index('content_posts_responsible_id_idx').on(table.responsibleId),
     index('content_posts_cycle_line_id_idx').on(table.cycleLineId),
     index('content_posts_cleared_review_id_idx').on(table.clearedReviewId),

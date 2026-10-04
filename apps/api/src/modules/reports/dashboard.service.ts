@@ -22,6 +22,7 @@ import { InvoiceReports } from '../invoices/index.js';
 import { LeadReports } from '../leads/index.js';
 import { EngagementReports } from '../projects/index.js';
 import { TaskReports } from '../tasks/index.js';
+import { managedDepartments, reportDepartments } from './report-access.js';
 
 /** The caller holds `permission` over clients they manage (`all` covers them too). */
 const coversOwnClients = (actor: CurrentUserInfo, permission: Permission) =>
@@ -135,11 +136,8 @@ export class DashboardService {
     actor: CurrentUserInfo,
     requested: DepartmentCode | undefined,
   ): Promise<DepartmentDashboard> {
-    const scopes = permissionScopes(actor.access, 'reports.read');
-    const managed = actor.access.departments.filter((d) => d.isManager).map((d) => d.code);
-    const departments = DEPARTMENT_CODES.filter(
-      (code) => scopes.includes('all') || (scopes.includes('department') && managed.includes(code)),
-    );
+    const managed = managedDepartments(actor);
+    const departments = reportDepartments(actor);
     const department =
       requested ?? departments.find((code) => managed.includes(code)) ?? departments[0];
     if (!department || !departments.includes(department)) throw new ForbiddenException();

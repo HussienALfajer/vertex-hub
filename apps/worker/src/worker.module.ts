@@ -13,6 +13,7 @@ import { NotificationsDailyJob } from './jobs/notifications-daily.job.js';
 import { PgBossService } from './jobs/pg-boss.service.js';
 import { QuotesDailyJob } from './jobs/quotes-daily.job.js';
 import { QuotesPdfJob } from './jobs/quotes-pdf.job.js';
+import { ReportsPdfJob } from './jobs/reports-pdf.job.js';
 import { RetainerCyclesJob } from './jobs/retainer-cycles.job.js';
 import { PdfRenderer } from './pdf/pdf-renderer.js';
 
@@ -43,6 +44,7 @@ import { PdfRenderer } from './pdf/pdf-renderer.js';
     QuotesPdfJob,
     InvoicesPdfJob,
     CampaignsPdfJob,
+    ReportsPdfJob,
   ],
 })
 export class WorkerModule {}

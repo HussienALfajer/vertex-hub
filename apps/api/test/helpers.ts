@@ -15,6 +15,8 @@ import {
   clientContacts,
   clientNotes,
   clientPlatformAccounts,
+  clientReportNotes,
+  clientReportPdfs,
   clients,
   contentPosts,
   type Database,
@@ -370,6 +372,8 @@ export async function removeClients(db: Database, ids: string[]): Promise<void> 
     .set({ proofFileItemId: null, receiptFileItemId: null })
     .where(inArray(adWalletEntries.clientId, ids));
   await db.delete(statementPdfs).where(inArray(statementPdfs.clientId, ids));
+  await db.delete(clientReportPdfs).where(inArray(clientReportPdfs.clientId, ids));
+  await db.delete(clientReportNotes).where(inArray(clientReportNotes.clientId, ids));
   await removeFileItems(db, inArray(fileItems.clientId, ids));
   // Campaigns point at the client's tasks, projects and retainers (F12): they go first.
   await removeCampaigns(db, ids);

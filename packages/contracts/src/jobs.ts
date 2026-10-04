@@ -14,6 +14,7 @@ import {
   statementSnapshotSchema,
 } from './invoices.js';
 import { quoteSnapshotSchema } from './quotes.js';
+import { clientReportSnapshotSchema } from './reports.js';
 
 /** F05 R2: closes past retainer cycles and opens the current month's, once a day. */
 export const RETAINER_CYCLES_JOB = {
@@ -215,3 +216,31 @@ export const campaignPdfReadyJobSchema = campaignPdfJobSchema
   .extend({ file: renderedFileSchema });
 
 export type CampaignPdfReadyJob = z.infer<typeof campaignPdfReadyJobSchema>;
+
+/**
+ * F15 rule 20: renders the monthly client report PDF, as `invoices.pdf` renders a statement. `id`
+ * is the `client_report_pdfs` row the result goes back to.
+ */
+export const REPORTS_PDF_JOB = { queue: 'reports.pdf', retryLimit: 3 } as const;
+
+export const reportPdfJobSchema = z.object({
+  kind: z.literal('client_report'),
+  id: z.uuid(),
+  hash: renderHashSchema,
+  snapshot: clientReportSnapshotSchema,
+});
+
+export type ReportPdfJob = z.infer<typeof reportPdfJobSchema>;
+
+/** Where the worker writes the PDF of a `reports.pdf` render, under `FILES_ROOT`. */
+export const reportPdfStorageKey = (job: Pick<ReportPdfJob, 'id' | 'hash'>) =>
+  `objects/client-reports/${job.id}/${job.hash}.pdf`;
+
+/** The result of a `reports.pdf` render, worked by the API: recorded on its row, or failed. */
+export const REPORTS_PDF_READY_JOB = { queue: 'reports.pdf-ready' } as const;
+
+export const reportPdfReadyJobSchema = reportPdfJobSchema
+  .pick({ kind: true, id: true, hash: true })
+  .extend({ file: renderedFileSchema });
+
+export type ReportPdfReadyJob = z.infer<typeof reportPdfReadyJobSchema>;

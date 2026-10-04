@@ -102,7 +102,7 @@ The implementation adds any index the report queries need and that is missing (e
     - Average client revisions and average internal revisions (sources `internal` and `medical`) per delivered task, one decimal.
     - Average cycle time: days from `started_at` (else `created_at`) to `delivered_at`, one decimal.
     - Open now and overdue now (at the time of the request, not the period).
-    - Department rows only: unassigned now (count and the oldest request's date).
+    - Department rows only: unassigned now (count and the day the oldest unassigned open task was created).
 
 ### Revenue by client and service
 11. Query: `from`, `to` (default this month; same limits as rule 8).
@@ -110,7 +110,7 @@ The implementation adds any index the report queries need and that is missing (e
 13. **By client**: client, account manager, invoiced, collected, and outstanding at the end of the period (issued on or before `to`, minus payments on or before `to`, at invoice rates).
 14. **By service**: each invoice's USD total is split over its lines by line totals; each payment's USD amount over its invoice's lines in the same shares. A line's share goes to:
     - its `service_id` when set;
-    - else, for a milestone line, the project's accepted quote's `one_off` lines, and for a retainer cycle line, the retainer's accepted quote's `monthly` lines, in proportion to quantity × unit price (owner decision); a package line counts as its package;
+    - else, for a milestone line, the project's accepted quote's `one_off` lines, and for a retainer cycle line, the retainer's accepted quote's `monthly` lines (the latest accepted one when the retainer was renewed), in proportion to quantity × unit price (owner decision); a package line counts as its package;
     - else "Unclassified".
     Rows: service or package name (archived ones included, marked), invoiced, collected.
 15. The Excel workbook has three sheets: By client, By service, Invoices (number, client, issued on, currency, total, rate, USD total, collected in the period in USD).
@@ -126,12 +126,12 @@ The implementation adds any index the report queries need and that is missing (e
     3. Projects: non-archived projects that were open at some point in the month (not completed or cancelled before it, started by its end): status, progress (delivered ÷ total tasks), milestones done in the month.
     4. Delivered work: the client's tasks delivered in the month: the client-facing title of the latest approval item for the task when one exists, else the task title; department; date.
     5. Published content: posts published in the month: date, platforms, title, links.
-    6. Shoots: the client's shoots completed in the month: date, title, location.
-    7. Approvals: approval items of the client closed in the month as approved or changes requested: the two counts and the average response time (item sent to closed), in hours under two days, else days.
-    8. Ad campaigns (needs `campaigns.read`): each campaign with non-archived updates in the month: platform, name, objective, spend (USD), reach, clicks, results, cost per result; totals (reach is the sum of the updates' reach).
-    9. Ad budget (needs `campaigns.read`; only when the client has wallet activity): opening balance at the month's start, deposits, refunds, wallet-funded spend, closing balance (USD, non-void entries).
+    6. Shoots: the client's completed shoots that took place in the month (dated by their start in Asia/Damascus): date, title, location.
+    7. Approvals: approval items of the client closed in the month as approved or changes requested: the two counts and the average response time (the request's creation to the item's close), in hours under two days, else days.
+    8. Ad campaigns (needs `campaigns.read`): each campaign with non-archived updates in the month (an update lies within one month, F12 rule 9, so its start dates it): platform, name, objective, spend (USD), reach, clicks, results, cost per result; totals (reach is the sum of the updates' reach).
+    9. Ad budget (needs `campaigns.read`; only when the client has wallet activity: a non-void entry or counted spend up to the month's end): opening balance at the month's start, deposits, refunds, wallet-funded spend, closing balance (USD, non-void entries).
     10. Next month: posts scheduled in the next month that are not cancelled (date, title) and shoots booked in it (date, title).
-19. The summary is edited by any reader of the report for that client, any month up to the current one; saving replaces the text (last write wins) and writes an audit entry. An empty text clears it.
+19. The summary is edited by any reader of the report for that client, any month up to the current one; saving replaces the text (last write wins) and writes an audit entry. An empty text clears it (stored as an empty text; the row stays). Saving the same text again changes nothing.
 20. The PDF is Arabic only (as F04 and F13), rendered by the worker on request with the company details from the quote settings, downloadable for 24 hours and not kept as a document (as F13 statements).
 
 ### Invoice line services
@@ -140,7 +140,7 @@ The implementation adds any index the report queries need and that is missing (e
 
 ### General
 23. Every number respects the caller's scope: a department manager never sees another department's tasks, an account manager never sees another manager's clients; a section or report the caller cannot read is a 403 from the API and absent from the UI.
-24. Excel files are built by the API on request (RTL sheet, Arabic headers through the API's i18n strings, dates as dates, money as numbers in major units with a currency column) and named `<report>-<from>-<to>.xlsx` or `client-report-<client>-<YYYY-MM>.xlsx`.
+24. Excel files are built by the API on request (RTL sheet, Arabic headers through the API's i18n strings, dates as dates, money as numbers in major units with a currency column) and named `<report>-<from>-<to>.xlsx` (`overdue-invoices-<today>.xlsx`) or `client-report-<client>-<YYYY-MM>.xlsx`. The API has no i18n: the Arabic names of printed values and the monthly report's titles live in `packages/contracts/src/report-labels.ts`, shared with the worker's PDF and matching `ar.json`.
 
 ## API
 Schemas live in `packages/contracts/src/reports.ts` (and the invoice line field in `invoices.ts`). Dates are `YYYY-MM-DD`, months `YYYY-MM`.
@@ -156,7 +156,7 @@ Schemas live in `packages/contracts/src/reports.ts` (and the invoice line field 
 | `GET /api/reports/overdue-invoices` · `GET /api/reports/overdue-invoices/export` | `reports.finance` | `accountManagerId`, `currency` | `overdueInvoicesReportSchema` · xlsx | 403 |
 | `GET /api/clients/:id/monthly-report` · `GET /api/clients/:id/monthly-report/export` | `reports.read` covering the client | `{ month }` | `clientMonthlyReportSchema` (rule 18) · xlsx | 404, `INVALID_MONTH` |
 | `PUT /api/clients/:id/monthly-report/summary` | `reports.read` covering the client | `{ month, summary }` | `clientMonthlyReportSchema` | 404, `INVALID_MONTH` |
-| `POST /api/clients/:id/monthly-report/pdf` · `GET` same path with `month` | `reports.read` covering the client | `{ month }` | `{ state }` · the PDF inline | 404, `INVALID_MONTH` |
+| `POST /api/clients/:id/monthly-report/pdf` · `GET` same path with `month` | `reports.read` covering the client | `month` query parameter (as F13 statements) | `{ state }` · the PDF inline | 404, `INVALID_MONTH` |
 | `PUT /api/invoices/:id/services` | `invoices.manage` | `{ lines: [{ lineId, serviceId \| null }] }` | `invoiceDetailSchema` | 404, `INVALID_TRANSITION`, `INVALID_SERVICE` |
 
 - F13's draft line schemas gain an optional `serviceId`; invoice detail lines return `service` (id, name, archived) or null.

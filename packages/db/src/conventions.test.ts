@@ -66,6 +66,9 @@ const NOT_BUSINESS_RECORDS: Record<string, string> = {
   statement_pdfs: 'Temporary statement renders, deleted after 24 hours (F13 rule 29)',
   ad_wallets: 'Settings of a client, following the client and edited in place (F12)',
   ad_wallet_entries: 'Voided, never archived or edited once recorded (F12 rule 18)',
+  client_report_notes:
+    'One summary per client and month, replaced on save and cleared, not archived (F15 rule 19)',
+  client_report_pdfs: 'Temporary monthly report renders, deleted after 24 hours (F15 rule 20)',
 };
 
 /** Tables keyed by a natural value instead of a UUIDv7 `id`. Every entry needs a reason. */

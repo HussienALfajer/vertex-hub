@@ -16,18 +16,21 @@ Spec: `docs/specs/F15-dashboards-reports.md` · ADRs 0006, 0008, 0013, 0014, 001
 - [x] /ship
 
 ## PR 2 — `feat/f15-reports-api`: reports, Excel and the monthly client report PDF
-- [ ] contracts: productivity, revenue, overdue invoices, monthly client report schemas and queries; rules (on-time, aging buckets, revenue split by line, quote and payment, period ≤ 366 days, month validation) with unit tests; error codes `INVALID_DATES` / `INVALID_MONTH` if missing; audit action and entity `client_report.summary_changed`; `reports.pdf` queue in `jobs.ts`; `ar.json` keys
-- [ ] db (`/db-migration`): `client_report_notes` (exception in `conventions.test.ts`), `client_report_pdfs`; `TABLE_OWNERS`; `content_posts.published_at` index if missing; drift
-- [ ] api exports extended: `TaskReports` (productivity), `InvoiceReports` (revenue split through `quotes` exports, overdue), `EngagementReports` (cycles, projects), `ContentReports`, `ShootReports`, `CampaignReports` (campaign updates, wallet), `ApprovalReports` (closed items)
-- [ ] api `reports`: productivity, revenue, overdue invoices (rules 8–16), monthly client report and summary (rules 17–19), Excel builder (rule 24; `exceljs`, approved by the owner), PDF request / download (rule 20) with the `files.purge-uploads` cleanup
-- [ ] worker: `reports-pdf.job.ts` and the Arabic client report template (ADR 0008 pipeline)
-- [ ] api tests: `test/reports.test.ts`, `test/client-report.test.ts` (rules 8–20, Excel contents, PDF queued once per payload, audit)
-- [ ] bridge; web typecheck
-- [ ] wiring checklist, full checks (incl. drift), reviewer, owner acceptance (API docs), /ship
+- [x] contracts: productivity, revenue, overdue invoices, monthly client report schemas and queries; rules (on-time, aging buckets, revenue split by line, quote and payment, period ≤ 366 days, month validation) with unit tests; error codes `INVALID_DATES` / `INVALID_MONTH` if missing; audit action and entity `client_report.summary_changed`; `reports.pdf` queue in `jobs.ts`; `ar.json` keys
+- [x] db (`/db-migration`, 0041, additive): `client_report_notes` (exception in `conventions.test.ts`), `client_report_pdfs`; `TABLE_OWNERS`; `content_posts.published_at` index if missing; drift
+- [x] api exports extended (also `QuoteDirectory.acceptedLines`, `RetainerCyclesService.ofMonth`, `UserDirectory.departmentNames`, `contentDisposition` from `files`): `TaskReports` (productivity), `InvoiceReports` (revenue split through `quotes` exports, overdue), `EngagementReports` (cycles, projects), `ContentReports`, `ShootReports`, `CampaignReports` (campaign updates, wallet), `ApprovalReports` (closed items)
+- [x] api `reports`: productivity, revenue, overdue invoices (rules 8–16), monthly client report and summary (rules 17–19), Excel builder (rule 24; `exceljs`, approved by the owner), PDF request / download (rule 20) with the `files.purge-uploads` cleanup
+- [x] worker (with `test/reports-pdf.test.ts`; shared Arabic labels in `contracts/report-labels.ts`): `reports-pdf.job.ts` and the Arabic client report template (ADR 0008 pipeline)
+- [x] api tests: `test/reports.test.ts`, `test/client-report.test.ts` (rules 8–20, Excel contents, PDF queued once per payload, audit)
+- [x] bridge; web typecheck
+- [x] wiring checklist (`docs/architecture.md`, spec details settled), full checks (incl. drift), reviewer (no blocking issues; period filters made index-friendly with `inBusinessPeriod`)
+- [x] owner acceptance (approved, with the spec details settled in this PR), dev database migrated (0041)
+- [x] /ship
 
 ## PR 3 — `feat/f15-web`: home dashboard, invoice services, reports screens and the monthly client report
 - [ ] web `features/dashboard/`: home `/` with the five sections (rules 1–7), each with loading, empty and error states, refresh, phone collapsible; navigation: "Home" first
 - [ ] web invoices: Service column in the draft editor and the issued invoice page, "Services" dialog
+- [ ] web: a report period error message (`INVALID_DATES` from the reports means "to before from, or over 366 days"; today's `errors.INVALID_DATES` text speaks of a project's dates)
 - [ ] web `features/reports/`: `/reports` index, productivity, revenue, overdue invoices (period pickers, filters, Excel download); navigation "Reports"
 - [ ] web monthly client report `/clients/$clientId/report` (sections, preliminary badge, summary editor, PDF and Excel) and the client profile action
 - [ ] e2e: mocks, `f15.spec.ts` (role sections, reports, summary), screenshots (home for General Manager, department manager, account manager, Finance, employee; phone; Services dialog; each report screen; monthly client report), both themes

@@ -8,6 +8,8 @@ import {
   invoicePdfStorageKey,
   quotePdfReadyJobSchema,
   quotePdfStorageKey,
+  reportPdfReadyJobSchema,
+  reportPdfStorageKey,
 } from './jobs.js';
 
 const quoteId = '0190a3c2-0000-7000-8000-000000000001';
@@ -119,5 +121,19 @@ describe('campaign PDF jobs', () => {
     const ready = { kind: 'ad_deposit_receipt', id, hash, file: null };
     expect(campaignPdfReadyJobSchema.safeParse(ready).success).toBe(true);
     expect(campaignPdfReadyJobSchema.safeParse({ ...ready, hash: 'x' }).success).toBe(false);
+  });
+});
+
+describe('client report PDF jobs', () => {
+  const id = '0190a3c2-0000-7000-8000-000000000004';
+
+  it('names the output by render row and payload hash', () => {
+    expect(reportPdfStorageKey({ id, hash })).toBe(`objects/client-reports/${id}/${hash}.pdf`);
+  });
+
+  it('reports a stored file or a failure', () => {
+    const ready = { kind: 'client_report', id, hash, file: null };
+    expect(reportPdfReadyJobSchema.safeParse(ready).success).toBe(true);
+    expect(reportPdfReadyJobSchema.safeParse({ ...ready, kind: 'statement' }).success).toBe(false);
   });
 });

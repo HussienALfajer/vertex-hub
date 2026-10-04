@@ -2,15 +2,20 @@ import { Inject, Injectable } from '@nestjs/common';
 import {
   businessDate,
   type CalendarDate,
+  type ClientMonthlyReport,
+  deliveryRate,
   OPEN_PROJECT_STATUSES,
   type ProjectStatus,
   type ReportClients,
+  type ReportPeriod,
 } from '@vertex-hub/contracts';
-import { type Database, projects, retainers } from '@vertex-hub/db';
-import { and, asc, count, eq, inArray, isNull, sql } from 'drizzle-orm';
+import { type Database, projectMilestones, projects, retainers } from '@vertex-hub/db';
+import { and, asc, count, eq, gte, inArray, isNull, lte, or, sql } from 'drizzle-orm';
+import { businessDateSql, inBusinessPeriod } from '../../core/database/business-date.js';
 import { DATABASE } from '../../core/database/database.module.js';
 import { ClientDirectory } from '../clients/index.js';
 import { RetainerCyclesService } from './retainer-cycles.service.js';
+import { NO_TASKS, WorkProgress } from './work-progress.js';
 
 /** This month's cycle of an active retainer (F15 rules 1, 4 and 6). */
 export interface RetainerProgress {
@@ -32,6 +37,7 @@ export class EngagementReports {
     @Inject(DATABASE) private readonly db: Database,
     private readonly clients: ClientDirectory,
     private readonly cycles: RetainerCyclesService,
+    private readonly progress: WorkProgress,
   ) {}
 
   /** Rule 1: open projects by status and active retainers. */
@@ -104,6 +110,103 @@ export class EngagementReports {
           linesBehind: cycle.lines.filter((line) => line.behind).length,
         },
       ];
+    });
+  }
+
+  /**
+   * F15 rule 18.2: the client's non-archived retainers with a cycle in the month, by name, each
+   * line with its committed and delivered counts (frozen for a closed cycle).
+   */
+  async clientRetainers(
+    clientId: string,
+    period: ReportPeriod,
+  ): Promise<ClientMonthlyReport['retainers']> {
+    const rows = await this.db
+      .select({ id: retainers.id, name: retainers.name, status: retainers.status })
+      .from(retainers)
+      .where(and(eq(retainers.clientId, clientId), isNull(retainers.archivedAt)))
+      .orderBy(asc(retainers.name), asc(retainers.id));
+    const cycles = await this.cycles.ofMonth(
+      new Map(rows.map((row) => [row.id, row.status])),
+      period.from,
+    );
+    const byRetainer = new Map(cycles.map((cycle) => [cycle.retainerId, cycle]));
+    return rows.flatMap((row) => {
+      const cycle = byRetainer.get(row.id);
+      if (!cycle) return [];
+      return [
+        {
+          retainer: { id: row.id, name: row.name },
+          status: cycle.status,
+          lines: cycle.lines.map((line) => ({
+            kind: line.kind,
+            label: line.label,
+            committed: line.committed,
+            delivered: line.delivered,
+            percent: deliveryRate([line]),
+          })),
+          completion: cycle.deliveryRate,
+        },
+      ];
+    });
+  }
+
+  /**
+   * F15 rule 18.3: the client's non-archived projects open at some point in the period (started
+   * by its end, not completed or cancelled before it), by name, with their task progress and the
+   * milestones done in the period.
+   */
+  async clientProjects(
+    clientId: string,
+    period: ReportPeriod,
+  ): Promise<ClientMonthlyReport['projects']> {
+    const rows = await this.db
+      .select({ id: projects.id, name: projects.name, status: projects.status })
+      .from(projects)
+      .where(
+        and(
+          eq(projects.clientId, clientId),
+          isNull(projects.archivedAt),
+          lte(projects.startDate, period.to),
+          or(isNull(projects.completedAt), gte(businessDateSql(projects.completedAt), period.from)),
+          or(isNull(projects.cancelledAt), gte(businessDateSql(projects.cancelledAt), period.from)),
+        ),
+      )
+      .orderBy(asc(projects.name), asc(projects.id));
+    const ids = rows.map((row) => row.id);
+    if (ids.length === 0) return [];
+    const [counts, milestones] = await Promise.all([
+      this.progress.projects(ids),
+      this.db
+        .select({
+          projectId: projectMilestones.projectId,
+          name: projectMilestones.name,
+          doneAt: projectMilestones.doneAt,
+        })
+        .from(projectMilestones)
+        .where(
+          and(
+            inArray(projectMilestones.projectId, ids),
+            eq(projectMilestones.status, 'done'),
+            isNull(projectMilestones.archivedAt),
+            inBusinessPeriod(projectMilestones.doneAt, period),
+          ),
+        )
+        .orderBy(asc(projectMilestones.doneAt), asc(projectMilestones.position)),
+    ]);
+    return rows.map((row) => {
+      const tasks = counts.get(row.id) ?? NO_TASKS;
+      return {
+        project: { id: row.id, name: row.name },
+        status: row.status,
+        deliveredTasks: tasks.delivered,
+        totalTasks: tasks.total,
+        milestonesDone: milestones.flatMap((milestone) =>
+          milestone.projectId === row.id && milestone.doneAt
+            ? [{ name: milestone.name, doneOn: businessDate(milestone.doneAt) }]
+            : [],
+        ),
+      };
     });
   }
 
