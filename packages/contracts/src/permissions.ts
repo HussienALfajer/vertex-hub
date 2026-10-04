@@ -138,6 +138,7 @@ export const DEPARTMENT_CAPABILITIES: Readonly<
     manager: {
       'users.manage': 'all',
       'clients.manage': 'all',
+      'leads.read': 'all',
       'catalog.read': 'all',
       'catalog.manage': 'all',
       'quotes.read': 'all',

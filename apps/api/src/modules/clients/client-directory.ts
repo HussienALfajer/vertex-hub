@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import type { ClientStatus } from '@vertex-hub/contracts';
 import { clientContacts, clients, type Database, type Transaction } from '@vertex-hub/db';
-import { and, eq, getTableName, inArray, isNull, type SQL, sql } from 'drizzle-orm';
+import { and, eq, getTableName, inArray, isNull, or, type SQL, sql } from 'drizzle-orm';
 import type { PgColumn } from 'drizzle-orm/pg-core';
 import { DATABASE } from '../../core/database/database.module.js';
 
@@ -145,6 +145,34 @@ export class ClientDirectory {
       )
       .orderBy(clientContacts.name, clientContacts.id);
     return rows.map(toContact);
+  }
+
+  /**
+   * Non-archived clients whose trade name equals one of `names` (case-insensitive) or with a
+   * non-archived contact of the same phone or email, by trade name (F03 rule 2).
+   */
+  async duplicates(
+    match: { names: readonly string[]; phone: string | null; email: string | null },
+    executor: Database | Transaction = this.db,
+  ): Promise<ClientSummary[]> {
+    const names = [...new Set(match.names.map((name) => name.toLowerCase()))];
+    const contactMatches = [
+      match.phone ? eq(clientContacts.phone, match.phone) : undefined,
+      match.email ? sql`lower(${clientContacts.email}) = ${match.email.toLowerCase()}` : undefined,
+    ].filter((filter): filter is SQL => !!filter);
+    const byName = names.length > 0 ? inArray(sql`lower(${clients.tradeName})`, names) : undefined;
+    const byContact =
+      contactMatches.length > 0
+        ? sql`${clients.id} in (select ${clientContacts.clientId} from ${clientContacts}
+            where ${clientContacts.archivedAt} is null and (${or(...contactMatches)}))`
+        : undefined;
+    if (!byName && !byContact) return [];
+    const rows = await executor
+      .select(summaryColumns)
+      .from(clients)
+      .where(and(isNull(clients.archivedAt), or(byName, byContact)))
+      .orderBy(clients.tradeName, clients.id);
+    return rows.map(toSummary);
   }
 
   /** `column` holds a non-archived client (F05 rule G2). */

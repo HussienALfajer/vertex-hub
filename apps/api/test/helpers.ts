@@ -26,6 +26,9 @@ import {
   fileVersions,
   invoiceLines,
   invoices,
+  leadInterests,
+  leadNotes,
+  leads,
   meetingAttendees,
   meetingContacts,
   meetings,
@@ -176,6 +179,29 @@ export async function removeUsers(db: Database, ids: string[]): Promise<void> {
   if (userPayments.length > 0) {
     await db.delete(auditEntries).where(inArray(auditEntries.entityId, userPayments));
     await db.delete(payments).where(inArray(payments.id, userPayments));
+  }
+  // Leads point at their owner, creator and converter, notes at their author (F03).
+  await removeLeads(
+    db,
+    (
+      await db
+        .select({ id: leads.id })
+        .from(leads)
+        .where(
+          or(
+            inArray(leads.ownerId, ids),
+            inArray(leads.createdById, ids),
+            inArray(leads.convertedById, ids),
+          ),
+        )
+    ).map((row) => row.id),
+  );
+  const leadNoteIds = (
+    await db.select({ id: leadNotes.id }).from(leadNotes).where(inArray(leadNotes.authorId, ids))
+  ).map((row) => row.id);
+  if (leadNoteIds.length > 0) {
+    await db.delete(auditEntries).where(inArray(auditEntries.entityId, leadNoteIds));
+    await db.delete(leadNotes).where(inArray(leadNotes.id, leadNoteIds));
   }
   // Expenses point at who logged them (F13).
   await db.delete(projectExpenses).where(inArray(projectExpenses.loggedById, ids));
@@ -731,6 +757,23 @@ export async function removeAdWallets(db: Database, clientIds: string[]): Promis
   await db.delete(notificationReminders).where(inArray(notificationReminders.subjectId, clientIds));
   await db.delete(notifications).where(inArray(notifications.subjectId, clientIds));
   await db.delete(adWallets).where(inArray(adWallets.clientId, clientIds));
+}
+
+/** Removes leads with their interests, notes, reminders, notifications and audit entries (F03). */
+export async function removeLeads(db: Database, ids: string[]): Promise<void> {
+  const unique = [...new Set(ids)];
+  if (unique.length === 0) return;
+  const notes = await db
+    .delete(leadNotes)
+    .where(inArray(leadNotes.leadId, unique))
+    .returning({ id: leadNotes.id });
+  await db
+    .delete(auditEntries)
+    .where(inArray(auditEntries.entityId, [...unique, ...notes.map((row) => row.id)]));
+  await db.delete(notifications).where(inArray(notifications.subjectId, unique));
+  await db.delete(notificationReminders).where(inArray(notificationReminders.subjectId, unique));
+  await db.delete(leadInterests).where(inArray(leadInterests.leadId, unique));
+  await db.delete(leads).where(inArray(leads.id, unique));
 }
 
 /** Removes the payments on the clients' invoices with their audit entries (F13). */

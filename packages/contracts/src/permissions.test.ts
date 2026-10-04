@@ -187,6 +187,36 @@ describe('invoices (F13)', () => {
   });
 });
 
+describe('leads (F03)', () => {
+  const operationsManager = access(
+    ['employee', 'department_manager'],
+    [{ code: 'internal_operations', isManager: true }],
+  );
+
+  it('lets General Communication and Marketing members work every lead', () => {
+    for (const code of ['general_communication', 'marketing'] as const) {
+      const member = access(['employee'], [{ code, isManager: false }]);
+      expect(permissionScopes(member, 'leads.read')).toEqual(['all']);
+      expect(permissionScopes(member, 'leads.manage')).toEqual(['all']);
+    }
+  });
+
+  it('lets the Operations manager read every lead without managing them', () => {
+    expect(permissionScopes(operationsManager, 'leads.read')).toEqual(['all']);
+    expect(hasPermission(operationsManager, 'leads.manage')).toBe(false);
+  });
+
+  it('shows leads to nobody else', () => {
+    const operationsMember = access(
+      ['employee'],
+      [{ code: 'internal_operations', isManager: false }],
+    );
+    for (const other of [access(['employee']), access(['finance']), operationsMember]) {
+      expect(hasPermission(other, 'leads.read')).toBe(false);
+    }
+  });
+});
+
 describe('ad campaigns (F12)', () => {
   const operationsManager = access(
     ['employee', 'department_manager'],

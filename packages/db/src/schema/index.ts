@@ -8,6 +8,7 @@ export * from './clients.js';
 export * from './content.js';
 export * from './files.js';
 export * from './invoices.js';
+export * from './leads.js';
 export * from './notifications.js';
 export * from './projects.js';
 export * from './quotes.js';

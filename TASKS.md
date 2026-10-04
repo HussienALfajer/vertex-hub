@@ -1,34 +1,31 @@
-# TASKS — F12 Ad campaigns and ad budget (with A11)
+# TASKS — F03 Leads (sales pipeline, with A12)
 
-Spec: `docs/specs/F12-ad-campaigns.md` · ADRs 0006, 0007, 0008, 0013, 0014, 0018, 0019, 0024, 0025 · Four PRs, each leaves `main` green and fully wired.
+Spec: `docs/specs/F03-leads.md` · ADRs 0006, 0007, 0013, 0014, 0018, 0023, 0026 · Three PRs, each leaves `main` green and fully wired.
 
-## PR 1 — `feat/f12-campaigns-api`: campaigns and updates
-- [x] contracts: `campaigns.ts` (enums platform, objective, status, funding; campaign create / update / status / list query and page; detail with links, totals, monthly totals, updates and `permissions`; update input; rule 23 functions `costPerResult`, `budgetUsed`, `periodsOverlap`, `periodInOneMonth`, status transitions) with unit tests; permissions (`campaigns.read` / `manage` for Marketing members and the Operations manager, `campaigns.read` for Finance, new `campaigns.fund`) with tests; error codes `INVALID_OWNER`, `INVALID_ENGAGEMENT`, `FUNDING_LOCKED`, `CAMPAIGN_HAS_UPDATES`, `PERIOD_CROSSES_MONTH`, `PERIOD_OVERLAP`; audit actions and entity types `ad_campaign`, `ad_campaign_update`; `ar.json` keys (errors, audit actions, entity types, fields)
-- [x] db (`/db-migration`, 0033): enums `ad_platform`, `ad_objective`, `ad_campaign_status`, `ad_funding`; `ad_campaigns` (checks: one engagement, cancel reason), `ad_campaign_updates`; `TABLE_OWNERS`; drift
-- [x] api `tasks`: `TaskLinks` read export (`projects`' `EngagementDirectory` already has the project and retainer summaries)
-- [x] api `campaigns` module: list (scopes, filters, sort, badges), create (rules 1–4), detail, `PUT` (rules 5–6, `CONCURRENT_CHANGE`), status (state machine, cancel reason), archive / restore (rule 7), updates add / edit / archive (rules 9–11, campaign row lock); audit; `app.module.ts`; `docs/architecture.md`
-- [x] api tests: `test/campaigns.test.ts`, `test/campaign-updates.test.ts` (shared `campaign-cast.ts`); `removeCampaigns` in `removeClients`; edit and archive of updates stay open on cancelled campaigns (permission flags `canAddUpdate` / `canEditUpdates`)
+## PR 1 — `feat/f03-leads-api`: leads, activity log, pipeline and A12
+- [x] contracts: `leads.ts` (enums stage, source, loss reason; lead create / update / stage / owner / lose / reopen schemas; list query and page, board, detail with `permissions`, duplicates query and result, owners; note create / update; rules: contact method, budget pair, source detail, follow-up bounds, interest limit, stage transitions, loss → rejection reason mapping, due / overdue work-day rules) with unit tests; permissions (Operations manager `leads.read` all) with tests; error codes `CONTACT_REQUIRED`, `INVALID_LEAD_OWNER`, `STALE_LEAD`, `LEAD_CLOSED`, `LEAD_ARCHIVED`, `LEAD_HAS_SENT_QUOTE`, `LEAD_HAS_QUOTES`; audit actions and entity types `lead`, `lead_note`; notification types `lead_assigned`, `lead_won`, `lead_follow_up_due`, `lead_follow_up_overdue`, subject `lead`, reminder kinds, `notification-content.ts`; responsibility `owner_of_open_leads`; `ar.json` keys
+- [x] db (`/db-migration`, 0036; `lead_interests` listed in `NOT_BUSINESS_RECORDS`: replaced as a whole on save): enums `lead_stage`, `lead_source`, `lead_loss_reason`; `leads` (checks: contact method, budget pair, follow-up iff open, loss fields, client iff won), `lead_interests` (one of service / package, partial uniques), `lead_notes`; notification enums; `TABLE_OWNERS`; drift
+- Notes from contracts: the board card's quote count arrives in PR 2 (a `quotes` registration, `leads` cannot read quotes); the lead link of `lead` notifications and the `owner_of_open_leads` blocker's icon and link arrive in PR 3 with the lead page.
+- [x] api `clients`: `ClientDirectory.duplicates` (trade name, contact phone / email)
+- [x] api `leads` module: list, board, detail, create, edit (`STALE_LEAD`), duplicates, stage (rule 5), owner (rule 6, `lead_assigned`), notes add / edit / archive (rule 4), lose / reopen (rules 8–9; `LeadClosedHooks`, no registrants yet), archive / restore (rule 12; `LeadQuoteChecks`, no registrants yet), owners; `ResponsibilityRegistry` (`owner_of_open_leads`); A12 sources in `DailyReminders` (rules 18–20); audit; `app.module.ts`; `docs/architecture.md`. `LeadDirectory` and `LeadPipeline` move to PR 2 with their first caller (`quotes`).
+- [x] api tests: `test/leads.test.ts`, `test/lead-notes.test.ts`, `test/lead-reminders.test.ts` (shared `lead-cast.ts`); user archive blocker; `removeLeads`, and `removeUsers` removes leads and notes of the users
 - [x] bridge: build, `openapi:export`, `api:generate`; web typecheck
-- [x] wiring checklist, full checks (lint, typecheck, build, test, drift pass), reviewer (one finding fixed: missing 401 / 403 / out-of-scope tests on PUT, status, archive, restore and update archive), owner acceptance (approved, incl. editing updates of cancelled campaigns), dev database migrated, /ship
+- [x] wiring checklist, full checks (lint, typecheck, build, test, E2E, drift pass), reviewer (two findings fixed: open leads, archived ones included, block archiving their owner and reopen checks the owner (`INVALID_LEAD_OWNER`); 403 / out-of-scope tests on owner, lose, reopen, archive, restore and note edit / archive)
+- [x] owner acceptance (approved; owner decision: reopen takes an optional new owner, recorded in spec rule 9), dev database migrated
+- [x] /ship
 
-## PR 2 — `feat/f12-ad-wallet-api`: wallet, deposits, refunds and A11
-- [x] contracts: wallet entry kind; `adWalletBalance`, `isLowBalance` with unit tests; wallet, ledger, entry, record / void, threshold, wallet list schemas; `REFUND_EXCEEDS_BALANCE`; audit `ad_wallet.*`, `ad_wallet_entry.*`; notification type `ad_budget_low` (subject `client`) and reminder kind, `notification-content.ts`; file owner type `ad_wallet_entry`; document number kind `ad_deposit`; `ar.json` keys
-- [x] db (`/db-migration`, 0034): `ad_wallets`, `ad_wallet_entries` (checks: number for deposits only, void fields together); `document_number_kind` + `ad_deposit`; `file_owner_type` + `ad_wallet_entry` and `file_items.ad_wallet_entry_id`; notification enums; drift
-- [x] api `invoices`: export `DocumentNumbers` and the current rate; `files`: `ad_wallet_entry` owner policy (hidden from the client library)
-- [x] api `campaigns`: wallet read / threshold, record entry (rules 16–17, proof), void (rule 18), wallet list; wallet row lock on every balance change (updates, funding change, archive / restore); campaign detail gains the wallet balance; A11 crossing (rule 20) and the `ad-budget-low` daily source (rules 21–22)
-- [x] api tests: `test/ad-wallets.test.ts` (balance, concurrent refunds and updates, numbering, A11 once per crossing, clearing, weekly reminders, idempotency)
-- [x] bridge; web typecheck
-- [x] wiring checklist, full checks (lint, typecheck, build, test, drift pass), reviewer (one finding fixed: concurrent update and refund test), owner acceptance (approved), dev database migrated, /ship
+## PR 2 — `feat/f03-conversion-quotes-api`: conversion and quotes on leads
+- [ ] contracts: conversion plan and `convertLeadSchema` (new / existing modes, contact block); `createQuoteSchema` client or lead; quote list `leadId` filter and `recipient`; detail `lead`; accept plan and `acceptQuoteSchema.conversion`; by-lead list schema; unit tests
+- [ ] db (`/db-migration`, 0037): `quotes.client_id` nullable, `quotes.lead_id` (indexed), check client or lead; drift
+- [ ] api `clients`: exported `ClientFactory` (create client with contact, reactivate an ended client, add contact, copy notes into the communication log; F02 rules, audit, `client_account_manager_assigned`, inside the caller's transaction)
+- [ ] api `leads`: `LeadDirectory` (summary, scope check, SQL filter), `LeadPipeline.markQuoteSent` (rule 14); `GET conversion-plan`, `POST convert` (rule 10, row lock, `lead_won`), `LeadPipeline.convert` for the accept transaction; `LeadClosedHooks` called on conversion
+- [ ] api `quotes`: scope through lead ownership, create / list / detail / send (rule 14, Quote sent) / accept-plan / accept with step 0 (rule 11, rollback), `GET by-lead/:leadId`, PDF snapshot recipient; registers loss (reject, rule 8), conversion (move quotes) and archive (`LEAD_HAS_QUOTES`) hooks; architecture test: `leads` never imports `quotes`
+- [ ] api tests: `test/lead-conversion.test.ts` (both modes, rollback on a refused F02 rule, concurrent conversion, notes and quotes moved, notifications); additions to `test/quotes.test.ts`, `test/quote-accept.test.ts`; lose rejects quotes; edge cases 2, 7, 8
+- [ ] bridge; web typecheck (quote screens adapted to the nullable client)
+- [ ] wiring checklist, full checks, reviewer, owner acceptance, dev database migrated, /ship
 
-## PR 3 — `feat/f12-ad-receipts-pdf`: deposit receipt PDFs
-- [x] contracts: jobs `campaigns.pdf`, `campaigns.pdf-ready`, kind `ad_deposit_receipt`, `adDepositReceiptSnapshotSchema`; entry `receiptPdf` state
-- [x] db (`/db-migration`, 0035): `receipt_snapshot`, `receipt_pdf_status`, `receipt_file_item_id` on `ad_wallet_entries` (first use here); drift
-- [x] worker: Arabic RTL receipt template (F13 document styles), idempotent per payload hash; worker test with text extraction
-- [x] api: `AdReceiptsService` (snapshot and queue on deposit, ready handler attaching once, receipt archived on void, `POST` / `GET` receipt endpoints; "Render again" on a void deposit is `INVALID_TRANSITION`); `campaigns` imports `quotes` for the company details; `test/ad-receipts.test.ts`; `removeClients` unlinks receipts; spec and `docs/architecture.md`
-- [x] bridge; web typecheck
-- [x] wiring checklist, full checks (lint, typecheck, build, test, drift pass), reviewer (no blocking findings), owner acceptance (approved, incl. `INVALID_TRANSITION` on a void deposit's "Render again"), dev database migrated, /ship
-
-## PR 4 — `feat/f12-web`: campaign, wallet and Ads screens
-- [x] web `features/campaigns/`: Campaigns page (Campaigns and Ad budgets tabs), campaign dialog, campaign page (cards, monthly totals, updates, status actions with dialogs, start warning), add / edit update dialog with warnings; client Ads tab (wallet cards, threshold edit, ledger, campaigns, new campaign), deposit / refund dialog (SYP rate, live USD, balance after, proof), void dialog, receipt links; `ad_budget_low` notification opens the Ads tab; routes; nav item; `ar.json` `campaigns` namespace; loading, empty, error states
-- [x] e2e: fixtures, `f12.spec.ts` (deposit, wallet campaign, start, update, balance drops; role differences), screenshots light + dark (Campaigns list, Ad budgets, campaign dialog, campaign page, update dialog with warnings, client Ads tab, deposit dialog in SYP)
-- [x] wiring checklist, full checks + E2E (pass), reviewer (three findings fixed: "Render again" on a pending receipt, own-client picker for account managers, hidden-tab fallback on the client profile), owner acceptance (approved), /ship; `docs/ROADMAP.md`
+## PR 3 — `feat/f03-web`: Leads screens and quote screens for leads
+- [ ] web `features/leads/`: Leads page (board with drag and drop and "Move to…", phone stage tabs, list, filters, view remembered), lead dialog with duplicate panel, lead page (header, actions, contact, activity, quotes, "New quote"), log activity, convert (both tabs), lose, reopen, change owner dialogs; client profile "Converted from lead"; routes; nav item; `ar.json` `leads` namespace; loading, empty, error states
+- [ ] web `features/quotes/`: "For: Client / Lead" in the new quote dialog, lead name and badge in the list and quote page, accept dialog step 0 (Client)
+- [ ] e2e: fixtures, `f03.spec.ts` (lead create, duplicate, stage moves, activity, convert, lose / reopen, lead → quote → send → accept with a new client → project, role differences), screenshots light + dark (board desktop and phone, list, lead dialog with duplicates, lead page open / won / lost, convert dialog both tabs, lose dialog, accept dialog step 0)
+- [ ] wiring checklist, full checks + E2E, reviewer, owner acceptance (spec acceptance 1–12), /ship; `docs/ROADMAP.md`
