@@ -12,7 +12,7 @@ import {
   type Database,
   type Transaction,
 } from '@vertex-hub/db';
-import { asc, inArray } from 'drizzle-orm';
+import { asc, inArray, isNull } from 'drizzle-orm';
 import { DATABASE } from '../../core/database/database.module.js';
 
 export interface CatalogServiceEntry {
@@ -70,6 +70,27 @@ export class CatalogDirectory {
       .from(catalogServices)
       .where(inArray(catalogServices.id, unique));
     return new Map(rows.map((row) => [row.id, toService(row)]));
+  }
+
+  /** Ids and names of the non-archived services and packages, by name (F03 lead interests). */
+  async activeNames(): Promise<{
+    services: { id: string; name: string }[];
+    packages: { id: string; name: string }[];
+  }> {
+    const pick = { id: catalogServices.id, name: catalogServices.name };
+    const [services, packages] = await Promise.all([
+      this.db
+        .select(pick)
+        .from(catalogServices)
+        .where(isNull(catalogServices.archivedAt))
+        .orderBy(asc(catalogServices.name)),
+      this.db
+        .select({ id: catalogPackages.id, name: catalogPackages.name })
+        .from(catalogPackages)
+        .where(isNull(catalogPackages.archivedAt))
+        .orderBy(asc(catalogPackages.name)),
+    ]);
+    return { services, packages };
   }
 
   async packages(

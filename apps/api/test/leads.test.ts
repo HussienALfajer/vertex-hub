@@ -8,6 +8,7 @@ import {
   leadBoardSchema,
   leadDetailSchema,
   leadDuplicatesSchema,
+  leadInterestOptionsSchema,
   leadOwnerOptionsSchema,
   leadPageSchema,
   loseLeadResultSchema,
@@ -88,6 +89,7 @@ describe('leads (F03 rules 1–3, 5–9, 12)', () => {
         '/api/leads',
         '/api/leads/board',
         '/api/leads/owners',
+        '/api/leads/interest-options',
         `/api/leads/${id}`,
       ]) {
         expect((await client.get(path)).status).toBe(401);
@@ -110,6 +112,7 @@ describe('leads (F03 rules 1–3, 5–9, 12)', () => {
         expect((await client.get('/api/leads', cookie)).status).toBe(403);
         expect((await client.get('/api/leads/board', cookie)).status).toBe(403);
         expect((await client.get('/api/leads/owners', cookie)).status).toBe(403);
+        expect((await client.get('/api/leads/interest-options', cookie)).status).toBe(403);
         expect((await detail(lead.id, cookie)).status).toBe(403);
         expect((await client.post('/api/leads', cookie, {})).status).toBe(403);
         expect((await client.post('/api/leads/duplicates', cookie, {})).status).toBe(403);
@@ -748,6 +751,26 @@ describe('leads (F03 rules 1–3, 5–9, 12)', () => {
       expect(items.find((item) => item.id === cast.marketer.id)?.departments).toEqual([
         'marketing',
       ]);
+    });
+
+    it('lists non-archived services and packages by name for lead managers', async () => {
+      const service = await cast.createService();
+      const archived = await cast.createService();
+      expect(
+        (await client.post(`/api/catalog/services/${archived.id}/archive`, cast.gm.cookie)).status,
+      ).toBe(200);
+      // A Marketing member holds no `catalog.read`, yet picks interests (owner decision).
+      const { services } = await ok(
+        await client.get('/api/leads/interest-options', cast.marketer.cookie),
+        leadInterestOptionsSchema,
+      );
+      expect(services).toContainEqual({ id: service.id, name: service.name });
+      expect(services.map((item) => item.id)).not.toContain(archived.id);
+      expect((await client.get('/api/catalog/services', cast.marketer.cookie)).status).toBe(403);
+      // Without `leads.manage`, no picker: the Operations manager only reads leads.
+      expect((await client.get('/api/leads/interest-options', cast.operations.cookie)).status).toBe(
+        403,
+      );
     });
 
     it('refuses archiving a user who owns open leads', async () => {

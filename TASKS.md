@@ -27,7 +27,11 @@ Spec: `docs/specs/F03-leads.md` · ADRs 0006, 0007, 0013, 0014, 0018, 0023, 0026
 - [x] /ship
 
 ## PR 3 — `feat/f03-web`: Leads screens and quote screens for leads
-- [ ] web `features/leads/`: Leads page (board with drag and drop and "Move to…", phone stage tabs, list, filters, view remembered), lead dialog with duplicate panel, lead page (header, actions, contact, activity, quotes, "New quote"), log activity, convert (both tabs), lose, reopen, change owner dialogs; client profile "Converted from lead"; routes; nav item; `ar.json` `leads` namespace; loading, empty, error states
-- [ ] web `features/quotes/`: "For: Client / Lead" in the new quote dialog, lead name and badge in the list and quote page, accept dialog step 0 (Client)
-- [ ] e2e: fixtures, `f03.spec.ts` (lead create, duplicate, stage moves, activity, convert, lose / reopen, lead → quote → send → accept with a new client → project, role differences), screenshots light + dark (board desktop and phone, list, lead dialog with duplicates, lead page open / won / lost, convert dialog both tabs, lose dialog, accept dialog step 0)
-- [ ] wiring checklist, full checks + E2E, reviewer, owner acceptance (spec acceptance 1–12), /ship; `docs/ROADMAP.md`
+- [x] api (owner decision, found while planning the lead dialog: General Communication and Marketing members hold no `catalog.read`): `GET /api/leads/interest-options` (`leads.manage`, names only) through `CatalogDirectory.activeNames`; test in `leads.test.ts`; spec API table; bridge
+- [x] web wiring: lead notification link, `owner_of_open_leads` blocker icon and link, nav item
+- [x] web `features/leads/`: Leads page (board with drag and drop and "Move to…", phone stage tabs, list, filters, view remembered), lead dialog with duplicate panel, lead page (header, actions, contact, activity, quotes, "New quote"), log activity, convert (both tabs), lose, reopen, change owner dialogs; client profile "Converted from lead"; routes; nav item; `ar.json` `leads` namespace; loading, empty, error states
+- [x] web `features/quotes/`: "For: Client / Lead" in the new quote dialog, lead name and badge in the list and quote page, accept dialog step 0 (Client)
+- [x] e2e: fixtures, `f03.spec.ts` (lead create, duplicate, stage moves, activity, convert, lose / reopen, lead → quote → send → accept with a new client → project, role differences), screenshots light + dark (board desktop and phone, list, lead dialog with duplicates, lead page open / won / lost, convert dialog both tabs, lose dialog, accept dialog step 0)
+- [x] wiring checklist, full checks + E2E, reviewer (six findings fixed: an overdue lead is edited without a new date; the list's Created date in Asia/Damascus; a taken trade name offers to link that client (edge case 6, convert dialog and accept step 0); accept's project manager follows the client of step 0; the budget field shows the chosen currency; the duplicate panel's debounce settles). Drag and drop is tested between neighbouring columns: far columns are off screen in the scrolling board, so Lost and Won are tested through "Move to…"
+- [x] owner acceptance (spec acceptance 1–12, approved)
+- [x] /ship; `docs/ROADMAP.md`

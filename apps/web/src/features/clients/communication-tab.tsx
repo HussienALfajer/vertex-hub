@@ -76,7 +76,7 @@ import {
   useUpdateNote,
 } from './clients.queries';
 
-const channelIcon: Record<NoteChannel, LucideIcon> = {
+export const channelIcon: Record<NoteChannel, LucideIcon> = {
   call: PhoneIcon,
   meeting: UsersRoundIcon,
   whatsapp: MessageCircleIcon,

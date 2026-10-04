@@ -38,7 +38,7 @@ test('a quote with both sections is built, sent and accepted, landing on the new
 
   await page.getByRole('button', { name: ar.quotes.accept.action }).click();
   const accept = page.getByRole('dialog', {
-    name: fill(ar.quotes.accept.title, { number: 'Q-2026-0005' }),
+    name: fill(ar.quotes.accept.title, { number: 'Q-2026-0006' }),
   });
   await expect(accept.getByText(ar.quotes.accept.steps.response, { exact: true })).toBeVisible();
   await accept.getByRole('button', { name: ar.common.next }).click();
@@ -71,7 +71,7 @@ test('a quote with both sections is built, sent and accepted, landing on the new
   await expect(page).toHaveURL(/\/projects\/[^/]+$/);
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('إطلاق الفرع الجديد');
   // Screen 8: the project names the quote it came from.
-  await page.getByRole('link', { name: 'Q-2026-0005' }).click();
+  await page.getByRole('link', { name: 'Q-2026-0006' }).click();
   await expect(page.getByRole('heading', { level: 1 })).toContainText(ar.quotes.statuses.accepted);
 });
 

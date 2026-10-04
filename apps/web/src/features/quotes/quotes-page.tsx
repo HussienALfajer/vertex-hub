@@ -41,6 +41,7 @@ import { ALL, flagParam, idParam, listParam, pageParam, textParam } from '../../
 import { usePageInRange } from '../../lib/use-page-in-range';
 import { useSearchText } from '../../lib/use-search-text';
 import { clientListQuery } from '../clients/clients.queries';
+import { LeadBadge } from '../leads/lead-badges';
 import { PersonName } from '../projects/project-badges';
 import { userListQuery } from '../users/users.queries';
 import { type Choice, ChoiceSelect } from './choice-select';
@@ -386,7 +387,9 @@ function QuotesTable({ quotes }: { quotes: Quote[] }) {
                 </span>
               </Link>
             </TableCell>
-            <TableCell>{quote.recipient.name}</TableCell>
+            <TableCell>
+              <Recipient recipient={quote.recipient} />
+            </TableCell>
             <TableCell>
               <PersonName name={quote.accountManager.name} />
             </TableCell>
@@ -428,6 +431,24 @@ function QuotesTable({ quotes }: { quotes: Quote[] }) {
         ))}
       </TableBody>
     </Table>
+  );
+}
+
+/** The client, or a lead not converted yet with its badge (F03 rule 16). */
+function Recipient({ recipient }: { recipient: Quote['recipient'] }) {
+  const me = useMe();
+  if (recipient.kind === 'client') return <>{recipient.name}</>;
+  return (
+    <span className="flex flex-wrap items-center gap-1.5">
+      {can(me, 'leads.read') ? (
+        <Link to="/leads/$leadId" params={{ leadId: recipient.id }} className="hover:underline">
+          {recipient.name}
+        </Link>
+      ) : (
+        recipient.name
+      )}
+      <LeadBadge />
+    </span>
   );
 }
 

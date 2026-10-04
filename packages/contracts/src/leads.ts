@@ -611,6 +611,19 @@ export const leadOwnerOptionsSchema = z
 
 export type LeadOwnerOptions = z.infer<typeof leadOwnerOptionsSchema>;
 
+/**
+ * The lead dialog's interest picker: names only, so lead managers without `catalog.read` can
+ * pick (owner decision); non-archived, by name.
+ */
+export const leadInterestOptionsSchema = z
+  .object({ services: z.array(personSchema), packages: z.array(personSchema) })
+  .meta({
+    id: 'LeadInterestOptions',
+    description: 'Non-archived catalog services and packages a lead may ask for, by name',
+  });
+
+export type LeadInterestOptions = z.infer<typeof leadInterestOptionsSchema>;
+
 export const leadConversionPlanSchema = z
   .object({
     /** New-client defaults (rule 10): the display name, the lead's sector and healthcare flag. */

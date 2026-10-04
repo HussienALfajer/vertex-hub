@@ -10386,6 +10386,27 @@
         ]
       }
     },
+    "/api/leads/interest-options": {
+      "get": {
+        "operationId": "LeadsController_interestOptions",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Services and packages a lead may ask for",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LeadInterestOptions"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "leads"
+        ]
+      }
+    },
     "/api/leads/duplicates": {
       "post": {
         "operationId": "LeadsController_duplicates",
@@ -36420,6 +36441,59 @@
         ],
         "additionalProperties": false,
         "description": "Active users who may own leads (rule 1), by name"
+      },
+      "LeadInterestOptions": {
+        "type": "object",
+        "properties": {
+          "services": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "name": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "name"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "packages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "name": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "name"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "services",
+          "packages"
+        ],
+        "additionalProperties": false,
+        "description": "Non-archived catalog services and packages a lead may ask for, by name"
       },
       "LeadDuplicateQuery": {
         "type": "object",

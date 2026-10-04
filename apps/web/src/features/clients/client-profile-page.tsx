@@ -77,6 +77,7 @@ import { ClientContentTab } from '../content/client-content-tab';
 import { ClientFilesTab } from '../files/client-files-tab';
 import { type FileLibrarySearch, parseFileLibrarySearch } from '../files/library-search';
 import { ClientInvoicesTab } from '../invoices/client-invoices-tab';
+import { ConvertedFromLead } from '../leads/converted-from-lead';
 import { ClientProjectsTab } from '../projects/client-projects-tab';
 import { hasMoneyAccess } from '../projects/project-access';
 import { ClientQuotesTab } from '../quotes/client-quotes-tab';
@@ -430,6 +431,7 @@ function ClientHero({
               </span>
             </HeroFact>
           </dl>
+          <ConvertedFromLead clientId={client.id} />
         </div>
         {(editable || (scopeAll && !archived)) && (
           <div className="flex shrink-0 flex-wrap items-center gap-2">

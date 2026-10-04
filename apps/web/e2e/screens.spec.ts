@@ -818,6 +818,80 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await screenshot(page, testInfo, `client-quotes-${colorScheme}`);
     });
 
+    test('leads board, list and the lead dialog with duplicates', async ({ page }, testInfo) => {
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await mockApi(page, { signedIn: true });
+      await page.goto('/leads?view=board');
+      await expect(page.getByRole('link', { name: 'عيادة النور لطب الأسنان' })).toBeVisible();
+      await screenshot(page, testInfo, `leads-board-${colorScheme}`);
+
+      await page.goto('/leads?view=list');
+      await expect(page.getByRole('table')).toBeVisible();
+      await screenshot(page, testInfo, `leads-list-${colorScheme}`);
+
+      await page.getByRole('button', { name: ar.leads.newLead }).click();
+      const dialog = page.getByRole('dialog', { name: ar.leads.form.newTitle });
+      await dialog.getByLabel(ar.leads.form.contactName).fill('أحمد');
+      await dialog.getByLabel(ar.leads.form.companyName).fill('مطعم الياسمين');
+      await dialog.getByLabel(ar.leads.form.phone).fill('+963944111222');
+      await expect(dialog.getByRole('list', { name: ar.leads.duplicates.title })).toBeVisible();
+      await screenshot(page, testInfo, `lead-dialog-duplicates-${colorScheme}`);
+    });
+
+    test('leads board on a phone', async ({ page }, testInfo) => {
+      await page.setViewportSize({ width: 390, height: 844 });
+      await mockApi(page, { signedIn: true });
+      await page.goto('/leads?view=board');
+      await page.getByRole('tab', { name: new RegExp(ar.leads.stages.contacted) }).click();
+      await expect(page.getByRole('link', { name: 'عيادة النور لطب الأسنان' })).toBeVisible();
+      await screenshot(page, testInfo, `leads-board-phone-${colorScheme}`);
+    });
+
+    test('lead page: open, won and lost; convert, lose and the accept step 0', async ({
+      page,
+    }, testInfo) => {
+      await page.setViewportSize({ width: 1440, height: 1100 });
+      await mockApi(page, { signedIn: true });
+      await page.goto(`/leads/${seedIds.noorLead}`);
+      await expect(page.getByText('أرسل صور العيادة وطلب عرضاً للباقة الذهبية.')).toBeVisible();
+      await screenshot(page, testInfo, `lead-open-${colorScheme}`);
+
+      await page.getByRole('button', { name: ar.leads.actions.convert }).click();
+      const convert = page.getByRole('dialog');
+      await expect(convert.getByLabel(ar.clients.form.tradeName)).toHaveValue(
+        'عيادة النور لطب الأسنان',
+      );
+      await screenshot(page, testInfo, `lead-convert-new-${colorScheme}`);
+      await convert.getByRole('tab', { name: ar.leads.convert.modes.existing }).click();
+      await convert.getByRole('combobox', { name: ar.leads.convert.client }).click();
+      await page.getByRole('option', { name: 'متجر النخبة' }).click();
+      await expect(convert.getByText(ar.leads.convert.reactivates)).toBeVisible();
+      await screenshot(page, testInfo, `lead-convert-existing-${colorScheme}`);
+      await page.keyboard.press('Escape');
+
+      await page.goto(`/leads/${seedIds.rashaqaLead}`);
+      await page.getByRole('button', { name: ar.leads.actions.more }).click();
+      await page.getByRole('menuitem', { name: ar.leads.actions.lose }).click();
+      await expect(page.getByRole('dialog').getByText('Q-2026-0005')).toBeVisible();
+      await screenshot(page, testInfo, `lead-lose-${colorScheme}`);
+      await page.keyboard.press('Escape');
+
+      await page.goto(`/leads/${seedIds.wonLead}`);
+      await expect(page.getByRole('link', { name: ar.leads.page.openClient })).toBeVisible();
+      await screenshot(page, testInfo, `lead-won-${colorScheme}`);
+
+      await page.goto(`/leads/${seedIds.lostLead}`);
+      await expect(page.getByText('الميزانية أقل من نصف العرض.')).toBeVisible();
+      await screenshot(page, testInfo, `lead-lost-${colorScheme}`);
+
+      await page.goto(`/quotes/${seedIds.leadQuote}`);
+      await page.getByRole('button', { name: ar.quotes.accept.action }).click();
+      await expect(
+        page.getByRole('dialog').getByText(ar.quotes.accept.steps.client, { exact: true }),
+      ).toBeVisible();
+      await screenshot(page, testInfo, `quote-accept-client-${colorScheme}`);
+    });
+
     test('invoice list', async ({ page }, testInfo) => {
       await page.setViewportSize({ width: 1440, height: 900 });
       await mockApi(page, { signedIn: true });
