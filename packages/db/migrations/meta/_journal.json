@@ -232,6 +232,13 @@
       "when": 1791052411991,
       "tag": "0032_common_alice",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1791069697208,
+      "tag": "0033_workable_paibok",
+      "breakpoints": true
     }
   ]
 }

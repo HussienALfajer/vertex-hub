@@ -265,6 +265,7 @@ describe('module boundaries', () => {
     audit: 'audit',
     auth: 'auth',
     calendar: 'calendar',
+    campaigns: 'campaigns',
     catalog: 'catalog',
     clients: 'clients',
     content: 'content',

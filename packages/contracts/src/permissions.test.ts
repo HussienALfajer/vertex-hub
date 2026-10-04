@@ -187,6 +187,64 @@ describe('invoices (F13)', () => {
   });
 });
 
+describe('ad campaigns (F12)', () => {
+  const operationsManager = access(
+    ['employee', 'department_manager'],
+    [{ code: 'internal_operations', isManager: true }],
+  );
+  const marketer = access(['employee'], [{ code: 'marketing', isManager: false }]);
+  const marketingManager = access(
+    ['employee', 'department_manager'],
+    [{ code: 'marketing', isManager: true }],
+  );
+
+  it('lets Marketing members and the Operations manager read and manage every campaign', () => {
+    for (const holder of [marketer, marketingManager, operationsManager]) {
+      expect(permissionScopes(holder, 'campaigns.read')).toEqual(['all']);
+      expect(permissionScopes(holder, 'campaigns.manage')).toEqual(['all']);
+    }
+  });
+
+  it('keeps account managers on their own clients', () => {
+    expect(permissionScopes(access(['account_manager']), 'campaigns.read')).toEqual([
+      'own_clients',
+    ]);
+    expect(permissionScopes(access(['account_manager']), 'campaigns.manage')).toEqual([
+      'own_clients',
+    ]);
+  });
+
+  it('lets Finance read campaigns but not manage them', () => {
+    expect(permissionScopes(access(['finance']), 'campaigns.read')).toEqual(['all']);
+    expect(hasPermission(access(['finance']), 'campaigns.manage')).toBe(false);
+  });
+
+  it('gives funding to the General Manager, Finance and the Operations manager only', () => {
+    expect(permissionScopes(access(['general_manager']), 'campaigns.fund')).toEqual(['all']);
+    expect(permissionScopes(access(['finance']), 'campaigns.fund')).toEqual(['all']);
+    expect(permissionScopes(operationsManager, 'campaigns.fund')).toEqual(['all']);
+    for (const other of [marketer, marketingManager, access(['account_manager'])]) {
+      expect(hasPermission(other, 'campaigns.fund')).toBe(false);
+    }
+  });
+
+  it('shows campaigns to nobody else', () => {
+    const designManager = access(
+      ['employee', 'department_manager'],
+      [{ code: 'design', isManager: true }],
+    );
+    const operationsMember = access(
+      ['employee'],
+      [{ code: 'internal_operations', isManager: false }],
+    );
+    for (const other of [access(['employee']), designManager, operationsMember]) {
+      expect(hasPermission(other, 'campaigns.read')).toBe(false);
+      expect(hasPermission(other, 'campaigns.manage')).toBe(false);
+      expect(hasPermission(other, 'campaigns.fund')).toBe(false);
+    }
+  });
+});
+
 describe('tasks (F06)', () => {
   const operationsManager = access(
     ['employee', 'department_manager'],
