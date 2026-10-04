@@ -30,6 +30,7 @@ Short records of decisions that shape the system. Each has a status: **Accepted*
 | [0024](0024-invoices-payments-and-collection.md) | Invoices: automatic drafts, numbering at issue, voids, and payments with their own rate | Accepted |
 | [0025](0025-ad-budget-wallet-and-campaigns.md) | Client ad budgets in a USD wallet apart from invoices; campaigns with manual periodic updates | Accepted |
 | [0026](0026-leads-pipeline-quotes-and-conversion.md) | Leads: a follow-up date on every open lead, quotes on leads, conversion by the sales team | Accepted |
+| [0027](0027-reports-on-read-and-revenue-by-service.md) | Reports computed on read through module report services; revenue by service from invoice lines | Accepted |
 
 Template:
 

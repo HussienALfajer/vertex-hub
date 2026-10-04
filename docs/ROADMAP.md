@@ -48,7 +48,7 @@ Build order (owner, 2026-09-30): F10 → F09 → F08 → F11. F09 approves exact
 - [ ] Production deploy of Phase 3
 
 ## Phase 4 — Visibility
-- [ ] F15 Dashboards and reports (incl. monthly client report)
+- [~] F15 Dashboards and reports (incl. monthly client report) (spec: `docs/specs/F15-dashboards-reports.md`, ADR 0027)
 - [ ] F14 Email and daily digest
 - [ ] Production deploy of Phase 4
 
