@@ -16,6 +16,7 @@ export const FILE_OWNER_TYPES = [
   'post',
   'quote',
   'invoice',
+  'ad_wallet_entry',
 ] as const;
 
 export const fileOwnerTypeSchema = z.enum(FILE_OWNER_TYPES).meta({ id: 'FileOwnerType' });
@@ -37,6 +38,7 @@ export const FILE_ROLES_BY_OWNER: Record<FileOwnerType, readonly FileRole[]> = {
   post: ['deliverable'],
   quote: ['document'],
   invoice: ['document'],
+  ad_wallet_entry: ['document'],
 };
 
 export const brandFileKindSchema = z.enum(BRAND_FILE_KINDS).meta({ id: 'BrandFileKind' });

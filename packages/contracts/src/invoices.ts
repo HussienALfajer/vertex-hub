@@ -2,7 +2,12 @@ import { z } from 'zod';
 import { calendarDateSchema } from './dates.js';
 import { extraWorkBillingSchema } from './extra-work.js';
 import { pageQuerySchema, pageSchema, queryListSchema, sortOrderSchema } from './lists.js';
-import { currencySchema, exchangeRateSchema, minorAmountSchema } from './money.js';
+import {
+  currencySchema,
+  exchangeRateSchema,
+  minorAmountSchema,
+  signedMinorAmountSchema,
+} from './money.js';
 import { milestoneStatusSchema } from './projects.js';
 import { quotePdfStateSchema } from './quotes.js';
 import { cycleStatusSchema } from './retainers.js';
@@ -553,12 +558,6 @@ export type ReceiptSnapshot = z.infer<typeof receiptSnapshotSchema>;
 
 // Client billing and statements (rule 28)
 
-const signedMinorSchema = z
-  .number()
-  .int()
-  .min(-Number.MAX_SAFE_INTEGER)
-  .max(Number.MAX_SAFE_INTEGER);
-
 export const clientBillingSchema = z
   .object({
     /** Over the client's issued, non-void invoices, one entry per currency it was invoiced in. */
@@ -602,7 +601,7 @@ export const statementRowSchema = z
     /** A payment's applied amount (rule 19). */
     creditMinor: minorAmountSchema,
     /** The running balance; negative when a payment came before its invoice (edge case 15). */
-    balanceMinor: signedMinorSchema,
+    balanceMinor: signedMinorAmountSchema,
     /** A payment's own amount when it was paid in the other currency. */
     original: z.object({ amountMinor: minorAmountSchema, currency: currencySchema }).nullable(),
   })
@@ -619,13 +618,13 @@ export const clientStatementSchema = z
     currency: currencySchema,
     from: calendarDateSchema,
     to: calendarDateSchema,
-    openingMinor: signedMinorSchema,
+    openingMinor: signedMinorAmountSchema,
     rows: z.array(statementRowSchema),
-    closingMinor: signedMinorSchema,
+    closingMinor: signedMinorAmountSchema,
     invoicedMinor: minorAmountSchema,
     paidMinor: minorAmountSchema,
     /** The closing balance. */
-    outstandingMinor: signedMinorSchema,
+    outstandingMinor: signedMinorAmountSchema,
   })
   .meta({ id: 'ClientStatement' });
 
@@ -700,7 +699,7 @@ export const projectMarginSchema = z
     /** Non-archived expenses, each at its own rate. */
     expensesUsdMinor: minorAmountSchema,
     /** Invoiced − expenses. */
-    marginUsdMinor: signedMinorSchema,
+    marginUsdMinor: signedMinorAmountSchema,
     /** Σ installments of the non-archived milestones, in the project's currency. */
     plannedInstallmentsMinor: minorAmountSchema,
   })

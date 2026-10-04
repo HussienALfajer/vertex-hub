@@ -13,6 +13,13 @@ export type Currency = z.infer<typeof currencySchema>;
 /** A non-negative amount in minor units of its record's currency (ADR 0006). */
 export const minorAmountSchema = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
 
+/** A balance in minor units that may go negative (a statement, a margin, an ad wallet). */
+export const signedMinorAmountSchema = z
+  .number()
+  .int()
+  .min(-Number.MAX_SAFE_INTEGER)
+  .max(Number.MAX_SAFE_INTEGER);
+
 const RATE_PATTERN = /^\d{1,8}(\.\d{1,4})?$/;
 
 /**

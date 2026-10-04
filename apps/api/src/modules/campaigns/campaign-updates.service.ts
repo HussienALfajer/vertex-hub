@@ -14,6 +14,7 @@ import { DATABASE } from '../../core/database/database.module.js';
 import { CodedException } from '../../core/errors/index.js';
 import { changedFields, recordAudit } from '../audit/index.js';
 import type { CurrentUserInfo } from '../auth/index.js';
+import { AdWalletBalances } from './ad-wallet-balances.js';
 import { actorOf } from './campaign-access.js';
 import { type CampaignRow, CampaignsService, type CampaignUpdateRow } from './campaigns.service.js';
 
@@ -37,14 +38,16 @@ const metrics = (row: CampaignUpdateInput | CampaignUpdateRow) => ({
 });
 
 /**
- * Periodic updates of a campaign's spend and results (spec F12, rules 9–11). Every write locks the
- * campaign row first, so overlapping periods entered at once are refused in turn.
+ * Periodic updates of a campaign's spend and results (spec F12, rules 9–12). Every write locks the
+ * campaign row first, so overlapping periods entered at once are refused in turn, then the client's
+ * wallet row for a wallet campaign, whose balance the spend changes (rules 17 and 20).
  */
 @Injectable()
 export class CampaignUpdatesService {
   constructor(
     @Inject(DATABASE) private readonly db: Database,
     private readonly campaigns: CampaignsService,
+    private readonly wallets: AdWalletBalances,
   ) {}
 
   async add(
@@ -62,6 +65,7 @@ export class CampaignUpdatesService {
         );
       }
       await this.assertPeriod(tx, campaign.id, input, null);
+      const wallet = await this.lockWallet(tx, campaign);
       const [row] = await tx
         .insert(adCampaignUpdates)
         .values({ ...input, campaignId: campaign.id, enteredById: actor.id })
@@ -74,6 +78,7 @@ export class CampaignUpdatesService {
         entityId: row.id,
         after: { ...identity(campaign, row), ...metrics(row) },
       });
+      if (wallet) await this.wallets.settle(tx, actorOf(actor), wallet, client);
       return this.campaigns.toDetail(actor, campaign, client, tx);
     });
   }
@@ -89,6 +94,7 @@ export class CampaignUpdatesService {
       await this.assertPeriod(tx, campaign.id, next, update.id);
       const changes = changedFields(metrics(update), next);
       if (!changes) return this.campaigns.toDetail(actor, campaign, client, tx);
+      const wallet = await this.lockWallet(tx, campaign);
       const [updated] = await tx
         .update(adCampaignUpdates)
         .set({ ...input, updatedById: actor.id, updatedAt: new Date() })
@@ -103,6 +109,7 @@ export class CampaignUpdatesService {
         before: { ...identity(campaign, update), ...changes.before },
         after: { ...identity(campaign, updated), ...changes.after },
       });
+      if (wallet) await this.wallets.settle(tx, actorOf(actor), wallet, client);
       return this.campaigns.toDetail(actor, campaign, client, tx);
     });
   }
@@ -111,6 +118,7 @@ export class CampaignUpdatesService {
   async archive(actor: CurrentUserInfo, id: string): Promise<CampaignDetail> {
     return this.db.transaction(async (tx) => {
       const { update, campaign, client } = await this.lockForChange(tx, actor, id);
+      const wallet = await this.lockWallet(tx, campaign);
       await tx
         .update(adCampaignUpdates)
         .set({ archivedAt: new Date(), archivedById: actor.id })
@@ -123,6 +131,7 @@ export class CampaignUpdatesService {
         before: { ...identity(campaign, update), archived: false },
         after: { ...identity(campaign, update), archived: true },
       });
+      if (wallet) await this.wallets.settle(tx, actorOf(actor), wallet, client);
       return this.campaigns.toDetail(actor, campaign, client, tx);
     });
   }
@@ -149,6 +158,11 @@ export class CampaignUpdatesService {
       throw new CodedException(409, 'INVALID_TRANSITION', 'The update is archived');
     }
     return { update, campaign, client };
+  }
+
+  /** Rule 17: a wallet campaign's spend changes the client's balance; a direct one's never does. */
+  private lockWallet(tx: Transaction, campaign: CampaignRow) {
+    return campaign.funding === 'wallet' ? this.wallets.lock(tx, campaign.clientId) : null;
   }
 
   /**

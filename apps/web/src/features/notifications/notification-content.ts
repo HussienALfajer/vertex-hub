@@ -8,6 +8,7 @@ import {
   formatNumber,
   formatTimeOfDay,
 } from '../../lib/format';
+import { formatAmount } from '../../lib/money';
 import { lineName } from '../retainers/retainer-badges';
 
 /** How many behind lines a `retainer_behind` notification names before "+n" (spec P2A). */
@@ -147,6 +148,17 @@ export function notificationText(
         }),
         context: notification.data.invoice.client,
       };
+    case 'ad_budget_low': {
+      const { data } = notification;
+      return {
+        text: t('notifications.text.ad_budget_low', {
+          client: data.client,
+          balance: formatAmount(data.balanceMinor),
+          threshold: formatAmount(data.thresholdMinor),
+        }),
+        context: data.client,
+      };
+    }
     case 'retainer_renewal_due': {
       const { data } = notification;
       return {
@@ -338,6 +350,7 @@ type TaskNotification = Exclude<
       | 'quote_approval_decided'
       | 'quote_accepted'
       | `invoice_${string}`
+      | 'ad_budget_low'
       | 'approval_responded'
       | 'approval_no_response'
       | 'approval_expired'

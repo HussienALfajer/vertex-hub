@@ -62,6 +62,8 @@ const NOT_BUSINESS_RECORDS: Record<string, string> = {
   invoice_lines: 'Part of its invoice; replaced while a draft, frozen once issued (F13)',
   payments: 'Voided, never archived or edited once recorded (F13 rule 22)',
   statement_pdfs: 'Temporary statement renders, deleted after 24 hours (F13 rule 29)',
+  ad_wallets: 'Settings of a client, following the client and edited in place (F12)',
+  ad_wallet_entries: 'Voided, never archived or edited once recorded (F12 rule 18)',
 };
 
 /** Tables keyed by a natural value instead of a UUIDv7 `id`. Every entry needs a reason. */
@@ -72,6 +74,7 @@ const NATURAL_KEYS: Record<string, string> = {
   quote_settings: 'A single row, keyed by a constant (F04)',
   quote_numbers: 'One row per year, keyed by the year (F04 rule 2)',
   invoice_settings: 'A single row, keyed by a constant (F13)',
+  ad_wallets: 'One row per client, keyed by the client (F12)',
 };
 
 describe('database conventions', () => {

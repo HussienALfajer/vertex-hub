@@ -4,6 +4,8 @@ import {
   accounts,
   adCampaigns,
   adCampaignUpdates,
+  adWalletEntries,
+  adWallets,
   approvalItems,
   approvalRequests,
   auditEntries,
@@ -318,10 +320,16 @@ export async function removeClients(db: Database, ids: string[]): Promise<void> 
   // removed before the file items go.
   await db.update(invoices).set({ pdfFileItemId: null }).where(inArray(invoices.clientId, ids));
   await removePayments(db, ids);
+  // Ad wallet entries point at their proof (F12): unlinked before the file items go.
+  await db
+    .update(adWalletEntries)
+    .set({ proofFileItemId: null })
+    .where(inArray(adWalletEntries.clientId, ids));
   await db.delete(statementPdfs).where(inArray(statementPdfs.clientId, ids));
   await removeFileItems(db, inArray(fileItems.clientId, ids));
   // Campaigns point at the client's tasks, projects and retainers (F12): they go first.
   await removeCampaigns(db, ids);
+  await removeAdWallets(db, ids);
   await removeShoots(
     db,
     (await db.select({ id: shoots.id }).from(shoots).where(inArray(shoots.clientId, ids))).map(
@@ -705,6 +713,24 @@ export async function removeCampaigns(db: Database, clientIds: string[]): Promis
     .delete(auditEntries)
     .where(inArray(auditEntries.entityId, [...ids, ...updates.map((row) => row.id)]));
   await db.delete(adCampaigns).where(inArray(adCampaigns.id, ids));
+}
+
+/**
+ * Removes the clients' ad wallets and entries with their audit entries, reminders and A11
+ * notifications (F12); the entries' files are removed with the clients' file items before.
+ */
+export async function removeAdWallets(db: Database, clientIds: string[]): Promise<void> {
+  if (clientIds.length === 0) return;
+  const entries = await db
+    .delete(adWalletEntries)
+    .where(inArray(adWalletEntries.clientId, clientIds))
+    .returning({ id: adWalletEntries.id });
+  await db
+    .delete(auditEntries)
+    .where(inArray(auditEntries.entityId, [...clientIds, ...entries.map((row) => row.id)]));
+  await db.delete(notificationReminders).where(inArray(notificationReminders.subjectId, clientIds));
+  await db.delete(notifications).where(inArray(notifications.subjectId, clientIds));
+  await db.delete(adWallets).where(inArray(adWallets.clientId, clientIds));
 }
 
 /** Removes the payments on the clients' invoices with their audit entries (F13). */
