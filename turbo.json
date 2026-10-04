@@ -16,6 +16,14 @@
       "dependsOn": ["^build"],
       "cache": false
     },
+    "@vertex-hub/worker#test": {
+      "dependsOn": ["^build", "@vertex-hub/db#test"],
+      "cache": false
+    },
+    "@vertex-hub/api#test": {
+      "dependsOn": ["^build", "@vertex-hub/worker#test"],
+      "cache": false
+    },
     "test:e2e": {
       "dependsOn": ["build"],
       "outputs": ["playwright-report/**", "test-results/**"]

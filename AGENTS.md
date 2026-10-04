@@ -46,7 +46,7 @@ Run from the repository root (Node 24, pnpm via Corepack). Turborepo builds depe
 | Dev (api :3000, worker, web :5173) | `pnpm dev` |
 | Typecheck | `pnpm typecheck` |
 | Lint + format check / fix | `pnpm lint` / `pnpm lint:fix` |
-| Unit + integration tests (need `TEST_DATABASE_URL`; migrations run automatically) | `pnpm test` |
+| Unit + integration tests (need `TEST_DATABASE_URL`; migrations run automatically; the packages that share the test database, `db` → `worker` → `api`, run one after another, see `turbo.json`) | `pnpm test` |
 | E2E smoke (Playwright, builds web first) | `pnpm test:e2e` |
 | Generate a migration after a schema change | `pnpm db:generate` |
 | Apply migrations to the dev database | `pnpm db:migrate` |
