@@ -22,6 +22,7 @@ import {
   CalendarClockIcon,
   FileTextIcon,
   FolderKanbanIcon,
+  ListTreeIcon,
   PaperclipIcon,
   RepeatIcon,
 } from 'lucide-react';
@@ -46,6 +47,7 @@ import {
 import { InvoiceEditor } from './invoice-editor';
 import { IssuedPdf, ReceiptPdf } from './invoice-pdf';
 import { invoiceQuery, invoiceSettingsQuery } from './invoices.queries';
+import { LineService, ServicesDialog } from './line-services';
 import { SourceChip } from './source-chip';
 
 /** Spec screens 2 and 3: the editor while a draft, the issued invoice with its payments after. */
@@ -165,7 +167,7 @@ function IssuedInvoice({
 }) {
   const { t } = useTranslation();
   const manages = can(useMe(), 'invoices.manage');
-  const [open, setOpen] = useState<'payment' | 'dueDate' | 'void' | null>(null);
+  const [open, setOpen] = useState<'payment' | 'dueDate' | 'services' | 'void' | null>(null);
   const [voidingPayment, setVoidingPayment] = useState<Payment | null>(null);
   const { permissions } = invoice;
   const livePayments = invoice.payments.some((payment) => !payment.voided);
@@ -200,6 +202,12 @@ function IssuedInvoice({
           <Button variant="outline" onClick={() => setOpen('dueDate')}>
             <CalendarClockIcon />
             {t('invoices.dueDate.action')}
+          </Button>
+        )}
+        {permissions.canEditServices && (
+          <Button variant="outline" onClick={() => setOpen('services')}>
+            <ListTreeIcon />
+            {t('invoices.services.action')}
           </Button>
         )}
         {(permissions.canVoid || blockedVoid) && (
@@ -249,6 +257,14 @@ function IssuedInvoice({
         open={open === 'dueDate'}
         onClose={() => setOpen(null)}
       />
+      {permissions.canEditServices && (
+        <ServicesDialog
+          key={invoice.lines.map((line) => line.service?.id ?? '').join()}
+          invoice={invoice}
+          open={open === 'services'}
+          onClose={() => setOpen(null)}
+        />
+      )}
       <VoidInvoiceDialog invoice={invoice} open={open === 'void'} onClose={() => setOpen(null)} />
       <VoidPaymentDialog payment={voidingPayment} onClose={() => setVoidingPayment(null)} />
     </>
@@ -264,6 +280,7 @@ function LinesCard({ invoice }: { invoice: InvoiceDetail }) {
         <TableHeader>
           <TableRow>
             <TableHead>{t('invoices.editor.description')}</TableHead>
+            <TableHead>{t('invoices.editor.service')}</TableHead>
             <TableHead className="text-end">{t('invoices.editor.quantity')}</TableHead>
             <TableHead className="text-end">{t('invoices.editor.unitPrice')}</TableHead>
             <TableHead className="text-end">{t('invoices.lineTotal')}</TableHead>
@@ -277,6 +294,9 @@ function LinesCard({ invoice }: { invoice: InvoiceDetail }) {
                   <span className="font-medium">{line.description}</span>
                   {line.source && <SourceChip source={line.source} />}
                 </span>
+              </TableCell>
+              <TableCell className="whitespace-normal">
+                <LineService service={line.service} />
               </TableCell>
               <TableCell className="text-end tabular-nums">{formatNumber(line.quantity)}</TableCell>
               <TableCell className="text-end">

@@ -200,7 +200,7 @@ None. Every owner decision above is recorded here and in ADR 0027.
 
 ## Acceptance
 - End-to-end check the owner runs in the browser:
-  1. Sign in as the General Manager: the home page shows Company, Finance and My work; overdue tasks per department match the task list filtered by overdue; invoiced and collected this month match the invoices list.
+  1. Sign in as the General Manager: the home page shows Company, Finance, Departments (with a department picker, rule 3), My clients when they are an account manager, and My work; overdue tasks per department match the task list filtered by overdue; invoiced and collected this month match the invoices list.
   2. Open a retainer that is behind: it appears under "Retainers behind this month"; an approval item sent over 48 hours ago appears in its card.
   3. Sign in as a department manager: only their department's section and My work; the workload numbers match F06 Workload.
   4. Sign in as an account manager: My clients lists only their clients with retainer completion, pending approvals and outstanding amounts.

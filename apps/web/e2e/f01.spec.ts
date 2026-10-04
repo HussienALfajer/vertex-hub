@@ -68,8 +68,8 @@ test('a user who must use 2FA sets it up before anything else', async ({ page })
   await expect(finish).toBeDisabled();
   await page.getByRole('checkbox', { name: ar.twoFactorSetup.confirmSaved }).click();
   await finish.click();
-  // The start page: My tasks, until the F15 dashboards.
-  await expect(page).toHaveURL(/127\.0\.0\.1:4173\/tasks$/);
+  // The start page: the dashboard (F15).
+  await expect(page).toHaveURL(/127\.0\.0\.1:4173\/$/);
 });
 
 test('sign-in asks for the code, and a wrong code is explained', async ({ page }) => {

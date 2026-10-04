@@ -22,6 +22,7 @@ import {
   addDays,
   addMonths,
   adWalletBalance,
+  agingBucket,
   allowedPostTransitions,
   allowedTaskTransitions,
   applyPayment,
@@ -47,11 +48,13 @@ import {
   type ClientApprovals,
   type ClientBilling,
   type ClientDetailResponse,
+  type ClientMonthlyReport,
   type ClientResponse,
   type ClientResponseEntry,
   type ClientStatement,
   type ClientStatus,
   type CloseShoot,
+  type CompanyDashboard,
   type Contact,
   type ContentCalendar,
   type ConvertLead,
@@ -78,6 +81,7 @@ import {
   calendarDay,
   canChangeCampaignStatus,
   changeInvoiceDueDateSchema,
+  conversionRate,
   convertLeadSchema,
   costPerResult,
   createCatalogPackageSchema,
@@ -88,12 +92,16 @@ import {
   createProjectExpenseSchema,
   createQuoteSchema,
   createTemplateSchema,
+  DASHBOARD_LIMITS,
+  DEPARTMENT_CODES,
   type DeliverableKind,
   type DepartmentCode,
+  type DepartmentDashboard,
   type DepartmentDetailResponse,
   type DepartmentResponse,
   type DuplicatePost,
   daysInStage,
+  daysOverdue,
   daysWithoutUpdate,
   defaultInstallmentMilestones,
   type ErrorCode,
@@ -106,6 +114,7 @@ import {
   type FileRole,
   type FileUpload,
   type FileVersion,
+  type FinanceDashboard,
   fileTypeOf,
   firstOfMonth,
   followUpDateInRange,
@@ -126,12 +135,14 @@ import {
   invoiceDraftSchema,
   invoiceStatus,
   invoiceTotal,
+  isFutureMonth,
   isInlineMimeType,
   isLineBehind,
   isLowBalance,
   isOpenLeadStage,
   isPostContentEditable,
   isPostOverdue,
+  isPreliminaryMonth,
   isProjectClosed,
   issueInvoiceSchema,
   isTaskBlocked,
@@ -168,11 +179,13 @@ import {
   type MeResponse,
   type Milestone,
   type MilestoneStatus,
+  type MyClientsDashboard,
   type MyContentSummary,
   type MyTaskSummary,
   manualLeadMoveRefusal,
   mentionedUserIds,
   mergeDeliverableLines,
+  monthPeriod,
   NOTIFICATION_CATALOG,
   NOTIFICATION_TYPES,
   type Note,
@@ -184,6 +197,8 @@ import {
   OPEN_INVOICE_STATUSES,
   OPEN_LEAD_STAGES,
   OPEN_TASK_STATUSES,
+  type OverdueInvoicesReport,
+  onTimeRate,
   type PatchCampaignUpdate,
   type Payment,
   type Permission,
@@ -202,6 +217,8 @@ import {
   type PostTask,
   type PostType,
   type PostView,
+  type ProductivityMeasures,
+  type ProductivityReport,
   type Project,
   type ProjectBilling,
   type ProjectDetail,
@@ -241,6 +258,7 @@ import {
   type RetainerStatus,
   type RetainerStatusChange,
   type RetainerTemplate,
+  type RevenueReport,
   type ReviewStage,
   type RevisionDecision,
   type RevisionDecisionInput,
@@ -253,6 +271,7 @@ import {
   renewalState,
   reopenLeadSchema,
   repeatedStepFor,
+  reportMonths,
   revisionSourceOf,
   type ScheduleConflict,
   type Shoot,
@@ -304,6 +323,8 @@ import {
   type UserResponse,
   updateCatalogPackageSchema,
   updateCatalogServiceSchema,
+  updateClientReportSummarySchema,
+  updateInvoiceServicesSchema,
   updateInvoiceSettingsSchema,
   updateLeadNoteSchema,
   updateLeadSchema,
@@ -409,6 +430,29 @@ export const accountManagerMe: MeResponse = {
     ],
   }),
   twoFactor: { enabled: false, required: false },
+};
+
+/** Basel as a plain department manager of Design, with no other role (F15 home page). */
+export const departmentManagerMe: MeResponse = {
+  user: { id: id(6), name: 'باسل يوسف', email: 'basel@vertex.example', image: null },
+  roles: ['department_manager', 'employee'],
+  departments: [{ ...design, isPrimary: true, isManager: true }],
+  permissions: grantedPermissions({
+    roles: ['department_manager', 'employee'],
+    departments: [{ code: 'design', isManager: true }],
+  }),
+  twoFactor: { enabled: false, required: false },
+};
+
+/** Layan as a plain account manager, managing no department (F15 home page). */
+export const plainAccountManagerMe: MeResponse = {
+  ...accountManagerMe,
+  roles: ['account_manager', 'employee'],
+  departments: [{ ...design, isPrimary: true, isManager: false }],
+  permissions: grantedPermissions({
+    roles: ['account_manager', 'employee'],
+    departments: [{ code: 'design', isManager: false }],
+  }),
 };
 
 /** Omar: the Internal Operations manager, who reads leads and quotes them (F03, F04). */
@@ -1035,6 +1079,15 @@ export async function mockApi(page: Page, options: MockOptions): Promise<MockedA
     requests: [...sent.requests, ...planned.requests],
     me: () => me,
   });
+  const reportsApi = reportRoutes({
+    users,
+    clients,
+    projects,
+    retainers,
+    tasks,
+    tasksApi,
+    me: () => me,
+  });
   const templates = templatesSeed();
   const templatesApi = templateRoutes({ users, clients, retainers, templates, me: () => me });
   const catalog = catalogSeed();
@@ -1068,6 +1121,7 @@ export async function mockApi(page: Page, options: MockOptions): Promise<MockedA
     users,
     projects,
     retainers,
+    catalog,
     me: () => me,
   });
   const campaignsApi = campaignRoutes({
@@ -1308,6 +1362,10 @@ export async function mockApi(page: Page, options: MockOptions): Promise<MockedA
       }
       return json(route, departmentDetail(department));
     }
+
+    // Dashboards and reports (F15), ahead of the client routes that answer the rest of a client.
+    const reported = reportsApi(route, method, url, request);
+    if (reported) return reported;
 
     // A client's approval history (F09) belongs to the approvals mock, with the tasks.
     if (/^\/api\/clients\/[^/]+\/approvals$/.test(path)) {
@@ -4092,7 +4150,12 @@ function taskRoutes({
   const PRIORITY_ORDER: readonly TaskPriority[] = TASK_PRIORITIES;
 
   // Answers a tasks request, or returns undefined to let the other mocks try.
-  return (route: Route, method: string, url: URL, request: Request): Promise<void> | undefined => {
+  const handle = (
+    route: Route,
+    method: string,
+    url: URL,
+    request: Request,
+  ): Promise<void> | undefined => {
     const path = url.pathname;
     const body = <T>() => request.postDataJSON() as T;
 
@@ -4869,6 +4932,8 @@ function taskRoutes({
     }
     return undefined;
   };
+  // The dashboard mock (F15) lists tasks as the task list does.
+  return Object.assign(handle, { summary, overdue });
 }
 
 // Content (F08)
@@ -10769,6 +10834,8 @@ interface InvoiceRecord {
     quantity: number;
     unitPriceMinor: number;
     source: InvoiceSource | null;
+    /** The catalog service (F15 rules 21 and 22). */
+    serviceId?: string | null;
   }[];
   payments: PaymentRecord[];
   pdf: InvoiceDetail['pdf'];
@@ -11013,11 +11080,20 @@ interface InvoiceState {
   users: UserResponse[];
   projects: ProjectRecord[];
   retainers: RetainerRecord[];
+  catalog: CatalogRecords;
   me: () => MeResponse;
 }
 
 /** The invoices API over the in-memory records, with the F13 rules the screens rely on. */
-function invoiceRoutes({ billing, clients, users, projects, retainers, me }: InvoiceState) {
+function invoiceRoutes({
+  billing,
+  clients,
+  users,
+  projects,
+  retainers,
+  catalog,
+  me,
+}: InvoiceState) {
   const { invoices, settings, expenses } = billing;
   let nextId = 9500;
   let clock = Date.parse('2026-10-02T09:00:00.000Z');
@@ -11150,7 +11226,7 @@ function invoiceRoutes({ billing, clients, users, projects, retainers, me }: Inv
         ...line,
         totalMinor: line.quantity * line.unitPriceMinor,
         source: line.source ? sourceOf(line.source) : null,
-        service: null,
+        service: serviceOf(line.serviceId ?? null),
       })),
       payments: i.payments.map((p) => ({
         id: p.id,
@@ -11191,6 +11267,12 @@ function invoiceRoutes({ billing, clients, users, projects, retainers, me }: Inv
         canEditServices: manages && item.status !== 'draft' && item.status !== 'void',
       },
     };
+  };
+  const serviceOf = (serviceId: string | null) => {
+    const service = catalog.services.find((s) => s.id === serviceId);
+    return service
+      ? { id: service.id, name: service.name, archived: service.archivedAt !== null }
+      : null;
   };
   const settingsOf = (): InvoiceSettings => {
     const { rateUpdatedById, updatedById, ...rest } = settings;
@@ -11669,6 +11751,25 @@ function invoiceRoutes({ billing, clients, users, projects, retainers, me }: Inv
       return fail(route, 403, null);
     }
     const status = listItemOf(i).status;
+    // F15 rule 22: services change on issued, non-void invoices only; nothing else does.
+    if (action === 'services' && method === 'PUT') {
+      if (status === 'draft' || status === 'void') return fail(route, 409, 'INVALID_TRANSITION');
+      const input = updateInvoiceServicesSchema.parse(request.postDataJSON());
+      for (const change of input.lines) {
+        const line = i.lines.find((l) => l.id === change.lineId);
+        if (!line) return fail(route, 404, null);
+        const service = catalog.services.find((s) => s.id === change.serviceId);
+        if (
+          change.serviceId &&
+          line.serviceId !== change.serviceId &&
+          service?.archivedAt !== null
+        ) {
+          return fail(route, 400, 'INVALID_SERVICE');
+        }
+        line.serviceId = change.serviceId;
+      }
+      return json(route, detailOf(i));
+    }
     if (!action && method === 'PUT') {
       if (status !== 'draft') return fail(route, 409, 'INVOICE_LOCKED');
       const input = invoiceDraftSchema.parse(request.postDataJSON());
@@ -12527,6 +12628,528 @@ function campaignRoutes({
   };
 }
 
+// Dashboards and reports (F15)
+
+interface ReportState {
+  users: UserResponse[];
+  clients: ClientRecord[];
+  projects: ProjectRecord[];
+  retainers: RetainerRecord[];
+  tasks: TaskRecord[];
+  tasksApi: ReturnType<typeof taskRoutes>;
+  me: () => MeResponse;
+}
+
+/** Monthly report summaries saved during a test, by `<clientId>:<month>`. */
+type SummaryRecords = Map<string, NonNullable<ClientMonthlyReport['summary']>>;
+
+/**
+ * The dashboard and report endpoints (spec F15). Task numbers come from the task mock, so they
+ * match the task list; money and the monthly report are fixed figures over the seeded clients.
+ * Each answers 403 without its permission, as the API does (rule 23).
+ */
+function reportRoutes({ users, clients, projects, retainers, tasks, tasksApi, me }: ReportState) {
+  const summaries: SummaryRecords = new Map();
+  let pdfAsked = false;
+  const scopes = (permission: string) =>
+    me().permissions.find((g) => g.permission === permission)?.scopes ?? [];
+  const holds = (permission: string) => scopes(permission).length > 0;
+  const named = (record: { id: string; name: string }) => ({ id: record.id, name: record.name });
+  const clientNamed = (clientId: string) => ({
+    id: clientId,
+    name: clients.find((c) => c.id === clientId)?.tradeName ?? '',
+  });
+  const userNamed = (userId: string) => ({
+    id: userId,
+    name: users.find((u) => u.id === userId)?.name ?? '',
+  });
+  const open = () => tasks.filter((t) => !t.archived && isTaskOpen(t.status));
+  const week = weekOf(PROJECTS_TODAY);
+  const workloadOf = (list: TaskRecord[]) => ({
+    open: list.length,
+    dueThisWeek: list.filter((t) => t.dueDate >= week.from && t.dueDate <= week.to).length,
+    overdue: list.filter(tasksApi.overdue).length,
+  });
+  /** The departments the caller reads tasks of: all, or the ones they manage. */
+  const departmentsInScope = (): DepartmentCode[] =>
+    scopes('reports.read').includes('all')
+      ? [...DEPARTMENT_CODES]
+      : scopes('reports.read').includes('department')
+        ? me()
+            .departments.filter((d) => d.isManager)
+            .map((d) => d.code)
+        : [];
+  const membersOf = (department: DepartmentCode) =>
+    users.filter(
+      (u) => u.status !== 'archived' && u.departments.some((d) => d.code === department),
+    );
+  const myClients = () => clients.filter((c) => !c.archived && c.accountManagerId === me().user.id);
+  const readsClient = (clientId: string) =>
+    scopes('reports.read').includes('all') ||
+    (scopes('reports.read').includes('own_clients') &&
+      clients.some((c) => c.id === clientId && c.accountManagerId === me().user.id));
+
+  const company = (): CompanyDashboard => {
+    const today = businessDate();
+    return {
+      months: reportMonths(today),
+      activeEngagements: {
+        projects: OPEN_STATUSES.map((status) => ({
+          status,
+          count: projects.filter((p) => !p.archived && p.status === status).length,
+        })),
+        retainers: retainers.filter((r) => !r.archived && r.status === 'active').length,
+      },
+      departments: DEPARTMENT_CODES.map((department) => {
+        const own = open().filter((t) => t.department === department);
+        return {
+          department,
+          ...workloadOf(own),
+          unassigned: own.filter((t) => t.assigneeId === null).length,
+        };
+      }),
+      retainersBehind: [
+        {
+          client: clientNamed(id(601)),
+          retainer: named({ id: id(901), name: 'إدارة السوشيال ميديا' }),
+          cycleId: id(921),
+          linesBehind: 2,
+          completion: 38,
+        },
+      ],
+      approvalsWaiting: {
+        count: 2,
+        oldest: {
+          itemId: id(1491),
+          title: 'تصاميم منيو الخريف',
+          client: clientNamed(id(601)),
+          sentAt: `${addDays(today, -4)}T10:00:00.000Z`,
+          expired: false,
+        },
+      },
+      lowWallets: [{ client: clientNamed(id(602)), balanceUsdMinor: 4_500 }],
+      leads: {
+        thisMonth: { new: 5, won: 2, lost: 1, conversionRate: conversionRate(2, 1) },
+        lastMonth: { new: 7, won: 1, lost: 3, conversionRate: conversionRate(1, 3) },
+      },
+    };
+  };
+
+  const finance = (): FinanceDashboard => ({
+    months: reportMonths(businessDate()),
+    invoicedUsdMinor: { thisMonth: 300_000, lastMonth: 245_000 },
+    collectedUsdMinor: { thisMonth: 62_195, lastMonth: 180_000 },
+    outstanding: {
+      byCurrency: [{ currency: 'USD', amountMinor: 190_000 }],
+      usdMinor: 190_000,
+    },
+    overdue: { count: 1, byCurrency: [{ currency: 'USD', amountMinor: 40_000 }], usdMinor: 40_000 },
+  });
+
+  const departmentDashboard = (department: DepartmentCode, inScope: DepartmentCode[]) => {
+    const own = open().filter((t) => t.department === department);
+    const late = own.filter(tasksApi.overdue).sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+    const body: DepartmentDashboard = {
+      departments: inScope,
+      department,
+      week,
+      byStatus: OPEN_TASK_STATUSES.map((status) => ({
+        status,
+        count: own.filter((t) => t.status === status).length,
+      })),
+      overdue: {
+        count: late.length,
+        oldest: late.slice(0, DASHBOARD_LIMITS.overdueTasks).map(tasksApi.summary),
+      },
+      unassigned: own.filter((t) => t.assigneeId === null).length,
+      people: membersOf(department).map((u) => ({
+        user: named(u),
+        ...workloadOf(open().filter((t) => t.assigneeId === u.id)),
+      })),
+    };
+    return body;
+  };
+
+  const myClientsDashboard = (): MyClientsDashboard => {
+    const money = holds('invoices.read');
+    const ads = holds('campaigns.read');
+    const rows = myClients().map((c) => {
+      const active = retainers.filter(
+        (r) => !r.archived && r.clientId === c.id && r.status === 'active',
+      );
+      const behind = active.some((r) => r.id === id(901));
+      const jasmine = c.id === id(601);
+      const lowWallet = ads ? c.id === id(602) : null;
+      const invoices = money
+        ? { outstandingUsdMinor: jasmine ? 190_000 : 0, overdue: jasmine ? 1 : 0 }
+        : null;
+      const approvals = jasmine
+        ? {
+            pending: 2,
+            oldestSentAt: `${addDays(businessDate(), -4)}T10:00:00.000Z`,
+            waiting: true,
+          }
+        : { pending: 0, oldestSentAt: null, waiting: false };
+      return {
+        client: clientNamed(c.id),
+        retainers: active.map((r) => ({
+          retainer: named(r),
+          completion: r.id === id(901) ? 38 : 75,
+          behind: r.id === id(901),
+        })),
+        openProjects: projects.filter(
+          (p) => !p.archived && p.clientId === c.id && OPEN_STATUSES.includes(p.status),
+        ).length,
+        approvals,
+        invoices,
+        lowWallet,
+        hasProblem: behind || (invoices?.overdue ?? 0) > 0 || !!lowWallet || approvals.waiting,
+      };
+    });
+    rows.sort(
+      (a, b) =>
+        Number(b.hasProblem) - Number(a.hasProblem) || a.client.name.localeCompare(b.client.name),
+    );
+    return { clients: rows };
+  };
+
+  const measures = (list: TaskRecord[], delivered: number): ProductivityMeasures => ({
+    new: list.length + delivered,
+    delivered,
+    onTimeRate: delivered === 0 ? null : onTimeRate(delivered - 1, delivered),
+    averageClientRevisions: delivered === 0 ? null : 1.5,
+    averageInternalRevisions: delivered === 0 ? null : 0.5,
+    averageCycleDays: delivered === 0 ? null : 4.2,
+    openNow: list.length,
+    overdueNow: list.filter(tasksApi.overdue).length,
+  });
+
+  const productivity = (url: URL): ProductivityReport => {
+    const asked = url.searchParams.getAll('department') as DepartmentCode[];
+    const inScope = departmentsInScope().filter(
+      (code) => asked.length === 0 || asked.includes(code),
+    );
+    const { thisMonth } = reportMonths(businessDate());
+    return {
+      period: {
+        from: url.searchParams.get('from') ?? thisMonth.from,
+        to: url.searchParams.get('to') ?? thisMonth.to,
+      },
+      departments: inScope.map((department) => {
+        const own = open().filter((t) => t.department === department);
+        const unassigned = own.filter((t) => t.assigneeId === null);
+        const people = membersOf(department).map((u, index) => ({
+          user: { ...named(u), archived: false },
+          measures: measures(
+            own.filter((t) => t.assigneeId === u.id),
+            index === 0 ? 3 : 1,
+          ),
+        }));
+        return {
+          department,
+          name: departmentsSeed.find((d) => d.code === department)?.name ?? department,
+          measures: measures(own, people.length + 2),
+          unassigned: {
+            count: unassigned.length,
+            oldestOn: unassigned.length > 0 ? '2026-10-05' : null,
+          },
+          people,
+        };
+      }),
+    };
+  };
+
+  const revenue = (url: URL): RevenueReport => {
+    const { thisMonth } = reportMonths(businessDate());
+    const today = businessDate();
+    return {
+      period: {
+        from: url.searchParams.get('from') ?? thisMonth.from,
+        to: url.searchParams.get('to') ?? thisMonth.to,
+      },
+      invoicedUsdMinor: 300_000,
+      collectedUsdMinor: 62_195,
+      byClient: [
+        {
+          client: clientNamed(id(602)),
+          accountManager: userNamed(id(1)),
+          invoicedUsdMinor: 0,
+          collectedUsdMinor: 42_195,
+          outstandingUsdMinor: 0,
+        },
+        {
+          client: clientNamed(id(601)),
+          accountManager: userNamed(id(3)),
+          invoicedUsdMinor: 300_000,
+          collectedUsdMinor: 20_000,
+          outstandingUsdMinor: 190_000,
+        },
+      ],
+      byService: [
+        {
+          kind: 'service',
+          id: id(9001),
+          name: 'تصميم سوشال ميديا',
+          archived: false,
+          invoicedUsdMinor: 150_000,
+          collectedUsdMinor: 20_000,
+        },
+        {
+          kind: 'package',
+          id: id(9051),
+          name: 'باقة السوشال الذهبية',
+          archived: false,
+          invoicedUsdMinor: 90_000,
+          collectedUsdMinor: 0,
+        },
+        {
+          kind: 'unclassified',
+          id: null,
+          name: null,
+          archived: false,
+          invoicedUsdMinor: 60_000,
+          collectedUsdMinor: 42_195,
+        },
+      ],
+      invoices: [
+        {
+          id: id(9403),
+          number: invoiceDisplayNumber({ year: 2026, number: 1 }),
+          client: clientNamed(id(601)),
+          issuedOn: addDays(today, -25),
+          currency: 'USD',
+          totalMinor: 60_000,
+          sypPerUsd: null,
+          totalUsdMinor: 60_000,
+          collectedUsdMinor: 20_000,
+        },
+      ],
+    };
+  };
+
+  const overdueInvoices = (url: URL): OverdueInvoicesReport => {
+    const today = businessDate();
+    const dueOn = addDays(today, -18);
+    const days = daysOverdue(dueOn, today);
+    const rows = [
+      {
+        id: id(9403),
+        number: invoiceDisplayNumber({ year: 2026, number: 1 }),
+        client: clientNamed(id(601)),
+        accountManager: userNamed(id(3)),
+        currency: 'USD' as const,
+        totalMinor: 60_000,
+        paidMinor: 20_000,
+        balanceMinor: 40_000,
+        balanceUsdMinor: 40_000,
+        dueOn,
+        daysOverdue: days,
+        bucket: agingBucket(days),
+      },
+    ].filter(
+      (row) =>
+        (!url.searchParams.get('accountManagerId') ||
+          row.accountManager.id === url.searchParams.get('accountManagerId')) &&
+        (!url.searchParams.get('currency') || row.currency === url.searchParams.get('currency')),
+    );
+    const usd = rows.reduce((sum, row) => sum + row.balanceUsdMinor, 0);
+    return {
+      today,
+      invoices: rows,
+      totals: {
+        count: rows.length,
+        byCurrency: rows.length > 0 ? [{ currency: 'USD', amountMinor: usd }] : [],
+        usdMinor: usd,
+      },
+    };
+  };
+
+  /** Jasmine's month: every section; other clients had no activity (edge case 12). */
+  const clientReport = (clientId: string, month: string): ClientMonthlyReport => {
+    const period = monthPeriod(month);
+    const summary = summaries.get(`${clientId}:${month}`) ?? null;
+    const base: ClientMonthlyReport = {
+      client: clientNamed(clientId),
+      month,
+      period,
+      preliminary: isPreliminaryMonth(month, businessDate()),
+      summary: summary?.text ? summary : null,
+      retainers: [],
+      projects: [],
+      deliveredWork: [],
+      posts: [],
+      shoots: [],
+      approvals: { approved: 0, changesRequested: 0, averageResponseHours: null },
+      campaigns: null,
+      adBudget: null,
+      nextMonth: { posts: [], shoots: [] },
+      empty: true,
+    };
+    if (clientId !== id(601)) return base;
+    const day = (n: number) => `${month}-${String(n).padStart(2, '0')}`;
+    const ads = holds('campaigns.read');
+    return {
+      ...base,
+      retainers: [
+        {
+          retainer: named({ id: id(901), name: 'إدارة السوشيال ميديا' }),
+          status: base.preliminary ? 'open' : 'closed',
+          lines: [
+            { kind: 'design', label: null, committed: 12, delivered: 9, percent: 75 },
+            { kind: 'reel', label: null, committed: 4, delivered: 4, percent: 100 },
+            { kind: 'story', label: null, committed: 8, delivered: 5, percent: 62 },
+          ],
+          completion: 75,
+        },
+      ],
+      projects: [
+        {
+          project: named({ id: id(801), name: 'الهوية البصرية الجديدة' }),
+          status: 'active',
+          deliveredTasks: 4,
+          totalTasks: 9,
+          milestonesDone: [{ name: 'الاستكشاف', doneOn: day(12) }],
+        },
+      ],
+      deliveredWork: [
+        {
+          taskId: id(1001),
+          title: 'تصاميم منيو الخريف',
+          department: 'design',
+          departmentName: 'التصميم',
+          deliveredOn: day(8),
+        },
+        {
+          taskId: id(1002),
+          title: 'تصوير أطباق المنيو',
+          department: 'photography',
+          departmentName: 'التصوير',
+          deliveredOn: day(15),
+        },
+      ],
+      posts: [
+        {
+          id: id(1601),
+          publishedOn: day(3),
+          platforms: ['instagram', 'facebook'],
+          title: 'منشور افتتاح الفرع الجديد',
+          links: [{ platform: 'instagram', url: 'https://instagram.com/p/opening' }],
+        },
+      ],
+      shoots: [{ id: id(1751), date: day(14), title: 'تصوير منيو الخريف', location: 'فرع المزة' }],
+      approvals: { approved: 6, changesRequested: 2, averageResponseHours: 30.5 },
+      campaigns: ads
+        ? {
+            rows: [
+              {
+                id: id(9601),
+                platform: 'meta',
+                name: 'حملة منيو الخريف',
+                objective: 'messages',
+                spendMinor: 35_000,
+                reach: 48_200,
+                clicks: 1_310,
+                results: 140,
+                costPerResultMinor: 250,
+              },
+            ],
+            totals: {
+              spendMinor: 35_000,
+              reach: 48_200,
+              clicks: 1_310,
+              results: 140,
+              costPerResultMinor: 250,
+            },
+          }
+        : null,
+      adBudget: ads
+        ? {
+            openingMinor: 20_000,
+            depositsMinor: 50_000,
+            refundsMinor: 0,
+            spendMinor: 35_000,
+            closingMinor: 35_000,
+          }
+        : null,
+      nextMonth: {
+        posts: [{ date: addDays(period.to, 3), title: 'عرض نهاية الأسبوع' }],
+        shoots: [{ date: addDays(period.to, 6), title: 'تصوير مشروبات الشتاء' }],
+      },
+      empty: false,
+    };
+  };
+
+  return (route: Route, method: string, url: URL, request: Request) => {
+    const path = url.pathname;
+    if (path === '/api/dashboard/company') {
+      return scopes('reports.read').includes('all')
+        ? json(route, company())
+        : fail(route, 403, null);
+    }
+    if (path === '/api/dashboard/finance') {
+      return holds('reports.finance') ? json(route, finance()) : fail(route, 403, null);
+    }
+    if (path === '/api/dashboard/departments') {
+      const inScope = departmentsInScope();
+      const asked = (url.searchParams.get('department') as DepartmentCode | null) ?? inScope[0];
+      if (!asked || !inScope.includes(asked)) return fail(route, 403, null);
+      return json(route, departmentDashboard(asked, inScope));
+    }
+    if (path === '/api/dashboard/clients') {
+      return scopes('reports.read').includes('own_clients')
+        ? json(route, myClientsDashboard())
+        : fail(route, 403, null);
+    }
+    const workbook = () =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        body: 'PK',
+      });
+    const report = path.match(
+      /^\/api\/reports\/(productivity|revenue|overdue-invoices)(\/export)?$/,
+    );
+    if (report) {
+      const allowed =
+        report[1] === 'productivity' ? departmentsInScope().length > 0 : holds('reports.finance');
+      if (!allowed) return fail(route, 403, null);
+      if (report[2]) return workbook();
+      if (report[1] === 'productivity') return json(route, productivity(url));
+      if (report[1] === 'revenue') return json(route, revenue(url));
+      return json(route, overdueInvoices(url));
+    }
+    const monthly = path.match(/^\/api\/clients\/([^/]+)\/monthly-report(?:\/(.+))?$/);
+    if (monthly) {
+      const [, clientId = '', action] = monthly;
+      if (!readsClient(clientId)) return fail(route, 404, null);
+      const month =
+        action === 'summary'
+          ? (request.postDataJSON() as { month: string }).month
+          : (url.searchParams.get('month') ?? '');
+      if (isFutureMonth(month, businessDate())) return fail(route, 400, 'INVALID_MONTH');
+      if (!action) return json(route, clientReport(clientId, month));
+      if (action === 'export') return workbook();
+      if (action === 'summary' && method === 'PUT') {
+        const input = updateClientReportSummarySchema.parse(request.postDataJSON());
+        summaries.set(`${clientId}:${month}`, {
+          text: input.summary,
+          updatedBy: userNamed(me().user.id),
+          updatedAt: new Date().toISOString(),
+        });
+        return json(route, clientReport(clientId, month));
+      }
+      if (action === 'pdf' && method === 'POST') {
+        pdfAsked = true;
+        return json(route, { state: 'ready' });
+      }
+      if (action === 'pdf') {
+        if (!pdfAsked) return fail(route, 404, null);
+        return route.fulfill({ status: 200, contentType: 'application/pdf', body: MOCK_PDF });
+      }
+    }
+    return undefined;
+  };
+}
 export const seedIds = {
   sara: id(1),
   omar: id(2),

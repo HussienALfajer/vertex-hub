@@ -27,6 +27,9 @@ import {
   CardHeader,
   CardTitle,
   Checkbox,
+  Collapsible,
+  CollapsiblePanel,
+  CollapsibleTrigger,
   ColorInput,
   ColorStrip,
   ColorSwatch,
@@ -255,6 +258,17 @@ function DesignSystemPage() {
             />
           ))}
         </div>
+      </Section>
+
+      <Section title={t('designSystem.collapsible')}>
+        <Collapsible defaultOpen className="rounded-lg border border-border">
+          <CollapsibleTrigger className="px-4 py-3 font-bold">
+            {t('designSystem.collapsibleTitle')}
+          </CollapsibleTrigger>
+          <CollapsiblePanel className="border-t border-border px-4 py-3 text-sm text-muted-foreground">
+            {t('designSystem.collapsibleBody')}
+          </CollapsiblePanel>
+        </Collapsible>
       </Section>
 
       <Section title={t('designSystem.statuses')}>

@@ -28,3 +28,11 @@ export function hasMoneyAccess(me: MeResponse, accountManagerId: string): boolea
     scopes.includes('all') || (scopes.includes('own_clients') && accountManagerId === me.user.id)
   );
 }
+
+/** The client's monthly report (F15 screen 6): `reports.read` covering the client. */
+export function hasReportAccess(me: MeResponse, accountManagerId: string): boolean {
+  const scopes = scopesOf(me, 'reports.read');
+  return (
+    scopes.includes('all') || (scopes.includes('own_clients') && accountManagerId === me.user.id)
+  );
+}

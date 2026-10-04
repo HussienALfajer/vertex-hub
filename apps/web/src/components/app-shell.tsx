@@ -22,10 +22,12 @@ import {
   Building2Icon,
   CalendarDaysIcon,
   CalendarRangeIcon,
+  ChartNoAxesCombinedIcon,
   ChevronDownIcon,
   CircleUserIcon,
   FileTextIcon,
   FolderKanbanIcon,
+  HouseIcon,
   LayoutTemplateIcon,
   ListTodoIcon,
   LogOutIcon,
@@ -47,6 +49,7 @@ import { type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { hasApprovalQueue } from '../features/approvals/approvals-page';
 import { NotificationBell } from '../features/notifications/notification-bell';
+import { hasReports } from '../features/reports/reports-page';
 import { managesTeams } from '../features/tasks/task-access';
 import { authClient, can, leaveSession, useMe } from '../lib/auth';
 import { formatList } from '../lib/format';
@@ -55,6 +58,8 @@ import { useTheme } from '../lib/theme';
 interface NavItem {
   to: LinkProps['to'];
   label:
+    | 'nav.home'
+    | 'nav.reports'
     | 'nav.clients'
     | 'nav.leads'
     | 'nav.tasks'
@@ -91,6 +96,8 @@ interface NavChild {
 }
 
 const navItems: NavItem[] = [
+  // The dashboard sections the user can read (F15 screen 1).
+  { to: '/', label: 'nav.home', icon: HouseIcon, exact: true },
   {
     to: '/tasks',
     label: 'nav.tasks',
@@ -119,6 +126,7 @@ const navItems: NavItem[] = [
   { to: '/quotes', label: 'nav.quotes', icon: FileTextIcon, permission: 'quotes.read' },
   { to: '/invoices', label: 'nav.invoices', icon: ReceiptTextIcon, permission: 'invoices.read' },
   { to: '/campaigns', label: 'nav.campaigns', icon: MegaphoneIcon, permission: 'campaigns.read' },
+  { to: '/reports', label: 'nav.reports', icon: ChartNoAxesCombinedIcon, show: hasReports },
   { to: '/catalog', label: 'nav.catalog', icon: PackageIcon, permission: 'catalog.read' },
   // Everyone reads templates; the people who apply or maintain them see the link (F07 screen 1).
   { to: '/templates', label: 'nav.templates', icon: LayoutTemplateIcon, show: managesTeams },

@@ -45,6 +45,7 @@ import {
   CheckIcon,
   ChevronDownIcon,
   EllipsisIcon,
+  FileChartColumnIcon,
   FileTextIcon,
   FolderKanbanIcon,
   FolderOpenIcon,
@@ -79,7 +80,7 @@ import { type FileLibrarySearch, parseFileLibrarySearch } from '../files/library
 import { ClientInvoicesTab } from '../invoices/client-invoices-tab';
 import { ConvertedFromLead } from '../leads/converted-from-lead';
 import { ClientProjectsTab } from '../projects/client-projects-tab';
-import { hasMoneyAccess } from '../projects/project-access';
+import { hasMoneyAccess, hasReportAccess } from '../projects/project-access';
 import { ClientQuotesTab } from '../quotes/client-quotes-tab';
 import { ClientRetainersTab, EndedClientWorkCallout } from '../retainers/client-retainers-tab';
 import { ClientTasksTab } from '../tasks/client-tasks-tab';
@@ -178,7 +179,7 @@ function Profile({
 }) {
   const { t } = useTranslation();
   const me = useMe();
-  const navigate = useNavigate({ from: '/clients/$clientId' });
+  const navigate = useNavigate({ from: '/clients/$clientId/' });
   const scopeAll = canAll(me, 'clients.manage');
   // Quotes are confidential to quote readers (F04 screen 7).
   const quoteReader = can(me, 'quotes.read');
@@ -386,6 +387,9 @@ function ClientHero({
   const { t } = useTranslation();
   const archived = client.archivedAt !== null;
   const colors = client.brandKit.colors.map((color) => color.hex);
+  const me = useMe();
+  // The monthly report needs `reports.read` covering the client (F15 screen 6).
+  const reportReader = !archived && hasReportAccess(me, client.accountManager.id);
 
   return (
     <section className="relative overflow-hidden rounded-lg border border-border bg-surface">
@@ -433,8 +437,17 @@ function ClientHero({
           </dl>
           <ConvertedFromLead clientId={client.id} />
         </div>
-        {(editable || (scopeAll && !archived)) && (
+        {(editable || (scopeAll && !archived) || reportReader) && (
           <div className="flex shrink-0 flex-wrap items-center gap-2">
+            {reportReader && (
+              <Button
+                variant="outline"
+                render={<Link to="/clients/$clientId/report" params={{ clientId: client.id }} />}
+              >
+                <FileChartColumnIcon />
+                {t('clients.profile.monthlyReport')}
+              </Button>
+            )}
             {editable && <EditBasics client={client} scopeAll={scopeAll} />}
             {editable && <StatusMenu client={client} />}
             {scopeAll && !archived && <ClientMenu client={client} />}
