@@ -166,7 +166,9 @@ Business decisions are recorded in `docs/decisions/` (see ADR 0007 and ADR 0006)
 - In-app notifications and email.
 - Triggers: assignment, @mention, due soon, overdue, client response to an approval, invoice paid.
 - Daily morning digest per user: today's tasks and overdue ones.
-- Per-user settings to mute notification types.
+- Per-user settings to mute notification types and to choose which ones arrive by email.
+- Account emails: activation and password reset links, self-service "forgot password", security notices, sign-in from a new device (owner, 2026-10-04).
+- Client emails sent by hand from each document, PDF attached: quotes and expiry reminders, approval links and reminders, invoices and overdue reminders, receipts, statements, the monthly client report, ad budget receipts and low-balance notices (owner, 2026-10-04).
 - **Not in V1:** WhatsApp notifications (first item for V2).
 
 ### F15 — Dashboards and basic reports

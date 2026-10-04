@@ -5,7 +5,6 @@ Decisions that belong to the owner. Agents must not guess answers to these. When
 | ID | Question | Needed before | Recommendation |
 |---|---|---|---|
 | Q4 | Off-server backup destination (none exists on the server today) | Launch | Required before launch: the system holds invoices and client data |
-| Q5 | Email provider for notifications (SMTP) | F14 email | — |
 | Q7 | Add swap on the server (none today) as a safety margin for Chromium PDF rendering? | Launch | 2–4 GB |
 | Q10 | License for the public repository (none means all rights reserved) | Anytime | — |
 | Q11 | Madani Arabic: is a license owned that covers web embedding and server-side PDF embedding? Which weights are available (need at least 400, 500, 700)? Provide the font files (WOFF2 preferred) privately | Design system (fallback works until then); required before launch | Buy/confirm a web license covering the number of users and PDF embedding |
@@ -30,4 +29,5 @@ Decisions that belong to the owner. Agents must not guess answers to these. When
 | Local PostgreSQL for development (was Q6) | PostgreSQL 17 installed natively on Windows, matching production | 2026-09-28 |
 | Currency code of the new Syrian pound (was Q8) | `SYP` with 2 decimal places, final (owner) | 2026-09-29 |
 | Work week (was Q9) | Saturday to Thursday, Friday off; weeks start on Saturday (`docs/specs/F06-tasks.md`, ADR 0016) | 2026-09-29 |
+| Email provider (was Q5) | Hostinger Email SMTP, sending as `info@vertexmedia.pro` (`docs/specs/F14-email-digest.md`, ADR 0028) | 2026-10-04 |
 | Operations manager across departments (was Q14) | Yes: reads and manages tasks in every department (`tasks.manage` `all`) and `reports.read` `all` (`docs/specs/F06-tasks.md`, ADR 0016) | 2026-09-29 |
