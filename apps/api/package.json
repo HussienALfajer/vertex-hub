@@ -23,6 +23,7 @@
     "@thallesp/nestjs-better-auth": "^2.8.0",
     "@vertex-hub/contracts": "workspace:*",
     "@vertex-hub/db": "workspace:*",
+    "@vertex-hub/messages": "workspace:*",
     "better-auth": "^1.7.6",
     "busboy": "^1.6.0",
     "drizzle-orm": "^0.45.3",

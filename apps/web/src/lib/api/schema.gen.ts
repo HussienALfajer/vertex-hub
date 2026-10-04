@@ -20,6 +20,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/emails": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["EmailController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/emails/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["EmailController_sendTest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/me": {
         parameters: {
             query?: never;
@@ -3862,6 +3894,78 @@ export interface components {
             after: {
                 [key: string]: unknown;
             } | null;
+        };
+        /** @enum {string} */
+        EmailStatus: "queued" | "sent" | "failed";
+        /** @enum {string} */
+        EmailAudience: "staff" | "client";
+        /** @enum {string} */
+        EmailKind: "notification_batch" | "digest" | "account_activation" | "password_reset" | "security_notice" | "new_device" | "test" | "client_quote" | "client_quote_reminder" | "client_approval_link" | "client_approval_reminder" | "client_invoice" | "client_invoice_reminder" | "client_receipt" | "client_statement" | "client_report" | "client_ad_receipt" | "client_ad_budget_low";
+        /** @description Emails of the outbox, newest first */
+        EmailPage: {
+            items: components["schemas"]["EmailLogItem"][];
+            total: number;
+            page: number;
+            pageSize: number;
+        };
+        EmailLogItem: {
+            /** Format: uuid */
+            id: string;
+            kind: components["schemas"]["EmailKind"];
+            status: components["schemas"]["EmailStatus"];
+            to: components["schemas"]["EmailAddress"][];
+            cc: components["schemas"]["EmailAddress"][];
+            subject: string;
+            sender: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            sentAt: string | null;
+            error: string | null;
+            audience: components["schemas"]["EmailAudience"];
+            attempts: number;
+            record: {
+                type: components["schemas"]["EmailRecordType"];
+                /** Format: uuid */
+                id: string;
+            } | null;
+            /** Format: uuid */
+            clientId: string | null;
+        };
+        EmailAddress: {
+            name: string;
+            /** Format: email */
+            email: string;
+            /** Format: uuid */
+            userId?: string;
+            /** Format: uuid */
+            contactId?: string;
+        };
+        /** @enum {string} */
+        EmailRecordType: "quote" | "invoice" | "payment" | "approval_request" | "client" | "ad_wallet_entry";
+        /** @description One email of the outbox */
+        EmailSummary: {
+            /** Format: uuid */
+            id: string;
+            kind: components["schemas"]["EmailKind"];
+            status: components["schemas"]["EmailStatus"];
+            to: components["schemas"]["EmailAddress"][];
+            cc: components["schemas"]["EmailAddress"][];
+            subject: string;
+            sender: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            sentAt: string | null;
+            error: string | null;
         };
         /** @description The signed-in user with their roles, departments and permissions */
         MeResponse: {
@@ -11216,6 +11320,55 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AuditPage"];
+                };
+            };
+        };
+    };
+    EmailController_list: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+                status?: components["schemas"]["EmailStatus"] | components["schemas"]["EmailStatus"][];
+                audience?: components["schemas"]["EmailAudience"];
+                kind?: components["schemas"]["EmailKind"] | components["schemas"]["EmailKind"][];
+                from?: string;
+                to?: string;
+                search?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Emails of the outbox, newest first */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmailPage"];
+                };
+            };
+        };
+    };
+    EmailController_sendTest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A test email to your own address, queued */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmailSummary"];
                 };
             };
         };

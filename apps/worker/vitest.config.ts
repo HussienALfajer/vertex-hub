@@ -8,8 +8,12 @@ export default defineConfig({
   plugins: [
     swc.vite({
       jsc: {
-        parser: { syntax: 'typescript', decorators: true },
-        transform: { legacyDecorator: true, decoratorMetadata: true },
+        parser: { syntax: 'typescript', decorators: true, tsx: true },
+        transform: {
+          legacyDecorator: true,
+          decoratorMetadata: true,
+          react: { runtime: 'automatic' },
+        },
       },
     }),
   ],

@@ -1,0 +1,2 @@
+ALTER TABLE "email_messages" ADD COLUMN "sender_name" text;--> statement-breakpoint
+ALTER TABLE "email_messages" ADD CONSTRAINT "email_messages_sender_check" CHECK (("email_messages"."sender_id" is null) = ("email_messages"."sender_name" is null));

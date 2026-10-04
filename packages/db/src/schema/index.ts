@@ -6,6 +6,7 @@ export * from './campaigns.js';
 export * from './catalog.js';
 export * from './clients.js';
 export * from './content.js';
+export * from './email.js';
 export * from './files.js';
 export * from './invoices.js';
 export * from './leads.js';

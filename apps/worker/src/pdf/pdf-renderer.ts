@@ -37,7 +37,7 @@ const WEIGHTS = [400, 500, 700] as const;
 const LOGO = 'brand/logo/svg/vertex-logo-green.svg';
 
 /** The repository root, where `brand/` lives, from this file in `src/` or `dist/`. */
-function repositoryRoot(): string {
+export function repositoryRoot(): string {
   let dir = dirname(fileURLToPath(import.meta.url));
   while (!existsSync(join(dir, 'pnpm-workspace.yaml'))) {
     const parent = dirname(dir);

@@ -50,6 +50,14 @@
           }
         }
       }
+    },
+    {
+      "includes": ["apps/worker/**/*.ts"],
+      "linter": {
+        "domains": {
+          "react": "none"
+        }
+      }
     }
   ],
   "css": {

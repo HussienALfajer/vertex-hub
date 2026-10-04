@@ -1,6 +1,7 @@
 import type { INestApplicationContext } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import {
+  EMAIL_PURGE_JOB,
   FILES_PURGE_UPLOADS_JOB,
   NOTIFICATIONS_DAILY_JOB,
   RETAINER_CYCLES_JOB,
@@ -46,6 +47,13 @@ describe('worker against the test database', () => {
     // The API works this queue; scheduling it again (a restart) keeps one schedule.
     await boss.schedule(queue, cron, null, { tz });
     expect(await boss.getSchedules(queue)).toEqual([
+      expect.objectContaining({ cron, timezone: tz }),
+    ]);
+  });
+
+  it('schedules the purge of old staff emails at 03:30 Damascus time (F14 email rule 25)', async () => {
+    const { queue, cron, tz } = EMAIL_PURGE_JOB;
+    expect(await app.get(PgBossService).boss.getSchedules(queue)).toEqual([
       expect.objectContaining({ cron, timezone: tz }),
     ]);
   });
