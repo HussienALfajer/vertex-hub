@@ -51,6 +51,9 @@ export function notificationLink(notification: Notification): ToOptions {
     case 'invoice':
       // The invoice page arrives with the invoice screens (F13 PR 6).
       return { to: '/' };
+    case 'lead':
+      // The lead page arrives with the Leads screens (F03 PR 3).
+      return { to: '/' };
     default:
       return { to: '/tasks/$taskId', params: { taskId: subject.id } };
   }
@@ -151,6 +154,29 @@ export function notificationText(
           invoice: notification.data.invoice.displayNumber,
         }),
         context: notification.data.invoice.client,
+      };
+    case 'lead_assigned':
+      return {
+        text: t('notifications.text.lead_assigned', { actor, lead: notification.data.lead }),
+        context: null,
+      };
+    case 'lead_won':
+      return {
+        text: t('notifications.text.lead_won', { actor, lead: notification.data.lead }),
+        context: notification.data.client,
+      };
+    case 'lead_follow_up_due':
+      return {
+        text: t('notifications.text.lead_follow_up_due', { lead: notification.data.lead }),
+        context: formatCalendarDate(notification.data.followUpOn),
+      };
+    case 'lead_follow_up_overdue':
+      return {
+        text: t('notifications.text.lead_follow_up_overdue', {
+          lead: notification.data.lead,
+          date: formatCalendarDate(notification.data.followUpOn),
+        }),
+        context: notification.data.owner,
       };
     case 'ad_budget_low': {
       const { data } = notification;
@@ -355,6 +381,7 @@ type TaskNotification = Exclude<
       | 'quote_accepted'
       | `invoice_${string}`
       | 'ad_budget_low'
+      | `lead_${string}`
       | 'approval_responded'
       | 'approval_no_response'
       | 'approval_expired'

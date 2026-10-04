@@ -24,6 +24,7 @@ describe('notification catalog', () => {
         'post_task_ready',
         'invoice_overdue',
         'invoice_paid',
+        'lead_won',
         'quote_accepted',
         'request_finished',
         'retainer_renewal_due',
@@ -228,6 +229,46 @@ describe('ad budget notifications (spec F12, A11)', () => {
     ).toBe(true);
     expect(
       schema.safeParse({ client: 'Client', balanceMinor: 0, thresholdMinor: -1 }).success,
+    ).toBe(false);
+  });
+});
+
+describe('lead notifications (spec F03, A12)', () => {
+  it('locks the reminders and the assignment and lets users mute a win', () => {
+    expect(NOTIFICATION_CATALOG.lead_assigned).toEqual({
+      category: 'clients_projects',
+      subject: 'lead',
+      mutable: false,
+    });
+    expect(NOTIFICATION_CATALOG.lead_won).toEqual({
+      category: 'clients_projects',
+      subject: 'lead',
+      mutable: true,
+    });
+    for (const type of ['lead_follow_up_due', 'lead_follow_up_overdue'] as const) {
+      expect(NOTIFICATION_CATALOG[type]).toEqual({
+        category: 'reminders',
+        subject: 'lead',
+        mutable: false,
+      });
+    }
+  });
+
+  it('carries the lead name, the date and, when overdue, the owner', () => {
+    expect(
+      NOTIFICATION_DATA_SCHEMAS.lead_won.safeParse({ lead: 'Al-Noor', client: 'Al-Noor' }).success,
+    ).toBe(true);
+    expect(
+      NOTIFICATION_DATA_SCHEMAS.lead_follow_up_due.safeParse({
+        lead: 'Al-Noor',
+        followUpOn: '2026-10-05',
+      }).success,
+    ).toBe(true);
+    expect(
+      NOTIFICATION_DATA_SCHEMAS.lead_follow_up_overdue.safeParse({
+        lead: 'Al-Noor',
+        followUpOn: '2026-10-05',
+      }).success,
     ).toBe(false);
   });
 });

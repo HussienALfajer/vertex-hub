@@ -119,7 +119,8 @@ export type UpdateBrandKitInput = z.input<typeof updateBrandKitSchema>;
 
 // Contacts
 
-const optionalEmailSchema = z
+/** Blank is null; stored lower-case. */
+export const optionalEmailSchema = z
   .string()
   .trim()
   .toLowerCase()

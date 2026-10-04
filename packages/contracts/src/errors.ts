@@ -170,6 +170,13 @@ export const ERROR_CODES = [
   'PERIOD_CROSSES_MONTH',
   'PERIOD_OVERLAP',
   'REFUND_EXCEEDS_BALANCE',
+  'CONTACT_REQUIRED',
+  'INVALID_LEAD_OWNER',
+  'STALE_LEAD',
+  'LEAD_CLOSED',
+  'LEAD_ARCHIVED',
+  'LEAD_HAS_SENT_QUOTE',
+  'LEAD_HAS_QUOTES',
 ] as const;
 
 export const errorCodeSchema = z.enum(ERROR_CODES).meta({ id: 'ErrorCode' });
@@ -196,7 +203,7 @@ export const errorResponseSchema = z
 export type ErrorResponse = z.infer<typeof errorResponseSchema>;
 
 /**
- * Something a user is responsible for, which blocks archiving them (F01 rule 9, F05 rule 4, F06, F08 rule 28, F11) or
+ * Something a user is responsible for, which blocks archiving them (F01 rule 9, F05 rule 4, F06, F08 rule 28, F11, F03) or
  * removing their Account Manager role (F02 rule 8).
  */
 export const responsibilitySchema = z
@@ -209,6 +216,7 @@ export const responsibilitySchema = z
       'responsible_for_open_posts',
       'lead_of_scheduled_shoots',
       'organizer_of_upcoming_meetings',
+      'owner_of_open_leads',
     ]),
     id: z.uuid(),
     name: z.string(),

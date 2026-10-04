@@ -46,6 +46,8 @@ const NOT_BUSINESS_RECORDS: Record<string, string> = {
   notifications: 'Personal, not a business record: purged after reading, never archived (F14)',
   notification_settings: 'Personal mute settings, one row per user (F14)',
   notification_reminders: 'Idempotency keys of the daily job, insert-only (F14 rule 8)',
+  lead_interests:
+    'Part of its lead; replaced as a whole when the lead is saved, audited on the lead (F03)',
   file_uploads: 'Temporary: deleted when attached or purged after 24 hours (F10)',
   shoot_crew: 'Link table; a crew member is added or removed, never archived (F11)',
   shoot_shots: "Part of its shoot's shot list; removed with the list edit, never archived (F11)",

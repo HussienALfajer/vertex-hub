@@ -67,6 +67,10 @@ export const NOTIFICATION_TYPES = [
   'invoice_overdue',
   'invoice_paid',
   'ad_budget_low',
+  'lead_assigned',
+  'lead_won',
+  'lead_follow_up_overdue',
+  'lead_follow_up_due',
 ] as const;
 
 export const notificationTypeSchema = z.enum(NOTIFICATION_TYPES).meta({ id: 'NotificationType' });
@@ -99,6 +103,7 @@ export const NOTIFICATION_SUBJECTS = [
   'meeting',
   'quote',
   'invoice',
+  'lead',
 ] as const;
 
 export const notificationSubjectTypeSchema = z
@@ -167,6 +172,10 @@ export const NOTIFICATION_CATALOG: Record<
   invoice_overdue: { category: 'reminders', subject: 'invoice', mutable: true },
   invoice_paid: { category: 'clients_projects', subject: 'invoice', mutable: true },
   ad_budget_low: { category: 'reminders', subject: 'client', mutable: true },
+  lead_assigned: { category: 'clients_projects', subject: 'lead', mutable: false },
+  lead_won: { category: 'clients_projects', subject: 'lead', mutable: true },
+  lead_follow_up_overdue: { category: 'reminders', subject: 'lead', mutable: false },
+  lead_follow_up_due: { category: 'reminders', subject: 'lead', mutable: false },
 };
 
 export function isMutableNotificationType(type: NotificationType): boolean {
@@ -243,6 +252,9 @@ const postData = z.object({
     publishTime: timeOfDaySchema.nullable(),
   }),
 });
+
+/** A lead as it was when the notification was sent (F03): its display name. */
+const leadData = z.object({ lead: nameSchema });
 
 /** A shoot as it was when the notification was sent (F11). */
 const shootData = z.object({
@@ -405,6 +417,14 @@ export const NOTIFICATION_DATA_SCHEMAS = {
     balanceMinor: signedMinorAmountSchema,
     thresholdMinor: minorAmountSchema,
   }),
+  /** F03 rule 6: someone else made the recipient the lead's owner. */
+  lead_assigned: leadData,
+  /** F03 rule 10: the lead was converted into (or linked to) a client. */
+  lead_won: leadData.extend({ client: nameSchema }),
+  /** F03 A12 rule 19: two full work days passed without a new follow-up date. */
+  lead_follow_up_overdue: leadData.extend({ followUpOn: calendarDateSchema, owner: nameSchema }),
+  /** F03 A12 rule 18: the follow-up date is reached. */
+  lead_follow_up_due: leadData.extend({ followUpOn: calendarDateSchema }),
 } satisfies Record<NotificationType, z.ZodType>;
 
 export type NotificationData<Type extends NotificationType> = z.infer<
@@ -536,6 +556,8 @@ export const NOTIFICATION_REMINDER_KINDS = [
   'cycle_behind_final',
   'invoice_overdue',
   'ad_budget_low',
+  'lead_follow_up_due',
+  'lead_follow_up_overdue',
 ] as const;
 
 export type NotificationReminderKind = (typeof NOTIFICATION_REMINDER_KINDS)[number];
