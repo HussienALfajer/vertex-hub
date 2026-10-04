@@ -13,6 +13,7 @@ import {
   date,
   index,
   integer,
+  jsonb,
   pgEnum,
   pgTable,
   text,
@@ -24,7 +25,7 @@ import { users } from './auth.js';
 import { clients } from './clients.js';
 import { archivedAt, id, minorAmount, timestamps } from './columns.js';
 import { fileItems } from './files.js';
-import { exchangeRate, paymentMethodEnum } from './invoices.js';
+import { exchangeRate, paymentMethodEnum, pdfStatusEnum } from './invoices.js';
 import { currencyEnum, projects } from './projects.js';
 import { retainers } from './retainers.js';
 import { tasks } from './tasks.js';
@@ -202,6 +203,12 @@ export const adWalletEntries = pgTable(
     note: text('note'),
     /** The proof, a document of the entry. */
     proofFileItemId: uuid('proof_file_item_id').references((): AnyPgColumn => fileItems.id),
+    /** Deposits: the frozen render payload of the receipt (`adDepositReceiptSnapshotSchema`). */
+    receiptSnapshot: jsonb('receipt_snapshot'),
+    /** Deposits; null for those recorded before receipts were rendered. */
+    receiptPdfStatus: pdfStatusEnum('receipt_pdf_status'),
+    /** Deposits: the receipt, a document of the entry; archived when the deposit is voided. */
+    receiptFileItemId: uuid('receipt_file_item_id').references((): AnyPgColumn => fileItems.id),
     recordedById: uuid('recorded_by_id')
       .notNull()
       .references(() => users.id),
@@ -214,6 +221,7 @@ export const adWalletEntries = pgTable(
     uniqueIndex('ad_wallet_entries_number_idx').on(table.year, table.number),
     index('ad_wallet_entries_client_id_occurred_on_idx').on(table.clientId, table.occurredOn),
     index('ad_wallet_entries_proof_file_item_id_idx').on(table.proofFileItemId),
+    index('ad_wallet_entries_receipt_file_item_id_idx').on(table.receiptFileItemId),
     index('ad_wallet_entries_recorded_by_id_idx').on(table.recordedById),
     index('ad_wallet_entries_voided_by_id_idx').on(table.voidedById),
     check(
@@ -223,6 +231,10 @@ export const adWalletEntries = pgTable(
     check(
       'ad_wallet_entries_amounts_check',
       sql`${table.amountMinor} > 0 and ${table.usdMinor} > 0`,
+    ),
+    check(
+      'ad_wallet_entries_receipt_check',
+      sql`${table.kind} = 'deposit' or (${table.receiptSnapshot} is null and ${table.receiptPdfStatus} is null and ${table.receiptFileItemId} is null)`,
     ),
     check('ad_wallet_entries_rate_check', sql`${table.sypPerUsd} > 0`),
     check('ad_wallet_entries_reference_check', sql`char_length(${table.reference}) <= 200`),

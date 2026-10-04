@@ -4,6 +4,7 @@ import { ConfigModule } from './core/config/config.module.js';
 import { ENV, type Env } from './core/config/env.js';
 import { DatabaseModule } from './core/database/database.module.js';
 import { ApprovalsRemindersJob } from './jobs/approvals-reminders.job.js';
+import { CampaignsPdfJob } from './jobs/campaigns-pdf.job.js';
 import { FilesPurgeUploadsJob } from './jobs/files-purge-uploads.job.js';
 import { HeartbeatJob } from './jobs/heartbeat.job.js';
 import { InvoicesDailyJob } from './jobs/invoices-daily.job.js';
@@ -41,6 +42,7 @@ import { PdfRenderer } from './pdf/pdf-renderer.js';
     PdfRenderer,
     QuotesPdfJob,
     InvoicesPdfJob,
+    CampaignsPdfJob,
   ],
 })
 export class WorkerModule {}

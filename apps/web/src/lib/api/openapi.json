@@ -11438,6 +11438,60 @@
         ]
       }
     },
+    "/api/ad-wallet-entries/{id}/receipt": {
+      "post": {
+        "operationId": "AdWalletsController_renderReceipt",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Renders a deposit's receipt again when its PDF is not ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuotePdfRender"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "campaigns"
+        ]
+      },
+      "get": {
+        "operationId": "AdWalletsController_downloadReceipt",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The receipt PDF of the deposit"
+          },
+          "404": {
+            "description": "No such deposit, its receipt is not ready, or it is void"
+          }
+        },
+        "tags": [
+          "campaigns"
+        ]
+      }
+    },
     "/api/health": {
       "get": {
         "operationId": "HealthController_check",
@@ -37381,6 +37435,19 @@
             ],
             "additionalProperties": false
           },
+          "receiptPdf": {
+            "nullable": true,
+            "type": "object",
+            "properties": {
+              "state": {
+                "$ref": "#/components/schemas/QuotePdfState"
+              }
+            },
+            "required": [
+              "state"
+            ],
+            "additionalProperties": false
+          },
           "recordedBy": {
             "type": "object",
             "properties": {
@@ -37456,6 +37523,7 @@
           "reference",
           "note",
           "proof",
+          "receiptPdf",
           "recordedBy",
           "createdAt",
           "voided"
