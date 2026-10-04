@@ -1,7 +1,12 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { APPROVAL_WAITING_HOURS, type ReportClients } from '@vertex-hub/contracts';
+import {
+  APPROVAL_WAITING_HOURS,
+  type ReportClients,
+  type ReportPeriod,
+} from '@vertex-hub/contracts';
 import { approvalItems, approvalRequests, type Database } from '@vertex-hub/db';
-import { and, asc, count, eq, inArray, isNull, lt, min } from 'drizzle-orm';
+import { and, asc, count, desc, eq, inArray, isNull, lt, min } from 'drizzle-orm';
+import { inBusinessPeriod } from '../../core/database/business-date.js';
 import { DATABASE } from '../../core/database/database.module.js';
 import { ClientDirectory } from '../clients/index.js';
 
@@ -87,6 +92,56 @@ export class ApprovalReports {
           : [],
       ),
     );
+  }
+
+  /** F15 rule 18.4: the client-facing title of the latest approval item of each task. */
+  async taskTitles(taskIds: readonly string[]): Promise<Map<string, string>> {
+    if (taskIds.length === 0) return new Map();
+    const rows = await this.db
+      .select({ taskId: approvalItems.taskId, title: approvalItems.title })
+      .from(approvalItems)
+      .innerJoin(approvalRequests, eq(approvalRequests.id, approvalItems.requestId))
+      .where(inArray(approvalItems.taskId, [...taskIds]))
+      .orderBy(desc(approvalRequests.createdAt), desc(approvalItems.id));
+    const titles = new Map<string, string>();
+    for (const row of rows) {
+      if (row.taskId && !titles.has(row.taskId)) titles.set(row.taskId, row.title);
+    }
+    return titles;
+  }
+
+  /**
+   * F15 rule 18.7: the client's items closed in the period as approved or changes requested, and
+   * the average hours from the request's creation to the item's close.
+   */
+  async closedForClient(
+    clientId: string,
+    period: ReportPeriod,
+  ): Promise<{ approved: number; changesRequested: number; averageResponseHours: number | null }> {
+    const rows = await this.db
+      .select({
+        status: approvalItems.status,
+        sentAt: approvalRequests.createdAt,
+        closedAt: approvalItems.closedAt,
+      })
+      .from(approvalItems)
+      .innerJoin(approvalRequests, eq(approvalRequests.id, approvalItems.requestId))
+      .where(
+        and(
+          eq(approvalRequests.clientId, clientId),
+          inArray(approvalItems.status, ['approved', 'changes_requested']),
+          inBusinessPeriod(approvalItems.closedAt, period),
+        ),
+      );
+    let hours = 0;
+    for (const row of rows) {
+      if (row.closedAt) hours += (row.closedAt.getTime() - row.sentAt.getTime()) / 3_600_000;
+    }
+    return {
+      approved: rows.filter((row) => row.status === 'approved').length,
+      changesRequested: rows.filter((row) => row.status === 'changes_requested').length,
+      averageResponseHours: rows.length ? Math.max(0, hours / rows.length) : null,
+    };
   }
 
   private pending(clients: ReportClients) {

@@ -197,6 +197,7 @@ export const AUDIT_ACTIONS = [
   'lead_note.created',
   'lead_note.updated',
   'lead_note.archived',
+  'client_report.summary_changed',
 ] as const;
 
 export const auditActionSchema = z.enum(AUDIT_ACTIONS).meta({ id: 'AuditAction' });
@@ -240,6 +241,7 @@ export const AUDIT_ENTITY_TYPES = [
   'ad_wallet_entry',
   'lead',
   'lead_note',
+  'client_report',
 ] as const;
 
 export const auditEntityTypeSchema = z.enum(AUDIT_ENTITY_TYPES).meta({ id: 'AuditEntityType' });

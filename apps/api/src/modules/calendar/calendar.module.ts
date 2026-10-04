@@ -13,6 +13,7 @@ import { MeetingsController } from './meetings.controller.js';
 import { MeetingsService } from './meetings.service.js';
 import { ScheduleConflicts } from './schedule-conflicts.js';
 import { ShootNotices } from './shoot-notices.js';
+import { ShootReports } from './shoot-reports.js';
 import { ShootWorkflowService } from './shoot-workflow.service.js';
 import { ShootsController } from './shoots.controller.js';
 import { ShootsService } from './shoots.service.js';
@@ -24,8 +25,9 @@ import { ShootsService } from './shoots.service.js';
  * its `TaskGuards` so a scheduled shoot holds its task; reads users through `auth`'s
  * `UserDirectory` (and registers into its `ResponsibilityRegistry`), clients through
  * `ClientDirectory` and key dates through `projects`' `EngagementDirectory` and `invoices`' `InvoiceDueDates`; sends the calendar
- * notifications through `notifications` and registers its reminder sources in the daily job. `tasks`,
- * `clients`, `projects` and `auth` never import it.
+ * notifications through `notifications` and registers its reminder sources in the daily job. Exports
+ * the read-only `ShootReports` for `reports` (F15). `tasks`, `clients`, `projects` and `auth` never
+ * import it.
  */
 @Module({
   imports: [
@@ -46,6 +48,8 @@ import { ShootsService } from './shoots.service.js';
     MeetingsService,
     MeetingNotices,
     CalendarReminders,
+    ShootReports,
   ],
+  exports: [ShootReports],
 })
 export class CalendarModule {}

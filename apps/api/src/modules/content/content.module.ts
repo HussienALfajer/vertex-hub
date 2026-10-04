@@ -7,6 +7,7 @@ import { ProjectsModule } from '../projects/index.js';
 import { TasksModule } from '../tasks/index.js';
 import { ContentController } from './content.controller.js';
 import { ContentService } from './content.service.js';
+import { ContentReports } from './content-reports.js';
 import { PostApprovals } from './post-approvals.js';
 import { PostHooksService } from './post-hooks.service.js';
 import { PostLinksService } from './post-links.service.js';
@@ -27,7 +28,8 @@ import { PostWorkflowService } from './post-workflow.service.js';
  * notifications and registers the publish reminders of the daily job through `notifications`.
  * Links tasks to posts through `tasks`' `PostTasks` and registers into its `PostTaskHooks`
  * (a linked task approved, cancelled or archived). Exports `PostApprovals` and the
- * `PostReviewHooks` registry for the `approvals` module, which it never imports.
+ * `PostReviewHooks` registry for the `approvals` module, which it never imports, and the
+ * read-only `ContentReports` for `reports` (F15).
  */
 @Module({
   imports: [
@@ -50,7 +52,8 @@ import { PostWorkflowService } from './post-workflow.service.js';
     PostReminders,
     PostApprovals,
     PostReviewHooks,
+    ContentReports,
   ],
-  exports: [PostApprovals, PostReviewHooks],
+  exports: [PostApprovals, PostReviewHooks, ContentReports],
 })
 export class ContentModule {}

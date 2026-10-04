@@ -548,6 +548,24 @@ export class RetainerCyclesService implements OnModuleInit {
     return this.present(rows, active, this.db, today);
   }
 
+  /**
+   * The cycles of the retainers for a month (first day), open or closed, as their pages show them
+   * (F15 monthly client report): frozen counts for closed cycles, live ones for open cycles.
+   */
+  async ofMonth(retainers: ReadonlyMap<string, RetainerStatus>, month: CalendarDate) {
+    if (retainers.size === 0) return [];
+    const rows = await this.db
+      .select(cycleColumns)
+      .from(retainerCycles)
+      .where(
+        and(
+          inArray(retainerCycles.retainerId, [...retainers.keys()]),
+          eq(retainerCycles.month, month),
+        ),
+      );
+    return this.present(rows, new Map(retainers));
+  }
+
   /** Cycles as the API returns them, with the counter (R7, R8, R11, R13). */
   private async present(
     cycles: CycleRow[],

@@ -12,6 +12,7 @@ export * from './leads.js';
 export * from './notifications.js';
 export * from './projects.js';
 export * from './quotes.js';
+export * from './reports.js';
 export * from './retainers.js';
 export * from './reviews.js';
 export * from './system.js';

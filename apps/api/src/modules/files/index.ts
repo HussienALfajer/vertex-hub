@@ -1,6 +1,6 @@
 // Public surface of the files module. Code outside this folder imports from here only.
 
-export type { PreviewSize } from './file-content.service.js';
+export { contentDisposition, type PreviewSize } from './file-content.service.js';
 export {
   type ClientOwner,
   type FileOwner,

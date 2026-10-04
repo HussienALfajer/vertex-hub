@@ -6,5 +6,8 @@ export {
   type BalanceTotals,
   InvoiceReports,
   type OutstandingInvoices,
+  type OverdueInvoice,
+  type RevenueFigures,
+  type RevenueInvoice,
 } from './invoice-reports.js';
 export { InvoicesModule } from './invoices.module.js';

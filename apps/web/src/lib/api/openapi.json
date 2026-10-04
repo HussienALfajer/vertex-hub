@@ -12500,6 +12500,481 @@
         ]
       }
     },
+    "/api/reports/productivity": {
+      "get": {
+        "operationId": "ReportsController_productivity",
+        "parameters": [
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+            }
+          },
+          {
+            "name": "department",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/DepartmentCode"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DepartmentCode"
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Department productivity over a period (rules 8–10)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductivityReport"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`INVALID_DATES`: to before from, or over 366 days"
+          },
+          "403": {
+            "description": "A department outside your `reports.read` scope"
+          }
+        },
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/reports/productivity/export": {
+      "get": {
+        "operationId": "ReportsController_productivityExport",
+        "parameters": [
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+            }
+          },
+          {
+            "name": "department",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/DepartmentCode"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DepartmentCode"
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The productivity report as an Excel file (rule 24)"
+          }
+        },
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/reports/revenue": {
+      "get": {
+        "operationId": "ReportsController_revenue",
+        "parameters": [
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Revenue by client and by service over a period (rules 11–15)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RevenueReport"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`INVALID_DATES`: to before from, or over 366 days"
+          }
+        },
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/reports/revenue/export": {
+      "get": {
+        "operationId": "ReportsController_revenueExport",
+        "parameters": [
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The revenue report as an Excel file with three sheets (rule 15)"
+          }
+        },
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/reports/overdue-invoices": {
+      "get": {
+        "operationId": "ReportsController_overdueInvoices",
+        "parameters": [
+          {
+            "name": "accountManagerId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          {
+            "name": "currency",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Currency"
+                }
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Overdue invoices today with aging buckets and totals (rule 16)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OverdueInvoicesReport"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/reports/overdue-invoices/export": {
+      "get": {
+        "operationId": "ReportsController_overdueInvoicesExport",
+        "parameters": [
+          {
+            "name": "accountManagerId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          {
+            "name": "currency",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Currency"
+                }
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The overdue invoices report as an Excel file (rule 24)"
+          }
+        },
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/clients/{id}/monthly-report": {
+      "get": {
+        "operationId": "ClientReportController_report",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "month",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-(0[1-9]|1[0-2])$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The client's report for a month (rules 17 and 18)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClientMonthlyReport"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`INVALID_MONTH`: a month after the current one"
+          },
+          "404": {
+            "description": "No such client in your `reports.read` scope"
+          }
+        },
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/clients/{id}/monthly-report/export": {
+      "get": {
+        "operationId": "ClientReportController_export",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "month",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-(0[1-9]|1[0-2])$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The report as an Excel file (rule 24)"
+          }
+        },
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/clients/{id}/monthly-report/summary": {
+      "put": {
+        "operationId": "ClientReportController_saveSummary",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateClientReportSummary"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Replaces the month's summary; an empty text clears it (rule 19)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClientMonthlyReport"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`INVALID_MONTH`: a month after the current one"
+          },
+          "404": {
+            "description": "No such client in your `reports.read` scope"
+          }
+        },
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/clients/{id}/monthly-report/pdf": {
+      "post": {
+        "operationId": "ClientReportController_renderPdf",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "month",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-(0[1-9]|1[0-2])$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Queues the PDF of the report as it is now (rule 20), or finds it ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuotePdfRender"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "reports"
+        ]
+      },
+      "get": {
+        "operationId": "ClientReportController_downloadPdf",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "month",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-(0[1-9]|1[0-2])$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The report PDF, for 24 hours after it was asked for"
+          },
+          "404": {
+            "description": "No such client, or no ready PDF of this report"
+          }
+        },
+        "tags": [
+          "reports"
+        ]
+      }
+    },
     "/api/health": {
       "get": {
         "operationId": "HealthController_check",
@@ -12580,7 +13055,8 @@
           "ad_wallet",
           "ad_wallet_entry",
           "lead",
-          "lead_note"
+          "lead_note",
+          "client_report"
         ]
       },
       "AuditAction": {
@@ -12779,7 +13255,8 @@
           "lead.restored",
           "lead_note.created",
           "lead_note.updated",
-          "lead_note.archived"
+          "lead_note.archived",
+          "client_report.summary_changed"
         ]
       },
       "AuditPage": {
@@ -41980,6 +42457,1143 @@
           "clients"
         ],
         "additionalProperties": false
+      },
+      "ProductivityReport": {
+        "type": "object",
+        "properties": {
+          "period": {
+            "$ref": "#/components/schemas/ReportPeriod"
+          },
+          "departments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "department": {
+                  "$ref": "#/components/schemas/DepartmentCode"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "measures": {
+                  "$ref": "#/components/schemas/ProductivityMeasures"
+                },
+                "unassigned": {
+                  "type": "object",
+                  "properties": {
+                    "count": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "oldestOn": {
+                      "nullable": true,
+                      "type": "string",
+                      "format": "date",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                    }
+                  },
+                  "required": [
+                    "count",
+                    "oldestOn"
+                  ],
+                  "additionalProperties": false
+                },
+                "people": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "user": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "archived": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "archived"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "measures": {
+                        "$ref": "#/components/schemas/ProductivityMeasures"
+                      }
+                    },
+                    "required": [
+                      "user",
+                      "measures"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": [
+                "department",
+                "name",
+                "measures",
+                "unassigned",
+                "people"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "period",
+          "departments"
+        ],
+        "additionalProperties": false
+      },
+      "ProductivityMeasures": {
+        "type": "object",
+        "properties": {
+          "new": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "delivered": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "onTimeRate": {
+            "nullable": true,
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "averageClientRevisions": {
+            "nullable": true,
+            "type": "number",
+            "minimum": 0
+          },
+          "averageInternalRevisions": {
+            "nullable": true,
+            "type": "number",
+            "minimum": 0
+          },
+          "averageCycleDays": {
+            "nullable": true,
+            "type": "number",
+            "minimum": 0
+          },
+          "openNow": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "overdueNow": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "new",
+          "delivered",
+          "onTimeRate",
+          "averageClientRevisions",
+          "averageInternalRevisions",
+          "averageCycleDays",
+          "openNow",
+          "overdueNow"
+        ],
+        "additionalProperties": false
+      },
+      "RevenueReport": {
+        "type": "object",
+        "properties": {
+          "period": {
+            "$ref": "#/components/schemas/ReportPeriod"
+          },
+          "invoicedUsdMinor": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "collectedUsdMinor": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "byClient": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "client": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "name": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name"
+                  ],
+                  "additionalProperties": false
+                },
+                "accountManager": {
+                  "nullable": true,
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "name": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name"
+                  ],
+                  "additionalProperties": false
+                },
+                "invoicedUsdMinor": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "collectedUsdMinor": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "outstandingUsdMinor": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "client",
+                "accountManager",
+                "invoicedUsdMinor",
+                "collectedUsdMinor",
+                "outstandingUsdMinor"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "byService": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "service",
+                    "package",
+                    "unclassified"
+                  ]
+                },
+                "id": {
+                  "nullable": true,
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "name": {
+                  "nullable": true,
+                  "type": "string"
+                },
+                "archived": {
+                  "type": "boolean"
+                },
+                "invoicedUsdMinor": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "collectedUsdMinor": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "kind",
+                "id",
+                "name",
+                "archived",
+                "invoicedUsdMinor",
+                "collectedUsdMinor"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "invoices": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "number": {
+                  "type": "string"
+                },
+                "client": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "name": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name"
+                  ],
+                  "additionalProperties": false
+                },
+                "issuedOn": {
+                  "type": "string",
+                  "format": "date",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                },
+                "currency": {
+                  "$ref": "#/components/schemas/Currency"
+                },
+                "totalMinor": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "sypPerUsd": {
+                  "nullable": true,
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ExchangeRate"
+                    }
+                  ]
+                },
+                "totalUsdMinor": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "collectedUsdMinor": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "id",
+                "number",
+                "client",
+                "issuedOn",
+                "currency",
+                "totalMinor",
+                "sypPerUsd",
+                "totalUsdMinor",
+                "collectedUsdMinor"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "period",
+          "invoicedUsdMinor",
+          "collectedUsdMinor",
+          "byClient",
+          "byService",
+          "invoices"
+        ],
+        "additionalProperties": false
+      },
+      "OverdueInvoicesReport": {
+        "type": "object",
+        "properties": {
+          "today": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+          },
+          "invoices": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "number": {
+                  "type": "string"
+                },
+                "client": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "name": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name"
+                  ],
+                  "additionalProperties": false
+                },
+                "accountManager": {
+                  "nullable": true,
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "name": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name"
+                  ],
+                  "additionalProperties": false
+                },
+                "currency": {
+                  "$ref": "#/components/schemas/Currency"
+                },
+                "totalMinor": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "paidMinor": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "balanceMinor": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "balanceUsdMinor": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "dueOn": {
+                  "type": "string",
+                  "format": "date",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                },
+                "daysOverdue": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "bucket": {
+                  "$ref": "#/components/schemas/AgingBucket"
+                }
+              },
+              "required": [
+                "id",
+                "number",
+                "client",
+                "accountManager",
+                "currency",
+                "totalMinor",
+                "paidMinor",
+                "balanceMinor",
+                "balanceUsdMinor",
+                "dueOn",
+                "daysOverdue",
+                "bucket"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "totals": {
+            "type": "object",
+            "properties": {
+              "count": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "byCurrency": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "currency": {
+                      "$ref": "#/components/schemas/Currency"
+                    },
+                    "amountMinor": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": [
+                    "currency",
+                    "amountMinor"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "usdMinor": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "count",
+              "byCurrency",
+              "usdMinor"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "today",
+          "invoices",
+          "totals"
+        ],
+        "additionalProperties": false
+      },
+      "AgingBucket": {
+        "type": "string",
+        "enum": [
+          "1_30",
+          "31_60",
+          "61_90",
+          "over_90"
+        ]
+      },
+      "ClientMonthlyReport": {
+        "type": "object",
+        "properties": {
+          "client": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ],
+            "additionalProperties": false
+          },
+          "month": {
+            "type": "string",
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])$"
+          },
+          "period": {
+            "$ref": "#/components/schemas/ReportPeriod"
+          },
+          "preliminary": {
+            "type": "boolean"
+          },
+          "summary": {
+            "nullable": true,
+            "type": "object",
+            "properties": {
+              "text": {
+                "type": "string"
+              },
+              "updatedBy": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "name"
+                ],
+                "additionalProperties": false
+              },
+              "updatedAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+              }
+            },
+            "required": [
+              "text",
+              "updatedBy",
+              "updatedAt"
+            ],
+            "additionalProperties": false
+          },
+          "retainers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "retainer": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "name": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name"
+                  ],
+                  "additionalProperties": false
+                },
+                "status": {
+                  "$ref": "#/components/schemas/CycleStatus"
+                },
+                "lines": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "$ref": "#/components/schemas/DeliverableKind"
+                      },
+                      "label": {
+                        "nullable": true,
+                        "type": "string"
+                      },
+                      "committed": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "delivered": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "percent": {
+                        "nullable": true,
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 100
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "label",
+                      "committed",
+                      "delivered",
+                      "percent"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "completion": {
+                  "nullable": true,
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 100
+                }
+              },
+              "required": [
+                "retainer",
+                "status",
+                "lines",
+                "completion"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "projects": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "project": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "name": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name"
+                  ],
+                  "additionalProperties": false
+                },
+                "status": {
+                  "$ref": "#/components/schemas/ProjectStatus"
+                },
+                "deliveredTasks": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "totalTasks": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "milestonesDone": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string"
+                      },
+                      "doneOn": {
+                        "type": "string",
+                        "format": "date",
+                        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "doneOn"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": [
+                "project",
+                "status",
+                "deliveredTasks",
+                "totalTasks",
+                "milestonesDone"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "deliveredWork": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "taskId": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "department": {
+                  "$ref": "#/components/schemas/DepartmentCode"
+                },
+                "departmentName": {
+                  "type": "string"
+                },
+                "deliveredOn": {
+                  "type": "string",
+                  "format": "date",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                }
+              },
+              "required": [
+                "taskId",
+                "title",
+                "department",
+                "departmentName",
+                "deliveredOn"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "posts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "publishedOn": {
+                  "type": "string",
+                  "format": "date",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                },
+                "platforms": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PostPlatform"
+                  }
+                },
+                "title": {
+                  "type": "string"
+                },
+                "links": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PublishedLink"
+                  }
+                }
+              },
+              "required": [
+                "id",
+                "publishedOn",
+                "platforms",
+                "title",
+                "links"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "shoots": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "date": {
+                  "type": "string",
+                  "format": "date",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "location": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "date",
+                "title",
+                "location"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "approvals": {
+            "type": "object",
+            "properties": {
+              "approved": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "changesRequested": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "averageResponseHours": {
+                "nullable": true,
+                "type": "number",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "approved",
+              "changesRequested",
+              "averageResponseHours"
+            ],
+            "additionalProperties": false
+          },
+          "campaigns": {
+            "nullable": true,
+            "type": "object",
+            "properties": {
+              "rows": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "spendMinor": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "reach": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "clicks": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "results": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "costPerResultMinor": {
+                      "nullable": true,
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "platform": {
+                      "$ref": "#/components/schemas/AdPlatform"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "objective": {
+                      "$ref": "#/components/schemas/AdObjective"
+                    }
+                  },
+                  "required": [
+                    "spendMinor",
+                    "reach",
+                    "clicks",
+                    "results",
+                    "costPerResultMinor",
+                    "id",
+                    "platform",
+                    "name",
+                    "objective"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "totals": {
+                "type": "object",
+                "properties": {
+                  "spendMinor": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "reach": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "clicks": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "results": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "costPerResultMinor": {
+                    "nullable": true,
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "spendMinor",
+                  "reach",
+                  "clicks",
+                  "results",
+                  "costPerResultMinor"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "rows",
+              "totals"
+            ],
+            "additionalProperties": false
+          },
+          "adBudget": {
+            "nullable": true,
+            "type": "object",
+            "properties": {
+              "openingMinor": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "depositsMinor": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "refundsMinor": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "spendMinor": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "closingMinor": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "openingMinor",
+              "depositsMinor",
+              "refundsMinor",
+              "spendMinor",
+              "closingMinor"
+            ],
+            "additionalProperties": false
+          },
+          "nextMonth": {
+            "type": "object",
+            "properties": {
+              "posts": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "date": {
+                      "type": "string",
+                      "format": "date",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                    },
+                    "title": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "date",
+                    "title"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "shoots": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "date": {
+                      "type": "string",
+                      "format": "date",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                    },
+                    "title": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "date",
+                    "title"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "posts",
+              "shoots"
+            ],
+            "additionalProperties": false
+          },
+          "empty": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "client",
+          "month",
+          "period",
+          "preliminary",
+          "summary",
+          "retainers",
+          "projects",
+          "deliveredWork",
+          "posts",
+          "shoots",
+          "approvals",
+          "campaigns",
+          "adBudget",
+          "nextMonth",
+          "empty"
+        ],
+        "additionalProperties": false
+      },
+      "UpdateClientReportSummary": {
+        "type": "object",
+        "properties": {
+          "month": {
+            "type": "string",
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])$"
+          },
+          "summary": {
+            "type": "string",
+            "maxLength": 4000
+          }
+        },
+        "required": [
+          "month",
+          "summary"
+        ]
       },
       "HealthResponse": {
         "type": "object",

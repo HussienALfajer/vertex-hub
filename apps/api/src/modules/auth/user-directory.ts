@@ -155,6 +155,16 @@ export class UserDirectory {
     return result;
   }
 
+  /** The display name of every department, by code (F15 reports). */
+  async departmentNames(
+    executor: Database | Transaction = this.db,
+  ): Promise<Map<DepartmentCode, string>> {
+    const rows = await executor
+      .select({ code: departments.code, name: departments.name })
+      .from(departments);
+    return new Map(rows.map((row) => [row.code, row.name]));
+  }
+
   /** The department codes each of the given users belongs to. */
   async memberships(ids: string[], executor: Database | Transaction = this.db) {
     const unique = [...new Set(ids)];
