@@ -26,6 +26,7 @@ import { type CurrentUserInfo, UserDirectory } from '../auth/index.js';
 import { ClientDirectory, type ClientSummary } from '../clients/index.js';
 import { EngagementDirectory } from '../projects/index.js';
 import { TaskLinks } from '../tasks/index.js';
+import { AdWalletBalances } from './ad-wallet-balances.js';
 import { actorOf, covers, readsAll } from './campaign-access.js';
 
 export type CampaignRow = typeof adCampaigns.$inferSelect;
@@ -84,6 +85,7 @@ export class CampaignsService {
     private readonly users: UserDirectory,
     private readonly engagements: EngagementDirectory,
     private readonly tasks: TaskLinks,
+    private readonly wallets: AdWalletBalances,
   ) {}
 
   async list(actor: CurrentUserInfo, query: CampaignListQuery): Promise<CampaignPage> {
@@ -196,6 +198,9 @@ export class CampaignsService {
       await this.assertLinks(tx, campaign.clientId, fields, campaign);
       const changes = changedFields(editable(campaign), editable(fields));
       if (!changes) return this.toDetail(actor, campaign, client, tx);
+      // Rule 17: a funding change moves the campaign into or out of the wallet.
+      const wallet =
+        fields.funding !== campaign.funding ? await this.wallets.lock(tx, campaign.clientId) : null;
       const [updated] = await tx
         .update(adCampaigns)
         .set({ ...fields, updatedAt: new Date() })
@@ -210,6 +215,7 @@ export class CampaignsService {
         before: { ...identity(campaign), ...changes.before },
         after: { ...identity(updated), ...changes.after },
       });
+      if (wallet) await this.wallets.settle(tx, actorOf(actor), wallet, client);
       return this.toDetail(actor, updated, client, tx);
     });
   }
@@ -335,6 +341,8 @@ export class CampaignsService {
       executor,
     );
     const tasks = await this.tasks.summaries(row.taskId ? [row.taskId] : [], executor);
+    const wallet =
+      row.funding === 'wallet' ? await this.wallets.totalsOf(executor, row.clientId) : null;
     const person = (userId: string) => {
       const user = users.get(userId);
       return { id: userId, name: user?.name ?? '' };
@@ -370,6 +378,7 @@ export class CampaignsService {
       cancelReason: row.cancelReason,
       totals: { ...totals, budgetUsed: budgetUsed(totals.spendMinor, row.budgetMinor) },
       months: monthsOf(updates),
+      walletBalanceMinor: wallet?.balanceMinor ?? null,
       updates: updates.map(
         (update): CampaignUpdate => ({
           id: update.id,
@@ -544,6 +553,9 @@ export class CampaignsService {
     client: ClientSummary,
     archive: boolean,
   ): Promise<CampaignDetail> {
+    // Rule 17: an archived campaign leaves the wallet.
+    const wallet =
+      campaign.funding === 'wallet' ? await this.wallets.lock(tx, campaign.clientId) : null;
     const [updated] = await tx
       .update(adCampaigns)
       .set({
@@ -561,6 +573,7 @@ export class CampaignsService {
       before: { ...identity(campaign), archived: !archive },
       after: { ...identity(campaign), archived: archive },
     });
+    if (wallet) await this.wallets.settle(tx, actorOf(actor), wallet, client);
     return this.toDetail(actor, updated, client, tx);
   }
 }

@@ -23,6 +23,7 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 import { users } from './auth.js';
+import { adWalletEntries } from './campaigns.js';
 import { clients } from './clients.js';
 import { archivedAt, id, timestamps } from './columns.js';
 import { contentPosts } from './content.js';
@@ -60,6 +61,7 @@ export const fileItems = pgTable(
     postId: uuid('post_id').references(() => contentPosts.id),
     quoteId: uuid('quote_id').references((): AnyPgColumn => quotes.id),
     invoiceId: uuid('invoice_id').references((): AnyPgColumn => invoices.id),
+    adWalletEntryId: uuid('ad_wallet_entry_id').references((): AnyPgColumn => adWalletEntries.id),
     /** The owner's client; the owner itself for `client`; null for a task without a client. */
     clientId: uuid('client_id').references(() => clients.id),
     role: fileRoleEnum('role').notNull(),
@@ -79,6 +81,7 @@ export const fileItems = pgTable(
     index('file_items_post_id_idx').on(table.postId),
     index('file_items_quote_id_idx').on(table.quoteId),
     index('file_items_invoice_id_idx').on(table.invoiceId),
+    index('file_items_ad_wallet_entry_id_idx').on(table.adWalletEntryId),
     index('file_items_client_id_idx').on(table.clientId, table.role),
     index('file_items_created_by_id_idx').on(table.createdById),
     /** Names are unique per owner and role among live items, except references. */
@@ -86,21 +89,23 @@ export const fileItems = pgTable(
       .on(
         table.ownerType,
         table.role,
-        sql`coalesce(${table.taskId}, ${table.projectId}, ${table.retainerId}, ${table.postId}, ${table.quoteId}, ${table.invoiceId}, ${table.clientId})`,
+        sql`coalesce(${table.taskId}, ${table.projectId}, ${table.retainerId}, ${table.postId}, ${table.quoteId}, ${table.invoiceId}, ${table.adWalletEntryId}, ${table.clientId})`,
         sql`lower(${table.name})`,
       )
       .where(sql`${table.archivedAt} is null and ${table.role} <> 'reference'`),
-    // `post`, `quote` and `invoice` are compared as text: their enum values were added in the same
-    // migration as these checks (F08, F04, F13).
+    // `post`, `quote`, `invoice` and `ad_wallet_entry` are compared as text: their enum values
+    // were added in the same migration as these checks (F08, F04, F13, F12).
     check(
       'file_items_owner_check',
-      sql`(${table.ownerType} = 'task' and ${table.taskId} is not null and ${table.projectId} is null and ${table.retainerId} is null and ${table.postId} is null and ${table.quoteId} is null and ${table.invoiceId} is null)
-        or (${table.ownerType} = 'client' and ${table.clientId} is not null and ${table.taskId} is null and ${table.projectId} is null and ${table.retainerId} is null and ${table.postId} is null and ${table.quoteId} is null and ${table.invoiceId} is null)
-        or (${table.ownerType} = 'project' and ${table.projectId} is not null and ${table.clientId} is not null and ${table.taskId} is null and ${table.retainerId} is null and ${table.postId} is null and ${table.quoteId} is null and ${table.invoiceId} is null)
-        or (${table.ownerType} = 'retainer' and ${table.retainerId} is not null and ${table.clientId} is not null and ${table.taskId} is null and ${table.projectId} is null and ${table.postId} is null and ${table.quoteId} is null and ${table.invoiceId} is null)
-        or (${table.ownerType}::text = 'post' and ${table.postId} is not null and ${table.clientId} is not null and ${table.taskId} is null and ${table.projectId} is null and ${table.retainerId} is null and ${table.quoteId} is null and ${table.invoiceId} is null)
-        or (${table.ownerType}::text = 'quote' and ${table.quoteId} is not null and ${table.clientId} is not null and ${table.taskId} is null and ${table.projectId} is null and ${table.retainerId} is null and ${table.postId} is null and ${table.invoiceId} is null)
-        or (${table.ownerType}::text = 'invoice' and ${table.invoiceId} is not null and ${table.clientId} is not null and ${table.taskId} is null and ${table.projectId} is null and ${table.retainerId} is null and ${table.postId} is null and ${table.quoteId} is null)`,
+      sql`num_nonnulls(${table.taskId}, ${table.projectId}, ${table.retainerId}, ${table.postId}, ${table.quoteId}, ${table.invoiceId}, ${table.adWalletEntryId}) <= 1 and (
+        (${table.ownerType} = 'task' and ${table.taskId} is not null)
+        or (${table.ownerType} = 'client' and ${table.clientId} is not null and num_nonnulls(${table.taskId}, ${table.projectId}, ${table.retainerId}, ${table.postId}, ${table.quoteId}, ${table.invoiceId}, ${table.adWalletEntryId}) = 0)
+        or (${table.ownerType} = 'project' and ${table.projectId} is not null and ${table.clientId} is not null)
+        or (${table.ownerType} = 'retainer' and ${table.retainerId} is not null and ${table.clientId} is not null)
+        or (${table.ownerType}::text = 'post' and ${table.postId} is not null and ${table.clientId} is not null)
+        or (${table.ownerType}::text = 'quote' and ${table.quoteId} is not null and ${table.clientId} is not null)
+        or (${table.ownerType}::text = 'invoice' and ${table.invoiceId} is not null and ${table.clientId} is not null)
+        or (${table.ownerType}::text = 'ad_wallet_entry' and ${table.adWalletEntryId} is not null and ${table.clientId} is not null))`,
     ),
     check(
       'file_items_role_check',
@@ -109,7 +114,7 @@ export const fileItems = pgTable(
         or (${table.ownerType} in ('project', 'retainer') and ${table.role} = 'document')
         or (${table.ownerType}::text = 'post' and ${table.role} = 'deliverable')
         or (${table.ownerType}::text = 'quote' and ${table.role} = 'document')
-        or (${table.ownerType}::text = 'invoice' and ${table.role} = 'document')`,
+        or (${table.ownerType}::text in ('invoice', 'ad_wallet_entry') and ${table.role} = 'document')`,
     ),
     check(
       'file_items_brand_kind_check',

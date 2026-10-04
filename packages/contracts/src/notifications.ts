@@ -3,6 +3,7 @@ import { CLIENT_DECISIONS } from './approvals.js';
 import { calendarDateSchema, timeOfDaySchema } from './dates.js';
 import { departmentCodeSchema } from './departments.js';
 import { pageQuerySchema, pageSchema, queryBooleanSchema } from './lists.js';
+import { minorAmountSchema, signedMinorAmountSchema } from './money.js';
 import { BEHIND_ALERT_DAYS, deliverableKindSchema, RETAINER_LIMITS } from './retainers.js';
 
 /*
@@ -65,6 +66,7 @@ export const NOTIFICATION_TYPES = [
   'quote_accepted',
   'invoice_overdue',
   'invoice_paid',
+  'ad_budget_low',
 ] as const;
 
 export const notificationTypeSchema = z.enum(NOTIFICATION_TYPES).meta({ id: 'NotificationType' });
@@ -164,6 +166,7 @@ export const NOTIFICATION_CATALOG: Record<
   quote_accepted: { category: 'clients_projects', subject: 'quote', mutable: true },
   invoice_overdue: { category: 'reminders', subject: 'invoice', mutable: true },
   invoice_paid: { category: 'clients_projects', subject: 'invoice', mutable: true },
+  ad_budget_low: { category: 'reminders', subject: 'client', mutable: true },
 };
 
 export function isMutableNotificationType(type: NotificationType): boolean {
@@ -396,6 +399,12 @@ export const NOTIFICATION_DATA_SCHEMAS = {
   invoice_overdue: invoiceData.extend({ daysOverdue: z.number().int().min(1) }),
   /** F13 rule 23: the invoice is fully paid. */
   invoice_paid: invoiceData,
+  /** F12 A11: the balance fell below the threshold, then every 7 days while it stays below. */
+  ad_budget_low: z.object({
+    client: nameSchema,
+    balanceMinor: signedMinorAmountSchema,
+    thresholdMinor: minorAmountSchema,
+  }),
 } satisfies Record<NotificationType, z.ZodType>;
 
 export type NotificationData<Type extends NotificationType> = z.infer<
@@ -526,6 +535,7 @@ export const NOTIFICATION_REMINDER_KINDS = [
   'cycle_behind',
   'cycle_behind_final',
   'invoice_overdue',
+  'ad_budget_low',
 ] as const;
 
 export type NotificationReminderKind = (typeof NOTIFICATION_REMINDER_KINDS)[number];

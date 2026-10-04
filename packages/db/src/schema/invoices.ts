@@ -42,13 +42,17 @@ export const invoiceOriginEnum = pgEnum('invoice_origin', INVOICE_ORIGINS);
 
 export const paymentMethodEnum = pgEnum('payment_method', PAYMENT_METHODS);
 
-export const documentNumberKindEnum = pgEnum('document_number_kind', ['invoice', 'receipt']);
+export const documentNumberKindEnum = pgEnum('document_number_kind', [
+  'invoice',
+  'receipt',
+  'ad_deposit',
+]);
 
 /** The state of a rendered PDF (rules 15, 20 and 29), as a quote's (F04 rule 12). */
 export const pdfStatusEnum = pgEnum('pdf_status', QUOTE_PDF_STATES);
 
 /** An exchange rate column: SYP per 1 USD, read and written as a decimal string. */
-const exchangeRate = (name: string) => numeric(name, { precision: 12, scale: 4 });
+export const exchangeRate = (name: string) => numeric(name, { precision: 12, scale: 4 });
 
 /** The single row of invoice settings, seeded by its migration. */
 export const invoiceSettings = pgTable(

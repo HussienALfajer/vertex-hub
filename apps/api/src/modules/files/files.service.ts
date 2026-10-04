@@ -631,7 +631,7 @@ export class FilesService {
 }
 
 /** The owner id of an item row, in SQL. */
-const ownerIdSql = sql<string>`coalesce(${fileItems.taskId}, ${fileItems.projectId}, ${fileItems.retainerId}, ${fileItems.postId}, ${fileItems.quoteId}, ${fileItems.invoiceId}, ${fileItems.clientId})`;
+const ownerIdSql = sql<string>`coalesce(${fileItems.taskId}, ${fileItems.projectId}, ${fileItems.retainerId}, ${fileItems.postId}, ${fileItems.quoteId}, ${fileItems.invoiceId}, ${fileItems.adWalletEntryId}, ${fileItems.clientId})`;
 
 export const NOT_FINAL = {
   isFinal: false,

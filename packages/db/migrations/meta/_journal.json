@@ -239,6 +239,13 @@
       "when": 1791069697208,
       "tag": "0033_workable_paibok",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1791074344390,
+      "tag": "0034_panoramic_stark_industries",
+      "breakpoints": true
     }
   ]
 }

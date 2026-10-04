@@ -399,7 +399,8 @@
     "FUNDING_LOCKED": "للحملة تحديثات مسجّلة، فلا يتغير مصدر تمويلها.",
     "CAMPAIGN_HAS_UPDATES": "للحملة تحديثات مسجّلة. أرشف تحديثاتها أولًا ثم أرشف الحملة.",
     "PERIOD_CROSSES_MONTH": "يجب أن تقع الفترة في شهر واحد. قسّمها إلى تحديثين عند بداية الشهر.",
-    "PERIOD_OVERLAP": "هذه الفترة تتداخل مع تحديث آخر للحملة."
+    "PERIOD_OVERLAP": "هذه الفترة تتداخل مع تحديث آخر للحملة.",
+    "REFUND_EXCEEDS_BALANCE": "المبلغ المسترد أكبر من رصيد الإعلانات الحالي للعميل."
   },
   "users": {
     "title": "الفريق",
@@ -732,7 +733,9 @@
       "payment": "دفعة",
       "project_expense": "مصروف مشروع",
       "ad_campaign": "حملة إعلانية",
-      "ad_campaign_update": "تحديث حملة إعلانية"
+      "ad_campaign_update": "تحديث حملة إعلانية",
+      "ad_wallet": "رصيد إعلانات عميل",
+      "ad_wallet_entry": "إيداع أو استرداد إعلاني"
     },
     "actions": {
       "user": {
@@ -977,6 +980,15 @@
         "created": "أضاف تحديثًا لحملة إعلانية",
         "updated": "عدّل تحديث حملة إعلانية",
         "archived": "أرشف تحديث حملة إعلانية"
+      },
+      "ad_wallet": {
+        "threshold_changed": "غيّر حد التنبيه لرصيد الإعلانات",
+        "low_balance": "انخفض رصيد الإعلانات عن حد التنبيه",
+        "low_balance_cleared": "عاد رصيد الإعلانات فوق حد التنبيه"
+      },
+      "ad_wallet_entry": {
+        "recorded": "سجّل حركة على رصيد الإعلانات",
+        "voided": "ألغى حركة على رصيد الإعلانات"
       }
     },
     "fields": {
@@ -992,6 +1004,14 @@
       "reach": "الوصول",
       "clicks": "النقرات",
       "results": "النتائج",
+      "occurredOn": "التاريخ",
+      "usdMinor": "المبلغ بالدولار",
+      "receiptNumber": "رقم الإيصال",
+      "reference": "المرجع",
+      "balanceMinor": "الرصيد",
+      "balanceAfterMinor": "الرصيد بعد الحركة",
+      "thresholdMinor": "حد التنبيه",
+      "lowBalanceThresholdMinor": "حد التنبيه",
       "billingName": "اسم الفوترة",
       "billingAddress": "عنوان الفوترة",
       "sypPerUsd": "سعر الصرف (ل.س للدولار)",
@@ -3481,7 +3501,8 @@
       "quote_approval_decided": "قرار على اعتماد خصم طلبته",
       "quote_accepted": "قبول عرض سعر",
       "invoice_overdue": "فاتورة متأخرة السداد",
-      "invoice_paid": "سداد فاتورة عميل أتابعه"
+      "invoice_paid": "سداد فاتورة عميل أتابعه",
+      "ad_budget_low": "انخفاض رصيد إعلانات عميل"
     },
     "text": {
       "task_assigned": "أُسندت إليك «{{task}}» بواسطة {{actor}}",
@@ -3627,7 +3648,8 @@
       "invoice_overdue_few": "تأخر سداد الفاتورة {{invoice}} {{n}} أيام",
       "invoice_overdue_many": "تأخر سداد الفاتورة {{invoice}} {{n}} يومًا",
       "invoice_overdue_other": "تأخر سداد الفاتورة {{invoice}} {{n}} يوم",
-      "invoice_paid": "سُدّدت الفاتورة {{invoice}} بالكامل"
+      "invoice_paid": "سُدّدت الفاتورة {{invoice}} بالكامل",
+      "ad_budget_low": "رصيد إعلانات {{client}} منخفض: {{balance}} دولار (حد التنبيه {{threshold}})"
     },
     "changes": {
       "shoot": {

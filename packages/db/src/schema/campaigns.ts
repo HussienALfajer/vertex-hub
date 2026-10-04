@@ -3,19 +3,36 @@ import {
   AD_FUNDINGS,
   AD_OBJECTIVES,
   AD_PLATFORMS,
+  AD_WALLET_ENTRY_KINDS,
+  CAMPAIGN_LIMITS,
 } from '@vertex-hub/contracts';
 import { sql } from 'drizzle-orm';
-import { check, date, index, integer, pgEnum, pgTable, text, uuid } from 'drizzle-orm/pg-core';
+import {
+  type AnyPgColumn,
+  check,
+  date,
+  index,
+  integer,
+  pgEnum,
+  pgTable,
+  text,
+  timestamp,
+  uniqueIndex,
+  uuid,
+} from 'drizzle-orm/pg-core';
 import { users } from './auth.js';
 import { clients } from './clients.js';
 import { archivedAt, id, minorAmount, timestamps } from './columns.js';
-import { projects } from './projects.js';
+import { fileItems } from './files.js';
+import { exchangeRate, paymentMethodEnum } from './invoices.js';
+import { currencyEnum, projects } from './projects.js';
 import { retainers } from './retainers.js';
 import { tasks } from './tasks.js';
 
 /*
- * Ad campaigns and their periodic updates (spec F12, ADR 0025), owned by the `campaigns` module.
- * Every amount is USD in minor units: ad platforms bill in USD (ADR 0006).
+ * Ad campaigns, their periodic updates and the clients' ad-budget wallets (spec F12, ADR 0025),
+ * owned by the `campaigns` module. Campaign and wallet amounts are USD in minor units: ad
+ * platforms bill in USD (ADR 0006).
  */
 
 export const adPlatformEnum = pgEnum('ad_platform', AD_PLATFORMS);
@@ -128,5 +145,91 @@ export const adCampaignUpdates = pgTable(
       sql`${table.spendMinor} >= 0 and ${table.reach} >= 0 and ${table.clicks} >= 0 and ${table.results} >= 0`,
     ),
     check('ad_campaign_updates_note_check', sql`char_length(${table.note}) <= 500`),
+  ],
+);
+
+export const adWalletEntryKindEnum = pgEnum('ad_wallet_entry_kind', AD_WALLET_ENTRY_KINDS);
+
+/**
+ * A client's wallet settings, created on first use and locked by every balance change (rule 17).
+ * The balance itself is computed on read (rule 15).
+ */
+export const adWallets = pgTable(
+  'ad_wallets',
+  {
+    clientId: uuid('client_id')
+      .primaryKey()
+      .references(() => clients.id),
+    /** USD; null turns A11 off for the client. */
+    lowBalanceThresholdMinor: minorAmount('low_balance_threshold_minor').default(
+      CAMPAIGN_LIMITS.lowBalanceThresholdMinor,
+    ),
+    /** Set when the balance fell below the threshold, cleared when it is back (rule 20). */
+    lowSince: timestamp('low_since', { withTimezone: true }),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedById: uuid('updated_by_id').references(() => users.id),
+  },
+  (table) => [
+    index('ad_wallets_updated_by_id_idx').on(table.updatedById),
+    check('ad_wallets_threshold_check', sql`${table.lowBalanceThresholdMinor} >= 0`),
+  ],
+);
+
+/**
+ * A deposit or refund of a client's ad money (rules 16–19), in its own currency with its USD
+ * amount. Voided by mistake, never archived or edited.
+ */
+export const adWalletEntries = pgTable(
+  'ad_wallet_entries',
+  {
+    id: id(),
+    clientId: uuid('client_id')
+      .notNull()
+      .references(() => clients.id),
+    kind: adWalletEntryKindEnum('kind').notNull(),
+    /** The receipt number of a deposit, kept by a void one. */
+    year: integer('year'),
+    number: integer('number'),
+    occurredOn: date('occurred_on', { mode: 'string' }).notNull(),
+    /** In the entry's own currency. */
+    amountMinor: minorAmount('amount_minor').notNull(),
+    currency: currencyEnum('currency').notNull(),
+    sypPerUsd: exchangeRate('syp_per_usd').notNull(),
+    /** What the entry adds to or takes from the wallet, converted once (rule 15). */
+    usdMinor: minorAmount('usd_minor').notNull(),
+    method: paymentMethodEnum('method').notNull(),
+    reference: text('reference'),
+    note: text('note'),
+    /** The proof, a document of the entry. */
+    proofFileItemId: uuid('proof_file_item_id').references((): AnyPgColumn => fileItems.id),
+    recordedById: uuid('recorded_by_id')
+      .notNull()
+      .references(() => users.id),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    voidedAt: timestamp('voided_at', { withTimezone: true }),
+    voidedById: uuid('voided_by_id').references(() => users.id),
+    voidReason: text('void_reason'),
+  },
+  (table) => [
+    uniqueIndex('ad_wallet_entries_number_idx').on(table.year, table.number),
+    index('ad_wallet_entries_client_id_occurred_on_idx').on(table.clientId, table.occurredOn),
+    index('ad_wallet_entries_proof_file_item_id_idx').on(table.proofFileItemId),
+    index('ad_wallet_entries_recorded_by_id_idx').on(table.recordedById),
+    index('ad_wallet_entries_voided_by_id_idx').on(table.voidedById),
+    check(
+      'ad_wallet_entries_number_check',
+      sql`(${table.kind} = 'deposit') = (${table.year} is not null) and (${table.year} is null) = (${table.number} is null)`,
+    ),
+    check(
+      'ad_wallet_entries_amounts_check',
+      sql`${table.amountMinor} > 0 and ${table.usdMinor} > 0`,
+    ),
+    check('ad_wallet_entries_rate_check', sql`${table.sypPerUsd} > 0`),
+    check('ad_wallet_entries_reference_check', sql`char_length(${table.reference}) <= 200`),
+    check('ad_wallet_entries_note_check', sql`char_length(${table.note}) <= 500`),
+    check(
+      'ad_wallet_entries_void_check',
+      sql`(${table.voidedAt} is null) = (${table.voidReason} is null) and (${table.voidedAt} is null) = (${table.voidedById} is null) and char_length(${table.voidReason}) <= 500`,
+    ),
   ],
 );

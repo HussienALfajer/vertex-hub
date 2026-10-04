@@ -32,6 +32,7 @@ const OWNER_COLUMNS = {
   post: fileItems.postId,
   quote: fileItems.quoteId,
   invoice: fileItems.invoiceId,
+  ad_wallet_entry: fileItems.adWalletEntryId,
 } as const;
 
 /** The items of one owner. `client_id` is set on every item of a client, so the type filters too. */
@@ -48,6 +49,7 @@ export function ownerValues(owner: FileOwner) {
     postId: owner.type === 'post' ? owner.id : null,
     quoteId: owner.type === 'quote' ? owner.id : null,
     invoiceId: owner.type === 'invoice' ? owner.id : null,
+    adWalletEntryId: owner.type === 'ad_wallet_entry' ? owner.id : null,
     clientId: owner.clientId,
   };
 }
@@ -59,6 +61,7 @@ export const ownerIdOf = (item: ItemRow): string =>
     item.postId ??
     item.quoteId ??
     item.invoiceId ??
+    item.adWalletEntryId ??
     item.clientId) as string;
 
 /**

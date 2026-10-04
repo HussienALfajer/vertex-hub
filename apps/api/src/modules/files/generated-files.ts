@@ -24,14 +24,15 @@ import { auditRefs, ownerFilter } from './file-access.js';
 import { FileContentService } from './file-content.service.js';
 import { FileStorage } from './file-storage.js';
 
-/** The owners whose documents only their module adds (F04 quotes, F13 invoices). */
-type DocumentOwnerType = 'quote' | 'invoice';
+/** The owners whose documents only their module adds (F04 quotes, F13 invoices, F12 entries). */
+type DocumentOwnerType = 'quote' | 'invoice' | 'ad_wallet_entry';
 
 /** The owner columns of a document of `type`. */
 const documentOwner = (type: DocumentOwnerType, id: string) => ({
   ownerType: type,
   quoteId: type === 'quote' ? id : null,
   invoiceId: type === 'invoice' ? id : null,
+  adWalletEntryId: type === 'ad_wallet_entry' ? id : null,
 });
 
 /** A file the system produced and already stored, such as the PDF of a sent quote (F04). */

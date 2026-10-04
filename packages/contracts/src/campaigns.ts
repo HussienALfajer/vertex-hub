@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { calendarDateSchema } from './dates.js';
+import { paymentMethodSchema } from './invoices.js';
 import {
   pageQuerySchema,
   pageSchema,
@@ -7,12 +8,19 @@ import {
   queryListSchema,
   sortOrderSchema,
 } from './lists.js';
-import { minorAmountSchema } from './money.js';
+import {
+  currencySchema,
+  exchangeRateSchema,
+  minorAmountSchema,
+  signedMinorAmountSchema,
+} from './money.js';
 import { taskStatusSchema } from './tasks.js';
+import { optionalText } from './text.js';
 
 /*
  * Ad campaigns (spec F12, ADR 0025): a client's campaign on an ad platform with a planned USD
- * budget, and periodic updates of spend and results entered by hand.
+ * budget, periodic updates of spend and results entered by hand, and the client's USD ad-budget
+ * wallet of deposits and refunds that wallet-funded spend is deducted from.
  */
 
 export const AD_PLATFORMS = [
@@ -77,6 +85,10 @@ export const CAMPAIGN_LIMITS = {
   metric: 2_147_483_647,
   /** "No update for N days" after this many days (rule 14). */
   staleUpdateDays: 7,
+  /** A new wallet's low-balance threshold: 100 USD. */
+  lowBalanceThresholdMinor: 10_000,
+  /** A11 repeats every this many days while the balance stays low (rule 21). */
+  lowBalanceReminderDays: 7,
 } as const;
 
 /** The allowed status changes (spec F12, "Campaign status"). `cancelled` is final. */
@@ -340,6 +352,8 @@ export const campaignDetailSchema = campaignSchema
     months: z.array(campaignMonthSchema),
     /** Non-archived, newest period first. */
     updates: z.array(campaignUpdateSchema),
+    /** The client's wallet balance for a `wallet` campaign (rule 8); null for direct ones. */
+    walletBalanceMinor: signedMinorAmountSchema.nullable(),
     createdBy: personSchema,
     createdAt: z.iso.datetime(),
     permissions: campaignPermissionsSchema,
@@ -370,3 +384,281 @@ export type CampaignListQuery = z.infer<typeof campaignListQuerySchema>;
 export const campaignPageSchema = pageSchema(campaignSchema).meta({ id: 'CampaignPage' });
 
 export type CampaignPage = z.infer<typeof campaignPageSchema>;
+
+// Wallet (rules 15–22)
+
+export const AD_WALLET_ENTRY_KINDS = ['deposit', 'refund'] as const;
+
+export const adWalletEntryKindSchema = z
+  .enum(AD_WALLET_ENTRY_KINDS)
+  .meta({ id: 'AdWalletEntryKind' });
+
+export type AdWalletEntryKind = z.infer<typeof adWalletEntryKindSchema>;
+
+/** `AD-2026-0001`, a deposit's receipt. */
+export function adDepositDisplayNumber(entry: { year: number; number: number }) {
+  return `AD-${entry.year}-${String(entry.number).padStart(4, '0')}`;
+}
+
+/** A deposit or refund as the balance sees it. */
+export interface WalletEntryAmount {
+  kind: AdWalletEntryKind;
+  usdMinor: number;
+  voided: boolean;
+}
+
+/** A campaign update as the balance sees it. */
+export interface WalletSpend {
+  spendMinor: number;
+  archived: boolean;
+  funding: AdFunding;
+  campaignArchived: boolean;
+}
+
+/** Spend of non-archived updates of non-archived `wallet` campaigns comes out of the wallet. */
+export function spendCountsInWallet(update: WalletSpend): boolean {
+  return !update.archived && !update.campaignArchived && update.funding === 'wallet';
+}
+
+/**
+ * Rule 15: non-void deposits − non-void refunds − counted spend, in USD minor units. May be
+ * negative ("owed by the client").
+ */
+export function adWalletBalance(
+  entries: readonly WalletEntryAmount[],
+  updates: readonly WalletSpend[],
+): number {
+  let balance = 0;
+  for (const entry of entries) {
+    if (entry.voided) continue;
+    balance += entry.kind === 'deposit' ? entry.usdMinor : -entry.usdMinor;
+  }
+  for (const update of updates) {
+    if (spendCountsInWallet(update)) balance -= update.spendMinor;
+  }
+  return balance;
+}
+
+/**
+ * Rule 20: below the threshold, for a client that uses the wallet (has a non-void deposit) and
+ * has a threshold.
+ */
+export function isLowBalance(
+  balanceMinor: number,
+  thresholdMinor: number | null,
+  usesWallet: boolean,
+): boolean {
+  return usesWallet && thresholdMinor !== null && balanceMinor < thresholdMinor;
+}
+
+/** A ledger item before the running balance; a spend item is never void. */
+export interface WalletLedgerItem {
+  kind: AdWalletEntryKind | 'spend';
+  /** The entry or the update; ties on one date are ordered by id (UUIDv7: creation order). */
+  id: string;
+  date: string;
+  usdMinor: number;
+  voided: boolean;
+}
+
+/**
+ * Rule 15's ledger: items by date with a running balance; void entries are listed and do not
+ * count. Items before `from` make the opening balance; items after `to` are left out.
+ */
+export function walletLedger<Item extends WalletLedgerItem>(
+  items: readonly Item[],
+  range: { from?: string; to?: string } = {},
+): { openingMinor: number; rows: (Item & { balanceMinor: number })[] } {
+  const sorted = [...items].sort((a, b) =>
+    a.date === b.date ? (a.id < b.id ? -1 : 1) : a.date < b.date ? -1 : 1,
+  );
+  const change = (item: Item) =>
+    item.voided ? 0 : item.kind === 'deposit' ? item.usdMinor : -item.usdMinor;
+  let openingMinor = 0;
+  let balance = 0;
+  const rows: (Item & { balanceMinor: number })[] = [];
+  for (const item of sorted) {
+    if (range.to !== undefined && item.date > range.to) break;
+    balance += change(item);
+    if (range.from !== undefined && item.date < range.from) {
+      openingMinor = balance;
+      continue;
+    }
+    rows.push({ ...item, balanceMinor: balance });
+  }
+  return { openingMinor, rows };
+}
+
+const reasonSchema = z.string().trim().min(1).max(500);
+
+/**
+ * Rules 16 and 19. `occurredOn` ≤ today (`INVALID_DATES`); the rate defaults to the current one
+ * (`RATE_REQUIRED` when none is set); a refund above the balance is `REFUND_EXCEEDS_BALANCE`. The
+ * proof is the actor's upload, kept as a document of the entry.
+ */
+export const recordWalletEntrySchema = z
+  .object({
+    kind: adWalletEntryKindSchema,
+    occurredOn: calendarDateSchema,
+    amountMinor: minorAmountSchema.min(1),
+    currency: currencySchema,
+    sypPerUsd: exchangeRateSchema.nullable().default(null),
+    method: paymentMethodSchema,
+    /** Bank or wallet name and transaction number. */
+    reference: optionalText(200).default(null),
+    note: optionalText(500).default(null),
+    proofUploadId: z.uuid().nullable().default(null),
+  })
+  .meta({ id: 'RecordWalletEntry' });
+
+export type RecordWalletEntry = z.infer<typeof recordWalletEntrySchema>;
+
+export type RecordWalletEntryInput = z.input<typeof recordWalletEntrySchema>;
+
+/** Rule 18: an entry recorded by mistake. */
+export const voidWalletEntrySchema = z
+  .object({ reason: reasonSchema })
+  .meta({ id: 'VoidWalletEntry' });
+
+export type VoidWalletEntry = z.infer<typeof voidWalletEntrySchema>;
+
+/** Null turns A11 off for the client. */
+export const updateWalletThresholdSchema = z
+  .object({ lowBalanceThresholdMinor: minorAmountSchema.nullable() })
+  .meta({ id: 'UpdateWalletThreshold' });
+
+export type UpdateWalletThreshold = z.infer<typeof updateWalletThresholdSchema>;
+
+/** The ledger's period; everything by default. */
+export const adWalletQuerySchema = z.object({
+  from: calendarDateSchema.optional(),
+  to: calendarDateSchema.optional(),
+});
+
+export type AdWalletQuery = z.infer<typeof adWalletQuerySchema>;
+
+export const walletEntrySchema = z
+  .object({
+    id: z.uuid(),
+    kind: adWalletEntryKindSchema,
+    /** `AD-2026-0001` for deposits, kept by a void one; null for refunds. */
+    receiptNumber: z.string().nullable(),
+    occurredOn: calendarDateSchema,
+    amountMinor: minorAmountSchema,
+    currency: currencySchema,
+    sypPerUsd: exchangeRateSchema,
+    usdMinor: minorAmountSchema,
+    method: paymentMethodSchema,
+    reference: z.string().nullable(),
+    note: z.string().nullable(),
+    /** The proof, a document of the entry. */
+    proof: z.object({ id: z.uuid(), name: z.string() }).nullable(),
+    recordedBy: personSchema,
+    createdAt: z.iso.datetime(),
+    voided: z.object({ at: z.iso.datetime(), by: personSchema, reason: z.string() }).nullable(),
+  })
+  .meta({ id: 'WalletEntry' });
+
+export type WalletEntry = z.infer<typeof walletEntrySchema>;
+
+export const walletLedgerRowSchema = z
+  .object({
+    kind: z.enum([...AD_WALLET_ENTRY_KINDS, 'spend']),
+    /** The entry, or the campaign update for `spend`. */
+    id: z.uuid(),
+    /** The entry's date, or the end of the update's period. */
+    date: calendarDateSchema,
+    usdMinor: minorAmountSchema,
+    /** After this row; a void entry leaves it unchanged. */
+    balanceMinor: signedMinorAmountSchema,
+    voided: z.boolean(),
+    /** Deposits and refunds. */
+    entry: walletEntrySchema
+      .pick({ receiptNumber: true, amountMinor: true, currency: true })
+      .nullable(),
+    /** Spend: the campaign and the update's period. */
+    spend: z
+      .object({
+        campaign: personSchema,
+        periodStart: calendarDateSchema,
+        periodEnd: calendarDateSchema,
+      })
+      .nullable(),
+  })
+  .meta({ id: 'WalletLedgerRow' });
+
+export type WalletLedgerRow = z.infer<typeof walletLedgerRowSchema>;
+
+export const adWalletPermissionsSchema = z
+  .object({
+    /** Record refunds and void entries (`campaigns.fund`). */
+    canFund: z.boolean(),
+    /** Record deposits: `canFund` on a non-archived client (rule 16). */
+    canDeposit: z.boolean(),
+    /** A campaign manager covering the client. */
+    canEditThreshold: z.boolean(),
+  })
+  .meta({ id: 'AdWalletPermissions', description: 'What the caller may do, for the UI' });
+
+export type AdWalletPermissions = z.infer<typeof adWalletPermissionsSchema>;
+
+/** Over every non-void entry and counted update, whatever the ledger's period. */
+const walletTotalsSchema = z.object({
+  depositedMinor: minorAmountSchema,
+  refundedMinor: minorAmountSchema,
+  spentMinor: minorAmountSchema,
+  /** Rule 15; negative when the client owes. */
+  balanceMinor: signedMinorAmountSchema,
+  /** Null: A11 is off for the client. */
+  lowBalanceThresholdMinor: minorAmountSchema.nullable(),
+  /** Below the threshold for a client that uses the wallet (rule 20). */
+  low: z.boolean(),
+});
+
+export const adWalletSchema = walletTotalsSchema
+  .extend({
+    client: personSchema.extend({ archived: z.boolean() }),
+    /** Has a non-void deposit (rule 20). */
+    usesWallet: z.boolean(),
+    from: calendarDateSchema.nullable(),
+    to: calendarDateSchema.nullable(),
+    /** The balance before `from`. */
+    openingMinor: signedMinorAmountSchema,
+    /** Oldest first. */
+    ledger: z.array(walletLedgerRowSchema),
+    /** Every deposit and refund, newest first, void ones included. */
+    entries: z.array(walletEntrySchema),
+    permissions: adWalletPermissionsSchema,
+  })
+  .meta({ id: 'AdWallet' });
+
+export type AdWallet = z.infer<typeof adWalletSchema>;
+
+export const WALLET_SORTS = ['balance', 'client'] as const;
+
+export const walletListQuerySchema = pageQuerySchema.extend({
+  /** Matches the client's trade name. */
+  search: z.string().trim().min(1).max(100).optional(),
+  /** Only balances below their threshold. */
+  low: queryBooleanSchema.optional(),
+  accountManagerId: z.uuid().optional(),
+  sort: z.enum(WALLET_SORTS).default('balance'),
+  order: sortOrderSchema.default('asc'),
+});
+
+export type WalletListQuery = z.infer<typeof walletListQuerySchema>;
+
+export const walletSummarySchema = walletTotalsSchema
+  .extend({
+    client: personSchema,
+    accountManager: personSchema,
+    lastDepositOn: calendarDateSchema.nullable(),
+  })
+  .meta({ id: 'WalletSummary' });
+
+export type WalletSummary = z.infer<typeof walletSummarySchema>;
+
+/** Clients that use the wallet or have a non-archived wallet campaign. */
+export const walletPageSchema = pageSchema(walletSummarySchema).meta({ id: 'WalletPage' });
+
+export type WalletPage = z.infer<typeof walletPageSchema>;

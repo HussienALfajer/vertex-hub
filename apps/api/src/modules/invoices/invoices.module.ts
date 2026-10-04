@@ -5,6 +5,7 @@ import { FilesModule } from '../files/index.js';
 import { NotificationsModule } from '../notifications/index.js';
 import { ProjectsModule } from '../projects/index.js';
 import { QuotesModule } from '../quotes/index.js';
+import { DocumentNumbers } from './document-numbers.js';
 import { InvoiceBillingController } from './invoice-billing.controller.js';
 import { InvoiceBillingService } from './invoice-billing.service.js';
 import { InvoiceDrafts } from './invoice-drafts.js';
@@ -34,7 +35,8 @@ import { ProjectExpensesService } from './project-expenses.service.js';
  * marks invoices overdue in `invoices.daily` and repeats the alert as a source of
  * `notifications.daily`. Owns `project_expenses` and serves client balances and statements, and the
  * billing summaries of projects (with their margin) and retainers; exports `InvoiceDueDates` for
- * the company calendar.
+ * the company calendar, and `DocumentNumbers` (ad deposit receipt numbers and the current rate)
+ * for `campaigns` (F12).
  */
 @Module({
   imports: [
@@ -64,7 +66,8 @@ import { ProjectExpensesService } from './project-expenses.service.js';
     InvoiceDueDates,
     InvoiceBillingService,
     ProjectExpensesService,
+    DocumentNumbers,
   ],
-  exports: [InvoiceDueDates],
+  exports: [InvoiceDueDates, DocumentNumbers],
 })
 export class InvoicesModule {}

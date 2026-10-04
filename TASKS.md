@@ -12,13 +12,13 @@ Spec: `docs/specs/F12-ad-campaigns.md` · ADRs 0006, 0007, 0008, 0013, 0014, 001
 - [x] wiring checklist, full checks (lint, typecheck, build, test, drift pass), reviewer (one finding fixed: missing 401 / 403 / out-of-scope tests on PUT, status, archive, restore and update archive), owner acceptance (approved, incl. editing updates of cancelled campaigns), dev database migrated, /ship
 
 ## PR 2 — `feat/f12-ad-wallet-api`: wallet, deposits, refunds and A11
-- [ ] contracts: wallet entry kind; `adWalletBalance`, `isLowBalance` with unit tests; wallet, ledger, entry, record / void, threshold, wallet list schemas; `REFUND_EXCEEDS_BALANCE`; audit `ad_wallet.*`, `ad_wallet_entry.*`; notification type `ad_budget_low` (subject `client`) and reminder kind, `notification-content.ts`; file owner type `ad_wallet_entry`; document number kind `ad_deposit`; `ar.json` keys
-- [ ] db (`/db-migration`): `ad_wallets`, `ad_wallet_entries` (checks: number for deposits only, void fields together); `document_number_kind` + `ad_deposit`; `file_owner_type` + `ad_wallet_entry` and `file_items.ad_wallet_entry_id`; notification enums; drift
-- [ ] api `invoices`: export `DocumentNumbers` and the current rate; `files`: `ad_wallet_entry` owner policy (hidden from the client library)
-- [ ] api `campaigns`: wallet read / threshold, record entry (rules 16–17, proof), void (rule 18), wallet list; wallet row lock on every balance change (updates, funding change, archive / restore); campaign detail gains the wallet balance; A11 crossing (rule 20) and the `ad-budget-low` daily source (rules 21–22)
-- [ ] api tests: `test/ad-wallets.test.ts` (balance, concurrent refunds and updates, numbering, A11 once per crossing, clearing, weekly reminders, idempotency)
-- [ ] bridge; web typecheck
-- [ ] wiring checklist, full checks (+ drift), reviewer, owner acceptance, /ship
+- [x] contracts: wallet entry kind; `adWalletBalance`, `isLowBalance` with unit tests; wallet, ledger, entry, record / void, threshold, wallet list schemas; `REFUND_EXCEEDS_BALANCE`; audit `ad_wallet.*`, `ad_wallet_entry.*`; notification type `ad_budget_low` (subject `client`) and reminder kind, `notification-content.ts`; file owner type `ad_wallet_entry`; document number kind `ad_deposit`; `ar.json` keys
+- [x] db (`/db-migration`, 0034): `ad_wallets`, `ad_wallet_entries` (checks: number for deposits only, void fields together); `document_number_kind` + `ad_deposit`; `file_owner_type` + `ad_wallet_entry` and `file_items.ad_wallet_entry_id`; notification enums; drift
+- [x] api `invoices`: export `DocumentNumbers` and the current rate; `files`: `ad_wallet_entry` owner policy (hidden from the client library)
+- [x] api `campaigns`: wallet read / threshold, record entry (rules 16–17, proof), void (rule 18), wallet list; wallet row lock on every balance change (updates, funding change, archive / restore); campaign detail gains the wallet balance; A11 crossing (rule 20) and the `ad-budget-low` daily source (rules 21–22)
+- [x] api tests: `test/ad-wallets.test.ts` (balance, concurrent refunds and updates, numbering, A11 once per crossing, clearing, weekly reminders, idempotency)
+- [x] bridge; web typecheck
+- [x] wiring checklist, full checks (lint, typecheck, build, test, drift pass), reviewer (one finding fixed: concurrent update and refund test), owner acceptance (approved), dev database migrated, /ship
 
 ## PR 3 — `feat/f12-ad-receipts-pdf`: deposit receipt PDFs
 - [ ] contracts: jobs `campaigns.pdf`, `campaigns.pdf-ready`, kind `ad_deposit_receipt`, `adDepositReceiptSnapshotSchema`; entry `receiptPdf` state

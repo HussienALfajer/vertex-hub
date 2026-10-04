@@ -178,6 +178,11 @@ export const AUDIT_ACTIONS = [
   'ad_campaign_update.created',
   'ad_campaign_update.updated',
   'ad_campaign_update.archived',
+  'ad_wallet.threshold_changed',
+  'ad_wallet.low_balance',
+  'ad_wallet.low_balance_cleared',
+  'ad_wallet_entry.recorded',
+  'ad_wallet_entry.voided',
 ] as const;
 
 export const auditActionSchema = z.enum(AUDIT_ACTIONS).meta({ id: 'AuditAction' });
@@ -217,6 +222,8 @@ export const AUDIT_ENTITY_TYPES = [
   'project_expense',
   'ad_campaign',
   'ad_campaign_update',
+  'ad_wallet',
+  'ad_wallet_entry',
 ] as const;
 
 export const auditEntityTypeSchema = z.enum(AUDIT_ENTITY_TYPES).meta({ id: 'AuditEntityType' });

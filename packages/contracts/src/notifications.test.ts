@@ -14,6 +14,7 @@ describe('notification catalog', () => {
     const mutable = NOTIFICATION_TYPES.filter(isMutableNotificationType);
     expect(mutable.sort()).toEqual(
       [
+        'ad_budget_low',
         'meeting_changed',
         'meeting_dropped',
         'meeting_invited',
@@ -208,5 +209,25 @@ describe('invoice notifications (spec F13)', () => {
       NOTIFICATION_DATA_SCHEMAS.invoice_overdue.safeParse({ invoice, daysOverdue: 0 }).success,
     ).toBe(false);
     expect(NOTIFICATION_DATA_SCHEMAS.invoice_paid.safeParse({ invoice }).success).toBe(true);
+  });
+});
+
+describe('ad budget notifications (spec F12, A11)', () => {
+  it('is a mutable reminder that opens the client', () => {
+    expect(NOTIFICATION_CATALOG.ad_budget_low).toEqual({
+      category: 'reminders',
+      subject: 'client',
+      mutable: true,
+    });
+  });
+
+  it('carries the client, a possibly negative balance and the threshold', () => {
+    const schema = NOTIFICATION_DATA_SCHEMAS.ad_budget_low;
+    expect(
+      schema.safeParse({ client: 'Client', balanceMinor: -2_500, thresholdMinor: 10_000 }).success,
+    ).toBe(true);
+    expect(
+      schema.safeParse({ client: 'Client', balanceMinor: 0, thresholdMinor: -1 }).success,
+    ).toBe(false);
   });
 });
