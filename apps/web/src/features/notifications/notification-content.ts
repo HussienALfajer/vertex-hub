@@ -17,6 +17,10 @@ const BEHIND_LINES_SHOWN = 3;
 /** What a notification opens (F14 rule 15). */
 export function notificationLink(notification: Notification): ToOptions {
   const { subject } = notification;
+  if (notification.type === 'ad_budget_low') {
+    // The client's wallet is on its Ads tab (F12 screen 6).
+    return { to: '/clients/$clientId', params: { clientId: subject.id }, search: { tab: 'ads' } };
+  }
   if (notification.type === 'tasks_generated') {
     // No run filter on the task list (owner decision): the assignee's newest tasks, or the
     // department's unassigned queue for its managers.

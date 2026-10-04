@@ -20,6 +20,8 @@ import { Route as AppDesignSystemRouteImport } from './routes/_app/design-system
 import { Route as ATokenRouteImport } from './routes/a.$token'
 import { Route as AppApprovalsIndexRouteImport } from './routes/_app/approvals/index'
 import { Route as AppCalendarIndexRouteImport } from './routes/_app/calendar/index'
+import { Route as AppCampaignsIndexRouteImport } from './routes/_app/campaigns/index'
+import { Route as AppCampaignsCampaignIdRouteImport } from './routes/_app/campaigns/$campaignId'
 import { Route as AppCatalogIndexRouteImport } from './routes/_app/catalog/index'
 import { Route as AppCatalogSettingsRouteImport } from './routes/_app/catalog/settings'
 import { Route as AppClientsIndexRouteImport } from './routes/_app/clients/index'
@@ -112,6 +114,16 @@ const AppApprovalsIndexRoute = AppApprovalsIndexRouteImport.update({
 const AppCalendarIndexRoute = AppCalendarIndexRouteImport.update({
   id: '/calendar/',
   path: '/calendar/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppCampaignsIndexRoute = AppCampaignsIndexRouteImport.update({
+  id: '/campaigns/',
+  path: '/campaigns/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppCampaignsCampaignIdRoute = AppCampaignsCampaignIdRouteImport.update({
+  id: '/campaigns/$campaignId',
+  path: '/campaigns/$campaignId',
   getParentRoute: () => AppRoute,
 } as any)
 const AppCatalogIndexRoute = AppCatalogIndexRouteImport.update({
@@ -322,6 +334,7 @@ export interface FileRoutesByFullPath {
   '/audit': typeof AppAuditRoute
   '/design-system': typeof AppDesignSystemRoute
   '/a/$token': typeof ATokenRoute
+  '/campaigns/$campaignId': typeof AppCampaignsCampaignIdRoute
   '/catalog/settings': typeof AppCatalogSettingsRoute
   '/clients/$clientId': typeof AppClientsClientIdRoute
   '/clients/new': typeof AppClientsNewRoute
@@ -347,6 +360,7 @@ export interface FileRoutesByFullPath {
   '/templates/new': typeof AppTemplatesNewRoute
   '/approvals/': typeof AppApprovalsIndexRoute
   '/calendar/': typeof AppCalendarIndexRoute
+  '/campaigns/': typeof AppCampaignsIndexRoute
   '/catalog/': typeof AppCatalogIndexRoute
   '/clients/': typeof AppClientsIndexRoute
   '/content/': typeof AppContentIndexRoute
@@ -373,6 +387,7 @@ export interface FileRoutesByTo {
   '/design-system': typeof AppDesignSystemRoute
   '/a/$token': typeof ATokenRoute
   '/': typeof AppIndexRoute
+  '/campaigns/$campaignId': typeof AppCampaignsCampaignIdRoute
   '/catalog/settings': typeof AppCatalogSettingsRoute
   '/clients/$clientId': typeof AppClientsClientIdRoute
   '/clients/new': typeof AppClientsNewRoute
@@ -398,6 +413,7 @@ export interface FileRoutesByTo {
   '/templates/new': typeof AppTemplatesNewRoute
   '/approvals': typeof AppApprovalsIndexRoute
   '/calendar': typeof AppCalendarIndexRoute
+  '/campaigns': typeof AppCampaignsIndexRoute
   '/catalog': typeof AppCatalogIndexRoute
   '/clients': typeof AppClientsIndexRoute
   '/content': typeof AppContentIndexRoute
@@ -426,6 +442,7 @@ export interface FileRoutesById {
   '/_app/design-system': typeof AppDesignSystemRoute
   '/a/$token': typeof ATokenRoute
   '/_app/': typeof AppIndexRoute
+  '/_app/campaigns/$campaignId': typeof AppCampaignsCampaignIdRoute
   '/_app/catalog/settings': typeof AppCatalogSettingsRoute
   '/_app/clients/$clientId': typeof AppClientsClientIdRoute
   '/_app/clients/new': typeof AppClientsNewRoute
@@ -451,6 +468,7 @@ export interface FileRoutesById {
   '/_app/templates/new': typeof AppTemplatesNewRoute
   '/_app/approvals/': typeof AppApprovalsIndexRoute
   '/_app/calendar/': typeof AppCalendarIndexRoute
+  '/_app/campaigns/': typeof AppCampaignsIndexRoute
   '/_app/catalog/': typeof AppCatalogIndexRoute
   '/_app/clients/': typeof AppClientsIndexRoute
   '/_app/content/': typeof AppContentIndexRoute
@@ -479,6 +497,7 @@ export interface FileRouteTypes {
     | '/audit'
     | '/design-system'
     | '/a/$token'
+    | '/campaigns/$campaignId'
     | '/catalog/settings'
     | '/clients/$clientId'
     | '/clients/new'
@@ -504,6 +523,7 @@ export interface FileRouteTypes {
     | '/templates/new'
     | '/approvals/'
     | '/calendar/'
+    | '/campaigns/'
     | '/catalog/'
     | '/clients/'
     | '/content/'
@@ -530,6 +550,7 @@ export interface FileRouteTypes {
     | '/design-system'
     | '/a/$token'
     | '/'
+    | '/campaigns/$campaignId'
     | '/catalog/settings'
     | '/clients/$clientId'
     | '/clients/new'
@@ -555,6 +576,7 @@ export interface FileRouteTypes {
     | '/templates/new'
     | '/approvals'
     | '/calendar'
+    | '/campaigns'
     | '/catalog'
     | '/clients'
     | '/content'
@@ -582,6 +604,7 @@ export interface FileRouteTypes {
     | '/_app/design-system'
     | '/a/$token'
     | '/_app/'
+    | '/_app/campaigns/$campaignId'
     | '/_app/catalog/settings'
     | '/_app/clients/$clientId'
     | '/_app/clients/new'
@@ -607,6 +630,7 @@ export interface FileRouteTypes {
     | '/_app/templates/new'
     | '/_app/approvals/'
     | '/_app/calendar/'
+    | '/_app/campaigns/'
     | '/_app/catalog/'
     | '/_app/clients/'
     | '/_app/content/'
@@ -710,6 +734,20 @@ declare module '@tanstack/react-router' {
       path: '/calendar'
       fullPath: '/calendar/'
       preLoaderRoute: typeof AppCalendarIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/campaigns/': {
+      id: '/_app/campaigns/'
+      path: '/campaigns'
+      fullPath: '/campaigns/'
+      preLoaderRoute: typeof AppCampaignsIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/campaigns/$campaignId': {
+      id: '/_app/campaigns/$campaignId'
+      path: '/campaigns/$campaignId'
+      fullPath: '/campaigns/$campaignId'
+      preLoaderRoute: typeof AppCampaignsCampaignIdRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/catalog/': {
@@ -993,6 +1031,7 @@ interface AppRouteChildren {
   AppAuditRoute: typeof AppAuditRoute
   AppDesignSystemRoute: typeof AppDesignSystemRoute
   AppIndexRoute: typeof AppIndexRoute
+  AppCampaignsCampaignIdRoute: typeof AppCampaignsCampaignIdRoute
   AppCatalogSettingsRoute: typeof AppCatalogSettingsRoute
   AppClientsClientIdRoute: typeof AppClientsClientIdRoute
   AppClientsNewRoute: typeof AppClientsNewRoute
@@ -1018,6 +1057,7 @@ interface AppRouteChildren {
   AppTemplatesNewRoute: typeof AppTemplatesNewRoute
   AppApprovalsIndexRoute: typeof AppApprovalsIndexRoute
   AppCalendarIndexRoute: typeof AppCalendarIndexRoute
+  AppCampaignsIndexRoute: typeof AppCampaignsIndexRoute
   AppCatalogIndexRoute: typeof AppCatalogIndexRoute
   AppClientsIndexRoute: typeof AppClientsIndexRoute
   AppContentIndexRoute: typeof AppContentIndexRoute
@@ -1041,6 +1081,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppAuditRoute: AppAuditRoute,
   AppDesignSystemRoute: AppDesignSystemRoute,
   AppIndexRoute: AppIndexRoute,
+  AppCampaignsCampaignIdRoute: AppCampaignsCampaignIdRoute,
   AppCatalogSettingsRoute: AppCatalogSettingsRoute,
   AppClientsClientIdRoute: AppClientsClientIdRoute,
   AppClientsNewRoute: AppClientsNewRoute,
@@ -1066,6 +1107,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppTemplatesNewRoute: AppTemplatesNewRoute,
   AppApprovalsIndexRoute: AppApprovalsIndexRoute,
   AppCalendarIndexRoute: AppCalendarIndexRoute,
+  AppCampaignsIndexRoute: AppCampaignsIndexRoute,
   AppCatalogIndexRoute: AppCatalogIndexRoute,
   AppClientsIndexRoute: AppClientsIndexRoute,
   AppContentIndexRoute: AppContentIndexRoute,

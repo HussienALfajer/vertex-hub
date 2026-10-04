@@ -897,6 +897,56 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await screenshot(page, testInfo, `project-expense-dialog-${colorScheme}`);
     });
 
+    test('campaigns and ad budgets', async ({ page }, testInfo) => {
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await mockApi(page, { signedIn: true });
+      await page.goto('/campaigns');
+      await expect(page.getByRole('link', { name: 'حملة رسائل الخريف' })).toBeVisible();
+      await screenshot(page, testInfo, `campaigns-${colorScheme}`);
+
+      await page.getByRole('button', { name: ar.campaigns.new.action }).click();
+      await expect(page.getByRole('dialog')).toContainText(ar.campaigns.new.title);
+      await screenshot(page, testInfo, `campaign-new-dialog-${colorScheme}`);
+      await page.keyboard.press('Escape');
+
+      await page.getByRole('tab', { name: ar.campaigns.tabs.budgets }).click();
+      await expect(page.getByText(ar.campaigns.wallet.lowBadge)).toBeVisible();
+      await screenshot(page, testInfo, `ad-budgets-${colorScheme}`);
+    });
+
+    test('campaign page with updates', async ({ page }, testInfo) => {
+      await page.setViewportSize({ width: 1440, height: 1100 });
+      await mockApi(page, { signedIn: true });
+      await page.goto(`/campaigns/${seedIds.autumnCampaign}`);
+      await expect(page.getByText(ar.campaigns.months.heading)).toBeVisible();
+      await screenshot(page, testInfo, `campaign-page-${colorScheme}`);
+
+      // Spend beyond the budget and the balance: both warnings, before saving.
+      await page.getByRole('button', { name: ar.campaigns.updates.add }).first().click();
+      const update = page.getByRole('dialog');
+      await update.getByLabel(ar.campaigns.updates.spend).fill('700');
+      await update.getByLabel(ar.campaigns.results.messages).fill('120');
+      await expect(update.getByText(ar.campaigns.updates.walletNegativeTitle)).toBeVisible();
+      await screenshot(page, testInfo, `campaign-update-dialog-${colorScheme}`);
+    });
+
+    test('client ads tab', async ({ page }, testInfo) => {
+      await page.setViewportSize({ width: 1440, height: 1300 });
+      await mockApi(page, { signedIn: true });
+      await page.goto(`/clients/${seedIds.jasmine}?tab=ads`);
+      await expect(page.getByText('AD-2026-0002')).toBeVisible();
+      await screenshot(page, testInfo, `client-ads-${colorScheme}`);
+
+      // A deposit in SYP, converted at its rate.
+      await page.getByRole('button', { name: ar.campaigns.entry.deposit }).click();
+      const deposit = page.getByRole('dialog');
+      await deposit.getByRole('combobox', { name: ar.campaigns.entry.currency }).click();
+      await page.getByRole('option', { name: ar.invoices.currencies.SYP }).click();
+      await deposit.getByLabel(ar.campaigns.entry.amount).fill('1185000');
+      await expect(deposit.getByText(ar.campaigns.entry.usd)).toBeVisible();
+      await screenshot(page, testInfo, `ad-deposit-dialog-${colorScheme}`);
+    });
+
     test('retainer billing', async ({ page }, testInfo) => {
       await page.setViewportSize({ width: 1280, height: 1400 });
       await mockApi(page, { signedIn: true });

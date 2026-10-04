@@ -30,6 +30,7 @@ import {
   ListTodoIcon,
   LogOutIcon,
   type LucideIcon,
+  MegaphoneIcon,
   MenuIcon,
   MoonIcon,
   PackageIcon,
@@ -62,6 +63,7 @@ interface NavItem {
     | 'nav.retainers'
     | 'nav.quotes'
     | 'nav.invoices'
+    | 'nav.campaigns'
     | 'nav.catalog'
     | 'nav.templates'
     | 'nav.team'
@@ -113,6 +115,7 @@ const navItems: NavItem[] = [
   { to: '/retainers', label: 'nav.retainers', icon: RepeatIcon, permission: 'projects.read' },
   { to: '/quotes', label: 'nav.quotes', icon: FileTextIcon, permission: 'quotes.read' },
   { to: '/invoices', label: 'nav.invoices', icon: ReceiptTextIcon, permission: 'invoices.read' },
+  { to: '/campaigns', label: 'nav.campaigns', icon: MegaphoneIcon, permission: 'campaigns.read' },
   { to: '/catalog', label: 'nav.catalog', icon: PackageIcon, permission: 'catalog.read' },
   // Everyone reads templates; the people who apply or maintain them see the link (F07 screen 1).
   { to: '/templates', label: 'nav.templates', icon: LayoutTemplateIcon, show: managesTeams },
