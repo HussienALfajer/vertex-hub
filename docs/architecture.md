@@ -38,7 +38,7 @@ vertex-hub/
 | PDF | HTML → PDF with Playwright/Chromium in the worker | 0008 |
 | Files | Local disk behind a storage interface; nginx serves after API authorization; versioned items | 0009, 0019 |
 | Images | sharp (thumbnails) | — |
-| Email | Nodemailer over SMTP, React Email templates | — |
+| Email | Nodemailer over SMTP (Hostinger), React Email templates in the worker, one outbox | 0028 |
 | Logging | pino (nestjs-pino) | — |
 | Frontend | React 19, Vite, TanStack Router / Query / Table | 0003 |
 | API client | Generated from the OpenAPI document (openapi-typescript + openapi-fetch) | 0003 |
