@@ -15,9 +15,10 @@ import { DATABASE } from '../../core/database/database.module.js';
 import { CodedException } from '../../core/errors/index.js';
 import { JobQueue } from '../../core/jobs/index.js';
 import type { CurrentUserInfo } from '../auth/index.js';
-import { ClientDirectory, type ClientSummary } from '../clients/index.js';
+import { ClientDirectory } from '../clients/index.js';
 import { GeneratedFiles } from '../files/index.js';
-import { assertCanManage, canRead } from './quote-access.js';
+import { assertCanManage, canRead, type Recipient, snapshotParty } from './quote-access.js';
+import { QuoteRecipients } from './quote-recipients.js';
 import {
   draftSnapshot,
   pdfFileName,
@@ -44,6 +45,7 @@ export class QuotePdfService implements OnModuleInit {
     @Inject(DATABASE) private readonly db: Database,
     private readonly settings: QuoteSettingsService,
     private readonly clients: ClientDirectory,
+    private readonly recipients: QuoteRecipients,
     private readonly files: GeneratedFiles,
     private readonly jobs: JobQueue,
   ) {}
@@ -61,7 +63,7 @@ export class QuotePdfService implements OnModuleInit {
   async render(actor: CurrentUserInfo, id: string): Promise<QuotePdfRender> {
     const { state, job } = await this.db.transaction(async (tx) => {
       const [quote] = await tx.select().from(quotes).where(eq(quotes.id, id)).for('update');
-      const client = quote ? await this.clients.summary(quote.clientId, tx) : null;
+      const client = quote ? await this.recipients.of(quote, tx) : null;
       if (!quote || !client || !canRead(actor, client, quote)) throw new NotFoundException();
       if (quote.status === 'draft') return this.requestPreview(tx, actor, quote, client);
       if (quote.pdfStatus === 'ready') return { state: 'ready' as const, job: null };
@@ -143,7 +145,9 @@ export class QuotePdfService implements OnModuleInit {
         return;
       }
       // A sent version: attached once; a result of another payload is not this version's PDF.
-      if (quote.status === 'draft' || quote.pdfFileItemId || !quote.snapshot) return;
+      if (quote.status === 'draft' || quote.pdfFileItemId || quote.heldPdf || !quote.snapshot) {
+        return;
+      }
       if (renderHash(quoteSnapshotSchema.parse(quote.snapshot), false) !== result.hash) {
         if (key) removals.push(key);
         return;
@@ -155,23 +159,55 @@ export class QuotePdfService implements OnModuleInit {
           .where(eq(quotes.id, quote.id));
         return;
       }
-      const pdfFileItemId = await this.files.attachDocument(tx, {
-        ownerType: 'quote',
-        ownerId: quote.id,
-        clientId: quote.clientId,
-        name: pdfFileName(quote),
+      const held = {
         storageKey: result.file.storageKey,
-        mimeType: PDF_MIME_TYPE,
         sizeBytes: result.file.sizeBytes,
         sha256: result.file.sha256,
-        createdById: quote.sentById ?? quote.createdById,
-      });
-      await tx
-        .update(quotes)
-        .set({ pdfStatus: 'ready', pdfFileItemId, updatedAt: quote.updatedAt })
-        .where(eq(quotes.id, quote.id));
+      };
+      // F03: a lead quote's PDF is held until the conversion gives it a client.
+      if (!quote.clientId) {
+        await tx
+          .update(quotes)
+          .set({ pdfStatus: 'ready', heldPdf: held, updatedAt: quote.updatedAt })
+          .where(eq(quotes.id, quote.id));
+        return;
+      }
+      await this.attach(tx, quote, quote.clientId, held);
     });
     for (const key of removals) await this.removeObject(key);
+  }
+
+  /**
+   * F03: attaches the held PDFs of a converted lead's quotes as documents of the client, inside
+   * the conversion's transaction.
+   */
+  async attachHeld(tx: Transaction, quote: QuoteRow, clientId: string): Promise<void> {
+    if (quote.heldPdf && !quote.pdfFileItemId) {
+      await this.attach(tx, quote, clientId, quote.heldPdf);
+    }
+  }
+
+  private async attach(
+    tx: Transaction,
+    quote: QuoteRow,
+    clientId: string,
+    file: NonNullable<QuoteRow['heldPdf']>,
+  ): Promise<void> {
+    const pdfFileItemId = await this.files.attachDocument(tx, {
+      ownerType: 'quote',
+      ownerId: quote.id,
+      clientId,
+      name: pdfFileName(quote),
+      storageKey: file.storageKey,
+      mimeType: PDF_MIME_TYPE,
+      sizeBytes: file.sizeBytes,
+      sha256: file.sha256,
+      createdById: quote.sentById ?? quote.createdById,
+    });
+    await tx
+      .update(quotes)
+      .set({ pdfStatus: 'ready', pdfFileItemId, heldPdf: null, updatedAt: quote.updatedAt })
+      .where(eq(quotes.id, quote.id));
   }
 
   /** The PDF of a sent version, or the draft preview with `draft`; 404 until it exists. */
@@ -183,7 +219,7 @@ export class QuotePdfService implements OnModuleInit {
     response: ServerResponse,
   ): Promise<void> {
     const [quote] = await this.db.select().from(quotes).where(eq(quotes.id, id));
-    const client = quote ? await this.clients.summary(quote.clientId) : null;
+    const client = quote ? await this.recipients.of(quote) : null;
     if (!quote || !client || !canRead(actor, client, quote)) throw new NotFoundException();
     const name = `${client.name} - ${pdfFileName(quote)}`;
     if (draft) {
@@ -197,7 +233,9 @@ export class QuotePdfService implements OnModuleInit {
       await this.files.serve(quote.draftPdfObjectKey, name, PDF_MIME_TYPE, request, response);
       return;
     }
-    const file = quote.pdfFileItemId ? await this.files.latest(quote.pdfFileItemId) : null;
+    const file = quote.pdfFileItemId
+      ? await this.files.latest(quote.pdfFileItemId)
+      : quote.heldPdf && { storageKey: quote.heldPdf.storageKey, mimeType: PDF_MIME_TYPE };
     if (!file) throw new NotFoundException();
     await this.files.serve(file.storageKey, name, file.mimeType, request, response);
   }
@@ -211,7 +249,7 @@ export class QuotePdfService implements OnModuleInit {
     tx: Transaction,
     actor: CurrentUserInfo,
     quote: QuoteRow,
-    client: ClientSummary,
+    client: Recipient,
   ): Promise<{ state: QuotePdfRender['state']; job: QuotePdfJob | null }> {
     assertCanManage(actor, client);
     if (quote.archivedAt) {
@@ -228,8 +266,10 @@ export class QuotePdfService implements OnModuleInit {
     );
     const snapshot = draftSnapshot(quote, children, {
       companyDetails: settings.companyDetails,
-      client: client.name,
-      addressee: quote.contactId ? (contacts.get(quote.contactId)?.name ?? null) : null,
+      ...snapshotParty(
+        client,
+        quote.contactId ? (contacts.get(quote.contactId)?.name ?? null) : null,
+      ),
     });
     const hash = renderHash(snapshot, true);
     if (quote.draftPdfStatus === 'ready' && quote.draftPdfHash === hash) {

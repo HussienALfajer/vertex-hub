@@ -12,12 +12,16 @@ import {
 } from '@nestjs/common';
 import { ApiCreatedResponse, ApiNoContentResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import {
+  type ConvertLead,
   type CreateLead,
   type CreateLeadNote,
+  convertLeadSchema,
   createLeadNoteSchema,
   createLeadSchema,
   type LeadBoard,
   type LeadBoardQuery,
+  type LeadConversionPlan,
+  type LeadConversionPlanQuery,
   type LeadDetail,
   type LeadDuplicateQuery,
   type LeadDuplicates,
@@ -31,6 +35,8 @@ import {
   type LoseLeadResult,
   leadBoardQuerySchema,
   leadBoardSchema,
+  leadConversionPlanQuerySchema,
+  leadConversionPlanSchema,
   leadDetailSchema,
   leadDuplicateQuerySchema,
   leadDuplicatesSchema,
@@ -51,6 +57,7 @@ import {
 } from '@vertex-hub/contracts';
 import { RequirePermissions } from '../../core/access/index.js';
 import { CurrentUser, type CurrentUserInfo } from '../auth/index.js';
+import { LeadConversionService } from './lead-conversion.service.js';
 import { LeadNotesService } from './lead-notes.service.js';
 import { LeadPipelineService } from './lead-pipeline.service.js';
 import { LeadsService } from './leads.service.js';
@@ -62,6 +69,7 @@ export class LeadsController {
     private readonly leads: LeadsService,
     private readonly pipeline: LeadPipelineService,
     private readonly notes: LeadNotesService,
+    private readonly conversion: LeadConversionService,
   ) {}
 
   @Get()
@@ -205,6 +213,37 @@ export class LeadsController {
     @Body({ schema: reopenLeadSchema }) input: ReopenLead,
   ): Promise<LeadDetail> {
     return this.pipeline.reopen(actor, id, input);
+  }
+
+  @Get(':id/conversion-plan')
+  @RequirePermissions('leads.manage')
+  @SerializeOptions({ schema: leadConversionPlanSchema })
+  @ApiOkResponse({
+    description: 'The convert dialog: new-client defaults, or the existing client with clientId',
+    standardSchema: leadConversionPlanSchema,
+  })
+  conversionPlan(
+    @CurrentUser() actor: CurrentUserInfo,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query({ schema: leadConversionPlanQuerySchema }) query: LeadConversionPlanQuery,
+  ): Promise<LeadConversionPlan> {
+    return this.conversion.planFor(actor, id, query);
+  }
+
+  @Post(':id/convert')
+  @HttpCode(200)
+  @RequirePermissions('leads.manage')
+  @SerializeOptions({ schema: leadDetailSchema })
+  @ApiOkResponse({
+    description: 'The won lead, linked to its new or existing client',
+    standardSchema: leadDetailSchema,
+  })
+  convert(
+    @CurrentUser() actor: CurrentUserInfo,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body({ schema: convertLeadSchema }) input: ConvertLead,
+  ): Promise<LeadDetail> {
+    return this.conversion.convertFor(actor, id, input);
   }
 
   @Post(':id/archive')

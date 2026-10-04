@@ -29,20 +29,24 @@ import { DATABASE } from '../../core/database/database.module.js';
 import { CodedException } from '../../core/errors/index.js';
 import { recordAudit } from '../audit/index.js';
 import { type CurrentUserInfo, lockAccessChanges, UserDirectory } from '../auth/index.js';
-import { ClientDirectory, type ClientSummary } from '../clients/index.js';
+import { ClientDirectory } from '../clients/index.js';
 import { GeneratedFiles } from '../files/index.js';
+import { type ConversionResult, LeadPipeline } from '../leads/index.js';
 import { NotificationCenter } from '../notifications/index.js';
 import { EngagementFactory } from '../projects/index.js';
 import { TemplateDirectory, TemplateRunner, type TemplateSummary } from '../templates/index.js';
 import { QuoteAcceptedHooks } from './quote-accepted-hooks.js';
 import {
   actorOf,
-  assertClientTakesQuotes,
+  assertTakesQuotes,
   canRead,
+  clientRecipient,
   covers,
   coversEngagements,
+  type Recipient,
 } from './quote-access.js';
 import { QuotePdfService } from './quote-pdf.service.js';
+import { QuoteRecipients } from './quote-recipients.js';
 import {
   identity,
   NO_DRAFT_PDF,
@@ -95,15 +99,39 @@ export class QuoteAcceptService {
     private readonly notifications: NotificationCenter,
     private readonly pdf: QuotePdfService,
     private readonly acceptedHooks: QuoteAcceptedHooks,
+    private readonly recipients: QuoteRecipients,
+    private readonly leadPipeline: LeadPipeline,
   ) {}
 
-  /** A2–A6: the dialog's defaults for its current choices. Nothing is written. */
+  /**
+   * A2–A6: the dialog's defaults for its current choices, with step 0 for a lead quote (F03 rule
+   * 11). Nothing is written.
+   */
   async plan(actor: CurrentUserInfo, id: string, query: AcceptPlanQuery): Promise<AcceptPlan> {
     const [quote] = await this.db.select().from(quotes).where(eq(quotes.id, id));
-    const client = quote ? await this.clients.summary(quote.clientId) : null;
-    if (!quote || !client || !canRead(actor, client, quote)) throw new NotFoundException();
-    assertMayAccept(actor, client, quote);
-    assertClientTakesQuotes(client);
+    const recipient = quote ? await this.recipients.of(quote) : null;
+    if (!quote || !recipient || !canRead(actor, recipient, quote)) throw new NotFoundException();
+    assertMayAccept(actor, recipient, quote);
+    assertTakesQuotes(recipient);
+    // The client the engagements go to: the quote's, or the one step 0 links (none when new).
+    const conversion =
+      recipient.kind === 'lead'
+        ? await this.leadPipeline.conversionPlan(recipient.id, query.clientId)
+        : null;
+    // Linking an existing client needs `projects.manage` over it, as the acceptance does.
+    const linked = conversion?.existingClient;
+    if (linked && !coversEngagements(actor, { accountManagerId: linked.accountManager.id })) {
+      throw new ForbiddenException();
+    }
+    const engagementClient = conversion
+      ? conversion.existingClient && {
+          id: conversion.existingClient.id,
+          accountManagerId: conversion.existingClient.accountManager.id,
+        }
+      : { id: recipient.id, accountManagerId: recipient.accountManagerId };
+    const projectManagerId = conversion
+      ? (engagementClient?.accountManagerId ?? conversion.client.accountManagerId)
+      : recipient.accountManagerId;
     const children = await this.children(this.db, quote);
     const derived = derive(children);
     const today = businessDate();
@@ -130,12 +158,14 @@ export class QuoteAcceptService {
       );
       const amounts = totalsOf(quote, children).installmentAmountsMinor;
       const mapping = defaultInstallmentMilestones(children.installments.length, milestones.length);
-      const manager = (await this.users.summaries([client.accountManagerId])).get(
-        client.accountManagerId,
-      );
+      const manager = projectManagerId
+        ? (await this.users.summaries([projectManagerId])).get(projectManagerId)
+        : undefined;
       project = {
         name: quote.title,
-        projectManager: { id: client.accountManagerId, name: manager?.name ?? '' },
+        projectManager: projectManagerId
+          ? { id: projectManagerId, name: manager?.name ?? '' }
+          : null,
         departments: derived.oneOff.departments,
         startDate,
         dueDate,
@@ -160,7 +190,10 @@ export class QuoteAcceptService {
       const startDate = query.retainerStartDate ?? today;
       const templateId = derived.monthly.templateIds.find((t) => live(t, 'retainer_cycle'));
       const template = templateId ? summaries.get(templateId) : undefined;
-      const renewable = await this.engagements.renewable(client.id);
+      // F03 rule 11: renewing is offered only for a client that exists.
+      const renewable = engagementClient
+        ? await this.engagements.renewable(engagementClient.id)
+        : [];
       retainer = {
         name: quote.title,
         departments: derived.monthly.departments,
@@ -183,26 +216,37 @@ export class QuoteAcceptService {
       archivedTemplates: [...summaries.values()]
         .filter((template) => template.archived)
         .map((template) => ({ id: template.id, name: template.name })),
+      conversion,
     };
   }
 
   /**
-   * A1–A12 in one transaction: the response, the project with its milestones and template runs,
-   * the new or renewed retainer, the proof, the quote `accepted`, a newer draft archived, the
-   * audit entries and the notices. Any refusal rolls everything back.
+   * A1–A12 in one transaction: for a lead quote first the conversion (F03 rule 11, step 0), then
+   * the response, the project with its milestones and template runs, the new or renewed
+   * retainer, the proof, the quote `accepted`, a newer draft archived, the audit entries and the
+   * notices. Any refusal rolls everything back.
    */
   async accept(actor: CurrentUserInfo, id: string, input: AcceptQuote): Promise<QuoteDetail> {
     const { detail, preview, discarded } = await this.db.transaction(async (tx) => {
       // Template runs assign users, who must stay active (F01 change); taken before row locks.
       await lockAccessChanges(tx);
       // Edge case 5: the row lock makes a second accept wait, then see `accepted`.
-      const { quote, client } = await this.quotes.lockForChange(tx, actor, id);
-      assertMayAccept(actor, client, quote);
-      assertClientTakesQuotes(client);
+      const locked = await this.quotes.lockForChange(tx, actor, id);
+      assertMayAccept(actor, locked.recipient, locked.quote);
+      assertTakesQuotes(locked.recipient);
       const today = businessDate();
-      if (input.respondedOn > today || input.respondedOn < sentOn(quote)) {
+      if (input.respondedOn > today || input.respondedOn < sentOn(locked.quote)) {
         throw new CodedException(400, 'INVALID_DATES', 'From the sent day to today');
       }
+      const converted = await this.convert(tx, actor, locked.recipient, input);
+      // The conversion gave the quote its client.
+      const [quote] = converted
+        ? await tx.select().from(quotes).where(eq(quotes.id, id))
+        : [locked.quote];
+      const client = quote?.clientId ? await this.clients.summary(quote.clientId, tx) : null;
+      if (!quote || !client) throw new Error('The quote has no client');
+      // Without a contact, the one the conversion added answered (F03 rule 11).
+      const contactId = input.contactId ?? converted?.contactId ?? null;
       if (
         input.contactId &&
         !(await this.clients.isActiveContact(client.id, input.contactId, tx))
@@ -353,7 +397,7 @@ export class QuoteAcceptService {
         .set({
           status: 'accepted',
           respondedOn: input.respondedOn,
-          responseContactId: input.contactId,
+          responseContactId: contactId,
           responseNote: input.note,
           respondedById: actor.id,
           projectId: project?.id ?? null,
@@ -373,7 +417,7 @@ export class QuoteAcceptService {
           ...identity(quote),
           status: 'accepted',
           respondedOn: input.respondedOn,
-          contactId: input.contactId,
+          contactId,
           ...(input.note ? { note: input.note } : {}),
           ...(project && { projectId: project.id, project: project.name }),
           ...(retainer && { retainerId: retainer.id, retainer: retainer.name }),
@@ -409,7 +453,7 @@ export class QuoteAcceptService {
         subjectId: quote.id,
       });
       return {
-        detail: await this.quotes.toDetail(actor, updated, client, tx),
+        detail: await this.quotes.toDetail(actor, updated, clientRecipient(client), tx),
         preview: proof?.preview ?? false,
         discarded,
       };
@@ -417,6 +461,30 @@ export class QuoteAcceptService {
     if (preview) await this.files.queuePreviews();
     for (const key of discarded) await this.pdf.discardPreview(key);
     return detail;
+  }
+
+  /**
+   * F03 rule 11, step 0: a lead quote converts its lead first, with the quote permissions (and
+   * `projects.manage` over a linked client); a client quote takes no conversion (400).
+   */
+  private async convert(
+    tx: Transaction,
+    actor: CurrentUserInfo,
+    recipient: Recipient,
+    input: AcceptQuote,
+  ): Promise<ConversionResult | null> {
+    if (recipient.kind === 'client') {
+      if (input.conversion) throw new BadRequestException('Only a lead quote converts its lead');
+      return null;
+    }
+    if (!input.conversion) {
+      throw new BadRequestException('A lead quote is accepted with its conversion (step 0)');
+    }
+    if (input.conversion.mode === 'existing') {
+      const linked = await this.clients.summary(input.conversion.clientId, tx);
+      if (linked && !coversEngagements(actor, linked)) throw new ForbiddenException();
+    }
+    return this.leadPipeline.convert(tx, actor, recipient.id, input.conversion);
   }
 
   /**
@@ -506,7 +574,7 @@ const sentOn = (quote: QuoteRow) => businessDate(quote.sentAt ?? new Date());
  * A1: client scope over quotes and projects, on a `sent` version (`QUOTE_EXPIRED` once expired,
  * `INVALID_TRANSITION` otherwise).
  */
-function assertMayAccept(actor: CurrentUserInfo, client: ClientSummary, quote: QuoteRow): void {
+function assertMayAccept(actor: CurrentUserInfo, client: Recipient, quote: QuoteRow): void {
   if (!covers(actor, 'quotes.manage', client) || !coversEngagements(actor, client)) {
     throw new ForbiddenException();
   }

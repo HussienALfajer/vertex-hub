@@ -26,6 +26,7 @@ import { catalogPackages, catalogServices } from './catalog.js';
 import { clientContacts, clients } from './clients.js';
 import { archivedAt, id, minorAmount, timestamps } from './columns.js';
 import { fileItems } from './files.js';
+import { leads } from './leads.js';
 import { currencyEnum, projects } from './projects.js';
 import { deliverableKindEnum, retainers } from './retainers.js';
 import { workTemplates } from './templates.js';
@@ -83,9 +84,10 @@ export const quotes = pgTable(
     year: integer('year').notNull(),
     number: integer('number').notNull(),
     version: integer('version').notNull().default(1),
-    clientId: uuid('client_id')
-      .notNull()
-      .references(() => clients.id),
+    /** Null while the quote's lead is not converted (F03); set by the conversion. */
+    clientId: uuid('client_id').references(() => clients.id),
+    /** The lead the quote was written on (F03); kept after conversion. */
+    leadId: uuid('lead_id').references(() => leads.id),
     /** The addressee. */
     contactId: uuid('contact_id').references(() => clientContacts.id),
     title: text('title').notNull(),
@@ -121,6 +123,11 @@ export const quotes = pgTable(
     pdfStatus: quotePdfStatusEnum('pdf_status'),
     /** The document of the quote that holds the sent version's PDF, once attached. */
     pdfFileItemId: uuid('pdf_file_item_id').references((): AnyPgColumn => fileItems.id),
+    /**
+     * The rendered PDF of a lead quote's sent version: documents belong to a client, so it is
+     * held here and attached as one when the lead is converted (F03).
+     */
+    heldPdf: jsonb('held_pdf').$type<{ storageKey: string; sizeBytes: number; sha256: string }>(),
     /** The last draft preview (rule 13): asked for with this payload hash, then rendered. */
     draftPdfStatus: quotePdfStatusEnum('draft_pdf_status'),
     draftPdfRequestedHash: text('draft_pdf_requested_hash'),
@@ -137,6 +144,7 @@ export const quotes = pgTable(
   (table) => [
     uniqueIndex('quotes_number_idx').on(table.year, table.number, table.version),
     index('quotes_client_id_idx').on(table.clientId),
+    index('quotes_lead_id_idx').on(table.leadId),
     index('quotes_status_idx').on(table.status),
     index('quotes_updated_at_idx').on(table.updatedAt),
     index('quotes_contact_id_idx').on(table.contactId),
@@ -157,6 +165,10 @@ export const quotes = pgTable(
     ),
     check('quotes_term_check', sql`${table.monthlyTermMonths} between 1 and 36`),
     check('quotes_validity_check', sql`${table.validityDays} between 1 and 90`),
+    check(
+      'quotes_recipient_check',
+      sql`${table.clientId} is not null or ${table.leadId} is not null`,
+    ),
   ],
 );
 

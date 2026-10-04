@@ -9,7 +9,7 @@ export async function setup(): Promise<void> {
   try {
     await removeLeftoverUsers(db);
   } catch (error) {
-    // Leftovers still tied to other records (a client they manage) stay; the run goes on.
+    // Leftovers still tied to other records stay; the run goes on.
     process.stderr.write(`Leftover test users not removed: ${String(error)}
 `);
   } finally {

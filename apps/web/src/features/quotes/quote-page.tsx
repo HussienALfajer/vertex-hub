@@ -97,14 +97,18 @@ function QuoteHeader({ quote }: { quote: QuoteDetail }) {
           <span dir="ltr" className="tabular-nums">
             {quote.displayNumber}
           </span>
-          <Link
-            to="/clients/$clientId"
-            params={{ clientId: quote.client.id }}
-            search={{ tab: 'quotes' }}
-            className="hover:underline"
-          >
-            {quote.client.name}
-          </Link>
+          {quote.client ? (
+            <Link
+              to="/clients/$clientId"
+              params={{ clientId: quote.client.id }}
+              search={{ tab: 'quotes' }}
+              className="hover:underline"
+            >
+              {quote.client.name}
+            </Link>
+          ) : (
+            <span>{quote.recipient.name}</span>
+          )}
           {quote.contact && <span>{t('quotes.addressedTo', { name: quote.contact.name })}</span>}
           <span>{t('quotes.accountManagerIs', { name: quote.accountManager.name })}</span>
         </span>

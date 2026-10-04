@@ -516,7 +516,7 @@ function BasicsSection({
   const { t } = useTranslation();
   const ids = { contact: useId(), currency: useId() };
   const { errors } = form.formState;
-  const client = useQuery(clientQuery(quote.client.id));
+  const client = useQuery({ ...clientQuery(quote.client?.id ?? ''), enabled: !!quote.client });
   const catalog = useCatalog(quote.permissions.canEdit);
 
   const contactItems = [

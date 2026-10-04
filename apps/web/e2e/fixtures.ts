@@ -8812,6 +8812,8 @@ interface QuoteRecord
     QuoteDetail,
     | 'displayNumber'
     | 'client'
+    | 'recipient'
+    | 'lead'
     | 'accountManager'
     | 'contact'
     | 'oneOffNetMinor'
@@ -9079,8 +9081,10 @@ function quoteRoutes({
       ...q,
       displayNumber: quoteDisplayNumber(q),
       client: { id: q.clientId, name: client?.tradeName ?? '' },
+      recipient: { kind: 'client', id: q.clientId, name: client?.tradeName ?? '' },
       accountManager: person(client?.accountManagerId ?? id(1)),
       contact: contact ? { id: contact.id, name: contact.name, archived: contact.archived } : null,
+      lead: null,
       oneOffNetMinor: totals.oneOff.netMinor,
       monthlyNetMinor: totals.monthly.netMinor,
       expiresSoon:
@@ -9260,6 +9264,7 @@ function quoteRoutes({
       project,
       retainer,
       archivedTemplates: used.filter((t) => t.archived).map((t) => ({ id: t.id, name: t.name })),
+      conversion: null,
     };
   };
   const listItemOf = (q: QuoteRecord): Quote => {
@@ -9272,6 +9277,7 @@ function quoteRoutes({
       version: d.version,
       title: d.title,
       client: d.client,
+      recipient: d.recipient,
       accountManager: d.accountManager,
       currency: d.currency,
       status: d.status,
@@ -9399,15 +9405,17 @@ function quoteRoutes({
             !search ||
             q.title.toLowerCase().includes(search) ||
             q.displayNumber.toLowerCase().includes(search) ||
-            q.client.name.includes(search),
+            q.recipient.name.includes(search),
         )
         .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
       return json(route, { items, total: items.length, page: 1, pageSize: 25 });
     }
     if (path === '/api/quotes' && method === 'POST') {
       const input = createQuoteSchema.parse(request.postDataJSON());
-      if (!covers('quotes.manage', input.clientId)) return fail(route, 403, null);
-      const client = clients.find((c) => c.id === input.clientId);
+      // Lead quotes are mocked with the lead screens (F03 PR 3).
+      const clientId = input.clientId ?? '';
+      if (!covers('quotes.manage', clientId)) return fail(route, 403, null);
+      const client = clients.find((c) => c.id === clientId);
       if (!client || client.archived) return fail(route, 409, 'CLIENT_ARCHIVED');
       if (client.status === 'ended') return fail(route, 409, 'CLIENT_ENDED');
       const at = now();
@@ -9417,7 +9425,7 @@ function quoteRoutes({
         number: Math.max(...quotes.map((q) => q.number)) + 1,
         version: 1,
         title: input.title,
-        clientId: input.clientId,
+        clientId,
         contactId: input.contactId,
         currency: input.currency,
         status: 'draft',

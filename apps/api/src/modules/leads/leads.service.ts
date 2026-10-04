@@ -390,6 +390,20 @@ export class LeadsService implements OnModuleInit {
     return lead;
   }
 
+  /** A lead the caller manages, without a lock: 404 outside read access, 403 otherwise. */
+  async manageable(executor: Executor, actor: CurrentUserInfo, id: string): Promise<LeadRow> {
+    const [lead] = await executor.select().from(leads).where(eq(leads.id, id));
+    if (!lead || !readsLead(actor, lead)) throw new NotFoundException();
+    if (!coversLead(actor, 'leads.manage', lead)) throw new ForbiddenException();
+    return lead;
+  }
+
+  /** A lead row, without access checks: for the conversion step of a quote's acceptance. */
+  async row(executor: Executor, id: string): Promise<LeadRow | null> {
+    const [lead] = await executor.select().from(leads).where(eq(leads.id, id));
+    return lead ?? null;
+  }
+
   /** Rule 1: an active holder of `leads.manage`. */
   async assertOwner(tx: Transaction, ownerId: string): Promise<void> {
     const access = await this.users.access(ownerId, tx);
@@ -426,6 +440,7 @@ export class LeadsService implements OnModuleInit {
     const interests = await this.interestsOf(executor, [row.id]);
     const client = row.clientId ? await this.clients.summary(row.clientId, executor) : null;
     const ownerAccess = await this.users.access(row.ownerId, executor);
+    const quoteCounts = await this.quoteChecks.quoteCounts(executor, [row.id]);
     const person = (id: string) => ({ id, name: people.get(id)?.name ?? '' });
     const detailInterests = interests.get(row.id) ?? [];
     const permissions = await this.permissionsOf(actor, row, executor);
@@ -435,6 +450,7 @@ export class LeadsService implements OnModuleInit {
         people.get(row.ownerId),
         detailInterests.map((interest) => interest.name),
         client,
+        quoteCounts.get(row.id) ?? 0,
       ),
       phone: row.phone,
       email: row.email,
@@ -516,13 +532,17 @@ export class LeadsService implements OnModuleInit {
   /** List items with their owners, interest names and won clients. */
   private async summaries(rows: LeadRow[]): Promise<Lead[]> {
     if (rows.length === 0) return [];
-    const [people, interests, clients] = await Promise.all([
+    const [people, interests, clients, quoteCounts] = await Promise.all([
       this.users.summaries(rows.map((row) => row.ownerId)),
       this.interestsOf(
         this.db,
         rows.map((row) => row.id),
       ),
       this.clients.summaries(rows.flatMap((row) => (row.clientId ? [row.clientId] : []))),
+      this.quoteChecks.quoteCounts(
+        this.db,
+        rows.map((row) => row.id),
+      ),
     ]);
     return rows.map((row) =>
       this.summary(
@@ -530,6 +550,7 @@ export class LeadsService implements OnModuleInit {
         people.get(row.ownerId),
         (interests.get(row.id) ?? []).map((interest) => interest.name),
         row.clientId ? (clients.get(row.clientId) ?? null) : null,
+        quoteCounts.get(row.id) ?? 0,
       ),
     );
   }
@@ -539,6 +560,7 @@ export class LeadsService implements OnModuleInit {
     owner: { name: string; archived: boolean } | undefined,
     interests: string[],
     client: { id: string; name: string } | null,
+    quoteCount: number,
   ): Lead {
     const today = businessDate();
     const followUp = row.nextFollowUpOn;
@@ -558,6 +580,7 @@ export class LeadsService implements OnModuleInit {
       budgetMinor: row.budgetMinor,
       budgetCurrency: row.budgetCurrency,
       interests,
+      quoteCount,
       client: client && { id: client.id, name: client.name },
       closedAt: row.closedAt?.toISOString() ?? null,
       createdAt: row.createdAt.toISOString(),

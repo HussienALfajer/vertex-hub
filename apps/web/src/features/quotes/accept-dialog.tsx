@@ -102,7 +102,7 @@ function defaultsOf(plan: AcceptPlan, today: string): AcceptValues {
     note: '',
     project: {
       name: plan.project?.name ?? '',
-      projectManagerId: plan.project?.projectManager.id ?? '',
+      projectManagerId: plan.project?.projectManager?.id ?? '',
       departments: plan.project?.departments ?? [],
       startDate: plan.project?.startDate ?? today,
       dueDate: plan.project?.dueDate ?? today,
@@ -473,7 +473,7 @@ function ResponseStep({
 }) {
   const { t } = useTranslation();
   const ids = { contact: useId(), date: useId(), note: useId() };
-  const client = useQuery(clientQuery(quote.client.id));
+  const client = useQuery({ ...clientQuery(quote.client?.id ?? ''), enabled: !!quote.client });
   const { errors } = form.formState;
   const contactItems = [
     { value: NONE, label: t('quotes.form.noContact') },
@@ -584,10 +584,9 @@ function ProjectStep({
     template: useId(),
   };
   const errors = form.formState.errors.project;
-  const managers = useProjectManagerOptions({
-    ...project.projectManager,
-    archived: false,
-  }).map((option) => ({ value: option.id, label: option.name }));
+  const managers = useProjectManagerOptions(
+    project.projectManager ? { ...project.projectManager, archived: false } : undefined,
+  ).map((option) => ({ value: option.id, label: option.name }));
   const choices = useWatch({ control: form.control, name: 'project.installmentMilestones' });
   const milestoneItems = project.milestones.map((milestone, position) => ({
     value: String(position),
@@ -1033,7 +1032,7 @@ function Summary({
   const managers = useProjectManagerOptions();
   const managerName =
     managers.find((option) => option.id === values.project.projectManagerId)?.name ??
-    plan.project?.projectManager.name;
+    plan.project?.projectManager?.name;
   const templates = plan.project?.templates.filter((template) =>
     values.project.templateIds.includes(template.id),
   );

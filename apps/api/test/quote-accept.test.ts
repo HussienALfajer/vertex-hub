@@ -191,7 +191,7 @@ describe('quote acceptance (F04 A01)', () => {
     respondedOn: today,
     project: plan.project && {
       name: plan.project.name,
-      projectManagerId: plan.project.projectManager.id,
+      projectManagerId: plan.project.projectManager?.id ?? '',
       departments: plan.project.departments,
       startDate: plan.project.startDate,
       dueDate: plan.project.dueDate,

@@ -2436,6 +2436,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/quotes/by-lead/{leadId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["QuotesController_byLead"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/quotes/{id}": {
         parameters: {
             query?: never;
@@ -2884,6 +2900,262 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/leads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["LeadsController_list"];
+        put?: never;
+        post: operations["LeadsController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/leads/board": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["LeadsController_board"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/leads/owners": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["LeadsController_owners"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/leads/duplicates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["LeadsController_duplicates"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/leads/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["LeadsController_detail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["LeadsController_update"];
+        trace?: never;
+    };
+    "/api/leads/{id}/stage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["LeadsController_changeStage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/leads/{id}/owner": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["LeadsController_changeOwner"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/leads/{id}/lose": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["LeadsController_lose"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/leads/{id}/reopen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["LeadsController_reopen"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/leads/{id}/conversion-plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["LeadsController_conversionPlan"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/leads/{id}/convert": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["LeadsController_convert"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/leads/{id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["LeadsController_archive"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/leads/{id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["LeadsController_restore"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/leads/{id}/notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["LeadsController_createNote"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/leads/{id}/notes/{noteId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["LeadsController_updateNote"];
+        trace?: never;
+    };
+    "/api/leads/{id}/notes/{noteId}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["LeadsController_archiveNote"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/approvals/ready": {
         parameters: {
             query?: never;
@@ -3070,230 +3342,6 @@ export interface paths {
         get: operations["PublicApprovalsController_thumbnail"];
         put?: never;
         post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/leads": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["LeadsController_list"];
-        put?: never;
-        post: operations["LeadsController_create"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/leads/board": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["LeadsController_board"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/leads/owners": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["LeadsController_owners"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/leads/duplicates": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["LeadsController_duplicates"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/leads/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["LeadsController_detail"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch: operations["LeadsController_update"];
-        trace?: never;
-    };
-    "/api/leads/{id}/stage": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["LeadsController_changeStage"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/leads/{id}/owner": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["LeadsController_changeOwner"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/leads/{id}/lose": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["LeadsController_lose"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/leads/{id}/reopen": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["LeadsController_reopen"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/leads/{id}/archive": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["LeadsController_archive"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/leads/{id}/restore": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["LeadsController_restore"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/leads/{id}/notes": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["LeadsController_createNote"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/leads/{id}/notes/{noteId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch: operations["LeadsController_updateNote"];
-        trace?: never;
-    };
-    "/api/leads/{id}/notes/{noteId}/archive": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["LeadsController_archiveNote"];
         delete?: never;
         options?: never;
         head?: never;
@@ -8264,6 +8312,13 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+            } | null;
+            recipient: {
+                /** @enum {string} */
+                kind: "client" | "lead";
+                /** Format: uuid */
+                id: string;
+                name: string;
             };
             accountManager: {
                 /** Format: uuid */
@@ -8285,6 +8340,30 @@ export interface components {
         };
         /** @enum {string} */
         DiscountApproval: "none" | "pending" | "approved" | "returned";
+        /** @description The lead's quotes: latest versions, newest first */
+        LeadQuotes: {
+            items: {
+                /** Format: uuid */
+                id: string;
+                displayNumber: string;
+                version: number;
+                title: string;
+                status: components["schemas"]["QuoteStatus"];
+                currency: components["schemas"]["Currency"];
+                /** Format: date-time */
+                sentAt: string | null;
+                /** Format: date */
+                validUntil: string | null;
+                oneOffNetMinor: number | null;
+                monthlyNetMinor: number | null;
+                versions: {
+                    /** Format: uuid */
+                    id: string;
+                    version: number;
+                    status: components["schemas"]["QuoteStatus"];
+                }[];
+            }[];
+        };
         QuoteDetail: {
             /** Format: uuid */
             id: string;
@@ -8294,6 +8373,13 @@ export interface components {
             version: number;
             title: string;
             client: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            recipient: {
+                /** @enum {string} */
+                kind: "client" | "lead";
                 /** Format: uuid */
                 id: string;
                 name: string;
@@ -8320,6 +8406,12 @@ export interface components {
                 id: string;
                 name: string;
                 archived: boolean;
+            } | null;
+            lead: {
+                /** Format: uuid */
+                id: string;
+                displayName: string;
+                stage: components["schemas"]["LeadStage"];
             } | null;
             discountDecision: {
                 by: {
@@ -8406,6 +8498,8 @@ export interface components {
             permissions: components["schemas"]["QuotePermissions"];
         };
         /** @enum {string} */
+        LeadStage: "new" | "contacted" | "meeting" | "quote_sent" | "won" | "lost";
+        /** @enum {string} */
         QuoteRejectionReason: "price" | "timing" | "competitor" | "scope" | "no_response" | "other";
         QuoteLine: {
             /** Format: uuid */
@@ -8474,7 +8568,9 @@ export interface components {
         };
         CreateQuote: {
             /** Format: uuid */
-            clientId: string;
+            clientId?: string;
+            /** Format: uuid */
+            leadId?: string;
             /**
              * Format: uuid
              * @default null
@@ -8566,7 +8662,7 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
-                };
+                } | null;
                 departments: components["schemas"]["DepartmentCode"][];
                 /** Format: date */
                 startDate: string;
@@ -8623,6 +8719,52 @@ export interface components {
                 id: string;
                 name: string;
             }[];
+            conversion: components["schemas"]["LeadConversionPlan"] | null;
+        };
+        /** @description The convert dialog (and accept step 0) defaults */
+        LeadConversionPlan: {
+            client: {
+                tradeName: string;
+                sector: string | null;
+                isHealthcare: boolean;
+                /** Format: uuid */
+                accountManagerId: string | null;
+            };
+            contact: {
+                name: string;
+                phone: string | null;
+                email: string | null;
+            };
+            accountManagers: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            }[];
+            duplicateClients: {
+                /** Format: uuid */
+                id: string;
+                tradeName: string;
+                status: components["schemas"]["ClientStatus"];
+                accountManager: {
+                    /** Format: uuid */
+                    id: string;
+                    name: string;
+                };
+            }[];
+            noteCount: number;
+            quoteCount: number;
+            existingClient: {
+                /** Format: uuid */
+                id: string;
+                tradeName: string;
+                status: components["schemas"]["ClientStatus"];
+                accountManager: {
+                    /** Format: uuid */
+                    id: string;
+                    name: string;
+                };
+                hasContact: boolean;
+            } | null;
         };
         AcceptQuote: {
             /** Format: date */
@@ -8669,6 +8811,47 @@ export interface components {
                 /** Format: uuid */
                 templateId: string | null;
             }) | null;
+            conversion?: components["schemas"]["ConvertLead"] | null;
+        };
+        ConvertLead: {
+            /** @enum {string} */
+            mode: "new";
+            client: {
+                tradeName: string;
+                sector: string | null;
+                isHealthcare: boolean;
+                /** Format: uuid */
+                accountManagerId: string;
+            };
+            contact: {
+                /** @enum {boolean} */
+                add: false;
+            } | {
+                name: string;
+                jobTitle?: string | null;
+                phone?: string | null;
+                email?: string | null;
+                hasFinalApproval?: boolean;
+                /** @enum {boolean} */
+                add: true;
+            };
+        } | {
+            /** @enum {string} */
+            mode: "existing";
+            /** Format: uuid */
+            clientId: string;
+            contact: {
+                /** @enum {boolean} */
+                add: false;
+            } | {
+                name: string;
+                jobTitle?: string | null;
+                phone?: string | null;
+                email?: string | null;
+                hasFinalApproval?: boolean;
+                /** @enum {boolean} */
+                add: true;
+            };
         };
         /** @enum {string} */
         CatalogBilling: "one_off" | "monthly";
@@ -9130,6 +9313,353 @@ export interface components {
             /** Format: uuid */
             templateId: string | null;
         };
+        /** @enum {string} */
+        LeadSource: "instagram" | "facebook" | "tiktok" | "whatsapp" | "website" | "referral" | "paid_ad" | "event" | "walk_in" | "other";
+        /** @enum {string} */
+        LeadFollowUpFilter: "overdue" | "today" | "week";
+        LeadPage: {
+            items: components["schemas"]["Lead"][];
+            total: number;
+            page: number;
+            pageSize: number;
+        };
+        Lead: {
+            /** Format: uuid */
+            id: string;
+            displayName: string;
+            contactName: string;
+            companyName: string | null;
+            source: components["schemas"]["LeadSource"];
+            stage: components["schemas"]["LeadStage"];
+            /** Format: date-time */
+            stageChangedAt: string;
+            daysInStage: number;
+            owner: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                archived: boolean;
+            };
+            /** Format: date */
+            nextFollowUpOn: string | null;
+            followUpOverdue: boolean;
+            followUpDueToday: boolean;
+            budgetMinor: number | null;
+            budgetCurrency: components["schemas"]["Currency"] | null;
+            interests: string[];
+            quoteCount: number;
+            client: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            /** Format: date-time */
+            closedAt: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** Format: date-time */
+            archivedAt: string | null;
+        };
+        /** @description One column per stage; Won and Lost hold leads closed in the last 30 days */
+        LeadBoard: {
+            columns: {
+                stage: components["schemas"]["LeadStage"];
+                count: number;
+                truncated: boolean;
+                items: components["schemas"]["Lead"][];
+            }[];
+        };
+        /** @description Active users who may own leads (rule 1), by name */
+        LeadOwnerOptions: {
+            items: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                departments: components["schemas"]["DepartmentCode"][];
+            }[];
+        };
+        LeadDuplicateQuery: {
+            phone?: string | null;
+            email?: string | null;
+            /** @default [] */
+            names: string[];
+            /** Format: uuid */
+            excludeLeadId?: string;
+        };
+        LeadDuplicates: {
+            leads: {
+                /** Format: uuid */
+                id: string;
+                displayName: string;
+                owner: {
+                    /** Format: uuid */
+                    id: string;
+                    name: string;
+                };
+                stage: components["schemas"]["LeadStage"];
+                readable: boolean;
+            }[];
+            clients: {
+                /** Format: uuid */
+                id: string;
+                tradeName: string;
+                status: components["schemas"]["ClientStatus"];
+                accountManager: {
+                    /** Format: uuid */
+                    id: string;
+                    name: string;
+                };
+            }[];
+        };
+        CreateLead: {
+            /** @default null */
+            budgetMinor: number | null;
+            /** @default null */
+            budgetCurrency: components["schemas"]["Currency"] | null;
+            contactName: string;
+            companyName?: string | null;
+            phone?: string | null;
+            email?: string | null;
+            socialHandle?: string | null;
+            source: components["schemas"]["LeadSource"];
+            sourceDetail?: string | null;
+            request?: string | null;
+            sector?: string | null;
+            /** @default false */
+            isHealthcare: boolean;
+            /** Format: date */
+            nextFollowUpOn: string;
+            /** @default [] */
+            interests: components["schemas"]["LeadInterestInput"][];
+            /** Format: uuid */
+            ownerId: string;
+        };
+        LeadInterestInput: {
+            /** Format: uuid */
+            serviceId?: string;
+            /** Format: uuid */
+            packageId?: string;
+        };
+        LeadDetail: {
+            /** Format: uuid */
+            id: string;
+            displayName: string;
+            contactName: string;
+            companyName: string | null;
+            source: components["schemas"]["LeadSource"];
+            stage: components["schemas"]["LeadStage"];
+            /** Format: date-time */
+            stageChangedAt: string;
+            daysInStage: number;
+            owner: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                archived: boolean;
+            };
+            /** Format: date */
+            nextFollowUpOn: string | null;
+            followUpOverdue: boolean;
+            followUpDueToday: boolean;
+            budgetMinor: number | null;
+            budgetCurrency: components["schemas"]["Currency"] | null;
+            interests: components["schemas"]["LeadInterest"][];
+            quoteCount: number;
+            client: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            /** Format: date-time */
+            closedAt: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** Format: date-time */
+            archivedAt: string | null;
+            phone: string | null;
+            email: string | null;
+            socialHandle: string | null;
+            sourceDetail: string | null;
+            request: string | null;
+            sector: string | null;
+            isHealthcare: boolean;
+            ownerCanManage: boolean;
+            lostReason: components["schemas"]["LeadLossReason"] | null;
+            lostNote: string | null;
+            convertedBy: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            createdBy: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            };
+            notes: components["schemas"]["LeadNote"][];
+            permissions: components["schemas"]["LeadPermissions"];
+        };
+        LeadInterest: {
+            /** @enum {string} */
+            kind: "service" | "package";
+            /** Format: uuid */
+            id: string;
+            name: string;
+            archived: boolean;
+        };
+        /** @enum {string} */
+        LeadLossReason: "price" | "timing" | "competitor" | "not_a_fit" | "no_response" | "other";
+        LeadNote: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            leadId: string;
+            /** Format: date-time */
+            occurredAt: string;
+            channel: components["schemas"]["NoteChannel"];
+            summary: string;
+            author: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            };
+            canEdit: boolean;
+            canArchive: boolean;
+        };
+        /** @description What the caller may do, for the UI */
+        LeadPermissions: {
+            canEdit: boolean;
+            moves: ("new" | "contacted" | "meeting")[];
+            canChangeOwner: boolean;
+            canLogActivity: boolean;
+            canLose: boolean;
+            canReopen: boolean;
+            canConvert: boolean;
+            canArchive: boolean;
+            canRestore: boolean;
+            canNewQuote: boolean;
+        };
+        UpdateLead: {
+            budgetMinor?: number | null;
+            budgetCurrency?: components["schemas"]["Currency"] | null;
+            contactName?: string;
+            companyName?: string | null;
+            phone?: string | null;
+            email?: string | null;
+            socialHandle?: string | null;
+            source?: components["schemas"]["LeadSource"];
+            sourceDetail?: string | null;
+            request?: string | null;
+            sector?: string | null;
+            isHealthcare?: boolean;
+            /** Format: date */
+            nextFollowUpOn?: string;
+            interests?: components["schemas"]["LeadInterestInput"][];
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        LeadStageChange: {
+            /** @enum {string} */
+            stage: "new" | "contacted" | "meeting";
+            /** Format: date */
+            nextFollowUpOn?: string;
+        };
+        LeadOwnerChange: {
+            /** Format: uuid */
+            ownerId: string;
+        };
+        LoseLead: {
+            reason: components["schemas"]["LeadLossReason"];
+            note?: string | null;
+        };
+        LoseLeadResult: {
+            /** Format: uuid */
+            id: string;
+            displayName: string;
+            contactName: string;
+            companyName: string | null;
+            source: components["schemas"]["LeadSource"];
+            stage: components["schemas"]["LeadStage"];
+            /** Format: date-time */
+            stageChangedAt: string;
+            daysInStage: number;
+            owner: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                archived: boolean;
+            };
+            /** Format: date */
+            nextFollowUpOn: string | null;
+            followUpOverdue: boolean;
+            followUpDueToday: boolean;
+            budgetMinor: number | null;
+            budgetCurrency: components["schemas"]["Currency"] | null;
+            interests: components["schemas"]["LeadInterest"][];
+            quoteCount: number;
+            client: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            /** Format: date-time */
+            closedAt: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** Format: date-time */
+            archivedAt: string | null;
+            phone: string | null;
+            email: string | null;
+            socialHandle: string | null;
+            sourceDetail: string | null;
+            request: string | null;
+            sector: string | null;
+            isHealthcare: boolean;
+            ownerCanManage: boolean;
+            lostReason: components["schemas"]["LeadLossReason"] | null;
+            lostNote: string | null;
+            convertedBy: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            createdBy: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            };
+            notes: components["schemas"]["LeadNote"][];
+            permissions: components["schemas"]["LeadPermissions"];
+            rejectedQuotes: string[];
+        };
+        ReopenLead: {
+            /** @enum {string} */
+            stage: "new" | "contacted";
+            /** Format: date */
+            nextFollowUpOn: string;
+            /** Format: uuid */
+            ownerId?: string;
+        };
+        CreateLeadNote: {
+            /** Format: date-time */
+            occurredAt?: string;
+            channel: components["schemas"]["NoteChannel"];
+            summary: string;
+            /** Format: date */
+            nextFollowUpOn: string;
+        };
+        UpdateLeadNote: {
+            /** Format: date-time */
+            occurredAt?: string;
+            channel?: components["schemas"]["NoteChannel"];
+            summary?: string;
+        };
         /** @description Tasks and posts ready to send, grouped by client, by name */
         ApprovalReady: {
             clients: components["schemas"]["ReadyClient"][];
@@ -9547,352 +10077,6 @@ export interface components {
         };
         PublicApprovalItems: {
             items: components["schemas"]["PublicApprovalItem"][];
-        };
-        /** @enum {string} */
-        LeadSource: "instagram" | "facebook" | "tiktok" | "whatsapp" | "website" | "referral" | "paid_ad" | "event" | "walk_in" | "other";
-        /** @enum {string} */
-        LeadFollowUpFilter: "overdue" | "today" | "week";
-        /** @enum {string} */
-        LeadStage: "new" | "contacted" | "meeting" | "quote_sent" | "won" | "lost";
-        LeadPage: {
-            items: components["schemas"]["Lead"][];
-            total: number;
-            page: number;
-            pageSize: number;
-        };
-        Lead: {
-            /** Format: uuid */
-            id: string;
-            displayName: string;
-            contactName: string;
-            companyName: string | null;
-            source: components["schemas"]["LeadSource"];
-            stage: components["schemas"]["LeadStage"];
-            /** Format: date-time */
-            stageChangedAt: string;
-            daysInStage: number;
-            owner: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-                archived: boolean;
-            };
-            /** Format: date */
-            nextFollowUpOn: string | null;
-            followUpOverdue: boolean;
-            followUpDueToday: boolean;
-            budgetMinor: number | null;
-            budgetCurrency: components["schemas"]["Currency"] | null;
-            interests: string[];
-            client: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            } | null;
-            /** Format: date-time */
-            closedAt: string | null;
-            /** Format: date-time */
-            createdAt: string;
-            /** Format: date-time */
-            updatedAt: string;
-            /** Format: date-time */
-            archivedAt: string | null;
-        };
-        /** @description One column per stage; Won and Lost hold leads closed in the last 30 days */
-        LeadBoard: {
-            columns: {
-                stage: components["schemas"]["LeadStage"];
-                count: number;
-                truncated: boolean;
-                items: components["schemas"]["Lead"][];
-            }[];
-        };
-        /** @description Active users who may own leads (rule 1), by name */
-        LeadOwnerOptions: {
-            items: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-                departments: components["schemas"]["DepartmentCode"][];
-            }[];
-        };
-        LeadDuplicateQuery: {
-            phone?: string | null;
-            email?: string | null;
-            /** @default [] */
-            names: string[];
-            /** Format: uuid */
-            excludeLeadId?: string;
-        };
-        LeadDuplicates: {
-            leads: {
-                /** Format: uuid */
-                id: string;
-                displayName: string;
-                owner: {
-                    /** Format: uuid */
-                    id: string;
-                    name: string;
-                };
-                stage: components["schemas"]["LeadStage"];
-                readable: boolean;
-            }[];
-            clients: {
-                /** Format: uuid */
-                id: string;
-                tradeName: string;
-                status: components["schemas"]["ClientStatus"];
-                accountManager: {
-                    /** Format: uuid */
-                    id: string;
-                    name: string;
-                };
-            }[];
-        };
-        CreateLead: {
-            /** @default null */
-            budgetMinor: number | null;
-            /** @default null */
-            budgetCurrency: components["schemas"]["Currency"] | null;
-            contactName: string;
-            companyName?: string | null;
-            phone?: string | null;
-            email?: string | null;
-            socialHandle?: string | null;
-            source: components["schemas"]["LeadSource"];
-            sourceDetail?: string | null;
-            request?: string | null;
-            sector?: string | null;
-            /** @default false */
-            isHealthcare: boolean;
-            /** Format: date */
-            nextFollowUpOn: string;
-            /** @default [] */
-            interests: components["schemas"]["LeadInterestInput"][];
-            /** Format: uuid */
-            ownerId: string;
-        };
-        LeadInterestInput: {
-            /** Format: uuid */
-            serviceId?: string;
-            /** Format: uuid */
-            packageId?: string;
-        };
-        LeadDetail: {
-            /** Format: uuid */
-            id: string;
-            displayName: string;
-            contactName: string;
-            companyName: string | null;
-            source: components["schemas"]["LeadSource"];
-            stage: components["schemas"]["LeadStage"];
-            /** Format: date-time */
-            stageChangedAt: string;
-            daysInStage: number;
-            owner: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-                archived: boolean;
-            };
-            /** Format: date */
-            nextFollowUpOn: string | null;
-            followUpOverdue: boolean;
-            followUpDueToday: boolean;
-            budgetMinor: number | null;
-            budgetCurrency: components["schemas"]["Currency"] | null;
-            interests: components["schemas"]["LeadInterest"][];
-            client: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            } | null;
-            /** Format: date-time */
-            closedAt: string | null;
-            /** Format: date-time */
-            createdAt: string;
-            /** Format: date-time */
-            updatedAt: string;
-            /** Format: date-time */
-            archivedAt: string | null;
-            phone: string | null;
-            email: string | null;
-            socialHandle: string | null;
-            sourceDetail: string | null;
-            request: string | null;
-            sector: string | null;
-            isHealthcare: boolean;
-            ownerCanManage: boolean;
-            lostReason: components["schemas"]["LeadLossReason"] | null;
-            lostNote: string | null;
-            convertedBy: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            } | null;
-            createdBy: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            };
-            notes: components["schemas"]["LeadNote"][];
-            permissions: components["schemas"]["LeadPermissions"];
-        };
-        LeadInterest: {
-            /** @enum {string} */
-            kind: "service" | "package";
-            /** Format: uuid */
-            id: string;
-            name: string;
-            archived: boolean;
-        };
-        /** @enum {string} */
-        LeadLossReason: "price" | "timing" | "competitor" | "not_a_fit" | "no_response" | "other";
-        LeadNote: {
-            /** Format: uuid */
-            id: string;
-            /** Format: uuid */
-            leadId: string;
-            /** Format: date-time */
-            occurredAt: string;
-            channel: components["schemas"]["NoteChannel"];
-            summary: string;
-            author: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            };
-            canEdit: boolean;
-            canArchive: boolean;
-        };
-        /** @description What the caller may do, for the UI */
-        LeadPermissions: {
-            canEdit: boolean;
-            moves: ("new" | "contacted" | "meeting")[];
-            canChangeOwner: boolean;
-            canLogActivity: boolean;
-            canLose: boolean;
-            canReopen: boolean;
-            canConvert: boolean;
-            canArchive: boolean;
-            canRestore: boolean;
-            canNewQuote: boolean;
-        };
-        UpdateLead: {
-            budgetMinor?: number | null;
-            budgetCurrency?: components["schemas"]["Currency"] | null;
-            contactName?: string;
-            companyName?: string | null;
-            phone?: string | null;
-            email?: string | null;
-            socialHandle?: string | null;
-            source?: components["schemas"]["LeadSource"];
-            sourceDetail?: string | null;
-            request?: string | null;
-            sector?: string | null;
-            isHealthcare?: boolean;
-            /** Format: date */
-            nextFollowUpOn?: string;
-            interests?: components["schemas"]["LeadInterestInput"][];
-            /** Format: date-time */
-            updatedAt: string;
-        };
-        LeadStageChange: {
-            /** @enum {string} */
-            stage: "new" | "contacted" | "meeting";
-            /** Format: date */
-            nextFollowUpOn?: string;
-        };
-        LeadOwnerChange: {
-            /** Format: uuid */
-            ownerId: string;
-        };
-        LoseLead: {
-            reason: components["schemas"]["LeadLossReason"];
-            note?: string | null;
-        };
-        LoseLeadResult: {
-            /** Format: uuid */
-            id: string;
-            displayName: string;
-            contactName: string;
-            companyName: string | null;
-            source: components["schemas"]["LeadSource"];
-            stage: components["schemas"]["LeadStage"];
-            /** Format: date-time */
-            stageChangedAt: string;
-            daysInStage: number;
-            owner: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-                archived: boolean;
-            };
-            /** Format: date */
-            nextFollowUpOn: string | null;
-            followUpOverdue: boolean;
-            followUpDueToday: boolean;
-            budgetMinor: number | null;
-            budgetCurrency: components["schemas"]["Currency"] | null;
-            interests: components["schemas"]["LeadInterest"][];
-            client: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            } | null;
-            /** Format: date-time */
-            closedAt: string | null;
-            /** Format: date-time */
-            createdAt: string;
-            /** Format: date-time */
-            updatedAt: string;
-            /** Format: date-time */
-            archivedAt: string | null;
-            phone: string | null;
-            email: string | null;
-            socialHandle: string | null;
-            sourceDetail: string | null;
-            request: string | null;
-            sector: string | null;
-            isHealthcare: boolean;
-            ownerCanManage: boolean;
-            lostReason: components["schemas"]["LeadLossReason"] | null;
-            lostNote: string | null;
-            convertedBy: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            } | null;
-            createdBy: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            };
-            notes: components["schemas"]["LeadNote"][];
-            permissions: components["schemas"]["LeadPermissions"];
-            rejectedQuotes: string[];
-        };
-        ReopenLead: {
-            /** @enum {string} */
-            stage: "new" | "contacted";
-            /** Format: date */
-            nextFollowUpOn: string;
-            /** Format: uuid */
-            ownerId?: string;
-        };
-        CreateLeadNote: {
-            /** Format: date-time */
-            occurredAt?: string;
-            channel: components["schemas"]["NoteChannel"];
-            summary: string;
-            /** Format: date */
-            nextFollowUpOn: string;
-        };
-        UpdateLeadNote: {
-            /** Format: date-time */
-            occurredAt?: string;
-            channel?: components["schemas"]["NoteChannel"];
-            summary?: string;
         };
         /** @enum {string} */
         AdCampaignStatus: "planned" | "active" | "paused" | "completed" | "cancelled";
@@ -15382,6 +15566,7 @@ export interface operations {
                 search?: string;
                 status?: components["schemas"]["QuoteStatus"] | components["schemas"]["QuoteStatus"][];
                 clientId?: string;
+                leadId?: string;
                 accountManagerId?: string;
                 approval?: "pending";
                 projectId?: string;
@@ -15428,6 +15613,28 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["QuoteDetail"];
+                };
+            };
+        };
+    };
+    QuotesController_byLead: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                leadId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A lead's quotes for its page (F03); nets only where quotes.read covers them */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeadQuotes"];
                 };
             };
         };
@@ -15617,6 +15824,7 @@ export interface operations {
                 chooseTemplates?: "true" | "false";
                 templateIds?: string | string[];
                 retainerStartDate?: string;
+                clientId?: string;
             };
             header?: never;
             path: {
@@ -16314,6 +16522,447 @@ export interface operations {
             };
         };
     };
+    LeadsController_list: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+                search?: string;
+                ownerId?: string;
+                source?: components["schemas"]["LeadSource"] | components["schemas"]["LeadSource"][];
+                followUp?: components["schemas"]["LeadFollowUpFilter"];
+                stage?: components["schemas"]["LeadStage"] | components["schemas"]["LeadStage"][];
+                clientId?: string;
+                archived?: "true" | "false";
+                sort?: "nextFollowUpOn" | "createdAt" | "updatedAt" | "stageChangedAt";
+                order?: components["schemas"]["SortOrder"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Leads in scope; open, non-archived leads by next follow-up date by default */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeadPage"];
+                };
+            };
+        };
+    };
+    LeadsController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateLead"];
+            };
+        };
+        responses: {
+            /** @description The new lead */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeadDetail"];
+                };
+            };
+        };
+    };
+    LeadsController_board: {
+        parameters: {
+            query?: {
+                search?: string;
+                ownerId?: string;
+                source?: components["schemas"]["LeadSource"] | components["schemas"]["LeadSource"][];
+                followUp?: components["schemas"]["LeadFollowUpFilter"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The pipeline board */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeadBoard"];
+                };
+            };
+        };
+    };
+    LeadsController_owners: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Users who may own leads */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeadOwnerOptions"];
+                };
+            };
+        };
+    };
+    LeadsController_duplicates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LeadDuplicateQuery"];
+            };
+        };
+        responses: {
+            /** @description Open leads and clients that look like the same person (a warning only) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeadDuplicates"];
+                };
+            };
+        };
+    };
+    LeadsController_detail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A lead with its interests and activity log */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeadDetail"];
+                };
+            };
+        };
+    };
+    LeadsController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateLead"];
+            };
+        };
+        responses: {
+            /** @description The saved lead */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeadDetail"];
+                };
+            };
+        };
+    };
+    LeadsController_changeStage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LeadStageChange"];
+            };
+        };
+        responses: {
+            /** @description Moved among New, Contacted and Meeting */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeadDetail"];
+                };
+            };
+        };
+    };
+    LeadsController_changeOwner: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LeadOwnerChange"];
+            };
+        };
+        responses: {
+            /** @description The lead with its new owner */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeadDetail"];
+                };
+            };
+        };
+    };
+    LeadsController_lose: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LoseLead"];
+            };
+        };
+        responses: {
+            /** @description The lost lead and the quotes the loss rejected */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoseLeadResult"];
+                };
+            };
+        };
+    };
+    LeadsController_reopen: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReopenLead"];
+            };
+        };
+        responses: {
+            /** @description The reopened lead */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeadDetail"];
+                };
+            };
+        };
+    };
+    LeadsController_conversionPlan: {
+        parameters: {
+            query?: {
+                clientId?: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The convert dialog: new-client defaults, or the existing client with clientId */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeadConversionPlan"];
+                };
+            };
+        };
+    };
+    LeadsController_convert: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConvertLead"];
+            };
+        };
+        responses: {
+            /** @description The won lead, linked to its new or existing client */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeadDetail"];
+                };
+            };
+        };
+    };
+    LeadsController_archive: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Archived (scope all) */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    LeadsController_restore: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Restored (scope all) */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    LeadsController_createNote: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateLeadNote"];
+            };
+        };
+        responses: {
+            /** @description The logged activity; the lead gets its new follow-up date */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeadNote"];
+                };
+            };
+        };
+    };
+    LeadsController_updateNote: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                noteId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateLeadNote"];
+            };
+        };
+        responses: {
+            /** @description The edited activity (its author) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeadNote"];
+                };
+            };
+        };
+    };
+    LeadsController_archiveNote: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                noteId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Archived (its author or scope all) */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     ApprovalsController_ready: {
         parameters: {
             query?: {
@@ -16763,397 +17412,6 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
-            };
-        };
-    };
-    LeadsController_list: {
-        parameters: {
-            query?: {
-                page?: number;
-                pageSize?: number;
-                search?: string;
-                ownerId?: string;
-                source?: components["schemas"]["LeadSource"] | components["schemas"]["LeadSource"][];
-                followUp?: components["schemas"]["LeadFollowUpFilter"];
-                stage?: components["schemas"]["LeadStage"] | components["schemas"]["LeadStage"][];
-                clientId?: string;
-                archived?: "true" | "false";
-                sort?: "nextFollowUpOn" | "createdAt" | "updatedAt" | "stageChangedAt";
-                order?: components["schemas"]["SortOrder"];
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Leads in scope; open, non-archived leads by next follow-up date by default */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LeadPage"];
-                };
-            };
-        };
-    };
-    LeadsController_create: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CreateLead"];
-            };
-        };
-        responses: {
-            /** @description The new lead */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LeadDetail"];
-                };
-            };
-        };
-    };
-    LeadsController_board: {
-        parameters: {
-            query?: {
-                search?: string;
-                ownerId?: string;
-                source?: components["schemas"]["LeadSource"] | components["schemas"]["LeadSource"][];
-                followUp?: components["schemas"]["LeadFollowUpFilter"];
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description The pipeline board */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LeadBoard"];
-                };
-            };
-        };
-    };
-    LeadsController_owners: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Users who may own leads */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LeadOwnerOptions"];
-                };
-            };
-        };
-    };
-    LeadsController_duplicates: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["LeadDuplicateQuery"];
-            };
-        };
-        responses: {
-            /** @description Open leads and clients that look like the same person (a warning only) */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LeadDuplicates"];
-                };
-            };
-        };
-    };
-    LeadsController_detail: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description A lead with its interests and activity log */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LeadDetail"];
-                };
-            };
-        };
-    };
-    LeadsController_update: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["UpdateLead"];
-            };
-        };
-        responses: {
-            /** @description The saved lead */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LeadDetail"];
-                };
-            };
-        };
-    };
-    LeadsController_changeStage: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["LeadStageChange"];
-            };
-        };
-        responses: {
-            /** @description Moved among New, Contacted and Meeting */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LeadDetail"];
-                };
-            };
-        };
-    };
-    LeadsController_changeOwner: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["LeadOwnerChange"];
-            };
-        };
-        responses: {
-            /** @description The lead with its new owner */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LeadDetail"];
-                };
-            };
-        };
-    };
-    LeadsController_lose: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["LoseLead"];
-            };
-        };
-        responses: {
-            /** @description The lost lead and the quotes the loss rejected */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LoseLeadResult"];
-                };
-            };
-        };
-    };
-    LeadsController_reopen: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ReopenLead"];
-            };
-        };
-        responses: {
-            /** @description The reopened lead */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LeadDetail"];
-                };
-            };
-        };
-    };
-    LeadsController_archive: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Archived (scope all) */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    LeadsController_restore: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Restored (scope all) */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    LeadsController_createNote: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CreateLeadNote"];
-            };
-        };
-        responses: {
-            /** @description The logged activity; the lead gets its new follow-up date */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LeadNote"];
-                };
-            };
-        };
-    };
-    LeadsController_updateNote: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-                noteId: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["UpdateLeadNote"];
-            };
-        };
-        responses: {
-            /** @description The edited activity (its author) */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LeadNote"];
-                };
-            };
-        };
-    };
-    LeadsController_archiveNote: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-                noteId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Archived (its author or scope all) */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
             };
         };
     };

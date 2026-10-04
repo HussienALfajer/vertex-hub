@@ -176,7 +176,7 @@ describe('automatic invoice drafts and billing locks (F13 PR 2)', () => {
           respondedOn: today,
           project: plan.project && {
             name: plan.project.name,
-            projectManagerId: plan.project.projectManager.id,
+            projectManagerId: plan.project.projectManager?.id ?? '',
             departments: plan.project.departments,
             startDate: plan.project.startDate,
             dueDate: plan.project.dueDate,

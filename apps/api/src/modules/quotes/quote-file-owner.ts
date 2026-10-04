@@ -6,6 +6,7 @@ import type { CurrentUserInfo } from '../auth/index.js';
 import { ClientDirectory } from '../clients/index.js';
 import { type ClientOwner, type FileOwner, FileOwnerRegistry } from '../files/index.js';
 import { canRead, covers, holdsAll } from './quote-access.js';
+import { QuoteRecipients } from './quote-recipients.js';
 
 type Executor = Database | Transaction;
 
@@ -19,6 +20,7 @@ export class QuoteFileOwner implements OnModuleInit {
   constructor(
     private readonly registry: FileOwnerRegistry,
     private readonly clients: ClientDirectory,
+    private readonly recipients: QuoteRecipients,
   ) {}
 
   onModuleInit(): void {
@@ -36,15 +38,22 @@ export class QuoteFileOwner implements OnModuleInit {
   ): Promise<FileOwner> {
     const query = executor.select().from(quotes).where(eq(quotes.id, id));
     const [quote] = options.forUpdate ? await query.for('update') : await query;
-    const client = quote ? await this.clients.summary(quote.clientId, executor) : null;
+    const client = quote ? await this.recipients.of(quote, executor) : null;
     if (!quote || !client || !canRead(actor, client, quote)) throw new NotFoundException();
+    // A lead quote has no documents until its lead is converted (F03): they belong to a client.
+    const archivedCode =
+      client.archived && client.kind === 'client'
+        ? 'CLIENT_ARCHIVED'
+        : client.archived || quote.archivedAt
+          ? 'QUOTE_LOCKED'
+          : null;
     return {
       type: 'quote',
       id,
       clientId: quote.clientId,
       clientName: client.name,
       label: quoteDisplayNumber(quote),
-      archivedCode: client.archived ? 'CLIENT_ARCHIVED' : quote.archivedAt ? 'QUOTE_LOCKED' : null,
+      archivedCode,
       task: null,
       rights: {
         addDeliverable: false,

@@ -75,7 +75,7 @@ export function NewQuoteDialog({
     }),
     enabled: open && !clientId,
   });
-  const client = useQuery({ ...clientQuery(chosenClient), enabled: open && !!chosenClient });
+  const client = useQuery({ ...clientQuery(chosenClient ?? ''), enabled: open && !!chosenClient });
 
   function close() {
     setFailure(null);
