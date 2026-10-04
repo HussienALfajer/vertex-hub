@@ -36,6 +36,6 @@ NestJS 12 HTTP API (modular monolith). Conventions and their reasons: ADR 0013. 
 - ESM: relative imports end in `.js`. Logs through the Nest logger (pino), never `console.log`.
 
 ## Tests
-For each endpoint in `test/<module>.test.ts`: success, 401 without a session, 403 without the permission, and a record outside the caller's scope. Start the app with `startApp()` from `test/start-app.ts`; seed users with `seedUser` and sign in with `api(url).signIn` / `signInWithTwoFactor` from `test/helpers.ts`, and remove them with `removeUsers`, as `test/auth.test.ts` does. Test files run one at a time: they share the test database and some rows are global (department managers).
+For each endpoint in `test/<module>.test.ts`: success, 401 without a session, 403 without the permission, and a record outside the caller's scope. Start the app with `startApp()` from `test/start-app.ts`; seed users with `seedUser` and sign in with `api(url).signIn` / `signInWithTwoFactor` from `test/helpers.ts`, and remove them with `removeUsers`, as `test/auth.test.ts` does. Test files run one at a time: they share the test database and some rows are global (department managers). For the same reason `turbo.json` runs this package's tests after those of `packages/db` and `apps/worker`, never alongside them.
 
 Run: `pnpm --filter @vertex-hub/api test` (needs `TEST_DATABASE_URL`) · `pnpm --filter @vertex-hub/api typecheck`.
