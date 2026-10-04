@@ -2,6 +2,8 @@ import { createHmac, randomUUID } from 'node:crypto';
 import type { AssignableRole, DepartmentCode } from '@vertex-hub/contracts';
 import {
   accounts,
+  adCampaigns,
+  adCampaignUpdates,
   approvalItems,
   approvalRequests,
   auditEntries,
@@ -318,6 +320,8 @@ export async function removeClients(db: Database, ids: string[]): Promise<void> 
   await removePayments(db, ids);
   await db.delete(statementPdfs).where(inArray(statementPdfs.clientId, ids));
   await removeFileItems(db, inArray(fileItems.clientId, ids));
+  // Campaigns point at the client's tasks, projects and retainers (F12): they go first.
+  await removeCampaigns(db, ids);
   await removeShoots(
     db,
     (await db.select({ id: shoots.id }).from(shoots).where(inArray(shoots.clientId, ids))).map(
@@ -681,6 +685,26 @@ export async function removeInvoices(db: Database, clientIds: string[]): Promise
   await db.delete(notificationReminders).where(inArray(notificationReminders.subjectId, ids));
   await db.delete(invoiceLines).where(inArray(invoiceLines.invoiceId, ids));
   await db.delete(invoices).where(inArray(invoices.id, ids));
+}
+
+/** Removes the ad campaigns of the clients with their updates and audit entries (F12). */
+export async function removeCampaigns(db: Database, clientIds: string[]): Promise<void> {
+  if (clientIds.length === 0) return;
+  const ids = (
+    await db
+      .select({ id: adCampaigns.id })
+      .from(adCampaigns)
+      .where(inArray(adCampaigns.clientId, clientIds))
+  ).map((row) => row.id);
+  if (ids.length === 0) return;
+  const updates = await db
+    .delete(adCampaignUpdates)
+    .where(inArray(adCampaignUpdates.campaignId, ids))
+    .returning({ id: adCampaignUpdates.id });
+  await db
+    .delete(auditEntries)
+    .where(inArray(auditEntries.entityId, [...ids, ...updates.map((row) => row.id)]));
+  await db.delete(adCampaigns).where(inArray(adCampaigns.id, ids));
 }
 
 /** Removes the payments on the clients' invoices with their audit entries (F13). */

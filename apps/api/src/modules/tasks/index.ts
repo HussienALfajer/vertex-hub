@@ -29,4 +29,5 @@ export {
 } from './task-approvals.js';
 export { type TaskDraft, TaskGenerator } from './task-generator.js';
 export { type TaskGuard, TaskGuards } from './task-guards.js';
+export { type TaskLink, TaskLinks } from './task-links.js';
 export { TasksModule } from './tasks.module.js';

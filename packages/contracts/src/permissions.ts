@@ -36,6 +36,7 @@ export const PERMISSIONS = [
   'meetings.manage',
   'campaigns.read',
   'campaigns.manage',
+  'campaigns.fund',
   'invoices.read',
   'invoices.manage',
   'payments.manage',
@@ -116,6 +117,8 @@ export const PERMISSION_MAP: Readonly<Record<Role, Grants>> = {
   finance: {
     'catalog.read': 'all',
     'quotes.read': 'all',
+    'campaigns.read': 'all',
+    'campaigns.fund': 'all',
     'invoices.read': 'all',
     'invoices.manage': 'all',
     'payments.manage': 'all',
@@ -148,6 +151,9 @@ export const DEPARTMENT_CAPABILITIES: Readonly<
       'content.review': 'all',
       'shoots.manage': 'all',
       'meetings.manage': 'all',
+      'campaigns.read': 'all',
+      'campaigns.manage': 'all',
+      'campaigns.fund': 'all',
       'invoices.read': 'all',
       'invoices.manage': 'all',
       'payments.manage': 'all',
@@ -162,7 +168,14 @@ export const DEPARTMENT_CAPABILITIES: Readonly<
   medical_consultation: { member: { 'approvals.review_medical': 'all' } },
   photography: { member: { 'shoots.manage': 'all' } },
   general_communication: { member: { 'leads.read': 'all', 'leads.manage': 'all' } },
-  marketing: { member: { 'leads.read': 'all', 'leads.manage': 'all' } },
+  marketing: {
+    member: {
+      'leads.read': 'all',
+      'leads.manage': 'all',
+      'campaigns.read': 'all',
+      'campaigns.manage': 'all',
+    },
+  },
 };
 
 export type DepartmentPosition = { code: DepartmentCode; isManager: boolean };
