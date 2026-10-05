@@ -14,7 +14,9 @@ import {
   SerializeOptions,
 } from '@nestjs/common';
 import {
+  ApiAcceptedResponse,
   ApiBadRequestResponse,
+  ApiConflictResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiProduces,
@@ -25,8 +27,14 @@ import {
   type ClientReportQuery,
   clientMonthlyReportSchema,
   clientReportQuerySchema,
+  type EmailHistory,
+  type EmailSummary,
+  emailHistorySchema,
+  emailSummarySchema,
   type QuotePdfRender,
   quotePdfRenderSchema,
+  type ReportEmail,
+  reportEmailSchema,
   type UpdateClientReportSummary,
   updateClientReportSummarySchema,
 } from '@vertex-hub/contracts';
@@ -38,7 +46,8 @@ import { sendWorkbook, XLSX_MIME_TYPE } from './send-workbook.js';
 
 /**
  * The monthly client report (spec F15, rules 17–20): on screen, as Excel and as a PDF, with the
- * account manager's summary. A client outside the caller's `reports.read` scope is a 404.
+ * account manager's summary, and emailed to the client (F14 email). A client outside the
+ * caller's `reports.read` scope is a 404.
  */
 @ApiTags('reports')
 @Controller('clients/:id/monthly-report')
@@ -125,5 +134,41 @@ export class ClientReportController {
     @Res() response: ServerResponse,
   ): Promise<void> {
     await this.reports.servePdf(actor, id, query.month, request, response);
+  }
+
+  @Post('email')
+  @HttpCode(202)
+  @RequirePermissions('reports.read')
+  @SerializeOptions({ schema: emailSummarySchema })
+  @ApiAcceptedResponse({
+    description: 'The report as it is now, queued with a copy of its ready PDF (F14 email)',
+    standardSchema: emailSummarySchema,
+  })
+  @ApiNotFoundResponse({ description: 'No such client' })
+  @ApiConflictResponse({
+    description: '`PDF_NOT_READY`, `CLIENT_ARCHIVED`, `INVALID_RECIPIENT`, `ATTACHMENT_TOO_LARGE`',
+  })
+  sendEmail(
+    @CurrentUser() actor: CurrentUserInfo,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body({ schema: reportEmailSchema }) input: ReportEmail,
+  ): Promise<EmailSummary> {
+    return this.reports.sendEmail(actor, id, input);
+  }
+
+  @Get('emails')
+  @RequirePermissions('reports.read')
+  @SerializeOptions({ schema: emailHistorySchema })
+  @ApiOkResponse({
+    description: "The month's emailed reports, newest first",
+    standardSchema: emailHistorySchema,
+  })
+  @ApiNotFoundResponse({ description: 'No such client' })
+  emails(
+    @CurrentUser() actor: CurrentUserInfo,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query({ schema: clientReportQuerySchema }) query: ClientReportQuery,
+  ): Promise<EmailHistory> {
+    return this.reports.emails(actor, id, query.month);
   }
 }

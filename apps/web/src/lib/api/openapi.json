@@ -8515,6 +8515,210 @@
         ]
       }
     },
+    "/api/invoices/{id}/email": {
+      "post": {
+        "operationId": "InvoiceEmailsController_sendInvoice",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InvoiceEmail"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "The invoice or its overdue reminder, queued with the invoice PDF",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailSummary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such invoice"
+          },
+          "409": {
+            "description": "`INVOICE_NOT_ISSUED`, `INVOICE_NOT_OVERDUE`, `PDF_NOT_READY`, `CLIENT_ARCHIVED`, `INVALID_RECIPIENT`, `ATTACHMENT_TOO_LARGE`"
+          }
+        },
+        "tags": [
+          "invoices"
+        ]
+      }
+    },
+    "/api/invoices/{id}/emails": {
+      "get": {
+        "operationId": "InvoiceEmailsController_invoiceHistory",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The emails of the invoice and of its payments' receipts, newest first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailHistory"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such invoice"
+          }
+        },
+        "tags": [
+          "invoices"
+        ]
+      }
+    },
+    "/api/payments/{id}/email": {
+      "post": {
+        "operationId": "InvoiceEmailsController_sendReceipt",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClientEmail"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "The payment's receipt, queued with its PDF",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailSummary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such payment"
+          },
+          "409": {
+            "description": "`PAYMENT_VOIDED`, `PDF_NOT_READY`, `CLIENT_ARCHIVED`, `INVALID_RECIPIENT`, `ATTACHMENT_TOO_LARGE`"
+          }
+        },
+        "tags": [
+          "invoices"
+        ]
+      }
+    },
+    "/api/clients/{id}/statement/email": {
+      "post": {
+        "operationId": "InvoiceEmailsController_sendStatement",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StatementEmail"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "The statement as it is now, queued with a copy of its ready PDF",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailSummary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such client"
+          },
+          "409": {
+            "description": "`PDF_NOT_READY`, `CLIENT_ARCHIVED`, `INVALID_RECIPIENT`, `ATTACHMENT_TOO_LARGE`"
+          }
+        },
+        "tags": [
+          "invoices"
+        ]
+      }
+    },
+    "/api/clients/{id}/statement/emails": {
+      "get": {
+        "operationId": "InvoiceEmailsController_statementHistory",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The client's emailed statements, newest first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailHistory"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such client"
+          }
+        },
+        "tags": [
+          "invoices"
+        ]
+      }
+    },
     "/api/catalog/services": {
       "get": {
         "operationId": "CatalogServicesController_list",
@@ -10322,6 +10526,85 @@
         ]
       }
     },
+    "/api/quotes/{id}/email": {
+      "post": {
+        "operationId": "QuoteEmailsController_send",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QuoteEmail"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "The quote or its reminder, queued with the PDF of the sent version",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailSummary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such quote"
+          },
+          "409": {
+            "description": "`QUOTE_NOT_SENT`, `QUOTE_EXPIRED`, `PDF_NOT_READY`, `CLIENT_ARCHIVED`, `INVALID_RECIPIENT`, `ATTACHMENT_TOO_LARGE`"
+          }
+        },
+        "tags": [
+          "quotes"
+        ]
+      }
+    },
+    "/api/quotes/{id}/emails": {
+      "get": {
+        "operationId": "QuoteEmailsController_history",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The quote's emails, newest first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailHistory"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such quote"
+          }
+        },
+        "tags": [
+          "quotes"
+        ]
+      }
+    },
     "/api/leads": {
       "get": {
         "operationId": "LeadsController_list",
@@ -11279,7 +11562,7 @@
             }
           },
           "409": {
-            "description": "`CLIENT_ARCHIVED`, `CONTACT_NOT_APPROVER`, `TASK_NOT_READY`, `POST_NOT_READY`, `MEDICAL_REVIEW_REQUIRED`, `LIMIT_REACHED`"
+            "description": "`CLIENT_ARCHIVED`, `CONTACT_NOT_APPROVER`, `TASK_NOT_READY`, `POST_NOT_READY`, `MEDICAL_REVIEW_REQUIRED`, `LIMIT_REACHED`, `CONTACT_NO_EMAIL`"
           }
         },
         "tags": [
@@ -11333,6 +11616,16 @@
             }
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReissueApprovalRequest"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "The request with a new link valid 7 days, shown only now; the old one stops",
@@ -11345,7 +11638,73 @@
             }
           },
           "409": {
-            "description": "`REQUEST_CLOSED`, `CONTACT_NOT_APPROVER`, `CLIENT_ARCHIVED`"
+            "description": "`REQUEST_CLOSED`, `CONTACT_NOT_APPROVER`, `CLIENT_ARCHIVED`, `CONTACT_NO_EMAIL`"
+          }
+        },
+        "tags": [
+          "approvals"
+        ]
+      }
+    },
+    "/api/approvals/requests/{id}/email-reminder": {
+      "post": {
+        "operationId": "ApprovalsController_emailReminder",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "A reminder by email to the contact, without the link (F14 email rule 19)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailSummary"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`REQUEST_CLOSED`, `REMINDER_NOT_DUE`, `CONTACT_NO_EMAIL`, `CLIENT_ARCHIVED`, `INVALID_RECIPIENT`"
+          }
+        },
+        "tags": [
+          "approvals"
+        ]
+      }
+    },
+    "/api/approvals/requests/{id}/emails": {
+      "get": {
+        "operationId": "ApprovalsController_emails",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request's emails, newest first (F14 email screen 5)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailHistory"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such request"
           }
         },
         "tags": [
@@ -12571,6 +12930,131 @@
         ]
       }
     },
+    "/api/ad-wallet-entries/{id}/email": {
+      "post": {
+        "operationId": "AdWalletEmailsController_sendReceipt",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClientEmail"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "The deposit's receipt, queued with its PDF",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailSummary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such deposit"
+          },
+          "409": {
+            "description": "`ENTRY_VOIDED`, `PDF_NOT_READY`, `CLIENT_ARCHIVED`, `INVALID_RECIPIENT`, `ATTACHMENT_TOO_LARGE`"
+          }
+        },
+        "tags": [
+          "campaigns"
+        ]
+      }
+    },
+    "/api/clients/{id}/ad-wallet/email": {
+      "post": {
+        "operationId": "AdWalletEmailsController_sendBudgetLow",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClientEmail"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "The low-balance notice, queued while the wallet is below its threshold",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailSummary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such client"
+          },
+          "409": {
+            "description": "`BUDGET_NOT_LOW`, `CLIENT_ARCHIVED`, `INVALID_RECIPIENT`"
+          }
+        },
+        "tags": [
+          "campaigns"
+        ]
+      }
+    },
+    "/api/clients/{id}/ad-wallet/emails": {
+      "get": {
+        "operationId": "AdWalletEmailsController_history",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The client's emailed ad receipts and budget notices, newest first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailHistory"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such client"
+          }
+        },
+        "tags": [
+          "campaigns"
+        ]
+      }
+    },
     "/api/dashboard/company": {
       "get": {
         "operationId": "DashboardController_company",
@@ -13152,6 +13636,94 @@
         ]
       }
     },
+    "/api/clients/{id}/monthly-report/email": {
+      "post": {
+        "operationId": "ClientReportController_sendEmail",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportEmail"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "The report as it is now, queued with a copy of its ready PDF (F14 email)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailSummary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such client"
+          },
+          "409": {
+            "description": "`PDF_NOT_READY`, `CLIENT_ARCHIVED`, `INVALID_RECIPIENT`, `ATTACHMENT_TOO_LARGE`"
+          }
+        },
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/clients/{id}/monthly-report/emails": {
+      "get": {
+        "operationId": "ClientReportController_emails",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "month",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-(0[1-9]|1[0-2])$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The month's emailed reports, newest first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailHistory"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such client"
+          }
+        },
+        "tags": [
+          "reports"
+        ]
+      }
+    },
     "/api/health": {
       "get": {
         "operationId": "HealthController_check",
@@ -13261,6 +13833,7 @@
           "client.archived",
           "client.restored",
           "client.brand_kit_updated",
+          "client.emailed",
           "client_contact.created",
           "client_contact.updated",
           "client_contact.archived",
@@ -13342,6 +13915,7 @@
           "approval_request.created",
           "approval_request.link_reissued",
           "approval_request.revoked",
+          "approval_request.emailed",
           "approval_item.responded",
           "approval_item.withdrawn",
           "post.created",
@@ -13393,6 +13967,7 @@
           "quote.version_created",
           "quote.superseded",
           "quote.archived",
+          "quote.emailed",
           "invoice_settings.updated",
           "invoice.created",
           "invoice.updated",
@@ -13402,8 +13977,10 @@
           "invoice.voided",
           "invoice.overdue",
           "invoice.services_changed",
+          "invoice.emailed",
           "payment.recorded",
           "payment.voided",
+          "payment.emailed",
           "project_expense.created",
           "project_expense.updated",
           "project_expense.archived",
@@ -13420,6 +13997,7 @@
           "ad_wallet.low_balance_cleared",
           "ad_wallet_entry.recorded",
           "ad_wallet_entry.voided",
+          "ad_wallet_entry.emailed",
           "lead.created",
           "lead.updated",
           "lead.stage_changed",
@@ -14021,6 +14599,7 @@
           "campaigns.fund",
           "invoices.read",
           "invoices.manage",
+          "invoices.send",
           "payments.manage",
           "expenses.manage",
           "reports.read",
@@ -20900,6 +21479,118 @@
               "type": {
                 "type": "string",
                 "enum": [
+                  "email_failed"
+                ]
+              },
+              "data": {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "$ref": "#/components/schemas/ClientEmailKind"
+                  },
+                  "client": {
+                    "type": "string"
+                  },
+                  "document": {
+                    "nullable": true,
+                    "type": "string"
+                  },
+                  "recipients": {
+                    "minItems": 1,
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "required": [
+                  "kind",
+                  "client",
+                  "document",
+                  "recipients"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "id",
+              "actor",
+              "subject",
+              "count",
+              "read",
+              "createdAt",
+              "updatedAt",
+              "type",
+              "data"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "actor": {
+                "nullable": true,
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "name"
+                ],
+                "additionalProperties": false
+              },
+              "subject": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "$ref": "#/components/schemas/NotificationSubjectType"
+                  },
+                  "id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  }
+                },
+                "required": [
+                  "type",
+                  "id"
+                ],
+                "additionalProperties": false
+              },
+              "count": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "read": {
+                "type": "boolean"
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+              },
+              "updatedAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
                   "lead_assigned"
                 ]
               },
@@ -21267,6 +21958,22 @@
           "other"
         ]
       },
+      "ClientEmailKind": {
+        "type": "string",
+        "enum": [
+          "client_quote",
+          "client_quote_reminder",
+          "client_approval_link",
+          "client_approval_reminder",
+          "client_invoice",
+          "client_invoice_reminder",
+          "client_receipt",
+          "client_statement",
+          "client_report",
+          "client_ad_receipt",
+          "client_ad_budget_low"
+        ]
+      },
       "NotificationUnreadCount": {
         "type": "object",
         "properties": {
@@ -21397,6 +22104,7 @@
           "invoice_overdue",
           "invoice_paid",
           "ad_budget_low",
+          "email_failed",
           "lead_assigned",
           "lead_won",
           "lead_follow_up_overdue",
@@ -21407,14 +22115,14 @@
         "type": "object",
         "properties": {
           "mutedTypes": {
-            "maxItems": 55,
+            "maxItems": 56,
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/NotificationType"
             }
           },
           "emailTypes": {
-            "maxItems": 55,
+            "maxItems": 56,
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/NotificationType"
@@ -32966,6 +33674,158 @@
         ],
         "additionalProperties": false
       },
+      "InvoiceEmail": {
+        "type": "object",
+        "properties": {
+          "contactIds": {
+            "minItems": 1,
+            "maxItems": 10,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          "ccAccountManager": {
+            "default": true,
+            "type": "boolean"
+          },
+          "ccMe": {
+            "default": false,
+            "type": "boolean"
+          },
+          "subject": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "invoice",
+              "overdue_reminder"
+            ]
+          }
+        },
+        "required": [
+          "contactIds",
+          "subject",
+          "message",
+          "kind"
+        ]
+      },
+      "EmailHistory": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EmailSummary"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "additionalProperties": false,
+        "description": "A document's emails, newest first"
+      },
+      "ClientEmail": {
+        "type": "object",
+        "properties": {
+          "contactIds": {
+            "minItems": 1,
+            "maxItems": 10,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          "ccAccountManager": {
+            "default": true,
+            "type": "boolean"
+          },
+          "ccMe": {
+            "default": false,
+            "type": "boolean"
+          },
+          "subject": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          }
+        },
+        "required": [
+          "contactIds",
+          "subject",
+          "message"
+        ]
+      },
+      "StatementEmail": {
+        "type": "object",
+        "properties": {
+          "contactIds": {
+            "minItems": 1,
+            "maxItems": 10,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          "ccAccountManager": {
+            "default": true,
+            "type": "boolean"
+          },
+          "ccMe": {
+            "default": false,
+            "type": "boolean"
+          },
+          "subject": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          },
+          "currency": {
+            "$ref": "#/components/schemas/Currency"
+          },
+          "from": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+          },
+          "to": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+          }
+        },
+        "required": [
+          "contactIds",
+          "subject",
+          "message",
+          "currency"
+        ]
+      },
       "CatalogBilling": {
         "type": "string",
         "enum": [
@@ -37358,6 +38218,52 @@
           }
         ]
       },
+      "QuoteEmail": {
+        "type": "object",
+        "properties": {
+          "contactIds": {
+            "minItems": 1,
+            "maxItems": 10,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          "ccAccountManager": {
+            "default": true,
+            "type": "boolean"
+          },
+          "ccMe": {
+            "default": false,
+            "type": "boolean"
+          },
+          "subject": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "quote",
+              "reminder"
+            ]
+          }
+        },
+        "required": [
+          "contactIds",
+          "subject",
+          "message",
+          "kind"
+        ]
+      },
       "LeadSource": {
         "type": "string",
         "enum": [
@@ -39676,6 +40582,10 @@
             "nullable": true,
             "type": "string"
           },
+          "contactEmail": {
+            "nullable": true,
+            "type": "string"
+          },
           "permissions": {
             "type": "object",
             "properties": {
@@ -39707,6 +40617,7 @@
           "message",
           "items",
           "contactPhone",
+          "contactEmail",
           "permissions"
         ],
         "additionalProperties": false
@@ -39958,6 +40869,10 @@
             "type": "string",
             "maxLength": 1000
           },
+          "email": {
+            "default": false,
+            "type": "boolean"
+          },
           "items": {
             "minItems": 1,
             "type": "array",
@@ -40147,6 +41062,10 @@
             "nullable": true,
             "type": "string"
           },
+          "contactEmail": {
+            "nullable": true,
+            "type": "string"
+          },
           "permissions": {
             "type": "object",
             "properties": {
@@ -40165,6 +41084,14 @@
           },
           "link": {
             "type": "string"
+          },
+          "email": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EmailSummary"
+              }
+            ]
           }
         },
         "required": [
@@ -40181,10 +41108,22 @@
           "message",
           "items",
           "contactPhone",
+          "contactEmail",
           "permissions",
-          "link"
+          "link",
+          "email"
         ],
         "additionalProperties": false
+      },
+      "ReissueApprovalRequest": {
+        "default": {},
+        "type": "object",
+        "properties": {
+          "email": {
+            "default": false,
+            "type": "boolean"
+          }
+        }
       },
       "ClientApprovals": {
         "type": "object",
@@ -44110,6 +45049,49 @@
         "required": [
           "month",
           "summary"
+        ]
+      },
+      "ReportEmail": {
+        "type": "object",
+        "properties": {
+          "contactIds": {
+            "minItems": 1,
+            "maxItems": 10,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          "ccAccountManager": {
+            "default": true,
+            "type": "boolean"
+          },
+          "ccMe": {
+            "default": false,
+            "type": "boolean"
+          },
+          "subject": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          },
+          "month": {
+            "type": "string",
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])$"
+          }
+        },
+        "required": [
+          "contactIds",
+          "subject",
+          "message",
+          "month"
         ]
       },
       "HealthResponse": {

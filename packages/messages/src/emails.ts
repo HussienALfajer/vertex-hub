@@ -51,8 +51,12 @@ export interface EmailContent {
   paragraphs: string[];
   /** Lists under the paragraphs (notifications, tasks). */
   sections?: EmailSection[];
+  /** Client emails (rule 17): the document's key facts, a fixed block under the message. */
+  facts?: { label: string; value: string }[];
   /** A button under the paragraphs and lists. */
   action?: EmailLink;
+  /** Client emails (rule 17): the sender's name, title, phone and address, one per line. */
+  signature?: string[];
   /** A last quiet line above the footer, with its link (the notification settings). */
   footnote?: { text: string; link: EmailLink };
 }

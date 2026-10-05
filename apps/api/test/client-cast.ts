@@ -2,10 +2,13 @@ import { randomUUID } from 'node:crypto';
 import {
   businessDate,
   type ClientDetailResponse,
+  type Contact,
   type CreateClientInput,
+  type CreateContactInput,
   type CreateProjectInput,
   type CreateRetainerInput,
   clientDetailResponseSchema,
+  contactSchema,
   type ErrorResponse,
   type ProjectDetail,
   projectDetailSchema,
@@ -60,6 +63,20 @@ export async function seedClientCast(db: Database, client: Api) {
     return created;
   }
 
+  /** A contact of `clientId` created by the General Manager, with an email unless given null. */
+  async function createContact(
+    clientId: string,
+    input: Partial<CreateContactInput> = {},
+  ): Promise<Contact> {
+    const response = await client.post(`/api/clients/${clientId}/contacts`, gm.cookie, {
+      name: `جهة اتصال ${randomUUID().slice(0, 6)}`,
+      email: `contact-${randomUUID().slice(0, 8)}@example.com`,
+      ...input,
+    });
+    expect(response.status).toBe(201);
+    return contactSchema.parse(await response.json());
+  }
+
   /** A project of `clientId` created by the General Manager; the employee manages it. */
   async function createProject(
     clientId: string,
@@ -108,6 +125,7 @@ export async function seedClientCast(db: Database, client: Api) {
     /** Seeds another user and signs them in. */
     signedIn,
     createClient,
+    createContact,
     createProject,
     createRetainer,
     /** Tracks a client created some other way, for cleanup. */

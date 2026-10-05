@@ -1,10 +1,12 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/index.js';
+import { EmailModule } from '../email/index.js';
 import { FilesModule } from '../files/index.js';
 import { NotificationsModule } from '../notifications/index.js';
 import { ClientContactsController } from './client-contacts.controller.js';
 import { ClientContactsService } from './client-contacts.service.js';
 import { ClientDirectory } from './client-directory.js';
+import { ClientEmails } from './client-emails.js';
 import { ClientFactory } from './client-factory.js';
 import { ClientFileOwner } from './client-file-owner.js';
 import { ClientFlagHooks } from './client-flag-hooks.js';
@@ -23,9 +25,10 @@ import { ClientsService } from './clients.service.js';
  * that attach work to clients (F05). Registers the `client` owner policy in `files` (F10).
  * Exports `ClientFlagHooks`, which `tasks` registers into for healthcare flag changes (F09), and
  * `ClientFactory`, which the lead conversion creates clients, contacts and log entries with (F03).
+ * Exports `ClientEmails`, which the document modules email clients with (F14 email).
  */
 @Module({
-  imports: [AuthModule, NotificationsModule, FilesModule],
+  imports: [AuthModule, NotificationsModule, FilesModule, EmailModule],
   controllers: [
     ClientsController,
     ClientContactsController,
@@ -38,10 +41,11 @@ import { ClientsService } from './clients.service.js';
     ClientPlatformAccountsService,
     ClientNotesService,
     ClientDirectory,
+    ClientEmails,
     ClientFactory,
     ClientFileOwner,
     ClientFlagHooks,
   ],
-  exports: [ClientDirectory, ClientFactory, ClientFlagHooks],
+  exports: [ClientDirectory, ClientEmails, ClientFactory, ClientFlagHooks],
 })
 export class ClientsModule {}

@@ -1,7 +1,15 @@
 import { render } from '@react-email/render';
-import { EMAIL_DATA_SCHEMAS, type EmailSendJob, emailAudienceOf } from '@vertex-hub/contracts';
+import {
+  type ClientEmailKind,
+  clientEmailKindSchema,
+  EMAIL_DATA_SCHEMAS,
+  type EmailSendJob,
+  emailAudienceOf,
+} from '@vertex-hub/contracts';
 import {
   accountActivationEmail,
+  type ClientEmailData,
+  clientEmailContent,
   digestEmail,
   type EmailContent,
   newDeviceEmail,
@@ -12,13 +20,20 @@ import {
 } from '@vertex-hub/messages';
 import { EmailLayout } from './email-layout.js';
 
-type RenderedJob = Pick<EmailSendJob, 'kind' | 'data'>;
+type RenderedJob = Pick<EmailSendJob, 'kind' | 'data'> & Partial<Pick<EmailSendJob, 'message'>>;
+
+const isClientKind = (kind: EmailSendJob['kind']): kind is ClientEmailKind =>
+  clientEmailKindSchema.safeParse(kind).success;
 
 /**
  * The content of a job's kind, from its data (validated again: the job crossed a queue), with
  * links into the web app at `appUrl`.
  */
 export function emailContent(job: RenderedJob, appUrl: string): EmailContent {
+  if (isClientKind(job.kind)) {
+    const email = { kind: job.kind, data: EMAIL_DATA_SCHEMAS[job.kind].parse(job.data) };
+    return clientEmailContent(email as ClientEmailData, job.message ?? null);
+  }
   switch (job.kind) {
     case 'test':
       return testEmail(EMAIL_DATA_SCHEMAS.test.parse(job.data));

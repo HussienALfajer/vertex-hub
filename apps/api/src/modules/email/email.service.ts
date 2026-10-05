@@ -20,7 +20,7 @@ import { and, count, desc, eq, gte, inArray, lt, type SQL, sql } from 'drizzle-o
 import { DATABASE } from '../../core/database/database.module.js';
 import { JobQueue } from '../../core/jobs/index.js';
 import type { EmailSender } from './email-sender.decorator.js';
-import { Mailer } from './mailer.js';
+import { emailSummary, Mailer } from './mailer.js';
 
 type EmailRow = typeof emailMessages.$inferSelect;
 
@@ -95,34 +95,45 @@ export class EmailService implements OnModuleInit {
     return this.summary(id);
   }
 
-  async summary(id: string): Promise<EmailSummary> {
-    const [row] = await this.db.select().from(emailMessages).where(eq(emailMessages.id, id));
-    if (!row) throw new Error(`Email ${id} not found`);
-    return emailSummary(row);
+  summary(id: string): Promise<EmailSummary> {
+    return this.mailer.summary(id);
   }
 
   /**
    * Rule 1: the worker's outcome. Only a `queued` email changes, so a repeated result is a no-op
-   * and nothing moves an email back.
+   * and nothing moves an email back. Rule 23: a client email that failed tells its sender.
    */
   async recordResult(result: EmailResultJob): Promise<void> {
-    await this.db
-      .update(emailMessages)
-      .set(
-        result.status === 'sent'
-          ? {
-              status: 'sent',
-              attempts: result.attempts,
-              sentAt: new Date(result.sentAt),
-              providerMessageId: result.providerMessageId,
-            }
-          : {
-              status: 'failed',
-              attempts: result.attempts,
-              lastError: result.error.slice(0, EMAIL_LIMITS.error),
-            },
-      )
-      .where(and(eq(emailMessages.id, result.id), eq(emailMessages.status, 'queued')));
+    await this.db.transaction(async (tx) => {
+      const [row] = await tx
+        .update(emailMessages)
+        .set(
+          result.status === 'sent'
+            ? {
+                status: 'sent',
+                attempts: result.attempts,
+                sentAt: new Date(result.sentAt),
+                providerMessageId: result.providerMessageId,
+              }
+            : {
+                status: 'failed',
+                attempts: result.attempts,
+                lastError: result.error.slice(0, EMAIL_LIMITS.error),
+              },
+        )
+        .where(and(eq(emailMessages.id, result.id), eq(emailMessages.status, 'queued')))
+        .returning();
+      if (row?.status !== 'failed' || row.audience !== 'client' || !row.senderId) return;
+      await this.mailer.failed(tx, {
+        id: row.id,
+        kind: row.kind,
+        to: row.to as EmailAddress[],
+        senderId: row.senderId,
+        clientId: row.clientId,
+        record: row.recordType && row.recordId ? { type: row.recordType, id: row.recordId } : null,
+        data: row.data as Record<string, unknown>,
+      });
+    });
   }
 
   /** Rule 25: deletes staff emails created more than 90 days ago; client emails are kept. */
@@ -134,22 +145,6 @@ export class EmailService implements OnModuleInit {
       .returning({ id: emailMessages.id });
     return deleted.length;
   }
-}
-
-function emailSummary(row: EmailRow): EmailSummary {
-  return {
-    id: row.id,
-    kind: row.kind,
-    status: row.status,
-    // Written only by `Mailer.queue`, which validates them.
-    to: row.to as EmailAddress[],
-    cc: row.cc as EmailAddress[],
-    subject: row.subject,
-    sender: row.senderId && row.senderName ? { id: row.senderId, name: row.senderName } : null,
-    createdAt: row.createdAt.toISOString(),
-    sentAt: row.sentAt?.toISOString() ?? null,
-    error: row.lastError,
-  };
 }
 
 function logItem(row: EmailRow): EmailLogItem {

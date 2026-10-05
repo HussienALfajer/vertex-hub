@@ -1,4 +1,7 @@
+import { createHash } from 'node:crypto';
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import { Transform } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
 import { Inject, Injectable } from '@nestjs/common';
 import {
   DEFAULT_FILE_NAME,
@@ -34,6 +37,14 @@ const documentOwner = (type: DocumentOwnerType, id: string) => ({
   invoiceId: type === 'invoice' ? id : null,
   adWalletEntryId: type === 'ad_wallet_entry' ? id : null,
 });
+
+/** A stored object with what an email attachment records of it (F14 email). */
+export interface StoredObject {
+  storageKey: string;
+  mimeType: string;
+  sizeBytes: number;
+  sha256: string;
+}
 
 /** A file the system produced and already stored, such as the PDF of a sent quote (F04). */
 export interface GeneratedDocument {
@@ -285,9 +296,14 @@ export class GeneratedFiles {
   }
 
   /** The latest live version of a live item, or null once removed. */
-  async latest(itemId: string): Promise<{ storageKey: string; mimeType: string } | null> {
+  async latest(itemId: string): Promise<StoredObject | null> {
     const [row] = await this.db
-      .select({ storageKey: fileVersions.storageKey, mimeType: fileVersions.mimeType })
+      .select({
+        storageKey: fileVersions.storageKey,
+        mimeType: fileVersions.mimeType,
+        sizeBytes: fileVersions.sizeBytes,
+        sha256: fileVersions.sha256,
+      })
       .from(fileVersions)
       .innerJoin(fileItems, eq(fileItems.id, fileVersions.fileItemId))
       .where(
@@ -300,9 +316,59 @@ export class GeneratedFiles {
       )
       .orderBy(desc(fileVersions.number))
       .limit(1);
-    return row?.storageKey && row.mimeType
-      ? { storageKey: row.storageKey, mimeType: row.mimeType }
+    return row?.storageKey && row.mimeType && row.sizeBytes && row.sha256
+      ? {
+          storageKey: row.storageKey,
+          mimeType: row.mimeType,
+          sizeBytes: row.sizeBytes,
+          sha256: row.sha256,
+        }
       : null;
+  }
+
+  /**
+   * F14 email rule 21: copies a render that is deleted after 24 hours (a statement, a monthly
+   * report) as `objects/emails/<email id>`, so the emailed file stays with the email, and
+   * queues the email with it through `send`. The copy is deleted when the email is not queued:
+   * `send` threw, or the render was gone (`missing`, edge case 12).
+   */
+  async withEmailCopy<T>(
+    key: string,
+    emailId: string,
+    missing: () => Error,
+    send: (copy: { storageKey: string; sizeBytes: number; sha256: string }) => Promise<T>,
+  ): Promise<T> {
+    const storageKey = `objects/emails/${emailId}`;
+    let copy: { storageKey: string; sizeBytes: number; sha256: string };
+    try {
+      copy = await this.copy(key, storageKey);
+    } catch {
+      await this.storage.remove(storageKey);
+      throw missing();
+    }
+    try {
+      return await send(copy);
+    } catch (error) {
+      await this.storage.remove(storageKey);
+      throw error;
+    }
+  }
+
+  private async copy(
+    key: string,
+    storageKey: string,
+  ): Promise<{ storageKey: string; sizeBytes: number; sha256: string }> {
+    const hash = createHash('sha256');
+    let sizeBytes = 0;
+    const measure = new Transform({
+      transform(chunk: Buffer, _encoding, done) {
+        hash.update(chunk);
+        sizeBytes += chunk.length;
+        done(null, chunk);
+      },
+    });
+    await pipeline(this.storage.read(key), measure, await this.storage.writable(storageKey));
+    return { storageKey, sizeBytes, sha256: hash.digest('hex') };
   }
 
   serve(

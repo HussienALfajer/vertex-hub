@@ -1,11 +1,14 @@
 import type { INestApplication } from '@nestjs/common';
 import { emailPageSchema, emailSummarySchema } from '@vertex-hub/contracts';
-import { createDatabase, emailMessages, newId } from '@vertex-hub/db';
+import { clients, createDatabase, emailMessages, newId, notifications } from '@vertex-hub/db';
 import { testDatabaseUrl } from '@vertex-hub/db/testing';
-import { eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import type { CurrentUserInfo } from '../src/modules/auth/index.js';
+import { ClientEmails } from '../src/modules/clients/index.js';
 import { EmailService } from '../src/modules/email/email.service.js';
 import { Mailer } from '../src/modules/email/index.js';
+import { seedClientCast } from './client-cast.js';
 import { api, removeUsers, seedUser } from './helpers.js';
 import { startApp } from './start-app.js';
 
@@ -230,5 +233,130 @@ describe('email outbox (F14 email)', () => {
       .from(emailMessages)
       .where(inArray(emailMessages.id, [oldStaff, recentStaff, oldClient]));
     expect(rows.map((row) => row.id).sort()).toEqual([recentStaff, oldClient].sort());
+  });
+
+  describe('client emails (rules 17, 18, 23)', () => {
+    let cast: Awaited<ReturnType<typeof seedClientCast>>;
+    let clientId: string;
+    let contactId: string;
+    const signature = { name: 'Rana', title: null, phone: null, email: 'rana@example.com' };
+    const quoteData = {
+      client: 'Acme',
+      signature,
+      quote: {
+        number: 'Q-2026-0001',
+        title: 'Social media',
+        currency: 'USD',
+        oneOffMinor: 100_000,
+        monthlyMinor: null,
+        validUntil: '2026-10-30',
+      },
+    };
+
+    beforeAll(async () => {
+      cast = await seedClientCast(db, client);
+      clientId = (await cast.createClient()).id;
+      contactId = (await cast.createContact(clientId)).id;
+    });
+
+    afterAll(async () => {
+      await cast?.cleanup();
+    });
+
+    const queue = (extra: { attachments?: { sizeBytes: number }[] } = {}) =>
+      db.transaction((tx) =>
+        app.get(ClientEmails).queue(tx, cast.am as unknown as CurrentUserInfo, {
+          kind: 'client_quote',
+          clientId,
+          recipients: { contactIds: [contactId], ccAccountManager: true, ccMe: false },
+          subject: 'Quote',
+          message: 'Hello',
+          data: { quote: quoteData.quote } as never,
+          attachments: extra.attachments?.map((file, index) => ({
+            fileName: `${index}.pdf`,
+            storageKey: `objects/test/${index}`,
+            sizeBytes: file.sizeBytes,
+            sha256: 'a'.repeat(64),
+          })),
+          record: { type: 'quote', id: newId() },
+        }),
+      );
+
+    it('refuses attachments over 10 MB in all (edge case 15)', async () => {
+      await expect(
+        queue({ attachments: [{ sizeBytes: 6 * 1024 * 1024 }, { sizeBytes: 5 * 1024 * 1024 }] }),
+      ).rejects.toMatchObject({ response: { code: 'ATTACHMENT_TOO_LARGE' } });
+      const { id } = await queue({ attachments: [{ sizeBytes: 5 * 1024 * 1024 }] });
+      expect(id).toBeTruthy();
+    });
+
+    it('refuses an archived client (rule 18)', async () => {
+      await db.update(clients).set({ archivedAt: new Date() }).where(eq(clients.id, clientId));
+      try {
+        await expect(queue()).rejects.toMatchObject({ response: { code: 'CLIENT_ARCHIVED' } });
+      } finally {
+        await db.update(clients).set({ archivedAt: null }).where(eq(clients.id, clientId));
+      }
+    });
+
+    it('tells the sender when a client email fails for good, opening its document (rule 23)', async () => {
+      const quoteId = newId();
+      const failing = await seedEmail({
+        kind: 'client_quote',
+        audience: 'client',
+        senderId: admin.id,
+        senderName: 'Admin',
+        clientId,
+        recordType: 'quote',
+        recordId: quoteId,
+        to: [{ name: 'سامي', email: `sami.${marker}@example.com` }],
+        data: quoteData,
+      });
+      await service.recordResult({ id: failing, status: 'failed', attempts: 4, error: 'EAUTH' });
+      // A repeated outcome changes nothing and tells nobody twice.
+      await service.recordResult({ id: failing, status: 'failed', attempts: 4, error: 'EAUTH' });
+      const notices = await db
+        .select()
+        .from(notifications)
+        .where(
+          and(eq(notifications.recipientId, admin.id), eq(notifications.type, 'email_failed')),
+        );
+      expect(notices).toHaveLength(1);
+      expect(notices[0]).toMatchObject({
+        subjectType: 'quote',
+        subjectId: quoteId,
+        data: {
+          kind: 'client_quote',
+          client: 'Acme',
+          document: 'Q-2026-0001',
+          recipients: ['سامي'],
+        },
+      });
+      // Staff emails and sent client emails tell nobody.
+      const staff = await seedEmail({ senderId: admin.id, senderName: 'Admin' });
+      await service.recordResult({ id: staff, status: 'failed', attempts: 4, error: 'EAUTH' });
+      const sent = await seedEmail({
+        kind: 'client_quote',
+        audience: 'client',
+        senderId: admin.id,
+        senderName: 'Admin',
+        clientId,
+        data: quoteData,
+      });
+      await service.recordResult({
+        id: sent,
+        status: 'sent',
+        attempts: 1,
+        providerMessageId: null,
+        sentAt: new Date().toISOString(),
+      });
+      const after = await db
+        .select()
+        .from(notifications)
+        .where(
+          and(eq(notifications.recipientId, admin.id), eq(notifications.type, 'email_failed')),
+        );
+      expect(after).toHaveLength(1);
+    });
   });
 });

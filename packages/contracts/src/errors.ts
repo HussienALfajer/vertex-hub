@@ -179,6 +179,17 @@ export const ERROR_CODES = [
   'LEAD_HAS_SENT_QUOTE',
   'LEAD_HAS_QUOTES',
   'INVALID_SERVICE',
+  'QUOTE_NOT_SENT',
+  'INVOICE_NOT_ISSUED',
+  'INVOICE_NOT_OVERDUE',
+  'PAYMENT_VOIDED',
+  'ENTRY_VOIDED',
+  'BUDGET_NOT_LOW',
+  'PDF_NOT_READY',
+  'INVALID_RECIPIENT',
+  'CONTACT_NO_EMAIL',
+  'ATTACHMENT_TOO_LARGE',
+  'REMINDER_NOT_DUE',
 ] as const;
 
 export const errorCodeSchema = z.enum(ERROR_CODES).meta({ id: 'ErrorCode' });

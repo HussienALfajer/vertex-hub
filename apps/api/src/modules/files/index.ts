@@ -12,4 +12,9 @@ export {
 export { type FilePurge, FilePurges } from './file-purges.js';
 export { FileVersions, type SentVersion, type VersionRef } from './file-versions.js';
 export { FilesModule } from './files.module.js';
-export { type AttachedUpload, type GeneratedDocument, GeneratedFiles } from './generated-files.js';
+export {
+  type AttachedUpload,
+  type GeneratedDocument,
+  GeneratedFiles,
+  type StoredObject,
+} from './generated-files.js';

@@ -5,17 +5,20 @@ import {
   businessDate,
   type ClientMonthlyReport,
   type ClientReportSnapshot,
+  type EmailHistory,
+  type EmailSummary,
   isFutureMonth,
   isPreliminaryMonth,
   monthPeriod,
   type QuotePdfRender,
   REPORTS_PDF_JOB,
   REPORTS_PDF_READY_JOB,
+  type ReportEmail,
   type ReportPdfJob,
   type ReportPdfReadyJob,
   reportPdfReadyJobSchema,
 } from '@vertex-hub/contracts';
-import { clientReportNotes, clientReportPdfs, type Database } from '@vertex-hub/db';
+import { clientReportNotes, clientReportPdfs, type Database, newId } from '@vertex-hub/db';
 import { and, eq, lt } from 'drizzle-orm';
 import { DATABASE } from '../../core/database/database.module.js';
 import { CodedException } from '../../core/errors/index.js';
@@ -25,7 +28,7 @@ import { recordAudit } from '../audit/index.js';
 import { type CurrentUserInfo, UserDirectory } from '../auth/index.js';
 import { ShootReports } from '../calendar/index.js';
 import { CampaignReports } from '../campaigns/index.js';
-import { ClientDirectory, type ClientSummary } from '../clients/index.js';
+import { ClientDirectory, ClientEmails, type ClientSummary } from '../clients/index.js';
 import { ContentReports } from '../content/index.js';
 import { FilePurges, GeneratedFiles } from '../files/index.js';
 import { EngagementReports } from '../projects/index.js';
@@ -52,6 +55,7 @@ export class ClientReportService implements OnModuleInit {
   constructor(
     @Inject(DATABASE) private readonly db: Database,
     private readonly clients: ClientDirectory,
+    private readonly clientEmails: ClientEmails,
     private readonly users: UserDirectory,
     private readonly tasks: TaskReports,
     private readonly engagements: EngagementReports,
@@ -238,6 +242,64 @@ export class ClientReportService implements OnModuleInit {
     if (!job) return { state: 'ready' };
     await this.queue(job);
     return { state: 'pending' };
+  }
+
+  /**
+   * F14 email rule 21: the report as it is now, from its ready render (`PDF_NOT_READY`
+   * otherwise), copied so the email keeps it after the render is deleted. Audited on the client.
+   */
+  async sendEmail(
+    actor: CurrentUserInfo,
+    clientId: string,
+    input: ReportEmail,
+  ): Promise<EmailSummary> {
+    const { snapshot, hash } = await this.payload(actor, clientId, input.month);
+    const [row] = await this.db
+      .select()
+      .from(clientReportPdfs)
+      .where(eq(clientReportPdfs.hash, hash));
+    const notReady = () => new CodedException(409, 'PDF_NOT_READY', 'The PDF is not ready yet');
+    if (row?.status !== 'ready' || !row.storageKey || row.requestedAt < pdfCutoff(new Date())) {
+      throw notReady();
+    }
+    const id = newId();
+    const emailId = await this.files.withEmailCopy(row.storageKey, id, notReady, (copy) =>
+      this.db.transaction(async (tx) => {
+        const queued = await this.clientEmails.queue(tx, actor, {
+          id,
+          kind: 'client_report',
+          clientId,
+          recipients: input,
+          subject: input.subject,
+          message: input.message,
+          data: { month: input.month },
+          attachments: [
+            {
+              fileName: `${snapshot.client.name} - Report ${snapshot.month}.pdf`,
+              storageKey: copy.storageKey,
+              sizeBytes: copy.sizeBytes,
+              sha256: copy.sha256,
+            },
+          ],
+          record: { type: 'client', id: clientId },
+        });
+        await recordAudit(tx, {
+          actor: { id: actor.id, name: actor.name },
+          action: 'client.emailed',
+          entityType: 'client',
+          entityId: clientId,
+          after: { month: input.month, email: queued.audit },
+        });
+        return queued.id;
+      }),
+    );
+    return this.clientEmails.summary(emailId);
+  }
+
+  /** Screens 5: the month's emailed reports, newest first. */
+  async emails(actor: CurrentUserInfo, clientId: string, month: string): Promise<EmailHistory> {
+    await this.readableClient(actor, clientId);
+    return this.clientEmails.history({ clientId, kinds: ['client_report'], month });
   }
 
   /** Rule 20: the PDF of the report as it is now, while it is downloadable; else 404. */

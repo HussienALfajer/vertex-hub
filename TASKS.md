@@ -31,13 +31,16 @@ Spec: `docs/specs/F14-email-digest.md` · ADRs 0006, 0008, 0013, 0014, 0018, 002
 - [x] wiring checklist, full checks, reviewer (two blocking issues fixed: batch subject over 200 characters; "forgot password" timing), owner approval, dev database migrated (0044), PR opened
 
 ## PR 3 — `feat/f14-client-emails`: client emails from each document (API + worker)
-- [ ] contracts: `clientEmailSchema`, client kinds' data schemas and prefilled Arabic templates, permission `invoices.send` (+ `permissions.test.ts`), notification type `email_failed` with its text in `packages/messages`, error codes (`QUOTE_NOT_SENT`, `QUOTE_EXPIRED`, `INVOICE_NOT_ISSUED`, `INVOICE_NOT_OVERDUE`, `PAYMENT_VOIDED`, `ENTRY_VOIDED`, `BUDGET_NOT_LOW`, `PDF_NOT_READY`, `CLIENT_ARCHIVED`, `INVALID_RECIPIENT`, `CONTACT_NO_EMAIL` as missing, `ATTACHMENT_TOO_LARGE`), audit action `<entity>.emailed`; `ar.json` keys
-- [ ] api `email`: attachments (10 MB cap), `Mailer.history(record)`, recipient resolution helper input, attachment copy for temporary renders (rule 21), `email_failed` to the sender (rule 23)
-- [ ] api routes: quotes (email, history), approvals (`email` on create / reissue, email reminder, history), invoices and payments (email, history), statement (email, history), monthly report (email, history), ad wallet entries and budget low (email, history); audit on each record (rule 22)
-- [ ] worker templates for the eleven client kinds with snapshots
-- [ ] api tests per route: success, 401, 403, out of scope, each 409 code
-- [ ] bridge; web typecheck
-- [ ] wiring checklist, full checks, reviewer, owner acceptance, /ship
+- [x] contracts: `clientEmailSchema`, client kinds' data schemas and prefilled Arabic templates, permission `invoices.send` (+ `permissions.test.ts`), notification type `email_failed` with its text in `packages/messages`, error codes (`QUOTE_NOT_SENT`, `QUOTE_EXPIRED`, `INVOICE_NOT_ISSUED`, `INVOICE_NOT_OVERDUE`, `PAYMENT_VOIDED`, `ENTRY_VOIDED`, `BUDGET_NOT_LOW`, `PDF_NOT_READY`, `CLIENT_ARCHIVED`, `INVALID_RECIPIENT`, `CONTACT_NO_EMAIL` as missing, `ATTACHMENT_TOO_LARGE`), audit action `<entity>.emailed`; `ar.json` keys; `CONTACT_NO_EMAIL` and `REMINDER_NOT_DUE` added; the client kinds and the email summary moved to `email-basics.ts` (import cycle with notifications and approvals); prefilled templates in `packages/messages/src/client-emails.ts`
+- [x] db (`/db-migration`, 0045, additive): `email_failed` in `notification_type`; drift
+- [x] api `email`: attachments (10 MB cap), `Mailer.history(record)`, recipient resolution helper input, attachment copy for temporary renders (rule 21), `email_failed` to the sender (rule 23) through `Mailer.onFailure`, registered by `notifications`; `clients` exports `ClientEmails` (contacts, copies, signature)
+- [x] api routes: quotes (email, history), approvals (`email` on create / reissue, email reminder, history), invoices and payments (email, history), statement (email, history), monthly report (email, history), ad wallet entries and budget low (email, history); audit on each record (rule 22)
+- [x] worker templates for the eleven client kinds with snapshots
+- [x] api tests per route: success, 401, 403, out of scope, each 409 code
+- [x] bridge; web typecheck
+- [x] wiring checklist, full checks (lint, typecheck, build, test, drift, OpenAPI current), reviewer (two blocking issues fixed: a refused statement or report send kept its copy on disk; missing 401/403/scope tests; also found: a reissue without a body answered 400)
+- [x] owner acceptance (approved), dev database migrated (0045)
+- [x] PR opened
 
 ## PR 4 — `feat/f14-email-web`: screens and E2E
 - [ ] web: notification settings email column and digest switch; `/forgot-password` and the sign-in link; shared "Send by email" dialog and email history; wired into quotes, invoices, receipts, statement, monthly report, ad receipts and budget notice, approval dialogs and request page; `/emails` log with test email and navigation; team profile "Sent to …"

@@ -11,6 +11,8 @@ import { InvoiceBillingController } from './invoice-billing.controller.js';
 import { InvoiceBillingService } from './invoice-billing.service.js';
 import { InvoiceDrafts } from './invoice-drafts.js';
 import { InvoiceDueDates } from './invoice-due-dates.js';
+import { InvoiceEmailsController } from './invoice-emails.controller.js';
+import { InvoiceEmailsService } from './invoice-emails.service.js';
 import { InvoiceFileOwner } from './invoice-file-owner.js';
 import { InvoiceOverdueService } from './invoice-overdue.service.js';
 import { InvoicePdfService } from './invoice-pdf.service.js';
@@ -56,12 +58,14 @@ import { ProjectExpensesService } from './project-expenses.service.js';
     InvoicesController,
     PaymentsController,
     InvoiceBillingController,
+    InvoiceEmailsController,
   ],
   providers: [
     InvoiceSettingsService,
     InvoiceSnapshots,
     InvoicesService,
     InvoicePdfService,
+    InvoiceEmailsService,
     InvoiceWorkflowService,
     InvoiceDrafts,
     PaymentsService,

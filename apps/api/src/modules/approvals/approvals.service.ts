@@ -19,11 +19,14 @@ import {
   type ClientApprovals,
   type ClientDecision,
   type CreateApprovalRequest,
+  type EmailHistory,
+  type EmailSummary,
   fileTypeOf,
   type IssuedApprovalRequest,
   type PageQuery,
   permissionScopes,
   type ReadyClient,
+  type ReissueApprovalRequest,
 } from '@vertex-hub/contracts';
 import { approvalItems, approvalRequests, type Database, type Transaction } from '@vertex-hub/db';
 import { and, asc, count, desc, eq, getTableName, inArray, or, type SQL, sql } from 'drizzle-orm';
@@ -33,7 +36,7 @@ import { DATABASE } from '../../core/database/database.module.js';
 import { CodedException } from '../../core/errors/index.js';
 import { type AuditActor, recordAudit } from '../audit/index.js';
 import { type CurrentUserInfo, UserDirectory } from '../auth/index.js';
-import { ClientDirectory, type ClientSummary } from '../clients/index.js';
+import { ClientDirectory, ClientEmails, type ClientSummary } from '../clients/index.js';
 import { PostApprovals, PostReviewHooks } from '../content/index.js';
 import { FileVersions, type SentVersion } from '../files/index.js';
 import { ClientReviewHooks, type PendingApproval, TaskApprovals } from '../tasks/index.js';
@@ -88,6 +91,7 @@ export class ApprovalsService implements OnModuleInit {
     @Inject(ENV) private readonly env: Env,
     private readonly users: UserDirectory,
     private readonly clients: ClientDirectory,
+    private readonly clientEmails: ClientEmails,
     private readonly files: FileVersions,
     private readonly tasks: TaskApprovals,
     private readonly reviewHooks: ClientReviewHooks,
@@ -271,6 +275,7 @@ export class ApprovalsService implements OnModuleInit {
         };
       }),
       contactPhone: contacts.get(request.contactId)?.phone ?? null,
+      contactEmail: contacts.get(request.contactId)?.email ?? null,
       permissions: {
         canReissue: scoped && live && !client.archived,
         canRevoke: scoped && live,
@@ -295,9 +300,10 @@ export class ApprovalsService implements OnModuleInit {
       );
     }
     const link = issueLink();
-    const id = await this.db.transaction(async (tx) => {
+    const { id, emailId } = await this.db.transaction(async (tx) => {
       const client = await this.scopedClient(tx, actor, input.clientId);
       await this.assertApprover(tx, client, input.contactId);
+      if (input.email) await this.assertContactEmail(tx, input.contactId);
       const taskIds = input.items.flatMap((item) => ('taskId' in item ? [item.taskId] : []));
       const postIds = input.items.flatMap((item) => ('postId' in item ? [item.postId] : []));
       // Posts are locked before tasks.
@@ -324,14 +330,17 @@ export class ApprovalsService implements OnModuleInit {
         })
         .returning({ id: approvalRequests.id });
       if (!request) throw new Error('Approval request insert returned no row');
+      const titles: string[] = [];
       await tx.insert(approvalItems).values(
         input.items.map((item, index) => {
           const sent = 'taskId' in item ? tasks.get(item.taskId) : posts.get(item.postId);
           if (!sent) throw new Error('A sendable item was not returned');
+          const title = item.title ?? sent.title.slice(0, 160);
+          titles.push(title);
           return {
             requestId: request.id,
             position: index + 1,
-            title: item.title ?? sent.title.slice(0, 160),
+            title,
             ...('taskId' in item
               ? { taskId: sent.id, reviewId: sent.reviewId }
               : { postId: sent.id, postReviewId: sent.reviewId }),
@@ -351,17 +360,34 @@ export class ApprovalsService implements OnModuleInit {
           expiresAt: link.expiresAt.toISOString(),
         },
       });
-      return request.id;
+      const emailId = input.email
+        ? await this.emailRequest(tx, actor, {
+            kind: 'client_approval_link',
+            requestId: request.id,
+            clientId: client.id,
+            contactId: input.contactId,
+            message: input.message ?? null,
+            titles,
+            expiresAt: link.expiresAt,
+            link: this.linkOf(link.token),
+          })
+        : null;
+      return { id: request.id, emailId };
     });
-    return { ...(await this.detail(actor, id)), link: this.linkOf(link.token) };
+    return this.issued(actor, id, link.token, emailId);
   }
 
   /** Rule 11: a new token and seven more days; the old link stops working. */
-  async reissue(actor: CurrentUserInfo, id: string): Promise<IssuedApprovalRequest> {
+  async reissue(
+    actor: CurrentUserInfo,
+    id: string,
+    input: ReissueApprovalRequest,
+  ): Promise<IssuedApprovalRequest> {
     const link = issueLink();
-    await this.db.transaction(async (tx) => {
+    const emailId = await this.db.transaction(async (tx) => {
       const request = await this.liveRequest(tx, actor, id, { clientArchived: 'refuse' });
       await this.assertApprover(tx, request.client, request.contactId);
+      if (input.email) await this.assertContactEmail(tx, request.contactId);
       await tx
         .update(approvalRequests)
         .set({
@@ -380,8 +406,53 @@ export class ApprovalsService implements OnModuleInit {
         before: { expiresAt: request.expiresAt.toISOString() },
         after: { expiresAt: link.expiresAt.toISOString() },
       });
+      if (!input.email) return null;
+      return this.emailRequest(tx, actor, {
+        kind: 'client_approval_link',
+        requestId: id,
+        clientId: request.clientId,
+        contactId: request.contactId,
+        message: request.message,
+        titles: await this.pendingTitles(tx, id),
+        expiresAt: link.expiresAt,
+        link: this.linkOf(link.token),
+      });
     });
-    return { ...(await this.detail(actor, id)), link: this.linkOf(link.token) };
+    return this.issued(actor, id, link.token, emailId);
+  }
+
+  /**
+   * F14 email rule 19: the reminder by email, offered with F09's WhatsApp reminder (rule 24):
+   * an open request with pending items whose "no response" notice went out. It has no link.
+   */
+  async emailReminder(actor: CurrentUserInfo, id: string): Promise<EmailSummary> {
+    const emailId = await this.db.transaction(async (tx) => {
+      const request = await this.liveRequest(tx, actor, id, { clientArchived: 'refuse' });
+      const titles = await this.pendingTitles(tx, id);
+      if (approvalRequestState(request) !== 'open' || titles.length === 0) {
+        throw new CodedException(409, 'REQUEST_CLOSED', 'The request waits for no response');
+      }
+      if (!request.remindedAt) {
+        throw new CodedException(409, 'REMINDER_NOT_DUE', 'No reminder is due yet');
+      }
+      await this.assertContactEmail(tx, request.contactId);
+      return this.emailRequest(tx, actor, {
+        kind: 'client_approval_reminder',
+        requestId: id,
+        clientId: request.clientId,
+        contactId: request.contactId,
+        message: request.message,
+        titles,
+        expiresAt: request.expiresAt,
+      });
+    });
+    return this.clientEmails.summary(emailId);
+  }
+
+  /** Screens 5: the request's emails, newest first, to whoever may read the request. */
+  async emails(actor: CurrentUserInfo, id: string): Promise<EmailHistory> {
+    await this.detail(actor, id);
+    return this.clientEmails.history({ records: [{ type: 'approval_request', id }] });
   }
 
   /**
@@ -415,6 +486,88 @@ export class ApprovalsService implements OnModuleInit {
       });
     });
     return this.detail(actor, id);
+  }
+
+  private async issued(
+    actor: CurrentUserInfo,
+    id: string,
+    token: string,
+    emailId: string | null,
+  ): Promise<IssuedApprovalRequest> {
+    return {
+      ...(await this.detail(actor, id)),
+      link: this.linkOf(token),
+      email: emailId ? await this.clientEmails.summary(emailId) : null,
+    };
+  }
+
+  /** F14 email rule 19: the contact must have an email (`CONTACT_NO_EMAIL`). */
+  private async assertContactEmail(tx: Transaction, contactId: string): Promise<void> {
+    const contact = (await this.clients.contacts([contactId], tx)).get(contactId);
+    if (!contact?.email) {
+      throw new CodedException(409, 'CONTACT_NO_EMAIL', 'The contact has no email');
+    }
+  }
+
+  /** The titles of the request's pending items, by position. */
+  private async pendingTitles(tx: Transaction, id: string): Promise<string[]> {
+    const rows = await tx
+      .select({ title: approvalItems.title })
+      .from(approvalItems)
+      .where(and(eq(approvalItems.requestId, id), eq(approvalItems.status, 'pending')))
+      .orderBy(asc(approvalItems.position));
+    return rows.map((row) => row.title);
+  }
+
+  /**
+   * F14 email rule 19: the link or the reminder to the request's contact, with the request's
+   * message, audited on the request (rule 22).
+   */
+  private async emailRequest(
+    tx: Transaction,
+    actor: CurrentUserInfo,
+    email: {
+      kind: 'client_approval_link' | 'client_approval_reminder';
+      requestId: string;
+      clientId: string;
+      contactId: string;
+      message: string | null;
+      titles: string[];
+      expiresAt: Date;
+      link?: string;
+    },
+  ): Promise<string> {
+    const contact = (await this.clients.contacts([email.contactId], tx)).get(email.contactId);
+    const facts = {
+      contact: contact?.name ?? '',
+      items: email.titles,
+      expiresAt: email.expiresAt.toISOString(),
+    };
+    const common = {
+      clientId: email.clientId,
+      recipients: { contactIds: [email.contactId], ccAccountManager: false, ccMe: false },
+      message: email.message,
+      record: { type: 'approval_request' as const, id: email.requestId },
+    };
+    const queued = email.link
+      ? await this.clientEmails.queue(tx, actor, {
+          ...common,
+          kind: 'client_approval_link',
+          data: { ...facts, link: email.link },
+        })
+      : await this.clientEmails.queue(tx, actor, {
+          ...common,
+          kind: 'client_approval_reminder',
+          data: facts,
+        });
+    await recordAudit(tx, {
+      actor: actorOf(actor),
+      action: 'approval_request.emailed',
+      entityType: 'approval_request',
+      entityId: email.requestId,
+      after: { clientId: email.clientId, email: queued.audit },
+    });
+    return queued.id;
   }
 
   private linkOf(token: string): string {

@@ -7,6 +7,7 @@ import {
   NOTIFICATION_EMAIL,
   type NotificationContent,
   type NotificationEmailState,
+  type NotificationSubjectType,
   type NotificationType,
 } from '@vertex-hub/contracts';
 import { newId, notificationSettings, notifications, type Transaction } from '@vertex-hub/db';
@@ -31,6 +32,8 @@ export type Notice = NotificationContent & {
   actorId: string | null;
   /** The record the notification opens; its type comes from the catalog. */
   subjectId: string;
+  /** A type whose subject varies (F14 email `email_failed`: the email's document). */
+  subjectType?: NotificationSubjectType;
   /**
    * F14 email rule 4: the recipients are the task's assignee and the morning digest lists the
    * task, so it is not emailed to those whose digest is on.
@@ -103,7 +106,7 @@ export class NotificationCenter {
           recipientId,
           type: notice.type,
           actorId: notice.actorId,
-          subjectType: NOTIFICATION_CATALOG[notice.type].subject,
+          subjectType: notice.subjectType ?? NOTIFICATION_CATALOG[notice.type].subject,
           subjectId: notice.subjectId,
           data,
           ...email,

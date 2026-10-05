@@ -59,6 +59,16 @@ const styles = {
   itemText: { color: COLORS.text, fontSize: '15px', lineHeight: '24px', margin: 0 },
   itemDetail: { color: COLORS.muted, fontSize: '13px', lineHeight: '20px', margin: '2px 0 0' },
   link: { color: COLORS.green, fontWeight: 600, textDecoration: 'underline' },
+  facts: {
+    backgroundColor: COLORS.background,
+    border: `1px solid ${COLORS.border}`,
+    borderRadius: '6px',
+    margin: '16px 0',
+    padding: '12px 16px',
+  },
+  fact: { color: COLORS.text, fontSize: '14px', lineHeight: '24px', margin: 0 },
+  factLabel: { color: COLORS.muted },
+  signature: { color: COLORS.text, fontSize: '14px', lineHeight: '22px', margin: 0 },
   rule: { borderColor: COLORS.border, margin: '32px 0 16px' },
   footer: { color: COLORS.muted, fontSize: '13px', lineHeight: '20px', margin: '0 0 4px' },
 } as const;
@@ -92,6 +102,17 @@ export function EmailLayout({
               {paragraph}
             </Text>
           ))}
+          {content.facts && content.facts.length > 0 && (
+            <Section style={styles.facts}>
+              {/* One line per fact, so the plain-text part reads "label: value". */}
+              {content.facts.map((fact) => (
+                <Text key={fact.label} style={styles.fact}>
+                  <span style={styles.factLabel}>{fact.label}: </span>
+                  <strong>{fact.value}</strong>
+                </Text>
+              ))}
+            </Section>
+          )}
           {content.sections?.map((section) => (
             <Section key={section.title}>
               <Text style={styles.sectionTitle}>{section.title}</Text>
@@ -125,6 +146,15 @@ export function EmailLayout({
               <Button href={content.action.url} style={styles.button}>
                 {content.action.label}
               </Button>
+            </Section>
+          )}
+          {content.signature && content.signature.length > 0 && (
+            <Section style={{ marginTop: '24px' }}>
+              {content.signature.map((line) => (
+                <Text key={line} style={styles.signature}>
+                  {line}
+                </Text>
+              ))}
             </Section>
           )}
           <Hr style={styles.rule} />

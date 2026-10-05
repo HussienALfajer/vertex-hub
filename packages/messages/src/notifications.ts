@@ -1,4 +1,5 @@
 import type { DeliverableKind, DepartmentCode, Notification } from '@vertex-hub/contracts';
+import { CLIENT_EMAIL_KIND_NAMES } from './client-emails.js';
 import {
   formatAmount,
   formatCalendarDate,
@@ -206,6 +207,7 @@ export const NOTIFICATION_TEXT = {
   },
   invoice_paid: 'سُدّدت الفاتورة {{invoice}} بالكامل',
   ad_budget_low: 'رصيد إعلانات {{client}} منخفض: {{balance}} دولار (حد التنبيه {{threshold}})',
+  email_failed: 'تعذّر إرسال {{email}} إلى {{recipients}}',
   lead_assigned: 'أسند إليك {{actor}} العميل المحتمل «{{lead}}»',
   lead_won: 'حوّل {{actor}} العميل المحتمل «{{lead}}» إلى عميل',
   lead_follow_up_overdue: 'تأخرت متابعة العميل المحتمل «{{lead}}»؛ كان موعدها {{date}}',
@@ -240,6 +242,20 @@ export function notificationLink(notification: Notification): NotificationLink {
   if (notification.type === 'ad_budget_low') {
     // The client's wallet is on its Ads tab (F12 screen 6).
     return { to: '/clients/$clientId', params: { clientId: subject.id }, search: { tab: 'ads' } };
+  }
+  if (notification.type === 'email_failed' && subject.type === 'client') {
+    // Rule 23: the statement is on the Invoices tab, the report on its own screen, the ad
+    // receipts and budget notices on the Ads tab.
+    const { kind, document } = notification.data;
+    if (kind === 'client_report' && document) {
+      return {
+        to: '/clients/$clientId/report',
+        params: { clientId: subject.id },
+        search: { month: document },
+      };
+    }
+    const tab = kind === 'client_statement' ? 'invoices' : 'ads';
+    return { to: '/clients/$clientId', params: { clientId: subject.id }, search: { tab } };
   }
   if (notification.type === 'tasks_generated') {
     // No run filter on the task list (owner decision): the assignee's newest tasks, or the
@@ -404,6 +420,17 @@ export function notificationText(
         }),
         context: notification.data.owner,
       };
+    case 'email_failed': {
+      const { data } = notification;
+      const name = CLIENT_EMAIL_KIND_NAMES[data.kind];
+      return {
+        text: fill(text.email_failed, {
+          email: data.document ? `${name} ${data.document}` : name,
+          recipients: formatList(data.recipients),
+        }),
+        context: data.client,
+      };
+    }
     case 'ad_budget_low': {
       const { data } = notification;
       return {
@@ -583,6 +610,7 @@ type TaskNotification = Exclude<
       | 'quote_accepted'
       | `invoice_${string}`
       | 'ad_budget_low'
+      | 'email_failed'
       | `lead_${string}`
       | 'approval_responded'
       | 'approval_no_response'

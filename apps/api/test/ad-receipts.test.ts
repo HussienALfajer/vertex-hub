@@ -11,11 +11,14 @@ import {
   type CampaignPdfJob,
   campaignPdfJobSchema,
   campaignPdfStorageKey,
+  emailHistorySchema,
+  emailSummarySchema,
   quotePdfRenderSchema,
   type RecordWalletEntryInput,
 } from '@vertex-hub/contracts';
 import {
   adWalletEntries,
+  adWallets,
   auditEntries,
   createDatabase,
   fileItems,
@@ -307,5 +310,89 @@ describe('ad deposit receipts (F12 rules 18 and 19)', () => {
     expect((await entryOf(entry.id))?.receiptPdf).toBeNull();
     expect((await renderAgain(entry.id)).status).toBe(404);
     expect((await download(entry.id)).status).toBe(404);
+  });
+
+  describe('emailed to the client (F14 email)', () => {
+    let walletClientId: string;
+    let contactId: string;
+    let depositId: string;
+    const body = () => ({
+      contactIds: [contactId],
+      subject: 'رصيد الإعلانات',
+      message: 'مرحبًا،\n\nنحيطكم علمًا.',
+    });
+    const emailReceipt = (cookie: string) =>
+      client.post(`/api/ad-wallet-entries/${depositId}/email`, cookie, body());
+    const emailBudgetLow = (cookie: string) =>
+      client.post(`/api/clients/${walletClientId}/ad-wallet/email`, cookie, body());
+    const history = (cookie: string) =>
+      client.get(`/api/clients/${walletClientId}/ad-wallet/emails`, cookie);
+
+    beforeAll(async () => {
+      walletClientId = (await cast.createClient()).id;
+      contactId = (await cast.createContact(walletClientId)).id;
+      const wallet = await ok(
+        await client.post(`/api/clients/${walletClientId}/ad-wallet/entries`, cast.finance.cookie, {
+          kind: 'deposit',
+          occurredOn: today,
+          amountMinor: 20_000,
+          currency: 'USD',
+          method: 'cash',
+        }),
+        adWalletSchema,
+        201,
+      );
+      depositId = newest(wallet).id;
+    });
+
+    it('emails a deposit receipt once it is rendered (rule 18)', async () => {
+      expect((await emailReceipt('')).status).toBe(401);
+      expect((await emailReceipt(cast.employee.cookie)).status).toBe(403);
+      expect((await emailReceipt(cast.otherAm.cookie)).status).toBe(404);
+      await expectError(await emailReceipt(cast.finance.cookie), 409, 'PDF_NOT_READY');
+      await work(lastJob());
+      const response = await emailReceipt(cast.marketer.cookie);
+      expect(response.status, await response.clone().text()).toBe(202);
+      const summary = emailSummarySchema.parse(await response.json());
+      expect(summary.kind).toBe('client_ad_receipt');
+      const [audit] = await db
+        .select()
+        .from(auditEntries)
+        .where(eq(auditEntries.entityId, depositId))
+        .then((rows) => rows.filter((row) => row.action === 'ad_wallet_entry.emailed'));
+      expect(audit?.after).toMatchObject({ email: { emailId: summary.id } });
+    });
+
+    it('emails the low-balance notice only below the threshold (F12 rule 20)', async () => {
+      expect((await emailBudgetLow('')).status).toBe(401);
+      expect((await emailBudgetLow(cast.employee.cookie)).status).toBe(403);
+      expect((await history('')).status).toBe(401);
+      expect((await history(cast.employee.cookie)).status).toBe(403);
+      await expectError(await emailBudgetLow(cast.am.cookie), 409, 'BUDGET_NOT_LOW');
+      await db
+        .update(adWallets)
+        .set({ lowBalanceThresholdMinor: 50_000 })
+        .where(eq(adWallets.clientId, walletClientId));
+      expect((await emailBudgetLow(cast.otherAm.cookie)).status).toBe(404);
+      const response = await emailBudgetLow(cast.am.cookie);
+      expect(response.status, await response.clone().text()).toBe(202);
+      expect(emailSummarySchema.parse(await response.json()).kind).toBe('client_ad_budget_low');
+      const listed = emailHistorySchema.parse(await (await history(cast.finance.cookie)).json());
+      expect(listed.items.map((item) => item.kind)).toEqual([
+        'client_ad_budget_low',
+        'client_ad_receipt',
+      ]);
+      expect((await history(cast.otherAm.cookie)).status).toBe(404);
+    });
+
+    it('refuses the receipt of a void deposit (rule 18)', async () => {
+      const voided = await client.post(
+        `/api/ad-wallet-entries/${depositId}/void`,
+        cast.finance.cookie,
+        { reason: 'خطأ' },
+      );
+      expect(voided.status).toBe(200);
+      await expectError(await emailReceipt(cast.finance.cookie), 409, 'ENTRY_VOIDED');
+    });
   });
 });

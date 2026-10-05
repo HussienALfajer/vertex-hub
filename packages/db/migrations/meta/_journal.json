@@ -316,6 +316,13 @@
       "when": 1791152568653,
       "tag": "0044_military_millenium_guard",
       "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1791163523551,
+      "tag": "0045_premium_mesmero",
+      "breakpoints": true
     }
   ]
 }

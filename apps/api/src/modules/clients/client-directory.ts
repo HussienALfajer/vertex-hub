@@ -15,6 +15,7 @@ export interface ContactSummary {
 export interface ContactDetail extends ContactSummary {
   clientId: string;
   phone: string | null;
+  email: string | null;
   hasFinalApproval: boolean;
 }
 
@@ -221,6 +222,7 @@ const contactColumns = {
   clientId: clientContacts.clientId,
   name: clientContacts.name,
   phone: clientContacts.phone,
+  email: clientContacts.email,
   hasFinalApproval: clientContacts.hasFinalApproval,
   archivedAt: clientContacts.archivedAt,
 };
@@ -233,6 +235,7 @@ const toContact = ({
   clientId: string;
   name: string;
   phone: string | null;
+  email: string | null;
   hasFinalApproval: boolean;
   archivedAt: Date | null;
 }): ContactDetail => ({ ...row, archived: !!archivedAt });

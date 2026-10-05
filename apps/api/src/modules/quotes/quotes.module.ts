@@ -11,6 +11,8 @@ import { LeadQuotes } from './lead-quotes.js';
 import { QuoteAcceptService } from './quote-accept.service.js';
 import { QuoteAcceptedHooks } from './quote-accepted-hooks.js';
 import { QuoteDirectory } from './quote-directory.js';
+import { QuoteEmailsController } from './quote-emails.controller.js';
+import { QuoteEmailsService } from './quote-emails.service.js';
 import { QuoteFileOwner } from './quote-file-owner.js';
 import { QuotePdfService } from './quote-pdf.service.js';
 import { QuoteRecipients } from './quote-recipients.js';
@@ -41,12 +43,13 @@ import { QuotesService } from './quotes.service.js';
     ProjectsModule,
     TemplatesModule,
   ],
-  controllers: [QuoteSettingsController, QuotesController],
+  controllers: [QuoteSettingsController, QuotesController, QuoteEmailsController],
   providers: [
     QuoteSettingsService,
     QuotesService,
     QuoteWorkflowService,
     QuotePdfService,
+    QuoteEmailsService,
     QuoteFileOwner,
     QuoteAcceptService,
     QuoteDirectory,

@@ -1,3 +1,4 @@
+export * from './client-emails.js';
 export * from './emails.js';
 export * from './format.js';
 export * from './notifications.js';

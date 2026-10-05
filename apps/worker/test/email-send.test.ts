@@ -1,5 +1,5 @@
 import { createCipheriv, randomBytes } from 'node:crypto';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { EmailResultJob, EmailSendJob, Notification } from '@vertex-hub/contracts';
@@ -121,6 +121,68 @@ function seal(secrets: Record<string, unknown>, key: Buffer): string {
   return Buffer.concat([iv, cipher.getAuthTag(), ciphertext]).toString('base64url');
 }
 
+const signature = {
+  name: 'رنا',
+  title: 'مديرة حسابات',
+  phone: '+963900000000',
+  email: 'rana@vertexmedia.pro',
+};
+const client = { client: 'مطعم الشام', signature };
+const usd = (amountMinor: number) => ({ amountMinor, currency: 'USD' });
+const invoiceFacts = {
+  number: 'INV-2026-0012',
+  issuedOn: '2026-09-01',
+  dueOn: '2026-09-15',
+  total: usd(150_000),
+  balance: usd(50_000),
+};
+const quoteFacts = {
+  number: 'Q-2026-0004',
+  title: 'إدارة حسابات التواصل',
+  currency: 'USD',
+  oneOffMinor: 120_000,
+  monthlyMinor: 30_000,
+  validUntil: '2026-10-20',
+};
+const approvalFacts = {
+  ...client,
+  contact: 'سامي',
+  items: ['تصميم منيو', 'ريلز الافتتاح'],
+  expiresAt: '2026-10-12T09:00:00.000Z',
+};
+
+/** Rule 17: the template data of each client kind, as the API queues it. */
+const CLIENT_DATA: Partial<Record<EmailSendJob['kind'], Record<string, unknown>>> = {
+  client_quote: { ...client, quote: quoteFacts },
+  client_quote_reminder: { ...client, quote: quoteFacts },
+  client_approval_link: { ...approvalFacts, link: 'https://hub.example.com/a/token' },
+  client_approval_reminder: approvalFacts,
+  client_invoice: { ...client, invoice: invoiceFacts },
+  client_invoice_reminder: { ...client, invoice: invoiceFacts, daysOverdue: 20 },
+  client_receipt: {
+    ...client,
+    invoiceId: '0190a3c2-0000-7000-8000-0000000000b1',
+    receipt: {
+      number: 'RC-2026-0003',
+      invoiceNumber: 'INV-2026-0012',
+      paidOn: '2026-09-20',
+      amount: usd(100_000),
+    },
+  },
+  client_statement: {
+    ...client,
+    statement: { currency: 'USD', from: '2026-01-01', to: '2026-10-05', outstandingMinor: 50_000 },
+  },
+  client_report: { ...client, month: '2026-09' },
+  client_ad_receipt: {
+    ...client,
+    receipt: { number: 'AD-2026-0002', occurredOn: '2026-10-01', amount: usd(30_000) },
+  },
+  client_ad_budget_low: { ...client, balanceMinor: 4_500, thresholdMinor: 10_000 },
+};
+
+const CLIENT_MESSAGE = 'مرحبًا،\n\nنرسل إليكم المستند في المرفق.\n\nمع التحية.';
+
 describe('email templates', () => {
   it('renders the test email as RTL Arabic HTML and plain text', async () => {
     const { html, text } = await renderEmail(job, APP_URL);
@@ -150,10 +212,34 @@ describe('email templates', () => {
     expect(html).toContain('https://hub.example.com/notifications');
   });
 
-  it('has no template for a kind that is not sent yet', async () => {
-    await expect(renderEmail({ kind: 'client_quote', data: {} }, APP_URL)).rejects.toThrow(
-      'No template',
+  it.each(Object.entries(CLIENT_DATA))('renders the %s client email', async (kind, data) => {
+    const { html, text } = await renderEmail(
+      { kind: kind as EmailSendJob['kind'], data: data ?? {}, message: CLIENT_MESSAGE },
+      APP_URL,
     );
+    expect(html).toContain('dir="rtl"');
+    expect(html).toContain('rana@vertexmedia.pro');
+    expect(html).toMatchSnapshot();
+    expect(text).toMatchSnapshot();
+  });
+
+  it('shows the message, the facts and the approval button (rules 17 and 19)', async () => {
+    const quote = await renderEmail(
+      { kind: 'client_quote', data: CLIENT_DATA.client_quote ?? {}, message: CLIENT_MESSAGE },
+      APP_URL,
+    );
+    expect(quote.text).toContain('نرسل إليكم المستند في المرفق.');
+    expect(quote.text).toContain('Q-2026-0004');
+    const link = await renderEmail(
+      { kind: 'client_approval_link', data: CLIENT_DATA.client_approval_link ?? {}, message: null },
+      APP_URL,
+    );
+    expect(link.html).toContain('https://hub.example.com/a/token');
+    expect(link.html).toContain('ريلز الافتتاح');
+  });
+
+  it('refuses client data that does not match its kind', async () => {
+    await expect(renderEmail({ kind: 'client_quote', data: {} }, APP_URL)).rejects.toThrow();
   });
 });
 
@@ -199,6 +285,37 @@ describe('log transport', () => {
     expect(eml).not.toContain('[redacted]');
     const wrongKey = { ...activation, sealed: seal({ link }, randomBytes(32)) };
     await expect(new EmailSender(env).send(wrongKey)).rejects.toThrow();
+  });
+
+  it('attaches the PDF from FILES_ROOT and replies to the sender (rules 17 and 20)', async () => {
+    const files = join(dir, 'files');
+    const storageKey = 'objects/2026/10/receipt';
+    await mkdir(join(files, 'objects/2026/10'), { recursive: true });
+    await writeFile(join(files, storageKey), '%PDF-1.7 receipt');
+    const env = parseEnv({
+      ...process.env,
+      EMAIL_TRANSPORT: 'log',
+      EMAIL_LOG_DIR: dir,
+      FILES_ROOT: files,
+    });
+    const receipt: EmailSendJob = {
+      ...job,
+      id: '0190a3c2-0000-7000-8000-0000000000e3',
+      kind: 'client_receipt',
+      replyTo: 'rana@vertexmedia.pro',
+      subject: 'إيصال الدفع RC-2026-0003',
+      message: CLIENT_MESSAGE,
+      data: CLIENT_DATA.client_receipt ?? {},
+      attachments: [
+        { fileName: 'RC-2026-0003.pdf', storageKey, sizeBytes: 16, sha256: 'a'.repeat(64) },
+      ],
+    };
+    await new EmailSender(env).send(receipt);
+    const eml = await readFile(join(dir, `${receipt.id}.eml`), 'utf8');
+    expect(eml).toContain('From: Vertex Media <info@vertexmedia.pro>');
+    expect(eml).toContain('Reply-To: rana@vertexmedia.pro');
+    expect(eml).toContain('filename=RC-2026-0003.pdf');
+    expect(eml).toContain(Buffer.from('%PDF-1.7 receipt').toString('base64'));
   });
 });
 

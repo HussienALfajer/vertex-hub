@@ -8,6 +8,8 @@ import {
   approvalRequestPageSchema,
   clientApprovalsSchema,
   contactSchema,
+  emailHistorySchema,
+  emailSummarySchema,
   issuedApprovalRequestSchema,
   myTaskSummarySchema,
   type NotificationType,
@@ -17,6 +19,7 @@ import {
   approvalRequests,
   auditEntries,
   createDatabase,
+  emailMessages,
   notifications,
   taskClientResponses,
 } from '@vertex-hub/db';
@@ -788,6 +791,114 @@ describe('approval requests (F09 rules 8–12, 16–17, 24–25)', () => {
       for (const request of [revoked, completed]) {
         expect(await typesOf(cast.am.id, request.id)).not.toContain('approval_expired');
       }
+    });
+  });
+
+  describe('by email (F14 email rule 19)', () => {
+    let clientId: string;
+    let contactId: string;
+    const setEmail = (email: string | null) =>
+      client.request('PATCH', `/api/clients/${clientId}/contacts/${contactId}`, {
+        cookie: cast.gm.cookie,
+        body: { email },
+      });
+    const emailReminder = (id: string, cookie?: string) =>
+      client.post(`/api/approvals/requests/${id}/email-reminder`, cookie, {});
+    const rowOf = async (id: string) =>
+      (await db.select().from(emailMessages).where(eq(emailMessages.id, id)))[0];
+
+    beforeAll(async () => {
+      clientId = (await cast.createClient()).id;
+      contactId = await cast.contactOf(clientId);
+    });
+
+    it('emails the link on create to a contact with an email, redacted in the outbox', async () => {
+      const input = async () => ({
+        clientId,
+        contactId,
+        message: 'تصاميم الأسبوع',
+        email: true,
+        items: [{ taskId: (await cast.readyTask(clientId)).id }],
+      });
+      await expectError(
+        await cast.createRequest(cast.am.cookie, await input()),
+        409,
+        'CONTACT_NO_EMAIL',
+      );
+      expect((await setEmail('approver@example.com')).status).toBe(200);
+      const response = await cast.createRequest(cast.am.cookie, await input());
+      expect(response.status, await response.clone().text()).toBe(201);
+      const issued = issuedApprovalRequestSchema.parse(await response.json());
+      expect(issued.contactEmail).toBe('approver@example.com');
+      expect(issued.email).toMatchObject({ kind: 'client_approval_link', cc: [] });
+      expect(issued.email?.to.map((address) => address.email)).toEqual(['approver@example.com']);
+      const row = await rowOf(issued.email?.id ?? '');
+      expect(row).toMatchObject({
+        message: 'تصاميم الأسبوع',
+        recordType: 'approval_request',
+        recordId: issued.id,
+      });
+      expect(row?.data).toMatchObject({ link: '[redacted]', items: [expect.any(String)] });
+      expect(JSON.stringify(row)).not.toContain(cast.tokenOf(issued));
+      expect((await auditOf(issued.id)).map((entry) => entry.action)).toContain(
+        'approval_request.emailed',
+      );
+      const history = await client.get(
+        `/api/approvals/requests/${issued.id}/emails`,
+        cast.employee.cookie,
+      );
+      expect(history.status).toBe(200);
+      expect(emailHistorySchema.parse(await history.json()).items).toHaveLength(1);
+      expect((await client.get(`/api/approvals/requests/${issued.id}/emails`)).status).toBe(401);
+
+      // Without `email` nothing is emailed, as before.
+      const plain = issuedApprovalRequestSchema.parse(
+        await (
+          await cast.createRequest(cast.am.cookie, { ...(await input()), email: false })
+        ).json(),
+      );
+      expect(plain.email).toBeNull();
+    });
+
+    it('emails the new link on reissue when asked', async () => {
+      const issued = await cast.requestOk(clientId, [(await cast.readyTask(clientId)).id]);
+      // A reissue without a body, as before F14 email, emails nothing.
+      const plain = await client.request('POST', `/api/approvals/requests/${issued.id}/reissue`, {
+        cookie: cast.am.cookie,
+      });
+      expect(plain.status, await plain.clone().text()).toBe(200);
+      expect(issuedApprovalRequestSchema.parse(await plain.json()).email).toBeNull();
+      const response = await client.post(
+        `/api/approvals/requests/${issued.id}/reissue`,
+        cast.am.cookie,
+        { email: true },
+      );
+      expect(response.status, await response.clone().text()).toBe(200);
+      const again = issuedApprovalRequestSchema.parse(await response.json());
+      expect(again.email?.kind).toBe('client_approval_link');
+    });
+
+    it('sends the reminder once the no-response notice went out, without the link', async () => {
+      const issued = await cast.requestOk(clientId, [(await cast.readyTask(clientId)).id]);
+      expect((await emailReminder(issued.id)).status).toBe(401);
+      expect((await emailReminder(issued.id, cast.employee.cookie)).status).toBe(403);
+      // Another account manager's client: no client scope.
+      expect((await emailReminder(issued.id, cast.otherAm.cookie)).status).toBe(403);
+      await expectError(await emailReminder(issued.id, cast.am.cookie), 409, 'REMINDER_NOT_DUE');
+      await db
+        .update(approvalRequests)
+        .set({ remindedAt: new Date() })
+        .where(eq(approvalRequests.id, issued.id));
+      const response = await emailReminder(issued.id, cast.am.cookie);
+      expect(response.status, await response.clone().text()).toBe(202);
+      const summary = emailSummarySchema.parse(await response.json());
+      expect(summary.kind).toBe('client_approval_reminder');
+      expect((await rowOf(summary.id))?.data).not.toHaveProperty('link');
+      await age(issued.id, { expiresAt: new Date(Date.now() - HOUR) });
+      await expectError(await emailReminder(issued.id, cast.am.cookie), 409, 'REQUEST_CLOSED');
+      await setEmail(null);
+      await age(issued.id, { expiresAt: new Date(Date.now() + HOUR) });
+      await expectError(await emailReminder(issued.id, cast.am.cookie), 409, 'CONTACT_NO_EMAIL');
     });
   });
 });

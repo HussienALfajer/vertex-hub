@@ -18,6 +18,382 @@ Vertex Media · نظام Vertex Hub الداخلي
 وصلتك هذه الرسالة لأن لديك حسابًا في Vertex Hub."
 `;
 
+exports[`email templates > renders the client_ad_budget_low client email 1`] = `"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="rtl" lang="ar"><head><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/></head><body dir="rtl" style="background-color:#F4F8F7;margin:0;padding:0"><!--$--><!--html--><!--head--><div style="display:none;overflow:hidden;line-height:1px;opacity:0;max-height:0;max-width:0" data-skip-in-text="true">رصيد إعلانات مطعم الشام منخفض<div> ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿</div></div><!--body--><table border="0" width="100%" cellPadding="0" cellSpacing="0" role="presentation" align="center"><tbody><tr><td style="background-color:#F4F8F7;font-family:Tahoma, &#x27;Segoe UI&#x27;, Arial, sans-serif;margin:0;padding:24px 0"><table align="center" width="100%" dir="rtl" border="0" cellPadding="0" cellSpacing="0" role="presentation" style="max-width:600px;background-color:#FFFFFF;border:1px solid #D4DBD9;border-radius:8px;padding:32px"><tbody><tr style="width:100%"><td><table align="center" width="100%" border="0" cellPadding="0" cellSpacing="0" role="presentation" style="border-bottom:3px solid #B9A87A;padding-bottom:16px;text-align:right"><tbody><tr><td><img alt="Vertex Media" height="73" src="cid:logo@vertexmedia.pro" style="display:block;outline:none;border:none;text-decoration:none" width="72"/></td></tr></tbody></table><h1 style="color:#004139;font-size:22px;line-height:32px;margin:24px 0 16px">تنبيه انخفاض رصيد الإعلانات</h1><p style="font-size:16px;line-height:28px;color:#222827;margin:0 0 12px;margin-top:0;margin-right:0;margin-bottom:12px;margin-left:0">مرحبًا،</p><p style="font-size:16px;line-height:28px;color:#222827;margin:0 0 12px;margin-top:0;margin-right:0;margin-bottom:12px;margin-left:0">نرسل إليكم المستند في المرفق.</p><p style="font-size:16px;line-height:28px;color:#222827;margin:0 0 12px;margin-top:0;margin-right:0;margin-bottom:12px;margin-left:0">مع التحية.</p><table align="center" width="100%" border="0" cellPadding="0" cellSpacing="0" role="presentation" style="background-color:#F4F8F7;border:1px solid #D4DBD9;border-radius:6px;margin:16px 0;padding:12px 16px"><tbody><tr><td><p style="font-size:14px;line-height:24px;color:#222827;margin:0;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0"><span style="color:#616866">الرصيد الحالي<!-- -->: </span><strong>‏45.00 USD</strong></p><p style="font-size:14px;line-height:24px;color:#222827;margin:0;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0"><span style="color:#616866">حد التنبيه<!-- -->: </span><strong>‏100.00 USD</strong></p></td></tr></tbody></table><table align="center" width="100%" border="0" cellPadding="0" cellSpacing="0" role="presentation" style="margin-top:24px"><tbody><tr><td><p style="font-size:14px;line-height:22px;color:#222827;margin:0;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0">رنا</p><p style="font-size:14px;line-height:22px;color:#222827;margin:0;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0">مديرة حسابات</p><p style="font-size:14px;line-height:22px;color:#222827;margin:0;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0">+963900000000</p><p style="font-size:14px;line-height:22px;color:#222827;margin:0;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0">rana@vertexmedia.pro</p></td></tr></tbody></table><hr style="width:100%;border:none;border-top:1px solid #eaeaea;border-color:#D4DBD9;margin:32px 0 16px"/><p style="font-size:13px;line-height:20px;color:#616866;margin:0 0 4px;margin-top:0;margin-right:0;margin-bottom:4px;margin-left:0">Vertex Media · شركة إعلام وتسويق متكاملة</p><p style="font-size:13px;line-height:20px;color:#616866;margin:0 0 4px;margin-top:0;margin-right:0;margin-bottom:4px;margin-left:0">للرد على هذه الرسالة، استخدم الرد العادي في بريدك.</p></td></tr></tbody></table></td></tr></tbody></table><!--/$--></body></html>"`;
+
+exports[`email templates > renders the client_ad_budget_low client email 2`] = `
+"تنبيه انخفاض رصيد الإعلانات
+
+مرحبًا،
+
+نرسل إليكم المستند في المرفق.
+
+مع التحية.
+
+الرصيد الحالي: ‏45.00 USD
+
+حد التنبيه: ‏100.00 USD
+
+رنا
+
+مديرة حسابات
+
++963900000000
+
+rana@vertexmedia.pro
+
+----------------------------------------
+
+Vertex Media · شركة إعلام وتسويق متكاملة
+
+للرد على هذه الرسالة، استخدم الرد العادي في بريدك."
+`;
+
+exports[`email templates > renders the client_ad_receipt client email 1`] = `"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="rtl" lang="ar"><head><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/></head><body dir="rtl" style="background-color:#F4F8F7;margin:0;padding:0"><!--$--><!--html--><!--head--><div style="display:none;overflow:hidden;line-height:1px;opacity:0;max-height:0;max-width:0" data-skip-in-text="true">إيصال إيداع رصيد الإعلانات AD-2026-0002<div> ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿</div></div><!--body--><table border="0" width="100%" cellPadding="0" cellSpacing="0" role="presentation" align="center"><tbody><tr><td style="background-color:#F4F8F7;font-family:Tahoma, &#x27;Segoe UI&#x27;, Arial, sans-serif;margin:0;padding:24px 0"><table align="center" width="100%" dir="rtl" border="0" cellPadding="0" cellSpacing="0" role="presentation" style="max-width:600px;background-color:#FFFFFF;border:1px solid #D4DBD9;border-radius:8px;padding:32px"><tbody><tr style="width:100%"><td><table align="center" width="100%" border="0" cellPadding="0" cellSpacing="0" role="presentation" style="border-bottom:3px solid #B9A87A;padding-bottom:16px;text-align:right"><tbody><tr><td><img alt="Vertex Media" height="73" src="cid:logo@vertexmedia.pro" style="display:block;outline:none;border:none;text-decoration:none" width="72"/></td></tr></tbody></table><h1 style="color:#004139;font-size:22px;line-height:32px;margin:24px 0 16px">إيصال إيداع الإعلانات</h1><p style="font-size:16px;line-height:28px;color:#222827;margin:0 0 12px;margin-top:0;margin-right:0;margin-bottom:12px;margin-left:0">مرحبًا،</p><p style="font-size:16px;line-height:28px;color:#222827;margin:0 0 12px;margin-top:0;margin-right:0;margin-bottom:12px;margin-left:0">نرسل إليكم المستند في المرفق.</p><p style="font-size:16px;line-height:28px;color:#222827;margin:0 0 12px;margin-top:0;margin-right:0;margin-bottom:12px;margin-left:0">مع التحية.</p><table align="center" width="100%" border="0" cellPadding="0" cellSpacing="0" role="presentation" style="background-color:#F4F8F7;border:1px solid #D4DBD9;border-radius:6px;margin:16px 0;padding:12px 16px"><tbody><tr><td><p style="font-size:14px;line-height:24px;color:#222827;margin:0;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0"><span style="color:#616866">رقم الإيصال<!-- -->: </span><strong>AD-2026-0002</strong></p><p style="font-size:14px;line-height:24px;color:#222827;margin:0;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0"><span style="color:#616866">التاريخ<!-- -->: </span><strong>1 تشرين الأول 2026</strong></p><p style="font-size:14px;line-height:24px;color:#222827;margin:0;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0"><span style="color:#616866">المبلغ<!-- -->: </span><strong>‏300.00 USD</strong></p></td></tr></tbody></table><table align="center" width="100%" border="0" cellPadding="0" cellSpacing="0" role="presentation" style="margin-top:24px"><tbody><tr><td><p style="font-size:14px;line-height:22px;color:#222827;margin:0;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0">رنا</p><p style="font-size:14px;line-height:22px;color:#222827;margin:0;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0">مديرة حسابات</p><p style="font-size:14px;line-height:22px;color:#222827;margin:0;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0">+963900000000</p><p style="font-size:14px;line-height:22px;color:#222827;margin:0;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0">rana@vertexmedia.pro</p></td></tr></tbody></table><hr style="width:100%;border:none;border-top:1px solid #eaeaea;border-color:#D4DBD9;margin:32px 0 16px"/><p style="font-size:13px;line-height:20px;color:#616866;margin:0 0 4px;margin-top:0;margin-right:0;margin-bottom:4px;margin-left:0">Vertex Media · شركة إعلام وتسويق متكاملة</p><p style="font-size:13px;line-height:20px;color:#616866;margin:0 0 4px;margin-top:0;margin-right:0;margin-bottom:4px;margin-left:0">للرد على هذه الرسالة، استخدم الرد العادي في بريدك.</p></td></tr></tbody></table></td></tr></tbody></table><!--/$--></body></html>"`;
+
+exports[`email templates > renders the client_ad_receipt client email 2`] = `
+"إيصال إيداع الإعلانات
+
+مرحبًا،
+
+نرسل إليكم المستند في المرفق.
+
+مع التحية.
+
+رقم الإيصال: AD-2026-0002
+
+التاريخ: 1 تشرين الأول 2026
+
+المبلغ: ‏300.00 USD
+
+رنا
+
+مديرة حسابات
+
++963900000000
+
+rana@vertexmedia.pro
+
+----------------------------------------
+
+Vertex Media · شركة إعلام وتسويق متكاملة
+
+للرد على هذه الرسالة، استخدم الرد العادي في بريدك."
+`;
+
+exports[`email templates > renders the client_approval_link client email 1`] = `"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="rtl" lang="ar"><head><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/></head><body dir="rtl" style="background-color:#F4F8F7;margin:0;padding:0"><!--$--><!--html--><!--head--><div style="display:none;overflow:hidden;line-height:1px;opacity:0;max-height:0;max-width:0" data-skip-in-text="true">أعمال بانتظار اعتمادكم من Vertex Media<div> ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿</div></div><!--body--><table border="0" width="100%" cellPadding="0" cellSpacing="0" role="presentation" align="center"><tbody><tr><td style="background-color:#F4F8F7;font-family:Tahoma, &#x27;Segoe UI&#x27;, Arial, sans-serif;margin:0;padding:24px 0"><table align="center" width="100%" dir="rtl" border="0" cellPadding="0" cellSpacing="0" role="presentation" style="max-width:600px;background-color:#FFFFFF;border:1px solid #D4DBD9;border-radius:8px;padding:32px"><tbody><tr style="width:100%"><td><table align="center" width="100%" border="0" cellPadding="0" cellSpacing="0" role="presentation" style="border-bottom:3px solid #B9A87A;padding-bottom:16px;text-align:right"><tbody><tr><td><img alt="Vertex Media" height="73" src="cid:logo@vertexmedia.pro" style="display:block;outline:none;border:none;text-decoration:none" width="72"/></td></tr></tbody></table><h1 style="color:#004139;font-size:22px;line-height:32px;margin:24px 0 16px">رابط الاعتماد</h1><p style="font-size:16px;line-height:28px;color:#222827;margin:0 0 12px;margin-top:0;margin-right:0;margin-bottom:12px;margin-left:0">مرحبًا سامي،</p><p style="font-size:16px;line-height:28px;color:#222827;margin:0 0 12px;margin-top:0;margin-right:0;margin-bottom:12px;margin-left:0">أعددنا لكم أعمالًا بانتظار مراجعتكم واعتمادكم. افتحوا الرابط أدناه لمراجعة كل عمل والموافقة عليه أو طلب التعديل.</p><p style="font-size:16px;line-height:28px;color:#222827;margin:0 0 12px;margin-top:0;margin-right:0;margin-bottom:12px;margin-left:0">مرحبًا،</p><p style="font-size:16px;line-height:28px;color:#222827;margin:0 0 12px;margin-top:0;margin-right:0;margin-bottom:12px;margin-left:0">نرسل إليكم المستند في المرفق.</p><p style="font-size:16px;line-height:28px;color:#222827;margin:0 0 12px;margin-top:0;margin-right:0;margin-bottom:12px;margin-left:0">مع التحية.</p><table align="center" width="100%" border="0" cellPadding="0" cellSpacing="0" role="presentation" style="background-color:#F4F8F7;border:1px solid #D4DBD9;border-radius:6px;margin:16px 0;padding:12px 16px"><tbody><tr><td><p style="font-size:14px;line-height:24px;color:#222827;margin:0;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0"><span style="color:#616866">الرابط صالح حتى<!-- -->: </span><strong>12 تشرين الأول 2026 في 12:00 م</strong></p></td></tr></tbody></table><table align="center" width="100%" border="0" cellPadding="0" cellSpacing="0" role="presentation"><tbody><tr><td><p style="font-size:17px;line-height:24px;color:#004139;font-weight:700;margin:24px 0 8px;margin-top:24px;margin-right:0;margin-bottom:8px;margin-left:0">الأعمال المطلوب اعتمادها</p><table align="center" width="100%" border="0" cellPadding="0" cellSpacing="0" role="presentation" style="border-top:1px solid #D4DBD9;padding:10px 0"><tbody><tr><td><p style="font-size:15px;line-height:24px;color:#222827;margin:0;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0">تصميم منيو</p></td></tr></tbody></table><table align="center" width="100%" border="0" cellPadding="0" cellSpacing="0" role="presentation" style="border-top:1px solid #D4DBD9;padding:10px 0"><tbody><tr><td><p style="font-size:15px;line-height:24px;color:#222827;margin:0;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0">ريلز الافتتاح</p></td></tr></tbody></table></td></tr></tbody></table><table align="center" width="100%" border="0" cellPadding="0" cellSpacing="0" role="presentation" style="margin:24px 0"><tbody><tr><td><a href="https://hub.example.com/a/token" style="line-height:100%;text-decoration:none;display:inline-block;max-width:100%;mso-padding-alt:0px;background-color:#004139;border-radius:6px;color:#FFFFFF;font-size:16px;font-weight:600;padding:12px 24px;padding-top:12px;padding-right:24px;padding-bottom:12px;padding-left:24px" target="_blank"><span><!--[if mso]><i style="mso-font-width:400%;mso-text-raise:18" hidden>&#8202;&#8202;&#8202;</i><![endif]--></span><span style="max-width:100%;display:inline-block;line-height:120%;mso-padding-alt:0px;mso-text-raise:9px">مراجعة الأعمال واعتمادها</span><span><!--[if mso]><i style="mso-font-width:400%" hidden>&#8202;&#8202;&#8202;&#8203;</i><![endif]--></span></a></td></tr></tbody></table><table align="center" width="100%" border="0" cellPadding="0" cellSpacing="0" role="presentation" style="margin-top:24px"><tbody><tr><td><p style="font-size:14px;line-height:22px;color:#222827;margin:0;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0">رنا</p><p style="font-size:14px;line-height:22px;color:#222827;margin:0;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0">مديرة حسابات</p><p style="font-size:14px;line-height:22px;color:#222827;margin:0;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0">+963900000000</p><p style="font-size:14px;line-height:22px;color:#222827;margin:0;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0">rana@vertexmedia.pro</p></td></tr></tbody></table><hr style="width:100%;border:none;border-top:1px solid #eaeaea;border-color:#D4DBD9;margin:32px 0 16px"/><p style="font-size:13px;line-height:20px;color:#616866;margin:0 0 4px;margin-top:0;margin-right:0;margin-bottom:4px;margin-left:0">Vertex Media · شركة إعلام وتسويق متكاملة</p><p style="font-size:13px;line-height:20px;color:#616866;margin:0 0 4px;margin-top:0;margin-right:0;margin-bottom:4px;margin-left:0">للرد على هذه الرسالة، استخدم الرد العادي في بريدك.</p></td></tr></tbody></table></td></tr></tbody></table><!--/$--></body></html>"`;
+
+exports[`email templates > renders the client_approval_link client email 2`] = `
+"رابط الاعتماد
+
+مرحبًا سامي،
+
+أعددنا لكم أعمالًا بانتظار مراجعتكم واعتمادكم. افتحوا الرابط أدناه لمراجعة كل عمل والموافقة عليه أو طلب التعديل.
+
+مرحبًا،
+
+نرسل إليكم المستند في المرفق.
+
+مع التحية.
+
+الرابط صالح حتى: 12 تشرين الأول 2026 في 12:00 م
+
+الأعمال المطلوب اعتمادها
+
+تصميم منيو
+
+ريلز الافتتاح
+
+مراجعة الأعمال واعتمادها https://hub.example.com/a/token
+
+رنا
+
+مديرة حسابات
+
++963900000000
+
+rana@vertexmedia.pro
+
+----------------------------------------
+
+Vertex Media · شركة إعلام وتسويق متكاملة
+
+للرد على هذه الرسالة، استخدم الرد العادي في بريدك."
+`;
+
+exports[`email templates > renders the client_approval_reminder client email 1`] = `"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="rtl" lang="ar"><head><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/></head><body dir="rtl" style="background-color:#F4F8F7;margin:0;padding:0"><!--$--><!--html--><!--head--><div style="display:none;overflow:hidden;line-height:1px;opacity:0;max-height:0;max-width:0" data-skip-in-text="true">تذكير: أعمال ما زالت بانتظار اعتمادكم<div> ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿</div></div><!--body--><table border="0" width="100%" cellPadding="0" cellSpacing="0" role="presentation" align="center"><tbody><tr><td style="background-color:#F4F8F7;font-family:Tahoma, &#x27;Segoe UI&#x27;, Arial, sans-serif;margin:0;padding:24px 0"><table align="center" width="100%" dir="rtl" border="0" cellPadding="0" cellSpacing="0" role="presentation" style="max-width:600px;background-color:#FFFFFF;border:1px solid #D4DBD9;border-radius:8px;padding:32px"><tbody><tr style="width:100%"><td><table align="center" width="100%" border="0" cellPadding="0" cellSpacing="0" role="presentation" style="border-bottom:3px solid #B9A87A;padding-bottom:16px;text-align:right"><tbody><tr><td><img alt="Vertex Media" height="73" src="cid:logo@vertexmedia.pro" style="display:block;outline:none;border:none;text-decoration:none" width="72"/></td></tr></tbody></table><h1 style="color:#004139;font-size:22px;line-height:32px;margin:24px 0 16px">تذكير بالاعتماد</h1><p style="font-size:16px;line-height:28px;color:#222827;margin:0 0 12px;margin-top:0;margin-right:0;margin-bottom:12px;margin-left:0">مرحبًا سامي،</p><p style="font-size:16px;line-height:28px;color:#222827;margin:0 0 12px;margin-top:0;margin-right:0;margin-bottom:12px;margin-left:0">نذكّركم بأن أعمالًا أرسلناها إليكم ما زالت بانتظار اعتمادكم. تجدون الرابط في رسالتنا السابقة، وهو صالح حتى 12 تشرين الأول 2026 في 12:00 م.</p><p style="font-size:16px;line-height:28px;color:#222827;margin:0 0 12px;margin-top:0;margin-right:0;margin-bottom:12px;margin-left:0">مرحبًا،</p><p style="font-size:16px;line-height:28px;color:#222827;margin:0 0 12px;margin-top:0;margin-right:0;margin-bottom:12px;margin-left:0">نرسل إليكم المستند في المرفق.</p><p style="font-size:16px;line-height:28px;color:#222827;margin:0 0 12px;margin-top:0;margin-right:0;margin-bottom:12px;margin-left:0">مع التحية.</p><table align="center" width="100%" border="0" cellPadding="0" cellSpacing="0" role="presentation" style="background-color:#F4F8F7;border:1px solid #D4DBD9;border-radius:6px;margin:16px 0;padding:12px 16px"><tbody><tr><td><p style="font-size:14px;line-height:24px;color:#222827;margin:0;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0"><span style="color:#616866">الرابط صالح حتى<!-- -->: </span><strong>12 تشرين الأول 2026 في 12:00 م</strong></p></td></tr></tbody></table><table align="center" width="100%" border="0" cellPadding="0" cellSpacing="0" role="presentation"><tbody><tr><td><p style="font-size:17px;line-height:24px;color:#004139;font-weight:700;margin:24px 0 8px;margin-top:24px;margin-right:0;margin-bottom:8px;margin-left:0">الأعمال المطلوب اعتمادها</p><table align="center" width="100%" border="0" cellPadding="0" cellSpacing="0" role="presentation" style="border-top:1px solid #D4DBD9;padding:10px 0"><tbody><tr><td><p style="font-size:15px;line-height:24px;color:#222827;margin:0;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0">تصميم منيو</p></td></tr></tbody></table><table align="center" width="100%" border="0" cellPadding="0" cellSpacing="0" role="presentation" style="border-top:1px solid #D4DBD9;padding:10px 0"><tbody><tr><td><p style="font-size:15px;line-height:24px;color:#222827;margin:0;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0">ريلز الافتتاح</p></td></tr></tbody></table></td></tr></tbody></table><table align="center" width="100%" border="0" cellPadding="0" cellSpacing="0" role="presentation" style="margin-top:24px"><tbody><tr><td><p style="font-size:14px;line-height:22px;color:#222827;margin:0;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0">رنا</p><p style="font-size:14px;line-height:22px;color:#222827;margin:0;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0">مديرة حسابات</p><p style="font-size:14px;line-height:22px;color:#222827;margin:0;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0">+963900000000</p><p style="font-size:14px;line-height:22px;color:#222827;margin:0;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0">rana@vertexmedia.pro</p></td></tr></tbody></table><hr style="width:100%;border:none;border-top:1px solid #eaeaea;border-color:#D4DBD9;margin:32px 0 16px"/><p style="font-size:13px;line-height:20px;color:#616866;margin:0 0 4px;margin-top:0;margin-right:0;margin-bottom:4px;margin-left:0">Vertex Media · شركة إعلام وتسويق متكاملة</p><p style="font-size:13px;line-height:20px;color:#616866;margin:0 0 4px;margin-top:0;margin-right:0;margin-bottom:4px;margin-left:0">للرد على هذه الرسالة، استخدم الرد العادي في بريدك.</p></td></tr></tbody></table></td></tr></tbody></table><!--/$--></body></html>"`;
+
+exports[`email templates > renders the client_approval_reminder client email 2`] = `
+"تذكير بالاعتماد
+
+مرحبًا سامي،
+
+نذكّركم بأن أعمالًا أرسلناها إليكم ما زالت بانتظار اعتمادكم. تجدون الرابط في رسالتنا السابقة، وهو صالح حتى 12 تشرين الأول 2026 في 12:00 م.
+
+مرحبًا،
+
+نرسل إليكم المستند في المرفق.
+
+مع التحية.
+
+الرابط صالح حتى: 12 تشرين الأول 2026 في 12:00 م
+
+الأعمال المطلوب اعتمادها
+
+تصميم منيو
+
+ريلز الافتتاح
+
+رنا
+
+مديرة حسابات
+
++963900000000
+
+rana@vertexmedia.pro
+
+----------------------------------------
+
+Vertex Media · شركة إعلام وتسويق متكاملة
+
+للرد على هذه الرسالة، استخدم الرد العادي في بريدك."
+`;
+
+exports[`email templates > renders the client_invoice client email 1`] = `"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="rtl" lang="ar"><head><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/></head><body dir="rtl" style="background-color:#F4F8F7;margin:0;padding:0"><!--$--><!--html--><!--head--><div style="display:none;overflow:hidden;line-height:1px;opacity:0;max-height:0;max-width:0" data-skip-in-text="true">الفاتورة INV-2026-0012 من Vertex Media<div> ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿</div></div><!--body--><table border="0" width="100%" cellPadding="0" cellSpacing="0" role="presentation" align="center"><tbody><tr><td style="background-color:#F4F8F7;font-family:Tahoma, &#x27;Segoe UI&#x27;, Arial, sans-serif;margin:0;padding:24px 0"><table align="center" width="100%" dir="rtl" border="0" cellPadding="0" cellSpacing="0" role="presentation" style="max-width:600px;background-color:#FFFFFF;border:1px solid #D4DBD9;border-radius:8px;padding:32px"><tbody><tr style="width:100%"><td><table align="center" width="100%" border="0" cellPadding="0" cellSpacing="0" role="presentation" style="border-bottom:3px solid #B9A87A;padding-bottom:16px;text-align:right"><tbody><tr><td><img alt="Vertex Media" height="73" src="cid:logo@vertexmedia.pro" style="display:block;outline:none;border:none;text-decoration:none" width="72"/></td></tr></tbody></table><h1 style="color:#004139;font-size:22px;line-height:32px;margin:24px 0 16px">الفاتورة</h1><p style="font-size:16px;line-height:28px;color:#222827;margin:0 0 12px;margin-top:0;margin-right:0;margin-bottom:12px;margin-left:0">مرحبًا،</p><p style="font-size:16px;line-height:28px;color:#222827;margin:0 0 12px;margin-top:0;margin-right:0;margin-bottom:12px;margin-left:0">نرسل إليكم المستند في المرفق.</p><p style="font-size:16px;line-height:28px;color:#222827;margin:0 0 12px;margin-top:0;margin-right:0;margin-bottom:12px;margin-left:0">مع التحية.</p><table align="center" width="100%" border="0" cellPadding="0" cellSpacing="0" role="presentation" style="background-color:#F4F8F7;border:1px solid #D4DBD9;border-radius:6px;margin:16px 0;padding:12px 16px"><tbody><tr><td><p style="font-size:14px;line-height:24px;color:#222827;margin:0;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0"><span style="color:#616866">رقم الفاتورة<!-- -->: </span><strong>INV-2026-0012</strong></p><p style="font-size:14px;line-height:24px;color:#222827;margin:0;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0"><span style="color:#616866">تاريخ الإصدار<!-- -->: </span><strong>1 أيلول 2026</strong></p><p style="font-size:14px;line-height:24px;color:#222827;margin:0;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0"><span style="color:#616866">تاريخ الاستحقاق<!-- -->: </span><strong>15 أيلول 2026</strong></p><p style="font-size:14px;line-height:24px;color:#222827;margin:0;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0"><span style="color:#616866">الإجمالي<!-- -->: </span><strong>‏1,500.00 USD</strong></p><p style="font-size:14px;line-height:24px;color:#222827;margin:0;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0"><span style="color:#616866">المتبقي<!-- -->: </span><strong>‏500.00 USD</strong></p></td></tr></tbody></table><table align="center" width="100%" border="0" cellPadding="0" cellSpacing="0" role="presentation" style="margin-top:24px"><tbody><tr><td><p style="font-size:14px;line-height:22px;color:#222827;margin:0;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0">رنا</p><p style="font-size:14px;line-height:22px;color:#222827;margin:0;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0">مديرة حسابات</p><p style="font-size:14px;line-height:22px;color:#222827;margin:0;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0">+963900000000</p><p style="font-size:14px;line-height:22px;color:#222827;margin:0;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0">rana@vertexmedia.pro</p></td></tr></tbody></table><hr style="width:100%;border:none;border-top:1px solid #eaeaea;border-color:#D4DBD9;margin:32px 0 16px"/><p style="font-size:13px;line-height:20px;color:#616866;margin:0 0 4px;margin-top:0;margin-right:0;margin-bottom:4px;margin-left:0">Vertex Media · شركة إعلام وتسويق متكاملة</p><p style="font-size:13px;line-height:20px;color:#616866;margin:0 0 4px;margin-top:0;margin-right:0;margin-bottom:4px;margin-left:0">للرد على هذه الرسالة، استخدم الرد العادي في بريدك.</p></td></tr></tbody></table></td></tr></tbody></table><!--/$--></body></html>"`;
+
+exports[`email templates > renders the client_invoice client email 2`] = `
+"الفاتورة
+
+مرحبًا،
+
+نرسل إليكم المستند في المرفق.
+
+مع التحية.
+
+رقم الفاتورة: INV-2026-0012
+
+تاريخ الإصدار: 1 أيلول 2026
+
+تاريخ الاستحقاق: 15 أيلول 2026
+
+الإجمالي: ‏1,500.00 USD
+
+المتبقي: ‏500.00 USD
+
+رنا
+
+مديرة حسابات
+
++963900000000
+
+rana@vertexmedia.pro
+
+----------------------------------------
+
+Vertex Media · شركة إعلام وتسويق متكاملة
+
+للرد على هذه الرسالة، استخدم الرد العادي في بريدك."
+`;
+
+exports[`email templates > renders the client_invoice_reminder client email 1`] = `"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="rtl" lang="ar"><head><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/></head><body dir="rtl" style="background-color:#F4F8F7;margin:0;padding:0"><!--$--><!--html--><!--head--><div style="display:none;overflow:hidden;line-height:1px;opacity:0;max-height:0;max-width:0" data-skip-in-text="true">تذكير: الفاتورة INV-2026-0012 متأخرة السداد<div> ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿</div></div><!--body--><table border="0" width="100%" cellPadding="0" cellSpacing="0" role="presentation" align="center"><tbody><tr><td style="background-color:#F4F8F7;font-family:Tahoma, &#x27;Segoe UI&#x27;, Arial, sans-serif;margin:0;padding:24px 0"><table align="center" width="100%" dir="rtl" border="0" cellPadding="0" cellSpacing="0" role="presentation" style="max-width:600px;background-color:#FFFFFF;border:1px solid #D4DBD9;border-radius:8px;padding:32px"><tbody><tr style="width:100%"><td><table align="center" width="100%" border="0" cellPadding="0" cellSpacing="0" role="presentation" style="border-bottom:3px solid #B9A87A;padding-bottom:16px;text-align:right"><tbody><tr><td><img alt="Vertex Media" height="73" src="cid:logo@vertexmedia.pro" style="display:block;outline:none;border:none;text-decoration:none" width="72"/></td></tr></tbody></table><h1 style="color:#004139;font-size:22px;line-height:32px;margin:24px 0 16px">تذكير بفاتورة متأخرة</h1><p style="font-size:16px;line-height:28px;color:#222827;margin:0 0 12px;margin-top:0;margin-right:0;margin-bottom:12px;margin-left:0">مرحبًا،</p><p style="font-size:16px;line-height:28px;color:#222827;margin:0 0 12px;margin-top:0;margin-right:0;margin-bottom:12px;margin-left:0">نرسل إليكم المستند في المرفق.</p><p style="font-size:16px;line-height:28px;color:#222827;margin:0 0 12px;margin-top:0;margin-right:0;margin-bottom:12px;margin-left:0">مع التحية.</p><table align="center" width="100%" border="0" cellPadding="0" cellSpacing="0" role="presentation" style="background-color:#F4F8F7;border:1px solid #D4DBD9;border-radius:6px;margin:16px 0;padding:12px 16px"><tbody><tr><td><p style="font-size:14px;line-height:24px;color:#222827;margin:0;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0"><span style="color:#616866">رقم الفاتورة<!-- -->: </span><strong>INV-2026-0012</strong></p><p style="font-size:14px;line-height:24px;color:#222827;margin:0;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0"><span style="color:#616866">تاريخ الإصدار<!-- -->: </span><strong>1 أيلول 2026</strong></p><p style="font-size:14px;line-height:24px;color:#222827;margin:0;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0"><span style="color:#616866">تاريخ الاستحقاق<!-- -->: </span><strong>15 أيلول 2026</strong></p><p style="font-size:14px;line-height:24px;color:#222827;margin:0;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0"><span style="color:#616866">الإجمالي<!-- -->: </span><strong>‏1,500.00 USD</strong></p><p style="font-size:14px;line-height:24px;color:#222827;margin:0;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0"><span style="color:#616866">المتبقي<!-- -->: </span><strong>‏500.00 USD</strong></p><p style="font-size:14px;line-height:24px;color:#222827;margin:0;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0"><span style="color:#616866">أيام التأخير<!-- -->: </span><strong>20</strong></p></td></tr></tbody></table><table align="center" width="100%" border="0" cellPadding="0" cellSpacing="0" role="presentation" style="margin-top:24px"><tbody><tr><td><p style="font-size:14px;line-height:22px;color:#222827;margin:0;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0">رنا</p><p style="font-size:14px;line-height:22px;color:#222827;margin:0;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0">مديرة حسابات</p><p style="font-size:14px;line-height:22px;color:#222827;margin:0;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0">+963900000000</p><p style="font-size:14px;line-height:22px;color:#222827;margin:0;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0">rana@vertexmedia.pro</p></td></tr></tbody></table><hr style="width:100%;border:none;border-top:1px solid #eaeaea;border-color:#D4DBD9;margin:32px 0 16px"/><p style="font-size:13px;line-height:20px;color:#616866;margin:0 0 4px;margin-top:0;margin-right:0;margin-bottom:4px;margin-left:0">Vertex Media · شركة إعلام وتسويق متكاملة</p><p style="font-size:13px;line-height:20px;color:#616866;margin:0 0 4px;margin-top:0;margin-right:0;margin-bottom:4px;margin-left:0">للرد على هذه الرسالة، استخدم الرد العادي في بريدك.</p></td></tr></tbody></table></td></tr></tbody></table><!--/$--></body></html>"`;
+
+exports[`email templates > renders the client_invoice_reminder client email 2`] = `
+"تذكير بفاتورة متأخرة
+
+مرحبًا،
+
+نرسل إليكم المستند في المرفق.
+
+مع التحية.
+
+رقم الفاتورة: INV-2026-0012
+
+تاريخ الإصدار: 1 أيلول 2026
+
+تاريخ الاستحقاق: 15 أيلول 2026
+
+الإجمالي: ‏1,500.00 USD
+
+المتبقي: ‏500.00 USD
+
+أيام التأخير: 20
+
+رنا
+
+مديرة حسابات
+
++963900000000
+
+rana@vertexmedia.pro
+
+----------------------------------------
+
+Vertex Media · شركة إعلام وتسويق متكاملة
+
+للرد على هذه الرسالة، استخدم الرد العادي في بريدك."
+`;
+
+exports[`email templates > renders the client_quote client email 1`] = `"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="rtl" lang="ar"><head><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/></head><body dir="rtl" style="background-color:#F4F8F7;margin:0;padding:0"><!--$--><!--html--><!--head--><div style="display:none;overflow:hidden;line-height:1px;opacity:0;max-height:0;max-width:0" data-skip-in-text="true">عرض السعر Q-2026-0004: إدارة حسابات التواصل<div> ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿</div></div><!--body--><table border="0" width="100%" cellPadding="0" cellSpacing="0" role="presentation" align="center"><tbody><tr><td style="background-color:#F4F8F7;font-family:Tahoma, &#x27;Segoe UI&#x27;, Arial, sans-serif;margin:0;padding:24px 0"><table align="center" width="100%" dir="rtl" border="0" cellPadding="0" cellSpacing="0" role="presentation" style="max-width:600px;background-color:#FFFFFF;border:1px solid #D4DBD9;border-radius:8px;padding:32px"><tbody><tr style="width:100%"><td><table align="center" width="100%" border="0" cellPadding="0" cellSpacing="0" role="presentation" style="border-bottom:3px solid #B9A87A;padding-bottom:16px;text-align:right"><tbody><tr><td><img alt="Vertex Media" height="73" src="cid:logo@vertexmedia.pro" style="display:block;outline:none;border:none;text-decoration:none" width="72"/></td></tr></tbody></table><h1 style="color:#004139;font-size:22px;line-height:32px;margin:24px 0 16px">عرض السعر</h1><p style="font-size:16px;line-height:28px;color:#222827;margin:0 0 12px;margin-top:0;margin-right:0;margin-bottom:12px;margin-left:0">مرحبًا،</p><p style="font-size:16px;line-height:28px;color:#222827;margin:0 0 12px;margin-top:0;margin-right:0;margin-bottom:12px;margin-left:0">نرسل إليكم المستند في المرفق.</p><p style="font-size:16px;line-height:28px;color:#222827;margin:0 0 12px;margin-top:0;margin-right:0;margin-bottom:12px;margin-left:0">مع التحية.</p><table align="center" width="100%" border="0" cellPadding="0" cellSpacing="0" role="presentation" style="background-color:#F4F8F7;border:1px solid #D4DBD9;border-radius:6px;margin:16px 0;padding:12px 16px"><tbody><tr><td><p style="font-size:14px;line-height:24px;color:#222827;margin:0;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0"><span style="color:#616866">رقم العرض<!-- -->: </span><strong>Q-2026-0004</strong></p><p style="font-size:14px;line-height:24px;color:#222827;margin:0;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0"><span style="color:#616866">العنوان<!-- -->: </span><strong>إدارة حسابات التواصل</strong></p><p style="font-size:14px;line-height:24px;color:#222827;margin:0;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0"><span style="color:#616866">الإجمالي<!-- -->: </span><strong>‏1,200.00 USD لمرة واحدة و‏300.00 USD شهريًا</strong></p><p style="font-size:14px;line-height:24px;color:#222827;margin:0;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0"><span style="color:#616866">صالح حتى<!-- -->: </span><strong>20 تشرين الأول 2026</strong></p></td></tr></tbody></table><table align="center" width="100%" border="0" cellPadding="0" cellSpacing="0" role="presentation" style="margin-top:24px"><tbody><tr><td><p style="font-size:14px;line-height:22px;color:#222827;margin:0;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0">رنا</p><p style="font-size:14px;line-height:22px;color:#222827;margin:0;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0">مديرة حسابات</p><p style="font-size:14px;line-height:22px;color:#222827;margin:0;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0">+963900000000</p><p style="font-size:14px;line-height:22px;color:#222827;margin:0;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0">rana@vertexmedia.pro</p></td></tr></tbody></table><hr style="width:100%;border:none;border-top:1px solid #eaeaea;border-color:#D4DBD9;margin:32px 0 16px"/><p style="font-size:13px;line-height:20px;color:#616866;margin:0 0 4px;margin-top:0;margin-right:0;margin-bottom:4px;margin-left:0">Vertex Media · شركة إعلام وتسويق متكاملة</p><p style="font-size:13px;line-height:20px;color:#616866;margin:0 0 4px;margin-top:0;margin-right:0;margin-bottom:4px;margin-left:0">للرد على هذه الرسالة، استخدم الرد العادي في بريدك.</p></td></tr></tbody></table></td></tr></tbody></table><!--/$--></body></html>"`;
+
+exports[`email templates > renders the client_quote client email 2`] = `
+"عرض السعر
+
+مرحبًا،
+
+نرسل إليكم المستند في المرفق.
+
+مع التحية.
+
+رقم العرض: Q-2026-0004
+
+العنوان: إدارة حسابات التواصل
+
+الإجمالي: ‏1,200.00 USD لمرة واحدة و‏300.00 USD شهريًا
+
+صالح حتى: 20 تشرين الأول 2026
+
+رنا
+
+مديرة حسابات
+
++963900000000
+
+rana@vertexmedia.pro
+
+----------------------------------------
+
+Vertex Media · شركة إعلام وتسويق متكاملة
+
+للرد على هذه الرسالة، استخدم الرد العادي في بريدك."
+`;
+
+exports[`email templates > renders the client_quote_reminder client email 1`] = `"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="rtl" lang="ar"><head><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/></head><body dir="rtl" style="background-color:#F4F8F7;margin:0;padding:0"><!--$--><!--html--><!--head--><div style="display:none;overflow:hidden;line-height:1px;opacity:0;max-height:0;max-width:0" data-skip-in-text="true">تذكير: عرض السعر Q-2026-0004 صالح حتى 20 تشرين الأول 2026<div> ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿</div></div><!--body--><table border="0" width="100%" cellPadding="0" cellSpacing="0" role="presentation" align="center"><tbody><tr><td style="background-color:#F4F8F7;font-family:Tahoma, &#x27;Segoe UI&#x27;, Arial, sans-serif;margin:0;padding:24px 0"><table align="center" width="100%" dir="rtl" border="0" cellPadding="0" cellSpacing="0" role="presentation" style="max-width:600px;background-color:#FFFFFF;border:1px solid #D4DBD9;border-radius:8px;padding:32px"><tbody><tr style="width:100%"><td><table align="center" width="100%" border="0" cellPadding="0" cellSpacing="0" role="presentation" style="border-bottom:3px solid #B9A87A;padding-bottom:16px;text-align:right"><tbody><tr><td><img alt="Vertex Media" height="73" src="cid:logo@vertexmedia.pro" style="display:block;outline:none;border:none;text-decoration:none" width="72"/></td></tr></tbody></table><h1 style="color:#004139;font-size:22px;line-height:32px;margin:24px 0 16px">تذكير بعرض السعر</h1><p style="font-size:16px;line-height:28px;color:#222827;margin:0 0 12px;margin-top:0;margin-right:0;margin-bottom:12px;margin-left:0">مرحبًا،</p><p style="font-size:16px;line-height:28px;color:#222827;margin:0 0 12px;margin-top:0;margin-right:0;margin-bottom:12px;margin-left:0">نرسل إليكم المستند في المرفق.</p><p style="font-size:16px;line-height:28px;color:#222827;margin:0 0 12px;margin-top:0;margin-right:0;margin-bottom:12px;margin-left:0">مع التحية.</p><table align="center" width="100%" border="0" cellPadding="0" cellSpacing="0" role="presentation" style="background-color:#F4F8F7;border:1px solid #D4DBD9;border-radius:6px;margin:16px 0;padding:12px 16px"><tbody><tr><td><p style="font-size:14px;line-height:24px;color:#222827;margin:0;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0"><span style="color:#616866">رقم العرض<!-- -->: </span><strong>Q-2026-0004</strong></p><p style="font-size:14px;line-height:24px;color:#222827;margin:0;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0"><span style="color:#616866">العنوان<!-- -->: </span><strong>إدارة حسابات التواصل</strong></p><p style="font-size:14px;line-height:24px;color:#222827;margin:0;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0"><span style="color:#616866">الإجمالي<!-- -->: </span><strong>‏1,200.00 USD لمرة واحدة و‏300.00 USD شهريًا</strong></p><p style="font-size:14px;line-height:24px;color:#222827;margin:0;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0"><span style="color:#616866">صالح حتى<!-- -->: </span><strong>20 تشرين الأول 2026</strong></p></td></tr></tbody></table><table align="center" width="100%" border="0" cellPadding="0" cellSpacing="0" role="presentation" style="margin-top:24px"><tbody><tr><td><p style="font-size:14px;line-height:22px;color:#222827;margin:0;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0">رنا</p><p style="font-size:14px;line-height:22px;color:#222827;margin:0;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0">مديرة حسابات</p><p style="font-size:14px;line-height:22px;color:#222827;margin:0;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0">+963900000000</p><p style="font-size:14px;line-height:22px;color:#222827;margin:0;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0">rana@vertexmedia.pro</p></td></tr></tbody></table><hr style="width:100%;border:none;border-top:1px solid #eaeaea;border-color:#D4DBD9;margin:32px 0 16px"/><p style="font-size:13px;line-height:20px;color:#616866;margin:0 0 4px;margin-top:0;margin-right:0;margin-bottom:4px;margin-left:0">Vertex Media · شركة إعلام وتسويق متكاملة</p><p style="font-size:13px;line-height:20px;color:#616866;margin:0 0 4px;margin-top:0;margin-right:0;margin-bottom:4px;margin-left:0">للرد على هذه الرسالة، استخدم الرد العادي في بريدك.</p></td></tr></tbody></table></td></tr></tbody></table><!--/$--></body></html>"`;
+
+exports[`email templates > renders the client_quote_reminder client email 2`] = `
+"تذكير بعرض السعر
+
+مرحبًا،
+
+نرسل إليكم المستند في المرفق.
+
+مع التحية.
+
+رقم العرض: Q-2026-0004
+
+العنوان: إدارة حسابات التواصل
+
+الإجمالي: ‏1,200.00 USD لمرة واحدة و‏300.00 USD شهريًا
+
+صالح حتى: 20 تشرين الأول 2026
+
+رنا
+
+مديرة حسابات
+
++963900000000
+
+rana@vertexmedia.pro
+
+----------------------------------------
+
+Vertex Media · شركة إعلام وتسويق متكاملة
+
+للرد على هذه الرسالة، استخدم الرد العادي في بريدك."
+`;
+
+exports[`email templates > renders the client_receipt client email 1`] = `"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="rtl" lang="ar"><head><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/></head><body dir="rtl" style="background-color:#F4F8F7;margin:0;padding:0"><!--$--><!--html--><!--head--><div style="display:none;overflow:hidden;line-height:1px;opacity:0;max-height:0;max-width:0" data-skip-in-text="true">إيصال الدفع RC-2026-0003<div> ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿</div></div><!--body--><table border="0" width="100%" cellPadding="0" cellSpacing="0" role="presentation" align="center"><tbody><tr><td style="background-color:#F4F8F7;font-family:Tahoma, &#x27;Segoe UI&#x27;, Arial, sans-serif;margin:0;padding:24px 0"><table align="center" width="100%" dir="rtl" border="0" cellPadding="0" cellSpacing="0" role="presentation" style="max-width:600px;background-color:#FFFFFF;border:1px solid #D4DBD9;border-radius:8px;padding:32px"><tbody><tr style="width:100%"><td><table align="center" width="100%" border="0" cellPadding="0" cellSpacing="0" role="presentation" style="border-bottom:3px solid #B9A87A;padding-bottom:16px;text-align:right"><tbody><tr><td><img alt="Vertex Media" height="73" src="cid:logo@vertexmedia.pro" style="display:block;outline:none;border:none;text-decoration:none" width="72"/></td></tr></tbody></table><h1 style="color:#004139;font-size:22px;line-height:32px;margin:24px 0 16px">إيصال الدفع</h1><p style="font-size:16px;line-height:28px;color:#222827;margin:0 0 12px;margin-top:0;margin-right:0;margin-bottom:12px;margin-left:0">مرحبًا،</p><p style="font-size:16px;line-height:28px;color:#222827;margin:0 0 12px;margin-top:0;margin-right:0;margin-bottom:12px;margin-left:0">نرسل إليكم المستند في المرفق.</p><p style="font-size:16px;line-height:28px;color:#222827;margin:0 0 12px;margin-top:0;margin-right:0;margin-bottom:12px;margin-left:0">مع التحية.</p><table align="center" width="100%" border="0" cellPadding="0" cellSpacing="0" role="presentation" style="background-color:#F4F8F7;border:1px solid #D4DBD9;border-radius:6px;margin:16px 0;padding:12px 16px"><tbody><tr><td><p style="font-size:14px;line-height:24px;color:#222827;margin:0;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0"><span style="color:#616866">رقم الإيصال<!-- -->: </span><strong>RC-2026-0003</strong></p><p style="font-size:14px;line-height:24px;color:#222827;margin:0;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0"><span style="color:#616866">الفاتورة<!-- -->: </span><strong>INV-2026-0012</strong></p><p style="font-size:14px;line-height:24px;color:#222827;margin:0;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0"><span style="color:#616866">تاريخ الدفع<!-- -->: </span><strong>20 أيلول 2026</strong></p><p style="font-size:14px;line-height:24px;color:#222827;margin:0;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0"><span style="color:#616866">المبلغ<!-- -->: </span><strong>‏1,000.00 USD</strong></p></td></tr></tbody></table><table align="center" width="100%" border="0" cellPadding="0" cellSpacing="0" role="presentation" style="margin-top:24px"><tbody><tr><td><p style="font-size:14px;line-height:22px;color:#222827;margin:0;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0">رنا</p><p style="font-size:14px;line-height:22px;color:#222827;margin:0;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0">مديرة حسابات</p><p style="font-size:14px;line-height:22px;color:#222827;margin:0;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0">+963900000000</p><p style="font-size:14px;line-height:22px;color:#222827;margin:0;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0">rana@vertexmedia.pro</p></td></tr></tbody></table><hr style="width:100%;border:none;border-top:1px solid #eaeaea;border-color:#D4DBD9;margin:32px 0 16px"/><p style="font-size:13px;line-height:20px;color:#616866;margin:0 0 4px;margin-top:0;margin-right:0;margin-bottom:4px;margin-left:0">Vertex Media · شركة إعلام وتسويق متكاملة</p><p style="font-size:13px;line-height:20px;color:#616866;margin:0 0 4px;margin-top:0;margin-right:0;margin-bottom:4px;margin-left:0">للرد على هذه الرسالة، استخدم الرد العادي في بريدك.</p></td></tr></tbody></table></td></tr></tbody></table><!--/$--></body></html>"`;
+
+exports[`email templates > renders the client_receipt client email 2`] = `
+"إيصال الدفع
+
+مرحبًا،
+
+نرسل إليكم المستند في المرفق.
+
+مع التحية.
+
+رقم الإيصال: RC-2026-0003
+
+الفاتورة: INV-2026-0012
+
+تاريخ الدفع: 20 أيلول 2026
+
+المبلغ: ‏1,000.00 USD
+
+رنا
+
+مديرة حسابات
+
++963900000000
+
+rana@vertexmedia.pro
+
+----------------------------------------
+
+Vertex Media · شركة إعلام وتسويق متكاملة
+
+للرد على هذه الرسالة، استخدم الرد العادي في بريدك."
+`;
+
+exports[`email templates > renders the client_report client email 1`] = `"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="rtl" lang="ar"><head><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/></head><body dir="rtl" style="background-color:#F4F8F7;margin:0;padding:0"><!--$--><!--html--><!--head--><div style="display:none;overflow:hidden;line-height:1px;opacity:0;max-height:0;max-width:0" data-skip-in-text="true">التقرير الشهري لـمطعم الشام: أيلول 2026<div> ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿</div></div><!--body--><table border="0" width="100%" cellPadding="0" cellSpacing="0" role="presentation" align="center"><tbody><tr><td style="background-color:#F4F8F7;font-family:Tahoma, &#x27;Segoe UI&#x27;, Arial, sans-serif;margin:0;padding:24px 0"><table align="center" width="100%" dir="rtl" border="0" cellPadding="0" cellSpacing="0" role="presentation" style="max-width:600px;background-color:#FFFFFF;border:1px solid #D4DBD9;border-radius:8px;padding:32px"><tbody><tr style="width:100%"><td><table align="center" width="100%" border="0" cellPadding="0" cellSpacing="0" role="presentation" style="border-bottom:3px solid #B9A87A;padding-bottom:16px;text-align:right"><tbody><tr><td><img alt="Vertex Media" height="73" src="cid:logo@vertexmedia.pro" style="display:block;outline:none;border:none;text-decoration:none" width="72"/></td></tr></tbody></table><h1 style="color:#004139;font-size:22px;line-height:32px;margin:24px 0 16px">التقرير الشهري</h1><p style="font-size:16px;line-height:28px;color:#222827;margin:0 0 12px;margin-top:0;margin-right:0;margin-bottom:12px;margin-left:0">مرحبًا،</p><p style="font-size:16px;line-height:28px;color:#222827;margin:0 0 12px;margin-top:0;margin-right:0;margin-bottom:12px;margin-left:0">نرسل إليكم المستند في المرفق.</p><p style="font-size:16px;line-height:28px;color:#222827;margin:0 0 12px;margin-top:0;margin-right:0;margin-bottom:12px;margin-left:0">مع التحية.</p><table align="center" width="100%" border="0" cellPadding="0" cellSpacing="0" role="presentation" style="background-color:#F4F8F7;border:1px solid #D4DBD9;border-radius:6px;margin:16px 0;padding:12px 16px"><tbody><tr><td><p style="font-size:14px;line-height:24px;color:#222827;margin:0;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0"><span style="color:#616866">الشهر<!-- -->: </span><strong>أيلول 2026</strong></p></td></tr></tbody></table><table align="center" width="100%" border="0" cellPadding="0" cellSpacing="0" role="presentation" style="margin-top:24px"><tbody><tr><td><p style="font-size:14px;line-height:22px;color:#222827;margin:0;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0">رنا</p><p style="font-size:14px;line-height:22px;color:#222827;margin:0;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0">مديرة حسابات</p><p style="font-size:14px;line-height:22px;color:#222827;margin:0;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0">+963900000000</p><p style="font-size:14px;line-height:22px;color:#222827;margin:0;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0">rana@vertexmedia.pro</p></td></tr></tbody></table><hr style="width:100%;border:none;border-top:1px solid #eaeaea;border-color:#D4DBD9;margin:32px 0 16px"/><p style="font-size:13px;line-height:20px;color:#616866;margin:0 0 4px;margin-top:0;margin-right:0;margin-bottom:4px;margin-left:0">Vertex Media · شركة إعلام وتسويق متكاملة</p><p style="font-size:13px;line-height:20px;color:#616866;margin:0 0 4px;margin-top:0;margin-right:0;margin-bottom:4px;margin-left:0">للرد على هذه الرسالة، استخدم الرد العادي في بريدك.</p></td></tr></tbody></table></td></tr></tbody></table><!--/$--></body></html>"`;
+
+exports[`email templates > renders the client_report client email 2`] = `
+"التقرير الشهري
+
+مرحبًا،
+
+نرسل إليكم المستند في المرفق.
+
+مع التحية.
+
+الشهر: أيلول 2026
+
+رنا
+
+مديرة حسابات
+
++963900000000
+
+rana@vertexmedia.pro
+
+----------------------------------------
+
+Vertex Media · شركة إعلام وتسويق متكاملة
+
+للرد على هذه الرسالة، استخدم الرد العادي في بريدك."
+`;
+
+exports[`email templates > renders the client_statement client email 1`] = `"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="rtl" lang="ar"><head><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/></head><body dir="rtl" style="background-color:#F4F8F7;margin:0;padding:0"><!--$--><!--html--><!--head--><div style="display:none;overflow:hidden;line-height:1px;opacity:0;max-height:0;max-width:0" data-skip-in-text="true">كشف حساب مطعم الشام من 1 كانون الثاني 2026 إلى 5 تشرين الأول 2026<div> ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿</div></div><!--body--><table border="0" width="100%" cellPadding="0" cellSpacing="0" role="presentation" align="center"><tbody><tr><td style="background-color:#F4F8F7;font-family:Tahoma, &#x27;Segoe UI&#x27;, Arial, sans-serif;margin:0;padding:24px 0"><table align="center" width="100%" dir="rtl" border="0" cellPadding="0" cellSpacing="0" role="presentation" style="max-width:600px;background-color:#FFFFFF;border:1px solid #D4DBD9;border-radius:8px;padding:32px"><tbody><tr style="width:100%"><td><table align="center" width="100%" border="0" cellPadding="0" cellSpacing="0" role="presentation" style="border-bottom:3px solid #B9A87A;padding-bottom:16px;text-align:right"><tbody><tr><td><img alt="Vertex Media" height="73" src="cid:logo@vertexmedia.pro" style="display:block;outline:none;border:none;text-decoration:none" width="72"/></td></tr></tbody></table><h1 style="color:#004139;font-size:22px;line-height:32px;margin:24px 0 16px">كشف الحساب</h1><p style="font-size:16px;line-height:28px;color:#222827;margin:0 0 12px;margin-top:0;margin-right:0;margin-bottom:12px;margin-left:0">مرحبًا،</p><p style="font-size:16px;line-height:28px;color:#222827;margin:0 0 12px;margin-top:0;margin-right:0;margin-bottom:12px;margin-left:0">نرسل إليكم المستند في المرفق.</p><p style="font-size:16px;line-height:28px;color:#222827;margin:0 0 12px;margin-top:0;margin-right:0;margin-bottom:12px;margin-left:0">مع التحية.</p><table align="center" width="100%" border="0" cellPadding="0" cellSpacing="0" role="presentation" style="background-color:#F4F8F7;border:1px solid #D4DBD9;border-radius:6px;margin:16px 0;padding:12px 16px"><tbody><tr><td><p style="font-size:14px;line-height:24px;color:#222827;margin:0;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0"><span style="color:#616866">العملة<!-- -->: </span><strong>USD</strong></p><p style="font-size:14px;line-height:24px;color:#222827;margin:0;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0"><span style="color:#616866">الفترة<!-- -->: </span><strong>1 كانون الثاني 2026 – 5 تشرين الأول 2026</strong></p><p style="font-size:14px;line-height:24px;color:#222827;margin:0;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0"><span style="color:#616866">الرصيد المستحق<!-- -->: </span><strong>‏500.00 USD</strong></p></td></tr></tbody></table><table align="center" width="100%" border="0" cellPadding="0" cellSpacing="0" role="presentation" style="margin-top:24px"><tbody><tr><td><p style="font-size:14px;line-height:22px;color:#222827;margin:0;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0">رنا</p><p style="font-size:14px;line-height:22px;color:#222827;margin:0;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0">مديرة حسابات</p><p style="font-size:14px;line-height:22px;color:#222827;margin:0;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0">+963900000000</p><p style="font-size:14px;line-height:22px;color:#222827;margin:0;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0">rana@vertexmedia.pro</p></td></tr></tbody></table><hr style="width:100%;border:none;border-top:1px solid #eaeaea;border-color:#D4DBD9;margin:32px 0 16px"/><p style="font-size:13px;line-height:20px;color:#616866;margin:0 0 4px;margin-top:0;margin-right:0;margin-bottom:4px;margin-left:0">Vertex Media · شركة إعلام وتسويق متكاملة</p><p style="font-size:13px;line-height:20px;color:#616866;margin:0 0 4px;margin-top:0;margin-right:0;margin-bottom:4px;margin-left:0">للرد على هذه الرسالة، استخدم الرد العادي في بريدك.</p></td></tr></tbody></table></td></tr></tbody></table><!--/$--></body></html>"`;
+
+exports[`email templates > renders the client_statement client email 2`] = `
+"كشف الحساب
+
+مرحبًا،
+
+نرسل إليكم المستند في المرفق.
+
+مع التحية.
+
+العملة: USD
+
+الفترة: 1 كانون الثاني 2026 – 5 تشرين الأول 2026
+
+الرصيد المستحق: ‏500.00 USD
+
+رنا
+
+مديرة حسابات
+
++963900000000
+
+rana@vertexmedia.pro
+
+----------------------------------------
+
+Vertex Media · شركة إعلام وتسويق متكاملة
+
+للرد على هذه الرسالة، استخدم الرد العادي في بريدك."
+`;
+
 exports[`email templates > renders the digest email 1`] = `"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="rtl" lang="ar"><head><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/></head><body dir="rtl" style="background-color:#F4F8F7;margin:0;padding:0"><!--$--><!--html--><!--head--><div style="display:none;overflow:hidden;line-height:1px;opacity:0;max-height:0;max-width:0" data-skip-in-text="true">ملخص يومك في Vertex Hub · 5 تشرين الأول 2026<div> ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿</div></div><!--body--><table border="0" width="100%" cellPadding="0" cellSpacing="0" role="presentation" align="center"><tbody><tr><td style="background-color:#F4F8F7;font-family:Tahoma, &#x27;Segoe UI&#x27;, Arial, sans-serif;margin:0;padding:24px 0"><table align="center" width="100%" dir="rtl" border="0" cellPadding="0" cellSpacing="0" role="presentation" style="max-width:600px;background-color:#FFFFFF;border:1px solid #D4DBD9;border-radius:8px;padding:32px"><tbody><tr style="width:100%"><td><table align="center" width="100%" border="0" cellPadding="0" cellSpacing="0" role="presentation" style="border-bottom:3px solid #B9A87A;padding-bottom:16px;text-align:right"><tbody><tr><td><img alt="Vertex Media" height="73" src="cid:logo@vertexmedia.pro" style="display:block;outline:none;border:none;text-decoration:none" width="72"/></td></tr></tbody></table><h1 style="color:#004139;font-size:22px;line-height:32px;margin:24px 0 16px">صباح الخير، هذا ملخص يومك</h1><p style="font-size:16px;line-height:28px;color:#222827;margin:0 0 12px;margin-top:0;margin-right:0;margin-bottom:12px;margin-left:0">لديك 7 إشعارات غير مقروءة.</p><table align="center" width="100%" border="0" cellPadding="0" cellSpacing="0" role="presentation"><tbody><tr><td><p style="font-size:17px;line-height:24px;color:#004139;font-weight:700;margin:24px 0 8px;margin-top:24px;margin-right:0;margin-bottom:8px;margin-left:0">مهام متأخرة</p><table align="center" width="100%" border="0" cellPadding="0" cellSpacing="0" role="presentation" style="border-top:1px solid #D4DBD9;padding:10px 0"><tbody><tr><td><p style="font-size:15px;line-height:24px;color:#222827;margin:0;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0">تصوير الأطباق<!-- --> · <a href="https://hub.example.com/tasks/0190a3c2-0000-7000-8000-0000000000c1" style="color:#004139;text-decoration-line:none;font-weight:600;text-decoration:underline" target="_blank">فتح</a></p><p style="font-size:13px;line-height:20px;color:#616866;margin:2px 0 0;margin-top:2px;margin-right:0;margin-bottom:0;margin-left:0">مطعم الشام · 1 تشرين الأول 2026 · متأخرة 4 أيام</p></td></tr></tbody></table></td></tr></tbody></table><table align="center" width="100%" border="0" cellPadding="0" cellSpacing="0" role="presentation"><tbody><tr><td><p style="font-size:17px;line-height:24px;color:#004139;font-weight:700;margin:24px 0 8px;margin-top:24px;margin-right:0;margin-bottom:8px;margin-left:0">مستحقة اليوم</p><table align="center" width="100%" border="0" cellPadding="0" cellSpacing="0" role="presentation" style="border-top:1px solid #D4DBD9;padding:10px 0"><tbody><tr><td><p style="font-size:15px;line-height:24px;color:#222827;margin:0;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0">تصوير الأطباق<!-- --> · <a href="https://hub.example.com/tasks/0190a3c2-0000-7000-8000-0000000000c1" style="color:#004139;text-decoration-line:none;font-weight:600;text-decoration:underline" target="_blank">فتح</a></p><p style="font-size:13px;line-height:20px;color:#616866;margin:2px 0 0;margin-top:2px;margin-right:0;margin-bottom:0;margin-left:0">مطعم الشام · 5 تشرين الأول 2026، 2:00 م</p></td></tr></tbody></table><p style="font-size:13px;line-height:20px;color:#616866;margin:2px 0 0;margin-top:2px;margin-right:0;margin-bottom:0;margin-left:0"><a href="https://hub.example.com/tasks" style="color:#004139;text-decoration-line:none;font-weight:600;text-decoration:underline" target="_blank">ومهمتان أخريان</a></p></td></tr></tbody></table><table align="center" width="100%" border="0" cellPadding="0" cellSpacing="0" role="presentation"><tbody><tr><td><p style="font-size:17px;line-height:24px;color:#004139;font-weight:700;margin:24px 0 8px;margin-top:24px;margin-right:0;margin-bottom:8px;margin-left:0">إشعارات وصلتك منذ أمس</p><table align="center" width="100%" border="0" cellPadding="0" cellSpacing="0" role="presentation" style="border-top:1px solid #D4DBD9;padding:10px 0"><tbody><tr><td><p style="font-size:15px;line-height:24px;color:#222827;margin:0;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0">أُسندت إليك «تصاميم منيو الخريف» بواسطة ليان الأحمد<!-- --> · <a href="https://hub.example.com/tasks/0190a3c2-0000-7000-8000-0000000000b1" style="color:#004139;text-decoration-line:none;font-weight:600;text-decoration:underline" target="_blank">فتح</a></p><p style="font-size:13px;line-height:20px;color:#616866;margin:2px 0 0;margin-top:2px;margin-right:0;margin-bottom:0;margin-left:0">مطعم الشام · 5 تشرين الأول 2026 في 10:00 ص</p></td></tr></tbody></table></td></tr></tbody></table><table align="center" width="100%" border="0" cellPadding="0" cellSpacing="0" role="presentation" style="margin:24px 0"><tbody><tr><td><a href="https://hub.example.com/tasks" style="line-height:100%;text-decoration:none;display:inline-block;max-width:100%;mso-padding-alt:0px;background-color:#004139;border-radius:6px;color:#FFFFFF;font-size:16px;font-weight:600;padding:12px 24px;padding-top:12px;padding-right:24px;padding-bottom:12px;padding-left:24px" target="_blank"><span><!--[if mso]><i style="mso-font-width:400%;mso-text-raise:18" hidden>&#8202;&#8202;&#8202;</i><![endif]--></span><span style="max-width:100%;display:inline-block;line-height:120%;mso-padding-alt:0px;mso-text-raise:9px">افتح مهامي</span><span><!--[if mso]><i style="mso-font-width:400%" hidden>&#8202;&#8202;&#8202;&#8203;</i><![endif]--></span></a></td></tr></tbody></table><hr style="width:100%;border:none;border-top:1px solid #eaeaea;border-color:#D4DBD9;margin:32px 0 16px"/><p style="font-size:13px;line-height:20px;color:#616866;margin:0 0 4px;margin-top:0;margin-right:0;margin-bottom:4px;margin-left:0">تختار ما يصلك بالبريد من<!-- --> <a href="https://hub.example.com/notifications/settings" style="color:#004139;text-decoration-line:none;font-weight:600;text-decoration:underline" target="_blank">إعدادات الإشعارات</a></p><p style="font-size:13px;line-height:20px;color:#616866;margin:0 0 4px;margin-top:0;margin-right:0;margin-bottom:4px;margin-left:0">Vertex Media · نظام Vertex Hub الداخلي</p><p style="font-size:13px;line-height:20px;color:#616866;margin:0 0 4px;margin-top:0;margin-right:0;margin-bottom:4px;margin-left:0">وصلتك هذه الرسالة لأن لديك حسابًا في Vertex Hub.</p></td></tr></tbody></table></td></tr></tbody></table><!--/$--></body></html>"`;
 
 exports[`email templates > renders the digest email 2`] = `

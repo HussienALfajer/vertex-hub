@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { calendarDateSchema, timeOfDaySchema } from './dates.js';
+import { emailSummarySchema } from './email-basics.js';
 import { filePreviewStatusSchema, fileTypeSchema, fileVersionKindSchema } from './files.js';
 import { pageQuerySchema, pageSchema, queryListSchema } from './lists.js';
 import { postPlatformSchema, postTypeSchema } from './post-values.js';
@@ -108,6 +109,8 @@ export const createApprovalRequestSchema = z
     contactId: z.uuid(),
     /** Shown to the client at the top of the page. */
     message: optionalText(1000).optional(),
+    /** F14 email rule 19: also email the link to the contact (`CONTACT_NO_EMAIL`). */
+    email: z.boolean().default(false),
     items: z
       .array(createApprovalItemSchema)
       .min(1)
@@ -239,15 +242,29 @@ export const approvalRequestDetailSchema = approvalRequestSchema
     items: z.array(approvalItemSchema),
     /** For "Send on WhatsApp"; without it only copying the link is offered. */
     contactPhone: z.string().nullable(),
+    /** For "Send reminder by email" (F14 email rule 19); null when the contact has none. */
+    contactEmail: z.string().nullable(),
     permissions: z.object({ canReissue: z.boolean(), canRevoke: z.boolean() }),
   })
   .meta({ id: 'ApprovalRequestDetail' });
 
 export type ApprovalRequestDetail = z.infer<typeof approvalRequestDetailSchema>;
 
-/** A created or reissued request: `link` is shown once, only its hash is stored. */
+/** F14 email rule 19: whether a reissued link is also emailed to the contact. */
+export const reissueApprovalRequestSchema = z
+  .object({ email: z.boolean().default(false) })
+  // A request without a body, as sent before F14 email, emails nothing.
+  .prefault({})
+  .meta({ id: 'ReissueApprovalRequest' });
+
+export type ReissueApprovalRequest = z.infer<typeof reissueApprovalRequestSchema>;
+
+/**
+ * A created or reissued request: `link` is shown once, only its hash is stored. `email` is the
+ * email that carries it, when one was asked for (F14 email rule 19).
+ */
 export const issuedApprovalRequestSchema = approvalRequestDetailSchema
-  .extend({ link: z.string() })
+  .extend({ link: z.string(), email: emailSummarySchema.nullable() })
   .meta({ id: 'IssuedApprovalRequest' });
 
 export type IssuedApprovalRequest = z.infer<typeof issuedApprovalRequestSchema>;
