@@ -17,18 +17,18 @@ Spec: `docs/specs/F14-email-digest.md` · ADRs 0006, 0008, 0013, 0014, 0018, 002
 - [x] /ship
 
 ## PR 2 — `feat/f14-staff-emails`: notification emails, digest, account emails (API + worker)
-- [ ] `packages/messages`: move `notification-content.ts`, its strings and the formatters it uses from `apps/web`, with their tests; links as paths; web keeps the router glue
-- [ ] contracts: catalog `emailByDefault`, settings schemas + `emailTypes`, `digestEnabled`, per-type `email`, `emailLocked`; jobs `email.notifications`, `email.digest`; staff kinds' data schemas; batch window rules with unit tests; device key parsing with unit tests
-- [ ] db (`/db-migration`, additive): `notifications.email_state`, `email_after`, `email_id` + partial index; `notification_settings.email_types`, `digest_enabled`; `email_digests`; `user_devices` (auth)
-- [ ] api `notifications`: marking in `notify` (rules 3–4), merge re-pending (rule 8), batch job (rules 5–7, 9), digest with registered sources (rules 10–12; `tasks` registers its source), settings round-trip; `email:run-notifications [--at]` and `email:run-digest [--date]` scripts
-- [ ] `.env.example`: the worker email variables from PR 1 (`EMAIL_TRANSPORT`, `EMAIL_FROM`, `EMAIL_LOG_DIR`, `SMTP_*`) and `EMAIL_SECRET_KEY`, if the owner has not added them
-- [ ] token links (first use): AES-256-GCM encryption in the job under `EMAIL_SECRET_KEY` (api and worker config, `.env.example`), redacted in the row, decrypted by the worker; tests
-- [ ] api `auth`: links emailed on create, restore, new link; `POST /api/password-links/request` (rule 13); security notices (rule 14); `user_devices` and new-device email (rule 15)
-- [ ] worker templates: `notification_batch`, `digest`, `account_activation`, `password_reset`, `security_notice`, `new_device` with snapshots
-- [ ] api tests: batches and digest with a fixed clock, settings, auth emails, forgot password (204 always, 3 per hour)
-- [ ] emails queued while pg-boss is off (CLI: `user:create`, `email:run-notifications`, `email:run-digest`) must still be sent: start pg-boss in those scripts, or have the worker pick up `queued` rows without a job (PR 1 reviewer note)
-- [ ] bridge; web typecheck; `AGENTS.md` commands for the two scripts
-- [ ] wiring checklist, full checks, reviewer, owner acceptance, /ship
+- [x] `packages/messages`: move `notification-content.ts`, its strings and the formatters it uses from `apps/web`, with their tests; links as paths; web keeps the router glue
+- [x] contracts: catalog `emailByDefault`, settings schemas + `emailTypes`, `digestEnabled`, per-type `email`, `emailLocked`; jobs `email.notifications`, `email.digest`; staff kinds' data schemas; batch window rules with unit tests; device key parsing with unit tests
+- [x] db (`/db-migration`, 0044, additive): `notifications.email_state`, `email_after`, `email_id` + partial index; `notification_settings.email_types`, `digest_enabled`; `email_digests`; `user_devices` (auth)
+- [x] api `notifications`: marking in `notify` (rules 3–4), merge re-pending (rule 8), batch job (rules 5–7, 9), digest with registered sources (rules 10–12; `tasks` registers its source), settings round-trip; `email:run-notifications [--at]` and `email:run-digest [--date]` scripts
+- [x] `.env.example` (still outside the session's permissions; the owner adds the lines): the worker email variables from PR 1 (`EMAIL_TRANSPORT`, `EMAIL_FROM`, `EMAIL_LOG_DIR`, `SMTP_*`) and `EMAIL_SECRET_KEY`, if the owner has not added them
+- [x] token links (first use): AES-256-GCM encryption in the job under `EMAIL_SECRET_KEY` (api and worker config, `.env.example`), redacted in the row, decrypted by the worker; tests
+- [x] api `auth`: links emailed on create, restore, new link; `POST /api/password-links/request` (rule 13); security notices (rule 14); `user_devices` and new-device email (rule 15)
+- [x] worker templates: `notification_batch`, `digest`, `account_activation`, `password_reset`, `security_notice`, `new_device` with snapshots
+- [x] api tests: batches and digest with a fixed clock, settings, auth emails, forgot password (204 always, 3 per hour)
+- [x] emails queued while pg-boss is off (done: `JobQueue.startSending()` in the two email scripts; `user:create` emails nothing, it creates an active user) (CLI: `user:create`, `email:run-notifications`, `email:run-digest`) must still be sent: start pg-boss in those scripts, or have the worker pick up `queued` rows without a job (PR 1 reviewer note)
+- [x] bridge; web typecheck; `AGENTS.md` commands for the two scripts
+- [x] wiring checklist, full checks, reviewer (two blocking issues fixed: batch subject over 200 characters; "forgot password" timing), owner approval, dev database migrated (0044), PR opened
 
 ## PR 3 — `feat/f14-client-emails`: client emails from each document (API + worker)
 - [ ] contracts: `clientEmailSchema`, client kinds' data schemas and prefilled Arabic templates, permission `invoices.send` (+ `permissions.test.ts`), notification type `email_failed` with its text in `packages/messages`, error codes (`QUOTE_NOT_SENT`, `QUOTE_EXPIRED`, `INVOICE_NOT_ISSUED`, `INVOICE_NOT_OVERDUE`, `PAYMENT_VOIDED`, `ENTRY_VOIDED`, `BUDGET_NOT_LOW`, `PDF_NOT_READY`, `CLIENT_ARCHIVED`, `INVALID_RECIPIENT`, `CONTACT_NO_EMAIL` as missing, `ATTACHMENT_TOO_LARGE`), audit action `<entity>.emailed`; `ar.json` keys

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  emailedTypes,
   firstMatchPerRecipient,
   isMutableNotificationType,
   NOTIFICATION_CATALOG,
@@ -7,6 +8,7 @@ import {
   NOTIFICATION_TYPES,
   notificationSchema,
   notificationTypesOf,
+  updateNotificationSettingsSchema,
 } from './notifications.js';
 
 describe('notification catalog', () => {
@@ -193,11 +195,13 @@ describe('invoice notifications (spec F13)', () => {
       category: 'reminders',
       subject: 'invoice',
       mutable: true,
+      emailByDefault: false,
     });
     expect(NOTIFICATION_CATALOG.invoice_paid).toEqual({
       category: 'clients_projects',
       subject: 'invoice',
       mutable: true,
+      emailByDefault: true,
     });
   });
 
@@ -219,6 +223,7 @@ describe('ad budget notifications (spec F12, A11)', () => {
       category: 'reminders',
       subject: 'client',
       mutable: true,
+      emailByDefault: false,
     });
   });
 
@@ -239,17 +244,20 @@ describe('lead notifications (spec F03, A12)', () => {
       category: 'clients_projects',
       subject: 'lead',
       mutable: false,
+      emailByDefault: false,
     });
     expect(NOTIFICATION_CATALOG.lead_won).toEqual({
       category: 'clients_projects',
       subject: 'lead',
       mutable: true,
+      emailByDefault: false,
     });
     for (const type of ['lead_follow_up_due', 'lead_follow_up_overdue'] as const) {
       expect(NOTIFICATION_CATALOG[type]).toEqual({
         category: 'reminders',
         subject: 'lead',
         mutable: false,
+        emailByDefault: false,
       });
     }
   });
@@ -270,5 +278,34 @@ describe('lead notifications (spec F03, A12)', () => {
         followUpOn: '2026-10-05',
       }).success,
     ).toBe(false);
+  });
+});
+
+describe('notification emails (F14 email rule 2)', () => {
+  it('emails the triggers of the scope by default', () => {
+    expect([...emailedTypes(null)].sort()).toEqual(
+      [
+        'approval_responded',
+        'invoice_paid',
+        'task_assigned',
+        'task_due_soon',
+        'task_mentioned',
+        'task_overdue',
+        'task_overdue_escalated',
+      ].sort(),
+    );
+    expect(NOTIFICATION_CATALOG.task_assigned.emailByDefault).toBe(true);
+    expect(NOTIFICATION_CATALOG.task_commented.emailByDefault).toBe(false);
+  });
+
+  it('follows a saved choice, even an empty one', () => {
+    expect([...emailedTypes(['task_commented'])]).toEqual(['task_commented']);
+    expect(emailedTypes([]).size).toBe(0);
+  });
+
+  it('keeps email choices and the digest switch when an update leaves them out', () => {
+    const update = updateNotificationSettingsSchema.parse({ mutedTypes: [] });
+    expect(update.emailTypes).toBeUndefined();
+    expect(update.digestEnabled).toBeUndefined();
   });
 });

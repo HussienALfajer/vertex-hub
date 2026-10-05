@@ -112,8 +112,22 @@ export const notificationSubjectTypeSchema = z
 
 export type NotificationSubjectType = z.infer<typeof notificationSubjectTypeSchema>;
 
+/**
+ * The types emailed to a user who saved no email choice (F14 email rule 2): the triggers of the
+ * scope.
+ */
+const EMAILED_BY_DEFAULT: readonly NotificationType[] = [
+  'task_assigned',
+  'task_mentioned',
+  'task_due_soon',
+  'task_overdue',
+  'task_overdue_escalated',
+  'approval_responded',
+  'invoice_paid',
+];
+
 /** Category, subject and whether a user may mute the type; action-required types may not. */
-export const NOTIFICATION_CATALOG: Record<
+const CATALOG: Record<
   NotificationType,
   { category: NotificationCategory; subject: NotificationSubjectType; mutable: boolean }
 > = {
@@ -177,6 +191,14 @@ export const NOTIFICATION_CATALOG: Record<
   lead_follow_up_overdue: { category: 'reminders', subject: 'lead', mutable: false },
   lead_follow_up_due: { category: 'reminders', subject: 'lead', mutable: false },
 };
+
+/** Each type with whether it is emailed when the user saved no email choice. */
+export const NOTIFICATION_CATALOG = Object.fromEntries(
+  NOTIFICATION_TYPES.map((type) => [
+    type,
+    { ...CATALOG[type], emailByDefault: EMAILED_BY_DEFAULT.includes(type) },
+  ]),
+) as Record<NotificationType, (typeof CATALOG)[NotificationType] & { emailByDefault: boolean }>;
 
 export function isMutableNotificationType(type: NotificationType): boolean {
   return NOTIFICATION_CATALOG[type].mutable;
@@ -522,16 +544,30 @@ export const notificationSettingsSchema = z
         category: notificationCategorySchema,
         mutable: z.boolean(),
         muted: z.boolean(),
+        /** F14 email rule 2: emailed to the user; false while `emailLocked`. */
+        email: z.boolean(),
+        /** Muted in the app, so nothing is created to email. */
+        emailLocked: z.boolean(),
       }),
     ),
+    /** F14 email rule 11: the morning digest. */
+    digestEnabled: z.boolean(),
   })
   .meta({ id: 'NotificationSettings' });
 
 export type NotificationSettings = z.infer<typeof notificationSettingsSchema>;
 
-/** The API refuses non-mutable types with `NOT_MUTABLE` (rule 3). */
+/**
+ * The API refuses non-mutable types with `NOT_MUTABLE` (rule 3). `emailTypes` and
+ * `digestEnabled` stay as they are when left out.
+ */
 export const updateNotificationSettingsSchema = z
-  .object({ mutedTypes: z.array(notificationTypeSchema).max(NOTIFICATION_TYPES.length) })
+  .object({
+    mutedTypes: z.array(notificationTypeSchema).max(NOTIFICATION_TYPES.length),
+    /** F14 email rule 2: every type may be emailed, including those that cannot be muted. */
+    emailTypes: z.array(notificationTypeSchema).max(NOTIFICATION_TYPES.length).optional(),
+    digestEnabled: z.boolean().optional(),
+  })
   .meta({ id: 'UpdateNotificationSettings' });
 
 export type UpdateNotificationSettings = z.infer<typeof updateNotificationSettingsSchema>;
@@ -561,3 +597,13 @@ export const NOTIFICATION_REMINDER_KINDS = [
 ] as const;
 
 export type NotificationReminderKind = (typeof NOTIFICATION_REMINDER_KINDS)[number];
+
+/** F14 email rule 2: the types a user emails, from their saved choice or the catalog defaults. */
+export function emailedTypes(saved: readonly NotificationType[] | null): Set<NotificationType> {
+  return new Set(saved ?? EMAILED_BY_DEFAULT);
+}
+
+/** F14 email rules 3–8: a notification waits to be emailed, was emailed, or was not needed. */
+export const NOTIFICATION_EMAIL_STATES = ['pending', 'sent', 'skipped'] as const;
+
+export type NotificationEmailState = (typeof NOTIFICATION_EMAIL_STATES)[number];

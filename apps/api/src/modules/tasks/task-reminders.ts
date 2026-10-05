@@ -63,22 +63,26 @@ export class TaskReminders implements OnModuleInit {
       gt(tasks.dueDate, today),
       lte(tasks.dueDate, nextWorkDay(today)),
     ];
-    return this.send(today, 'due_soon', filters, async (_tx, task) =>
-      this.notices.notice(task, 'task_due_soon', [task.assigneeId], null, dueOf(task)),
-    );
+    // F14 email rule 4: the assignee's morning digest lists the task.
+    return this.send(today, 'due_soon', filters, async (_tx, task) => ({
+      ...this.notices.notice(task, 'task_due_soon', [task.assigneeId], null, dueOf(task)),
+      digestCovered: true,
+    }));
   }
 
   /** Rule 10: open tasks due before `today`, to the assignee or the department's managers. */
   private overdue(today: CalendarDate): Promise<number> {
-    return this.send(today, 'overdue', [lt(tasks.dueDate, today)], async (tx, task) =>
-      this.notices.notice(
+    return this.send(today, 'overdue', [lt(tasks.dueDate, today)], async (tx, task) => ({
+      ...this.notices.notice(
         task,
         'task_overdue',
         await this.notices.assigneeOrManagers(tx, task),
         null,
         dueOf(task),
       ),
-    );
+      // F14 email rule 4: the assignee's digest lists it; managers of an unassigned task get it.
+      digestCovered: task.assigneeId !== null,
+    }));
   }
 
   /**

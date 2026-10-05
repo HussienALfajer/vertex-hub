@@ -152,3 +152,10 @@ export const redeemLinkSchema = z
   .meta({ id: 'RedeemLink' });
 
 export type RedeemLink = z.infer<typeof redeemLinkSchema>;
+
+/** F14 email rule 13, "forgot password": the address is trimmed and compared case-insensitively. */
+export const requestPasswordLinkSchema = z
+  .object({ email: z.string().trim().max(254).pipe(z.email()) })
+  .meta({ id: 'RequestPasswordLink' });
+
+export type RequestPasswordLink = z.infer<typeof requestPasswordLinkSchema>;

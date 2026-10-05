@@ -13,7 +13,9 @@
     "user:reset-two-factor": "node dist/cli/reset-two-factor.js",
     "openapi:export": "node dist/cli/openapi.js",
     "notifications:run-daily": "node dist/cli/run-notifications-daily.js",
-    "invoices:run-daily": "node dist/cli/run-invoices-daily.js"
+    "invoices:run-daily": "node dist/cli/run-invoices-daily.js",
+    "email:run-notifications": "node dist/cli/run-email-notifications.js",
+    "email:run-digest": "node dist/cli/run-email-digest.js"
   },
   "dependencies": {
     "@nestjs/common": "^12.1.0",

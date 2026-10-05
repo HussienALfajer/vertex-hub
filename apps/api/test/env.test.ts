@@ -11,6 +11,7 @@ describe('environment', () => {
       ...base,
       NODE_ENV: 'production',
       BETTER_AUTH_SECRET: 'x'.repeat(32),
+      EMAIL_SECRET_KEY: Buffer.alloc(32, 7).toString('base64'),
       APP_URL: 'https://hub.example.com',
       FILES_ROOT: '/srv/hub.example.com/shared/files',
     };
@@ -28,6 +29,7 @@ describe('environment', () => {
       ...base,
       NODE_ENV: 'production',
       BETTER_AUTH_SECRET: 'x'.repeat(32),
+      EMAIL_SECRET_KEY: Buffer.alloc(32, 7).toString('base64'),
       APP_URL: 'https://hub.example.com',
     };
     expect(() => parseEnv(production)).toThrow(/FILES_ROOT/);
@@ -44,5 +46,23 @@ describe('environment', () => {
     expect(env.NODE_ENV).toBe('development');
     expect(env.APP_URL).toBe('http://127.0.0.1:5173');
     expect(env.BETTER_AUTH_SECRET).toHaveLength(64);
+    expect(env.EMAIL_SECRET_KEY).toHaveLength(32);
+  });
+
+  it('needs a 32-byte email key in production (F14 email rule 24)', () => {
+    const production = {
+      ...base,
+      NODE_ENV: 'production',
+      BETTER_AUTH_SECRET: 'x'.repeat(32),
+      APP_URL: 'https://hub.example.com',
+      FILES_ROOT: '/srv/files',
+    };
+    expect(() => parseEnv(production)).toThrow(/EMAIL_SECRET_KEY/);
+    const short = Buffer.alloc(16).toString('base64');
+    expect(() => parseEnv({ ...production, EMAIL_SECRET_KEY: short })).toThrow(/32 bytes/);
+    const key = Buffer.alloc(32, 7).toString('base64');
+    expect(parseEnv({ ...production, EMAIL_SECRET_KEY: key }).EMAIL_SECRET_KEY).toEqual(
+      Buffer.alloc(32, 7),
+    );
   });
 });

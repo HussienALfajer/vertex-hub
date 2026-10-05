@@ -12,6 +12,7 @@ import { ShootTasks } from './shoot-tasks.js';
 import { TaskApprovals } from './task-approvals.js';
 import { TaskCommentsController } from './task-comments.controller.js';
 import { TaskCommentsService } from './task-comments.service.js';
+import { TaskDigest } from './task-digest.js';
 import { TaskFileOwner } from './task-file-owner.js';
 import { TaskGenerator } from './task-generator.js';
 import { TaskGuards } from './task-guards.js';
@@ -67,6 +68,7 @@ import { TasksService } from './tasks.service.js';
     TaskGenerator,
     TaskNotices,
     TaskReminders,
+    TaskDigest,
     OverLimitReminders,
     TaskFileOwner,
     TaskReviews,

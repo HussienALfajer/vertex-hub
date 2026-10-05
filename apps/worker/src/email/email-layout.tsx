@@ -7,6 +7,7 @@ import {
   Hr,
   Html,
   Img,
+  Link,
   Preview,
   Section,
   Text,
@@ -53,6 +54,11 @@ const styles = {
     padding: '12px 24px',
     textDecoration: 'none',
   },
+  sectionTitle: { color: COLORS.green, fontSize: '17px', fontWeight: 700, margin: '24px 0 8px' },
+  item: { borderTop: `1px solid ${COLORS.border}`, padding: '10px 0' },
+  itemText: { color: COLORS.text, fontSize: '15px', lineHeight: '24px', margin: 0 },
+  itemDetail: { color: COLORS.muted, fontSize: '13px', lineHeight: '20px', margin: '2px 0 0' },
+  link: { color: COLORS.green, fontWeight: 600, textDecoration: 'underline' },
   rule: { borderColor: COLORS.border, margin: '32px 0 16px' },
   footer: { color: COLORS.muted, fontSize: '13px', lineHeight: '20px', margin: '0 0 4px' },
 } as const;
@@ -86,6 +92,34 @@ export function EmailLayout({
               {paragraph}
             </Text>
           ))}
+          {content.sections?.map((section) => (
+            <Section key={section.title}>
+              <Text style={styles.sectionTitle}>{section.title}</Text>
+              {section.items.map((item) => (
+                <Section key={item.link?.url ?? item.text} style={styles.item}>
+                  <Text style={styles.itemText}>
+                    {item.text}
+                    {item.link && (
+                      <>
+                        {' · '}
+                        <Link href={item.link.url} style={styles.link}>
+                          {item.link.label}
+                        </Link>
+                      </>
+                    )}
+                  </Text>
+                  {item.detail && <Text style={styles.itemDetail}>{item.detail}</Text>}
+                </Section>
+              ))}
+              {section.more && (
+                <Text style={styles.itemDetail}>
+                  <Link href={section.more.url} style={styles.link}>
+                    {section.more.label}
+                  </Link>
+                </Text>
+              )}
+            </Section>
+          ))}
           {content.action && (
             <Section style={{ margin: '24px 0' }}>
               <Button href={content.action.url} style={styles.button}>
@@ -94,6 +128,14 @@ export function EmailLayout({
             </Section>
           )}
           <Hr style={styles.rule} />
+          {content.footnote && (
+            <Text style={styles.footer}>
+              {content.footnote.text}{' '}
+              <Link href={content.footnote.link.url} style={styles.link}>
+                {content.footnote.link.label}
+              </Link>
+            </Text>
+          )}
           <Text style={styles.footer}>{layout.footer}</Text>
           <Text style={styles.footer}>{layout.reason}</Text>
         </Container>

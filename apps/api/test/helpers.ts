@@ -22,6 +22,7 @@ import {
   type Database,
   departmentMembers,
   departments,
+  emailDigests,
   emailMessages,
   extraWorkItems,
   fileItems,
@@ -79,7 +80,7 @@ import {
   workTemplates,
 } from '@vertex-hub/db';
 import { hashPassword } from 'better-auth/crypto';
-import { and, eq, inArray, isNotNull, like, or, type SQL } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull, like, or, type SQL, sql } from 'drizzle-orm';
 
 /*
  * Shared helpers for API integration tests: seed users straight into the test database, sign in
@@ -290,6 +291,12 @@ export async function removeUsers(db: Database, ids: string[]): Promise<void> {
     .delete(notifications)
     .where(or(inArray(notifications.recipientId, ids), inArray(notifications.actorId, ids)));
   await db.delete(notificationSettings).where(inArray(notificationSettings.userId, ids));
+  // Digests, and the staff emails sent to the users (F14 email).
+  await db.delete(emailDigests).where(inArray(emailDigests.userId, ids));
+  await db.delete(emailMessages).where(
+    sql`exists (select 1 from jsonb_array_elements(${emailMessages.to}) as r
+        where r->>'userId' in ${ids})`,
+  );
   // Activation and reset links keep the user id as their value.
   await db.delete(verifications).where(inArray(verifications.value, ids));
   await db.update(departments).set({ managerId: null }).where(inArray(departments.managerId, ids));

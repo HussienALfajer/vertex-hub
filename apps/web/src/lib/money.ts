@@ -1,5 +1,5 @@
 import type { Currency } from '@vertex-hub/contracts';
-import { APP_LOCALE } from './format';
+import { APP_LOCALE } from '@vertex-hub/messages';
 
 /** Both V1 currencies use 2 decimal places, so amounts are kept in hundredths (ADR 0006). */
 const MINOR_PER_UNIT = 100;
@@ -15,13 +15,7 @@ export function formatMoney(minor: number, currency: Currency): string {
   }).format(minor / MINOR_PER_UNIT);
 }
 
-/** An amount in minor units without its currency, e.g. `1,500.00`, where the code is not at hand. */
-export function formatAmount(minor: number): string {
-  return new Intl.NumberFormat(APP_LOCALE, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(minor / MINOR_PER_UNIT);
-}
+export { formatAmount } from '@vertex-hub/messages';
 
 const ARABIC_DIGITS = /[٠-٩۰-۹]/g;
 

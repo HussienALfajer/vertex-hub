@@ -191,6 +191,7 @@ import {
   type Note,
   type NoteChannel,
   type Notification,
+  type NotificationSettings,
   type NotificationType,
   needsDiscountApproval,
   OPEN_AD_CAMPAIGN_STATUSES,
@@ -7654,7 +7655,7 @@ function notificationRoutes({
   const mine = () => notifications.filter((n) => n.recipientId === me().user.id);
   const unreadCount = () => mine().filter((n) => !n.read).length;
   const strip = ({ recipientId: _, ...rest }: NotificationRecord) => rest as Notification;
-  const settings = () => {
+  const settings = (): NotificationSettings => {
     const off = muted.get(me().user.id) ?? new Set();
     return {
       types: NOTIFICATION_TYPES.map((type) => ({
@@ -7662,7 +7663,11 @@ function notificationRoutes({
         category: NOTIFICATION_CATALOG[type].category,
         mutable: NOTIFICATION_CATALOG[type].mutable,
         muted: off.has(type),
+        // F14 email: the catalog defaults; a muted type has nothing to email.
+        email: !off.has(type) && NOTIFICATION_CATALOG[type].emailByDefault,
+        emailLocked: off.has(type),
       })),
+      digestEnabled: true,
     };
   };
 

@@ -6,6 +6,8 @@ import { DatabaseModule } from './core/database/database.module.js';
 import { EmailSender } from './email/email-sender.js';
 import { ApprovalsRemindersJob } from './jobs/approvals-reminders.job.js';
 import { CampaignsPdfJob } from './jobs/campaigns-pdf.job.js';
+import { EmailDigestJob } from './jobs/email-digest.job.js';
+import { EmailNotificationsJob } from './jobs/email-notifications.job.js';
 import { EmailPurgeJob } from './jobs/email-purge.job.js';
 import { EmailSendJob } from './jobs/email-send.job.js';
 import { FilesPurgeUploadsJob } from './jobs/files-purge-uploads.job.js';
@@ -51,6 +53,8 @@ import { PdfRenderer } from './pdf/pdf-renderer.js';
     EmailSender,
     EmailSendJob,
     EmailPurgeJob,
+    EmailNotificationsJob,
+    EmailDigestJob,
   ],
 })
 export class WorkerModule {}

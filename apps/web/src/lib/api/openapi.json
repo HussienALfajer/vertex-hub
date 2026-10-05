@@ -767,6 +767,40 @@
         ]
       }
     },
+    "/api/password-links/request": {
+      "post": {
+        "operationId": "PasswordLinksController_request",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequestPasswordLink"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Always, whether or not a link was emailed"
+          },
+          "400": {
+            "description": "Not an email address",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
     "/api/me/notifications": {
       "get": {
         "operationId": "NotificationsController_list",
@@ -14508,6 +14542,18 @@
         "additionalProperties": false,
         "description": "An error; `code` tells errors apart"
       },
+      "RequestPasswordLink": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "maxLength": 254
+          }
+        },
+        "required": [
+          "email"
+        ]
+      },
       "NotificationCategory": {
         "type": "string",
         "enum": [
@@ -21268,20 +21314,32 @@
                 },
                 "muted": {
                   "type": "boolean"
+                },
+                "email": {
+                  "type": "boolean"
+                },
+                "emailLocked": {
+                  "type": "boolean"
                 }
               },
               "required": [
                 "type",
                 "category",
                 "mutable",
-                "muted"
+                "muted",
+                "email",
+                "emailLocked"
               ],
               "additionalProperties": false
             }
+          },
+          "digestEnabled": {
+            "type": "boolean"
           }
         },
         "required": [
-          "types"
+          "types",
+          "digestEnabled"
         ],
         "additionalProperties": false
       },
@@ -21354,6 +21412,16 @@
             "items": {
               "$ref": "#/components/schemas/NotificationType"
             }
+          },
+          "emailTypes": {
+            "maxItems": 55,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NotificationType"
+            }
+          },
+          "digestEnabled": {
+            "type": "boolean"
           }
         },
         "required": [

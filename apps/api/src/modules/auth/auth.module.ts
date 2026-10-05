@@ -4,7 +4,9 @@ import { AuthModule as BetterAuthModule } from '@thallesp/nestjs-better-auth';
 import type { Database } from '@vertex-hub/db';
 import { ENV, type Env } from '../../core/config/env.js';
 import { DATABASE } from '../../core/database/database.module.js';
+import { EmailModule, Mailer } from '../email/index.js';
 import { AccessService } from './access.service.js';
+import { AccountEmails } from './account-emails.js';
 import { createAuth } from './auth.config.js';
 import { DepartmentsController } from './departments.controller.js';
 import { DepartmentsService } from './departments.service.js';
@@ -24,10 +26,12 @@ import { UsersService } from './users.service.js';
  */
 @Module({
   imports: [
+    EmailModule,
     BetterAuthModule.forRootAsync({
-      inject: [DATABASE, ENV],
-      useFactory: (db: Database, env: Env) => ({
-        auth: createAuth(db, env),
+      imports: [EmailModule],
+      inject: [DATABASE, ENV, Mailer],
+      useFactory: (db: Database, env: Env, mailer: Mailer) => ({
+        auth: createAuth(db, env, new AccountEmails(db, mailer)),
         // The SPA and the API share one origin (nginx in production, the Vite proxy locally).
         disableTrustedOriginsCors: true,
       }),
@@ -38,6 +42,7 @@ import { UsersService } from './users.service.js';
     AccessService,
     UsersService,
     UserLinksService,
+    AccountEmails,
     DepartmentsService,
     ResponsibilityRegistry,
     UserDirectory,

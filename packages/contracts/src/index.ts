@@ -9,6 +9,7 @@ export * from './clients.js';
 export * from './content.js';
 export * from './dates.js';
 export * from './departments.js';
+export * from './devices.js';
 export * from './emails.js';
 export * from './errors.js';
 export * from './extra-work.js';

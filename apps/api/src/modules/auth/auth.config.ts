@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import { type ErrorCode, MIN_PASSWORD_LENGTH } from '@vertex-hub/contracts';
 import {
   accounts,
@@ -16,6 +17,7 @@ import { twoFactor } from 'better-auth/plugins';
 import { eq } from 'drizzle-orm';
 import type { Env } from '../../core/config/env.js';
 import { recordAudit } from '../audit/index.js';
+import type { AccountEmails } from './account-emails.js';
 import { resolveAccess } from './resolve-access.js';
 
 export const AUTH_BASE_PATH = '/api/auth';
@@ -102,7 +104,8 @@ function twoFactorRequiredError() {
   return new APIError('FORBIDDEN', { code, message: 'Two-factor sign-in is required' });
 }
 
-export function createAuth(db: Database, env: Env) {
+export function createAuth(db: Database, env: Env, emails: AccountEmails) {
+  const logger = new Logger('Auth');
   /** 2FA state of each session token before a switch request, to audit real changes only. */
   const twoFactorBefore = new Map<string, boolean>();
   const accountFailures = new AccountFailures();
@@ -172,6 +175,14 @@ export function createAuth(db: Database, env: Env) {
               .where(eq(users.id, session.userId));
             if (!user || user.archivedAt) {
               throw APIError.from('UNAUTHORIZED', BASE_ERROR_CODES.INVALID_EMAIL_OR_PASSWORD);
+            }
+          },
+          // F14 email rule 15. A failure to record the device must not refuse the sign-in.
+          after: async (session) => {
+            try {
+              await emails.signedIn(session);
+            } catch (error) {
+              logger.error(error, `Could not record the device of user ${session.userId}`);
             }
           },
         },
@@ -245,11 +256,14 @@ export function createAuth(db: Database, env: Env) {
 
         if (ctx.path === '/change-password') {
           if (ctx.context.returned instanceof APIError) return;
-          await recordAudit(db, {
-            actor,
-            action: 'user.password_changed',
-            entityType: 'user',
-            entityId: actor.id,
+          await db.transaction(async (tx) => {
+            await recordAudit(tx, {
+              actor,
+              action: 'user.password_changed',
+              entityType: 'user',
+              entityId: actor.id,
+            });
+            await emails.securityNotice(tx, actor.id, 'password_changed', null);
           });
           return;
         }
@@ -258,13 +272,17 @@ export function createAuth(db: Database, env: Env) {
         twoFactorBefore.delete(session.session.token);
         const after = await twoFactorEnabled(actor.id);
         if (before === undefined || before === after) return;
-        await recordAudit(db, {
-          actor,
-          action: after ? 'user.two_factor_enabled' : 'user.two_factor_disabled',
-          entityType: 'user',
-          entityId: actor.id,
-          before: { twoFactorEnabled: before },
-          after: { twoFactorEnabled: after },
+        await db.transaction(async (tx) => {
+          await recordAudit(tx, {
+            actor,
+            action: after ? 'user.two_factor_enabled' : 'user.two_factor_disabled',
+            entityType: 'user',
+            entityId: actor.id,
+            before: { twoFactorEnabled: before },
+            after: { twoFactorEnabled: after },
+          });
+          const change = after ? 'two_factor_enabled' : 'two_factor_disabled';
+          await emails.securityNotice(tx, actor.id, change, null);
         });
       }),
     },

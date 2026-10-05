@@ -1,6 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import { createCipheriv, randomBytes } from 'node:crypto';
+import { Inject, Injectable } from '@nestjs/common';
 import {
   EMAIL_DATA_SCHEMAS,
+  EMAIL_SECRET_FIELDS,
   EMAIL_SEND_JOB,
   type EmailAddress,
   type EmailAttachment,
@@ -8,9 +10,11 @@ import {
   type EmailRecordType,
   emailAudienceOf,
   emailSendJobSchema,
+  REDACTED,
   type SendableEmailKind,
 } from '@vertex-hub/contracts';
 import { emailMessages, type Transaction } from '@vertex-hub/db';
+import { ENV, type Env } from '../../core/config/env.js';
 import { JobQueue } from '../../core/jobs/index.js';
 
 export interface QueuedEmail<Kind extends SendableEmailKind> {
@@ -36,7 +40,10 @@ export interface QueuedEmail<Kind extends SendableEmailKind> {
  */
 @Injectable()
 export class Mailer {
-  constructor(private readonly jobs: JobQueue) {}
+  constructor(
+    private readonly jobs: JobQueue,
+    @Inject(ENV) private readonly env: Env,
+  ) {}
 
   /**
    * Writes the email and its `email.send` job in `tx`, so both commit or roll back with the
@@ -46,7 +53,8 @@ export class Mailer {
     tx: Transaction,
     email: QueuedEmail<Kind>,
   ): Promise<string> {
-    const data = EMAIL_DATA_SCHEMAS[email.kind].parse(email.data) as Record<string, unknown>;
+    const parsed = EMAIL_DATA_SCHEMAS[email.kind].parse(email.data) as Record<string, unknown>;
+    const { data, sealed } = this.seal(email.kind, parsed);
     const fields = {
       kind: email.kind,
       to: email.to,
@@ -74,9 +82,29 @@ export class Mailer {
     await this.jobs.sendInTransaction(
       tx,
       queue,
-      emailSendJobSchema.parse({ id: row.id, ...fields }),
+      emailSendJobSchema.parse({ id: row.id, ...fields, sealed }),
       { retryLimit, retryDelay, retryBackoff },
     );
     return row.id;
+  }
+
+  /**
+   * ADR 0028: token links leave the data, which the row stores, and travel encrypted in the job
+   * (AES-256-GCM under `EMAIL_SECRET_KEY`; base64url of IV, tag and ciphertext).
+   */
+  private seal(
+    kind: SendableEmailKind,
+    data: Record<string, unknown>,
+  ): { data: Record<string, unknown>; sealed: string | null } {
+    const fields = EMAIL_SECRET_FIELDS[kind] ?? [];
+    if (fields.length === 0) return { data, sealed: null };
+    const secrets = Object.fromEntries(fields.map((field) => [field, data[field]]));
+    const iv = randomBytes(12);
+    const cipher = createCipheriv('aes-256-gcm', this.env.EMAIL_SECRET_KEY, iv);
+    const ciphertext = Buffer.concat([cipher.update(JSON.stringify(secrets)), cipher.final()]);
+    return {
+      data: { ...data, ...Object.fromEntries(fields.map((field) => [field, REDACTED])) },
+      sealed: Buffer.concat([iv, cipher.getAuthTag(), ciphertext]).toString('base64url'),
+    };
   }
 }

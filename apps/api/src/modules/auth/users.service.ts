@@ -42,6 +42,7 @@ import {
 import { DATABASE } from '../../core/database/database.module.js';
 import { CodedException } from '../../core/errors/index.js';
 import { type AuditActor, changedFields, recordAudit } from '../audit/index.js';
+import { AccountEmails } from './account-emails.js';
 import type { CurrentUserInfo } from './current-user.decorator.js';
 import { resetTwoFactor } from './reset-two-factor.js';
 import { ResponsibilityRegistry } from './responsibility-registry.js';
@@ -82,6 +83,7 @@ export class UsersService {
     @Inject(DATABASE) private readonly db: Database,
     private readonly links: UserLinksService,
     private readonly responsibilities: ResponsibilityRegistry,
+    private readonly emails: AccountEmails,
   ) {}
 
   async list(actor: CurrentUserInfo, query: UserListQuery): Promise<UserPage> {
@@ -257,6 +259,8 @@ export class UsersService {
       await tx.update(users).set({ archivedAt: new Date() }).where(eq(users.id, id));
       await tx.delete(sessions).where(eq(sessions.userId, id));
       await this.links.revoke(tx, id);
+      // F14 email edge case 6: the only email an archived user gets.
+      await this.emails.securityNotice(tx, id, 'archived', actor.name);
       await recordAudit(tx, {
         actor: actorOf(actor),
         action: 'user.archived',
@@ -289,7 +293,7 @@ export class UsersService {
         before: { status: 'archived' },
         after: { status: 'invited' },
       });
-      return this.issueLink(tx, actor, id, 'activation');
+      return this.issueLink(tx, actor, id, 'activation', { restored: true });
     });
     return { user: await this.detail(actor, id), link };
   }
@@ -298,6 +302,7 @@ export class UsersService {
     await this.db.transaction(async (tx) => {
       await this.loadForChange(tx, actor, id);
       await resetTwoFactor(tx, id, actorOf(actor));
+      await this.emails.securityNotice(tx, id, 'two_factor_reset', actor.name);
     });
     return this.detail(actor, id);
   }
@@ -471,6 +476,8 @@ export class UsersService {
       before: { roles: current.roles },
       after: { roles: [...roles].sort() },
     });
+    // F14 email rule 14; nobody changes their own roles (above).
+    await this.emails.securityNotice(tx, current.id, 'roles_changed', actor.name);
   }
 
   /**
@@ -576,8 +583,11 @@ export class UsersService {
     actor: CurrentUserInfo,
     userId: string,
     kind: 'activation' | 'reset',
+    options: { restored?: boolean } = {},
   ) {
     const link = await this.links.issue(tx, userId, kind);
+    // F14 email rule 13: the link is emailed too, and still returned once for copying.
+    await this.emails.link(tx, userId, link, options);
     await recordAudit(tx, {
       actor: actorOf(actor),
       action: 'user.link_issued',

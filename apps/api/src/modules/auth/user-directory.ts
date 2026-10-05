@@ -12,6 +12,14 @@ import {
 import { and, eq, gt, inArray, isNull } from 'drizzle-orm';
 import { DATABASE } from '../../core/database/database.module.js';
 import { resolveAccess } from './resolve-access.js';
+import { hasPassword } from './user-status.js';
+
+/** An active user and their address (F14 email: only active users get notification emails). */
+export interface Mailbox {
+  id: string;
+  name: string;
+  email: string;
+}
 
 export interface UserSummary {
   id: string;
@@ -35,6 +43,25 @@ export class UserDirectory {
     return new Map<string, UserSummary>(
       rows.map((row) => [row.id, { id: row.id, name: row.name, archived: !!row.archivedAt }]),
     );
+  }
+
+  /**
+   * Active users (a password set, not archived) by id: the given ones, or all of them when
+   * `ids` is null. Invited and archived users are left out.
+   */
+  async mailboxes(ids: readonly string[] | null, executor: Database | Transaction = this.db) {
+    if (ids?.length === 0) return new Map<string, Mailbox>();
+    const rows = await executor
+      .select({ id: users.id, name: users.name, email: users.email })
+      .from(users)
+      .where(
+        and(
+          isNull(users.archivedAt),
+          hasPassword,
+          ids ? inArray(users.id, [...new Set(ids)]) : undefined,
+        ),
+      );
+    return new Map<string, Mailbox>(rows.map((row) => [row.id, row]));
   }
 
   /** Whether the session still exists and has not expired (it ends on sign-out, reset, archive). */

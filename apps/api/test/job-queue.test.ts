@@ -1,18 +1,23 @@
-import { randomUUID } from 'node:crypto';
+import { createDecipheriv, randomUUID } from 'node:crypto';
 import { Controller, type INestApplication, type OnModuleInit } from '@nestjs/common';
 import {
+  EMAIL_DIGEST_JOB,
+  EMAIL_NOTIFICATIONS_JOB,
   EMAIL_PURGE_JOB,
   EMAIL_RESULT_JOB,
+  EMAIL_SEND_JOB,
   NOTIFICATIONS_DAILY_JOB,
+  REDACTED,
   RETAINER_CYCLES_JOB,
 } from '@vertex-hub/contracts';
-import { createDatabase } from '@vertex-hub/db';
+import { createDatabase, emailMessages } from '@vertex-hub/db';
 import { testDatabaseUrl } from '@vertex-hub/db/testing';
-import { sql } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { PgBoss } from 'pg-boss';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { ENV, parseEnv } from '../src/core/config/env.js';
 import { JobQueue } from '../src/core/jobs/index.js';
+import { Mailer } from '../src/modules/email/index.js';
 import { startApp } from './start-app.js';
 
 /*
@@ -68,6 +73,8 @@ describe('job queue', () => {
         NOTIFICATIONS_DAILY_JOB.queue,
         EMAIL_RESULT_JOB.queue,
         EMAIL_PURGE_JOB.queue,
+        EMAIL_NOTIFICATIONS_JOB.queue,
+        EMAIL_DIGEST_JOB.queue,
         probeQueue,
       ]),
     );
@@ -114,5 +121,40 @@ describe('job queue', () => {
       ).rejects.toThrow('change failed');
       expect(await jobsWith('dropped')).toBe(0);
     });
+  });
+
+  it('seals token links in the job and keeps them out of the outbox row (ADR 0028)', async () => {
+    const link = 'https://hub.example.com/activate#token=only-in-the-job';
+    const id = await db.transaction((tx) =>
+      app.get(Mailer).queue(tx, {
+        kind: 'password_reset',
+        to: [{ name: 'Rana', email: 'rana@example.com' }],
+        subject: 'Reset',
+        data: { name: 'Rana', link, expiresAt: '2026-10-05T08:00:00.000Z', requested: true },
+        sender: null,
+      }),
+    );
+    try {
+      const [row] = await db.select().from(emailMessages).where(eq(emailMessages.id, id));
+      expect(row?.data).toMatchObject({ link: REDACTED });
+      expect(JSON.stringify(row)).not.toContain('only-in-the-job');
+      const result = await db.execute<{ data: { data: { link: string }; sealed: string } }>(
+        sql`select data from pgboss.job where name = ${EMAIL_SEND_JOB.queue} and data->>'id' = ${id}`,
+      );
+      const job = result.rows[0]?.data;
+      expect(job?.data.link).toBe(REDACTED);
+      const sealed = Buffer.from(job?.sealed ?? '', 'base64url');
+      const decipher = createDecipheriv(
+        'aes-256-gcm',
+        app.get<{ EMAIL_SECRET_KEY: Buffer }>(ENV).EMAIL_SECRET_KEY,
+        sealed.subarray(0, 12),
+      );
+      decipher.setAuthTag(sealed.subarray(12, 28));
+      const opened = Buffer.concat([decipher.update(sealed.subarray(28)), decipher.final()]);
+      expect(JSON.parse(opened.toString('utf8'))).toEqual({ link });
+    } finally {
+      await db.execute(sql`delete from pgboss.job where data->>'id' = ${id}`);
+      await db.delete(emailMessages).where(eq(emailMessages.id, id));
+    }
   });
 });

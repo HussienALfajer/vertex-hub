@@ -8,6 +8,7 @@ import { ENV, type Env } from '../core/config/env.js';
 import { repositoryRoot } from '../pdf/pdf-renderer.js';
 import { LOGO_CID } from './email-layout.js';
 import { renderEmail } from './email-render.js';
+import { unsealData } from './email-secrets.js';
 
 /** The logo emails show (brand/identity.md §7): the green full logo, as PNG for mail clients. */
 const LOGO = 'brand/logo/png/vertex-logo-green.png';
@@ -22,6 +23,8 @@ type EmailEnv = Pick<
   | 'SMTP_SECURE'
   | 'SMTP_USER'
   | 'SMTP_PASSWORD'
+  | 'APP_URL'
+  | 'EMAIL_SECRET_KEY'
 >;
 
 /**
@@ -48,7 +51,8 @@ export class EmailSender {
 
   /** Sends the email; returns the SMTP message id. Throws when the server refuses it. */
   async send(job: EmailSendJob): Promise<{ messageId: string | null }> {
-    const { html, text } = await renderEmail(job);
+    const data = unsealData(job, this.env.EMAIL_SECRET_KEY);
+    const { html, text } = await renderEmail({ kind: job.kind, data }, this.env.APP_URL);
     this.logo ??= await readFile(join(repositoryRoot(), LOGO));
     const info = await this.transport.sendMail({
       from: { name: EMAIL_SENDER_NAMES[emailAudienceOf(job.kind)], address: this.env.EMAIL_FROM },
