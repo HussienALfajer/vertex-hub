@@ -10,6 +10,8 @@ import {
   businessDate,
   type ClientMonthlyReport,
   clientMonthlyReportSchema,
+  emailHistorySchema,
+  emailSummarySchema,
   monthPeriod,
   quotePdfRenderSchema,
   REPORTS_PDF_JOB,
@@ -29,6 +31,7 @@ import {
   clientReportPdfs,
   contentPosts,
   createDatabase,
+  emailMessages,
   projectMilestones,
   projects,
   retainerCycleLines,
@@ -571,6 +574,46 @@ describe('monthly client report (F15 rules 17–20)', () => {
         .from(clientReportPdfs)
         .where(eq(clientReportPdfs.id, job.id));
       expect(failed?.status).toBe('failed');
+    });
+
+    it('is emailed with a copy that outlives the render (F14 email rule 21)', async () => {
+      const contact = await cast.createContact(clientId);
+      const email = (cookie: string) =>
+        client.post(`${path()}/email`, cookie, {
+          month,
+          contactIds: [contact.id],
+          subject: 'التقرير الشهري',
+          message: 'مرحبًا،\n\nتجدون التقرير في المرفق.',
+        });
+      expect((await email('')).status).toBe(401);
+      expect((await email(finance.cookie)).status).toBe(403);
+      expect((await email(cast.otherAm.cookie)).status).toBe(404);
+      await expectError(await email(cast.am.cookie), 409, 'PDF_NOT_READY');
+      const asked = await client.post(`${path()}/pdf?month=${month}`, cast.am.cookie, {});
+      expect(quotePdfRenderSchema.parse(await asked.json())).toEqual({ state: 'pending' });
+      await work(queued.at(-1) as ReportPdfJob);
+      const response = await email(cast.am.cookie);
+      expect(response.status, await response.clone().text()).toBe(202);
+      const summary = emailSummarySchema.parse(await response.json());
+      expect(summary.kind).toBe('client_report');
+      const [row] = await db.select().from(emailMessages).where(eq(emailMessages.id, summary.id));
+      expect(row).toMatchObject({ recordType: 'client', recordId: clientId, data: { month } });
+      const [attachment] = (row?.attachments ?? []) as { storageKey: string }[];
+      expect(attachment?.storageKey).toBe(`objects/emails/${summary.id}`);
+      await stat(join(filesRoot, attachment?.storageKey ?? ''));
+      const history = async (wanted: string) =>
+        emailHistorySchema.parse(
+          await (await client.get(`${path()}/emails?month=${wanted}`, cast.gm.cookie)).json(),
+        ).items;
+      expect((await history(month)).map((item) => item.id)).toEqual([summary.id]);
+      expect(await history(thisMonth)).toEqual([]);
+      expect(
+        (await client.get(`${path()}/emails?month=${month}`, cast.otherAm.cookie)).status,
+      ).toBe(404);
+      expect((await client.get(`${path()}/emails?month=${month}`)).status).toBe(401);
+      expect((await client.get(`${path()}/emails?month=${month}`, finance.cookie)).status).toBe(
+        403,
+      );
     });
 
     it('is purged with its object after 24 hours', async () => {

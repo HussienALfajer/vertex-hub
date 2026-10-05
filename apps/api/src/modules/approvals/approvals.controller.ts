@@ -10,6 +10,7 @@ import {
   SerializeOptions,
 } from '@nestjs/common';
 import {
+  ApiAcceptedResponse,
   ApiConflictResponse,
   ApiCreatedResponse,
   ApiNotFoundResponse,
@@ -29,8 +30,14 @@ import {
   approvalRequestPageSchema,
   type CreateApprovalRequest,
   createApprovalRequestSchema,
+  type EmailHistory,
+  type EmailSummary,
+  emailHistorySchema,
+  emailSummarySchema,
   type IssuedApprovalRequest,
   issuedApprovalRequestSchema,
+  type ReissueApprovalRequest,
+  reissueApprovalRequestSchema,
 } from '@vertex-hub/contracts';
 import { RequirePermissions } from '../../core/access/index.js';
 import { CurrentUser, type CurrentUserInfo } from '../auth/index.js';
@@ -95,7 +102,7 @@ export class ApprovalsController {
   })
   @ApiConflictResponse({
     description:
-      '`CLIENT_ARCHIVED`, `CONTACT_NOT_APPROVER`, `TASK_NOT_READY`, `POST_NOT_READY`, `MEDICAL_REVIEW_REQUIRED`, `LIMIT_REACHED`',
+      '`CLIENT_ARCHIVED`, `CONTACT_NOT_APPROVER`, `TASK_NOT_READY`, `POST_NOT_READY`, `MEDICAL_REVIEW_REQUIRED`, `LIMIT_REACHED`, `CONTACT_NO_EMAIL`',
   })
   create(
     @CurrentUser() actor: CurrentUserInfo,
@@ -113,13 +120,48 @@ export class ApprovalsController {
     standardSchema: issuedApprovalRequestSchema,
   })
   @ApiConflictResponse({
-    description: '`REQUEST_CLOSED`, `CONTACT_NOT_APPROVER`, `CLIENT_ARCHIVED`',
+    description: '`REQUEST_CLOSED`, `CONTACT_NOT_APPROVER`, `CLIENT_ARCHIVED`, `CONTACT_NO_EMAIL`',
   })
   reissue(
     @CurrentUser() actor: CurrentUserInfo,
     @Param('id', ParseUUIDPipe) id: string,
+    @Body({ schema: reissueApprovalRequestSchema }) input: ReissueApprovalRequest,
   ): Promise<IssuedApprovalRequest> {
-    return this.approvals.reissue(actor, id);
+    return this.approvals.reissue(actor, id, input);
+  }
+
+  @Post('requests/:id/email-reminder')
+  @HttpCode(202)
+  @RequirePermissions('tasks.manage')
+  @SerializeOptions({ schema: emailSummarySchema })
+  @ApiAcceptedResponse({
+    description: 'A reminder by email to the contact, without the link (F14 email rule 19)',
+    standardSchema: emailSummarySchema,
+  })
+  @ApiConflictResponse({
+    description:
+      '`REQUEST_CLOSED`, `REMINDER_NOT_DUE`, `CONTACT_NO_EMAIL`, `CLIENT_ARCHIVED`, `INVALID_RECIPIENT`',
+  })
+  emailReminder(
+    @CurrentUser() actor: CurrentUserInfo,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<EmailSummary> {
+    return this.approvals.emailReminder(actor, id);
+  }
+
+  @Get('requests/:id/emails')
+  @RequirePermissions('tasks.read')
+  @SerializeOptions({ schema: emailHistorySchema })
+  @ApiOkResponse({
+    description: "The request's emails, newest first (F14 email screen 5)",
+    standardSchema: emailHistorySchema,
+  })
+  @ApiNotFoundResponse({ description: 'No such request' })
+  emails(
+    @CurrentUser() actor: CurrentUserInfo,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<EmailHistory> {
+    return this.approvals.emails(actor, id);
   }
 
   @Post('requests/:id/revoke')

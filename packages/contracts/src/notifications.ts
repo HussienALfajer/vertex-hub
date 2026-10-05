@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { CLIENT_DECISIONS } from './approvals.js';
 import { calendarDateSchema, timeOfDaySchema } from './dates.js';
 import { departmentCodeSchema } from './departments.js';
+import { clientEmailKindSchema } from './email-basics.js';
 import { pageQuerySchema, pageSchema, queryBooleanSchema } from './lists.js';
 import { minorAmountSchema, signedMinorAmountSchema } from './money.js';
 import { BEHIND_ALERT_DAYS, deliverableKindSchema, RETAINER_LIMITS } from './retainers.js';
@@ -67,6 +68,7 @@ export const NOTIFICATION_TYPES = [
   'invoice_overdue',
   'invoice_paid',
   'ad_budget_low',
+  'email_failed',
   'lead_assigned',
   'lead_won',
   'lead_follow_up_overdue',
@@ -186,6 +188,8 @@ const CATALOG: Record<
   invoice_overdue: { category: 'reminders', subject: 'invoice', mutable: true },
   invoice_paid: { category: 'clients_projects', subject: 'invoice', mutable: true },
   ad_budget_low: { category: 'reminders', subject: 'client', mutable: true },
+  /** F14 email rule 23: opens the email's document; its subject type is given with the notice. */
+  email_failed: { category: 'clients_projects', subject: 'client', mutable: false },
   lead_assigned: { category: 'clients_projects', subject: 'lead', mutable: false },
   lead_won: { category: 'clients_projects', subject: 'lead', mutable: true },
   lead_follow_up_overdue: { category: 'reminders', subject: 'lead', mutable: false },
@@ -438,6 +442,14 @@ export const NOTIFICATION_DATA_SCHEMAS = {
     client: nameSchema,
     balanceMinor: signedMinorAmountSchema,
     thresholdMinor: minorAmountSchema,
+  }),
+  /** F14 email rule 23: a client email the recipient sent failed for good. */
+  email_failed: z.object({
+    kind: clientEmailKindSchema,
+    client: nameSchema,
+    /** The document's number, or the report's month; null for the statement and budget notices. */
+    document: nameSchema.nullable(),
+    recipients: z.array(nameSchema).min(1),
   }),
   /** F03 rule 6: someone else made the recipient the lead's owner. */
   lead_assigned: leadData,

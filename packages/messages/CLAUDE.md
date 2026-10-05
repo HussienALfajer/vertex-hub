@@ -4,7 +4,7 @@ The user-facing Arabic texts that more than one app renders (ADR 0028): the emai
 
 ## Layout
 - `src/notifications.ts`: the text and link of every notification type (`NOTIFICATION_TEXT`, `notificationText`, `notificationLink`, `linkPath`). A new notification type gets its text here, not in the web app.
-- `src/emails.ts`: sender names, the layout texts, `EmailContent` and the `test` email. `src/staff-emails.ts`: notification batches, the digest and the account emails.
+- `src/emails.ts`: sender names, the layout texts, `EmailContent` and the `test` email. `src/staff-emails.ts`: notification batches, the digest and the account emails. `src/client-emails.ts`: the client emails (the dialog's prefilled subject and message, `clientEmailDraft`, and the rendered content around the sent message, `clientEmailContent`) and the kinds' names.
 - `src/format.ts`: the formatters these texts use (the web app re-exports them). `src/text.ts`: `fill` (`{{name}}` placeholders) and `plural` (Arabic plural forms).
 
 ## Rules

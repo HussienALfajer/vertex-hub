@@ -4038,6 +4038,7 @@ function taskRoutes({
         };
       }),
       contactPhone: requestContact(request).phone,
+      contactEmail: null,
       permissions: {
         canReissue: scoped && (state === 'open' || state === 'expired') && counts.pending > 0,
         canRevoke: scoped && (state === 'open' || state === 'expired'),
@@ -4052,7 +4053,7 @@ function taskRoutes({
       TASKS_NOW.getTime() + APPROVAL_LIMITS.linkDays * 24 * 60 * 60 * 1000,
     ).toISOString();
     request.remindedAt = null;
-    return { ...requestDetail(request), link: `${origin}/a/${request.token}` };
+    return { ...requestDetail(request), link: `${origin}/a/${request.token}`, email: null };
   };
   const publicItem = (item: ApprovalItemRecord): PublicApprovalItem => {
     const withdrawn = item.status === 'withdrawn';

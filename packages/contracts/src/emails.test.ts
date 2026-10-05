@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
+import { EMAIL_KINDS, emailAudienceOf } from './email-basics.js';
 import {
+  clientEmailSchema,
   EMAIL_DATA_SCHEMAS,
-  EMAIL_KINDS,
   EMAIL_SECRET_FIELDS,
-  emailAudienceOf,
   emailListQuerySchema,
   isEmailBatchWindow,
+  quoteEmailSchema,
 } from './emails.js';
 import { emailResultJobSchema, emailSendJobSchema } from './jobs.js';
 
@@ -99,6 +100,7 @@ describe('staff email data', () => {
   it('keeps the token links of account emails out of the outbox row', () => {
     expect(EMAIL_SECRET_FIELDS.account_activation).toEqual(['link']);
     expect(EMAIL_SECRET_FIELDS.password_reset).toEqual(['link']);
+    expect(EMAIL_SECRET_FIELDS.client_approval_link).toEqual(['link']);
     expect(EMAIL_SECRET_FIELDS.digest).toBeUndefined();
   });
 
@@ -121,6 +123,55 @@ describe('staff email data', () => {
     expect(
       EMAIL_DATA_SCHEMAS.security_notice.safeParse({ ...notice, change: 'email_changed', by: null })
         .success,
+    ).toBe(false);
+  });
+});
+
+describe('client emails', () => {
+  const email = { contactIds: [id], subject: 'عرض السعر', message: 'مرحبًا' };
+
+  it('copies the account manager by default and not the sender', () => {
+    const parsed = clientEmailSchema.parse(email);
+    expect(parsed.ccAccountManager).toBe(true);
+    expect(parsed.ccMe).toBe(false);
+  });
+
+  it('needs one to ten different contacts, a subject and a message', () => {
+    expect(clientEmailSchema.safeParse({ ...email, contactIds: [] }).success).toBe(false);
+    expect(clientEmailSchema.safeParse({ ...email, contactIds: [id, id] }).success).toBe(false);
+    const eleven = Array.from({ length: 11 }, (_, i) => id.replace(/1$/, i.toString(16)));
+    expect(clientEmailSchema.safeParse({ ...email, contactIds: eleven }).success).toBe(false);
+    expect(clientEmailSchema.safeParse({ ...email, subject: ' ' }).success).toBe(false);
+    expect(clientEmailSchema.safeParse({ ...email, message: 'x'.repeat(4001) }).success).toBe(
+      false,
+    );
+  });
+
+  it('tells a quote from its reminder', () => {
+    expect(quoteEmailSchema.safeParse({ ...email, kind: 'reminder' }).success).toBe(true);
+    expect(quoteEmailSchema.safeParse({ ...email, kind: 'invoice' }).success).toBe(false);
+  });
+
+  it('carries the sender signature and the document facts', () => {
+    const signature = { name: 'Rana', title: null, phone: null, email: 'rana@example.com' };
+    const quote = {
+      client: 'Acme',
+      signature,
+      quote: {
+        number: 'Q-2026-0001',
+        title: 'Social media',
+        currency: 'USD',
+        oneOffMinor: 150000,
+        monthlyMinor: null,
+        validUntil: '2026-10-30',
+      },
+    };
+    expect(EMAIL_DATA_SCHEMAS.client_quote.safeParse(quote).success).toBe(true);
+    expect(
+      EMAIL_DATA_SCHEMAS.client_quote.safeParse({
+        ...quote,
+        signature: { ...signature, email: '' },
+      }).success,
     ).toBe(false);
   });
 });

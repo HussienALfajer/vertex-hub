@@ -25,6 +25,7 @@ type EmailEnv = Pick<
   | 'SMTP_PASSWORD'
   | 'APP_URL'
   | 'EMAIL_SECRET_KEY'
+  | 'FILES_ROOT'
 >;
 
 /**
@@ -52,8 +53,19 @@ export class EmailSender {
   /** Sends the email; returns the SMTP message id. Throws when the server refuses it. */
   async send(job: EmailSendJob): Promise<{ messageId: string | null }> {
     const data = unsealData(job, this.env.EMAIL_SECRET_KEY);
-    const { html, text } = await renderEmail({ kind: job.kind, data }, this.env.APP_URL);
+    const { html, text } = await renderEmail(
+      { kind: job.kind, data, message: job.message },
+      this.env.APP_URL,
+    );
     this.logo ??= await readFile(join(repositoryRoot(), LOGO));
+    // Rule 20: the record's PDF, as stored under `FILES_ROOT` when the email was queued.
+    const files = await Promise.all(
+      job.attachments.map(async (file) => ({
+        filename: file.fileName,
+        content: await readFile(join(resolve(this.env.FILES_ROOT), file.storageKey)),
+        contentType: 'application/pdf',
+      })),
+    );
     const info = await this.transport.sendMail({
       from: { name: EMAIL_SENDER_NAMES[emailAudienceOf(job.kind)], address: this.env.EMAIL_FROM },
       to: job.to.map(({ name, email }) => ({ name, address: email })),
@@ -62,7 +74,7 @@ export class EmailSender {
       subject: job.subject,
       html,
       text,
-      attachments: [{ filename: 'vertex-media.png', content: this.logo, cid: LOGO_CID }],
+      attachments: [{ filename: 'vertex-media.png', content: this.logo, cid: LOGO_CID }, ...files],
     });
     if (this.env.EMAIL_TRANSPORT === 'log') {
       const dir = resolve(this.env.EMAIL_LOG_DIR);

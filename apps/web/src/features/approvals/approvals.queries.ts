@@ -90,7 +90,9 @@ export const useCreateApprovalRequest = () =>
 
 /** A new link for the same request; the old one stops working (rule 11). */
 export const useReissueApprovalRequest = (id: string) =>
-  useApprovalsMutation(() => call(api.POST('/api/approvals/requests/{id}/reissue', path(id))));
+  useApprovalsMutation(() =>
+    call(api.POST('/api/approvals/requests/{id}/reissue', { ...path(id), body: { email: false } })),
+  );
 
 export const useRevokeApprovalRequest = (id: string) =>
   useApprovalsMutation(() => call(api.POST('/api/approvals/requests/{id}/revoke', path(id))));

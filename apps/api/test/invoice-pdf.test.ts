@@ -1,11 +1,14 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { mkdir, mkdtemp, rm, stat, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import type { INestApplication } from '@nestjs/common';
 import {
   addDays,
   businessDate,
+  type EmailSummary,
+  emailHistorySchema,
+  emailSummarySchema,
   INVOICES_PDF_JOB,
   type InvoiceDetail,
   type InvoiceDraftInput,
@@ -16,7 +19,10 @@ import {
   quotePdfRenderSchema,
 } from '@vertex-hub/contracts';
 import {
+  auditEntries,
+  clients,
   createDatabase,
+  emailMessages,
   fileItems,
   fileVersions,
   invoiceSettings,
@@ -559,6 +565,191 @@ describe('invoice PDFs', () => {
         await db.select().from(statementPdfs).where(eq(statementPdfs.clientId, clientId)),
       ).toHaveLength(0);
       expect(await exists(path)).toBe(false);
+    });
+  });
+
+  describe('emailed to the client (F14 email)', () => {
+    let contact: { id: string; name: string };
+    let invoice: InvoiceDetail;
+    const message = 'مرحبًا،\n\nتجدون المستند في المرفق.';
+    const body = (extra: object = {}) => ({
+      contactIds: [contact.id],
+      subject: 'مستند من Vertex Media',
+      message,
+      ...extra,
+    });
+    const accepted = async (response: Response): Promise<EmailSummary> => {
+      if (response.status !== 202) {
+        throw new Error(`Expected 202, got ${response.status} ${await response.text()}`);
+      }
+      return emailSummarySchema.parse(await response.json());
+    };
+    const rowOf = async (id: string) =>
+      (await db.select().from(emailMessages).where(eq(emailMessages.id, id)))[0];
+    const emailInvoice = (id: string, kind: string, cookie = finance.cookie) =>
+      client.post(`/api/invoices/${id}/email`, cookie, body({ kind }));
+    const history = (path: string, cookie = finance.cookie) =>
+      client.get(`/api/${path}/emails`, cookie);
+
+    beforeAll(async () => {
+      contact = await cast.createContact(clientId);
+      invoice = await issue(await draftInvoice(20_000));
+      await work(lastJob('invoice'));
+    });
+
+    it('needs a session, invoices.send and the client in scope', async () => {
+      expect((await emailInvoice(invoice.id, 'invoice', '')).status).toBe(401);
+      expect((await emailInvoice(invoice.id, 'invoice', cast.employee.cookie)).status).toBe(403);
+      expect((await emailInvoice(invoice.id, 'invoice', cast.otherAm.cookie)).status).toBe(404);
+      expect((await history(`invoices/${invoice.id}`, '')).status).toBe(401);
+      expect((await history(`invoices/${invoice.id}`, cast.otherAm.cookie)).status).toBe(404);
+      const receipt = await client.post(
+        `/api/payments/${randomUUID()}/email`,
+        finance.cookie,
+        body(),
+      );
+      expect(receipt.status).toBe(404);
+    });
+
+    it('queues the issued invoice with its PDF and copies the account manager (rules 17, 20, 22)', async () => {
+      const summary = await accepted(await emailInvoice(invoice.id, 'invoice'));
+      expect(summary).toMatchObject({ kind: 'client_invoice', sender: { id: finance.id } });
+      expect(summary.cc.map((address) => address.userId)).toEqual([cast.am.id]);
+      const row = await rowOf(summary.id);
+      expect(row?.attachments).toEqual([
+        expect.objectContaining({ fileName: `${invoice.displayNumber}.pdf` }),
+      ]);
+      expect(row?.data).toMatchObject({
+        invoice: { number: invoice.displayNumber, total: { amountMinor: 20_000, currency: 'USD' } },
+      });
+      const [audit] = await db
+        .select()
+        .from(auditEntries)
+        .where(
+          and(eq(auditEntries.entityId, invoice.id), eq(auditEntries.action, 'invoice.emailed')),
+        );
+      expect(audit?.after).toMatchObject({ email: { emailId: summary.id } });
+      // The account manager sends for their own clients (owner decision).
+      await accepted(await emailInvoice(invoice.id, 'invoice', cast.am.cookie));
+    });
+
+    it('sends the overdue reminder for an overdue invoice only (rule 18)', async () => {
+      await expectError(
+        await emailInvoice(invoice.id, 'overdue_reminder'),
+        409,
+        'INVOICE_NOT_OVERDUE',
+      );
+      await db
+        .update(invoices)
+        .set({ status: 'overdue', issuedOn: addDays(today, -12), dueOn: addDays(today, -5) })
+        .where(eq(invoices.id, invoice.id));
+      const summary = await accepted(await emailInvoice(invoice.id, 'overdue_reminder'));
+      expect(summary.kind).toBe('client_invoice_reminder');
+      expect((await rowOf(summary.id))?.data).toMatchObject({ daysOverdue: 5 });
+    });
+
+    it('refuses drafts and invoices whose PDF is not ready (rule 18)', async () => {
+      const draft = await draftInvoice(1_000);
+      await expectError(await emailInvoice(draft.id, 'invoice'), 409, 'INVOICE_NOT_ISSUED');
+      const unrendered = await issue(draft);
+      await expectError(await emailInvoice(unrendered.id, 'invoice'), 409, 'PDF_NOT_READY');
+      await work(lastJob('invoice'));
+    });
+
+    it('emails a receipt, but not that of a void payment (rule 18)', async () => {
+      const paid = await ok(
+        await client.post(`/api/invoices/${invoice.id}/payments`, finance.cookie, {
+          paidOn: today,
+          amountMinor: 5_000,
+          currency: 'USD',
+          method: 'cash',
+        }),
+        201,
+      );
+      const payment = paid.payments[0];
+      if (!payment) throw new Error('No payment');
+      const email = (cookie = finance.cookie) =>
+        client.post(`/api/payments/${payment.id}/email`, cookie, body());
+      expect((await email('')).status).toBe(401);
+      expect((await email(cast.employee.cookie)).status).toBe(403);
+      expect((await email(cast.otherAm.cookie)).status).toBe(404);
+      await expectError(await email(), 409, 'PDF_NOT_READY');
+      await work(lastJob('receipt'));
+      const summary = await accepted(await email());
+      expect(summary.kind).toBe('client_receipt');
+      expect((await rowOf(summary.id))?.attachments).toEqual([
+        expect.objectContaining({ fileName: `${payment.receiptNumber}.pdf` }),
+      ]);
+      const listed = emailHistorySchema.parse(
+        await (await history(`invoices/${invoice.id}`, cast.am.cookie)).json(),
+      );
+      // The invoice's history holds its receipts' emails too, newest first.
+      expect(listed.items[0]?.id).toBe(summary.id);
+      expect(listed.items.map((item) => item.kind)).toContain('client_invoice');
+      await db
+        .update(payments)
+        .set({ voidedAt: new Date(), voidedById: finance.id, voidReason: 'خطأ' })
+        .where(eq(payments.id, payment.id));
+      await expectError(await email(), 409, 'PAYMENT_VOIDED');
+    });
+
+    it('emails a ready statement with a copy of its PDF (rule 21)', async () => {
+      const period = `currency=USD&from=${today.slice(0, 4)}-01-01&to=${today}`;
+      const email = (cookie = finance.cookie, extra: object = {}) =>
+        client.post(
+          `/api/clients/${clientId}/statement/email`,
+          cookie,
+          body({ currency: 'USD', from: `${today.slice(0, 4)}-01-01`, to: today, ...extra }),
+        );
+      expect((await email('')).status).toBe(401);
+      expect((await email(cast.employee.cookie)).status).toBe(403);
+      expect((await email(cast.otherAm.cookie)).status).toBe(404);
+      await expectError(await email(), 409, 'PDF_NOT_READY');
+      await client.post(`/api/clients/${clientId}/statement/pdf?${period}`, finance.cookie, {});
+      await work(lastJob('statement'));
+      // A refused send keeps no copy of the render (rule 21).
+      const elsewhere = await cast.createContact((await cast.createClient()).id);
+      await expectError(
+        await email(finance.cookie, { contactIds: [elsewhere.id] }),
+        409,
+        'INVALID_RECIPIENT',
+      );
+      const copies = () => readdir(join(filesRoot, 'objects/emails')).catch((): string[] => []);
+      expect(await copies()).toEqual([]);
+      const summary = await accepted(await email());
+      expect(summary.kind).toBe('client_statement');
+      const row = await rowOf(summary.id);
+      const [attachment] = (row?.attachments ?? []) as { storageKey: string; sha256: string }[];
+      expect(attachment?.storageKey).toBe(`objects/emails/${summary.id}`);
+      expect(await exists(join(filesRoot, attachment?.storageKey ?? ''))).toBe(true);
+      expect(row).toMatchObject({ recordType: 'client', recordId: clientId });
+      const [audit] = await db
+        .select()
+        .from(auditEntries)
+        .where(and(eq(auditEntries.entityId, clientId), eq(auditEntries.action, 'client.emailed')));
+      expect(audit?.after).toMatchObject({ statement: { currency: 'USD' } });
+      const listed = emailHistorySchema.parse(
+        await (await history(`clients/${clientId}/statement`)).json(),
+      );
+      expect(listed.items.map((item) => item.id)).toEqual([summary.id]);
+      expect(await copies()).toEqual([summary.id]);
+      expect((await history(`clients/${clientId}/statement`, cast.otherAm.cookie)).status).toBe(
+        404,
+      );
+      expect((await history(`clients/${clientId}/statement`, '')).status).toBe(401);
+      expect((await history(`clients/${clientId}/statement`, cast.employee.cookie)).status).toBe(
+        403,
+      );
+      expect((await history(`invoices/${invoice.id}`, cast.employee.cookie)).status).toBe(403);
+    });
+
+    it('refuses an archived client (rule 18)', async () => {
+      await db.update(clients).set({ archivedAt: new Date() }).where(eq(clients.id, clientId));
+      try {
+        await expectError(await emailInvoice(invoice.id, 'invoice'), 409, 'CLIENT_ARCHIVED');
+      } finally {
+        await db.update(clients).set({ archivedAt: null }).where(eq(clients.id, clientId));
+      }
     });
   });
 });

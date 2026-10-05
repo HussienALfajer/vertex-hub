@@ -13,49 +13,18 @@ import {
   timeOfDaySchema,
 } from './dates.js';
 import { departmentCodeSchema } from './departments.js';
+import {
+  type EmailKind,
+  emailAudienceSchema,
+  emailKindSchema,
+  emailStatusSchema,
+  emailSummarySchema,
+} from './email-basics.js';
+import { clientStatementQuerySchema } from './invoices.js';
 import { pageQuerySchema, pageSchema, queryListSchema } from './lists.js';
+import { currencySchema, minorAmountSchema, signedMinorAmountSchema } from './money.js';
 import { notificationSchema } from './notifications.js';
-
-export const EMAIL_AUDIENCES = ['staff', 'client'] as const;
-
-export const emailAudienceSchema = z.enum(EMAIL_AUDIENCES).meta({ id: 'EmailAudience' });
-
-export type EmailAudience = z.infer<typeof emailAudienceSchema>;
-
-export const EMAIL_KINDS = [
-  'notification_batch',
-  'digest',
-  'account_activation',
-  'password_reset',
-  'security_notice',
-  'new_device',
-  'test',
-  'client_quote',
-  'client_quote_reminder',
-  'client_approval_link',
-  'client_approval_reminder',
-  'client_invoice',
-  'client_invoice_reminder',
-  'client_receipt',
-  'client_statement',
-  'client_report',
-  'client_ad_receipt',
-  'client_ad_budget_low',
-] as const;
-
-export const emailKindSchema = z.enum(EMAIL_KINDS).meta({ id: 'EmailKind' });
-
-export type EmailKind = z.infer<typeof emailKindSchema>;
-
-/** Who reads each kind: staff emails come from "Vertex Hub", client emails from "Vertex Media". */
-export const emailAudienceOf = (kind: EmailKind): EmailAudience =>
-  kind.startsWith('client_') ? 'client' : 'staff';
-
-export const EMAIL_STATUSES = ['queued', 'sent', 'failed'] as const;
-
-export const emailStatusSchema = z.enum(EMAIL_STATUSES).meta({ id: 'EmailStatus' });
-
-export type EmailStatus = z.infer<typeof emailStatusSchema>;
+import { reportMonthSchema } from './reports.js';
 
 /** The record a client email belongs to; statements, reports and ad budget notices use `client`. */
 export const EMAIL_RECORD_TYPES = [
@@ -82,17 +51,6 @@ export const EMAIL_LIMITS = {
 /** Staff emails (notifications, digests, account emails, tests) are deleted after this (rule 25). */
 export const STAFF_EMAIL_RETENTION_DAYS = 90;
 
-export const emailAddressSchema = z
-  .object({
-    name: z.string().min(1),
-    email: z.email(),
-    userId: z.uuid().optional(),
-    contactId: z.uuid().optional(),
-  })
-  .meta({ id: 'EmailAddress' });
-
-export type EmailAddress = z.infer<typeof emailAddressSchema>;
-
 export const emailAttachmentSchema = z.object({
   fileName: z.string().min(1),
   /** Path under `FILES_ROOT`. */
@@ -102,6 +60,9 @@ export const emailAttachmentSchema = z.object({
 });
 
 export type EmailAttachment = z.infer<typeof emailAttachmentSchema>;
+
+/** Edge case 15: the attachments of one email; more is refused before queueing. */
+export const EMAIL_ATTACHMENTS_MAX_BYTES = 10 * 1024 * 1024;
 
 /* Notification emails and the digest (rules 3–12). */
 
@@ -163,6 +124,52 @@ const accountLinkSchema = z.object({
   expiresAt: z.iso.datetime(),
 });
 
+/* Client emails (rules 16–23). */
+
+const moneySchema = z.object({ amountMinor: minorAmountSchema, currency: currencySchema });
+
+/** Rule 17: the sender's signature under the message. */
+const signatureSchema = z.object({
+  name: z.string().min(1),
+  title: z.string().nullable(),
+  phone: z.string().nullable(),
+  email: z.email(),
+});
+
+/** What every client email carries: the client's name and the sender's signature. */
+const clientEmailDataSchema = z.object({ client: z.string().min(1), signature: signatureSchema });
+
+const quoteFactsSchema = clientEmailDataSchema.extend({
+  quote: z.object({
+    number: z.string().min(1),
+    title: z.string().min(1),
+    currency: currencySchema,
+    /** The one-off net; null without one-off lines. */
+    oneOffMinor: minorAmountSchema.nullable(),
+    /** The monthly net, per month; null without monthly lines. */
+    monthlyMinor: minorAmountSchema.nullable(),
+    validUntil: calendarDateSchema,
+  }),
+});
+
+const invoiceFactsSchema = clientEmailDataSchema.extend({
+  invoice: z.object({
+    number: z.string().min(1),
+    issuedOn: calendarDateSchema,
+    dueOn: calendarDateSchema,
+    total: moneySchema,
+    /** What is left to pay. */
+    balance: moneySchema,
+  }),
+});
+
+/** Rule 19: the request's contact, message and items; the request's message is the message. */
+const approvalFactsSchema = clientEmailDataSchema.extend({
+  contact: z.string().min(1),
+  items: z.array(z.string().min(1)).min(1),
+  expiresAt: z.iso.datetime(),
+});
+
 /**
  * The template data of each kind, validated when the email is queued and again by the worker.
  * A kind gets its schema with the change that first sends it.
@@ -202,6 +209,52 @@ export const EMAIL_DATA_SCHEMAS = {
     ip: z.string().nullable(),
     at: z.iso.datetime(),
   }),
+  /** Rules 17–18: a sent quote, with its PDF. */
+  client_quote: quoteFactsSchema,
+  /** Rule 18: a sent quote still valid, with its PDF. */
+  client_quote_reminder: quoteFactsSchema,
+  /** Rule 19: the approval link of a created or reissued request. */
+  client_approval_link: approvalFactsSchema.extend({ link: z.string().min(1) }),
+  /** Rule 19: the reminder carries no link; it points to the earlier email. */
+  client_approval_reminder: approvalFactsSchema,
+  /** Rule 18: an issued invoice, with its PDF. */
+  client_invoice: invoiceFactsSchema,
+  /** Rule 18: an overdue invoice, with its PDF. */
+  client_invoice_reminder: invoiceFactsSchema.extend({ daysOverdue: z.number().int().min(1) }),
+  /** Rule 18: the receipt of a payment; `invoiceId` is what a failure notice opens (rule 23). */
+  client_receipt: clientEmailDataSchema.extend({
+    invoiceId: z.uuid(),
+    receipt: z.object({
+      number: z.string().min(1),
+      invoiceNumber: z.string().min(1),
+      paidOn: calendarDateSchema,
+      amount: moneySchema,
+    }),
+  }),
+  /** Rule 21: a rendered statement of one currency and period. */
+  client_statement: clientEmailDataSchema.extend({
+    statement: z.object({
+      currency: currencySchema,
+      from: calendarDateSchema,
+      to: calendarDateSchema,
+      outstandingMinor: signedMinorAmountSchema,
+    }),
+  }),
+  /** Rule 21: a rendered monthly client report (F15). */
+  client_report: clientEmailDataSchema.extend({ month: reportMonthSchema }),
+  /** Rule 18: the receipt of an ad deposit (F12). */
+  client_ad_receipt: clientEmailDataSchema.extend({
+    receipt: z.object({
+      number: z.string().min(1),
+      occurredOn: calendarDateSchema,
+      amount: moneySchema,
+    }),
+  }),
+  /** Rule 18: the ad wallet is below its threshold (F12 rule 20); amounts in USD. */
+  client_ad_budget_low: clientEmailDataSchema.extend({
+    balanceMinor: signedMinorAmountSchema,
+    thresholdMinor: minorAmountSchema,
+  }),
 } satisfies Partial<Record<EmailKind, z.ZodType>>;
 
 /**
@@ -211,6 +264,7 @@ export const EMAIL_DATA_SCHEMAS = {
 export const EMAIL_SECRET_FIELDS: Partial<Record<EmailKind, readonly string[]>> = {
   account_activation: ['link'],
   password_reset: ['link'],
+  client_approval_link: ['link'],
 };
 
 export const REDACTED = '[redacted]';
@@ -219,25 +273,62 @@ export type SendableEmailKind = keyof typeof EMAIL_DATA_SCHEMAS;
 
 export type EmailData<Kind extends SendableEmailKind> = z.infer<(typeof EMAIL_DATA_SCHEMAS)[Kind]>;
 
-const personSchema = z.object({ id: z.uuid(), name: z.string() });
-
-export const emailSummarySchema = z
+/**
+ * What a person writes in the "Send by email" dialog (rule 17): the client's contacts with an
+ * email, the copies, the subject and the message. The API checks the contacts
+ * (`INVALID_RECIPIENT`).
+ */
+export const clientEmailSchema = z
   .object({
-    id: z.uuid(),
-    kind: emailKindSchema,
-    status: emailStatusSchema,
-    to: z.array(emailAddressSchema),
-    cc: z.array(emailAddressSchema),
-    subject: z.string(),
-    sender: personSchema.nullable(),
-    createdAt: z.iso.datetime(),
-    sentAt: z.iso.datetime().nullable(),
-    /** The SMTP error of the last attempt. */
-    error: z.string().nullable(),
+    contactIds: z
+      .array(z.uuid())
+      .min(1)
+      .max(EMAIL_LIMITS.to)
+      .refine((ids) => new Set(ids).size === ids.length, { message: 'A contact is chosen once' }),
+    /** The client's primary account manager. */
+    ccAccountManager: z.boolean().default(true),
+    ccMe: z.boolean().default(false),
+    subject: z.string().trim().min(1).max(EMAIL_LIMITS.subject),
+    /** Plain text with line breaks. */
+    message: z.string().trim().min(1).max(EMAIL_LIMITS.message),
   })
-  .meta({ id: 'EmailSummary', description: 'One email of the outbox' });
+  .meta({ id: 'ClientEmail' });
 
-export type EmailSummary = z.infer<typeof emailSummarySchema>;
+export type ClientEmail = z.infer<typeof clientEmailSchema>;
+
+export type ClientEmailInput = z.input<typeof clientEmailSchema>;
+
+export const quoteEmailSchema = clientEmailSchema
+  .extend({ kind: z.enum(['quote', 'reminder']) })
+  .meta({ id: 'QuoteEmail' });
+
+export type QuoteEmail = z.infer<typeof quoteEmailSchema>;
+
+export const invoiceEmailSchema = clientEmailSchema
+  .extend({ kind: z.enum(['invoice', 'overdue_reminder']) })
+  .meta({ id: 'InvoiceEmail' });
+
+export type InvoiceEmail = z.infer<typeof invoiceEmailSchema>;
+
+/** Rule 21: the statement as rendered; its ready PDF is found as the download finds it. */
+export const statementEmailSchema = clientEmailSchema
+  .extend(clientStatementQuerySchema.shape)
+  .meta({ id: 'StatementEmail' });
+
+export type StatementEmail = z.infer<typeof statementEmailSchema>;
+
+/** Rule 21: the monthly report as rendered; its ready PDF is found as the download finds it. */
+export const reportEmailSchema = clientEmailSchema
+  .extend({ month: reportMonthSchema })
+  .meta({ id: 'ReportEmail' });
+
+export type ReportEmail = z.infer<typeof reportEmailSchema>;
+
+export const emailHistorySchema = z
+  .object({ items: z.array(emailSummarySchema) })
+  .meta({ id: 'EmailHistory', description: "A document's emails, newest first" });
+
+export type EmailHistory = z.infer<typeof emailHistorySchema>;
 
 export const emailLogItemSchema = emailSummarySchema
   .extend({

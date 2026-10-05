@@ -117,6 +117,12 @@ const SAMPLES: Record<NotificationType, unknown> = {
   invoice_overdue: { invoice, daysOverdue: 14 },
   invoice_paid: { invoice },
   ad_budget_low: { client: 'مطعم الشام', balanceMinor: 4_500, thresholdMinor: 10_000 },
+  email_failed: {
+    kind: 'client_invoice',
+    client: 'مطعم الشام',
+    document: 'INV-2026-0012',
+    recipients: ['سامي', 'ليلى'],
+  },
   lead_assigned: { lead: 'مقهى الياسمين' },
   lead_won: { lead: 'مقهى الياسمين', client: 'مقهى الياسمين' },
   lead_follow_up_overdue: { lead: 'مقهى الياسمين', followUpOn: '2026-10-01', owner: 'رنا' },
@@ -188,5 +194,36 @@ describe('notification links', () => {
     expect(queued.pathname).toBe('/tasks/list');
     expect(JSON.parse(queued.searchParams.get('department') ?? '')).toEqual(['design']);
     expect(queued.searchParams.get('assignee')).toBe('unassigned');
+  });
+});
+
+describe('failed client emails (F14 email rule 23)', () => {
+  it('names the email, its document and its recipients', () => {
+    const { text, context } = notificationText(sample('email_failed'), departmentName);
+    expect(text).toBe('تعذّر إرسال الفاتورة INV-2026-0012 إلى سامي وليلى');
+    expect(context).toBe('مطعم الشام');
+  });
+
+  it('opens the document, or the client screen that holds it', () => {
+    const invoice = sample('email_failed', { subject: { type: 'invoice', id: SUBJECT_ID } });
+    expect(linkPath(notificationLink(invoice))).toBe(`/invoices/${SUBJECT_ID}`);
+    const report = sample('email_failed', {
+      data: {
+        kind: 'client_report',
+        client: 'مطعم الشام',
+        document: '2026-09',
+        recipients: ['سامي'],
+      },
+    });
+    expect(linkPath(notificationLink(report))).toBe(`/clients/${SUBJECT_ID}/report?month=2026-09`);
+    const statement = sample('email_failed', {
+      data: {
+        kind: 'client_statement',
+        client: 'مطعم الشام',
+        document: null,
+        recipients: ['سامي'],
+      },
+    });
+    expect(linkPath(notificationLink(statement))).toBe(`/clients/${SUBJECT_ID}?tab=invoices`);
   });
 });

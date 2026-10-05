@@ -9,6 +9,8 @@ import { QuotesModule } from '../quotes/index.js';
 import { TasksModule } from '../tasks/index.js';
 import { AdReceiptsService } from './ad-receipts.service.js';
 import { AdWalletBalances } from './ad-wallet-balances.js';
+import { AdWalletEmailsController } from './ad-wallet-emails.controller.js';
+import { AdWalletEmailsService } from './ad-wallet-emails.service.js';
 import { AdWalletEntryFileOwner } from './ad-wallet-entry-file-owner.js';
 import { AdWalletsController } from './ad-wallets.controller.js';
 import { AdWalletsService } from './ad-wallets.service.js';
@@ -41,13 +43,14 @@ import { CampaignsService } from './campaigns.service.js';
     QuotesModule,
     TasksModule,
   ],
-  controllers: [CampaignsController, AdWalletsController],
+  controllers: [CampaignsController, AdWalletsController, AdWalletEmailsController],
   providers: [
     CampaignsService,
     CampaignUpdatesService,
     AdWalletBalances,
     AdWalletsService,
     AdReceiptsService,
+    AdWalletEmailsService,
     AdWalletEntryFileOwner,
     CampaignReports,
   ],

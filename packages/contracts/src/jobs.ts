@@ -7,12 +7,8 @@
 import { z } from 'zod';
 import { adDepositReceiptSnapshotSchema } from './campaigns.js';
 import { BUSINESS_TIME_ZONE } from './dates.js';
-import {
-  EMAIL_LIMITS,
-  emailAddressSchema,
-  emailAttachmentSchema,
-  emailKindSchema,
-} from './emails.js';
+import { emailAddressSchema, emailKindSchema } from './email-basics.js';
+import { EMAIL_LIMITS, emailAttachmentSchema } from './emails.js';
 import {
   invoiceDraftSnapshotSchema,
   invoiceSnapshotSchema,

@@ -19,6 +19,7 @@ import {
   type QuotePdfRender,
   receiptDisplayNumber,
   receiptSnapshotSchema,
+  type StatementSnapshot,
 } from '@vertex-hub/contracts';
 import {
   type Database,
@@ -283,6 +284,22 @@ export class InvoicePdfService implements OnModuleInit {
     }
     const name = `${snapshot.client.name} - Statement ${snapshot.currency} ${snapshot.from} ${snapshot.to}.pdf`;
     await this.files.serve(row.storageKey, name, PDF_MIME_TYPE, request, response);
+  }
+
+  /**
+   * F14 email rule 21: the statement as it is now and the object of its ready render, while it
+   * is downloadable; `storageKey` is null when there is none (rule 18: `PDF_NOT_READY`).
+   */
+  async readyStatement(
+    actor: CurrentUserInfo,
+    clientId: string,
+    query: ClientStatementQuery,
+  ): Promise<{ statement: StatementSnapshot; storageKey: string | null }> {
+    const { snapshot, hash } = await this.statementPayload(actor, clientId, query);
+    const [row] = await this.db.select().from(statementPdfs).where(eq(statementPdfs.hash, hash));
+    const ready =
+      row?.status === 'ready' && row.storageKey && row.requestedAt >= statementCutoff(new Date());
+    return { statement: snapshot, storageKey: ready ? row.storageKey : null };
   }
 
   /** Rule 29: statement renders older than 24 hours go, with their objects. */

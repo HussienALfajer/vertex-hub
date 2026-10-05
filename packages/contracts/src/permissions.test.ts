@@ -185,6 +185,14 @@ describe('invoices (F13)', () => {
     expect(hasPermission(access(['account_manager']), 'invoices.manage')).toBe(false);
     expect(hasPermission(access(['account_manager']), 'payments.manage')).toBe(false);
   });
+
+  it('lets the invoice managers email invoices, and account managers for their clients (F14)', () => {
+    expect(permissionScopes(access(['general_manager']), 'invoices.send')).toEqual(['all']);
+    expect(permissionScopes(access(['finance']), 'invoices.send')).toEqual(['all']);
+    expect(permissionScopes(operationsManager, 'invoices.send')).toEqual(['all']);
+    expect(permissionScopes(access(['account_manager']), 'invoices.send')).toEqual(['own_clients']);
+    expect(hasPermission(access(['employee']), 'invoices.send')).toBe(false);
+  });
 });
 
 describe('leads (F03)', () => {

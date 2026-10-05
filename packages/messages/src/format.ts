@@ -1,4 +1,4 @@
-import { BUSINESS_TIME_ZONE } from '@vertex-hub/contracts';
+import { BUSINESS_TIME_ZONE, type Currency } from '@vertex-hub/contracts';
 
 /*
  * The formatters the notification texts use, shared by the web app and the emails (ADR 0028). The
@@ -61,4 +61,24 @@ export function formatAmount(minor: number): string {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(minor / MINOR_PER_UNIT);
+}
+
+/** An amount in minor units with its currency code, e.g. `1,500.00 USD`. */
+export function formatMoney(minor: number, currency: Currency): string {
+  return new Intl.NumberFormat(APP_LOCALE, {
+    style: 'currency',
+    currency,
+    currencyDisplay: 'code',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(minor / MINOR_PER_UNIT);
+}
+
+/** A `YYYY-MM` month, e.g. "تشرين الأول 2026". */
+export function formatMonth(month: string): string {
+  return new Intl.DateTimeFormat(APP_LOCALE, {
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC',
+  }).format(new Date(`${month}-01T00:00:00Z`));
 }

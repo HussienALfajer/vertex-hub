@@ -21,6 +21,14 @@ export interface Mailbox {
   email: string;
 }
 
+/** F14 email rule 17: how a sender signs a client email. */
+export interface Signature {
+  name: string;
+  title: string | null;
+  phone: string | null;
+  email: string;
+}
+
 export interface UserSummary {
   id: string;
   name: string;
@@ -43,6 +51,18 @@ export class UserDirectory {
     return new Map<string, UserSummary>(
       rows.map((row) => [row.id, { id: row.id, name: row.name, archived: !!row.archivedAt }]),
     );
+  }
+
+  /** The signature of a user, archived or not; null when there is no such user. */
+  async signature(
+    id: string,
+    executor: Database | Transaction = this.db,
+  ): Promise<Signature | null> {
+    const [row] = await executor
+      .select({ name: users.name, title: users.title, phone: users.phone, email: users.email })
+      .from(users)
+      .where(eq(users.id, id));
+    return row ?? null;
   }
 
   /**

@@ -370,6 +370,8 @@ export async function removeLeftoverUsers(db: Database): Promise<number> {
  */
 export async function removeClients(db: Database, ids: string[]): Promise<void> {
   if (ids.length === 0) return;
+  // Client emails (F14 email) point at the client.
+  await db.delete(emailMessages).where(inArray(emailMessages.clientId, ids));
   // Quotes point at their PDF document (F04): unlink them before the file items go.
   await db.update(quotes).set({ pdfFileItemId: null }).where(inArray(quotes.clientId, ids));
   // Invoices point at their PDF document, payments at their proof and receipt (F13): unlinked or

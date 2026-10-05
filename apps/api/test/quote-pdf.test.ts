@@ -6,6 +6,8 @@ import type { INestApplication } from '@nestjs/common';
 import {
   type CatalogService,
   catalogServiceSchema,
+  emailHistorySchema,
+  emailSummarySchema,
   fileItemListSchema,
   fileItemPageSchema,
   QUOTES_PDF_JOB,
@@ -16,13 +18,13 @@ import {
   quotePdfRenderSchema,
   quotePdfStorageKey,
 } from '@vertex-hub/contracts';
-import { auditEntries, createDatabase, fileItems, quotes } from '@vertex-hub/db';
+import { auditEntries, createDatabase, emailMessages, fileItems, quotes } from '@vertex-hub/db';
 import { testDatabaseUrl } from '@vertex-hub/db/testing';
 import { and, eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { JobQueue } from '../src/core/jobs/index.js';
 import { QuotePdfService } from '../src/modules/quotes/quote-pdf.service.js';
-import { seedClientCast } from './client-cast.js';
+import { expectError, seedClientCast } from './client-cast.js';
 import { api, clientIp, ORIGIN, removeCatalog } from './helpers.js';
 import { startApp } from './start-app.js';
 
@@ -343,6 +345,117 @@ describe('quote PDFs', () => {
       queued.length = 0;
       expect(await pdf.requeuePending()).toBeGreaterThanOrEqual(1);
       expect(queued.map((job) => job.quoteId)).toContain(other.id);
+    });
+
+    describe('emailed to the client (F14 email)', () => {
+      let contact: { id: string; name: string; email: string | null };
+      const body = (kind: 'quote' | 'reminder' = 'quote') => ({
+        kind,
+        contactIds: [contact.id],
+        ccMe: true,
+        subject: 'عرض السعر',
+        message: 'مرحبًا،\n\nتجدون العرض في المرفق.',
+      });
+      const email = (id: string, cookie = cast.am.cookie, input: object = body()) =>
+        client.post(`/api/quotes/${id}/email`, cookie, input);
+
+      beforeAll(async () => {
+        contact = await cast.createContact(clientId);
+      });
+
+      it('requires a session, quotes.manage and the client in scope', async () => {
+        expect((await email(quote.id, '')).status).toBe(401);
+        expect((await email(quote.id, finance.cookie)).status).toBe(403);
+        expect((await email(quote.id, cast.otherAm.cookie)).status).toBe(404);
+        expect((await client.get(`/api/quotes/${quote.id}/emails`, '')).status).toBe(401);
+        const hidden = await client.get(`/api/quotes/${quote.id}/emails`, cast.otherAm.cookie);
+        expect(hidden.status).toBe(404);
+      });
+
+      it('queues the sent version with its PDF, copying the account manager once (rules 17, 20, 22)', async () => {
+        const response = await email(quote.id);
+        expect(response.status).toBe(202);
+        const summary = emailSummarySchema.parse(await response.json());
+        expect(summary).toMatchObject({
+          kind: 'client_quote',
+          status: 'queued',
+          subject: 'عرض السعر',
+          sender: { id: cast.am.id },
+        });
+        expect(summary.to).toEqual([
+          { name: contact.name, email: contact.email, contactId: contact.id },
+        ]);
+        // The sender is the account manager: copied once although both copies were asked for.
+        expect(summary.cc.map((address) => address.userId)).toEqual([cast.am.id]);
+        const [row] = await db.select().from(emailMessages).where(eq(emailMessages.id, summary.id));
+        expect(row).toMatchObject({
+          audience: 'client',
+          clientId,
+          recordType: 'quote',
+          recordId: quote.id,
+          replyTo: cast.am.email,
+          message: 'مرحبًا،\n\nتجدون العرض في المرفق.',
+        });
+        expect(row?.attachments).toEqual([
+          expect.objectContaining({ fileName: `${quote.displayNumber}.pdf` }),
+        ]);
+        expect(row?.data).toMatchObject({
+          client: expect.any(String),
+          signature: { name: cast.am.name, email: cast.am.email },
+          quote: { number: quote.displayNumber },
+        });
+        const [audit] = await db
+          .select()
+          .from(auditEntries)
+          .where(
+            and(eq(auditEntries.entityId, quote.id), eq(auditEntries.action, 'quote.emailed')),
+          );
+        expect(audit?.after).toMatchObject({
+          email: { emailId: summary.id, kind: 'client_quote' },
+        });
+        const history = await client.get(`/api/quotes/${quote.id}/emails`, finance.cookie);
+        expect(history.status).toBe(200);
+        expect(emailHistorySchema.parse(await history.json()).items.map((item) => item.id)).toEqual(
+          [summary.id],
+        );
+      });
+
+      it('sends the reminder only while the quote is valid (rule 18)', async () => {
+        const response = await email(quote.id, cast.am.cookie, body('reminder'));
+        expect(response.status).toBe(202);
+        expect(emailSummarySchema.parse(await response.json()).kind).toBe('client_quote_reminder');
+        const [row] = await db.select().from(quotes).where(eq(quotes.id, quote.id));
+        await db.update(quotes).set({ validUntil: '2020-01-01' }).where(eq(quotes.id, quote.id));
+        try {
+          await expectError(
+            await email(quote.id, cast.am.cookie, body('reminder')),
+            409,
+            'QUOTE_EXPIRED',
+          );
+        } finally {
+          await db
+            .update(quotes)
+            .set({ validUntil: row?.validUntil ?? null })
+            .where(eq(quotes.id, quote.id));
+        }
+      });
+
+      it('refuses a quote that is not sent, or whose PDF is not ready (rule 18)', async () => {
+        await expectError(await email((await createQuote()).id), 409, 'QUOTE_NOT_SENT');
+        await expectError(await email((await send(await createQuote())).id), 409, 'PDF_NOT_READY');
+      });
+
+      it('refuses contacts without an email or of another client (rule 17)', async () => {
+        const silent = await cast.createContact(clientId, { email: null });
+        const elsewhere = await cast.createContact((await cast.createClient()).id);
+        for (const id of [silent.id, elsewhere.id]) {
+          await expectError(
+            await email(quote.id, cast.am.cookie, { ...body(), contactIds: [id] }),
+            409,
+            'INVALID_RECIPIENT',
+          );
+        }
+      });
     });
   });
 
