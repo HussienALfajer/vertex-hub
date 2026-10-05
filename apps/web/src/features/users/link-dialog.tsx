@@ -11,7 +11,7 @@ import {
   FieldLabel,
   Input,
 } from '@vertex-hub/ui';
-import { CheckIcon, ClockIcon, CopyIcon, LinkIcon } from 'lucide-react';
+import { CheckIcon, ClockIcon, CopyIcon, LinkIcon, MailCheckIcon } from 'lucide-react';
 import { type ReactNode, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useCopy } from '../../lib/clipboard';
@@ -20,16 +20,18 @@ import { formatDateTime } from '../../lib/format';
 interface LinkDialogProps {
   link: UserLink | null;
   name: string;
+  /** The address the link was emailed to (F14 email rule 13). */
+  email: string | null;
   onClose: () => void;
   /** Buttons after "Copy", e.g. "Open profile". */
   actions?: ReactNode;
 }
 
 /**
- * Shows a one-time activation or reset link. It is shown only here, once: the user manager copies
- * it and sends it by hand until email exists (F01, Q5).
+ * Shows a one-time activation or reset link. It is emailed to the user and shown here once, so the
+ * user manager can also copy it (F01, F14 email screen 7).
  */
-export function LinkDialog({ link, name, onClose, actions }: LinkDialogProps) {
+export function LinkDialog({ link, name, email, onClose, actions }: LinkDialogProps) {
   const { t } = useTranslation();
   const { copy, copied } = useCopy();
   const copyButton = useRef<HTMLButtonElement>(null);
@@ -49,6 +51,14 @@ export function LinkDialog({ link, name, onClose, actions }: LinkDialogProps) {
               </DialogTitle>
               <DialogDescription>{t('users.link.body', { name })}</DialogDescription>
             </DialogHeader>
+            {email && (
+              <p className="flex items-center gap-2 text-sm font-medium">
+                <MailCheckIcon className="size-4 shrink-0 text-muted-foreground" />
+                <span>
+                  {t('users.link.sentTo')} <bdi dir="ltr">{email}</bdi>
+                </span>
+              </p>
+            )}
             <Field>
               <FieldLabel>{t('users.link.label')}</FieldLabel>
               <div className="flex gap-2">

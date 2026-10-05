@@ -29,6 +29,7 @@ import { isMissing, LoadError } from '../../components/load-error';
 import { can, useMe } from '../../lib/auth';
 import { errorMessage } from '../../lib/errors';
 import { formatCalendarDate, formatDateTime, formatNumber } from '../../lib/format';
+import { EmailHistory } from '../email/email-history';
 import { LeadBadge } from '../leads/lead-badges';
 import { AcceptDialog } from './accept-dialog';
 import {
@@ -41,6 +42,7 @@ import {
 } from './quote-badges';
 import { QuoteBuilder } from './quote-builder';
 import { ExtendDialog, RejectDialog } from './quote-dialogs';
+import { QuoteEmailActions } from './quote-email';
 import { SentPdf } from './quote-pdf';
 import { quoteQuery, useCreateVersion } from './quotes.queries';
 
@@ -151,6 +153,7 @@ function SentQuote({ quote }: { quote: QuoteDetail }) {
     <>
       <div className="flex flex-wrap items-center gap-2">
         <SentPdf quote={quote} />
+        <QuoteEmailActions quote={quote} />
         {permissions.canAccept && (
           <Button onClick={() => setOpen('accept')}>
             <ThumbsUpIcon />
@@ -220,6 +223,7 @@ function SentQuote({ quote }: { quote: QuoteDetail }) {
           <Facts quote={quote} />
           {quote.response && <Response quote={quote} />}
           <Versions quote={quote} />
+          {quote.client && <EmailHistory target={{ type: 'quote', id: quote.id }} />}
         </aside>
       </div>
 

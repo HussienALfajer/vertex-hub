@@ -8,7 +8,7 @@ import {
   AlertDialogTitle,
   Button,
 } from '@vertex-hub/ui';
-import { useState } from 'react';
+import { type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { errorMessage } from '../lib/errors';
 import { FormAlert } from './form-alert';
@@ -25,6 +25,8 @@ interface ConfirmDialogProps {
   onConfirm: () => Promise<void>;
   /** Says more about a failure than its code's message (the records it names); else undefined. */
   describeFailure?: (error: unknown) => string | undefined;
+  /** Options of the action, under the body. */
+  children?: ReactNode;
 }
 
 /** Asks before an action that changes a record, and shows why it failed. */
@@ -38,6 +40,7 @@ export function ConfirmDialog({
   pending,
   onConfirm,
   describeFailure,
+  children,
 }: ConfirmDialogProps) {
   const { t } = useTranslation();
   const [failure, setFailure] = useState<string | null>(null);
@@ -56,6 +59,7 @@ export function ConfirmDialog({
           <AlertDialogTitle>{title}</AlertDialogTitle>
           <AlertDialogDescription>{body}</AlertDialogDescription>
         </AlertDialogHeader>
+        {children}
         {failure && <FormAlert>{failure}</FormAlert>}
         <AlertDialogFooter>
           <AlertDialogClose render={<Button variant="outline" />}>

@@ -19,13 +19,15 @@ import {
   Skeleton,
   toast,
 } from '@vertex-hub/ui';
-import { ArrowRightIcon, BanIcon, BellRingIcon, RefreshCwIcon } from 'lucide-react';
-import { type ReactNode, useState } from 'react';
+import { ArrowRightIcon, BanIcon, BellRingIcon, MailIcon, RefreshCwIcon } from 'lucide-react';
+import { type ReactNode, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '../../components/confirm-dialog';
 import { isMissing, LoadError } from '../../components/load-error';
+import { errorMessage } from '../../lib/errors';
 import { formatDateTime, formatNumber } from '../../lib/format';
 import { PostFacts } from '../content/post-parts';
+import { EmailHistory } from '../email/email-history';
 import { FileThumbnail, VersionBadge } from '../files/file-parts';
 import {
   IssuedLink,
@@ -36,9 +38,11 @@ import {
 } from './approval-parts';
 import {
   approvalRequestQuery,
+  useEmailApprovalReminder,
   useReissueApprovalRequest,
   useRevokeApprovalRequest,
 } from './approvals.queries';
+import { EmailedNote, EmailOption } from './request-dialog';
 
 /**
  * An approval request (spec F09, screen 3): who was asked, the state of the link, and what the
@@ -161,6 +165,8 @@ function RequestView({ request }: { request: ApprovalRequestDetail }) {
           />
         ))}
       </ol>
+
+      <EmailHistory target={{ type: 'approval_request', id: request.id }} />
     </>
   );
 }
@@ -182,16 +188,29 @@ function RequestActions({ request }: { request: ApprovalRequestDetail }) {
   const { t } = useTranslation();
   const reissue = useReissueApprovalRequest(request.id);
   const revoke = useRevokeApprovalRequest(request.id);
+  const remindByEmail = useEmailApprovalReminder(request.id);
+  const emailOptionId = useId();
   const [confirming, setConfirming] = useState<'reissue' | 'revoke' | null>(null);
   const [issued, setIssued] = useState<IssuedApprovalRequest | null>(null);
+  const [emailing, setEmailing] = useState(true);
   const { canReissue, canRevoke } = request.permissions;
+  // Rule 24: after the 48-hour notice; F14 email rule 19 adds the email beside WhatsApp.
   const reminds =
     canReissue &&
     request.state === 'open' &&
     request.counts.pending > 0 &&
-    request.remindedAt !== null &&
-    request.contactPhone !== null;
+    request.remindedAt !== null;
   if (!canReissue && !canRevoke) return null;
+
+  async function emailReminder() {
+    try {
+      await remindByEmail.mutateAsync(undefined);
+      toast.add({ title: t('email.send.queued'), type: 'success' });
+    } catch (error) {
+      toast.add({ title: errorMessage(t, error), type: 'error' });
+    }
+  }
+
   return (
     <div className="flex shrink-0 flex-wrap items-center gap-2">
       {reminds && request.contactPhone && (
@@ -200,6 +219,12 @@ function RequestActions({ request }: { request: ApprovalRequestDetail }) {
           text={t('approvals.requestPage.reminderMessage', { name: request.contact.name })}
           label={t('approvals.requestPage.remind')}
         />
+      )}
+      {reminds && request.contactEmail && (
+        <Button variant="outline" disabled={remindByEmail.isPending} onClick={emailReminder}>
+          <MailIcon />
+          {t('approvals.requestPage.remindByEmail')}
+        </Button>
       )}
       {canReissue && (
         <Button variant="outline" onClick={() => setConfirming('reissue')}>
@@ -222,8 +247,19 @@ function RequestActions({ request }: { request: ApprovalRequestDetail }) {
         })}
         action={t('approvals.requestPage.reissue')}
         pending={reissue.isPending}
-        onConfirm={async () => setIssued(await reissue.mutateAsync(undefined))}
-      />
+        onConfirm={async () =>
+          setIssued(await reissue.mutateAsync({ email: !!request.contactEmail && emailing }))
+        }
+      >
+        {request.contactEmail && (
+          <EmailOption
+            id={emailOptionId}
+            email={request.contactEmail}
+            checked={emailing}
+            onCheckedChange={setEmailing}
+          />
+        )}
+      </ConfirmDialog>
       <ConfirmDialog
         open={confirming === 'revoke'}
         onClose={() => setConfirming(null)}
@@ -250,6 +286,7 @@ function RequestActions({ request }: { request: ApprovalRequestDetail }) {
                   })}
                 </DialogDescription>
               </DialogHeader>
+              <EmailedNote email={issued.email} />
               <IssuedLink
                 link={issued.link}
                 contactName={issued.contact.name}

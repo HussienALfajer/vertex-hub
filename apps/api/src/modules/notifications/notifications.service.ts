@@ -123,8 +123,9 @@ export class NotificationsService {
         category: NOTIFICATION_CATALOG[type].category,
         mutable: NOTIFICATION_CATALOG[type].mutable,
         muted: muted.has(type),
-        // F14 email rule 2: a type muted in the app creates nothing to email.
-        email: !muted.has(type) && emailed.has(type),
+        // F14 email rule 2: the saved choice, kept while the type is muted in the app (which
+        // creates nothing to email), so saving the switches never drops it.
+        email: emailed.has(type),
         emailLocked: muted.has(type),
       })),
       digestEnabled: row?.digestEnabled ?? true,

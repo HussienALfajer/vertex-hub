@@ -413,7 +413,7 @@ function ProfileActions({ user, onEdit }: { user: UserResponse; onEdit: () => vo
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <LinkDialog link={link} name={user.name} onClose={() => setLink(null)} />
+      <LinkDialog link={link} name={user.name} email={user.email} onClose={() => setLink(null)} />
       <ArchiveDialog
         user={user}
         open={confirming === 'archive'}

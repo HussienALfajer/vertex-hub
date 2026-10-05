@@ -3,9 +3,11 @@ import type {
   CreateApprovalRequest,
   PublicApproveAll,
   PublicResponse,
+  ReissueApprovalRequest,
 } from '@vertex-hub/contracts';
 import { api, call } from '../../lib/api/client';
 import type { paths } from '../../lib/api/schema.gen';
+import { emailKeys } from '../email/email.queries';
 
 /** The list endpoint's query string as the API reads it. */
 export type ApprovalRequestFilters = NonNullable<
@@ -65,7 +67,7 @@ export const clientApprovalsQuery = (clientId: string, page: number) =>
 /**
  * A change to an approval request, refreshing also on failure (a request closed meanwhile shows
  * its current state): approvals, and tasks and posts, which show their pending link and whether
- * they are ready to send.
+ * they are ready to send, and the emails of the request (F14 email rule 19).
  */
 function useApprovalsMutation<Input, Output>(mutationFn: (input: Input) => Promise<Output>) {
   const queryClient = useQueryClient();
@@ -73,7 +75,7 @@ function useApprovalsMutation<Input, Output>(mutationFn: (input: Input) => Promi
     mutationFn,
     onSettled: () =>
       Promise.all(
-        [approvalsKeys.all, ['tasks'], ['content']].map((queryKey) =>
+        [approvalsKeys.all, ['tasks'], ['content'], emailKeys.all].map((queryKey) =>
           queryClient.invalidateQueries({ queryKey }),
         ),
       ),
@@ -88,10 +90,16 @@ export const useCreateApprovalRequest = () =>
     call(api.POST('/api/approvals/requests', { body: input })),
   );
 
-/** A new link for the same request; the old one stops working (rule 11). */
+/** A new link for the same request, emailed when asked; the old one stops working (rule 11). */
 export const useReissueApprovalRequest = (id: string) =>
+  useApprovalsMutation((body: ReissueApprovalRequest) =>
+    call(api.POST('/api/approvals/requests/{id}/reissue', { ...path(id), body })),
+  );
+
+/** F14 email rule 19: the reminder by email, without the link. */
+export const useEmailApprovalReminder = (id: string) =>
   useApprovalsMutation(() =>
-    call(api.POST('/api/approvals/requests/{id}/reissue', { ...path(id), body: { email: false } })),
+    call(api.POST('/api/approvals/requests/{id}/email-reminder', path(id))),
   );
 
 export const useRevokeApprovalRequest = (id: string) =>

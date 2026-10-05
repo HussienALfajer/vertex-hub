@@ -556,7 +556,7 @@ export const notificationSettingsSchema = z
         category: notificationCategorySchema,
         mutable: z.boolean(),
         muted: z.boolean(),
-        /** F14 email rule 2: emailed to the user; false while `emailLocked`. */
+        /** F14 email rule 2: the user's choice; nothing is emailed while `emailLocked`. */
         email: z.boolean(),
         /** Muted in the app, so nothing is created to email. */
         emailLocked: z.boolean(),

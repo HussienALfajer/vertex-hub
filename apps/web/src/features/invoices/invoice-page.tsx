@@ -31,6 +31,7 @@ import { useTranslation } from 'react-i18next';
 import { isMissing, LoadError } from '../../components/load-error';
 import { can, useMe } from '../../lib/auth';
 import { formatCalendarDate, formatDateTime, formatNumber } from '../../lib/format';
+import { EmailHistory } from '../email/email-history';
 import { Money } from '../quotes/quote-badges';
 import {
   DaysOverdueBadge,
@@ -45,6 +46,7 @@ import {
   VoidPaymentDialog,
 } from './invoice-dialogs';
 import { InvoiceEditor } from './invoice-editor';
+import { InvoiceEmailActions, ReceiptEmailButton } from './invoice-email';
 import { IssuedPdf, ReceiptPdf } from './invoice-pdf';
 import { invoiceQuery, invoiceSettingsQuery } from './invoices.queries';
 import { LineService, ServicesDialog } from './line-services';
@@ -192,6 +194,7 @@ function IssuedInvoice({
       )}
       <div className="flex flex-wrap items-center gap-2">
         <IssuedPdf invoice={invoice} />
+        <InvoiceEmailActions invoice={invoice} />
         {permissions.canRecordPayment && (
           <Button onClick={() => setOpen('payment')}>
             <BanknoteIcon />
@@ -240,8 +243,9 @@ function IssuedInvoice({
             </Card>
           )}
         </div>
-        <aside>
+        <aside className="flex flex-col gap-6">
           <Facts invoice={invoice} showUsd={manages} />
+          <EmailHistory target={{ type: 'invoice', id: invoice.id }} />
         </aside>
       </div>
 
@@ -406,6 +410,7 @@ function PaymentsCard({
                 <TableCell>
                   <span className="flex flex-wrap items-center gap-1">
                     <ReceiptPdf invoice={invoice} payment={payment} />
+                    <ReceiptEmailButton invoice={invoice} payment={payment} />
                     {payment.proof ? (
                       <Link
                         to="/clients/$clientId"

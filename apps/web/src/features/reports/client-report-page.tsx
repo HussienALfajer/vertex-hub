@@ -36,6 +36,7 @@ import {
   FileTextIcon,
   HourglassIcon,
   LoaderCircleIcon,
+  MailIcon,
 } from 'lucide-react';
 import { type FormEvent, type ReactNode, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -46,6 +47,8 @@ import { formatCalendarDate, formatDateTime, formatMonth, formatNumber } from '.
 import { monthParam } from '../../lib/search-params';
 import { CostPerResult, PlatformName } from '../campaigns/campaign-badges';
 import { PostPlatforms } from '../content/post-parts';
+import { EmailHistory } from '../email/email-history';
+import { SendEmailDialog } from '../email/send-email-dialog';
 import { ProjectStatusBadge } from '../projects/project-badges';
 import { Money } from '../quotes/quote-badges';
 import { DeliveryRate, lineName } from '../retainers/retainer-badges';
@@ -120,6 +123,7 @@ export function ClientReportPage({
                 key={`${month}-${report.data.summary?.updatedAt ?? ''}`}
                 clientId={clientId}
                 month={month}
+                clientName={report.data.client.name}
               />
               <ExportButton href={reportExportUrls.clientReport(clientId, month)} />
             </div>
@@ -223,6 +227,7 @@ function ReportBody({ report, clientId }: { report: ClientMonthlyReport; clientI
           <NextMonthSection report={report} />
         </>
       )}
+      <EmailHistory target={{ type: 'report', clientId, month: report.month }} />
     </>
   );
 }
@@ -710,11 +715,20 @@ function NextMonthSection({ report }: { report: ClientMonthlyReport }) {
  * Rule 20: the PDF is rendered on request; once asked for, the page looks for it until it is
  * ready, then offers the download (valid for 24 hours). As F13 statements.
  */
-function ClientReportPdf({ clientId, month }: { clientId: string; month: string }) {
+function ClientReportPdf({
+  clientId,
+  month,
+  clientName,
+}: {
+  clientId: string;
+  month: string;
+  clientName: string;
+}) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const render = useRenderClientReport(clientId);
   const [asked, setAsked] = useState(false);
+  const [emailing, setEmailing] = useState(false);
   const ready = useQuery({ ...clientReportPdfReadyQuery(clientId, month), enabled: asked });
 
   async function ask() {
@@ -730,12 +744,26 @@ function ClientReportPdf({ clientId, month }: { clientId: string; month: string 
 
   if (asked && ready.isSuccess) {
     return (
-      <Button
-        render={<a href={clientReportPdfUrl(clientId, month)} target="_blank" rel="noopener" />}
-      >
-        <DownloadIcon />
-        {t('reports.client.downloadPdf')}
-      </Button>
+      <>
+        <Button
+          render={<a href={clientReportPdfUrl(clientId, month)} target="_blank" rel="noopener" />}
+        >
+          <DownloadIcon />
+          {t('reports.client.downloadPdf')}
+        </Button>
+        <Button variant="outline" onClick={() => setEmailing(true)}>
+          <MailIcon />
+          {t('email.send.action')}
+        </Button>
+        <SendEmailDialog
+          open={emailing}
+          onClose={() => setEmailing(false)}
+          clientId={clientId}
+          target={{ type: 'report', clientId, month }}
+          draft={{ kind: 'client_report', data: { month } }}
+          attachment={{ fileName: `${clientName} - Report ${month}.pdf`, ready: true }}
+        />
+      </>
     );
   }
   const gaveUp = asked && ready.isError;

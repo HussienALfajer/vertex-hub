@@ -27,6 +27,7 @@ import { LoadError } from '../../components/load-error';
 import { can, useMe } from '../../lib/auth';
 import { errorMessage } from '../../lib/errors';
 import { useUpdateClient } from '../clients/clients.queries';
+import { EmailHistory } from '../email/email-history';
 import { Money } from '../quotes/quote-badges';
 import { FormDialog } from '../quotes/quote-dialogs';
 import { clientBillingQuery, invoicesKeys } from './invoices.queries';
@@ -104,6 +105,7 @@ export function ClientInvoicesTab({ client }: { client: ClientDetailResponse }) 
             clientId={client.id}
             currencies={billing.data.byCurrency.map((row) => row.currency)}
           />
+          <EmailHistory target={{ type: 'statement', clientId: client.id }} />
         </>
       )}
       {canCreate && (
