@@ -53,6 +53,7 @@ Run from the repository root (Node 24, pnpm via Corepack). Turborepo builds depe
 | Apply migrations to the dev database | `pnpm db:migrate` |
 | Build | `pnpm build` |
 | Refresh the web app's OpenAPI document and client types after an API change (CI checks both; needs `pnpm build`) | `pnpm --filter @vertex-hub/api openapi:export` then `pnpm --filter @vertex-hub/web api:generate` |
+| Seed the dev database with a sample agency for manual testing (20 users on `@vertexhub.test`, clients, leads, quotes, projects, retainers, tasks, content, calendar, campaigns, invoices; safe to rerun; development only; needs `pnpm build`) | `pnpm --filter @vertex-hub/api db:seed` |
 | Create a user (prints a generated password once; needs `pnpm build`) | `pnpm --filter @vertex-hub/api user:create --email <email> --name <name> --department <code> [--role <role>]` |
 | Run the daily notifications job once, as if on a date (development only; needs `pnpm build`) | `pnpm --filter @vertex-hub/api notifications:run-daily [--date YYYY-MM-DD]` |
 | Run the daily invoices job once (overdue, A10), as if on a date (development only; needs `pnpm build`) | `pnpm --filter @vertex-hub/api invoices:run-daily [--date YYYY-MM-DD]` |

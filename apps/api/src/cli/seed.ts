@@ -1,7 +1,8 @@
 /**
  * Fills the development database with a realistic agency for manual testing: a team in every
  * department, the catalog, leads, quotes, clients, projects, retainers, tasks, content, campaigns,
- * the calendar, invoices and payments. Development only; refuses to run twice.
+ * the calendar, invoices and payments. Development only. A second run reuses the seeded users and
+ * skips the business data when its first client exists.
  *
  *   pnpm --filter @vertex-hub/api db:seed
  *
@@ -172,13 +173,18 @@ async function seedData(http: Http, people: Record<string, string>) {
   const log = (line: string) => process.stdout.write(`  ${line}\n`);
 
   // Department managers (F01).
-  const departments = await http.get<{ id: string; code: DepartmentCode }[]>('/departments');
+  const departments = await http.get<{ items: { id: string; code: DepartmentCode }[] }>(
+    '/departments',
+  );
   for (const person of TEAM.filter((p) => p.manager)) {
-    const department = departments.find((d) => d.code === person.department);
+    const department = departments.items.find((d) => d.code === person.department);
     if (department)
       await http.patch(`/departments/${department.id}`, { managerId: people[person.key] });
   }
   log('department managers');
+
+  // The SYP rate that expenses, invoices and payments fall back on (F13 rule 10).
+  await http.patch('/invoice-settings', { sypPerUsd: '13000' });
 
   // Catalog (F04).
   const service = (body: Body) => http.post('/catalog/services', body);
@@ -357,6 +363,7 @@ async function seedData(http: Http, people: Record<string, string>) {
       occurredAt: new Date().toISOString(),
       channel: 'call',
       summary: 'مكالمة أولى، طلب عرض سعر مبدئي.',
+      nextFollowUpOn: day(1 + (index % 3)),
     });
     if (spec.stage === 'contacted' || spec.stage === 'meeting') {
       await http.post(`/leads/${lead.id}/stage`, { stage: 'contacted', nextFollowUpOn: day(2) });
@@ -622,7 +629,7 @@ async function seedData(http: Http, people: Record<string, string>) {
     assigneeId: people.designer1,
     clientId: cafe.id,
     needsClientApproval: false,
-    dueDate: day(-1),
+    dueDate: today,
   });
   await toReview(delivered.id);
   await passReview(delivered.id, 'approved');
@@ -632,7 +639,9 @@ async function seedData(http: Http, people: Record<string, string>) {
     department: 'marketing',
     assigneeId: people.marketer,
     clientId: cafe.id,
-    dueDate: day(-2),
+    // Past dates are refused; due at the start of today, it shows as overdue.
+    dueDate: today,
+    dueTime: '00:30',
   });
   await move(overdue.id, 'in_progress');
   await t({
@@ -758,19 +767,22 @@ async function seedData(http: Http, people: Record<string, string>) {
     currency: 'USD',
     method: 'bank_transfer',
   });
+  // A results period stays within one month: from the 1st of yesterday's month to yesterday.
+  const periodEnd = day(-1);
+  const periodStart = `${periodEnd.slice(0, 8)}01` as CalendarDate;
   const campaign = await http.post('/campaigns', {
     clientId: cafe.id,
     name: 'حملة رسائل الافتتاح',
     platform: 'meta',
     objective: 'messages',
     budgetMinor: 30_000,
-    startsOn: day(-6),
+    startsOn: periodStart,
     ownerId: people.marketer,
   });
   await http.post(`/campaigns/${campaign.id}/status`, { to: 'active' });
   await http.post(`/campaigns/${campaign.id}/updates`, {
-    periodStart: day(-6),
-    periodEnd: day(-1),
+    periodStart,
+    periodEnd,
     spendMinor: 12_000,
     reach: 18_500,
     clicks: 1_200,
@@ -847,50 +859,64 @@ async function seedData(http: Http, people: Record<string, string>) {
 
 // Run
 
+// The seed prints its own progress; request logs would bury it.
+process.env.LOG_LEVEL = 'error';
+const MARKER_CLIENT = 'مطعم الياسمين';
+
 const { db, close } = createDatabase(databaseUrl);
 try {
-  if (await userIdByEmail(db, ADMIN_EMAIL)) {
-    console.error(`Already seeded (${ADMIN_EMAIL} exists). Reset the dev database to seed again.`);
-    process.exitCode = 1;
-  } else {
-    process.stdout.write('Seeding the development database…\n');
-    const people: Record<string, string> = {};
-    for (const person of TEAM) {
-      const { id } = await createUser(
-        db,
-        {
-          email: `${person.key.toLowerCase()}@${EMAIL_DOMAIN}`,
-          name: person.name,
-          department: person.department,
-          roles: person.roles ?? [],
-          password: SEED_PASSWORD,
-        },
-        null,
-      );
-      people[person.key] = id;
-    }
-    process.stdout.write(`  users: ${TEAM.length}\n`);
+  process.stdout.write('Seeding the development database…\n');
+  // Users already seeded by an earlier run are reused, so an interrupted run can be resumed.
+  const people: Record<string, string> = {};
+  for (const person of TEAM) {
+    const email = `${person.key.toLowerCase()}@${EMAIL_DOMAIN}`;
+    people[person.key] =
+      (await userIdByEmail(db, email)) ??
+      (
+        await createUser(
+          db,
+          {
+            email,
+            name: person.name,
+            department: person.department,
+            roles: person.roles ?? [],
+            password: SEED_PASSWORD,
+          },
+          null,
+        )
+      ).id;
+  }
+  const adminId = people.admin as string;
+  // Sign-in below turns two-factor on with a secret of its own.
+  await db.transaction((tx) => resetTwoFactor(tx, adminId, null));
+  process.stdout.write(`  users: ${TEAM.length}\n`);
 
-    const app = await NestFactory.create(AppModule, { logger: ['error'], bodyParser: false });
-    configureApp(app);
-    await app.listen(0, '127.0.0.1');
-    try {
-      const http = httpClient((await app.getUrl()).replace('[::1]', '127.0.0.1'));
-      await http.signInWithTwoFactor(ADMIN_EMAIL);
+  const app = await NestFactory.create(AppModule, { bufferLogs: true, bodyParser: false });
+  configureApp(app);
+  await app.listen(0, '127.0.0.1');
+  try {
+    const http = httpClient((await app.getUrl()).replace('[::1]', '127.0.0.1'));
+    await http.signInWithTwoFactor(ADMIN_EMAIL);
+    const existing = await http.get<{ items: unknown[] }>(
+      `/clients?search=${encodeURIComponent(MARKER_CLIENT)}&status=active&status=paused&status=ended`,
+    );
+    if (existing.items.length > 0) {
+      process.stdout.write('  business data already seeded: skipped\n');
+    } else {
       await seedData(http, people);
-    } finally {
-      (app.getHttpServer() as Server).closeAllConnections();
-      await app.close();
     }
+  } finally {
+    (app.getHttpServer() as Server).closeAllConnections();
+    await app.close();
     // The owner sets up their own authenticator on first sign-in.
-    await db.transaction((tx) => resetTwoFactor(tx, people.admin as string, null));
+    await db.transaction((tx) => resetTwoFactor(tx, adminId, null));
+  }
 
-    process.stdout.write(`
+  process.stdout.write(`
 Done. Every seeded user signs in with the password: ${SEED_PASSWORD}
   General Manager: ${ADMIN_EMAIL}
-  Others: <key>@${EMAIL_DOMAIN} — ${TEAM.map((p) => p.key.toLowerCase()).join(', ')}
+  Others: <key>@${EMAIL_DOMAIN}, keys: ${TEAM.map((p) => p.key.toLowerCase()).join(', ')}
 `);
-  }
 } finally {
   await close();
 }
