@@ -293,6 +293,9 @@ importers:
       '@vertex-hub/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@vertex-hub/messages':
+        specifier: workspace:*
+        version: link:../../packages/messages
       '@vertex-hub/ui':
         specifier: workspace:*
         version: link:../../packages/ui

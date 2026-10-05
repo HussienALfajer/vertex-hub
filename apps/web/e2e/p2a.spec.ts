@@ -1,3 +1,4 @@
+import { NOTIFICATION_TEXT } from '@vertex-hub/messages';
 import ar from '../src/i18n/locales/ar.json' with { type: 'json' };
 import { mockApi, seedIds } from './fixtures';
 import { expect, test } from './test';
@@ -7,7 +8,7 @@ import { expect, test } from './test';
 const fill = (text: string, values: Record<string, string>) =>
   Object.entries(values).reduce((out, [key, value]) => out.replace(`{{${key}}}`, value), text);
 
-const behindText = fill(ar.notifications.text.retainer_behind_few, {
+const behindText = fill(NOTIFICATION_TEXT.retainer_behind.few, {
   retainer: 'إدارة السوشيال ميديا',
   n: '7',
 });
@@ -22,11 +23,11 @@ test('a retainer behind alert lists its short lines and opens the retainer on Th
   // Up to three lines, with the ready work, then how many more.
   await expect(alert).toContainText(`${ar.retainers.kinds.design} 9/12`);
   await expect(alert).toContainText(
-    fill(ar.notifications.behindLineReady, { line: '', ready: '2' }),
+    fill(NOTIFICATION_TEXT.behindLineReady, { line: '', ready: '2' }),
   );
   await expect(alert).toContainText(`${ar.retainers.kinds.story} 5/8`);
   await expect(alert).not.toContainText(ar.retainers.kinds.monthly_report);
-  await expect(alert).toContainText(fill(ar.notifications.behindMore, { n: '1' }));
+  await expect(alert).toContainText(fill(NOTIFICATION_TEXT.behindMore, { n: '1' }));
 
   await alert.getByRole('link', { name: behindText }).click();
   await expect(page).toHaveURL(new RegExp(`/retainers/${seedIds.socialRetainer}$`));

@@ -25,13 +25,36 @@ export const EMAIL_LAYOUT_TEXT: Record<EmailAudience, EmailLayoutText> = {
   },
 };
 
+export interface EmailLink {
+  label: string;
+  url: string;
+}
+
+/** One line of a list: its text, a quieter detail line, and a link. */
+export interface EmailListItem {
+  text: string;
+  detail: string | null;
+  link: EmailLink | null;
+}
+
+/** A titled list, cut short with a link to the rest. */
+export interface EmailSection {
+  title: string;
+  items: EmailListItem[];
+  more: EmailLink | null;
+}
+
 /** The content of one email, laid out by the worker's template. */
 export interface EmailContent {
   subject: string;
   heading: string;
   paragraphs: string[];
-  /** A button under the paragraphs. */
-  action?: { label: string; url: string };
+  /** Lists under the paragraphs (notifications, tasks). */
+  sections?: EmailSection[];
+  /** A button under the paragraphs and lists. */
+  action?: EmailLink;
+  /** A last quiet line above the footer, with its link (the notification settings). */
+  footnote?: { text: string; link: EmailLink };
 }
 
 /** Rule 26: the email an administrator sends themselves to check the configuration. */

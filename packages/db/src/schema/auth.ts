@@ -157,3 +157,23 @@ export const departmentMembers = pgTable(
       .where(sql`${table.isPrimary}`),
   ],
 );
+
+/**
+ * The browsers and systems each user signed in from (F14 email rule 15): a session from a device
+ * not listed sends a new-device email. Owned by `auth`.
+ */
+export const userDevices = pgTable(
+  'user_devices',
+  {
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    /** SHA-256 of the browser family and the system family. */
+    deviceKey: text('device_key').notNull(),
+    /** E.g. "Chrome · Windows". */
+    label: text('label').notNull(),
+    firstSeenAt: timestamp('first_seen_at', { withTimezone: true }).notNull().defaultNow(),
+    lastSeenAt: timestamp('last_seen_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.userId, table.deviceKey] })],
+);

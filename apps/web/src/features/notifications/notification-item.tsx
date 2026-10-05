@@ -27,7 +27,7 @@ export function NotificationItem({
   const { t } = useTranslation();
   const departmentName = useDepartmentNames();
   const markRead = useMarkRead();
-  const { text, context } = notificationText(t, notification, departmentName);
+  const { text, context } = notificationText(notification, departmentName);
 
   function open() {
     if (!notification.read) markRead.mutate(notification.id);

@@ -30,6 +30,18 @@ export const envSchema = z
       .transform((value) => (value === undefined ? undefined : value === 'true')),
     /** Signs session cookies. Required in production; derived locally when unset. */
     BETTER_AUTH_SECRET: z.string().min(32).optional(),
+    /**
+     * F14 email (ADR 0028): 32 bytes, base64, shared with the worker; encrypts token links in
+     * `email.send` jobs. Required in production; derived locally when unset.
+     */
+    EMAIL_SECRET_KEY: z
+      .string()
+      .refine((value) => Buffer.from(value, 'base64').length === 32, 'Expected 32 bytes, base64')
+      .optional(),
+  })
+  .refine((env) => env.NODE_ENV !== 'production' || env.EMAIL_SECRET_KEY, {
+    message: 'EMAIL_SECRET_KEY is required in production',
+    path: ['EMAIL_SECRET_KEY'],
   })
   .refine((env) => env.NODE_ENV !== 'production' || env.BETTER_AUTH_SECRET, {
     message: 'BETTER_AUTH_SECRET is required in production',
@@ -46,7 +58,7 @@ export const envSchema = z
     message: 'APP_URL must be an https origin in production',
     path: ['APP_URL'],
   })
-  .transform(({ BETTER_AUTH_SECRET, FILES_X_ACCEL, ...env }) => ({
+  .transform(({ BETTER_AUTH_SECRET, EMAIL_SECRET_KEY, FILES_X_ACCEL, ...env }) => ({
     ...env,
     FILES_X_ACCEL: FILES_X_ACCEL ?? env.NODE_ENV === 'production',
     // Outside production, fall back to a stable per-machine value: DATABASE_URL carries the random
@@ -54,6 +66,10 @@ export const envSchema = z
     BETTER_AUTH_SECRET:
       BETTER_AUTH_SECRET ??
       createHash('sha256').update(`vertex-hub-dev-auth:${env.DATABASE_URL}`).digest('hex'),
+    // The worker derives the same key from the same DATABASE_URL.
+    EMAIL_SECRET_KEY: EMAIL_SECRET_KEY
+      ? Buffer.from(EMAIL_SECRET_KEY, 'base64')
+      : createHash('sha256').update(`vertex-hub-dev-email:${env.DATABASE_URL}`).digest(),
   }));
 
 export type Env = z.infer<typeof envSchema>;

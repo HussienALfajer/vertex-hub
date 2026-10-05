@@ -5,31 +5,20 @@ import {
   businessInstant,
   businessTimeOfDay,
 } from '@vertex-hub/contracts';
+import { APP_LOCALE, formatDateTime, formatNumber } from '@vertex-hub/messages';
 
-/**
- * Arabic as read in Damascus (Levantine month names: أيلول، تشرين الأول) with Latin digits (open
- * question Q3, resolved: Latin digits in the UI; month names: owner decision 2026-09-30).
- */
-export const APP_LOCALE = 'ar-SY-u-nu-latn';
+/** The formatters the notification texts use live in `@vertex-hub/messages` (ADR 0028). */
+export {
+  APP_LOCALE,
+  formatCalendarDate,
+  formatDateTime,
+  formatList,
+  formatNumber,
+  formatTimeOfDay,
+} from '@vertex-hub/messages';
 
 /** Timestamps are stored in UTC and displayed in the business timezone. */
 export { BUSINESS_TIME_ZONE };
-
-export function formatNumber(value: number, options?: Intl.NumberFormatOptions): string {
-  return new Intl.NumberFormat(APP_LOCALE, options).format(value);
-}
-
-/** A moment, in the same day-month-year style as calendar dates: "20 أيلول 2026 في 1:00 م". */
-export function formatDateTime(value: Date | string): string {
-  return new Intl.DateTimeFormat(APP_LOCALE, {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-    timeZone: BUSINESS_TIME_ZONE,
-  }).format(new Date(value));
-}
 
 /**
  * Left-to-right text (a phone number) inside an Arabic sentence that cannot carry `dir="ltr"`, as
@@ -37,11 +26,6 @@ export function formatDateTime(value: Date | string): string {
  */
 export function isolateLtr(text: string): string {
   return `${String.fromCodePoint(0x2066)}${text}${String.fromCodePoint(0x2069)}`;
-}
-
-/** Names joined as Arabic lists them: "أ وب وج". */
-export function formatList(items: readonly string[]): string {
-  return new Intl.ListFormat(APP_LOCALE, { type: 'conjunction' }).format(items);
 }
 
 export function formatDate(value: Date | string): string {
@@ -78,26 +62,6 @@ export function formatRelativeTime(value: Date | string, now: Date = new Date())
   if (seconds < 60) return format.format(0, 'second');
   const [unit, size] = RELATIVE_STEPS.findLast(([, step]) => seconds >= step) ?? ['minute', 60];
   return format.format(-Math.floor(seconds / size), unit);
-}
-
-/** A time of day stored without a date (`HH:MM`, already business-timezone time), e.g. "4:00 م". */
-export function formatTimeOfDay(time: string): string {
-  return new Intl.DateTimeFormat(APP_LOCALE, { timeStyle: 'short', timeZone: 'UTC' }).format(
-    new Date(`1970-01-01T${time}:00Z`),
-  );
-}
-
-/**
- * A calendar day stored without a time (`YYYY-MM-DD`, already a business-timezone day), e.g.
- * "5 أكتوبر 2026". Read as UTC so no timezone shift can move it to another day.
- */
-export function formatCalendarDate(day: string): string {
-  return new Intl.DateTimeFormat(APP_LOCALE, {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-    timeZone: 'UTC',
-  }).format(new Date(`${day}T00:00:00Z`));
 }
 
 /** A calendar month from any of its days (`YYYY-MM-DD`), e.g. "أكتوبر 2026". */

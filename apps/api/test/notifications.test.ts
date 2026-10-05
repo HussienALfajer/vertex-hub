@@ -227,6 +227,9 @@ describe('notifications', () => {
         category: 'tasks',
         mutable: false,
         muted: false,
+        // F14 email rule 2: emailed by default.
+        email: true,
+        emailLocked: false,
       });
       expect(initial.types.every((type) => !type.muted)).toBe(true);
 

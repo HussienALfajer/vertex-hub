@@ -276,6 +276,11 @@ export const emailSendJobSchema = z.object({
   /** Validated by the worker with the kind's schema in `EMAIL_DATA_SCHEMAS`. */
   data: z.record(z.string(), z.unknown()),
   attachments: z.array(emailAttachmentSchema),
+  /**
+   * The token links of `EMAIL_SECRET_FIELDS`, as JSON encrypted with AES-256-GCM under
+   * `EMAIL_SECRET_KEY` (base64url of IV, tag and ciphertext); `data` holds `REDACTED` there.
+   */
+  sealed: z.string().nullable().default(null),
 });
 
 export type EmailSendJob = z.infer<typeof emailSendJobSchema>;
@@ -300,6 +305,23 @@ export const emailResultJobSchema = z.discriminatedUnion('status', [
 ]);
 
 export type EmailResultJob = z.infer<typeof emailResultJobSchema>;
+
+/**
+ * F14 email rules 6–7: every 5 minutes, emails each recipient's pending notifications in one
+ * batch; acts only on work days from 08:10 to 20:00. Worked by the API.
+ */
+export const EMAIL_NOTIFICATIONS_JOB = {
+  queue: 'email.notifications',
+  cron: '*/5 * * * *',
+  tz: BUSINESS_TIME_ZONE,
+} as const;
+
+/** F14 email rule 10: the morning digest, 08:00 on work days. Worked by the API. */
+export const EMAIL_DIGEST_JOB = {
+  queue: 'email.digest',
+  cron: '0 8 * * 0-4,6',
+  tz: BUSINESS_TIME_ZONE,
+} as const;
 
 /** F14 rule 25: deletes staff emails older than 90 days, daily at 03:30. */
 export const EMAIL_PURGE_JOB = {

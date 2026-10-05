@@ -5,8 +5,16 @@
  */
 
 import { z } from 'zod';
-import { calendarDateSchema } from './dates.js';
+import {
+  businessDate,
+  businessTimeOfDay,
+  calendarDateSchema,
+  isWorkDay,
+  timeOfDaySchema,
+} from './dates.js';
+import { departmentCodeSchema } from './departments.js';
 import { pageQuerySchema, pageSchema, queryListSchema } from './lists.js';
+import { notificationSchema } from './notifications.js';
 
 export const EMAIL_AUDIENCES = ['staff', 'client'] as const;
 
@@ -95,6 +103,66 @@ export const emailAttachmentSchema = z.object({
 
 export type EmailAttachment = z.infer<typeof emailAttachmentSchema>;
 
+/* Notification emails and the digest (rules 3–12). */
+
+export const NOTIFICATION_EMAIL = {
+  /** Rule 3: a notification waits this long before it may be emailed. */
+  delayMinutes: 10,
+  /** Rule 6: items in one batch email; the rest are counted as "n more". */
+  batchItems: 20,
+  /** Rule 7: batches go out on work days from `from` until `to`, Damascus time. */
+  window: { from: '08:10', to: '20:00' },
+  /** Rule 10: tasks in each digest list, and notifications held overnight. */
+  digestTasks: 10,
+  digestNotifications: 20,
+} as const;
+
+/** Rule 7: whether batches may go out at `now` (work days, 08:10 to 20:00 Damascus). */
+export function isEmailBatchWindow(now: Date): boolean {
+  const time = businessTimeOfDay(now).slice(0, 5);
+  const { from, to } = NOTIFICATION_EMAIL.window;
+  return isWorkDay(businessDate(now)) && time >= from && time < to;
+}
+
+/** A department code and its display name, for the texts that name departments. */
+const departmentNamesSchema = z.partialRecord(departmentCodeSchema, z.string());
+
+/** A list cut to its first items, with how many were left out. */
+const shortListSchema = <Item extends z.ZodType>(item: Item, max: number) =>
+  z.object({ items: z.array(item).max(max), more: z.number().int().min(0) });
+
+/** A task in the digest (rule 10), as the `tasks` digest source gives it. */
+export const digestTaskSchema = z.object({
+  id: z.uuid(),
+  title: z.string(),
+  client: z.string().nullable(),
+  dueDate: calendarDateSchema,
+  dueTime: timeOfDaySchema.nullable(),
+  /** Work is late by this many days; 0 when due today. */
+  daysLate: z.number().int().min(0),
+});
+
+export type DigestTask = z.infer<typeof digestTaskSchema>;
+
+/** Rule 14: what changed on the account. */
+export const SECURITY_CHANGES = [
+  'password_changed',
+  'two_factor_enabled',
+  'two_factor_disabled',
+  'two_factor_reset',
+  'roles_changed',
+  'archived',
+] as const;
+
+export type SecurityChange = (typeof SECURITY_CHANGES)[number];
+
+/** An activation or reset link (rule 13): its token is sealed in the job and redacted in the row. */
+const accountLinkSchema = z.object({
+  name: z.string().min(1),
+  link: z.string().min(1),
+  expiresAt: z.iso.datetime(),
+});
+
 /**
  * The template data of each kind, validated when the email is queued and again by the worker.
  * A kind gets its schema with the change that first sends it.
@@ -102,7 +170,50 @@ export type EmailAttachment = z.infer<typeof emailAttachmentSchema>;
 export const EMAIL_DATA_SCHEMAS = {
   /** Rule 26: an administrator checks the configuration. */
   test: z.object({ requestedBy: z.string().min(1) }),
+  /** Rules 6–9: the recipient's notifications, newest first. */
+  notification_batch: z.object({
+    notifications: shortListSchema(notificationSchema, NOTIFICATION_EMAIL.batchItems),
+    departments: departmentNamesSchema,
+  }),
+  /** Rule 10: the morning digest of one work day. */
+  digest: z.object({
+    date: calendarDateSchema,
+    overdue: shortListSchema(digestTaskSchema, NOTIFICATION_EMAIL.digestTasks),
+    dueToday: shortListSchema(digestTaskSchema, NOTIFICATION_EMAIL.digestTasks),
+    notifications: shortListSchema(notificationSchema, NOTIFICATION_EMAIL.digestNotifications),
+    unreadCount: z.number().int().min(0),
+    departments: departmentNamesSchema,
+  }),
+  /** Rule 13: a user created, restored, or sent a new activation link. */
+  account_activation: accountLinkSchema.extend({ restored: z.boolean() }),
+  /** Rule 13: a reset link from a user manager, or asked for by the user (`requested`). */
+  password_reset: accountLinkSchema.extend({ requested: z.boolean() }),
+  /** Rule 14: `by` is the user manager who made the change; null when it was the user. */
+  security_notice: z.object({
+    name: z.string().min(1),
+    change: z.enum(SECURITY_CHANGES),
+    at: z.iso.datetime(),
+    by: z.string().nullable(),
+  }),
+  /** Rule 15: a sign-in from a browser and system the user had not used. */
+  new_device: z.object({
+    name: z.string().min(1),
+    device: z.string().min(1),
+    ip: z.string().nullable(),
+    at: z.iso.datetime(),
+  }),
 } satisfies Partial<Record<EmailKind, z.ZodType>>;
+
+/**
+ * The data fields that hold a token link (ADR 0028): the job carries them encrypted under
+ * `EMAIL_SECRET_KEY` and the outbox row keeps `REDACTED` in their place.
+ */
+export const EMAIL_SECRET_FIELDS: Partial<Record<EmailKind, readonly string[]>> = {
+  account_activation: ['link'],
+  password_reset: ['link'],
+};
+
+export const REDACTED = '[redacted]';
 
 export type SendableEmailKind = keyof typeof EMAIL_DATA_SCHEMAS;
 

@@ -12,7 +12,7 @@ React 19 + Vite SPA, Arabic RTL first. Read `brand/identity.md` before visual wo
 ## Rules
 - UI comes from `@vertex-hub/ui` only. No ad-hoc colors, fonts, spacing or raw hex values. Missing component: add it to `packages/ui`, not here.
 - Logical CSS only (`ms-*`, `ps-*`, `start-*`, `text-start`). `packages/ui/src/conventions.test.ts` checks this file tree too.
-- No hard-coded user-facing text: `t('<feature>.<key>')`, shared strings under `common`. Arabic copy follows `brand/identity.md` §9.
+- No hard-coded user-facing text: `t('<feature>.<key>')`, shared strings under `common`. Arabic copy follows `brand/identity.md` §9. Notification texts and links come from `@vertex-hub/messages`, which the emails share (ADR 0028).
 - Numbers and dates only through `src/lib/format.ts` (`ar-u-nu-latn`, `Asia/Damascus`).
 - Server state in TanStack Query. Query keys start with the module name. API calls go through `api` and `call()` in `src/lib/api/client.ts`, typed from the OpenAPI document (`schema.gen.ts`, generated: never edit). After an API change: `pnpm --filter @vertex-hub/api openapi:export`, then `pnpm --filter @vertex-hub/web api:generate`. Better Auth calls use `authClient`.
 - Forms validate with the same Zod schema from `@vertex-hub/contracts` that the API uses.

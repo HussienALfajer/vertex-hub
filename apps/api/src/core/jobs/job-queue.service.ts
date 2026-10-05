@@ -78,11 +78,25 @@ export class JobQueue implements OnApplicationBootstrap, OnApplicationShutdown {
     this.created.add(queue);
   }
 
-  async onApplicationBootstrap(): Promise<void> {
-    if (!this.env.JOBS_ENABLED || this.handlers.size === 0) return;
+  /**
+   * Starts pg-boss to send jobs without working any queue: for the command-line scripts, which
+   * run a handler themselves but queue emails the worker must still send (F14 email).
+   */
+  async startSending(): Promise<void> {
+    if (this.boss) return;
+    this.boss = await this.startBoss();
+  }
+
+  private async startBoss(): Promise<PgBoss> {
     const boss = new PgBoss(this.env.DATABASE_URL);
     boss.on('error', (error) => this.logger.error(error));
     await boss.start();
+    return boss;
+  }
+
+  async onApplicationBootstrap(): Promise<void> {
+    if (!this.env.JOBS_ENABLED || this.handlers.size === 0) return;
+    const boss = await this.startBoss();
     this.boss = boss;
     for (const [queue, handler] of this.handlers) {
       await boss.createQueue(queue);

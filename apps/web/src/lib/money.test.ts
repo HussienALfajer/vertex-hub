@@ -1,16 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { amountText, formatAmount, formatMoney, isAmountDraft, parseAmount } from './money';
+import { amountText, formatMoney, isAmountDraft, parseAmount } from './money';
 
 describe('money', () => {
   it('formats minor units with two decimals, Latin digits and the currency code', () => {
     expect(formatMoney(150_050, 'USD')).toMatch(/1,500\.50\sUSD/);
     // ICU shows no decimals for SYP by default; V1 keeps two (owner decision, was Q8).
     expect(formatMoney(150_000, 'SYP')).toMatch(/1,500\.00\sSYP/);
-  });
-
-  it('formats a bare amount in major units', () => {
-    expect(formatAmount(150_000)).toBe('1,500.00');
-    expect(formatAmount(7)).toBe('0.07');
   });
 
   it('parses typed amounts into minor units without floating point', () => {

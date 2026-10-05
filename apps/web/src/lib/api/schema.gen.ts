@@ -244,6 +244,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/password-links/request": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PasswordLinksController_request"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/me/notifications": {
         parameters: {
             query?: never;
@@ -4127,6 +4143,9 @@ export interface components {
             message: string;
             details?: unknown;
         };
+        RequestPasswordLink: {
+            email: string;
+        };
         /** @enum {string} */
         NotificationCategory: "tasks" | "reminders" | "calendar" | "clients_projects";
         /** @description Newest `updatedAt` first */
@@ -5799,12 +5818,17 @@ export interface components {
                 category: components["schemas"]["NotificationCategory"];
                 mutable: boolean;
                 muted: boolean;
+                email: boolean;
+                emailLocked: boolean;
             }[];
+            digestEnabled: boolean;
         };
         /** @enum {string} */
         NotificationType: "task_assigned" | "task_mentioned" | "task_returned" | "task_review_requested" | "task_medical_review_requested" | "task_awaiting_client" | "task_over_limit" | "approval_responded" | "approval_no_response" | "approval_expired" | "task_changed" | "task_commented" | "task_file_added" | "task_requested" | "tasks_generated" | "task_approved" | "task_opened" | "request_finished" | "post_returned" | "post_review_requested" | "post_medical_review_requested" | "post_awaiting_client" | "post_assigned" | "post_approved" | "post_task_ready" | "post_task_unlinked" | "shoot_booked" | "shoot_dropped" | "shoot_changed" | "meeting_invited" | "meeting_dropped" | "meeting_changed" | "task_due_soon" | "task_overdue" | "task_overdue_escalated" | "task_over_limit_pending" | "post_publish_today" | "post_publish_overdue" | "shoot_upcoming" | "shoot_not_closed" | "meeting_upcoming" | "client_account_manager_assigned" | "project_manager_assigned" | "retainer_renewal_due" | "retainer_behind" | "quote_approval_requested" | "quote_approval_decided" | "quote_accepted" | "invoice_overdue" | "invoice_paid" | "ad_budget_low" | "lead_assigned" | "lead_won" | "lead_follow_up_overdue" | "lead_follow_up_due";
         UpdateNotificationSettings: {
             mutedTypes: components["schemas"]["NotificationType"][];
+            emailTypes?: components["schemas"]["NotificationType"][];
+            digestEnabled?: boolean;
         };
         /** @description An upload waiting to be attached */
         FileUpload: {
@@ -11721,6 +11745,37 @@ export interface operations {
                 content?: never;
             };
             /** @description LINK_INVALID: unknown, used, expired or replaced link */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    PasswordLinksController_request: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RequestPasswordLink"];
+            };
+        };
+        responses: {
+            /** @description Always, whether or not a link was emailed */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not an email address */
             400: {
                 headers: {
                     [name: string]: unknown;

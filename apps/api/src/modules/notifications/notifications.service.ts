@@ -1,5 +1,6 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import {
+  emailedTypes,
   isMutableNotificationType,
   NOTIFICATION_CATALOG,
   NOTIFICATION_TYPES,
@@ -17,8 +18,7 @@ import { and, count, desc, eq, inArray, isNotNull, isNull, type SQL } from 'driz
 import { DATABASE } from '../../core/database/database.module.js';
 import { CodedException } from '../../core/errors/index.js';
 import { UserDirectory } from '../auth/index.js';
-
-type NotificationRow = typeof notifications.$inferSelect;
+import { notificationResponses } from './notification-responses.js';
 
 /** Each user's own notifications and mute settings (spec F14); another user's id answers 404. */
 @Injectable()
@@ -48,7 +48,7 @@ export class NotificationsService {
       this.db.select({ value: count() }).from(notifications).where(where),
     ]);
     return {
-      items: await this.toResponses(rows),
+      items: await notificationResponses(rows, this.users, this.db),
       total: total?.value ?? 0,
       page: query.page,
       pageSize: query.pageSize,
@@ -103,26 +103,38 @@ export class NotificationsService {
       .from(notifications)
       .where(and(eq(notifications.recipientId, userId), inArray(notifications.id, ids)))
       .orderBy(desc(notifications.updatedAt), desc(notifications.id));
-    return this.toResponses(rows);
+    return notificationResponses(rows, this.users, this.db);
   }
 
   async settings(userId: string): Promise<NotificationSettings> {
     const [row] = await this.db
-      .select({ mutedTypes: notificationSettings.mutedTypes })
+      .select({
+        mutedTypes: notificationSettings.mutedTypes,
+        emailTypes: notificationSettings.emailTypes,
+        digestEnabled: notificationSettings.digestEnabled,
+      })
       .from(notificationSettings)
       .where(eq(notificationSettings.userId, userId));
     const muted = new Set(row?.mutedTypes ?? []);
+    const emailed = emailedTypes(row?.emailTypes ?? null);
     return {
       types: NOTIFICATION_TYPES.map((type) => ({
         type,
         category: NOTIFICATION_CATALOG[type].category,
         mutable: NOTIFICATION_CATALOG[type].mutable,
         muted: muted.has(type),
+        // F14 email rule 2: a type muted in the app creates nothing to email.
+        email: !muted.has(type) && emailed.has(type),
+        emailLocked: muted.has(type),
       })),
+      digestEnabled: row?.digestEnabled ?? true,
     };
   }
 
-  /** Rule 3: only mutable types may be muted; unmuting affects later events only. */
+  /**
+   * Rule 3: only mutable types may be muted; unmuting affects later events only. F14 email
+   * rules 2 and 11: email choices and the digest switch, kept when left out.
+   */
   async updateSettings(
     userId: string,
     input: UpdateNotificationSettings,
@@ -136,34 +148,20 @@ export class NotificationsService {
     const mutedTypes: NotificationType[] = NOTIFICATION_TYPES.filter((type) =>
       input.mutedTypes.includes(type),
     );
+    const changes = {
+      mutedTypes,
+      ...(input.emailTypes && {
+        emailTypes: NOTIFICATION_TYPES.filter((type) => input.emailTypes?.includes(type)),
+      }),
+      ...(input.digestEnabled !== undefined && { digestEnabled: input.digestEnabled }),
+    };
     await this.db
       .insert(notificationSettings)
-      .values({ userId, mutedTypes })
+      .values({ userId, ...changes })
       .onConflictDoUpdate({
         target: notificationSettings.userId,
-        set: { mutedTypes, updatedAt: new Date() },
+        set: { ...changes, updatedAt: new Date() },
       });
     return this.settings(userId);
-  }
-
-  private async toResponses(rows: NotificationRow[]): Promise<Notification[]> {
-    const actors = await this.users.summaries(
-      rows.flatMap((row) => (row.actorId ? [row.actorId] : [])),
-      this.db,
-    );
-    return rows.map((row) => {
-      const actor = row.actorId ? actors.get(row.actorId) : undefined;
-      return {
-        id: row.id,
-        type: row.type,
-        actor: actor ? { id: actor.id, name: actor.name } : null,
-        subject: { type: row.subjectType, id: row.subjectId },
-        data: row.data,
-        count: row.count,
-        read: row.readAt !== null,
-        createdAt: row.createdAt.toISOString(),
-        updatedAt: row.updatedAt.toISOString(),
-      } as Notification;
-    });
   }
 }

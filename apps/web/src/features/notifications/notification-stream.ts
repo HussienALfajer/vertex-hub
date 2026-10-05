@@ -124,7 +124,7 @@ function useEventToast(openBell: () => void) {
     }
 
     const { notification } = event;
-    const { text, context } = notificationText(t, notification, departmentName);
+    const { text, context } = notificationText(notification, departmentName);
     const id = toast.add({
       title: text,
       description: context ?? undefined,

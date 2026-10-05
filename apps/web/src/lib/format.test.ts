@@ -3,16 +3,12 @@ import {
   businessDay,
   businessDayEnd,
   businessDayStart,
-  formatCalendarDate,
   formatDateTime,
   formatFileSize,
   formatLink,
   formatLinkHost,
-  formatList,
   formatMonth,
-  formatNumber,
   formatRelativeTime,
-  formatTimeOfDay,
   formatWeekday,
   formatWeekdayDate,
   fromBusinessDateTimeInput,
@@ -22,26 +18,6 @@ import {
 const ARABIC_INDIC_DIGITS = /[٠-٩۰-۹]/;
 
 describe('formatting', () => {
-  it('formats numbers with Latin digits', () => {
-    const formatted = formatNumber(1234567.5);
-    expect(formatted).not.toMatch(ARABIC_INDIC_DIGITS);
-    expect(formatted.replace(/\D/g, '')).toBe('12345675');
-  });
-
-  it('formats a stored time of day as it is, with Latin digits', () => {
-    const formatted = formatTimeOfDay('16:05');
-    expect(formatted).not.toMatch(ARABIC_INDIC_DIGITS);
-    expect(formatted).toContain('4:05');
-  });
-
-  it('formats date-times with Latin digits in the business timezone', () => {
-    // 21:30 UTC is 00:30 the next day in Damascus (UTC+3).
-    const formatted = formatDateTime('2026-09-28T21:30:00.000Z');
-    expect(formatted).not.toMatch(ARABIC_INDIC_DIGITS);
-    expect(formatted).toContain('29');
-    expect(formatted).toContain('12:30');
-  });
-
   it('turns a business day into its UTC bounds', () => {
     expect(businessDayStart('2026-09-28')).toBe('2026-09-27T21:00:00.000Z');
     expect(businessDayEnd('2026-09-28')).toBe('2026-09-28T20:59:59.999Z');
@@ -58,12 +34,6 @@ describe('formatting', () => {
     expect(formatLinkHost('not a url')).toBe('not a url');
     expect(formatLink('https://www.instagram.com/vertex/')).toBe('instagram.com/vertex');
     expect(formatLink('https://vertex.example')).toBe('vertex.example');
-  });
-
-  it('formats a calendar day as that same day, with Latin digits', () => {
-    const formatted = formatCalendarDate('2026-10-01');
-    expect(formatted).not.toMatch(ARABIC_INDIC_DIGITS);
-    expect(formatted).toMatch(/^1 .+ 2026$/);
   });
 
   it('names the weekday of a calendar day, and the day without its year', () => {
@@ -95,16 +65,6 @@ describe('formatting', () => {
     expect(ago(3 * 60 * 60)).not.toBe(ago(3 * 60));
     expect(ago(8 * 24 * 60 * 60)).toBe(formatDateTime('2026-10-02T12:00:00Z'));
     expect(ago(5 * 60)).not.toMatch(ARABIC_INDIC_DIGITS);
-  });
-
-  it('writes moments like calendar dates, with the month names read in Damascus', () => {
-    // 10:00 UTC is 13:00 in Damascus.
-    expect(formatDateTime('2026-09-20T10:00:00Z')).toBe('20 أيلول 2026 في 1:00 م');
-    expect(formatCalendarDate('2026-10-05')).toContain('تشرين الأول');
-  });
-
-  it('joins names as Arabic lists them', () => {
-    expect(formatList(['أ', 'ب', 'ج'])).toBe('أ وب وج');
   });
 
   it('formats file sizes in 1024 steps with Latin digits', () => {

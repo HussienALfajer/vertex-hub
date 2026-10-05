@@ -56,6 +56,8 @@ Run from the repository root (Node 24, pnpm via Corepack). Turborepo builds depe
 | Create a user (prints a generated password once; needs `pnpm build`) | `pnpm --filter @vertex-hub/api user:create --email <email> --name <name> --department <code> [--role <role>]` |
 | Run the daily notifications job once, as if on a date (development only; needs `pnpm build`) | `pnpm --filter @vertex-hub/api notifications:run-daily [--date YYYY-MM-DD]` |
 | Run the daily invoices job once (overdue, A10), as if on a date (development only; needs `pnpm build`) | `pnpm --filter @vertex-hub/api invoices:run-daily [--date YYYY-MM-DD]` |
+| Run the notification email batches once, as if at an instant (F14 email; development only; needs `pnpm build`; the worker sends what it queues) | `pnpm --filter @vertex-hub/api email:run-notifications [--at <ISO date-time>]` |
+| Run the morning digest once, as if at 08:00 on a date (F14 email; development only; needs `pnpm build`) | `pnpm --filter @vertex-hub/api email:run-digest [--date YYYY-MM-DD]` |
 | One package only | `pnpm --filter @vertex-hub/<name> <script>` |
 
 API docs (non-production): `http://127.0.0.1:3000/api/docs`. Health: `GET /api/health`.

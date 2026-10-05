@@ -1,6 +1,8 @@
 import type { INestApplicationContext } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import {
+  EMAIL_DIGEST_JOB,
+  EMAIL_NOTIFICATIONS_JOB,
   EMAIL_PURGE_JOB,
   FILES_PURGE_UPLOADS_JOB,
   NOTIFICATIONS_DAILY_JOB,
@@ -56,6 +58,16 @@ describe('worker against the test database', () => {
     expect(await app.get(PgBossService).boss.getSchedules(queue)).toEqual([
       expect.objectContaining({ cron, timezone: tz }),
     ]);
+  });
+
+  it('schedules the notification email batches and the 08:00 digest (F14 email rules 6, 10)', async () => {
+    const boss = app.get(PgBossService).boss;
+    for (const { queue, cron, tz } of [EMAIL_NOTIFICATIONS_JOB, EMAIL_DIGEST_JOB]) {
+      expect(await boss.getSchedules(queue)).toEqual([
+        expect.objectContaining({ cron, timezone: tz }),
+      ]);
+    }
+    expect(EMAIL_DIGEST_JOB.cron).toBe('0 8 * * 0-4,6');
   });
 
   it('schedules the daily notifications run at 09:00 Damascus time on work days', async () => {

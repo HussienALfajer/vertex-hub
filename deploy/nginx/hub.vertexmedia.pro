@@ -64,6 +64,15 @@ server {
         include snippets/vertexhub-proxy.conf;
     }
 
+    # "Forgot password" (F14 email rule 13) is anonymous and sends email: the same tight limit,
+    # answered with 429 so the page can say to try later.
+    location = /api/password-links/request {
+        limit_req zone=vhsignin burst=5 nodelay;
+        limit_req_status 429;
+        proxy_pass http://127.0.0.1:3050;
+        include snippets/vertexhub-proxy.conf;
+    }
+
     # Approval links (F09, ADR 0020): the client page's API takes no session, only the link's
     # token, so it gets its own per-address limit. Its file content goes through /_files/ below.
     location /api/public/ {

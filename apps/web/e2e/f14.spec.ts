@@ -1,3 +1,4 @@
+import { NOTIFICATION_TEXT } from '@vertex-hub/messages';
 import ar from '../src/i18n/locales/ar.json' with { type: 'json' };
 import { employeeMe, manager, mockApi, notificationFor, seedIds } from './fixtures';
 import { expect, test } from './test';
@@ -9,7 +10,7 @@ const fill = (text: string, values: Record<string, string>) =>
 
 const bellLabel = (count: number) => fill(ar.notifications.bellUnread, { count: String(count) });
 
-const reviewText = fill(ar.notifications.text.task_review_requested, {
+const reviewText = fill(NOTIFICATION_TEXT.task_review_requested, {
   actor: 'ليان الأحمد',
   task: 'تصاميم منيو الخريف',
 });
@@ -24,12 +25,12 @@ test('the bell counts unread notifications and opens one, marking it read', asyn
   // A merged comment says how many; the daily job's reminders have no actor.
   await expect(
     panel.getByRole('link', {
-      name: fill(ar.notifications.text.task_commented_merged_two, { task: 'تصاميم منيو الخريف' }),
+      name: fill(NOTIFICATION_TEXT.task_commented_merged.two, { task: 'تصاميم منيو الخريف' }),
     }),
   ).toBeVisible();
   await expect(
     panel.getByRole('link', {
-      name: fill(ar.notifications.text.tasks_generated_queued_few, {
+      name: fill(NOTIFICATION_TEXT.tasks_generated_queued.few, {
         n: '4',
         template: 'إطلاق موقع',
         department: 'التصميم',
@@ -77,7 +78,7 @@ test('a pushed notification shows a toast that opens its subject', async ({ page
   });
   await page.goto('/');
 
-  const text = fill(ar.notifications.text.task_assigned, {
+  const text = fill(NOTIFICATION_TEXT.task_assigned, {
     actor: manager.user.name,
     task: 'تصوير الأطباق',
   });
