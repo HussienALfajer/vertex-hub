@@ -167,9 +167,11 @@ test('mute a type; action-required types stay on', async ({ page }) => {
   await page.goto('/notifications/settings');
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(ar.notifications.settings.title);
 
-  // Each switch is named by its type; locked ones add the hint.
+  // Each switch is named by its type and column; locked ones add the hint.
   const notifyMe = (type: keyof typeof ar.notifications.types) =>
-    page.getByRole('switch', { name: ar.notifications.types[type] });
+    page.getByRole('switch', {
+      name: fill(ar.notifications.settings.appLabel, { name: ar.notifications.types[type] }),
+    });
   await expect(notifyMe('task_assigned')).toBeChecked();
   await expect(notifyMe('task_assigned')).toBeDisabled();
 

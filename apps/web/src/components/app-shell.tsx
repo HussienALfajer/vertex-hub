@@ -32,6 +32,7 @@ import {
   ListTodoIcon,
   LogOutIcon,
   type LucideIcon,
+  MailIcon,
   MegaphoneIcon,
   MenuIcon,
   MoonIcon,
@@ -76,6 +77,7 @@ interface NavItem {
     | 'nav.team'
     | 'nav.departments'
     | 'nav.audit'
+    | 'nav.emails'
     | 'nav.designSystem';
   icon: LucideIcon;
   /** Hides the item from users without it. Cosmetic: the API enforces access. */
@@ -133,6 +135,7 @@ const navItems: NavItem[] = [
   { to: '/team', label: 'nav.team', icon: UsersIcon },
   { to: '/departments', label: 'nav.departments', icon: Building2Icon },
   { to: '/audit', label: 'nav.audit', icon: ScrollTextIcon, permission: 'audit.read' },
+  { to: '/emails', label: 'nav.emails', icon: MailIcon, permission: 'audit.read' },
   // A developer gallery (and the screenshot tests' page): listed in development only.
   {
     to: '/design-system',

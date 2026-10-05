@@ -32,6 +32,7 @@ import { errorMessage } from '../../lib/errors';
 import { formatCalendarDate } from '../../lib/format';
 import { ChoiceSelect } from '../quotes/choice-select';
 import { Money } from '../quotes/quote-badges';
+import { StatementEmailButton } from './invoice-email';
 import {
   clientStatementQuery,
   invoicesKeys,
@@ -74,7 +75,12 @@ export function StatementSection({
       action={
         validDates &&
         statement.isSuccess && (
-          <StatementPdf key={JSON.stringify(query)} clientId={clientId} query={query} />
+          <StatementPdf
+            key={JSON.stringify(query)}
+            clientId={clientId}
+            query={query}
+            statement={statement.data}
+          />
         )
       }
     >
@@ -227,7 +233,15 @@ function StatementTable({ statement }: { statement: ClientStatement }) {
  * Rule 29: the statement's PDF is rendered on request; once asked for, the page looks for it
  * until it is ready, then offers the download (valid for 24 hours).
  */
-function StatementPdf({ clientId, query }: { clientId: string; query: ClientStatementQuery }) {
+function StatementPdf({
+  clientId,
+  query,
+  statement,
+}: {
+  clientId: string;
+  query: ClientStatementQuery;
+  statement: ClientStatement;
+}) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const render = useRenderStatement(clientId);
@@ -247,14 +261,17 @@ function StatementPdf({ clientId, query }: { clientId: string; query: ClientStat
 
   if (asked && ready.isSuccess) {
     return (
-      <Button
-        variant="outline"
-        size="sm"
-        render={<a href={statementPdfUrl(clientId, query)} target="_blank" rel="noopener" />}
-      >
-        <DownloadIcon />
-        {t('invoices.statement.download')}
-      </Button>
+      <span className="flex flex-wrap items-center gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          render={<a href={statementPdfUrl(clientId, query)} target="_blank" rel="noopener" />}
+        >
+          <DownloadIcon />
+          {t('invoices.statement.download')}
+        </Button>
+        <StatementEmailButton clientId={clientId} query={query} statement={statement} />
+      </span>
     );
   }
   const gaveUp = asked && ready.isError;

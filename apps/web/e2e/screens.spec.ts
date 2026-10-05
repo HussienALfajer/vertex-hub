@@ -1497,6 +1497,37 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await expect(page.getByRole('dialog')).toBeVisible();
       await screenshot(page, testInfo, `invoice-services-dialog-${colorScheme}`);
     });
+
+    test('forgot password, form and confirmation', async ({ page }, testInfo) => {
+      await mockApi(page, { signedIn: false });
+      await page.goto('/forgot-password');
+      await expect(page.getByRole('heading', { name: ar.forgotPassword.title })).toBeVisible();
+      await screenshot(page, testInfo, `forgot-password-${colorScheme}`);
+      await page.getByLabel(ar.login.email).fill('sara@vertex.example');
+      await page.getByRole('button', { name: ar.forgotPassword.submit }).click();
+      await expect(page.getByText(ar.forgotPassword.sentTitle)).toBeVisible();
+      await screenshot(page, testInfo, `forgot-password-sent-${colorScheme}`);
+    });
+
+    test('send by email dialog and email history', async ({ page }, testInfo) => {
+      await page.clock.setFixedTime(new Date(`${PROJECTS_TODAY}T09:00:00+03:00`));
+      await page.setViewportSize({ width: 1280, height: 1400 });
+      await mockApi(page, { signedIn: true, me: financeMe });
+      await page.goto(`/invoices/${seedIds.overdueInvoice}`);
+      await expect(page.getByRole('heading', { name: ar.email.history.title })).toBeVisible();
+      await expect(page.getByText('535 5.7.8 Authentication failed')).toBeVisible();
+      await screenshot(page, testInfo, `email-history-${colorScheme}`);
+      await page.getByRole('button', { name: ar.email.send.action }).click();
+      await expect(page.getByRole('dialog').getByLabel(ar.email.send.subject)).not.toBeEmpty();
+      await screenshot(page, testInfo, `send-email-dialog-${colorScheme}`);
+    });
+
+    test('email log', async ({ page }, testInfo) => {
+      await mockApi(page, { signedIn: true, me: manager });
+      await page.goto('/emails');
+      await expect(page.getByRole('row')).toHaveCount(5);
+      await screenshot(page, testInfo, `email-log-${colorScheme}`);
+    });
   });
 }
 

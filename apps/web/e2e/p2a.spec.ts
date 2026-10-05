@@ -52,7 +52,9 @@ test('both reminders are locked on in the settings', async ({ page }) => {
   await mockApi(page, { signedIn: true });
   await page.goto('/notifications/settings');
   for (const type of ['retainer_behind', 'task_over_limit_pending'] as const) {
-    const notifyMe = page.getByRole('switch', { name: ar.notifications.types[type] });
+    const notifyMe = page.getByRole('switch', {
+      name: ar.notifications.settings.appLabel.replace('{{name}}', ar.notifications.types[type]),
+    });
     await expect(notifyMe).toBeChecked();
     await expect(notifyMe).toBeDisabled();
   }

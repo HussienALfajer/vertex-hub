@@ -1,10 +1,12 @@
 import { standardSchemaResolver } from '@hookform/resolvers/standard-schema';
+import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import {
   APPROVAL_LIMITS,
   type CreateApprovalRequest,
   type CreateApprovalRequestInput,
   createApprovalRequestSchema,
+  type EmailSummary,
   type IssuedApprovalRequest,
   type ReadyClient,
   type ReadyPost,
@@ -12,6 +14,7 @@ import {
 } from '@vertex-hub/contracts';
 import {
   Button,
+  Checkbox,
   Dialog,
   DialogClose,
   DialogContent,
@@ -37,6 +40,7 @@ import { useTranslation } from 'react-i18next';
 import { FormAlert } from '../../components/form-alert';
 import { errorMessage } from '../../lib/errors';
 import { formatDateTime, formatNumber, isolateLtr } from '../../lib/format';
+import { clientQuery } from '../clients/clients.queries';
 import { PostFacts, PostThumbnail } from '../content/post-parts';
 import { IssuedLink, ItemKindBadge } from './approval-parts';
 import { useCreateApprovalRequest } from './approvals.queries';
@@ -125,8 +129,11 @@ function RequestForm({
   onIssued: (request: IssuedApprovalRequest) => void;
 }) {
   const { t } = useTranslation();
-  const ids = { contact: useId(), message: useId(), items: useId() };
+  const ids = { contact: useId(), message: useId(), items: useId(), email: useId() };
   const create = useCreateApprovalRequest();
+  // F14 email rule 19: the contacts' addresses, for "Also send by email".
+  const details = useQuery(clientQuery(client.client.id));
+  const [emailing, setEmailing] = useState(true);
   const [failure, setFailure] = useState<string | null>(null);
   const form = useForm<CreateApprovalRequestInput, unknown, CreateApprovalRequest>({
     resolver: standardSchemaResolver(createApprovalRequestSchema),
@@ -148,6 +155,8 @@ function RequestForm({
   const errors = form.formState.errors;
   const contactId = form.watch('contactId');
   const contact = client.contacts.find((candidate) => candidate.id === contactId);
+  const contactEmail =
+    details.data?.contacts.find((candidate) => candidate.id === contactId)?.email ?? null;
   const contactItems = client.contacts.map((candidate) => ({
     value: candidate.id,
     label: candidate.phone
@@ -163,7 +172,7 @@ function RequestForm({
   const submit = form.handleSubmit(async (values) => {
     setFailure(null);
     try {
-      onIssued(await create.mutateAsync(values));
+      onIssued(await create.mutateAsync({ ...values, email: !!contactEmail && emailing }));
     } catch (error) {
       setFailure(errorMessage(t, error));
     }
@@ -205,6 +214,14 @@ function RequestForm({
         )}
         <FieldError match={!!errors.contactId}>{t('approvals.request.errors.contact')}</FieldError>
       </Field>
+      {contact && contactEmail && (
+        <EmailOption
+          id={ids.email}
+          email={contactEmail}
+          checked={emailing}
+          onCheckedChange={setEmailing}
+        />
+      )}
       <Field invalid={!!errors.message}>
         <FieldLabel htmlFor={ids.message}>{t('approvals.request.message')}</FieldLabel>
         <Textarea
@@ -288,6 +305,7 @@ function IssuedStep({ request, onClose }: { request: IssuedApprovalRequest; onCl
           })}
         </DialogDescription>
       </DialogHeader>
+      <EmailedNote email={request.email} />
       <IssuedLink
         link={request.link}
         contactName={request.contact.name}
@@ -303,5 +321,45 @@ function IssuedStep({ request, onClose }: { request: IssuedApprovalRequest; onCl
         <Button onClick={onClose}>{t('approvals.request.done')}</Button>
       </DialogFooter>
     </div>
+  );
+}
+
+/** F14 email screen 4: "Also send by email to <contact>", checked by default. */
+export function EmailOption({
+  id,
+  email,
+  checked,
+  onCheckedChange,
+}: {
+  id: string;
+  email: string;
+  checked: boolean;
+  onCheckedChange: (checked: boolean) => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <label htmlFor={id} className="flex cursor-pointer items-center gap-3 text-sm">
+      <Checkbox id={id} checked={checked} onCheckedChange={onCheckedChange} />
+      <span>
+        {t('approvals.request.alsoEmail')} <bdi dir="ltr">{email}</bdi>
+      </span>
+    </label>
+  );
+}
+
+/** Whether the new link was emailed (screen 4). */
+export function EmailedNote({ email }: { email: EmailSummary | null }) {
+  const { t } = useTranslation();
+  const address = email?.to[0]?.email;
+  return (
+    <p className="text-sm text-muted-foreground">
+      {address ? (
+        <>
+          {t('approvals.request.emailed')} <bdi dir="ltr">{address}</bdi>
+        </>
+      ) : (
+        t('approvals.request.notEmailed')
+      )}
+    </p>
   );
 }

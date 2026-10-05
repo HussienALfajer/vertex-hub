@@ -1,6 +1,6 @@
 import { standardSchemaResolver } from '@hookform/resolvers/standard-schema';
 import { useQueryClient } from '@tanstack/react-query';
-import { useRouter } from '@tanstack/react-router';
+import { Link, useRouter } from '@tanstack/react-router';
 import { backupCodeSchema, type SignIn, signInSchema, totpCodeSchema } from '@vertex-hub/contracts';
 import { Button, Field, FieldError, FieldLabel, Input, OtpField } from '@vertex-hub/ui';
 import { ArrowRightIcon, KeyRoundIcon, SmartphoneIcon } from 'lucide-react';
@@ -131,6 +131,14 @@ function SignInForm({
         />
         <FieldError match={!!errors.password}>{t('login.errors.password')}</FieldError>
       </Field>
+      <Button
+        variant="link"
+        size="sm"
+        className="-mt-3 self-start px-0"
+        render={<Link to="/forgot-password" />}
+      >
+        {t('login.forgot')}
+      </Button>
       {failure && <FormAlert>{failure}</FormAlert>}
       <Button type="submit" size="lg" className="w-full" disabled={isSubmitting}>
         {isSubmitting ? t('login.submitting') : t('login.submit')}

@@ -144,6 +144,8 @@ test('a user manager creates a user and gets the activation link', async ({ page
   const dialog = page.getByRole('dialog');
   await expect(dialog.getByRole('heading', { name: ar.users.link.activationTitle })).toBeVisible();
   await expect(dialog.getByRole('textbox')).toHaveValue(new RegExp(`#token=${VALID_LINK_TOKEN}$`));
+  // F14 email screen 7: the link was also emailed.
+  await expect(dialog.getByText(ar.users.link.sentTo)).toContainText('hala@vertex.example');
 });
 
 test('the sidebar link clears the team search', async ({ page }) => {

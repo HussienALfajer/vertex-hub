@@ -11,12 +11,14 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as ActivateRouteImport } from './routes/activate'
+import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as SetupTwoFactorRouteImport } from './routes/setup-two-factor'
 import { Route as AppIndexRouteImport } from './routes/_app/index'
 import { Route as AppAccountRouteImport } from './routes/_app/account'
 import { Route as AppAuditRouteImport } from './routes/_app/audit'
 import { Route as AppDesignSystemRouteImport } from './routes/_app/design-system'
+import { Route as AppEmailsRouteImport } from './routes/_app/emails'
 import { Route as ATokenRouteImport } from './routes/a.$token'
 import { Route as AppApprovalsIndexRouteImport } from './routes/_app/approvals/index'
 import { Route as AppCalendarIndexRouteImport } from './routes/_app/calendar/index'
@@ -78,6 +80,11 @@ const ActivateRoute = ActivateRouteImport.update({
   path: '/activate',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
+  id: '/forgot-password',
+  path: '/forgot-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
@@ -106,6 +113,11 @@ const AppAuditRoute = AppAuditRouteImport.update({
 const AppDesignSystemRoute = AppDesignSystemRouteImport.update({
   id: '/design-system',
   path: '/design-system',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppEmailsRoute = AppEmailsRouteImport.update({
+  id: '/emails',
+  path: '/emails',
   getParentRoute: () => AppRoute,
 } as any)
 const ATokenRoute = ATokenRouteImport.update({
@@ -372,11 +384,13 @@ const AppShootsShootIdEditRoute = AppShootsShootIdEditRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
   '/activate': typeof ActivateRoute
+  '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
   '/setup-two-factor': typeof SetupTwoFactorRoute
   '/account': typeof AppAccountRoute
   '/audit': typeof AppAuditRoute
   '/design-system': typeof AppDesignSystemRoute
+  '/emails': typeof AppEmailsRoute
   '/a/$token': typeof ATokenRoute
   '/campaigns/$campaignId': typeof AppCampaignsCampaignIdRoute
   '/catalog/settings': typeof AppCatalogSettingsRoute
@@ -431,11 +445,13 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/activate': typeof ActivateRoute
+  '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
   '/setup-two-factor': typeof SetupTwoFactorRoute
   '/account': typeof AppAccountRoute
   '/audit': typeof AppAuditRoute
   '/design-system': typeof AppDesignSystemRoute
+  '/emails': typeof AppEmailsRoute
   '/a/$token': typeof ATokenRoute
   '/': typeof AppIndexRoute
   '/campaigns/$campaignId': typeof AppCampaignsCampaignIdRoute
@@ -493,11 +509,13 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_app': typeof AppRouteWithChildren
   '/activate': typeof ActivateRoute
+  '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
   '/setup-two-factor': typeof SetupTwoFactorRoute
   '/_app/account': typeof AppAccountRoute
   '/_app/audit': typeof AppAuditRoute
   '/_app/design-system': typeof AppDesignSystemRoute
+  '/_app/emails': typeof AppEmailsRoute
   '/a/$token': typeof ATokenRoute
   '/_app/': typeof AppIndexRoute
   '/_app/campaigns/$campaignId': typeof AppCampaignsCampaignIdRoute
@@ -556,11 +574,13 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/activate'
+    | '/forgot-password'
     | '/login'
     | '/setup-two-factor'
     | '/account'
     | '/audit'
     | '/design-system'
+    | '/emails'
     | '/a/$token'
     | '/campaigns/$campaignId'
     | '/catalog/settings'
@@ -615,11 +635,13 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/activate'
+    | '/forgot-password'
     | '/login'
     | '/setup-two-factor'
     | '/account'
     | '/audit'
     | '/design-system'
+    | '/emails'
     | '/a/$token'
     | '/'
     | '/campaigns/$campaignId'
@@ -676,11 +698,13 @@ export interface FileRouteTypes {
     | '__root__'
     | '/_app'
     | '/activate'
+    | '/forgot-password'
     | '/login'
     | '/setup-two-factor'
     | '/_app/account'
     | '/_app/audit'
     | '/_app/design-system'
+    | '/_app/emails'
     | '/a/$token'
     | '/_app/'
     | '/_app/campaigns/$campaignId'
@@ -738,6 +762,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   AppRoute: typeof AppRouteWithChildren
   ActivateRoute: typeof ActivateRoute
+  ForgotPasswordRoute: typeof ForgotPasswordRoute
   LoginRoute: typeof LoginRoute
   SetupTwoFactorRoute: typeof SetupTwoFactorRoute
   ATokenRoute: typeof ATokenRoute
@@ -757,6 +782,13 @@ declare module '@tanstack/react-router' {
       path: '/activate'
       fullPath: '/activate'
       preLoaderRoute: typeof ActivateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/forgot-password': {
+      id: '/forgot-password'
+      path: '/forgot-password'
+      fullPath: '/forgot-password'
+      preLoaderRoute: typeof ForgotPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -799,6 +831,13 @@ declare module '@tanstack/react-router' {
       path: '/design-system'
       fullPath: '/design-system'
       preLoaderRoute: typeof AppDesignSystemRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/emails': {
+      id: '/_app/emails'
+      path: '/emails'
+      fullPath: '/emails'
+      preLoaderRoute: typeof AppEmailsRouteImport
       parentRoute: typeof AppRoute
     }
     '/a/$token': {
@@ -1165,6 +1204,7 @@ interface AppRouteChildren {
   AppAccountRoute: typeof AppAccountRoute
   AppAuditRoute: typeof AppAuditRoute
   AppDesignSystemRoute: typeof AppDesignSystemRoute
+  AppEmailsRoute: typeof AppEmailsRoute
   AppIndexRoute: typeof AppIndexRoute
   AppCampaignsCampaignIdRoute: typeof AppCampaignsCampaignIdRoute
   AppCatalogSettingsRoute: typeof AppCatalogSettingsRoute
@@ -1222,6 +1262,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppAccountRoute: AppAccountRoute,
   AppAuditRoute: AppAuditRoute,
   AppDesignSystemRoute: AppDesignSystemRoute,
+  AppEmailsRoute: AppEmailsRoute,
   AppIndexRoute: AppIndexRoute,
   AppCampaignsCampaignIdRoute: AppCampaignsCampaignIdRoute,
   AppCatalogSettingsRoute: AppCatalogSettingsRoute,
@@ -1280,6 +1321,7 @@ const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
 const rootRouteChildren: RootRouteChildren = {
   AppRoute: AppRouteWithChildren,
   ActivateRoute: ActivateRoute,
+  ForgotPasswordRoute: ForgotPasswordRoute,
   LoginRoute: LoginRoute,
   SetupTwoFactorRoute: SetupTwoFactorRoute,
   ATokenRoute: ATokenRoute,

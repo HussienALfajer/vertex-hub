@@ -43,6 +43,8 @@ Spec: `docs/specs/F14-email-digest.md` · ADRs 0006, 0008, 0013, 0014, 0018, 002
 - [x] PR opened
 
 ## PR 4 — `feat/f14-email-web`: screens and E2E
-- [ ] web: notification settings email column and digest switch; `/forgot-password` and the sign-in link; shared "Send by email" dialog and email history; wired into quotes, invoices, receipts, statement, monthly report, ad receipts and budget notice, approval dialogs and request page; `/emails` log with test email and navigation; team profile "Sent to …"
-- [ ] e2e: mocks, `f14-email.spec.ts`, screenshots light and dark (settings, forgot password, dialog, history, log)
-- [ ] wiring checklist, full checks, reviewer, owner acceptance (browser steps of the spec's Acceptance), /ship; `docs/ROADMAP.md`
+- [x] web: notification settings email column and digest switch; `/forgot-password` and the sign-in link; shared "Send by email" dialog and email history; wired into quotes, invoices, receipts, statement, monthly report, ad receipts and budget notice, approval dialogs and request page; `/emails` log with test email and navigation; team profile "Sent to …"
+- [x] e2e: mocks, `f14-email.spec.ts`, screenshots light and dark (settings, forgot password, dialog, history, log)
+- [x] wiring checklist, full checks (lint, typecheck, test, build, E2E), reviewer (one blocking issue fixed: the settings API reported a muted type's email choice as off, so saving any switch erased it; it now returns the saved choice and `emailLocked`)
+- [x] owner acceptance (approved), then a last full check run
+- [x] `docs/ROADMAP.md`, commit, PR with auto-merge (opened by hand, not through /ship, at the owner's request)

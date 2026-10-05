@@ -48,6 +48,8 @@ import {
   type ClientApprovals,
   type ClientBilling,
   type ClientDetailResponse,
+  type ClientEmail,
+  type ClientEmailKind,
   type ClientMonthlyReport,
   type ClientResponse,
   type ClientResponseEntry,
@@ -104,6 +106,9 @@ import {
   daysOverdue,
   daysWithoutUpdate,
   defaultInstallmentMilestones,
+  type EmailLogItem,
+  type EmailRecordType,
+  type EmailSummary,
   type ErrorCode,
   type ExtraWork,
   type ExtraWorkBilling,
@@ -317,6 +322,7 @@ import {
   type UpdateCycleLine,
   type UpdateExtraWork,
   type UpdateMeeting,
+  type UpdateNotificationSettings,
   type UpdatePost,
   type UpdateShoot,
   type UpdateTaskInput,
@@ -1069,6 +1075,7 @@ export async function mockApi(page: Page, options: MockOptions): Promise<MockedA
     invoices: billing.invoices,
     me: () => me,
   });
+  const outbox = emailsSeed();
   const tasksApi = taskRoutes({
     users,
     clients,
@@ -1078,6 +1085,7 @@ export async function mockApi(page: Page, options: MockOptions): Promise<MockedA
     posts: planned.posts,
     files: [...sent.files, ...planned.files],
     requests: [...sent.requests, ...planned.requests],
+    outbox,
     me: () => me,
   });
   const reportsApi = reportRoutes({
@@ -1134,6 +1142,7 @@ export async function mockApi(page: Page, options: MockOptions): Promise<MockedA
     tasks,
     me: () => me,
   });
+  const emailsApi = emailRoutes({ outbox, clients, users, me: () => me });
   const notificationsApi = notificationRoutes({
     notifications: options.notifications ?? notificationsSeed(),
     streamed: options.streamed ?? [],
@@ -1237,6 +1246,8 @@ export async function mockApi(page: Page, options: MockOptions): Promise<MockedA
         ? route.fulfill({ status: 204 })
         : fail(route, 400, 'LINK_INVALID');
     }
+    // F14 email rule 13: the same answer whatever the address.
+    if (path === '/api/password-links/request') return route.fulfill({ status: 204 });
     // The client page (F09): the link's token is the access, with no session.
     if (path.startsWith('/api/public/')) {
       const shown = tasksApi(route, method, url, request);
@@ -1363,6 +1374,10 @@ export async function mockApi(page: Page, options: MockOptions): Promise<MockedA
       }
       return json(route, departmentDetail(department));
     }
+
+    // Emails (F14 email), ahead of the documents' own routes.
+    const emailed = emailsApi(route, method, url);
+    if (emailed) return emailed;
 
     // Dashboards and reports (F15), ahead of the client routes that answer the rest of a client.
     const reported = reportsApi(route, method, url, request);
@@ -3518,6 +3533,8 @@ interface TaskState {
   /** Files beyond the seeded ones, and the approval requests (`approvalsSeed`). */
   files: FileRecord[];
   requests: ApprovalRequestRecord[];
+  /** The email outbox, where an approval link asked to be emailed goes (F14 email rule 19). */
+  outbox?: EmailRecord[];
   me: () => MeResponse;
 }
 
@@ -3536,6 +3553,7 @@ function taskRoutes({
   posts,
   files,
   requests,
+  outbox = [],
   me,
 }: TaskState) {
   const holds = (permission: string, scope: string) =>
@@ -4038,7 +4056,7 @@ function taskRoutes({
         };
       }),
       contactPhone: requestContact(request).phone,
-      contactEmail: null,
+      contactEmail: requestContact(request).email,
       permissions: {
         canReissue: scoped && (state === 'open' || state === 'expired') && counts.pending > 0,
         canRevoke: scoped && (state === 'open' || state === 'expired'),
@@ -4046,14 +4064,40 @@ function taskRoutes({
     };
   };
   /** A new link: only the request knows its token (rule 9). */
-  const issue = (request: ApprovalRequestRecord, origin: string): IssuedApprovalRequest => {
+  const issue = (
+    request: ApprovalRequestRecord,
+    origin: string,
+    emailed = false,
+  ): IssuedApprovalRequest => {
     request.token = `link-token-${next++}`;
     request.issuedAt = TASKS_NOW.toISOString();
     request.expiresAt = new Date(
       TASKS_NOW.getTime() + APPROVAL_LIMITS.linkDays * 24 * 60 * 60 * 1000,
     ).toISOString();
     request.remindedAt = null;
-    return { ...requestDetail(request), link: `${origin}/a/${request.token}`, email: null };
+    const contact = requestContact(request);
+    if (!emailed || !contact.email) {
+      return { ...requestDetail(request), link: `${origin}/a/${request.token}`, email: null };
+    }
+    const email: EmailRecord = {
+      id: id(9900 + outbox.length),
+      kind: 'client_approval_link',
+      audience: 'client',
+      status: 'queued',
+      to: [{ name: contact.name, email: contact.email }],
+      cc: [],
+      subject: 'أعمال بانتظار اعتمادكم من Vertex Media',
+      sender: { id: me().user.id, name: me().user.name },
+      createdAt: TASKS_NOW.toISOString(),
+      sentAt: null,
+      error: null,
+      attempts: 0,
+      record: { type: 'approval_request', id: request.id },
+      clientId: request.clientId,
+    };
+    outbox.push(email);
+    const { audience: _, attempts: __, record: ___, clientId: ____, ...summary } = email;
+    return { ...requestDetail(request), link: `${origin}/a/${request.token}`, email: summary };
   };
   const publicItem = (item: ApprovalItemRecord): PublicApprovalItem => {
     const withdrawn = item.status === 'withdrawn';
@@ -4443,7 +4487,7 @@ function taskRoutes({
         });
       }
       requests.push(created);
-      return json(route, issue(created, url.origin), 201);
+      return json(route, issue(created, url.origin, input.email), 201);
     }
     const requestMatch = path.match(/^\/api\/approvals\/requests\/([^/]+)(?:\/([^/]+))?$/);
     if (requestMatch) {
@@ -4454,7 +4498,10 @@ function taskRoutes({
       if (!clientScope(found.clientId)) return fail(route, 403, null);
       const state = stateOf(found);
       if (state === 'revoked' || state === 'completed') return fail(route, 409, 'REQUEST_CLOSED');
-      if (action === 'reissue') return json(route, issue(found, url.origin));
+      if (action === 'reissue') {
+        const { email } = route.request().postDataJSON() as { email?: boolean };
+        return json(route, issue(found, url.origin, email));
+      }
       if (action === 'revoke') {
         // Rule 12: what still waits is withdrawn, and the tasks are ready again.
         found.revokedAt = TASKS_NOW.toISOString();
@@ -7653,6 +7700,8 @@ function notificationRoutes({
   me: () => MeResponse;
 }) {
   const muted = new Map<string, Set<NotificationType>>();
+  const emailed = new Map<string, Set<NotificationType>>();
+  const digest = new Map<string, boolean>();
   const mine = () => notifications.filter((n) => n.recipientId === me().user.id);
   const unreadCount = () => mine().filter((n) => !n.read).length;
   const strip = ({ recipientId: _, ...rest }: NotificationRecord) => rest as Notification;
@@ -7664,11 +7713,11 @@ function notificationRoutes({
         category: NOTIFICATION_CATALOG[type].category,
         mutable: NOTIFICATION_CATALOG[type].mutable,
         muted: off.has(type),
-        // F14 email: the catalog defaults; a muted type has nothing to email.
-        email: !off.has(type) && NOTIFICATION_CATALOG[type].emailByDefault,
+        // F14 email: the saved choice, else the catalog defaults, kept while the type is muted.
+        email: emailed.get(me().user.id)?.has(type) ?? NOTIFICATION_CATALOG[type].emailByDefault,
         emailLocked: off.has(type),
       })),
-      digestEnabled: true,
+      digestEnabled: digest.get(me().user.id) ?? true,
     };
   };
 
@@ -7722,16 +7771,309 @@ function notificationRoutes({
       return json(route, settings());
     }
     if (path === '/api/me/notification-settings' && method === 'PUT') {
-      const { mutedTypes } = route.request().postDataJSON() as { mutedTypes: NotificationType[] };
+      const { mutedTypes, emailTypes, digestEnabled } = route
+        .request()
+        .postDataJSON() as UpdateNotificationSettings;
       if (mutedTypes.some((type) => !NOTIFICATION_CATALOG[type].mutable)) {
         return fail(route, 400, 'NOT_MUTABLE');
       }
       muted.set(me().user.id, new Set(mutedTypes));
+      if (emailTypes) emailed.set(me().user.id, new Set(emailTypes));
+      if (digestEnabled !== undefined) digest.set(me().user.id, digestEnabled);
       return json(route, settings());
     }
     return undefined;
   };
 }
+// Email (F14 email)
+
+/** An email of the mock outbox, with the invoice whose history shows a receipt, and its month. */
+export interface EmailRecord extends EmailLogItem {
+  invoiceId?: string;
+  month?: string;
+}
+
+const address = (name: string, email: string, userId?: string) => ({
+  name,
+  email,
+  ...(userId && { userId }),
+});
+
+/** The outbox: client emails of the seeded documents, and staff emails of each state. */
+export function emailsSeed(): EmailRecord[] {
+  const hala = address('هالة الشامي', 'hala@jasmine.example');
+  const layan = { id: id(3), name: 'ليان الأحمد' };
+  const client = {
+    audience: 'client' as const,
+    cc: [address(layan.name, 'layan@vertex.example', layan.id)],
+    clientId: id(601),
+  };
+  const staff = { audience: 'staff' as const, cc: [], sender: null, record: null, clientId: null };
+  return [
+    {
+      ...client,
+      id: id(9801),
+      kind: 'client_invoice_reminder',
+      status: 'failed',
+      to: [hala],
+      subject: 'تذكير: الفاتورة INV-2026-0001 متأخرة السداد',
+      sender: { id: id(7), name: 'رنا المصري' },
+      createdAt: '2026-10-09T09:30:00.000Z',
+      sentAt: null,
+      error: '535 5.7.8 Authentication failed',
+      attempts: 3,
+      record: { type: 'invoice', id: id(9403) },
+    },
+    {
+      ...client,
+      id: id(9802),
+      kind: 'client_quote',
+      status: 'sent',
+      to: [hala],
+      subject: 'عرض السعر Q-2026-0001: هوية مطعم الياسمين',
+      sender: layan,
+      createdAt: '2026-10-08T08:00:00.000Z',
+      sentAt: '2026-10-08T08:00:20.000Z',
+      error: null,
+      attempts: 1,
+      record: { type: 'quote', id: id(9201) },
+    },
+    {
+      ...staff,
+      id: id(9803),
+      kind: 'digest',
+      status: 'sent',
+      to: [address('كريم الزين', 'karim@vertex.example', id(4))],
+      subject: 'ملخص يومك: 3 مهام',
+      createdAt: '2026-10-08T05:00:00.000Z',
+      sentAt: '2026-10-08T05:00:12.000Z',
+      error: null,
+      attempts: 1,
+    },
+    {
+      ...staff,
+      id: id(9804),
+      kind: 'account_activation',
+      status: 'queued',
+      to: [address('نور السيد', 'nour@vertex.example', id(5))],
+      subject: 'فعّل حسابك في Vertex Hub',
+      createdAt: '2026-10-07T12:00:00.000Z',
+      sentAt: null,
+      error: null,
+      attempts: 0,
+    },
+  ];
+}
+
+/** The record a document's "Send by email" route belongs to, and the kind its body asks for. */
+const SENT_FROM = {
+  quotes: {
+    type: 'quote',
+    kind: (body: { kind?: string }) =>
+      body.kind === 'reminder' ? 'client_quote_reminder' : 'client_quote',
+  },
+  invoices: {
+    type: 'invoice',
+    kind: (body: { kind?: string }) =>
+      body.kind === 'overdue_reminder' ? 'client_invoice_reminder' : 'client_invoice',
+  },
+  payments: { type: 'payment', kind: () => 'client_receipt' },
+  'ad-wallet-entries': { type: 'ad_wallet_entry', kind: () => 'client_ad_receipt' },
+} as const satisfies Record<
+  string,
+  {
+    type: EmailRecordType;
+    kind: (body: { kind?: string }) => ClientEmailKind;
+  }
+>;
+
+/**
+ * The email API over the mock outbox: the log and its test email, and each document's "Send by
+ * email" and history. Approval links are queued by the approvals mock.
+ */
+function emailRoutes({
+  outbox,
+  clients,
+  users,
+  me,
+}: {
+  outbox: EmailRecord[];
+  clients: ClientRecord[];
+  users: UserResponse[];
+  me: () => MeResponse;
+}) {
+  const summary = (email: EmailRecord): EmailSummary => ({
+    id: email.id,
+    kind: email.kind,
+    status: email.status,
+    to: email.to,
+    cc: email.cc,
+    subject: email.subject,
+    sender: email.sender,
+    createdAt: email.createdAt,
+    sentAt: email.sentAt,
+    error: email.error,
+  });
+  // Mock emails share one time: the later one (higher id) first.
+  const newest = (a: EmailRecord, b: EmailRecord) =>
+    b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id);
+  const history = (match: (email: EmailRecord) => boolean) => ({
+    items: outbox.filter(match).sort(newest).map(summary),
+  });
+  const push = (route: Route, email: Omit<EmailRecord, 'id' | 'status' | 'createdAt'>) => {
+    const queued: EmailRecord = {
+      ...email,
+      id: id(9900 + outbox.length),
+      status: 'queued',
+      createdAt: TASKS_NOW.toISOString(),
+    };
+    outbox.push(queued);
+    return json(route, summary(queued), 202);
+  };
+  /** Rules 17–18: the chosen contacts with an email, and the copies. */
+  const queue = (
+    route: Route,
+    clientId: string,
+    kind: ClientEmailKind,
+    record: EmailRecord['record'],
+    input: ClientEmail & { month?: string },
+  ) => {
+    const client = clients.find((c) => c.id === clientId);
+    if (!client) return fail(route, 404, null);
+    if (client.archived) return fail(route, 409, 'CLIENT_ARCHIVED');
+    const to = input.contactIds.map((contactId) =>
+      client.contacts.find((c) => c.id === contactId && !c.archived && c.email),
+    );
+    if (to.some((contact) => !contact)) return fail(route, 409, 'INVALID_RECIPIENT');
+    const copied = new Set([
+      ...(input.ccAccountManager ? [client.accountManagerId] : []),
+      ...(input.ccMe ? [me().user.id] : []),
+    ]);
+    return push(route, {
+      kind,
+      audience: 'client',
+      to: to.flatMap((contact) => (contact?.email ? [address(contact.name, contact.email)] : [])),
+      cc: users.flatMap((user) =>
+        copied.has(user.id) && user.email ? [address(user.name, user.email, user.id)] : [],
+      ),
+      subject: input.subject,
+      sender: { id: me().user.id, name: me().user.name },
+      sentAt: null,
+      error: null,
+      attempts: 0,
+      record,
+      clientId,
+      month: input.month,
+    });
+  };
+
+  return (route: Route, method: string, url: URL) => {
+    const path = url.pathname;
+    const input = () =>
+      route.request().postDataJSON() as ClientEmail & { kind?: string; month?: string };
+    if (path === '/api/emails' && method === 'GET') {
+      const status = url.searchParams.getAll('status');
+      const kind = url.searchParams.getAll('kind');
+      const audience = url.searchParams.get('audience');
+      const search = url.searchParams.get('search')?.toLowerCase();
+      const items = outbox
+        .filter(
+          (email) =>
+            (status.length === 0 || status.includes(email.status)) &&
+            (kind.length === 0 || kind.includes(email.kind)) &&
+            (!audience || email.audience === audience) &&
+            (!search ||
+              email.to.some(
+                (to) => to.email.includes(search) || to.name.toLowerCase().includes(search),
+              )),
+        )
+        .sort(newest)
+        .map(({ invoiceId: _, month: __, ...item }) => item);
+      return json(route, { items, total: items.length, page: 1, pageSize: 30 });
+    }
+    if (path === '/api/emails/test' && method === 'POST') {
+      const { user } = me();
+      return push(route, {
+        kind: 'test',
+        audience: 'staff',
+        to: [address(user.name, user.email, user.id)],
+        cc: [],
+        subject: 'بريد تجريبي من Vertex Hub',
+        sender: { id: user.id, name: user.name },
+        sentAt: null,
+        error: null,
+        attempts: 0,
+        record: null,
+        clientId: null,
+      });
+    }
+    const sent = path.match(
+      /^\/api\/(quotes|invoices|payments|ad-wallet-entries)\/([^/]+)\/email$/,
+    );
+    if (sent?.[1] && sent[2] && method === 'POST') {
+      const from = SENT_FROM[sent[1] as keyof typeof SENT_FROM];
+      const body = input();
+      return queue(route, id(601), from.kind(body), { type: from.type, id: sent[2] }, body);
+    }
+    const reminder = path.match(/^\/api\/approvals\/requests\/([^/]+)\/email-reminder$/);
+    if (reminder?.[1] && method === 'POST') {
+      return push(route, {
+        kind: 'client_approval_reminder',
+        audience: 'client',
+        to: [address('هالة الشامي', 'hala@jasmine.example')],
+        cc: [],
+        subject: 'تذكير: أعمال ما زالت بانتظار اعتمادكم',
+        sender: { id: me().user.id, name: me().user.name },
+        sentAt: null,
+        error: null,
+        attempts: 0,
+        record: { type: 'approval_request', id: reminder[1] },
+        clientId: id(601),
+      });
+    }
+    const documentHistory = path.match(
+      /^\/api\/(quotes|invoices|approvals\/requests)\/([^/]+)\/emails$/,
+    );
+    if (documentHistory?.[2] && method === 'GET') {
+      const recordId = documentHistory[2];
+      return json(
+        route,
+        history((email) => email.record?.id === recordId || email.invoiceId === recordId),
+      );
+    }
+    const clientDocument = path.match(
+      /^\/api\/clients\/([^/]+)\/(statement|monthly-report|ad-wallet)\/(email|emails)$/,
+    );
+    if (clientDocument?.[1]) {
+      const [, clientId, document, action] = clientDocument;
+      const kinds: ClientEmailKind[] =
+        document === 'statement'
+          ? ['client_statement']
+          : document === 'monthly-report'
+            ? ['client_report']
+            : ['client_ad_receipt', 'client_ad_budget_low'];
+      if (action === 'emails' && method === 'GET') {
+        const month = url.searchParams.get('month');
+        return json(
+          route,
+          history(
+            (email) =>
+              email.clientId === clientId &&
+              (kinds as string[]).includes(email.kind) &&
+              (!month || email.month === month),
+          ),
+        );
+      }
+      if (action === 'email' && method === 'POST') {
+        const kind = document === 'ad-wallet' ? 'client_ad_budget_low' : kinds[0];
+        if (!kind) return undefined;
+        return queue(route, clientId, kind, { type: 'client', id: clientId }, input());
+      }
+    }
+    return undefined;
+  };
+}
+
 // Calendar and shoots (F11)
 
 interface ShootRecord {

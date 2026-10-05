@@ -157,8 +157,15 @@ describe('notification emails (F14 email rules 2–12)', () => {
       expect(saved.digestEnabled).toBe(false);
       expect(typeOf(saved, 'task_review_requested')?.email).toBe(true);
       expect(typeOf(saved, 'task_assigned')?.email).toBe(false);
-      // Muted in the app: nothing to email, the switch shows off and locked.
-      expect(typeOf(saved, 'task_mentioned')).toMatchObject({ email: false, emailLocked: true });
+      // Muted in the app: nothing to email, the switch locked; the choice stays.
+      expect(typeOf(saved, 'task_mentioned')).toMatchObject({ email: true, emailLocked: true });
+
+      // The screen saves every switch as it reads them: a muted type keeps its choice.
+      const resaved = await saveSettings(cookie, {
+        mutedTypes: ['task_mentioned'],
+        emailTypes: saved.types.filter((item) => item.email).map((item) => item.type),
+      });
+      expect(typeOf(resaved, 'task_mentioned')).toMatchObject({ email: true, emailLocked: true });
 
       // Leaving them out keeps them.
       const kept = await saveSettings(cookie, { mutedTypes: [] });

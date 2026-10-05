@@ -46,6 +46,7 @@ export function NewUserPage() {
       <LinkDialog
         link={created?.link ?? null}
         name={created?.user.name ?? ''}
+        email={created?.user.email ?? ''}
         onClose={() => {
           if (created) void navigate({ to: '/team/$userId', params: { userId: created.user.id } });
         }}

@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "user:create": "node dist/cli/create-user.js",
+    "db:seed": "node dist/cli/seed.js",
     "user:reset-two-factor": "node dist/cli/reset-two-factor.js",
     "openapi:export": "node dist/cli/openapi.js",
     "notifications:run-daily": "node dist/cli/run-notifications-daily.js",

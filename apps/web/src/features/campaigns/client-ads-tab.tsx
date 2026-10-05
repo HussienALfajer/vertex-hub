@@ -35,6 +35,7 @@ import { LoadError } from '../../components/load-error';
 import { TabHeader } from '../../components/tab-header';
 import { scopesOf } from '../../lib/auth';
 import { formatCalendarDate } from '../../lib/format';
+import { EmailHistory } from '../email/email-history';
 import { Money } from '../quotes/quote-badges';
 import { Balance, LowBalanceBadge } from './campaign-badges';
 import { CampaignDialog } from './campaign-dialog';
@@ -47,6 +48,7 @@ import {
   VoidEntryDialog,
   WalletEntryDialog,
 } from './wallet-dialogs';
+import { BudgetLowEmailButton, DepositEmailButton } from './wallet-email';
 
 /** Campaign readers covering the client see its Ads tab (spec screen 4). */
 export function hasCampaignAccess(me: MeResponse, accountManagerId: string): boolean {
@@ -106,8 +108,9 @@ function WalletSection({ wallet }: { wallet: AdWallet }) {
         title={t('campaigns.wallet.title')}
         description={t('campaigns.wallet.hint')}
         action={
-          (permissions.canDeposit || permissions.canFund) && (
+          (permissions.canDeposit || permissions.canFund || wallet.low) && (
             <div className="flex flex-wrap items-center gap-2">
+              <BudgetLowEmailButton wallet={wallet} />
               {permissions.canFund && (
                 <Button size="sm" variant="outline" onClick={() => setRecording('refund')}>
                   <BanknoteArrowUpIcon />
@@ -165,6 +168,7 @@ function WalletSection({ wallet }: { wallet: AdWallet }) {
         </Stat>
       </section>
       <Ledger wallet={wallet} onVoid={permissions.canFund ? setVoiding : undefined} />
+      <EmailHistory target={{ type: 'ad_wallet', clientId: wallet.client.id }} />
 
       <WalletEntryDialog wallet={wallet} kind={recording} onClose={() => setRecording(null)} />
       {permissions.canEditThreshold && (
@@ -311,6 +315,7 @@ function Ledger({ wallet, onVoid }: { wallet: AdWallet; onVoid?: (entry: WalletE
                   {entry ? (
                     <span className="flex flex-wrap items-center gap-1">
                       <DepositReceipt clientId={wallet.client.id} entry={entry} />
+                      <DepositEmailButton wallet={wallet} entry={entry} />
                       <ProofLink entry={entry} />
                     </span>
                   ) : null}
