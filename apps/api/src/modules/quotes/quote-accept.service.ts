@@ -17,11 +17,11 @@ import {
   type CountedQuoteItem,
   type DepartmentCode,
   defaultInstallmentMilestones,
-  firstOfMonth,
   mergeDeliverableLines,
   type QuoteDetail,
   quoteDisplayNumber,
   RETAINER_LIMITS,
+  splitEvenly,
 } from '@vertex-hub/contracts';
 import { type Database, quotes, type Transaction } from '@vertex-hub/db';
 import { and, eq, gt, isNull } from 'drizzle-orm';
@@ -194,18 +194,35 @@ export class QuoteAcceptService {
       const renewable = engagementClient
         ? await this.engagements.renewable(engagementClient.id)
         : [];
+      const monthlyFeeMinor = totalsOf(quote, children).monthly.netMinor;
+      const months = quote.monthlyTermMonths;
       retainer = {
         name: quote.title,
         departments: derived.monthly.departments,
         startDate,
-        renewalDate: quote.monthlyTermMonths ? addMonths(startDate, quote.monthlyTermMonths) : null,
+        renewalDate: months ? addMonths(startDate, months) : null,
         template: template ? { id: template.id, name: template.name } : null,
         currency: quote.currency,
-        monthlyFeeMinor: totalsOf(quote, children).monthly.netMinor,
+        monthlyFeeMinor,
         lines: derived.monthly.lines,
+        // F05B Q1: the quote's term, at the monthly net each month, renewing.
+        term: months
+          ? {
+              months,
+              agreedTotalMinor: monthlyFeeMinor * months,
+              schedule: splitEvenly(monthlyFeeMinor * months, months),
+              endAction: 'renew',
+            }
+          : null,
         renewable: renewable
           .filter((candidate) => candidate.currency === quote.currency)
-          .map(({ id: retainerId, name, status }) => ({ id: retainerId, name, status })),
+          .map(({ id: retainerId, name, status, renewsFrom, afterTerm }) => ({
+            id: retainerId,
+            name,
+            status,
+            renewsFrom,
+            afterTerm,
+          })),
       };
     }
 
@@ -349,16 +366,22 @@ export class QuoteAcceptService {
         }
         const choice = input.retainer;
         if (choice.mode === 'new') {
-          const retainerId = await this.engagements.createRetainer(tx, actor, {
-            clientId: client.id,
-            name: choice.name,
-            departments: choice.departments,
-            startDate: choice.startDate,
-            renewalDate: choice.renewalDate,
-            currency: quote.currency,
-            monthlyFeeMinor: totals.monthly.netMinor,
-            deliverables: lines,
-          });
+          const retainerId = await this.engagements.createRetainer(
+            tx,
+            actor,
+            {
+              clientId: client.id,
+              name: choice.name,
+              departments: choice.departments,
+              startDate: choice.startDate,
+              renewalDate: choice.renewalDate,
+              currency: quote.currency,
+              monthlyFeeMinor: totals.monthly.netMinor,
+              deliverables: lines,
+              ...(choice.term && { term: choice.term }),
+            },
+            { quoteId: quote.id },
+          );
           // A8: linked before the first cycle opens, so F07 generates the month's tasks.
           if (choice.templateId) {
             await this.runner.linkRetainerTemplate(tx, actor, retainerId, choice.templateId);
@@ -367,18 +390,18 @@ export class QuoteAcceptService {
           retainer = { id: retainerId, name: choice.name };
           for (const code of choice.departments) departments.add(code);
         } else {
+          // F05B Q2: the lines, fee and term take effect after the active term, else next month.
           const renewed = await this.engagements.renewRetainer(tx, actor, choice.retainerId, {
+            quoteId: quote.id,
             clientId: client.id,
             currency: quote.currency,
             deliverables: lines,
             monthlyFeeMinor: totals.monthly.netMinor,
-            ...(quote.monthlyTermMonths && {
-              renewalDate: addMonths(firstOfMonth(today), 1 + quote.monthlyTermMonths),
-            }),
+            term: choice.term,
+            // Linked with the lines, in the renewal's month (owner decision 2026-10-07).
+            templateId: choice.templateId && (await this.renewalTemplate(tx, choice.templateId)),
+            reason: `${quoteDisplayNumber(quote)} — ${quote.title}`.slice(0, 500),
           });
-          if (choice.templateId) {
-            await this.runner.linkRetainerTemplate(tx, actor, choice.retainerId, choice.templateId);
-          }
           retainer = { id: choice.retainerId, name: renewed.name };
           for (const code of renewed.departments) departments.add(code);
         }
@@ -461,6 +484,19 @@ export class QuoteAcceptService {
     if (preview) await this.files.queuePreviews();
     for (const key of discarded) await this.pdf.discardPreview(key);
     return detail;
+  }
+
+  /** A7: the monthly template a renewal links later must be a live monthly template now. */
+  private async renewalTemplate(tx: Transaction, templateId: string): Promise<string> {
+    const template = (await this.templates.summaries([templateId], tx)).get(templateId);
+    if (!template) throw new NotFoundException();
+    if (template.archived) {
+      throw new CodedException(409, 'TEMPLATE_ARCHIVED', 'The template is archived');
+    }
+    if (template.kind !== 'retainer_cycle') {
+      throw new CodedException(400, 'TEMPLATE_KIND_MISMATCH', 'The template is of another kind');
+    }
+    return template.id;
   }
 
   /**

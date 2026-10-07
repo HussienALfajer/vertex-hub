@@ -1,4 +1,10 @@
-import { ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import {
   type AuditAction,
   addDays,
@@ -11,6 +17,7 @@ import {
   type DeliverableLineList,
   deliverableKey,
   duplicateDeliverables,
+  firstOfMonth,
   permissionScopes,
   RENEWAL_NOTICE_DAYS,
   RETAINER_LIMITS,
@@ -21,6 +28,7 @@ import {
   type RetainerPage,
   type RetainerStatus,
   type RetainerStatusChange,
+  type RetainerTermSummary,
   renewalState,
   type UpdateRetainer,
 } from '@vertex-hub/contracts';
@@ -75,7 +83,10 @@ import {
   retainerPermissions,
   workableRetainer,
 } from './retainer-access.js';
+import { RetainerAmendmentsService } from './retainer-amendments.service.js';
+import { RetainerCharges } from './retainer-charges.js';
 import { RetainerCyclesService } from './retainer-cycles.service.js';
+import { RetainerTermsService } from './retainer-terms.service.js';
 
 type Executor = Database | Transaction;
 
@@ -119,6 +130,9 @@ export class RetainersService {
     private readonly clients: ClientDirectory,
     private readonly cycles: RetainerCyclesService,
     private readonly locks: BillingLocks,
+    private readonly charges: RetainerCharges,
+    private readonly terms: RetainerTermsService,
+    private readonly amendments: RetainerAmendmentsService,
   ) {}
 
   async list(actor: CurrentUserInfo, query: RetainerListQuery): Promise<RetainerPage> {
@@ -153,6 +167,9 @@ export class RetainersService {
         lte(retainers.renewalDate, addDays(today, RENEWAL_NOTICE_DAYS)),
       );
       filters.push(query.renewalDue ? due : or(isNull(retainers.renewalDate), not(due as SQL)));
+    }
+    if (query.pendingApproval !== undefined) {
+      filters.push(this.amendments.pendingApprovalFilter(query.pendingApproval));
     }
     const where = and(...filters);
 
@@ -196,8 +213,15 @@ export class RetainersService {
     const people = await this.users.summaries(
       [...clients.values()].map((client) => client.accountManagerId),
     );
+    const ids = rows.map((row) => row.id);
+    const [terms, pending] = await Promise.all([
+      this.terms.summaries(this.db, ids),
+      this.amendments.pendingCounts(this.db, ids),
+    ]);
     return {
-      items: rows.map((row) => toRetainer(row, { clients, people, currentCycles, today })),
+      items: rows.map((row) =>
+        toRetainer(row, { clients, people, currentCycles, terms, pending, today }),
+      ),
       total,
       page: query.page,
       pageSize: query.pageSize,
@@ -221,33 +245,60 @@ export class RetainersService {
       this.standingLines(this.db, id),
     ]);
     if (!row) throw new NotFoundException();
-    const [currentCycles, people] = await Promise.all([
+    const money = seesMoney(actor, access.client);
+    const [currentCycles, people, term, pending, credits] = await Promise.all([
       this.cycles.current([row]),
       this.users.summaries([access.client.accountManagerId]),
+      this.terms.summaryWithMoney(this.db, id, money),
+      this.amendments.pendingCounts(this.db, [id]),
+      money ? this.creditPending(id) : Promise.resolve(0),
     ]);
     return {
       ...toRetainer(row, {
         clients: new Map([[access.client.id, access.client]]),
         people,
         currentCycles,
+        terms: new Map(term ? [[id, term]] : []),
+        pending,
         today: businessDate(),
       }),
       startDate: row.startDate,
       endedOn: row.endedOn,
       deliverables: lines,
       archivedAt: row.archivedAt?.toISOString() ?? null,
-      ...(seesMoney(actor, access.client) && {
-        money: { currency: row.currency, monthlyFeeMinor: row.monthlyFeeMinor },
+      ...(money && {
+        money: {
+          currency: row.currency,
+          monthlyFeeMinor: row.monthlyFeeMinor,
+          creditPendingMinor: credits,
+        },
       }),
       permissions: retainerPermissions(actor, access),
     };
   }
 
   async create(actor: CurrentUserInfo, input: CreateRetainer): Promise<RetainerDetail> {
+    if (input.term && input.renewalDate) {
+      throw new CodedException(
+        409,
+        'RENEWAL_DATE_FROM_TERM',
+        'A retainer with a term takes its renewal date from the term',
+      );
+    }
     const id = await this.db.transaction(async (tx) => {
       // A cycle opening at once may assign its tasks (F07 rule 16): users must stay active.
       if (input.startDate <= businessDate()) await lockAccessChanges(tx);
       const created = await this.createIn(tx, actor, input);
+      // F05B: the term starts in the start date's month, before the first cycle opens.
+      if (input.term) {
+        await this.terms.createIn(
+          tx,
+          actorOf(actor),
+          { id: created, startDate: input.startDate },
+          { ...input.term, startMonth: firstOfMonth(input.startDate) },
+          businessDate(),
+        );
+      }
       // R3: a retainer that has started gets this month's cycle at once.
       await this.start(tx, actor, created, input.startDate);
       return created;
@@ -264,7 +315,11 @@ export class RetainersService {
     if (!client) throw new NotFoundException();
     if (!coversClient(actor, client)) throw new ForbiddenException();
     assertClientTakesWork(client);
-    if (input.currency !== undefined || input.monthlyFeeMinor !== undefined) {
+    if (
+      input.currency !== undefined ||
+      input.monthlyFeeMinor !== undefined ||
+      input.term !== undefined
+    ) {
       assertCanEditMoney(actor, client);
     }
     assertLines(input.deliverables);
@@ -352,6 +407,29 @@ export class RetainersService {
         input.startDate ?? current.startDate,
         input.renewalDate === undefined ? current.renewalDate : input.renewalDate,
       );
+      // F05B T2: a term never starts before the month of the retainer's start date.
+      if (startChanges && input.startDate) {
+        const termStart = await this.terms.firstOpenMonth(tx, id);
+        if (termStart && firstOfMonth(input.startDate) > termStart) {
+          throw new CodedException(
+            400,
+            'INVALID_DATES',
+            'The start date falls after the start of the retainer’s term',
+          );
+        }
+      }
+      // F05B T11: with an active or scheduled term the renewal date is derived from it.
+      if (
+        input.renewalDate !== undefined &&
+        input.renewalDate !== current.renewalDate &&
+        (await this.terms.hasOpenTerm(tx, id))
+      ) {
+        throw new CodedException(
+          409,
+          'RENEWAL_DATE_FROM_TERM',
+          'The renewal date follows the retainer term',
+        );
+      }
       if (input.name !== undefined && input.name.toLowerCase() !== current.name.toLowerCase()) {
         await this.assertNameFree(tx, retainer.clientId, input.name, id);
       }
@@ -374,8 +452,19 @@ export class RetainersService {
         { currency: current.currency, monthlyFeeMinor: current.monthlyFeeMinor },
         { currency: input.currency, monthlyFeeMinor: input.monthlyFeeMinor },
       );
+      // F05B A9: once the retainer has a charge, its fee changes only by an onward amendment.
+      if (money?.after.monthlyFeeMinor !== undefined && (await this.charges.hasCharges(tx, id))) {
+        throw new CodedException(
+          409,
+          'FEE_CHANGE_NEEDS_AMENDMENT',
+          'The retainer has charges; change its fee with an amendment',
+        );
+      }
       if (money?.after.currency !== undefined) {
         await this.assertCurrencyFree(tx, id, current.monthlyFeeMinor);
+        if (await this.charges.hasCharges(tx, id)) {
+          throw new CodedException(409, 'CURRENCY_LOCKED', 'The retainer has charges');
+        }
         await this.locks.assertCurrencyFree(tx, { type: 'retainer', id });
       }
       if (!basics && !money) return;
@@ -405,6 +494,16 @@ export class RetainersService {
         retainer.status === 'active'
       ) {
         await this.cycles.open(tx, id, input.startDate, today, actorOf(actor));
+      }
+      // F05B C2: a fee set while the month's open cycle has none charges that month.
+      if (money?.after.monthlyFeeMinor && !current.monthlyFeeMinor) {
+        await this.charges.chargeOpenMonth(
+          tx,
+          id,
+          today,
+          money.after.monthlyFeeMinor,
+          actorOf(actor),
+        );
       }
     });
     return this.detail(actor, id);
@@ -506,8 +605,14 @@ export class RetainersService {
       if (change.status === 'active') await lockAccessChanges(tx);
       const retainer = await readableRetainer(tx, this.clients, actor, id, { forUpdate: true });
       if (!coversClient(actor, retainer.client)) throw new ForbiddenException();
-      assertRetainerNotArchived(retainer);
       const to = change.status;
+      if (change.termination) {
+        if (to !== 'ended') {
+          throw new BadRequestException('A termination fee comes only with ending the retainer');
+        }
+        assertCanEditMoney(actor, retainer.client);
+      }
+      assertRetainerNotArchived(retainer);
       if (!canChangeRetainerStatus(retainer.status, to)) {
         throw new CodedException(
           409,
@@ -535,7 +640,21 @@ export class RetainersService {
         before: { status: retainer.status },
         after: { status: to },
       });
-      if (to === 'ended') await this.cycles.closeAll(tx, id, today, actorOf(actor));
+      if (to === 'ended') {
+        await this.cycles.closeAll(tx, id, today, actorOf(actor));
+        // F05B E1, E2: later months are cancelled; a termination fee drafts at once.
+        await this.terms.endEarly(tx, id, today, actorOf(actor));
+        await this.amendments.cancelOpen(tx, id, actorOf(actor));
+        if (change.termination) {
+          await this.charges.createTerminationFee(
+            tx,
+            id,
+            today,
+            change.termination,
+            actorOf(actor),
+          );
+        }
+      }
       // R3: resuming or reactivating a started retainer opens this month's cycle, from today.
       if (to === 'active' && retainer.startDate <= today) {
         await this.cycles.open(tx, id, today, today, actorOf(actor));
@@ -586,6 +705,14 @@ export class RetainersService {
       });
     });
     return this.detail(actor, id);
+  }
+
+  /** C9: the pending credits no live invoice bills, owed to the client, as a positive amount. */
+  private async creditPending(retainerId: string): Promise<number> {
+    return this.db.transaction(async (tx) => {
+      const credits = await this.charges.pendingCredits(tx, retainerId, tx);
+      return -credits.reduce((total, credit) => total + credit.amountMinor, 0);
+    });
   }
 
   /** Non-archived standing lines, by position. */
@@ -675,6 +802,8 @@ function toRetainer(
     clients: Map<string, ClientSummary>;
     people: Map<string, UserSummary>;
     currentCycles: Map<string, Cycle>;
+    terms: Map<string, RetainerTermSummary>;
+    pending: Map<string, number>;
     today: string;
   },
 ): Retainer {
@@ -689,6 +818,8 @@ function toRetainer(
     status: row.status,
     renewalDate: row.renewalDate,
     renewal: renewalState(row.renewalDate, row.status, context.today),
+    term: context.terms.get(row.id) ?? null,
+    pendingAmendments: context.pending.get(row.id) ?? 0,
     currentCycle: context.currentCycles.get(row.id) ?? null,
   };
 }

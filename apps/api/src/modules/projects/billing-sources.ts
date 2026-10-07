@@ -1,22 +1,27 @@
 import { Inject, Injectable } from '@nestjs/common';
-import type {
-  Currency,
-  CycleStatus,
-  ExtraWorkBilling,
-  InvoiceSource,
-  InvoiceSourceType,
-  MilestoneStatus,
+import {
+  type Currency,
+  type ExtraWorkBilling,
+  type InvoiceSource,
+  type InvoiceSourceType,
+  type MilestoneStatus,
+  type RetainerChargeKind,
+  type RetainerChargeListQuery,
+  type RetainerChargeStatus,
+  termPosition,
 } from '@vertex-hub/contracts';
 import {
   type Database,
   extraWorkItems,
   projectMilestones,
   projects,
-  retainerCycles,
+  retainerAmendments,
+  retainerCharges,
   retainers,
+  retainerTerms,
   type Transaction,
 } from '@vertex-hub/db';
-import { and, asc, desc, eq, gt, inArray, isNull } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gt, inArray, isNotNull, isNull, type SQL } from 'drizzle-orm';
 import { DATABASE } from '../../core/database/database.module.js';
 import { type AuditActor, recordAudit } from '../audit/index.js';
 
@@ -32,16 +37,17 @@ export interface BillingEngagement {
   archived: boolean;
 }
 
-/** A milestone, cycle or extra work item as an invoice line bills it (F13 rules 2–6). */
+/** A milestone, retainer charge or extra work item as an invoice line bills it (F13 rules 2–6). */
 export interface BillingSource {
   type: InvoiceSourceType;
   id: string;
-  /** The milestone or extra work name; the cycle's month for a cycle. */
+  /** The milestone or extra work name; the charge's month for a retainer charge. */
   name: string;
   /** The default line text: "<engagement> — <milestone or month>", or the extra work title. */
   description: string;
-  /** The installment, the retainer's current fee or the estimate; null when it has none. */
+  /** The installment, the charge's amount or the estimate; null when it has none. */
   amountMinor: number | null;
+  /** Archived work, or a charge that is not due yet, cancelled or settled outside (F05B C7, C10). */
   archived: boolean;
   /** Extra work only. */
   billingStatus: ExtraWorkBilling | null;
@@ -57,11 +63,12 @@ export interface BillableWork {
     status: MilestoneStatus;
     installmentMinor: number;
   }[];
-  cycles: {
+  charges: {
     id: string;
     retainer: { id: string; name: string };
     month: string;
-    feeMinor: number | null;
+    kind: RetainerChargeKind;
+    amountMinor: number;
   }[];
   extraWork: {
     id: string;
@@ -81,10 +88,51 @@ export interface BillingMilestone {
   installmentMinor: number | null;
 }
 
+/** A retainer's charge as its billing summary and charge list show it (F05B). */
+export interface RetainerChargeRow {
+  id: string;
+  month: string;
+  kind: RetainerChargeKind;
+  amountMinor: number;
+  status: RetainerChargeStatus;
+  /** A term month's `monthly` charge: its place in the term (F05B C4). */
+  term: ChargeTerm | null;
+  /** The amendment of an addition or a credit (C6). */
+  amendment: { id: string; number: number } | null;
+  settleNote: string | null;
+  due: boolean;
+}
+
+export interface ChargeTerm {
+  number: number;
+  position: number;
+  months: number;
+}
+
+const chargeTermColumns = {
+  number: retainerTerms.number,
+  startMonth: retainerTerms.startMonth,
+  months: retainerTerms.months,
+};
+
+/** "2 of 3" of the charge's term, read from the joined term columns. */
+function chargeTerm(
+  month: string,
+  term: { number: number; startMonth: string; months: number } | null,
+): ChargeTerm | null {
+  if (!term) return null;
+  return {
+    number: term.number,
+    position: termPosition(term.startMonth, month),
+    months: term.months,
+  };
+}
+
 /** What a retainer's billing summary lists (F13). */
 export interface RetainerWork {
   monthlyFeeMinor: number | null;
-  cycles: { id: string; month: string; status: CycleStatus }[];
+  /** Newest month first. */
+  charges: RetainerChargeRow[];
   extraWork: {
     id: string;
     title: string;
@@ -102,12 +150,35 @@ const monthName = new Intl.DateTimeFormat('ar-SY-u-nu-latn', {
 
 export const cycleMonthName = (month: string) => monthName.format(new Date(`${month}T00:00:00Z`));
 
+/**
+ * F05B C4: a charge's line text after its retainer's name: the month (with "n من N" in a term),
+ * the amendment of an addition or a credit, or the termination fee.
+ */
+function chargeName(row: {
+  kind: RetainerChargeKind;
+  month: string;
+  term: ChargeTerm | null;
+  amendmentNumber: number | null;
+}): string {
+  const month = cycleMonthName(row.month);
+  switch (row.kind) {
+    case 'monthly':
+      return row.term ? `${month} (${row.term.position} من ${row.term.months})` : month;
+    case 'addition':
+      return `تعديل ${row.amendmentNumber ?? ''} — ${month}`;
+    case 'credit':
+      return `رصيد دائن (تعديل ${row.amendmentNumber ?? ''}) — ${month}`;
+    case 'termination_fee':
+      return `رسوم إنهاء مبكر — ${month}`;
+  }
+}
+
 /** The map key of a source in `BillingSources.resolve`. */
 export const sourceKey = (source: InvoiceSource) => `${source.type}:${source.id}`;
 
 /**
  * What the `invoices` module bills from projects and retainers (F13): milestone installments,
- * retainer cycles and extra work, their engagements, and the extra work billing status that
+ * retainer charges (F05B) and extra work, their engagements, and the extra work billing status that
  * issuing and voiding set. Never the tables.
  */
 @Injectable()
@@ -203,31 +274,40 @@ export class BillingSources {
         });
       }
     }
-    const cycleIds = ids('retainer_cycle');
-    if (cycleIds.length) {
-      const rows = await executor
+    const chargeIds = ids('retainer_charge');
+    if (chargeIds.length) {
+      const query = executor
         .select({
-          id: retainerCycles.id,
-          month: retainerCycles.month,
-          feeMinor: retainers.monthlyFeeMinor,
+          id: retainerCharges.id,
+          month: retainerCharges.month,
+          kind: retainerCharges.kind,
+          amountMinor: retainerCharges.amountMinor,
+          status: retainerCharges.status,
+          dueAt: retainerCharges.dueAt,
           engagement: engagementColumns(retainers),
+          term: chargeTermColumns,
+          amendmentNumber: retainerAmendments.number,
         })
-        .from(retainerCycles)
-        .innerJoin(retainers, eq(retainers.id, retainerCycles.retainerId))
-        .where(inArray(retainerCycles.id, cycleIds));
+        .from(retainerCharges)
+        .innerJoin(retainers, eq(retainers.id, retainerCharges.retainerId))
+        .leftJoin(retainerTerms, eq(retainerTerms.id, retainerCharges.termId))
+        .leftJoin(retainerAmendments, eq(retainerAmendments.id, retainerCharges.amendmentId))
+        .where(inArray(retainerCharges.id, chargeIds));
+      // Locked like milestones: a draft waits for a change of the charge's amount or status.
+      const rows = options.lock ? await query.for('share', { of: retainerCharges }) : await query;
       for (const row of rows) {
         const engagement: BillingEngagement = {
           type: 'retainer',
           ...withoutArchivedAt(row.engagement),
         };
-        const month = cycleMonthName(row.month);
-        result.set(sourceKey({ type: 'retainer_cycle', id: row.id }), {
-          type: 'retainer_cycle',
+        const name = chargeName({ ...row, term: chargeTerm(row.month, row.term) });
+        result.set(sourceKey({ type: 'retainer_charge', id: row.id }), {
+          type: 'retainer_charge',
           id: row.id,
-          name: month,
-          description: `${engagement.name} — ${month}`,
-          amountMinor: row.feeMinor,
-          archived: false,
+          name,
+          description: `${engagement.name} — ${name}`.slice(0, 300),
+          amountMinor: row.amountMinor,
+          archived: row.status !== 'pending' || row.dueAt === null,
           billingStatus: null,
           engagement,
         });
@@ -274,8 +354,9 @@ export class BillingSources {
   }
 
   /**
-   * F13 rule 6: the client's non-archived milestones with an installment, cycles and unbilled
-   * extra work of its non-archived projects and retainers in `currency`.
+   * F13 rule 6: the client's non-archived milestones with an installment, due pending retainer
+   * charges (F05B C7) and unbilled extra work of its non-archived projects and retainers in
+   * `currency`.
    */
   async billable(clientId: string, currency: Currency): Promise<BillableWork> {
     const liveProject = and(
@@ -288,7 +369,7 @@ export class BillingSources {
       eq(retainers.currency, currency),
       isNull(retainers.archivedAt),
     );
-    const [milestones, cycles, projectWork, retainerWork] = await Promise.all([
+    const [milestones, charges, projectWork, retainerWork] = await Promise.all([
       this.db
         .select({
           id: projectMilestones.id,
@@ -310,16 +391,28 @@ export class BillingSources {
         .orderBy(asc(projects.name), asc(projectMilestones.position)),
       this.db
         .select({
-          id: retainerCycles.id,
+          id: retainerCharges.id,
           retainerId: retainers.id,
           retainerName: retainers.name,
-          month: retainerCycles.month,
-          feeMinor: retainers.monthlyFeeMinor,
+          month: retainerCharges.month,
+          kind: retainerCharges.kind,
+          amountMinor: retainerCharges.amountMinor,
         })
-        .from(retainerCycles)
-        .innerJoin(retainers, eq(retainers.id, retainerCycles.retainerId))
-        .where(liveRetainer)
-        .orderBy(asc(retainers.name), desc(retainerCycles.month)),
+        .from(retainerCharges)
+        .innerJoin(retainers, eq(retainers.id, retainerCharges.retainerId))
+        .where(
+          and(
+            liveRetainer,
+            eq(retainerCharges.status, 'pending'),
+            isNotNull(retainerCharges.dueAt),
+          ),
+        )
+        .orderBy(
+          asc(retainers.name),
+          desc(retainerCharges.month),
+          asc(retainerCharges.createdAt),
+          asc(retainerCharges.id),
+        ),
       this.db
         .select({
           id: extraWorkItems.id,
@@ -357,11 +450,12 @@ export class BillingSources {
         status: row.status,
         installmentMinor: row.installmentMinor ?? 0,
       })),
-      cycles: cycles.map((row) => ({
+      charges: charges.map((row) => ({
         id: row.id,
         retainer: { id: row.retainerId, name: row.retainerName },
         month: row.month,
-        feeMinor: row.feeMinor,
+        kind: row.kind,
+        amountMinor: row.amountMinor,
       })),
       extraWork: [
         ...projectWork.map((row) => ({ ...row, project: owner(row), retainer: null })),
@@ -394,24 +488,16 @@ export class BillingSources {
   }
 
   /**
-   * F13 retainer billing: the retainer's current fee, its cycles (newest month first) and its
-   * non-archived extra work (newest first).
+   * F13 retainer billing: the retainer's current fee, its charges (newest month first, F05B) and
+   * its non-archived extra work (newest first).
    */
   async retainerWork(retainerId: string): Promise<RetainerWork> {
-    const [[retainer], cycles, extraWork] = await Promise.all([
+    const [[retainer], charges, extraWork] = await Promise.all([
       this.db
         .select({ monthlyFeeMinor: retainers.monthlyFeeMinor })
         .from(retainers)
         .where(eq(retainers.id, retainerId)),
-      this.db
-        .select({
-          id: retainerCycles.id,
-          month: retainerCycles.month,
-          status: retainerCycles.status,
-        })
-        .from(retainerCycles)
-        .where(eq(retainerCycles.retainerId, retainerId))
-        .orderBy(desc(retainerCycles.month)),
+      this.chargeRows(eq(retainerCharges.retainerId, retainerId)),
       this.db
         .select({
           id: extraWorkItems.id,
@@ -423,7 +509,70 @@ export class BillingSources {
         .where(and(eq(extraWorkItems.retainerId, retainerId), isNull(extraWorkItems.archivedAt)))
         .orderBy(desc(extraWorkItems.requestedOn), asc(extraWorkItems.id)),
     ]);
-    return { monthlyFeeMinor: retainer?.monthlyFeeMinor ?? null, cycles, extraWork };
+    return { monthlyFeeMinor: retainer?.monthlyFeeMinor ?? null, charges, extraWork };
+  }
+
+  /** F05B: one page of a retainer's charges, newest month first. */
+  async retainerCharges(
+    retainerId: string,
+    query: RetainerChargeListQuery,
+  ): Promise<{ items: RetainerChargeRow[]; total: number }> {
+    const where = and(
+      eq(retainerCharges.retainerId, retainerId),
+      query.status ? inArray(retainerCharges.status, query.status) : undefined,
+      query.kind ? inArray(retainerCharges.kind, query.kind) : undefined,
+    );
+    const [items, [total]] = await Promise.all([
+      this.chargeRows(where, { limit: query.pageSize, offset: (query.page - 1) * query.pageSize }),
+      this.db.select({ value: count() }).from(retainerCharges).where(where),
+    ]);
+    return { items, total: total?.value ?? 0 };
+  }
+
+  /** F05B C9: one charge of the retainer, as its billing shows it. */
+  async retainerCharge(retainerId: string, chargeId: string): Promise<RetainerChargeRow | null> {
+    const [row] = await this.chargeRows(
+      and(eq(retainerCharges.retainerId, retainerId), eq(retainerCharges.id, chargeId)),
+    );
+    return row ?? null;
+  }
+
+  private async chargeRows(
+    where: SQL | undefined,
+    page?: { limit: number; offset: number },
+  ): Promise<RetainerChargeRow[]> {
+    const query = this.db
+      .select({
+        id: retainerCharges.id,
+        month: retainerCharges.month,
+        kind: retainerCharges.kind,
+        amountMinor: retainerCharges.amountMinor,
+        status: retainerCharges.status,
+        dueAt: retainerCharges.dueAt,
+        settleNote: retainerCharges.settleNote,
+        term: chargeTermColumns,
+        amendmentId: retainerAmendments.id,
+        amendmentNumber: retainerAmendments.number,
+      })
+      .from(retainerCharges)
+      .leftJoin(retainerTerms, eq(retainerTerms.id, retainerCharges.termId))
+      .leftJoin(retainerAmendments, eq(retainerAmendments.id, retainerCharges.amendmentId))
+      .where(where)
+      .orderBy(
+        desc(retainerCharges.month),
+        asc(retainerCharges.createdAt),
+        asc(retainerCharges.id),
+      );
+    const rows = page ? await query.limit(page.limit).offset(page.offset) : await query;
+    return rows.map(({ dueAt, term, amendmentId, amendmentNumber, ...row }) => ({
+      ...row,
+      term: chargeTerm(row.month, term),
+      amendment:
+        amendmentId && amendmentNumber !== null
+          ? { id: amendmentId, number: amendmentNumber }
+          : null,
+      due: dueAt !== null,
+    }));
   }
 
   /**

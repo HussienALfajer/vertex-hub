@@ -451,6 +451,8 @@ function LineCard({
     `lines.${index}.unitPriceMinor`,
   ]);
   const name = t('invoices.editor.lineN', { n: formatNumber(index + 1) });
+  // F05B C7: a credit charge's line keeps a negative price; its amount is typed as a positive one.
+  const [credit] = useState(() => line.source?.type === 'retainer_charge' && (price ?? 0) < 0);
 
   return (
     <li>
@@ -502,12 +504,14 @@ function LineCard({
             name={`lines.${index}.unitPriceMinor`}
             render={({ field }) => (
               <Field invalid={invalid('unitPriceMinor')}>
-                <FieldLabel htmlFor={ids.price}>{t('invoices.editor.unitPrice')}</FieldLabel>
+                <FieldLabel htmlFor={ids.price}>
+                  {credit ? t('invoices.editor.creditAmount') : t('invoices.editor.unitPrice')}
+                </FieldLabel>
                 <MoneyInput
                   id={ids.price}
                   currency={invoice.currency}
-                  value={field.value}
-                  onValueChange={(minor) => field.onChange(minor ?? 0)}
+                  value={credit ? Math.abs(field.value ?? 0) : field.value}
+                  onValueChange={(minor) => field.onChange((credit ? -1 : 1) * (minor ?? 0))}
                   disabled={readOnly}
                 />
               </Field>

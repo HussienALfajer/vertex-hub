@@ -75,7 +75,11 @@ export type InvoiceRow = typeof invoices.$inferSelect;
 
 export type InvoiceLineRow = typeof invoiceLines.$inferSelect;
 
-type NewLine = Omit<InvoiceLineRow, 'id' | 'invoiceId' | 'holdsSource' | 'position'>;
+// `retainerCycleId` is deprecated by F05B: new lines never set it.
+type NewLine = Omit<
+  InvoiceLineRow,
+  'id' | 'invoiceId' | 'holdsSource' | 'position' | 'retainerCycleId'
+>;
 
 /** `INV-2026-0012`, `2026-12` or `12`. */
 function numberSearch(search: string): SQL | undefined {
@@ -88,14 +92,14 @@ function numberSearch(search: string): SQL | undefined {
 /** The source a line bills, if any. */
 export function lineSource(line: InvoiceLineRow): InvoiceSource | null {
   if (line.milestoneId) return { type: 'milestone', id: line.milestoneId };
-  if (line.retainerCycleId) return { type: 'retainer_cycle', id: line.retainerCycleId };
+  if (line.retainerChargeId) return { type: 'retainer_charge', id: line.retainerChargeId };
   if (line.extraWorkItemId) return { type: 'extra_work', id: line.extraWorkItemId };
   return null;
 }
 
 const sourceColumns = (source: InvoiceSource | null) => ({
   milestoneId: source?.type === 'milestone' ? source.id : null,
-  retainerCycleId: source?.type === 'retainer_cycle' ? source.id : null,
+  retainerChargeId: source?.type === 'retainer_charge' ? source.id : null,
   extraWorkItemId: source?.type === 'extra_work' ? source.id : null,
 });
 
@@ -224,12 +228,12 @@ export class InvoicesService {
     const work = await this.sources.billable(client.id, query.currency);
     const taken = await this.takenSources(this.db, [
       ...work.milestones.map((item) => ({ type: 'milestone' as const, id: item.id })),
-      ...work.cycles.map((item) => ({ type: 'retainer_cycle' as const, id: item.id })),
+      ...work.charges.map((item) => ({ type: 'retainer_charge' as const, id: item.id })),
       ...work.extraWork.map((item) => ({ type: 'extra_work' as const, id: item.id })),
     ]);
     return {
       milestones: work.milestones.filter((item) => !taken.has(`milestone:${item.id}`)),
-      cycles: work.cycles.filter((item) => !taken.has(`retainer_cycle:${item.id}`)),
+      charges: work.charges.filter((item) => !taken.has(`retainer_charge:${item.id}`)),
       extraWork: work.extraWork.filter((item) => !taken.has(`extra_work:${item.id}`)),
     };
   }
@@ -726,6 +730,19 @@ export class InvoicesService {
         serviceId: input.serviceId ?? null,
       };
     });
+    // F05B C7: only a credit charge's line is negative, and the invoice never goes below 0.
+    for (const [index, line] of lines.entries()) {
+      const source = inputs[index]?.source;
+      const credit =
+        source?.type === 'retainer_charge' &&
+        (resolved.get(sourceKey(source))?.amountMinor ?? 0) < 0;
+      if (line.unitPriceMinor < 0 && !credit) {
+        throw new BadRequestException('Only a credit line has a negative price');
+      }
+    }
+    if (invoiceTotal(lines) < 0) {
+      throw new CodedException(409, 'INVOICE_NEGATIVE', 'The invoice total would be below 0');
+    }
     return { lines, engagement };
   }
 
@@ -740,7 +757,7 @@ export class InvoicesService {
       refs.filter((ref) => ref.type === type).map((ref) => ref.id);
     const byType: [InvoiceSource['type'], PgColumn][] = [
       ['milestone', invoiceLines.milestoneId],
-      ['retainer_cycle', invoiceLines.retainerCycleId],
+      ['retainer_charge', invoiceLines.retainerChargeId],
       ['extra_work', invoiceLines.extraWorkItemId],
     ];
     const conditions = byType.flatMap(([type, column]) =>

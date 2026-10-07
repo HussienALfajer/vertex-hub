@@ -5,6 +5,8 @@ import {
   formatCalendarDate,
   formatDateTime,
   formatList,
+  formatMoney,
+  formatMonth,
   formatNumber,
   formatTimeOfDay,
 } from './format.js';
@@ -121,6 +123,19 @@ export const NOTIFICATION_TEXT = {
     other: 'يتجدد عقد «{{retainer}}» بعد {{n}} يوم',
   },
   retainer_renewal_reached: 'حلّ موعد تجديد عقد «{{retainer}}»',
+  /** F05B T11: what the retainer's last term does when it ends. */
+  termEndAction: {
+    renew: 'يتجدد تلقائيًا',
+    end: 'ينتهي العقد',
+    continue: 'يستمر شهريًا',
+  },
+  retainer_amendment_pending:
+    'طلب {{actor}} اعتماد التعديل {{number}} على عقد «{{retainer}}»: تخفيض {{amount}}',
+  retainer_amendment_decided: {
+    approved: 'اعتمد {{actor}} التعديل {{number}} على عقد «{{retainer}}»',
+    rejected: 'رفض {{actor}} التعديل {{number}} على عقد «{{retainer}}»: {{note}}',
+  },
+  retainer_term_renewed: 'جُدّد عقد «{{retainer}}» تلقائيًا: المدة {{term}} من {{start}} إلى {{end}}',
   retainer_behind: {
     zero: 'عقد «{{retainer}}» متأخر: انتهى الشهر',
     one: 'عقد «{{retainer}}» متأخر: بقي يوم واحد على نهاية الشهر',
@@ -328,7 +343,8 @@ export function notificationText(
   departmentName: (code: DepartmentCode) => string,
 ): { text: string; context: string | null } {
   const actor = notification.actor?.name ?? SYSTEM_ACTOR;
-  const context = (...parts: (string | null)[]) => parts.filter(Boolean).join(' · ') || null;
+  const context = (...parts: (string | null | undefined)[]) =>
+    parts.filter(Boolean).join(' · ') || null;
   switch (notification.type) {
     case 'tasks_generated': {
       const { data } = notification;
@@ -449,7 +465,47 @@ export function notificationText(
           data.daysLeft === 0
             ? fill(text.retainer_renewal_reached, { retainer: data.retainer })
             : counted(text.retainer_renewal_due, data.daysLeft, { retainer: data.retainer }),
-        context: context(data.client, formatCalendarDate(data.renewalDate)),
+        context: context(
+          data.client,
+          formatCalendarDate(data.renewalDate),
+          data.endAction ? text.termEndAction[data.endAction] : undefined,
+        ),
+      };
+    }
+    case 'retainer_amendment_pending': {
+      const { data } = notification;
+      return {
+        text: fill(text.retainer_amendment_pending, {
+          actor,
+          number: formatNumber(data.number),
+          retainer: data.retainer,
+          amount: formatMoney(Math.abs(data.moneyDeltaMinor), data.currency),
+        }),
+        context: data.client,
+      };
+    }
+    case 'retainer_amendment_decided': {
+      const { data } = notification;
+      return {
+        text: fill(text.retainer_amendment_decided[data.approved ? 'approved' : 'rejected'], {
+          actor,
+          number: formatNumber(data.number),
+          retainer: data.retainer,
+          note: data.note ?? '',
+        }),
+        context: null,
+      };
+    }
+    case 'retainer_term_renewed': {
+      const { data } = notification;
+      return {
+        text: fill(text.retainer_term_renewed, {
+          retainer: data.retainer,
+          term: formatNumber(data.termNumber),
+          start: formatMonth(data.startMonth.slice(0, 7)),
+          end: formatMonth(data.endMonth.slice(0, 7)),
+        }),
+        context: data.client,
       };
     }
     case 'retainer_behind': {
@@ -604,6 +660,8 @@ type TaskNotification = Exclude<
       | 'client_account_manager_assigned'
       | 'project_manager_assigned'
       | 'retainer_renewal_due'
+      | 'retainer_term_renewed'
+      | `retainer_amendment_${string}`
       | 'retainer_behind'
       | 'quote_approval_requested'
       | 'quote_approval_decided'

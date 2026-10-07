@@ -25,10 +25,11 @@ import { departmentCodeEnum, users } from './auth.js';
 import { catalogPackages, catalogServices } from './catalog.js';
 import { clientContacts, clients } from './clients.js';
 import { archivedAt, id, minorAmount, timestamps } from './columns.js';
+import { deliverableKindEnum } from './deliverables.js';
 import { fileItems } from './files.js';
 import { leads } from './leads.js';
 import { currencyEnum, projects } from './projects.js';
-import { deliverableKindEnum, retainers } from './retainers.js';
+import { retainers } from './retainers.js';
 import { workTemplates } from './templates.js';
 
 /*

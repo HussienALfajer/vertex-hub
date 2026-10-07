@@ -56,7 +56,7 @@ Module ownership: the `clients` module owns `clients`, `client_contacts`, `clien
 | Field | Type | Rules |
 |---|---|---|
 | `id` | uuid | `id()` |
-| `trade_name` | text | required, trimmed, runs of inner spaces collapsed to one (migration 0047), 1–120 chars; unique case-insensitively among non-archived clients (unique index on `lower(trade_name)` where `archived_at is null`) |
+| `trade_name` | text | required, trimmed, runs of inner spaces collapsed to one (migration 0053), 1–120 chars; unique case-insensitively among non-archived clients (unique index on `lower(trade_name)` where `archived_at is null`) |
 | `sector` | text | optional, trimmed, 1–60 chars; indexed for the filter; suggestions come from the distinct values in use |
 | `account_manager_id` | uuid → `users.id` | required, indexed; the primary account manager |
 | `status` | enum `client_status` (`active`, `paused`, `ended`) | required, default `active`, indexed |

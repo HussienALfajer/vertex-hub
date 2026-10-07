@@ -6,13 +6,20 @@ import {
   useQueryClient,
 } from '@tanstack/react-query';
 import type {
+  ApproveAmendment,
+  CancelRetainerTerm,
+  CreateAmendment,
   CreateCycleAdjustment,
   CreateCycleLine,
   CreateRetainer,
+  CreateRetainerTerm,
+  RejectAmendment,
+  RescheduleTerm,
   RetainerDeliverables,
   RetainerStatusChange,
   UpdateCycleLine,
   UpdateRetainer,
+  UpdateRetainerTerm,
 } from '@vertex-hub/contracts';
 import { api, call } from '../../lib/api/client';
 import type { paths } from '../../lib/api/schema.gen';
@@ -29,6 +36,8 @@ export const retainersKeys = {
   cycles: (id: string) => ['retainers', 'cycles', id] as const,
   cycle: (id: string, cycleId: string) => ['retainers', 'cycle', id, cycleId] as const,
   extraWork: (id: string) => ['retainers', 'extra-work', id] as const,
+  terms: (id: string) => ['retainers', 'terms', id] as const,
+  amendments: (id: string) => ['retainers', 'amendments', id] as const,
 };
 
 export const retainerListQuery = (filters: RetainerListFilters) =>
@@ -42,6 +51,25 @@ export const retainerQuery = (id: string) =>
   queryOptions({
     queryKey: retainersKeys.detail(id),
     queryFn: () => call(api.GET('/api/retainers/{id}', { params: { path: { id } } })),
+  });
+
+/** The retainer's terms, newest first (F05B). */
+export const retainerTermsQuery = (id: string) =>
+  queryOptions({
+    queryKey: retainersKeys.terms(id),
+    queryFn: () => call(api.GET('/api/retainers/{retainerId}/terms', retainerPath(id))),
+  });
+
+/** The retainer's amendments, newest first (F05B); at most 300 per retainer (A7). */
+export const retainerAmendmentsQuery = (id: string) =>
+  queryOptions({
+    queryKey: retainersKeys.amendments(id),
+    queryFn: () =>
+      call(
+        api.GET('/api/retainers/{retainerId}/amendments', {
+          params: { path: { retainerId: id }, query: { page: 1, pageSize: 100 } },
+        }),
+      ),
   });
 
 const CYCLE_PAGE_SIZE = 12;
@@ -77,7 +105,8 @@ export const retainerCycleQuery = (id: string, cycleId: string) =>
  * A mutation on retainer data. Every one refreshes the whole `retainers` cache, also on failure:
  * a 403 after the client changed account manager (edge case 9) reloads the page without edit
  * actions. Committed quantities and status also drive the monthly template's line counts (F07),
- * and archiving or reopening a month hides or generates tasks, so task views refresh too.
+ * and archiving or reopening a month hides or generates tasks, so task views refresh too. Terms,
+ * starting a month and ending with a fee draft invoices (F05B C4), so invoice views refresh too.
  */
 function useRetainersMutation<Input, Output>(mutationFn: (input: Input) => Promise<Output>) {
   const queryClient = useQueryClient();
@@ -88,11 +117,115 @@ function useRetainersMutation<Input, Output>(mutationFn: (input: Input) => Promi
         queryClient.invalidateQueries({ queryKey: retainersKeys.all }),
         queryClient.invalidateQueries({ queryKey: ['templates', 'retainer'] }),
         queryClient.invalidateQueries({ queryKey: ['tasks'] }),
+        queryClient.invalidateQueries({ queryKey: ['invoices'] }),
       ]),
   });
 }
 
 const path = (id: string) => ({ params: { path: { id } } });
+
+const retainerPath = (retainerId: string) => ({ params: { path: { retainerId } } });
+
+const termPath = (retainerId: string, termId: string) => ({
+  params: { path: { retainerId, termId } },
+});
+
+export const useCreateTerm = (retainerId: string) =>
+  useRetainersMutation((input: CreateRetainerTerm) =>
+    call(
+      api.POST('/api/retainers/{retainerId}/terms', { ...retainerPath(retainerId), body: input }),
+    ),
+  );
+
+export const useUpdateTerm = (retainerId: string) =>
+  useRetainersMutation(({ termId, ...input }: UpdateRetainerTerm & { termId: string }) =>
+    call(
+      api.PATCH('/api/retainers/{retainerId}/terms/{termId}', {
+        ...termPath(retainerId, termId),
+        body: input,
+      }),
+    ),
+  );
+
+export const useCancelTerm = (retainerId: string) =>
+  useRetainersMutation(({ termId, ...input }: CancelRetainerTerm & { termId: string }) =>
+    call(
+      api.POST('/api/retainers/{retainerId}/terms/{termId}/cancel', {
+        ...termPath(retainerId, termId),
+        body: input,
+      }),
+    ),
+  );
+
+/** F05B A1–A5: the amendment saved, applied, scheduled or waiting for approval. */
+export const useCreateAmendment = (retainerId: string) =>
+  useRetainersMutation((input: CreateAmendment) =>
+    call(
+      api.POST('/api/retainers/{retainerId}/amendments', {
+        ...retainerPath(retainerId),
+        body: input,
+      }),
+    ),
+  );
+
+/** What saving an amendment would do; nothing is saved, so nothing is refreshed. */
+export const usePreviewAmendment = (retainerId: string) =>
+  useMutation({
+    mutationFn: (input: CreateAmendment) =>
+      call(
+        api.POST('/api/retainers/{retainerId}/amendments/preview', {
+          ...retainerPath(retainerId),
+          body: input,
+        }),
+      ),
+  });
+
+const amendmentPath = (retainerId: string, amendmentId: string) => ({
+  params: { path: { retainerId, amendmentId } },
+});
+
+/** A4: the General Manager approves or rejects; the creator or a manager withdraws. */
+export const useDecideAmendment = (retainerId: string) =>
+  useRetainersMutation(
+    (
+      input:
+        | ({ action: 'approve'; amendmentId: string } & ApproveAmendment)
+        | ({ action: 'reject'; amendmentId: string } & RejectAmendment)
+        | { action: 'withdraw'; amendmentId: string },
+    ) => {
+      const where = amendmentPath(retainerId, input.amendmentId);
+      if (input.action === 'withdraw') {
+        return call(
+          api.POST('/api/retainers/{retainerId}/amendments/{amendmentId}/withdraw', where),
+        );
+      }
+      if (input.action === 'reject') {
+        return call(
+          api.POST('/api/retainers/{retainerId}/amendments/{amendmentId}/reject', {
+            ...where,
+            body: { note: input.note },
+          }),
+        );
+      }
+      return call(
+        api.POST('/api/retainers/{retainerId}/amendments/{amendmentId}/approve', {
+          ...where,
+          body: { note: input.note },
+        }),
+      );
+    },
+  );
+
+/** A6: new amounts for unbilled months of a term, same total. */
+export const useRescheduleTerm = (retainerId: string) =>
+  useRetainersMutation(({ termId, ...input }: RescheduleTerm & { termId: string }) =>
+    call(
+      api.POST('/api/retainers/{retainerId}/terms/{termId}/reschedule', {
+        ...termPath(retainerId, termId),
+        body: input,
+      }),
+    ),
+  );
 
 export const useCreateRetainer = () =>
   useRetainersMutation((input: CreateRetainer) =>

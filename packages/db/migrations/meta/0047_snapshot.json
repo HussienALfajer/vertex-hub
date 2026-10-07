@@ -1,6 +1,6 @@
 {
-  "id": "0c3b0723-539b-4202-9a85-7cce915ad27f",
-  "prevId": "b22cb1d5-13d2-4278-99fb-122c92423edc",
+  "id": "c318e7b6-ce22-4991-8b69-c1e5540b4cf2",
+  "prevId": "65dca468-66d6-49c3-9f74-1dea6b5ae088",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -1035,21 +1035,6 @@
         }
       },
       "indexes": {
-        "departments_name_idx": {
-          "name": "departments_name_idx",
-          "columns": [
-            {
-              "expression": "lower(\"name\")",
-              "isExpression": true,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "with": {},
-          "method": "btree",
-          "concurrently": false
-        },
         "departments_manager_id_idx": {
           "name": "departments_manager_id_idx",
           "columns": [
@@ -1087,6 +1072,13 @@
           "name": "departments_code_unique",
           "columns": [
             "code"
+          ],
+          "nullsNotDistinct": false
+        },
+        "departments_name_unique": {
+          "name": "departments_name_unique",
+          "columns": [
+            "name"
           ],
           "nullsNotDistinct": false
         }
@@ -6790,6 +6782,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "retainer_charge_id": {
+          "name": "retainer_charge_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
         "extra_work_item_id": {
           "name": "extra_work_item_id",
           "type": "uuid",
@@ -6868,6 +6866,21 @@
           "method": "btree",
           "concurrently": false
         },
+        "invoice_lines_retainer_charge_id_idx": {
+          "name": "invoice_lines_retainer_charge_id_idx",
+          "columns": [
+            {
+              "expression": "retainer_charge_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "with": {},
+          "method": "btree",
+          "concurrently": false
+        },
         "invoice_lines_extra_work_item_id_idx": {
           "name": "invoice_lines_extra_work_item_id_idx",
           "columns": [
@@ -6919,6 +6932,22 @@
           "columns": [
             {
               "expression": "retainer_cycle_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "with": {},
+          "method": "btree",
+          "where": "\"invoice_lines\".\"holds_source\"",
+          "concurrently": false
+        },
+        "invoice_lines_live_retainer_charge_idx": {
+          "name": "invoice_lines_live_retainer_charge_idx",
+          "columns": [
+            {
+              "expression": "retainer_charge_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -6987,6 +7016,19 @@
           "onUpdate": "no action",
           "onDelete": "no action"
         },
+        "invoice_lines_retainer_charge_id_retainer_charges_id_fk": {
+          "name": "invoice_lines_retainer_charge_id_retainer_charges_id_fk",
+          "tableFrom": "invoice_lines",
+          "columnsFrom": [
+            "retainer_charge_id"
+          ],
+          "tableTo": "retainer_charges",
+          "columnsTo": [
+            "id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "no action"
+        },
         "invoice_lines_extra_work_item_id_extra_work_items_id_fk": {
           "name": "invoice_lines_extra_work_item_id_extra_work_items_id_fk",
           "tableFrom": "invoice_lines",
@@ -7020,7 +7062,7 @@
       "checkConstraints": {
         "invoice_lines_source_check": {
           "name": "invoice_lines_source_check",
-          "value": "num_nonnulls(\"invoice_lines\".\"milestone_id\", \"invoice_lines\".\"retainer_cycle_id\", \"invoice_lines\".\"extra_work_item_id\") <= 1"
+          "value": "num_nonnulls(\"invoice_lines\".\"milestone_id\", coalesce(\"invoice_lines\".\"retainer_charge_id\", \"invoice_lines\".\"retainer_cycle_id\"), \"invoice_lines\".\"extra_work_item_id\") <= 1"
         },
         "invoice_lines_description_check": {
           "name": "invoice_lines_description_check",
@@ -11753,6 +11795,160 @@
       },
       "isRLSEnabled": false
     },
+    "public.retainer_charges": {
+      "name": "retainer_charges",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "retainer_id": {
+          "name": "retainer_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "month": {
+          "name": "month",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "kind": {
+          "name": "kind",
+          "type": "retainer_charge_kind",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "amount_minor": {
+          "name": "amount_minor",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "retainer_charge_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pending'"
+        },
+        "due_at": {
+          "name": "due_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "retainer_charges_retainer_month_idx": {
+          "name": "retainer_charges_retainer_month_idx",
+          "columns": [
+            {
+              "expression": "retainer_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "month",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "with": {},
+          "method": "btree",
+          "concurrently": false
+        },
+        "retainer_charges_status_idx": {
+          "name": "retainer_charges_status_idx",
+          "columns": [
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "with": {},
+          "method": "btree",
+          "concurrently": false
+        },
+        "retainer_charges_monthly_idx": {
+          "name": "retainer_charges_monthly_idx",
+          "columns": [
+            {
+              "expression": "retainer_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "month",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "with": {},
+          "method": "btree",
+          "where": "\"retainer_charges\".\"kind\" = 'monthly' and \"retainer_charges\".\"status\" <> 'cancelled'",
+          "concurrently": false
+        }
+      },
+      "foreignKeys": {
+        "retainer_charges_retainer_id_retainers_id_fk": {
+          "name": "retainer_charges_retainer_id_retainers_id_fk",
+          "tableFrom": "retainer_charges",
+          "columnsFrom": [
+            "retainer_id"
+          ],
+          "tableTo": "retainers",
+          "columnsTo": [
+            "id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "retainer_charges_amount_check": {
+          "name": "retainer_charges_amount_check",
+          "value": "case when \"retainer_charges\".\"kind\" = 'credit' then \"retainer_charges\".\"amount_minor\" < 0 else \"retainer_charges\".\"amount_minor\" >= 0 end"
+        },
+        "retainer_charges_month_check": {
+          "name": "retainer_charges_month_check",
+          "value": "extract(day from \"retainer_charges\".\"month\") = 1"
+        }
+      },
+      "isRLSEnabled": false
+    },
     "public.retainer_cycle_adjustments": {
       "name": "retainer_cycle_adjustments",
       "schema": "",
@@ -15834,7 +16030,9 @@
         "quote_accepted",
         "milestone_done",
         "cycle_opened",
-        "manual"
+        "manual",
+        "retainer_amendment",
+        "retainer_termination"
       ]
     },
     "public.invoice_status": {
@@ -16127,6 +16325,25 @@
         "unbilled",
         "billed",
         "waived"
+      ]
+    },
+    "public.retainer_charge_kind": {
+      "name": "retainer_charge_kind",
+      "schema": "public",
+      "values": [
+        "monthly",
+        "addition",
+        "credit",
+        "termination_fee"
+      ]
+    },
+    "public.retainer_charge_status": {
+      "name": "retainer_charge_status",
+      "schema": "public",
+      "values": [
+        "pending",
+        "cancelled",
+        "settled_outside"
       ]
     },
     "public.retainer_status": {

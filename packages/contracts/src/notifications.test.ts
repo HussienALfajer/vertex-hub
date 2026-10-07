@@ -30,6 +30,7 @@ describe('notification catalog', () => {
         'quote_accepted',
         'request_finished',
         'retainer_renewal_due',
+        'retainer_term_renewed',
         'shoot_booked',
         'shoot_changed',
         'shoot_dropped',

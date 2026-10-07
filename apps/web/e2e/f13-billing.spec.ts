@@ -98,16 +98,22 @@ test('a manager sees a project’s margin, adds and archives expenses and invoic
   await expect(page.getByText('1,200.00 USD').first()).toBeVisible();
 });
 
-test('a retainer’s billing lists its months and extra work with their invoices', async ({
+test('a retainer’s billing lists its charges and extra work with their invoices', async ({
   page,
 }) => {
   await mockApi(page, { signedIn: true, me: manager });
   await page.goto(`/retainers/${seedIds.socialRetainer}?tab=billing`);
-  const months = page.getByRole('table').first();
-  await expect(months).toContainText(ar.invoices.draftNumber);
-  await expect(
-    page.getByRole('row', { name: new RegExp(ar.invoices.billing.notInvoiced) }).first(),
-  ).toBeVisible();
+  // F05B: each month's charge with its kind, amount and invoice.
+  const charges = page.getByRole('table').first();
+  await expect(charges).toContainText(ar.invoices.draftNumber);
+  await expect(charges).toContainText(ar.retainers.chargeKinds.monthly);
+  const free = page.getByRole('row', { name: new RegExp(ar.invoices.billing.notInvoiced) }).first();
+  await expect(free).toContainText('1,500.00 USD');
+  // A manual draft for a charge no invoice bills, at the charge's amount.
+  await free.getByRole('button').click();
+  await expect(page).toHaveURL(/\/invoices\/[^/]+$/);
+  await expect(page.getByRole('heading', { level: 1 })).toContainText(ar.invoices.draftTitle);
+  await expect(page.getByText('1,500.00 USD').first()).toBeVisible();
 });
 
 test('invoice due dates on the calendar open the invoice for invoice readers only', async ({

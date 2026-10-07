@@ -45,6 +45,8 @@ import {
   CycleOpenedHooks,
   EngagementDirectory,
   type ProjectLink,
+  type QuoteRenewalApplied,
+  QuoteRenewalHooks,
 } from '../projects/index.js';
 import { TaskGenerator } from '../tasks/index.js';
 import type { NewProjectPlan } from './template-runner.js';
@@ -82,6 +84,7 @@ export class TemplateRunsService implements OnModuleInit {
     private readonly engagements: EngagementDirectory,
     private readonly generator: TaskGenerator,
     private readonly openedHooks: CycleOpenedHooks,
+    private readonly renewalHooks: QuoteRenewalHooks,
     private readonly templates: TemplatesService,
     private readonly clients: ClientDirectory,
     private readonly notifications: NotificationCenter,
@@ -89,6 +92,7 @@ export class TemplateRunsService implements OnModuleInit {
 
   onModuleInit(): void {
     this.openedHooks.register((tx, event) => this.onCycleOpened(tx, event));
+    this.renewalHooks.register((tx, event) => this.onQuoteRenewal(tx, event));
   }
 
   /** The plan a run would create; nothing is written. */
@@ -706,25 +710,51 @@ export class TemplateRunsService implements OnModuleInit {
     if (next) assertTemplate(next, 'retainer_cycle');
     const current = await this.linkedTemplate(tx, retainerId);
     if ((current?.id ?? null) === (next?.id ?? null)) return;
+    await this.link(tx, toActor(actor), actor.id, retainerId, current, next);
+  }
+
+  /**
+   * F05B Q2: a quote renewal links its monthly template in its month, before the cycle opens. A
+   * template archived since the acceptance is left out: the lines and fee still apply.
+   */
+  private async onQuoteRenewal(tx: Transaction, event: QuoteRenewalApplied): Promise<void> {
+    const next = await this.templates.forRun(tx, event.templateId);
+    if (!next || next.archivedAt || next.kind !== 'retainer_cycle') return;
+    const current = await this.linkedTemplate(tx, event.retainerId);
+    if (current?.id === next.id) return;
+    await this.link(tx, event.actor, null, event.retainerId, current, next, {
+      amendmentId: event.amendmentId,
+    });
+  }
+
+  private async link(
+    tx: Transaction,
+    actor: AuditActor | null,
+    linkedById: string | null,
+    retainerId: string,
+    current: TemplateForRun | null,
+    next: TemplateForRun | null,
+    extra: { amendmentId?: string } = {},
+  ): Promise<void> {
     if (next) {
       await tx
         .insert(retainerTemplates)
-        .values({ retainerId, templateId: next.id, linkedById: actor.id })
+        .values({ retainerId, templateId: next.id, linkedById })
         .onConflictDoUpdate({
           target: retainerTemplates.retainerId,
-          set: { templateId: next.id, linkedById: actor.id, updatedAt: new Date() },
+          set: { templateId: next.id, linkedById, updatedAt: new Date() },
         });
     } else {
       await tx.delete(retainerTemplates).where(eq(retainerTemplates.retainerId, retainerId));
     }
     const summary = (t: TemplateForRun | null) => (t ? { id: t.id, name: t.name } : null);
     await recordAudit(tx, {
-      actor: toActor(actor),
+      actor,
       action: 'retainer.template_changed',
       entityType: 'retainer',
       entityId: retainerId,
       before: { template: summary(current) },
-      after: { template: summary(next) },
+      after: { template: summary(next), ...extra },
     });
   }
 }

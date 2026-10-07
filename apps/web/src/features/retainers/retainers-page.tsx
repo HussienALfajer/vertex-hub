@@ -40,14 +40,15 @@ import {
   PlusIcon,
   RepeatIcon,
   SearchIcon,
+  ShieldAlertIcon,
   TrendingDownIcon,
   UserRoundCheckIcon,
 } from 'lucide-react';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LoadError } from '../../components/load-error';
-import { canAll, scopesOf, useMe } from '../../lib/auth';
-import { formatNumber } from '../../lib/format';
+import { can, canAll, scopesOf, useMe } from '../../lib/auth';
+import { formatMonth, formatNumber } from '../../lib/format';
 import {
   ALL,
   flagParam,
@@ -68,6 +69,7 @@ import {
   BehindBadge,
   CycleCounters,
   DeliveryRate,
+  PendingApprovalBadge,
   RenewalBadge,
   RetainerStatusBadge,
 } from './retainer-badges';
@@ -82,6 +84,8 @@ export interface RetainersSearch {
   department?: DepartmentCode;
   behind?: true;
   renewalDue?: true;
+  /** F05B A4: with amendments waiting for the General Manager. */
+  pendingApproval?: true;
   archived?: true;
   page?: number;
 }
@@ -99,6 +103,7 @@ export function parseRetainersSearch(search: Record<string, unknown>): Retainers
     department: oneOfParam(DEPARTMENT_CODES, search.department),
     behind: flagParam(search.behind),
     renewalDue: flagParam(search.renewalDue),
+    pendingApproval: flagParam(search.pendingApproval),
     archived: flagParam(search.archived),
     page: pageParam(search.page),
   };
@@ -123,6 +128,7 @@ export function RetainersPage({ search }: { search: RetainersSearch }) {
       department: search.department,
       behind: search.behind ? 'true' : undefined,
       renewalDue: search.renewalDue ? 'true' : undefined,
+      pendingApproval: search.pendingApproval ? 'true' : undefined,
       archived: archived ? 'true' : undefined,
       page,
       pageSize: PAGE_SIZE,
@@ -447,6 +453,19 @@ function Filters({
             <CalendarClockIcon />
             {t('retainers.filters.renewalDue')}
           </Button>
+          {can(me, 'retainers.approve_reduction') && (
+            <Button
+              variant={search.pendingApproval ? 'secondary' : 'outline'}
+              size="sm"
+              aria-pressed={search.pendingApproval === true}
+              onClick={() =>
+                onChange({ pendingApproval: search.pendingApproval ? undefined : true })
+              }
+            >
+              <ShieldAlertIcon />
+              {t('retainers.filters.pendingApproval')}
+            </Button>
+          )}
           {accountManager && (
             <Button
               variant={mine ? 'secondary' : 'outline'}
@@ -482,6 +501,7 @@ function Filters({
                   department: undefined,
                   behind: undefined,
                   renewalDue: undefined,
+                  pendingApproval: undefined,
                 })
               }
             >
@@ -566,7 +586,17 @@ function RetainersTable({ retainers, archived }: { retainers: Retainer[]; archiv
               <span className="flex flex-col items-start gap-1">
                 <RetainerStatusBadge status={retainer.status} />
                 {retainer.renewal && <RenewalBadge state={retainer.renewal} />}
+                {retainer.pendingAmendments > 0 && (
+                  <PendingApprovalBadge count={retainer.pendingAmendments} />
+                )}
                 {archived && <ArchivedBadge />}
+                {retainer.term && (
+                  <span className="text-xs text-muted-foreground">
+                    {t('retainers.terms.until', { month: formatMonth(retainer.term.endMonth) })}
+                    {' · '}
+                    {t(`retainers.terms.endActions.${retainer.term.endAction}`)}
+                  </span>
+                )}
               </span>
             </TableCell>
             <TableCell className="min-w-56 whitespace-normal">

@@ -23,6 +23,7 @@ import {
   invoiceSettings,
   invoices,
   projects,
+  retainerCharges,
   retainers,
 } from '@vertex-hub/db';
 import { testDatabaseUrl } from '@vertex-hub/db/testing';
@@ -266,7 +267,7 @@ describe('invoices', () => {
 
   describe('drafting (rules 1, 4, 6–8)', () => {
     it('lists billable work of the client in the currency', async () => {
-      // The open cycle was drafted automatically (rule 4); once discarded it is billable again.
+      // The month's charge was drafted automatically (rule 4); once discarded it is billable again.
       const [automatic] = await db
         .select()
         .from(invoices)
@@ -282,10 +283,11 @@ describe('invoices', () => {
       expect(response.status).toBe(200);
       const items = billableItemsSchema.parse(await response.json());
       expect(items.milestones.map((item) => item.name)).toEqual(['الدفعة الأولى', 'التسليم']);
-      expect(items.cycles).toEqual([
+      expect(items.charges).toEqual([
         expect.objectContaining({
           retainer: { id: retainer.id, name: retainer.name },
-          feeMinor: 40000,
+          kind: 'monthly',
+          amountMinor: 40000,
         }),
       ]);
       expect(items.extraWork).toEqual([
@@ -299,7 +301,7 @@ describe('invoices', () => {
           )
         ).json(),
       );
-      expect(syp).toEqual({ milestones: [], cycles: [], extraWork: [] });
+      expect(syp).toEqual({ milestones: [], charges: [], extraWork: [] });
       expect(
         (
           await client.get(
@@ -375,20 +377,27 @@ describe('invoices', () => {
     });
 
     it('refuses mixed engagements, other currencies and archived records', async () => {
-      const cycleId = retainer.currentCycle?.id;
-      if (!cycleId) throw new Error('The retainer has no open cycle');
+      const [charge] = await db
+        .select({ id: retainerCharges.id })
+        .from(retainerCharges)
+        .where(eq(retainerCharges.retainerId, retainer.id));
+      const chargeId = charge?.id;
+      if (!chargeId) throw new Error('The retainer has no charge');
       await expectError(
         await create({
           sources: [
             { type: 'milestone', id: milestone(1).id },
-            { type: 'retainer_cycle', id: cycleId },
+            { type: 'retainer_charge', id: chargeId },
           ],
         }),
         409,
         'MIXED_ENGAGEMENTS',
       );
       await expectError(
-        await create({ projectId: project.id, sources: [{ type: 'retainer_cycle', id: cycleId }] }),
+        await create({
+          projectId: project.id,
+          sources: [{ type: 'retainer_charge', id: chargeId }],
+        }),
         409,
         'MIXED_ENGAGEMENTS',
       );

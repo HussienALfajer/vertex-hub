@@ -19,6 +19,7 @@ import {
   ArrowRightIcon,
   CalendarDaysIcon,
   CircleStopIcon,
+  FileSignatureIcon,
   FileTextIcon,
   HistoryIcon,
   ReceiptTextIcon,
@@ -36,13 +37,28 @@ import { RetainerBillingTab } from '../invoices/retainer-billing-tab';
 import { ExtraWorkTab } from '../projects/extra-work-tab';
 import { ArchivedBadge, DepartmentChips, PersonName } from '../projects/project-badges';
 import { SourceQuotes } from '../quotes/source-quotes';
+import { ContractTab } from './contract-tab';
 import { ThisMonthTab } from './cycle-tab';
 import { HistoryTab } from './history-tab';
 import { RetainerActions } from './retainer-actions';
-import { BehindBadge, DeliveryRate, RenewalBadge, RetainerStatusBadge } from './retainer-badges';
+import {
+  BehindBadge,
+  DeliveryRate,
+  PendingApprovalBadge,
+  RenewalBadge,
+  RetainerStatusBadge,
+  TermChip,
+} from './retainer-badges';
 import { retainerQuery, useRestoreRetainer } from './retainers.queries';
 
-const RETAINER_TABS = ['this-month', 'history', 'extra-work', 'billing', 'documents'] as const;
+const RETAINER_TABS = [
+  'this-month',
+  'contract',
+  'history',
+  'extra-work',
+  'billing',
+  'documents',
+] as const;
 
 type RetainerTab = (typeof RETAINER_TABS)[number];
 
@@ -112,6 +128,10 @@ function RetainerView({ retainer, tab }: { retainer: RetainerDetail; tab: Retain
             <CalendarDaysIcon />
             {t('retainers.page.tabs.thisMonth')}
           </TabsTrigger>
+          <TabsTrigger value="contract">
+            <FileSignatureIcon />
+            {t('retainers.page.tabs.contract')}
+          </TabsTrigger>
           <TabsTrigger value="history">
             <HistoryIcon />
             {t('retainers.page.tabs.history')}
@@ -133,6 +153,9 @@ function RetainerView({ retainer, tab }: { retainer: RetainerDetail; tab: Retain
         </TabsList>
         <TabsContent value="this-month">
           <ThisMonthTab retainer={retainer} />
+        </TabsContent>
+        <TabsContent value="contract">
+          <ContractTab retainer={retainer} />
         </TabsContent>
         <TabsContent value="history">
           <HistoryTab retainer={retainer} />
@@ -205,8 +228,12 @@ function RetainerHero({ retainer }: { retainer: RetainerDetail }) {
                 <RetainerStatusBadge status={retainer.status} />
                 {retainer.currentCycle?.behind && <BehindBadge />}
                 {retainer.renewal && <RenewalBadge state={retainer.renewal} />}
+                {retainer.pendingAmendments > 0 && (
+                  <PendingApprovalBadge count={retainer.pendingAmendments} />
+                )}
                 {archived && <ArchivedBadge />}
               </div>
+              {retainer.term && <TermChip term={retainer.term} />}
             </div>
             <dl className="flex flex-wrap items-center gap-x-6 gap-y-3 text-sm">
               <div className="flex items-center gap-2">
