@@ -10449,11 +10449,15 @@ export interface components {
                     monthlyQuantity: number;
                     revisionLimit: number;
                 }[];
+                term: components["schemas"]["AcceptTermPlan"];
                 renewable: {
                     /** Format: uuid */
                     id: string;
                     name: string;
                     status: components["schemas"]["RetainerStatus"];
+                    /** Format: date */
+                    renewsFrom: string;
+                    afterTerm: boolean;
                 }[];
             } | null;
             archivedTemplates: {
@@ -10463,6 +10467,12 @@ export interface components {
             }[];
             conversion: components["schemas"]["LeadConversionPlan"] | null;
         };
+        AcceptTermPlan: {
+            months: number;
+            agreedTotalMinor: number;
+            schedule: number[];
+            endAction: components["schemas"]["TermEndAction"];
+        } | null;
         /** @description The convert dialog (and accept step 0) defaults */
         LeadConversionPlan: {
             client: {
@@ -10545,6 +10555,8 @@ export interface components {
                 renewalDate: string | null;
                 /** Format: uuid */
                 templateId: string | null;
+                /** @default null */
+                term: components["schemas"]["RetainerTermInput"] | null;
             } | {
                 /** @enum {string} */
                 mode: "renew";
@@ -10552,6 +10564,8 @@ export interface components {
                 retainerId: string;
                 /** Format: uuid */
                 templateId: string | null;
+                /** @default null */
+                term: components["schemas"]["RetainerTermInput"] | null;
             }) | null;
             conversion?: components["schemas"]["ConvertLead"] | null;
         };

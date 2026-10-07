@@ -297,6 +297,7 @@ import {
   setRetainerTemplateSchema,
   shootTaskTitle,
   spendCountsInWallet,
+  splitEvenly,
   statementRows,
   TASK_PRIORITIES,
   type Task,
@@ -10260,6 +10261,17 @@ function quoteRoutes({
         currency: q.currency,
         monthlyFeeMinor: detail.totals.monthly.netMinor,
         lines: mergeDeliverableLines(counted),
+        term: q.monthlyTermMonths
+          ? {
+              months: q.monthlyTermMonths,
+              agreedTotalMinor: detail.totals.monthly.netMinor * q.monthlyTermMonths,
+              schedule: splitEvenly(
+                detail.totals.monthly.netMinor * q.monthlyTermMonths,
+                q.monthlyTermMonths,
+              ),
+              endAction: 'renew',
+            }
+          : null,
         renewable: retainers
           .filter(
             (r) =>
@@ -10268,7 +10280,22 @@ function quoteRoutes({
               r.status !== 'ended' &&
               r.currency === q.currency,
           )
-          .map((r) => ({ id: r.id, name: r.name, status: r.status })),
+          .map((r) => {
+            // F05B Q2: after the active term, else next month; never before the start month.
+            const active = (r.terms ?? []).find((t) => t.status === 'active');
+            const [renewsFrom] = [
+              addMonths(firstOfMonth(today), 1),
+              firstOfMonth(r.startDate),
+              ...(active ? [addMonths(active.startMonth, active.months)] : []),
+            ].sort((a, b) => b.localeCompare(a));
+            return {
+              id: r.id,
+              name: r.name,
+              status: r.status,
+              renewsFrom: renewsFrom ?? addMonths(firstOfMonth(today), 1),
+              afterTerm: !!active,
+            };
+          }),
       };
     }
 

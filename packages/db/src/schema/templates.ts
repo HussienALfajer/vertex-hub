@@ -16,8 +16,9 @@ import {
 } from 'drizzle-orm/pg-core';
 import { departmentCodeEnum, users } from './auth.js';
 import { archivedAt, id, timestamps } from './columns.js';
+import { deliverableKindEnum } from './deliverables.js';
 import { projects } from './projects.js';
-import { deliverableKindEnum, retainerCycleLines, retainerCycles, retainers } from './retainers.js';
+import { retainerCycleLines, retainerCycles, retainers } from './retainers.js';
 import { taskPriorityEnum, tasks } from './tasks.js';
 
 /*
@@ -152,9 +153,8 @@ export const retainerTemplates = pgTable(
     templateId: uuid('template_id')
       .notNull()
       .references(() => workTemplates.id),
-    linkedById: uuid('linked_by_id')
-      .notNull()
-      .references(() => users.id),
+    /** Null: linked by the daily job, applying a quote renewal (F05B Q2). */
+    linkedById: uuid('linked_by_id').references(() => users.id),
     ...timestamps(),
   },
   (table) => [

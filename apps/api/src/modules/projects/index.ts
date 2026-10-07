@@ -38,6 +38,7 @@ export {
 } from './engagement-reports.js';
 export { type MilestoneDone, MilestoneDoneHooks } from './milestone-done-hooks.js';
 export { ProjectsModule } from './projects.module.js';
+export { type QuoteRenewalApplied, QuoteRenewalHooks } from './quote-renewal-hooks.js';
 export { type RetainerChargeDue, RetainerChargeDueHooks } from './retainer-charge-due-hooks.js';
 /** F05B C5, C9: credits taken off drafts and settled outside, for `invoices`. */
 export { RetainerCharges } from './retainer-charges.js';

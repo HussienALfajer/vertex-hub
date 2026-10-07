@@ -891,6 +891,20 @@ async function removeQuoteRows(db: Database, where: SQL): Promise<void> {
   ).map((row) => row.id);
   await db.delete(auditEntries).where(inArray(auditEntries.entityId, ids));
   await db.delete(notifications).where(inArray(notifications.subjectId, ids));
+  // Terms and quote renewals an accepted quote made (F05B Q1, Q2) point at it.
+  await db.update(retainerTerms).set({ quoteId: null }).where(inArray(retainerTerms.quoteId, ids));
+  const renewalIds = (
+    await db
+      .select({ id: retainerAmendments.id })
+      .from(retainerAmendments)
+      .where(inArray(retainerAmendments.quoteId, ids))
+  ).map((row) => row.id);
+  if (renewalIds.length) {
+    await db
+      .delete(retainerAmendmentLines)
+      .where(inArray(retainerAmendmentLines.amendmentId, renewalIds));
+    await db.delete(retainerAmendments).where(inArray(retainerAmendments.id, renewalIds));
+  }
   if (lineIds.length)
     await db.delete(quoteLineItems).where(inArray(quoteLineItems.lineId, lineIds));
   await db.delete(quoteLines).where(inArray(quoteLines.quoteId, ids));

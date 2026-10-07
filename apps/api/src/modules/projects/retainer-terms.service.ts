@@ -1,6 +1,7 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import {
   addDays,
+  addMonths,
   businessDate,
   type CalendarDate,
   type CancelRetainerTerm,
@@ -12,6 +13,7 @@ import {
   type RetainerChargeStatus,
   type RetainerStatus,
   type RetainerTerm,
+  type RetainerTermInput,
   type RetainerTermList,
   type RetainerTermMonth,
   type RetainerTermSummary,
@@ -123,7 +125,7 @@ export class RetainerTermsService {
     retainer: { id: string; startDate: CalendarDate },
     plan: TermPlan,
     today: CalendarDate,
-    options: { renewedFromId?: string } = {},
+    options: { renewedFromId?: string; quoteId?: string } = {},
   ): Promise<TermRow> {
     assertSchedule(plan);
     await this.assertPlacement(tx, retainer, plan.startMonth, today);
@@ -145,6 +147,7 @@ export class RetainerTermsService {
         endAction: plan.endAction,
         status: active ? 'active' : 'scheduled',
         renewedFromId: options.renewedFromId ?? null,
+        quoteId: options.quoteId ?? null,
       })
       .returning();
     if (!term) throw new Error('Term insert returned no row');
@@ -172,6 +175,7 @@ export class RetainerTermsService {
         schedule: plan.schedule,
         endAction: term.endAction,
         ...(options.renewedFromId && { renewedFromId: options.renewedFromId }),
+        ...(options.quoteId && { quoteId: options.quoteId }),
         retainerId: retainer.id,
       },
     });
@@ -237,6 +241,87 @@ export class RetainerTermsService {
       await this.syncRenewalDate(tx, retainerId, actorOf(actor), { clearWhenNone: true });
     });
     return this.presentOne(actor, retainerId, termId);
+  }
+
+  /**
+   * F05B Q2: the month a quote renewal takes effect in, per retainer: the month after its active
+   * term (`afterTerm`), else next month, and never before the retainer's start month (T2).
+   */
+  async renewalStarts(
+    executor: Executor,
+    retainers: readonly { id: string; startDate: CalendarDate }[],
+    today: CalendarDate,
+  ): Promise<Map<string, { renewsFrom: CalendarDate; afterTerm: boolean }>> {
+    const retainerIds = retainers.map((retainer) => retainer.id);
+    const active =
+      retainerIds.length === 0
+        ? []
+        : await executor
+            .select({ retainerId: retainerTerms.retainerId, endMonth: retainerTerms.endMonth })
+            .from(retainerTerms)
+            .where(
+              and(
+                inArray(retainerTerms.retainerId, [...retainerIds]),
+                eq(retainerTerms.status, 'active'),
+              ),
+            );
+    const nextMonth = addMonths(firstOfMonth(today), 1);
+    return new Map(
+      retainers.map(({ id, startDate }) => {
+        const term = active.find((row) => row.retainerId === id);
+        // A term that ended but the job has not completed yet: next month.
+        const candidates = [
+          nextMonth,
+          firstOfMonth(startDate),
+          ...(term ? [dayAfterTerm(term.endMonth)] : []),
+        ].sort();
+        return [id, { renewsFrom: candidates.at(-1) ?? nextMonth, afterTerm: !!term }];
+      }),
+    );
+  }
+
+  /**
+   * F05B Q2 on a retainer the caller locked: a quote renewal replaces the scheduled term; with a
+   * term, the new term starts the month after the active term (else next month); without one, an
+   * active term continues monthly after it ends. Returns the month the renewal takes effect in.
+   */
+  async renewForQuote(
+    tx: Transaction,
+    actor: AuditActor,
+    retainer: { id: string; startDate: CalendarDate },
+    input: { quoteId: string; term: RetainerTermInput | null },
+    today: CalendarDate,
+  ): Promise<CalendarDate> {
+    const open = await tx
+      .select()
+      .from(retainerTerms)
+      .where(
+        and(
+          eq(retainerTerms.retainerId, retainer.id),
+          inArray(retainerTerms.status, [...OPEN_STATUSES]),
+        ),
+      );
+    const active = open.find((term) => term.status === 'active');
+    const scheduled = open.find((term) => term.status === 'scheduled');
+    const start = (await this.renewalStarts(tx, [retainer], today)).get(retainer.id);
+    if (!start) throw new Error('No renewal month');
+    if (scheduled) await this.cancelTerm(tx, scheduled, actor, { cause: 'quote_renewal' });
+    if (input.term) {
+      await this.createIn(
+        tx,
+        actor,
+        retainer,
+        { ...input.term, startMonth: start.renewsFrom },
+        today,
+        { quoteId: input.quoteId },
+      );
+      return start.renewsFrom;
+    }
+    if (active && active.endAction !== 'continue') {
+      await this.setEndAction(tx, active, 'continue', actor);
+    }
+    if (scheduled) await this.syncRenewalDate(tx, retainer.id, actor, { clearWhenNone: true });
+    return start.renewsFrom;
   }
 
   /** T11: whether the retainer has an active or scheduled term (its renewal date is derived). */
@@ -665,7 +750,7 @@ export class RetainerTermsService {
     actor: AuditActor | null,
     options: {
       reason?: string;
-      cause?: 'retainer_ended' | 'end_action_changed';
+      cause?: 'retainer_ended' | 'end_action_changed' | 'quote_renewal';
       keepCharges?: boolean;
     },
   ): Promise<void> {

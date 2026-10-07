@@ -127,9 +127,11 @@ function AmendmentCard({
   const title =
     amendment.kind === 'reschedule'
       ? t('retainers.amendments.reschedule')
-      : t(`retainers.amendments.scopeOf.${amendment.scope ?? 'month'}`, {
-          month: formatMonth(amendment.effectiveMonth),
-        });
+      : amendment.kind === 'quote_renewal'
+        ? t('retainers.amendments.quoteRenewal', { month: formatMonth(amendment.effectiveMonth) })
+        : t(`retainers.amendments.scopeOf.${amendment.scope ?? 'month'}`, {
+            month: formatMonth(amendment.effectiveMonth),
+          });
 
   async function act(action: 'approve' | 'withdraw') {
     try {

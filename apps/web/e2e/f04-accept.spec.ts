@@ -1,4 +1,6 @@
+import { addMonths, businessDate, firstOfMonth } from '@vertex-hub/contracts';
 import ar from '../src/i18n/locales/ar.json' with { type: 'json' };
+import { formatMonth } from '../src/lib/format';
 import { accountManagerMe, manager, mockApi, seedIds } from './fixtures';
 import { expect, test } from './test';
 
@@ -99,7 +101,14 @@ test('unticking the template makes the installments the milestones; renew keeps 
   await expect(accept.getByText(ar.quotes.accept.errors.retainer)).toBeVisible();
   await accept.getByRole('combobox', { name: ar.quotes.accept.retainer.renewed }).click();
   await page.getByRole('option', { name: 'إدارة السوشيال ميديا' }).click();
-  await expect(accept.getByText(ar.quotes.accept.retainer.renewTitle)).toBeVisible();
+  // F05B Q2: an open-ended retainer renews next month.
+  await expect(
+    accept.getByText(
+      fill(ar.quotes.accept.retainer.renewFrom, {
+        month: formatMonth(addMonths(firstOfMonth(businessDate()), 1)),
+      }),
+    ),
+  ).toBeVisible();
   await accept.getByRole('button', { name: ar.common.next }).click();
 
   await expect(
@@ -154,4 +163,53 @@ test('a retainer line takes its own revision limit', async ({ page }) => {
   await expect(dialog).toBeHidden();
   await page.getByRole('button', { name: ar.retainers.actions.editLines }).click();
   await expect(first).toHaveValue('3');
+});
+
+test('renewing a retainer with a running term starts the new term after it (F05B Q2)', async ({
+  page,
+}) => {
+  await mockApi(page, { signedIn: true, me: manager });
+  await page.goto(`/quotes/${seedIds.sentQuote}`);
+  const month = firstOfMonth(businessDate());
+  const termCreated = await page.evaluate(
+    async ({ retainerId, body }) =>
+      (
+        await fetch(`/api/retainers/${retainerId}/terms`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(body),
+        })
+      ).status,
+    {
+      retainerId: seedIds.socialRetainer,
+      body: { startMonth: month, months: 2, agreedTotalMinor: 100000, schedule: [50000, 50000] },
+    },
+  );
+  expect(termCreated).toBe(201);
+  await page.getByRole('button', { name: ar.quotes.accept.action }).click();
+  const accept = page.getByRole('dialog', {
+    name: fill(ar.quotes.accept.title, { number: 'Q-2026-0001' }),
+  });
+  await accept.getByRole('button', { name: ar.common.next }).click();
+  await accept.getByRole('button', { name: ar.common.next }).click();
+
+  await accept.getByRole('button', { name: ar.quotes.accept.retainer.modes.renew }).click();
+  await accept.getByRole('combobox', { name: ar.quotes.accept.retainer.renewed }).click();
+  await page.getByRole('option', { name: 'إدارة السوشيال ميديا' }).click();
+  const after = formatMonth(addMonths(month, 2));
+  await expect(
+    accept.getByText(fill(ar.quotes.accept.retainer.renewFrom, { month: after })),
+  ).toBeVisible();
+  await expect(
+    accept.getByText(fill(ar.quotes.accept.retainer.renewAfterTerm, { month: after })),
+  ).toBeVisible();
+  // The quote's term (Q1) starts in that month.
+  await expect(
+    accept.getByText(fill(ar.quotes.accept.retainer.termStarts, { month: after })),
+  ).toBeVisible();
+  // Without a term, the running term continues monthly after it ends.
+  await accept.getByRole('switch', { name: ar.retainers.terms.enable }).click();
+  await expect(
+    accept.getByText(fill(ar.quotes.accept.retainer.renewContinue, { month: after })),
+  ).toBeVisible();
 });
