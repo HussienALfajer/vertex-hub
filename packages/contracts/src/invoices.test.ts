@@ -51,6 +51,11 @@ describe('invoiceStatus (rule 21)', () => {
     }
   });
 
+  it('is paid at issue with a total of 0, a credit taking the whole month (F05B C7)', () => {
+    expect(status('sent', 0, '2026-10-01', 0)).toBe('paid');
+    expect(status('draft', 0, null, 0)).toBe('draft');
+  });
+
   it('is not overdue on the due date itself', () => {
     expect(status('sent', 0, today)).toBe('sent');
     expect(status('overdue', 400, today)).toBe('partially_paid');
@@ -161,11 +166,15 @@ describe('invoiceDraftSchema', () => {
       { description: 'x'.repeat(301), quantity: 1, unitPriceMinor: 0 },
       { description: 'x', quantity: 0, unitPriceMinor: 0 },
       { description: 'x', quantity: 1000, unitPriceMinor: 0 },
-      { description: 'x', quantity: 1, unitPriceMinor: -1 },
       { description: 'x', quantity: 1, unitPriceMinor: 1.5 },
     ]) {
       expect(invoiceDraftSchema.safeParse(draft([line])).success, JSON.stringify(line)).toBe(false);
     }
+  });
+
+  it('takes a negative price, which the API allows on a credit line only (F05B C7)', () => {
+    const credit = { description: 'x', quantity: 1, unitPriceMinor: -8000 };
+    expect(invoiceDraftSchema.safeParse(draft([credit])).success).toBe(true);
   });
 });
 

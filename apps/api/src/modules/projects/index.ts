@@ -11,6 +11,11 @@ export {
   type RetainerWork,
   sourceKey,
 } from './billing-sources.js';
+export {
+  type ChargeInvoice,
+  type ChargeInvoiceSource,
+  ChargeInvoices,
+} from './charge-invoices.js';
 export { type CycleOpened, CycleOpenedHooks } from './cycle-opened-hooks.js';
 export {
   type CycleLineLink,
@@ -34,6 +39,8 @@ export {
 export { type MilestoneDone, MilestoneDoneHooks } from './milestone-done-hooks.js';
 export { ProjectsModule } from './projects.module.js';
 export { type RetainerChargeDue, RetainerChargeDueHooks } from './retainer-charge-due-hooks.js';
+/** F05B C5, C9: credits taken off drafts and settled outside, for `invoices`. */
+export { RetainerCharges } from './retainer-charges.js';
 /** For the `retainers:run-daily` development script. */
 export { RetainerCyclesService } from './retainer-cycles.service.js';
 export { type CycleLineCounts, WorkProgress, type WorkProgressSource } from './work-progress.js';

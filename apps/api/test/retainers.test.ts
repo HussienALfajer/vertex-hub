@@ -231,7 +231,11 @@ describe('retainers', () => {
       expect(asEmployee.money).toBeUndefined();
       expect(asEmployee.permissions).toMatchObject({ canManage: false, canSeeMoney: false });
       const asFinance = await detail(created.id, finance.cookie);
-      expect(asFinance.money).toEqual({ currency: 'USD', monthlyFeeMinor: 90000 });
+      expect(asFinance.money).toEqual({
+        currency: 'USD',
+        monthlyFeeMinor: 90000,
+        creditPendingMinor: 0,
+      });
       expect(asFinance.permissions).toMatchObject({
         canManage: false,
         canEditMoney: false,
@@ -316,7 +320,12 @@ describe('retainers', () => {
         409,
         'CURRENCY_LOCKED',
       );
-      expect((await patch(created.id, cast.gm.cookie, { monthlyFeeMinor: null })).status).toBe(200);
+      // Once charged, the fee changes only by amendment (F05B A9).
+      await expectError(
+        await patch(created.id, cast.gm.cookie, { monthlyFeeMinor: null }),
+        409,
+        'FEE_CHANGE_NEEDS_AMENDMENT',
+      );
       // The first cycle's month was drafted when the retainer started.
       await expectError(
         await patch(created.id, cast.gm.cookie, { currency: 'SYP' }),

@@ -730,6 +730,19 @@ export class InvoicesService {
         serviceId: input.serviceId ?? null,
       };
     });
+    // F05B C7: only a credit charge's line is negative, and the invoice never goes below 0.
+    for (const [index, line] of lines.entries()) {
+      const source = inputs[index]?.source;
+      const credit =
+        source?.type === 'retainer_charge' &&
+        (resolved.get(sourceKey(source))?.amountMinor ?? 0) < 0;
+      if (line.unitPriceMinor < 0 && !credit) {
+        throw new BadRequestException('Only a credit line has a negative price');
+      }
+    }
+    if (invoiceTotal(lines) < 0) {
+      throw new CodedException(409, 'INVOICE_NEGATIVE', 'The invoice total would be below 0');
+    }
     return { lines, engagement };
   }
 

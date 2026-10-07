@@ -1,22 +1,38 @@
 import { useQuery } from '@tanstack/react-query';
-import type { RetainerBilling, RetainerDetail } from '@vertex-hub/contracts';
+import type { RetainerBilling, RetainerCharge, RetainerDetail } from '@vertex-hub/contracts';
 import {
+  Button,
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
   EmptyState,
+  Field,
+  FieldError,
+  FieldLabel,
   Table,
   TableBody,
   TableCell,
   TableHead,
   TableHeader,
   TableRow,
+  Textarea,
+  toast,
 } from '@vertex-hub/ui';
-import { ReceiptTextIcon, SparklesIcon } from 'lucide-react';
+import { HandCoinsIcon, ReceiptTextIcon, SparklesIcon } from 'lucide-react';
+import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { FormAlert } from '../../components/form-alert';
 import { LoadError } from '../../components/load-error';
 import { can, useMe } from '../../lib/auth';
+import { errorMessage } from '../../lib/errors';
 import { formatMonth, formatNumber } from '../../lib/format';
 import { BillingBadge } from '../projects/extra-work-tab';
 import { Money } from '../quotes/quote-badges';
-import { retainerBillingQuery } from './invoices.queries';
+import { retainerBillingQuery, useSettleCharge } from './invoices.queries';
 import { InvoicesTable } from './invoices-page';
 import { BillingSection, BillingSkeleton } from './project-billing-tab';
 import { CreateFromSource, SourceInvoiceCell } from './source-invoice';
@@ -106,14 +122,32 @@ function RetainerBillingView({
                       )}
                     </span>
                   </TableCell>
-                  <TableCell>{t(`retainers.chargeKinds.${charge.kind}`)}</TableCell>
+                  <TableCell>
+                    <span className="flex flex-col">
+                      <span>{t(`retainers.chargeKinds.${charge.kind}`)}</span>
+                      {charge.amendment && (
+                        <span className="text-xs text-muted-foreground">
+                          {t('invoices.billing.amendment', {
+                            number: formatNumber(charge.amendment.number),
+                          })}
+                        </span>
+                      )}
+                    </span>
+                  </TableCell>
                   <TableCell className="text-end">
                     <Money minor={charge.amountMinor} currency={currency} />
                   </TableCell>
                   <TableCell>
                     {charge.status !== 'pending' ? (
-                      <span className="text-muted-foreground">
-                        {t(`retainers.chargeStatuses.${charge.status}`)}
+                      <span className="flex flex-col text-muted-foreground">
+                        <span>{t(`retainers.chargeStatuses.${charge.status}`)}</span>
+                        {charge.settleNote && (
+                          <span className="text-xs whitespace-normal">{charge.settleNote}</span>
+                        )}
+                      </span>
+                    ) : charge.kind === 'credit' && charge.due && !charge.invoice ? (
+                      <span className="font-medium text-status-gold-foreground">
+                        {t('invoices.billing.creditOwed')}
                       </span>
                     ) : !charge.due ? (
                       <span className="text-muted-foreground">{t('invoices.billing.notDue')}</span>
@@ -124,12 +158,20 @@ function RetainerBillingView({
                   {canInvoice && (
                     <TableCell className="text-end">
                       {!charge.invoice && charge.due && charge.status === 'pending' && (
-                        <CreateFromSource
-                          clientId={clientId}
-                          currency={currency}
-                          source={{ type: 'retainer_charge', id: charge.id }}
-                          name={formatMonth(charge.month)}
-                        />
+                        <span className="flex flex-wrap justify-end gap-2">
+                          {/* A credit alone cannot be an invoice (C9): it joins a manual one. */}
+                          {charge.kind !== 'credit' && (
+                            <CreateFromSource
+                              clientId={clientId}
+                              currency={currency}
+                              source={{ type: 'retainer_charge', id: charge.id }}
+                              name={formatMonth(charge.month)}
+                            />
+                          )}
+                          {charge.kind === 'credit' && billing.canSettleCredits && (
+                            <SettleDialog retainerId={billing.retainer.id} charge={charge} />
+                          )}
+                        </span>
                       )}
                     </TableCell>
                   )}
@@ -193,5 +235,83 @@ function RetainerBillingView({
         )}
       </BillingSection>
     </div>
+  );
+}
+
+/** F05B C9: a pending credit refunded or settled outside the system, with a note. */
+function SettleDialog({ retainerId, charge }: { retainerId: string; charge: RetainerCharge }) {
+  const { t } = useTranslation();
+  const id = useId();
+  const settle = useSettleCharge(retainerId);
+  const [open, setOpen] = useState(false);
+  const [note, setNote] = useState('');
+  const [missing, setMissing] = useState(false);
+  const [failure, setFailure] = useState<string | null>(null);
+
+  async function submit(event: React.FormEvent) {
+    event.preventDefault();
+    setFailure(null);
+    if (!note.trim()) {
+      setMissing(true);
+      return;
+    }
+    try {
+      await settle.mutateAsync({ chargeId: charge.id, note: note.trim() });
+      toast.add({ title: t('invoices.billing.settled'), type: 'success' });
+      setOpen(false);
+    } catch (error) {
+      setFailure(errorMessage(t, error));
+    }
+  }
+
+  return (
+    <>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => {
+          setNote('');
+          setMissing(false);
+          setFailure(null);
+          setOpen(true);
+        }}
+      >
+        <HandCoinsIcon />
+        {t('invoices.billing.settle')}
+      </Button>
+      <Dialog open={open} onOpenChange={(next) => !next && setOpen(false)}>
+        <DialogContent closeLabel={t('common.close')}>
+          <form className="grid gap-5" onSubmit={submit} noValidate>
+            <DialogHeader>
+              <DialogTitle>{t('invoices.billing.settleTitle')}</DialogTitle>
+              <DialogDescription>{t('invoices.billing.settleBody')}</DialogDescription>
+            </DialogHeader>
+            <Field invalid={missing}>
+              <FieldLabel htmlFor={id}>{t('invoices.billing.settleNote')}</FieldLabel>
+              <Textarea
+                id={id}
+                rows={2}
+                maxLength={300}
+                value={note}
+                onChange={(event) => {
+                  setNote(event.target.value);
+                  setMissing(false);
+                }}
+              />
+              <FieldError match={missing}>{t('invoices.billing.settleNoteRequired')}</FieldError>
+            </Field>
+            {failure && <FormAlert>{failure}</FormAlert>}
+            <DialogFooter>
+              <DialogClose render={<Button variant="outline" type="button" />}>
+                {t('common.cancel')}
+              </DialogClose>
+              <Button type="submit" disabled={settle.isPending}>
+                {t('invoices.billing.settle')}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

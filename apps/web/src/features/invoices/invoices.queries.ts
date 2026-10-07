@@ -144,6 +144,25 @@ function useSaveInvoice({ wide }: { wide: boolean }) {
   };
 }
 
+/** F05B C9: a pending credit settled outside the system, with a note. */
+export function useSettleCharge(retainerId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ chargeId, note }: { chargeId: string; note: string }) =>
+      call(
+        api.POST('/api/retainers/{id}/charges/{chargeId}/settle', {
+          params: { path: { id: retainerId, chargeId } },
+          body: { note },
+        }),
+      ),
+    onSettled: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: invoicesKeys.all }),
+        queryClient.invalidateQueries({ queryKey: retainersKeys.all }),
+      ]),
+  });
+}
+
 export function useCreateInvoice() {
   const save = useSaveInvoice({ wide: true });
   return useMutation({

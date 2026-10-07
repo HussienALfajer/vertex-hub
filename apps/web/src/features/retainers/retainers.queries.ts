@@ -6,11 +6,15 @@ import {
   useQueryClient,
 } from '@tanstack/react-query';
 import type {
+  ApproveAmendment,
   CancelRetainerTerm,
+  CreateAmendment,
   CreateCycleAdjustment,
   CreateCycleLine,
   CreateRetainer,
   CreateRetainerTerm,
+  RejectAmendment,
+  RescheduleTerm,
   RetainerDeliverables,
   RetainerStatusChange,
   UpdateCycleLine,
@@ -33,6 +37,7 @@ export const retainersKeys = {
   cycle: (id: string, cycleId: string) => ['retainers', 'cycle', id, cycleId] as const,
   extraWork: (id: string) => ['retainers', 'extra-work', id] as const,
   terms: (id: string) => ['retainers', 'terms', id] as const,
+  amendments: (id: string) => ['retainers', 'amendments', id] as const,
 };
 
 export const retainerListQuery = (filters: RetainerListFilters) =>
@@ -53,6 +58,18 @@ export const retainerTermsQuery = (id: string) =>
   queryOptions({
     queryKey: retainersKeys.terms(id),
     queryFn: () => call(api.GET('/api/retainers/{retainerId}/terms', retainerPath(id))),
+  });
+
+/** The retainer's amendments, newest first (F05B); at most 300 per retainer (A7). */
+export const retainerAmendmentsQuery = (id: string) =>
+  queryOptions({
+    queryKey: retainersKeys.amendments(id),
+    queryFn: () =>
+      call(
+        api.GET('/api/retainers/{retainerId}/amendments', {
+          params: { path: { retainerId: id }, query: { page: 1, pageSize: 100 } },
+        }),
+      ),
   });
 
 const CYCLE_PAGE_SIZE = 12;
@@ -134,6 +151,76 @@ export const useCancelTerm = (retainerId: string) =>
   useRetainersMutation(({ termId, ...input }: CancelRetainerTerm & { termId: string }) =>
     call(
       api.POST('/api/retainers/{retainerId}/terms/{termId}/cancel', {
+        ...termPath(retainerId, termId),
+        body: input,
+      }),
+    ),
+  );
+
+/** F05B A1–A5: the amendment saved, applied, scheduled or waiting for approval. */
+export const useCreateAmendment = (retainerId: string) =>
+  useRetainersMutation((input: CreateAmendment) =>
+    call(
+      api.POST('/api/retainers/{retainerId}/amendments', {
+        ...retainerPath(retainerId),
+        body: input,
+      }),
+    ),
+  );
+
+/** What saving an amendment would do; nothing is saved, so nothing is refreshed. */
+export const usePreviewAmendment = (retainerId: string) =>
+  useMutation({
+    mutationFn: (input: CreateAmendment) =>
+      call(
+        api.POST('/api/retainers/{retainerId}/amendments/preview', {
+          ...retainerPath(retainerId),
+          body: input,
+        }),
+      ),
+  });
+
+const amendmentPath = (retainerId: string, amendmentId: string) => ({
+  params: { path: { retainerId, amendmentId } },
+});
+
+/** A4: the General Manager approves or rejects; the creator or a manager withdraws. */
+export const useDecideAmendment = (retainerId: string) =>
+  useRetainersMutation(
+    (
+      input:
+        | ({ action: 'approve'; amendmentId: string } & ApproveAmendment)
+        | ({ action: 'reject'; amendmentId: string } & RejectAmendment)
+        | { action: 'withdraw'; amendmentId: string },
+    ) => {
+      const where = amendmentPath(retainerId, input.amendmentId);
+      if (input.action === 'withdraw') {
+        return call(
+          api.POST('/api/retainers/{retainerId}/amendments/{amendmentId}/withdraw', where),
+        );
+      }
+      if (input.action === 'reject') {
+        return call(
+          api.POST('/api/retainers/{retainerId}/amendments/{amendmentId}/reject', {
+            ...where,
+            body: { note: input.note },
+          }),
+        );
+      }
+      return call(
+        api.POST('/api/retainers/{retainerId}/amendments/{amendmentId}/approve', {
+          ...where,
+          body: { note: input.note },
+        }),
+      );
+    },
+  );
+
+/** A6: new amounts for unbilled months of a term, same total. */
+export const useRescheduleTerm = (retainerId: string) =>
+  useRetainersMutation(({ termId, ...input }: RescheduleTerm & { termId: string }) =>
+    call(
+      api.POST('/api/retainers/{retainerId}/terms/{termId}/reschedule', {
         ...termPath(retainerId, termId),
         body: input,
       }),

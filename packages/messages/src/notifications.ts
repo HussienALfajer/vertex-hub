@@ -5,6 +5,7 @@ import {
   formatCalendarDate,
   formatDateTime,
   formatList,
+  formatMoney,
   formatMonth,
   formatNumber,
   formatTimeOfDay,
@@ -127,6 +128,12 @@ export const NOTIFICATION_TEXT = {
     renew: 'يتجدد تلقائيًا',
     end: 'ينتهي العقد',
     continue: 'يستمر شهريًا',
+  },
+  retainer_amendment_pending:
+    'طلب {{actor}} اعتماد التعديل {{number}} على عقد «{{retainer}}»: تخفيض {{amount}}',
+  retainer_amendment_decided: {
+    approved: 'اعتمد {{actor}} التعديل {{number}} على عقد «{{retainer}}»',
+    rejected: 'رفض {{actor}} التعديل {{number}} على عقد «{{retainer}}»: {{note}}',
   },
   retainer_term_renewed: 'جُدّد عقد «{{retainer}}» تلقائيًا: المدة {{term}} من {{start}} إلى {{end}}',
   retainer_behind: {
@@ -465,6 +472,30 @@ export function notificationText(
         ),
       };
     }
+    case 'retainer_amendment_pending': {
+      const { data } = notification;
+      return {
+        text: fill(text.retainer_amendment_pending, {
+          actor,
+          number: formatNumber(data.number),
+          retainer: data.retainer,
+          amount: formatMoney(Math.abs(data.moneyDeltaMinor), data.currency),
+        }),
+        context: data.client,
+      };
+    }
+    case 'retainer_amendment_decided': {
+      const { data } = notification;
+      return {
+        text: fill(text.retainer_amendment_decided[data.approved ? 'approved' : 'rejected'], {
+          actor,
+          number: formatNumber(data.number),
+          retainer: data.retainer,
+          note: data.note ?? '',
+        }),
+        context: null,
+      };
+    }
     case 'retainer_term_renewed': {
       const { data } = notification;
       return {
@@ -630,6 +661,7 @@ type TaskNotification = Exclude<
       | 'project_manager_assigned'
       | 'retainer_renewal_due'
       | 'retainer_term_renewed'
+      | `retainer_amendment_${string}`
       | 'retainer_behind'
       | 'quote_approval_requested'
       | 'quote_approval_decided'

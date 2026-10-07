@@ -17,6 +17,7 @@ import {
   MegaphoneIcon,
   PaletteIcon,
   ShapesIcon,
+  ShieldAlertIcon,
   SmartphoneIcon,
   TrendingDownIcon,
   TrendingUpIcon,
@@ -59,7 +60,17 @@ export function OverDeliveredBadge() {
   );
 }
 
-/** R6: renewal due from 30 days before the date, overdue after it. */
+/** F05B screen 2: amendments waiting for the General Manager (A4). */
+export function PendingApprovalBadge({ count }: { count: number }) {
+  const { t } = useTranslation();
+  return (
+    <Badge tone="warning">
+      <ShieldAlertIcon aria-hidden="true" />
+      {t('retainers.amendments.pendingBadge', { count, n: formatNumber(count) })}
+    </Badge>
+  );
+}
+
 /** F05B screen 2: "Term 2 · Nov 2026 – Jan 2027 · renews automatically". */
 export function TermChip({ term }: { term: RetainerTermSummary }) {
   const { t } = useTranslation();
@@ -79,6 +90,7 @@ export function TermChip({ term }: { term: RetainerTermSummary }) {
   );
 }
 
+/** R6: renewal due from 30 days before the date, overdue after it. */
 export function RenewalBadge({ state }: { state: RenewalState }) {
   const { t } = useTranslation();
   return (

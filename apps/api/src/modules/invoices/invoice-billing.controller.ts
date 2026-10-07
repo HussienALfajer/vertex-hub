@@ -28,11 +28,15 @@ import {
   type QuotePdfRender,
   quotePdfRenderSchema,
   type RetainerBilling,
+  type RetainerCharge,
   type RetainerChargeListQuery,
   type RetainerChargePage,
   retainerBillingSchema,
   retainerChargeListQuerySchema,
   retainerChargePageSchema,
+  retainerChargeSchema,
+  type SettleRetainerCharge,
+  settleRetainerChargeSchema,
   type UpdateProjectExpense,
   updateProjectExpenseSchema,
 } from '@vertex-hub/contracts';
@@ -201,5 +205,22 @@ export class InvoiceBillingController {
     @Query({ schema: retainerChargeListQuerySchema }) query: RetainerChargeListQuery,
   ): Promise<RetainerChargePage> {
     return this.billing.retainerCharges(actor, id, query);
+  }
+
+  @Post('retainers/:id/charges/:chargeId/settle')
+  @HttpCode(200)
+  @RequirePermissions('invoices.manage')
+  @SerializeOptions({ schema: retainerChargeSchema })
+  @ApiOkResponse({
+    description: 'A pending credit no live invoice bills, settled outside the system (F05B C9)',
+    standardSchema: retainerChargeSchema,
+  })
+  settleCharge(
+    @CurrentUser() actor: CurrentUserInfo,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('chargeId', ParseUUIDPipe) chargeId: string,
+    @Body({ schema: settleRetainerChargeSchema }) input: SettleRetainerCharge,
+  ): Promise<RetainerCharge> {
+    return this.billing.settleCharge(actor, id, chargeId, input);
   }
 }

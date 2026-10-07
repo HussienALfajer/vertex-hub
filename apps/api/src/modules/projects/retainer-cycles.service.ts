@@ -40,6 +40,7 @@ import { ClientDirectory } from '../clients/index.js';
 import { CycleOpenedHooks } from './cycle-opened-hooks.js';
 import { actorOf } from './project-access.js';
 import { readableRetainer, workableRetainer } from './retainer-access.js';
+import { RetainerAmendmentsService } from './retainer-amendments.service.js';
 import { RetainerCharges } from './retainer-charges.js';
 import { RetainerTermsService } from './retainer-terms.service.js';
 import { NO_TASKS, WorkProgress } from './work-progress.js';
@@ -109,6 +110,7 @@ export class RetainerCyclesService implements OnModuleInit {
     private readonly openedHooks: CycleOpenedHooks,
     private readonly charges: RetainerCharges,
     private readonly terms: RetainerTermsService,
+    private readonly amendments: RetainerAmendmentsService,
   ) {}
 
   onModuleInit(): void {
@@ -124,7 +126,8 @@ export class RetainerCyclesService implements OnModuleInit {
   /**
    * R2 and F05B "Jobs": for every non-archived retainer of a non-archived client, in one
    * transaction under its lock and in this order: starts and completes terms, ends the retainer
-   * when a term ending with `end` completed (T8), closes open cycles that ended before `today`
+   * when a term ending with `end` completed (T8), applies the month's scheduled amendments (A5),
+   * closes open cycles that ended before `today`
    * and opens the current month's for an active, started retainer (with its open-ended charge,
    * C2), marks the charges that became due and runs their hooks (C3), unless the retainer ended,
    * and schedules renewal terms (T7). Idempotent.
@@ -135,6 +138,7 @@ export class RetainerCyclesService implements OnModuleInit {
     due: number;
     ended: number;
     renewed: number;
+    applied: number;
   }> {
     const candidates = await this.db
       .select({ id: retainers.id })
@@ -146,6 +150,7 @@ export class RetainerCyclesService implements OnModuleInit {
     let due = 0;
     let endedCount = 0;
     let renewed = 0;
+    let applied = 0;
     // One retainer failing does not hold back the others (ADR 0015); the run fails at the end.
     await runEach(
       candidates,
@@ -176,6 +181,10 @@ export class RetainerCyclesService implements OnModuleInit {
             retainer.status = 'ended';
             endedCount += 1;
           }
+          // A5: the month's amendments apply before its cycle opens and its charges become due.
+          if (retainer.status !== 'ended') {
+            applied += await this.amendments.applyScheduled(tx, retainer, today);
+          }
           const ended = await tx
             .select(cycleColumns)
             .from(retainerCycles)
@@ -198,7 +207,7 @@ export class RetainerCyclesService implements OnModuleInit {
         });
       },
     );
-    return { closed, opened, due, ended: endedCount, renewed };
+    return { closed, opened, due, ended: endedCount, renewed, applied };
   }
 
   /**
@@ -226,6 +235,7 @@ export class RetainerCyclesService implements OnModuleInit {
     });
     await this.closeAll(tx, retainerId, endOn, null);
     await this.terms.endEarly(tx, retainerId, today, null);
+    await this.amendments.cancelOpen(tx, retainerId, null);
   }
 
   /**
@@ -277,6 +287,8 @@ export class RetainerCyclesService implements OnModuleInit {
       position: index + 1,
     }));
     if (lines.length > 0) await tx.insert(retainerCycleLines).values(lines);
+    // F05B A2: month-scope line changes already applied for this month.
+    await this.amendments.openWithAmendments(tx, retainerId, created.id, month);
     await recordAudit(tx, {
       actor,
       action: 'retainer_cycle.created',

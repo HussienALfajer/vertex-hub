@@ -21,6 +21,7 @@ export const PERMISSIONS = [
   'quotes.approve_discount',
   'projects.read',
   'projects.manage',
+  'retainers.approve_reduction',
   'tasks.read',
   'tasks.request',
   'tasks.work',

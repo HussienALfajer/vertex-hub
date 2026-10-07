@@ -15,6 +15,7 @@ import {
   extraWorkItems,
   projectMilestones,
   projects,
+  retainerAmendments,
   retainerCharges,
   retainers,
   retainerTerms,
@@ -96,6 +97,9 @@ export interface RetainerChargeRow {
   status: RetainerChargeStatus;
   /** A term month's `monthly` charge: its place in the term (F05B C4). */
   term: ChargeTerm | null;
+  /** The amendment of an addition or a credit (C6). */
+  amendment: { id: string; number: number } | null;
+  settleNote: string | null;
   due: boolean;
 }
 
@@ -145,6 +149,29 @@ const monthName = new Intl.DateTimeFormat('ar-SY-u-nu-latn', {
 });
 
 export const cycleMonthName = (month: string) => monthName.format(new Date(`${month}T00:00:00Z`));
+
+/**
+ * F05B C4: a charge's line text after its retainer's name: the month (with "n من N" in a term),
+ * the amendment of an addition or a credit, or the termination fee.
+ */
+function chargeName(row: {
+  kind: RetainerChargeKind;
+  month: string;
+  term: ChargeTerm | null;
+  amendmentNumber: number | null;
+}): string {
+  const month = cycleMonthName(row.month);
+  switch (row.kind) {
+    case 'monthly':
+      return row.term ? `${month} (${row.term.position} من ${row.term.months})` : month;
+    case 'addition':
+      return `تعديل ${row.amendmentNumber ?? ''} — ${month}`;
+    case 'credit':
+      return `رصيد دائن (تعديل ${row.amendmentNumber ?? ''}) — ${month}`;
+    case 'termination_fee':
+      return `رسوم إنهاء مبكر — ${month}`;
+  }
+}
 
 /** The map key of a source in `BillingSources.resolve`. */
 export const sourceKey = (source: InvoiceSource) => `${source.type}:${source.id}`;
@@ -253,15 +280,18 @@ export class BillingSources {
         .select({
           id: retainerCharges.id,
           month: retainerCharges.month,
+          kind: retainerCharges.kind,
           amountMinor: retainerCharges.amountMinor,
           status: retainerCharges.status,
           dueAt: retainerCharges.dueAt,
           engagement: engagementColumns(retainers),
           term: chargeTermColumns,
+          amendmentNumber: retainerAmendments.number,
         })
         .from(retainerCharges)
         .innerJoin(retainers, eq(retainers.id, retainerCharges.retainerId))
         .leftJoin(retainerTerms, eq(retainerTerms.id, retainerCharges.termId))
+        .leftJoin(retainerAmendments, eq(retainerAmendments.id, retainerCharges.amendmentId))
         .where(inArray(retainerCharges.id, chargeIds));
       // Locked like milestones: a draft waits for a change of the charge's amount or status.
       const rows = options.lock ? await query.for('share', { of: retainerCharges }) : await query;
@@ -270,15 +300,12 @@ export class BillingSources {
           type: 'retainer',
           ...withoutArchivedAt(row.engagement),
         };
-        const term = chargeTerm(row.month, row.term);
-        const month = term
-          ? `${cycleMonthName(row.month)} (${term.position} من ${term.months})`
-          : cycleMonthName(row.month);
+        const name = chargeName({ ...row, term: chargeTerm(row.month, row.term) });
         result.set(sourceKey({ type: 'retainer_charge', id: row.id }), {
           type: 'retainer_charge',
           id: row.id,
-          name: month,
-          description: `${engagement.name} — ${month}`,
+          name,
+          description: `${engagement.name} — ${name}`.slice(0, 300),
           amountMinor: row.amountMinor,
           archived: row.status !== 'pending' || row.dueAt === null,
           billingStatus: null,
@@ -502,6 +529,14 @@ export class BillingSources {
     return { items, total: total?.value ?? 0 };
   }
 
+  /** F05B C9: one charge of the retainer, as its billing shows it. */
+  async retainerCharge(retainerId: string, chargeId: string): Promise<RetainerChargeRow | null> {
+    const [row] = await this.chargeRows(
+      and(eq(retainerCharges.retainerId, retainerId), eq(retainerCharges.id, chargeId)),
+    );
+    return row ?? null;
+  }
+
   private async chargeRows(
     where: SQL | undefined,
     page?: { limit: number; offset: number },
@@ -514,10 +549,14 @@ export class BillingSources {
         amountMinor: retainerCharges.amountMinor,
         status: retainerCharges.status,
         dueAt: retainerCharges.dueAt,
+        settleNote: retainerCharges.settleNote,
         term: chargeTermColumns,
+        amendmentId: retainerAmendments.id,
+        amendmentNumber: retainerAmendments.number,
       })
       .from(retainerCharges)
       .leftJoin(retainerTerms, eq(retainerTerms.id, retainerCharges.termId))
+      .leftJoin(retainerAmendments, eq(retainerAmendments.id, retainerCharges.amendmentId))
       .where(where)
       .orderBy(
         desc(retainerCharges.month),
@@ -525,9 +564,13 @@ export class BillingSources {
         asc(retainerCharges.id),
       );
     const rows = page ? await query.limit(page.limit).offset(page.offset) : await query;
-    return rows.map(({ dueAt, term, ...row }) => ({
+    return rows.map(({ dueAt, term, amendmentId, amendmentNumber, ...row }) => ({
       ...row,
       term: chargeTerm(row.month, term),
+      amendment:
+        amendmentId && amendmentNumber !== null
+          ? { id: amendmentId, number: amendmentNumber }
+          : null,
       due: dueAt !== null,
     }));
   }

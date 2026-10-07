@@ -32,6 +32,9 @@ const NOT_BUSINESS_RECORDS: Record<string, string> = {
     'Never archived: cancelled or completed through its status, it goes with its retainer (F05B T5)',
   retainer_charges:
     'Never archived or deleted: cancelled or settled through its status, it goes with its retainer (F05B C10)',
+  retainer_amendments:
+    'Never archived or edited: corrected by another amendment, it goes with its retainer (F05B A7)',
+  retainer_amendment_lines: 'Part of its amendment, which is never edited (F05B A7)',
   task_dependencies: 'Link table; a dependency is added or removed, never archived (F06)',
   task_revisions: 'Append-only; never archived, an over-limit decision is set once (F06 rule 10)',
   task_reviews: 'Append-only review history with its snapshots; never edited or archived (F09)',

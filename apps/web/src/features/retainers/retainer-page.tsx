@@ -44,6 +44,7 @@ import { RetainerActions } from './retainer-actions';
 import {
   BehindBadge,
   DeliveryRate,
+  PendingApprovalBadge,
   RenewalBadge,
   RetainerStatusBadge,
   TermChip,
@@ -227,6 +228,9 @@ function RetainerHero({ retainer }: { retainer: RetainerDetail }) {
                 <RetainerStatusBadge status={retainer.status} />
                 {retainer.currentCycle?.behind && <BehindBadge />}
                 {retainer.renewal && <RenewalBadge state={retainer.renewal} />}
+                {retainer.pendingAmendments > 0 && (
+                  <PendingApprovalBadge count={retainer.pendingAmendments} />
+                )}
                 {archived && <ArchivedBadge />}
               </div>
               {retainer.term && <TermChip term={retainer.term} />}

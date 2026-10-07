@@ -223,7 +223,11 @@ export const invoiceLines = pgTable(
       sql`char_length(${table.description}) between 1 and 300`,
     ),
     check('invoice_lines_quantity_check', sql`${table.quantity} between 1 and 999`),
-    check('invoice_lines_price_check', sql`${table.unitPriceMinor} >= 0`),
+    // A negative price bills a credit charge (F05B C7); the invoice total stays ≥ 0.
+    check(
+      'invoice_lines_price_check',
+      sql`${table.unitPriceMinor} >= 0 or ${table.retainerChargeId} is not null`,
+    ),
   ],
 );
 

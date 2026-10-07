@@ -432,6 +432,46 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await screenshot(page, testInfo, `retainer-end-fee-${colorScheme}`);
     });
 
+    test('retainer amendments (F05B)', async ({ page }, testInfo) => {
+      await page.setViewportSize({ width: 1280, height: 2200 });
+      await page.clock.setFixedTime(new Date(`${PROJECTS_TODAY}T09:00:00+03:00`));
+      await mockApi(page, { signedIn: true });
+      await page.goto(`/retainers/${seedIds.adsRetainer}?tab=contract`);
+      await expect(page.getByTestId('amendment').first()).toBeVisible();
+      await screenshot(page, testInfo, `retainer-amendments-${colorScheme}`);
+
+      await page.setViewportSize({ width: 1280, height: 1400 });
+      await page.getByRole('button', { name: ar.retainers.amendments.new }).click();
+      const dialog = page.getByRole('dialog');
+      await dialog
+        .getByRole('button', { name: ar.retainers.amendments.directions.decrease })
+        .click();
+      await dialog.getByLabel(ar.retainers.amendments.amount).fill('5000');
+      await expect(dialog.getByTestId('amendment-preview')).toContainText(/25,000\.00/);
+      await screenshot(page, testInfo, `retainer-amendment-dialog-${colorScheme}`);
+      await page.keyboard.press('Escape');
+
+      await page.setViewportSize({ width: 1280, height: 1200 });
+      await page.goto(`/retainers/${seedIds.adsRetainer}?tab=billing`);
+      await expect(page.getByText(ar.invoices.billing.creditOwed)).toBeVisible();
+      await screenshot(page, testInfo, `retainer-billing-credit-${colorScheme}`);
+    });
+
+    test('retainer amendment needing approval (account manager)', async ({ page }, testInfo) => {
+      await page.setViewportSize({ width: 1280, height: 1400 });
+      await page.clock.setFixedTime(new Date(`${PROJECTS_TODAY}T09:00:00+03:00`));
+      await mockApi(page, { signedIn: true, me: accountManagerMe });
+      await page.goto(`/retainers/${seedIds.socialRetainer}?tab=contract`);
+      await page.getByRole('button', { name: ar.retainers.amendments.new }).click();
+      const dialog = page.getByRole('dialog');
+      await dialog
+        .getByRole('button', { name: ar.retainers.amendments.directions.decrease })
+        .click();
+      await dialog.getByLabel(ar.retainers.amendments.amount).fill('200');
+      await expect(dialog.getByText(ar.retainers.amendments.needsApproval)).toBeVisible();
+      await screenshot(page, testInfo, `retainer-amendment-approval-${colorScheme}`);
+    });
+
     test('retainer terms (employee view)', async ({ page }, testInfo) => {
       await page.setViewportSize({ width: 1280, height: 1300 });
       await page.clock.setFixedTime(new Date(`${PROJECTS_TODAY}T09:00:00+03:00`));
