@@ -32,6 +32,7 @@ Short records of decisions that shape the system. Each has a status: **Accepted*
 | [0026](0026-leads-pipeline-quotes-and-conversion.md) | Leads: a follow-up date on every open lead, quotes on leads, conversion by the sales team | Accepted |
 | [0027](0027-reports-on-read-and-revenue-by-service.md) | Reports computed on read through module report services; revenue by service from invoice lines | Accepted |
 | [0028](0028-email-outbox-digest-and-client-emails.md) | Email: one outbox sent by the worker over Hostinger SMTP; batched notification emails, a morning digest, client emails sent by hand | Accepted |
+| [0029](0029-retainer-terms-charges-and-amendments.md) | Retainer terms, charges as the billing source, and amendments with approval of reductions | Accepted |
 
 Template:
 
