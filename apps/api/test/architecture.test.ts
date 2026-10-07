@@ -309,6 +309,8 @@ describe('module boundaries', () => {
     catalog: 'catalog',
     clients: 'clients',
     content: 'content',
+    // The deliverable kind enum only, shared by catalog, quotes, retainers and templates.
+    deliverables: 'projects',
     email: 'email',
     files: 'files',
     invoices: 'invoices',

@@ -19,6 +19,7 @@ import { ProjectMilestonesController } from './project-milestones.controller.js'
 import { ProjectMilestonesService } from './project-milestones.service.js';
 import { ProjectsController } from './projects.controller.js';
 import { ProjectsService } from './projects.service.js';
+import { QuoteRenewalHooks } from './quote-renewal-hooks.js';
 import { RetainerAmendmentsController } from './retainer-amendments.controller.js';
 import { RetainerAmendmentsService } from './retainer-amendments.service.js';
 import { RetainerBehindAlerts } from './retainer-behind.js';
@@ -39,7 +40,7 @@ import { WorkProgress } from './work-progress.js';
  * (rule 4), takes task counts from whatever registers in `WorkProgress` (F06), and works the
  * `retainers.cycles` job that `apps/worker` schedules (R2). Notifies new project managers and
  * registers the renewal reminder and the behind alert (A09) in `notifications`' daily job (F14). Exports `EngagementDirectory` for
- * the `tasks` and `templates` modules, `CycleOpenedHooks` for `templates` (F07 rule 16) and
+ * the `tasks` and `templates` modules, `CycleOpenedHooks` for `templates` (F07 rule 16), `QuoteRenewalHooks` for `templates` (F05B Q2) and
  * `EngagementFactory` for `quotes` (F04 A01), and `BillingSources`, `BillingLocks`,
  * `MilestoneDoneHooks`, `RetainerChargeDueHooks`, `ChargeInvoices` and `RetainerCharges` (credits)
  * for `invoices` (F13, F05B).
@@ -74,6 +75,7 @@ import { WorkProgress } from './work-progress.js';
     ChargeInvoices,
     CycleOpenedHooks,
     MilestoneDoneHooks,
+    QuoteRenewalHooks,
     RetainerCharges,
     RetainerChargeDueHooks,
     RetainerRenewals,
@@ -90,6 +92,7 @@ import { WorkProgress } from './work-progress.js';
     ChargeInvoices,
     CycleOpenedHooks,
     MilestoneDoneHooks,
+    QuoteRenewalHooks,
     RetainerChargeDueHooks,
     RetainerCharges,
     EngagementReports,

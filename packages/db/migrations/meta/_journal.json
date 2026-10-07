@@ -351,6 +351,20 @@
       "when": 1791383621283,
       "tag": "0049_naive_multiple_man",
       "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1791397615866,
+      "tag": "0050_cool_wiccan",
+      "breakpoints": true
+    },
+    {
+      "idx": 51,
+      "version": "7",
+      "when": 1791399470198,
+      "tag": "0051_white_vermin",
+      "breakpoints": true
     }
   ]
 }

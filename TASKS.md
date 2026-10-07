@@ -35,10 +35,15 @@ Spec: `docs/specs/F05B-retainer-terms.md` · ADRs 0006, 0015, 0023, 0024, 0029 �
 - [x] full checks after the fixes (lint, typecheck, build, OpenAPI and migration drift, test 1,775 incl. api 987, E2E 353); spec updated where settled; dev database migrated (0049); owner approved acceptance (2026-10-07); PR opened without `/ship` at the owner's request, auto-merge on
 
 ## PR 4 — `feat/f05b-quotes`: quotes with a term (Q1–Q3)
-- [ ] contracts: `acceptPlanSchema` / `acceptQuoteSchema` retainer `term`; unit tests
-- [ ] api: acceptance creates the term (Q1), Renew on a running term (`quote_renewal` amendment, Q2), a quote without a term sets `continue`; tests `quote-accept.test.ts`
-- [ ] bridge; web: accept dialog term block and the Renew notice; E2E + screenshots
-- [ ] spec and ROADMAP updates, wiring checklist, full checks, reviewer, owner acceptance, /ship (merge at once)
+- [x] contracts: `acceptQuoteSchema` retainer `term` (new and renew, default null), `acceptPlanSchema` retainer `term` (`AcceptTermPlan`) and renewable `renewsFrom` / `afterTerm`; unit test; contracts test 536 passed
+- [x] db (`/db-migration`, 0050 + 0051, expand only, SQL reviewed): `retainer_terms.quote_id`, `retainer_amendments.quote_id` + `fee_minor` (check: set exactly for `quote_renewal`); `deliverableKindEnum` moved to `schema/deliverables.ts` (the `quotes` / `retainers` import cycle), owner `projects` in `TABLE_OWNERS`; `db` test 11 passed, drift clean
+- [x] api: new retainer with the quote's term (Q1, `quoteId`, `RENEWAL_DATE_FROM_TERM`); Renew (Q2): `RetainerTermsService.renewForQuote` (scheduled term cancelled, term after the active one or next month, `continue` without a term), `RetainerAmendmentsService.createQuoteRenewal` (scheduled `quote_renewal`, replaces a scheduled one) applied by the job (lines replaced, fee set); plan term and renewal months; test cleanup unlinks quote terms; `quote-accept` 19, `retainer-amendments` 19, `retainer-terms` 21, `retainers` 22, `retainer-cycles` 14, `architecture` 17 passed
+- [x] bridge (OpenAPI, client types); web: accept dialog term block (switch + `TermPlanEditor`, renewal date locked), Renew notice by `renewsFrom` / `afterTerm` (Q2), summary term; amendment title for quote renewals; fixtures; `f04-accept` E2E (renew after a running term); RTL screenshots of the retainer step in both themes checked; web typecheck, lint, test 59 passed
+- [x] spec (settled details, `fee_minor`) and ROADMAP updates
+- [x] wiring checklist; reviewer (blocking fixed: a retainer not started yet renewed before its start month, T2; the summary's month count showed `{{n}}`)
+- [x] owner decisions (2026-10-07): the Renew template is linked with the lines in the renewal's month (0051: `retainer_amendments.template_id`, `retainer_templates.linked_by_id` nullable; `QuoteRenewalHooks` registered by `templates`); a past start date starts the quote's term this month; `quote-accept` 21 passed
+- [x] full checks after the last fix (lint, typecheck, build, OpenAPI and migration drift, test, E2E: all pass)
+- [x] dev database migrated (0050, 0051); owner approved acceptance (2026-10-07); PR opened without `/ship` at the owner's request, auto-merge on
 - [ ] then: production deploy in its own session (order step 3)
 
 ## After the UI walkthrough — `chore/f05b-drop-cycle-source` (order step 5)

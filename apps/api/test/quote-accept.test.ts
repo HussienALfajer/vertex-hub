@@ -9,6 +9,7 @@ import {
   acceptPlanSchema,
   addDays,
   addMonths,
+  amendmentPageSchema,
   businessDate,
   type CatalogPackage,
   type CatalogService,
@@ -22,7 +23,9 @@ import {
   type QuoteDraftInput,
   quoteDetailSchema,
   quotePageSchema,
+  type RetainerDetail,
   retainerDetailSchema,
+  retainerTermListSchema,
   templateDetailSchema,
 } from '@vertex-hub/contracts';
 import {
@@ -33,12 +36,17 @@ import {
   notifications,
   projects,
   quotes,
+  retainerCycleLines,
+  retainerCycles,
   retainers,
+  retainerTemplates,
+  retainerTerms,
   tasks,
 } from '@vertex-hub/db';
 import { testDatabaseUrl } from '@vertex-hub/db/testing';
 import { and, asc, eq, isNotNull } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { RetainerCyclesService } from '../src/modules/projects/index.js';
 import { QuoteWorkflowService } from '../src/modules/quotes/quote-workflow.service.js';
 import { expectError, seedClientCast } from './client-cast.js';
 import { api, clientIp, ORIGIN, removeCatalog, removeClients, removeTemplates } from './helpers.js';
@@ -750,7 +758,232 @@ describe('quote acceptance (F04 A01)', () => {
     expect((await detail(version.id, cast.gm.cookie)).archivedAt).not.toBeNull();
   });
 
-  it('renews a retainer from the next cycle (A7) and refuses another currency', async () => {
+  const month = firstOfMonth(today);
+
+  const retainerOf = async (id: string) =>
+    created(
+      await client.get(`/api/retainers/${id}`, cast.gm.cookie),
+      (body) => retainerDetailSchema.parse(body),
+      200,
+    );
+
+  const linesOf = (retainer: RetainerDetail) =>
+    retainer.deliverables.map((l) => [l.kind, l.monthlyQuantity, l.revisionLimit]);
+
+  const termsOf = async (id: string) =>
+    (
+      await created(
+        await client.get(`/api/retainers/${id}/terms`, cast.gm.cookie),
+        (body) => retainerTermListSchema.parse(body),
+        200,
+      )
+    ).items;
+
+  const amendmentsOf = async (id: string) =>
+    (
+      await created(
+        await client.get(`/api/retainers/${id}/amendments`, cast.gm.cookie),
+        (body) => amendmentPageSchema.parse(body),
+        200,
+      )
+    ).items;
+
+  const termQuoteIds = async (retainerId: string) =>
+    (
+      await db
+        .select({ number: retainerTerms.number, quoteId: retainerTerms.quoteId })
+        .from(retainerTerms)
+        .where(eq(retainerTerms.retainerId, retainerId))
+        .orderBy(asc(retainerTerms.number))
+    ).map((row) => [row.number, row.quoteId]);
+
+  const monthlyOnlyQuote = (monthlyTermMonths: number | null) =>
+    sentQuote({ lines: [goldLine()], installments: [], monthlyTermMonths });
+
+  const renewBody = (
+    plan: AcceptPlan,
+    retainerId: string,
+    term: NonNullable<AcceptPlan['retainer']>['term'],
+  ) =>
+    acceptBody(plan, {
+      retainer: { mode: 'renew', retainerId, templateId: null, term },
+    });
+
+  it("creates the quote's term on a new retainer (F05B Q1)", async () => {
+    const quote = await monthlyOnlyQuote(6);
+    const plan = await planOf(quote);
+    // The quote's term at the monthly net, split evenly, renewing.
+    expect(plan.retainer?.term).toEqual({
+      months: 6,
+      agreedTotalMinor: 270000,
+      schedule: [45000, 45000, 45000, 45000, 45000, 45000],
+      endAction: 'renew',
+    });
+    const term = {
+      months: 6,
+      agreedTotalMinor: 270000,
+      schedule: [70000, 40000, 40000, 40000, 40000, 40000],
+      endAction: 'end' as const,
+    };
+    const base = acceptBody(plan);
+    const retainer = base.retainer as Record<string, unknown>;
+    await expectError(
+      await accept(quote, { ...base, retainer: { ...retainer, term } }),
+      409,
+      'RENEWAL_DATE_FROM_TERM',
+    );
+    await expectError(
+      await accept(quote, {
+        ...base,
+        retainer: { ...retainer, renewalDate: null, term: { ...term, agreedTotalMinor: 1 } },
+      }),
+      409,
+      'SCHEDULE_TOTAL_MISMATCH',
+    );
+    const accepted = await created(
+      await accept(quote, { ...base, retainer: { ...retainer, renewalDate: null, term } }),
+      (body) => quoteDetailSchema.parse(body),
+      200,
+    );
+    const retainerId = accepted.retainer?.id as string;
+    // The term starts in the start date's month; the fee stays the monthly net (T9).
+    expect(await retainerOf(retainerId)).toMatchObject({
+      renewalDate: addMonths(month, 6),
+      money: { monthlyFeeMinor: 45000 },
+      term: { number: 1, status: 'active', startMonth: month, months: 6, endAction: 'end' },
+    });
+    const [created1] = await termsOf(retainerId);
+    expect(created1?.schedule.map((row) => row.money?.amountMinor)).toEqual(term.schedule);
+    expect(await termQuoteIds(retainerId)).toEqual([[1, quote.id]]);
+    const [entry] = await db
+      .select({ after: auditEntries.after })
+      .from(auditEntries)
+      .where(
+        and(
+          eq(auditEntries.entityId, created1?.id as string),
+          eq(auditEntries.action, 'retainer_term.created'),
+        ),
+      );
+    expect(entry?.after).toMatchObject({ quoteId: quote.id, schedule: term.schedule });
+  });
+
+  it('starts the quote term after a running term, replacing the scheduled one (F05B Q2)', async () => {
+    const existing = await cast.createRetainer(clientId, {
+      monthlyFeeMinor: 30000,
+      term: { months: 2, agreedTotalMinor: 60000, schedule: [30000, 30000], endAction: 'renew' },
+    });
+    const scheduled = await client.post(`/api/retainers/${existing.id}/terms`, cast.gm.cookie, {
+      startMonth: addMonths(month, 2),
+      months: 1,
+      agreedTotalMinor: 30000,
+      schedule: [30000],
+      endAction: 'renew',
+    });
+    expect(scheduled.status).toBe(201);
+    const quote = await monthlyOnlyQuote(6);
+    const plan = await planOf(quote);
+    expect(plan.retainer?.renewable.find((r) => r.id === existing.id)).toMatchObject({
+      renewsFrom: addMonths(month, 2),
+      afterTerm: true,
+    });
+    expect(
+      (await accept(quote, renewBody(plan, existing.id, plan.retainer?.term ?? null))).status,
+    ).toBe(200);
+    const terms = await termsOf(existing.id);
+    expect(terms.map((t) => [t.number, t.status, t.startMonth, t.months])).toEqual([
+      [3, 'scheduled', addMonths(month, 2), 6],
+      [2, 'cancelled', addMonths(month, 2), 1],
+      [1, 'active', month, 2],
+    ]);
+    expect(await termQuoteIds(existing.id)).toEqual([
+      [1, null],
+      [2, null],
+      [3, quote.id],
+    ]);
+    expect(await retainerOf(existing.id)).toMatchObject({ renewalDate: addMonths(month, 8) });
+    expect(await amendmentsOf(existing.id)).toMatchObject([
+      {
+        kind: 'quote_renewal',
+        scope: 'onward',
+        effectiveMonth: addMonths(month, 2),
+        status: 'scheduled',
+        createdBy: null,
+        money: { amountDeltaMinor: 15000 },
+      },
+    ]);
+  });
+
+  it('starts the term this month for a start date in an earlier month (F05B Q1)', async () => {
+    const quote = await monthlyOnlyQuote(3);
+    const plan = await planOf(quote, `?retainerStartDate=${addDays(month, -20)}`);
+    const base = acceptBody(plan);
+    const term = plan.retainer?.term;
+    const accepted = await created(
+      await accept(quote, {
+        ...base,
+        retainer: { ...(base.retainer as Record<string, unknown>), renewalDate: null, term },
+      }),
+      (body) => quoteDetailSchema.parse(body),
+      200,
+    );
+    expect(await retainerOf(accepted.retainer?.id as string)).toMatchObject({
+      startDate: addDays(month, -20),
+      renewalDate: addMonths(month, 3),
+      term: { status: 'active', startMonth: month, months: 3 },
+    });
+  });
+
+  it('renews a retainer that has not started from its start month (F05B Q2, T2)', async () => {
+    const later = addMonths(month, 3);
+    const existing = await cast.createRetainer(clientId, {
+      monthlyFeeMinor: 30000,
+      startDate: addDays(later, 14),
+    });
+    const quote = await monthlyOnlyQuote(3);
+    const plan = await planOf(quote);
+    expect(plan.retainer?.renewable.find((r) => r.id === existing.id)).toMatchObject({
+      renewsFrom: later,
+      afterTerm: false,
+    });
+    expect(
+      (await accept(quote, renewBody(plan, existing.id, plan.retainer?.term ?? null))).status,
+    ).toBe(200);
+    expect((await termsOf(existing.id)).map((t) => [t.status, t.startMonth])).toEqual([
+      ['scheduled', later],
+    ]);
+    expect(await amendmentsOf(existing.id)).toMatchObject([
+      { kind: 'quote_renewal', effectiveMonth: later },
+    ]);
+  });
+
+  it('continues a running term monthly for a quote without a term; a newer renewal replaces it (F05B Q2)', async () => {
+    const existing = await cast.createRetainer(clientId, {
+      monthlyFeeMinor: 30000,
+      term: { months: 2, agreedTotalMinor: 60000, schedule: [30000, 30000], endAction: 'renew' },
+    });
+    const first = await monthlyOnlyQuote(null);
+    const firstPlan = await planOf(first);
+    expect(firstPlan.retainer?.term).toBeNull();
+    expect((await accept(first, renewBody(firstPlan, existing.id, null))).status).toBe(200);
+    expect(await retainerOf(existing.id)).toMatchObject({
+      renewalDate: addMonths(month, 2),
+      term: { number: 1, status: 'active', endAction: 'continue' },
+      money: { monthlyFeeMinor: 30000 },
+    });
+    expect(await amendmentsOf(existing.id)).toMatchObject([
+      { kind: 'quote_renewal', effectiveMonth: addMonths(month, 2), status: 'scheduled' },
+    ]);
+    const second = await monthlyOnlyQuote(null);
+    expect((await accept(second, renewBody(await planOf(second), existing.id, null))).status).toBe(
+      200,
+    );
+    expect((await amendmentsOf(existing.id)).map((a) => [a.number, a.status])).toEqual([
+      [2, 'scheduled'],
+      [1, 'cancelled'],
+    ]);
+  });
+
+  it('renews an open-ended retainer next month through a quote renewal (A7, F05B Q2) and refuses another currency', async () => {
     const existing = await cast.createRetainer(clientId, { monthlyFeeMinor: 30000 });
     const quote = await sentQuote({
       lines: [goldLine()],
@@ -759,33 +992,92 @@ describe('quote acceptance (F04 A01)', () => {
     });
     const plan = await planOf(quote);
     expect(plan.project).toBeNull();
+    const next = addMonths(month, 1);
+    expect(plan.retainer?.renewable.find((r) => r.id === existing.id)).toMatchObject({
+      renewsFrom: next,
+      afterTerm: false,
+    });
     const response = await accept(
       quote,
       acceptBody(plan, {
-        retainer: { mode: 'renew', retainerId: existing.id, templateId: monthlyTemplate },
+        retainer: {
+          mode: 'renew',
+          retainerId: existing.id,
+          templateId: monthlyTemplate,
+          term: plan.retainer?.term ?? null,
+        },
       }),
     );
     const accepted = await created(response, (body) => quoteDetailSchema.parse(body), 200);
     expect(accepted.retainer).toEqual({ id: existing.id, name: existing.name });
     expect(accepted.project).toBeNull();
-    const retainer = await created(
-      await client.get(`/api/retainers/${existing.id}`, cast.gm.cookie),
-      (body) => retainerDetailSchema.parse(body),
-      200,
-    );
+    // Nothing changes this month: the lines and fee wait for the renewal's month.
+    const retainer = await retainerOf(existing.id);
     expect(retainer).toMatchObject({
-      renewalDate: addMonths(firstOfMonth(today), 4),
-      money: { monthlyFeeMinor: 45000 },
+      renewalDate: addMonths(month, 4),
+      money: { monthlyFeeMinor: 30000 },
+      term: { number: 1, status: 'scheduled', startMonth: next, months: 3 },
     });
-    expect(retainer.deliverables.map((l) => [l.kind, l.monthlyQuantity, l.revisionLimit])).toEqual([
+    expect(linesOf(retainer)).toEqual([
+      ['design', 12, null],
+      ['reel', 4, null],
+    ]);
+    expect(await termQuoteIds(existing.id)).toEqual([[1, quote.id]]);
+    expect(await amendmentsOf(existing.id)).toMatchObject([
+      {
+        kind: 'quote_renewal',
+        effectiveMonth: next,
+        status: 'scheduled',
+        lines: [
+          { kind: 'design', quantity: 12, revisionLimit: 1 },
+          { kind: 'reel', quantity: 4, revisionLimit: 2 },
+        ],
+      },
+    ]);
+    // The template waits for the renewal's month too (owner decision 2026-10-07).
+    const linked = () =>
+      db
+        .select({
+          templateId: retainerTemplates.templateId,
+          linkedById: retainerTemplates.linkedById,
+        })
+        .from(retainerTemplates)
+        .where(eq(retainerTemplates.retainerId, existing.id));
+    expect(await linked()).toEqual([]);
+    // The job applies it in its month, before the month's cycle opens (A5).
+    await app.get(RetainerCyclesService).runDaily(next);
+    expect(await linked()).toEqual([{ templateId: monthlyTemplate, linkedById: null }]);
+    const renewed = await retainerOf(existing.id);
+    expect(renewed).toMatchObject({
+      money: { monthlyFeeMinor: 45000 },
+      term: { number: 1, status: 'active' },
+    });
+    expect(linesOf(renewed)).toEqual([
       ['design', 12, 1],
       ['reel', 4, 2],
     ]);
-    // R10: the open cycle keeps its lines.
-    expect(retainer.currentCycle?.lines.map((l) => [l.kind, l.revisionLimit])).toEqual([
-      ['design', null],
-      ['reel', null],
+    expect(await amendmentsOf(existing.id)).toMatchObject([
+      { status: 'applied', effects: [{ month: next, effect: 'fee_changed' }] },
     ]);
+    const [cycle] = await db
+      .select({ id: retainerCycles.id })
+      .from(retainerCycles)
+      .where(and(eq(retainerCycles.retainerId, existing.id), eq(retainerCycles.month, next)));
+    const cycleLines = await db
+      .select({ kind: retainerCycleLines.kind, revisionLimit: retainerCycleLines.revisionLimit })
+      .from(retainerCycleLines)
+      .where(eq(retainerCycleLines.cycleId, cycle?.id as string))
+      .orderBy(asc(retainerCycleLines.position));
+    expect(cycleLines.map((l) => [l.kind, l.revisionLimit])).toEqual([
+      ['design', 1],
+      ['reel', 2],
+    ]);
+    // The new template generated the month's tasks (F07 rule 16), one per design.
+    const renewedTasks = await db
+      .select({ id: tasks.id })
+      .from(tasks)
+      .where(and(eq(tasks.retainerCycleId, cycle?.id as string), isNotNull(tasks.cycleLineId)));
+    expect(renewedTasks).toHaveLength(12);
 
     // An ended retainer, or another client's, is not renewed.
     const monthlyOnly = await sentQuote({ lines: [goldLine()], installments: [] });

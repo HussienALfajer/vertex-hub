@@ -4,10 +4,14 @@ import {
   type AcceptPlan,
   type AcceptQuoteInput,
   acceptQuoteSchema,
+  addMonths,
   businessDate,
+  type CalendarDate,
   type Currency,
   type DepartmentCode,
+  firstOfMonth,
   type QuoteDetail,
+  type RetainerTermInput,
 } from '@vertex-hub/contracts';
 import {
   Badge,
@@ -29,6 +33,7 @@ import {
   Input,
   MultiCombobox,
   Skeleton,
+  Switch,
   Textarea,
   ToggleGroup,
   ToggleGroupItem,
@@ -42,7 +47,7 @@ import { FormAlert } from '../../components/form-alert';
 import { LoadError } from '../../components/load-error';
 import { ApiError } from '../../lib/api/client';
 import { errorMessage, fieldError, SCREEN_ERROR } from '../../lib/errors';
-import { formatCalendarDate, formatNumber } from '../../lib/format';
+import { formatCalendarDate, formatMonth, formatNumber } from '../../lib/format';
 import { clientQuery } from '../clients/clients.queries';
 import { departmentListQuery } from '../departments/departments.queries';
 import { type Proof, ProofField } from '../files/proof-field';
@@ -59,6 +64,14 @@ import { conversionRefusal } from '../leads/lead-dialogs';
 import { DepartmentChips } from '../projects/project-badges';
 import { useProjectManagerOptions } from '../projects/project-form';
 import { DeliverableIcon, lineName, RetainerStatusBadge } from '../retainers/retainer-badges';
+import {
+  EMPTY_TERM,
+  isTermProblems,
+  parseTerm,
+  type TermDraft,
+  TermPlanEditor,
+  type TermProblems,
+} from '../retainers/term-fields';
 import { templateListQuery } from '../templates/templates.queries';
 import { ChoiceSelect } from './choice-select';
 import { Money } from './quote-badges';
@@ -125,10 +138,35 @@ function defaultsOf(plan: AcceptPlan, today: string): AcceptValues {
       name: plan.retainer?.name ?? '',
       departments: plan.retainer?.departments ?? [],
       startDate: plan.retainer?.startDate ?? today,
-      renewalDate: plan.retainer?.renewalDate ?? '',
+      // A term sets the renewal date (F05B T11): empty while the quote's term is on.
+      renewalDate: plan.retainer?.term ? '' : (plan.retainer?.renewalDate ?? ''),
       templateId: plan.retainer?.template?.id ?? null,
     },
   };
+}
+
+/** The term the dialog sends: null without one, or while it does not add up yet. */
+function termInput(term: TermDraft | null): RetainerTermInput | null {
+  const parsed = term ? parseTerm(term) : null;
+  return parsed && !isTermProblems(parsed) ? parsed : null;
+}
+
+/** F05B Q1: the start date's month, or the current month when that is later (owner decision). */
+function newTermStart(startDate: string): CalendarDate {
+  const current = firstOfMonth(businessDate());
+  const month = firstOfMonth(startDate);
+  return month > current ? month : current;
+}
+
+/** F05B Q1, Q2: the term's first month: the start date's, or the month the renewal takes effect. */
+function termStartOf(values: AcceptValues, plan: AcceptPlan): CalendarDate | null {
+  if (values.retainer.mode === 'new') {
+    return isDate(values.retainer.startDate) ? newTermStart(values.retainer.startDate) : null;
+  }
+  return (
+    plan.retainer?.renewable.find((item) => item.id === values.retainer.retainerId)?.renewsFrom ??
+    null
+  );
 }
 
 function toRequest(
@@ -136,6 +174,7 @@ function toRequest(
   plan: AcceptPlan,
   proof: Proof | null,
   conversion: ConversionValues | null,
+  term: TermDraft | null,
 ): AcceptQuoteInput {
   const { project, retainer } = values;
   return {
@@ -159,14 +198,21 @@ function toRequest(
     retainer:
       plan.retainer &&
       (retainer.mode === 'renew'
-        ? { mode: 'renew', retainerId: retainer.retainerId, templateId: retainer.templateId }
+        ? {
+            mode: 'renew',
+            retainerId: retainer.retainerId,
+            templateId: retainer.templateId,
+            term: termInput(term),
+          }
         : {
             mode: 'new',
             name: retainer.name,
             departments: retainer.departments,
             startDate: retainer.startDate,
-            renewalDate: retainer.renewalDate || null,
+            // A term sets the renewal date (F05B T11).
+            renewalDate: term ? null : retainer.renewalDate || null,
             templateId: retainer.templateId,
+            term: termInput(term),
           }),
   };
 }
@@ -263,6 +309,10 @@ function AcceptSteps({
   const [failure, setFailure] = useState<string | null>(null);
   const [conversion, setConversion] = useConversionValues(plan.conversion);
   const [conversionIssues, setConversionIssues] = useState<ConversionProblems>({});
+  // F05B Q1: the quote's term, editable; kept beside the form while it is typed.
+  const [term, setTerm] = useState<TermDraft | null>(plan.retainer?.term ?? null);
+  const [termProblems, setTermProblems] = useState<TermProblems>({});
+  const termOn = useRef(term !== null);
   const steps: Step[] = [
     ...(plan.conversion ? (['client'] as const) : []),
     'response',
@@ -292,7 +342,7 @@ function AcceptSteps({
         plan.project.installments.map((installment) => installment.milestone),
       );
     }
-    if (plan.retainer && !edited.current.renewalDate) {
+    if (plan.retainer && !edited.current.renewalDate && !termOn.current) {
       form.setValue('retainer.renewalDate', plan.retainer.renewalDate ?? '');
     }
   }, [plan, form]);
@@ -326,7 +376,7 @@ function AcceptSteps({
     form.clearErrors();
     const values = form.getValues();
     const problems: [FieldPath<AcceptValues>, string | undefined][] = [];
-    const parsed = acceptQuoteSchema.safeParse(toRequest(values, plan, proof, conversion));
+    const parsed = acceptQuoteSchema.safeParse(toRequest(values, plan, proof, conversion, term));
     if (!parsed.success) {
       for (const issue of parsed.error.issues) {
         const [first, second] = issue.path;
@@ -354,11 +404,18 @@ function AcceptSteps({
         problems.push(['project.installmentMilestones', undefined]);
       }
     }
-    if (current === 'retainer' && values.retainer.mode === 'new') {
+    if (current === 'retainer' && values.retainer.mode === 'new' && !term) {
       const { startDate, renewalDate } = values.retainer;
       if (renewalDate && renewalDate <= startDate) {
         problems.push(['retainer.renewalDate', t('retainers.form.errors.renewalAfterStart')]);
       }
+    }
+    let termInvalid = false;
+    if (current === 'retainer') {
+      const parsedTerm = term ? parseTerm(term) : null;
+      const found = parsedTerm && isTermProblems(parsedTerm) ? parsedTerm : {};
+      setTermProblems(found);
+      termInvalid = Object.keys(found).length > 0;
     }
     let proofPending = false;
     for (const [path, message] of problems) {
@@ -369,7 +426,7 @@ function AcceptSteps({
       form.setError(path, { type: message ? SCREEN_ERROR : 'invalid', message: message ?? '' });
     }
     setFailure(proofPending ? t('quotes.accept.proof.waiting') : null);
-    return problems.length === 0;
+    return problems.length === 0 && !termInvalid;
   }
 
   function next() {
@@ -395,9 +452,9 @@ function AcceptSteps({
   async function submit() {
     setFailure(null);
     const parsed = acceptQuoteSchema.safeParse(
-      toRequest(form.getValues(), plan, proof, conversion),
+      toRequest(form.getValues(), plan, proof, conversion, term),
     );
-    if (!parsed.success) {
+    if (!parsed.success || (term && !termInput(term))) {
       setFailure(t('quotes.accept.errors.review'));
       return;
     }
@@ -461,10 +518,23 @@ function AcceptSteps({
           onRenewalEdited={() => {
             edited.current.renewalDate = true;
           }}
+          term={term}
+          onTerm={(next) => {
+            if ((next !== null) !== termOn.current) {
+              termOn.current = next !== null;
+              form.setValue(
+                'retainer.renewalDate',
+                next || edited.current.renewalDate ? '' : (plan.retainer?.renewalDate ?? ''),
+              );
+            }
+            setTerm(next);
+            setTermProblems({});
+          }}
+          termProblems={termProblems}
         />
       )}
       {step === 'summary' && (
-        <Summary plan={plan} form={form} proof={proof} conversion={conversion} />
+        <Summary plan={plan} form={form} proof={proof} conversion={conversion} term={term} />
       )}
       {planning && step !== 'response' && (
         <p className="text-sm text-muted-foreground" aria-live="polite">
@@ -873,10 +943,16 @@ function RetainerStep({
   retainer,
   form,
   onRenewalEdited,
+  term,
+  onTerm,
+  termProblems,
 }: {
   retainer: NonNullable<AcceptPlan['retainer']>;
   form: AcceptForm;
   onRenewalEdited: () => void;
+  term: TermDraft | null;
+  onTerm: (next: TermDraft | null) => void;
+  termProblems: TermProblems;
 }) {
   const { t } = useTranslation();
   const ids = {
@@ -886,9 +962,20 @@ function RetainerStep({
     start: useId(),
     renewal: useId(),
     template: useId(),
+    term: useId(),
   };
   const errors = form.formState.errors.retainer;
-  const mode = useWatch({ control: form.control, name: 'retainer.mode' });
+  const [mode, retainerId, startDate] = useWatch({
+    control: form.control,
+    name: ['retainer.mode', 'retainer.retainerId', 'retainer.startDate'],
+  });
+  const renewed = retainer.renewable.find((item) => item.id === retainerId);
+  const termStart =
+    mode === 'renew'
+      ? (renewed?.renewsFrom ?? null)
+      : isDate(startDate)
+        ? newTermStart(startDate)
+        : null;
   const templates = useQuery(templateListQuery({ kind: 'retainer_cycle', pageSize: 100 }));
   const templateItems = [
     {
@@ -965,10 +1052,22 @@ function RetainerStep({
               </Field>
             )}
           />
-          <Callout
-            title={t('quotes.accept.retainer.renewTitle')}
-            description={t('quotes.accept.retainer.renewBody')}
-          />
+          {renewed && (
+            // F05B Q2: the lines, fee and term take effect after the active term, else next month.
+            <Callout
+              title={t('quotes.accept.retainer.renewFrom', {
+                month: formatMonth(renewed.renewsFrom),
+              })}
+              description={t(
+                renewed.afterTerm
+                  ? term
+                    ? 'quotes.accept.retainer.renewAfterTerm'
+                    : 'quotes.accept.retainer.renewContinue'
+                  : 'quotes.accept.retainer.renewBody',
+                { month: formatMonth(renewed.renewsFrom) },
+              )}
+            />
+          )}
         </section>
       ) : (
         <section className="grid gap-5">
@@ -1000,9 +1099,12 @@ function RetainerStep({
               <Input
                 id={ids.renewal}
                 type="date"
+                disabled={term !== null}
                 {...form.register('retainer.renewalDate', { onChange: onRenewalEdited })}
               />
-              <FieldDescription>{t('retainers.form.renewalHint')}</FieldDescription>
+              <FieldDescription>
+                {term ? t('retainers.terms.renewalFromTerm') : t('retainers.form.renewalHint')}
+              </FieldDescription>
               <FieldError match={!!errors?.renewalDate}>
                 {fieldError(errors?.renewalDate, t('projects.form.errors.date'))}
               </FieldError>
@@ -1010,6 +1112,36 @@ function RetainerStep({
           </div>
         </section>
       )}
+
+      <section className="grid gap-4 rounded-lg border border-border p-4">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex flex-col gap-0.5">
+            <label htmlFor={ids.term} className="text-sm font-medium">
+              {t('retainers.terms.enable')}
+            </label>
+            <p id={`${ids.term}-hint`} className="text-sm text-muted-foreground">
+              {term && termStart
+                ? t('quotes.accept.retainer.termStarts', { month: formatMonth(termStart) })
+                : t('retainers.terms.enableHint')}
+            </p>
+          </div>
+          <Switch
+            id={ids.term}
+            aria-describedby={`${ids.term}-hint`}
+            checked={term !== null}
+            onCheckedChange={(checked) => onTerm(checked ? (retainer.term ?? EMPTY_TERM) : null)}
+          />
+        </div>
+        {term && (
+          <TermPlanEditor
+            value={term}
+            onChange={onTerm}
+            startMonth={termStart}
+            currency={retainer.currency}
+            problems={termProblems}
+          />
+        )}
+      </section>
 
       <Controller
         control={form.control}
@@ -1094,14 +1226,18 @@ function Summary({
   form,
   proof,
   conversion,
+  term,
 }: {
   plan: AcceptPlan;
   form: AcceptForm;
   proof: Proof | null;
   conversion: ConversionValues | null;
+  term: TermDraft | null;
 }) {
   const { t } = useTranslation();
   const values = form.getValues();
+  const termStart = termStartOf(values, plan);
+  const accepted = termInput(term);
   const managers = useProjectManagerOptions();
   const managerName =
     managers.find((option) => option.id === values.project.projectManagerId)?.name ??
@@ -1175,12 +1311,31 @@ function Summary({
                 {formatCalendarDate(values.retainer.startDate)}
               </Fact>
               <Fact label={t('retainers.form.renewalDate')}>
-                {values.retainer.renewalDate
-                  ? formatCalendarDate(values.retainer.renewalDate)
-                  : t('common.none')}
+                {accepted && termStart
+                  ? formatCalendarDate(addMonths(termStart, accepted.months))
+                  : values.retainer.renewalDate
+                    ? formatCalendarDate(values.retainer.renewalDate)
+                    : t('common.none')}
               </Fact>
             </>
           )}
+          <Fact label={t('retainers.terms.sectionTitle')}>
+            {accepted && termStart ? (
+              <>
+                {t('quotes.accept.summary.term', {
+                  months: t('retainers.terms.monthsCount', {
+                    count: accepted.months,
+                    n: formatNumber(accepted.months),
+                  }),
+                  month: formatMonth(termStart),
+                  endAction: t(`retainers.terms.endActions.${accepted.endAction}`),
+                })}{' '}
+                <Money minor={accepted.agreedTotalMinor} currency={plan.retainer.currency} />
+              </>
+            ) : (
+              t('common.none')
+            )}
+          </Fact>
           <Fact label={t('retainers.form.monthlyFee')}>
             <Money minor={plan.retainer.monthlyFeeMinor} currency={plan.retainer.currency} />
           </Fact>

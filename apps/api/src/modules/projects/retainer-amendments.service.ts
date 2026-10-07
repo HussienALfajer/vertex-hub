@@ -47,6 +47,7 @@ import { ClientDirectory } from '../clients/index.js';
 import { NotificationCenter } from '../notifications/index.js';
 import { ChargeInvoices } from './charge-invoices.js';
 import { actorOf, assertCanEditMoney, coversClient, seesMoney } from './project-access.js';
+import { QuoteRenewalHooks } from './quote-renewal-hooks.js';
 import { type RetainerAccess, readableRetainer, workableRetainer } from './retainer-access.js';
 import { RetainerCharges } from './retainer-charges.js';
 
@@ -61,6 +62,34 @@ type PlannedRetainer = Pick<RetainerAccess, 'id' | 'status' | 'archivedAt' | 'st
 type AmendmentRow = typeof retainerAmendments.$inferSelect;
 
 type LineRow = typeof retainerAmendmentLines.$inferSelect;
+
+/** A line an amendment stores: a change (`quantityDelta`) or a quote's new quantity. */
+interface AmendmentLineInput {
+  kind: DeliverableKind;
+  label?: string | null;
+  quantityDelta?: number | null;
+  quantity?: number | null;
+  revisionLimit?: number | null;
+}
+
+/** What an accepted quote renews a retainer with (F04 A7, F05B Q2). */
+export interface QuoteRenewalInput {
+  quoteId: string;
+  /** The month it takes effect in: after the active term, else next month. */
+  effectiveMonth: CalendarDate;
+  /** The quote's monthly net: the open-ended fee from that month. */
+  feeMinor: number;
+  /** The monthly template to link in that month; null keeps the retainer's. */
+  templateId: string | null;
+  /** The quote's merged lines, which replace the standing lines. */
+  lines: {
+    kind: DeliverableKind;
+    label: string | null;
+    monthlyQuantity: number;
+    revisionLimit: number | null;
+  }[];
+  reason: string;
+}
 
 /** What a `change` amendment asks for (A1–A3). */
 type ChangeInput = Pick<CreateAmendment, 'scope' | 'effectiveMonth' | 'lines' | 'amountDeltaMinor'>;
@@ -124,6 +153,7 @@ export class RetainerAmendmentsService {
     private readonly charges: RetainerCharges,
     private readonly invoices: ChargeInvoices,
     private readonly notifications: NotificationCenter,
+    private readonly renewalHooks: QuoteRenewalHooks,
   ) {}
 
   async list(
@@ -502,6 +532,10 @@ export class RetainerAmendmentsService {
         // A savepoint: an amendment that fails rolls back alone (ADR 0015).
         await tx.transaction(async (savepoint) => {
           const lines = await this.lines(savepoint, [row.id]);
+          if (row.kind === 'quote_renewal') {
+            await this.applyQuoteRenewal(savepoint, row, lines, null);
+            return;
+          }
           const plan = await this.plan(savepoint, retainer, changeOf(row, lines), today, {
             fromJob: true,
           });
@@ -515,6 +549,149 @@ export class RetainerAmendmentsService {
       applied += 1;
     }
     return applied;
+  }
+
+  /**
+   * F05B Q2 on a retainer the caller locked: the quote's lines and fee become a `quote_renewal`
+   * amendment of its effective month, applied by the job like any scheduled amendment (A5), with
+   * no approval (the quote's own discount approval covers it). A quote renewal still scheduled is
+   * replaced by the newer one.
+   */
+  async createQuoteRenewal(
+    tx: Transaction,
+    retainerId: string,
+    actor: AuditActor,
+    input: QuoteRenewalInput,
+  ): Promise<void> {
+    const replaced = await tx
+      .select()
+      .from(retainerAmendments)
+      .where(
+        and(
+          eq(retainerAmendments.retainerId, retainerId),
+          eq(retainerAmendments.kind, 'quote_renewal'),
+          eq(retainerAmendments.status, 'scheduled'),
+        ),
+      )
+      .orderBy(asc(retainerAmendments.number));
+    for (const row of replaced) await this.cancel(tx, row, actor, 'replaced');
+    const [fee] = await tx
+      .select({ monthlyFeeMinor: retainers.monthlyFeeMinor })
+      .from(retainers)
+      .where(eq(retainers.id, retainerId));
+    const beforeMinor = fee?.monthlyFeeMinor ?? 0;
+    const deltaMinor = input.feeMinor - beforeMinor;
+    // The amendment is the system's (no creator); the audit entry names who accepted the quote.
+    const row = await this.insert(tx, retainerId, actor, {
+      kind: 'quote_renewal',
+      scope: 'onward',
+      effectiveMonth: input.effectiveMonth,
+      amountDeltaMinor: deltaMinor,
+      moneyDeltaMinor: deltaMinor,
+      reason: input.reason,
+      status: 'scheduled',
+      effects:
+        deltaMinor === 0
+          ? []
+          : [
+              {
+                month: input.effectiveMonth,
+                effect: 'fee_changed',
+                invoice: null,
+                beforeMinor,
+                afterMinor: input.feeMinor,
+              },
+            ],
+      quoteId: input.quoteId,
+      feeMinor: input.feeMinor,
+      templateId: input.templateId,
+      createdById: null,
+      lines: input.lines.map((line) => ({
+        kind: line.kind,
+        label: line.label,
+        quantity: line.monthlyQuantity,
+        revisionLimit: line.revisionLimit,
+      })),
+    });
+    if (input.effectiveMonth <= firstOfMonth(businessDate())) {
+      await this.applyQuoteRenewal(tx, row, await this.lines(tx, [row.id]), actor);
+    }
+  }
+
+  /**
+   * Applies a `quote_renewal` in its month (A5): the quote's lines replace the standing lines
+   * (same kind and label keep their identity, the others are archived) and its monthly template is
+   * linked before the month's cycle opens and copies them, and its fee becomes the open-ended rate.
+   */
+  private async applyQuoteRenewal(
+    tx: Transaction,
+    row: AmendmentRow,
+    lines: LineRow[],
+    actor: AuditActor | null,
+  ): Promise<void> {
+    const standingLines = await tx
+      .select({
+        id: retainerDeliverables.id,
+        kind: retainerDeliverables.kind,
+        label: retainerDeliverables.label,
+      })
+      .from(retainerDeliverables)
+      .where(
+        and(
+          eq(retainerDeliverables.retainerId, row.retainerId),
+          isNull(retainerDeliverables.archivedAt),
+        ),
+      );
+    const wanted = new Set(lines.map((line) => deliverableKey(line)));
+    const plan: LinePlan[] = [
+      ...standingLines
+        .filter((line) => !wanted.has(deliverableKey(line)))
+        .map((line) => ({ ...line, quantity: 0, revisionLimit: null })),
+      ...lines.map((line) => ({
+        kind: line.kind,
+        label: line.label,
+        id: standingLines.find((item) => deliverableKey(item) === deliverableKey(line))?.id ?? null,
+        quantity: line.quantity ?? 0,
+        revisionLimit: line.revisionLimit,
+      })),
+    ];
+    await this.applyStanding(tx, row.retainerId, plan, { revisionLimits: true });
+    if (row.templateId) {
+      await this.renewalHooks.run(tx, {
+        retainerId: row.retainerId,
+        amendmentId: row.id,
+        templateId: row.templateId,
+        actor,
+      });
+    }
+    const effects: AmendmentEffectRow[] = [];
+    const [fee] = await tx
+      .select({ monthlyFeeMinor: retainers.monthlyFeeMinor })
+      .from(retainers)
+      .where(eq(retainers.id, row.retainerId));
+    const beforeMinor = fee?.monthlyFeeMinor ?? null;
+    if (row.feeMinor !== null && beforeMinor !== row.feeMinor) {
+      await tx
+        .update(retainers)
+        .set({ monthlyFeeMinor: row.feeMinor })
+        .where(eq(retainers.id, row.retainerId));
+      await recordAudit(tx, {
+        actor,
+        action: 'retainer.updated',
+        entityType: 'retainer',
+        entityId: row.retainerId,
+        before: { monthlyFeeMinor: beforeMinor },
+        after: { monthlyFeeMinor: row.feeMinor, amendmentId: row.id },
+      });
+      effects.push({
+        month: row.effectiveMonth,
+        effect: 'fee_changed',
+        invoice: null,
+        beforeMinor: beforeMinor ?? 0,
+        afterMinor: row.feeMinor,
+      });
+    }
+    await this.markApplied(tx, row, effects, actor);
   }
 
   /** A8: ending a retainer cancels its pending and scheduled amendments. */
@@ -846,7 +1023,12 @@ export class RetainerAmendmentsService {
   }
 
   /** A2, `onward`: lines change, new ones are added, a line reaching 0 is archived. */
-  private async applyStanding(tx: Transaction, retainerId: string, lines: LinePlan[]) {
+  private async applyStanding(
+    tx: Transaction,
+    retainerId: string,
+    lines: LinePlan[],
+    options: { revisionLimits?: boolean } = {},
+  ) {
     if (lines.length === 0) return;
     const [top] = await tx
       .select({ value: max(retainerDeliverables.position) })
@@ -867,7 +1049,11 @@ export class RetainerAmendmentsService {
       } else if (line.id) {
         await tx
           .update(retainerDeliverables)
-          .set({ monthlyQuantity: line.quantity })
+          .set({
+            monthlyQuantity: line.quantity,
+            // A quote renewal brings its lines' revision rounds (F04 A6).
+            ...(options.revisionLimits && { revisionLimit: line.revisionLimit }),
+          })
           .where(eq(retainerDeliverables.id, line.id));
       } else {
         position += 1;
@@ -1007,7 +1193,12 @@ export class RetainerAmendmentsService {
       status: AmendmentRow['status'];
       effects: AmendmentEffectRow[];
       schedule?: { month: string; amountMinor: number }[];
-      lines: CreateAmendment['lines'];
+      quoteId?: string;
+      feeMinor?: number;
+      templateId?: string | null;
+      /** Default: the actor (a person's amendment). */
+      createdById?: string | null;
+      lines: AmendmentLineInput[];
     },
   ): Promise<AmendmentRow> {
     const [top] = await tx
@@ -1015,14 +1206,14 @@ export class RetainerAmendmentsService {
       .from(retainerAmendments)
       .where(eq(retainerAmendments.retainerId, retainerId));
     if ((top?.total ?? 0) >= RETAINER_LIMITS.amendments) throw limit();
-    const { lines, ...fields } = values;
+    const { lines, createdById, ...fields } = values;
     const [row] = await tx
       .insert(retainerAmendments)
       .values({
         ...fields,
         retainerId,
         number: (top?.value ?? 0) + 1,
-        createdById: actor?.id ?? null,
+        createdById: createdById === undefined ? (actor?.id ?? null) : createdById,
         schedule: values.schedule ?? null,
       })
       .returning();
@@ -1033,7 +1224,8 @@ export class RetainerAmendmentsService {
           amendmentId: row.id,
           kind: line.kind,
           label: line.label ?? null,
-          quantityDelta: line.quantityDelta,
+          quantityDelta: line.quantityDelta ?? null,
+          quantity: line.quantity ?? null,
           revisionLimit: line.revisionLimit ?? null,
           position: index + 1,
         })),
@@ -1053,7 +1245,15 @@ export class RetainerAmendmentsService {
         amountDeltaMinor: row.amountDeltaMinor,
         moneyDeltaMinor: row.moneyDeltaMinor,
         ...(row.schedule && { schedule: row.schedule }),
-        lines: lines.map(({ kind, label, quantityDelta }) => ({ kind, label, quantityDelta })),
+        lines: lines.map(({ kind, label, quantityDelta, quantity }) => ({
+          kind,
+          label,
+          ...(quantityDelta != null && { quantityDelta }),
+          ...(quantity != null && { quantity }),
+        })),
+        ...(row.feeMinor !== null && { feeMinor: row.feeMinor }),
+        ...(row.quoteId && { quoteId: row.quoteId }),
+        ...(row.templateId && { templateId: row.templateId }),
         reason: row.reason,
         retainerId,
       },

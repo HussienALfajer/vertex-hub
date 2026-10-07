@@ -40075,6 +40075,9 @@
                   "additionalProperties": false
                 }
               },
+              "term": {
+                "$ref": "#/components/schemas/AcceptTermPlan"
+              },
               "renewable": {
                 "type": "array",
                 "items": {
@@ -40090,12 +40093,22 @@
                     },
                     "status": {
                       "$ref": "#/components/schemas/RetainerStatus"
+                    },
+                    "renewsFrom": {
+                      "type": "string",
+                      "format": "date",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                    },
+                    "afterTerm": {
+                      "type": "boolean"
                     }
                   },
                   "required": [
                     "id",
                     "name",
-                    "status"
+                    "status",
+                    "renewsFrom",
+                    "afterTerm"
                   ],
                   "additionalProperties": false
                 }
@@ -40110,6 +40123,7 @@
               "currency",
               "monthlyFeeMinor",
               "lines",
+              "term",
               "renewable"
             ],
             "additionalProperties": false
@@ -40150,6 +40164,42 @@
           "retainer",
           "archivedTemplates",
           "conversion"
+        ],
+        "additionalProperties": false
+      },
+      "AcceptTermPlan": {
+        "nullable": true,
+        "type": "object",
+        "properties": {
+          "months": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 36
+          },
+          "agreedTotalMinor": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "schedule": {
+            "minItems": 1,
+            "maxItems": 36,
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "endAction": {
+            "$ref": "#/components/schemas/TermEndAction"
+          }
+        },
+        "required": [
+          "months",
+          "agreedTotalMinor",
+          "schedule",
+          "endAction"
         ],
         "additionalProperties": false
       },
@@ -40465,6 +40515,15 @@
                     "type": "string",
                     "format": "uuid",
                     "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "term": {
+                    "default": null,
+                    "nullable": true,
+                    "allOf": [
+                      {
+                        "$ref": "#/components/schemas/RetainerTermInput"
+                      }
+                    ]
                   }
                 },
                 "required": [
@@ -40495,6 +40554,15 @@
                     "type": "string",
                     "format": "uuid",
                     "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "term": {
+                    "default": null,
+                    "nullable": true,
+                    "allOf": [
+                      {
+                        "$ref": "#/components/schemas/RetainerTermInput"
+                      }
+                    ]
                   }
                 },
                 "required": [

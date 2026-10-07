@@ -3,7 +3,6 @@ import {
   AMENDMENT_SCOPES,
   AMENDMENT_STATUSES,
   CYCLE_STATUSES,
-  DELIVERABLE_KINDS,
   EXTRA_WORK_BILLING,
   RETAINER_CHARGE_KINDS,
   RETAINER_CHARGE_STATUSES,
@@ -29,7 +28,10 @@ import {
 import { departmentCodeEnum, users } from './auth.js';
 import { clientContacts, clients } from './clients.js';
 import { archivedAt, id, minorAmount, timestamps } from './columns.js';
+import { deliverableKindEnum } from './deliverables.js';
 import { currencyEnum, projects } from './projects.js';
+import { quotes } from './quotes.js';
+import { workTemplates } from './templates.js';
 
 /*
  * Retainers, their monthly cycles, their terms and charges (F05B) and the extra work log of projects and retainers (F05), owned
@@ -37,8 +39,6 @@ import { currencyEnum, projects } from './projects.js';
  */
 
 export const retainerStatusEnum = pgEnum('retainer_status', RETAINER_STATUSES);
-
-export const deliverableKindEnum = pgEnum('deliverable_kind', DELIVERABLE_KINDS);
 
 export const cycleStatusEnum = pgEnum('cycle_status', CYCLE_STATUSES);
 
@@ -242,6 +242,8 @@ export const retainerTerms = pgTable(
     status: termStatusEnum('status').notNull(),
     /** The term this one renews automatically (T7). */
     renewedFromId: uuid('renewed_from_id').references((): AnyPgColumn => retainerTerms.id),
+    /** The accepted quote that created it (F04 Q1, Q2). */
+    quoteId: uuid('quote_id').references((): AnyPgColumn => quotes.id),
     cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
     cancelReason: text('cancel_reason'),
     ...timestamps(),
@@ -256,6 +258,7 @@ export const retainerTerms = pgTable(
       .on(table.retainerId)
       .where(sql`${table.status} = 'scheduled'`),
     index('retainer_terms_renewed_from_id_idx').on(table.renewedFromId),
+    index('retainer_terms_quote_id_idx').on(table.quoteId),
     check('retainer_terms_months_check', sql`${table.months} between 1 and 36`),
     check('retainer_terms_agreed_total_check', sql`${table.agreedTotalMinor} >= 0`),
     check('retainer_terms_start_month_check', sql`extract(day from ${table.startMonth}) = 1`),
@@ -360,6 +363,15 @@ export const retainerAmendments = pgTable(
      * the invoice and the amounts before and after; money fields.
      */
     effects: jsonb('effects').$type<AmendmentEffectRow[]>().notNull().default([]),
+    /** `quote_renewal` only: the accepted quote. */
+    quoteId: uuid('quote_id').references((): AnyPgColumn => quotes.id),
+    /**
+     * `quote_renewal` only: the monthly fee (the open-ended rate) from its month, the quote's
+     * monthly net; a money field.
+     */
+    feeMinor: minorAmount('fee_minor'),
+    /** `quote_renewal` only: the monthly template the quote renewal links in its month. */
+    templateId: uuid('template_id').references((): AnyPgColumn => workTemplates.id),
     ...timestamps(),
   },
   (table) => [
@@ -367,6 +379,8 @@ export const retainerAmendments = pgTable(
     index('retainer_amendments_status_idx').on(table.status),
     index('retainer_amendments_created_by_id_idx').on(table.createdById),
     index('retainer_amendments_decided_by_id_idx').on(table.decidedById),
+    index('retainer_amendments_quote_id_idx').on(table.quoteId),
+    index('retainer_amendments_template_id_idx').on(table.templateId),
     check(
       'retainer_amendments_effective_month_check',
       sql`extract(day from ${table.effectiveMonth}) = 1`,
@@ -374,6 +388,14 @@ export const retainerAmendments = pgTable(
     check(
       'retainer_amendments_scope_check',
       sql`case ${table.kind} when 'change' then ${table.scope} is not null when 'quote_renewal' then ${table.scope} = 'onward' else ${table.scope} is null end`,
+    ),
+    check(
+      'retainer_amendments_quote_check',
+      sql`(${table.kind} = 'quote_renewal') = (${table.quoteId} is not null and ${table.feeMinor} is not null) and coalesce(${table.feeMinor}, 0) >= 0`,
+    ),
+    check(
+      'retainer_amendments_template_check',
+      sql`${table.templateId} is null or ${table.kind} = 'quote_renewal'`,
     ),
     check('retainer_amendments_reason_check', sql`char_length(${table.reason}) between 1 and 500`),
     check('retainer_amendments_note_check', sql`char_length(${table.decisionNote}) <= 500`),
