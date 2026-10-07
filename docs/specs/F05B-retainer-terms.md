@@ -55,7 +55,7 @@ Module ownership: the `projects` module owns `retainer_terms`, `retainer_charges
 | `agreed_total_minor` | bigint | required, ≥ 0; frozen when the term is created (and while it is `scheduled`, on edit); money field |
 | `end_action` | enum `term_end_action` (`renew`, `end`, `continue`) | required, default `renew` |
 | `status` | enum `term_status` (`scheduled`, `active`, `completed`, `cancelled`) | required |
-| `quote_id` | uuid → `quotes.id` | optional; the accepted quote that created it |
+| `quote_id` | uuid → `quotes.id` | optional; the accepted quote that created it (arrives with PR 4, its first use) |
 | `renewed_from_id` | uuid → `retainer_terms.id` | optional; the term it renews automatically |
 | `cancelled_at`, `cancel_reason` | timestamptz, text | set when cancelled |
 | timestamps | | terms are never archived; they go with their retainer |
@@ -145,12 +145,12 @@ pending_approval | scheduled ──retainer ends, or its month leaves the term�
 
 ### Terms
 - T1. A term is optional. A retainer without one bills open-ended months at `monthly_fee_minor`, as before F05B.
-- T2. A term is created on a non-archived, `active` or `paused` retainer of a non-archived client. `start_month` ≥ the current month, ≥ the month of the retainer's `start_date`, and after the end of any other non-cancelled term (`TERM_OVERLAP`). A partial first month counts as a whole month of the term (F05 R4).
+- T2. A term is created on a non-archived, `active` or `paused` retainer of a non-archived client. `start_month` ≥ the current month, ≥ the month of the retainer's `start_date`, and after the end of any other non-cancelled term (`TERM_OVERLAP`). A start date change on `PATCH /api/retainers/:id` that would put the start date's month after the start of an active or scheduled term is refused (`INVALID_DATES`, settled in PR 2). A partial first month counts as a whole month of the term (F05 R4).
 - T3. The schedule has one amount per month, each ≥ 0, summing to the agreed total (`SCHEDULE_TOTAL_MISMATCH`). The default is an even split with the remainder on the last month (`splitEvenly(total, months)` in `packages/contracts`; 1,000.00 over 3 months is 333.33 / 333.33 / 333.34). A month of 0 is allowed (a term paid up front: 1,000 / 0 / 0).
 - T4. Creating a term creates its `monthly` charges at once (that is the schedule; `base_amount_minor` = the amount). When the start month is the current month and an open-ended `monthly` charge exists for it: if no live invoice bills it, it is cancelled and replaced; otherwise the term is refused (`MONTH_ALREADY_CHARGED`; start next month). Charges of months already begun become due at once (rule C3).
 - T5. A `scheduled` term can be edited (start month, months, agreed total, schedule, end action) or cancelled with a reason; its charges are rebuilt or cancelled. An `active` term changes only its end action, and its amounts only through amendments (rules A1–A9).
 - T6. The **current total** of a term is Σ of its months' `monthly`, `addition` and `credit` charges that are not cancelled; the page shows "agreed 1,000 · current 1,150 (amendments +150)".
-- T7. **Renew.** On the first job run on or after 30 days before the end of an `active` term with end action `renew`, when the retainer has no scheduled term, the job creates the next term: `scheduled`, the same number of months from the next month, each month's amount = the ending term's month at the same position's `base_amount_minor`, agreed total = their sum, end action `renew`, `renewed_from_id` set; it notifies the account manager (`retainer_term_renewed`). The scheduled term can be edited or cancelled until it starts (T5).
+- T7. **Renew.** On the first job run on or after 30 days before the end of an `active` term with end action `renew`, when the retainer has no scheduled term, the job creates the next term: `scheduled`, the same number of months from the next month, each month's amount = the ending term's month at the same position's `base_amount_minor`, agreed total = their sum, end action `renew`, `renewed_from_id` set; it notifies the account manager (`retainer_term_renewed`). The scheduled term can be edited or cancelled until it starts (T5). A renewal a manager cancelled is not created again for the same term (settled in PR 2); one cancelled by leaving `renew` (T10) is created again when the end action returns to `renew`.
 - T8. **End.** When a term with end action `end` completes, the same job run ends the retainer (F05 status `ended`, `ended_on` = the term's last day, closing its cycle as F05 R5), with a null actor.
 - T9. **Continue.** After a term with end action `continue` completes, the retainer is open-ended: each month's charge is created when its cycle opens, at `monthly_fee_minor` (none while it is null or 0; F05 M4 shows "fee missing").
 - T10. Changing an active term's end action away from `renew` cancels its scheduled renewal term (which has no invoice yet: drafts start only in its first month). Changing it to `renew` within the last 30 days creates the renewal on the next job run.
@@ -201,7 +201,7 @@ Schemas live in `packages/contracts/src/retainers.ts` (terms, amendments, charge
 
 | Method and path | Permission | Request | Response | Error codes |
 |---|---|---|---|---|
-| `GET /api/retainers/:id/terms` | `projects.read` | — | `retainerTermSchema[]` newest first: number, months, start and end month, status, end action, `money { agreedTotalMinor, currentTotalMinor }`, months[] (`month`, status of its charges and invoices, `money { amountMinor, baseAmountMinor }`) | 404 |
+| `GET /api/retainers/:id/terms` | `projects.read` | — | `{ items: retainerTermSchema[] }` newest first: number, months, start and end month, status, end action, renewed from, `money { agreedTotalMinor, currentTotalMinor }`, `schedule[]` (`month`, position, `chargeId`, charge status, `due`, `money { amountMinor, baseAmountMinor, totalMinor }`). The invoice of a month is read from the retainer's billing (`RetainerCharge`, by `chargeId`, money access) | 404 |
 | `POST /api/retainers/:id/terms` | `projects.manage` (client) + money | `createRetainerTermSchema`: startMonth, months, agreedTotalMinor, schedule[] (amountMinor per month), endAction | `retainerTermSchema` | 403, 404, `RETAINER_ENDED`, `RETAINER_ARCHIVED`, `CLIENT_ARCHIVED`, `TERM_OVERLAP`, `INVALID_DATES`, `SCHEDULE_TOTAL_MISMATCH`, `MONTH_ALREADY_CHARGED` |
 | `PATCH /api/retainers/:id/terms/:termId` | `projects.manage` (client) + money | `updateRetainerTermSchema`: scheduled: all fields; active: endAction only | `retainerTermSchema` | 403, 404, `TERM_STARTED`, `TERM_OVERLAP`, `SCHEDULE_TOTAL_MISMATCH`, `RETAINER_ENDED` |
 | `POST /api/retainers/:id/terms/:termId/cancel` | `projects.manage` (client) + money | `{ reason }` | `retainerTermSchema` | 403, 404, `TERM_STARTED` |
@@ -219,7 +219,7 @@ Changes to existing endpoints:
 - `POST /api/retainers` (F05): optional `term { months, agreedTotalMinor, schedule, endAction }`, starting in the start date's month.
 - `PATCH /api/retainers/:id`: `monthlyFeeMinor` refused with `FEE_CHANGE_NEEDS_AMENDMENT` once the retainer has a charge (A9); `renewalDate` refused with `RENEWAL_DATE_FROM_TERM` while it has a term (T11).
 - `POST /api/retainers/:id/status` with `ended`: optional `termination { feeMinor, reason }` (money access).
-- `GET /api/retainers/:id` and the list: `term` summary (number, months, end month, end action, `money { agreedTotalMinor, currentTotalMinor }`), `pendingAmendments` count, `money.creditPendingMinor`; the list gains a `pendingApproval` filter.
+- `GET /api/retainers/:id` and the list: `term` summary (the active term, else the scheduled one: number, status, start and end month, months, end action; `money { agreedTotalMinor, currentTotalMinor }` on the detail only, with money access), `pendingAmendments` count, `money.creditPendingMinor`; the list gains a `pendingApproval` filter. `RetainerCharge` carries `term { number, position, months }` for a term month.
 - `GET /api/retainers/:id/billing` (F13): months with their charges and invoices, pending credits.
 - F13: `GET /api/invoices/billable` returns `charges` instead of `cycles`; `invoiceDraftSchema` line sources accept `{ type: 'retainer_charge', id }`; `INVOICE_NEGATIVE`; issue accepts total 0 with a credit line.
 - F04: `acceptPlanSchema` and `acceptQuoteSchema` retainer part gain `term { months, agreedTotalMinor, schedule, endAction }` (Q1, Q2).
@@ -241,7 +241,7 @@ All Arabic RTL through i18next (`retainers.terms.*`, `retainers.amendments.*`), 
 8. **Retainers list** — a "Pending approval" filter for GMs; the term's end month and end action in the renewal column.
 
 ## Audit, notifications and jobs
-- Audit (entity `retainer`, `after` carries `retainerId`): `retainer_term.created`, `.updated`, `.end_action_changed`, `.cancelled`, `.started`, `.completed`, `.renewed` (null actor); `retainer_charge.created`, `.amount_changed`, `.cancelled`, `.split`, `.settled_outside`; `retainer_amendment.created`, `.approved`, `.rejected`, `.withdrawn`, `.applied` (with `effects`), `.cancelled`; `retainer.updated` for fee changes from amendments. F13's `invoice.created` / `invoice.updated` for drafts and syncs. Amounts are visible to money readers only, as in F05.
+- Audit (entities `retainer_term`, `retainer_charge` and later `retainer_amendment`, whose `after` carries `retainerId` so the log links the retainer page): `retainer_term.created`, `.updated`, `.end_action_changed`, `.cancelled`, `.started`, `.completed`, `.renewed` (null actor); `retainer_charge.created`, `.amount_changed`, `.cancelled`, `.split`, `.settled_outside`; `retainer_amendment.created`, `.approved`, `.rejected`, `.withdrawn`, `.applied` (with `effects`), `.cancelled`; `retainer.updated` for fee changes from amendments. F13's `invoice.created` / `invoice.updated` for drafts and syncs. Amounts are visible to money readers only, as in F05.
 - Notifications (F14 catalog, emails per F14's categories):
   | Type | Category | Subject | Mutable | Recipients | Data |
   |---|---|---|---|---|---|

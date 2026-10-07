@@ -71,6 +71,7 @@ import {
   type CreatePostTask,
   type CreateProject,
   type CreateRetainer,
+  type CreateRetainerTerm,
   type CreateShoot,
   type CreateTaskInput,
   type CreateTemplate,
@@ -264,6 +265,8 @@ import {
   type RetainerStatus,
   type RetainerStatusChange,
   type RetainerTemplate,
+  type RetainerTerm,
+  type RetainerTermSummary,
   type RevenueReport,
   type ReviewStage,
   type RevisionDecision,
@@ -315,6 +318,8 @@ import {
   type TemplateRunInput,
   type TemplateRunTrigger,
   type TemplateStep,
+  type TermEndAction,
+  type TermStatus,
   taskMove,
   templateRunInputSchema,
   toUsdMinor,
@@ -324,6 +329,7 @@ import {
   type UpdateMeeting,
   type UpdateNotificationSettings,
   type UpdatePost,
+  type UpdateRetainerTerm,
   type UpdateShoot,
   type UpdateTaskInput,
   type UpdateWalletThreshold,
@@ -2228,6 +2234,117 @@ interface DeliverableRecord {
 /** F05B: each cycle of a retainer with a fee holds one monthly charge, keyed off the cycle. */
 const retainerChargeId = (cycleId: string) => `c${cycleId.slice(1)}`;
 
+/** A fixed term of a retainer (F05B); its months' charges derive from `schedule`. */
+interface TermRecord {
+  id: string;
+  number: number;
+  status: TermStatus;
+  startMonth: string;
+  months: number;
+  endAction: TermEndAction;
+  /** One amount per month (minor units of the retainer's currency). */
+  schedule: number[];
+  renewedFromId: string | null;
+  cancelReason: string | null;
+  cancelledAt: string | null;
+  createdAt: string;
+}
+
+/** The charge of a term's month, at its position (0-based). */
+const termChargeId = (termId: string, index: number) =>
+  `d${termId.slice(1, -2)}${index.toString().padStart(2, '0')}`;
+
+const termEndMonthOf = (term: TermRecord) => addMonths(term.startMonth, term.months - 1);
+
+/** The term's months as their charges: due from the month's first day (F05B C3). */
+function termChargesOf(r: RetainerRecord, today: string) {
+  return (r.terms ?? []).flatMap((term) =>
+    term.schedule.map((amountMinor, index) => {
+      const month = addMonths(term.startMonth, index);
+      return {
+        id: termChargeId(term.id, index),
+        month,
+        kind: 'monthly' as const,
+        amountMinor,
+        // Early end and cancelled terms cancel months not begun (E1, T5).
+        status:
+          term.status === 'cancelled' && month > firstOfMonth(today)
+            ? ('cancelled' as const)
+            : ('pending' as const),
+        term: { number: term.number, position: index + 1, months: term.months },
+        due: month <= firstOfMonth(today),
+      };
+    }),
+  );
+}
+
+/** Months a term covers that are not cancelled: open-ended charges skip them (C2). */
+function termCovers(r: RetainerRecord, month: string) {
+  return (r.terms ?? []).some(
+    (term) =>
+      term.status !== 'cancelled' && term.startMonth <= month && termEndMonthOf(term) >= month,
+  );
+}
+
+function termSummaryOf(term: TermRecord): RetainerTermSummary {
+  return {
+    id: term.id,
+    number: term.number,
+    status: term.status,
+    startMonth: term.startMonth,
+    endMonth: termEndMonthOf(term),
+    months: term.months,
+    endAction: term.endAction,
+  };
+}
+
+/** A term as `GET /api/retainers/:id/terms` returns it; amounts only with money access (G3). */
+function termOf(r: RetainerRecord, term: TermRecord, money: boolean, today: string): RetainerTerm {
+  const charges = termChargesOf(r, today).filter((c) => c.term.number === term.number);
+  const schedule = charges.map((c) => ({
+    month: c.month,
+    position: c.term.position,
+    chargeId: c.id,
+    status: c.status,
+    due: c.due,
+    ...(money && {
+      money: {
+        amountMinor: c.amountMinor,
+        baseAmountMinor: c.amountMinor,
+        totalMinor: c.status === 'cancelled' ? 0 : c.amountMinor,
+      },
+    }),
+  }));
+  const from = (r.terms ?? []).find((t) => t.id === term.renewedFromId);
+  return {
+    ...termSummaryOf(term),
+    renewedFrom: from ? { id: from.id, number: from.number } : null,
+    cancelledAt: term.cancelledAt,
+    cancelReason: term.cancelReason,
+    createdAt: term.createdAt,
+    ...(money && {
+      money: {
+        agreedTotalMinor: term.schedule.reduce((sum, amount) => sum + amount, 0),
+        currentTotalMinor: schedule.reduce((sum, m) => sum + (m.money?.totalMinor ?? 0), 0),
+      },
+    }),
+    schedule,
+  };
+}
+
+/** The active term, else the scheduled one (header chip, list). */
+const currentTermOf = (r: RetainerRecord) =>
+  (r.terms ?? []).find((t) => t.status === 'active') ??
+  (r.terms ?? []).find((t) => t.status === 'scheduled');
+
+/** T11: with an active or scheduled term, the day after the last one. */
+function syncRenewal(r: RetainerRecord) {
+  const open = (r.terms ?? []).filter((t) => t.status === 'active' || t.status === 'scheduled');
+  if (open.length === 0) return;
+  const last = open.map(termEndMonthOf).sort().at(-1);
+  if (last) r.renewalDate = addMonths(last, 1);
+}
+
 interface RetainerRecord {
   id: string;
   clientId: string;
@@ -2243,6 +2360,8 @@ interface RetainerRecord {
   deliverables: DeliverableRecord[];
   cycles: CycleRecord[];
   extraWork: ExtraWorkRecord[];
+  /** F05B: fixed terms, oldest first. */
+  terms?: TermRecord[];
 }
 
 const deliverable = (
@@ -2387,12 +2506,40 @@ export function retainersSeed(): RetainerRecord[] {
       departments: ['marketing'],
       status: 'paused',
       startDate: '2026-05-01',
-      renewalDate: '2027-05-01',
+      renewalDate: '2027-01-01',
       endedOn: null,
       currency: 'SYP',
       monthlyFeeMinor: null,
       archived: false,
       deliverables: [ads, adsReport],
+      terms: [
+        {
+          id: id(1931),
+          number: 1,
+          status: 'completed',
+          startMonth: '2026-07-01',
+          months: 3,
+          endAction: 'renew',
+          schedule: [2_500_000, 2_500_000, 2_500_000],
+          renewedFromId: null,
+          cancelReason: null,
+          cancelledAt: null,
+          createdAt: '2026-06-20T09:00:00.000Z',
+        },
+        {
+          id: id(1932),
+          number: 2,
+          status: 'active',
+          startMonth: '2026-10-01',
+          months: 3,
+          endAction: 'renew',
+          schedule: [3_000_000, 3_000_000, 4_000_000],
+          renewedFromId: id(1931),
+          cancelReason: null,
+          cancelledAt: null,
+          createdAt: '2026-09-01T00:05:00.000Z',
+        },
+      ],
       cycles: [
         {
           id: id(924),
@@ -2540,11 +2687,20 @@ function retainerRoutes({ users, clients, retainers, me }: RetainerState) {
       status: r.status,
       renewalDate: r.renewalDate,
       renewal: renewalState(r.renewalDate, r.status, today),
+      term: (() => {
+        const term = currentTermOf(r);
+        return term ? termSummaryOf(term) : null;
+      })(),
       currentCycle: open ? cycleOf(r, open) : null,
     };
   };
   const detail = (r: RetainerRecord): RetainerDetail => ({
     ...summary(r),
+    term: (() => {
+      const term = currentTermOf(r);
+      if (!term) return null;
+      return { ...termSummaryOf(term), money: termOf(r, term, seesMoney(r), today).money };
+    })(),
     startDate: r.startDate,
     endedOn: r.endedOn,
     deliverables: live(r).map((d, index) => ({
@@ -2652,7 +2808,26 @@ function retainerRoutes({ users, clients, retainers, me }: RetainerState) {
         ),
         cycles: [],
         extraWork: [],
+        terms: input.term
+          ? [
+              {
+                id: id(next++),
+                number: 1,
+                status:
+                  firstOfMonth(input.startDate) <= firstOfMonth(today) ? 'active' : 'scheduled',
+                startMonth: firstOfMonth(input.startDate),
+                months: input.term.months,
+                endAction: input.term.endAction ?? 'renew',
+                schedule: input.term.schedule,
+                renewedFromId: null,
+                cancelReason: null,
+                cancelledAt: null,
+                createdAt: new Date().toISOString(),
+              },
+            ]
+          : [],
       };
+      syncRenewal(created);
       if (!clientScope(created)) return fail(route, 403, null);
       if (created.startDate <= today) openCurrent(created, created.startDate);
       retainers.push(created);
@@ -2714,6 +2889,11 @@ function retainerRoutes({ users, clients, retainers, me }: RetainerState) {
           });
         }
         retainer.endedOn = today;
+        for (const term of retainer.terms ?? []) {
+          if (term.status === 'active' || term.status === 'scheduled') {
+            Object.assign(term, { status: 'cancelled', cancelledAt: new Date().toISOString() });
+          }
+        }
       }
       if (status === 'active') {
         retainer.endedOn = null;
@@ -2725,6 +2905,75 @@ function retainerRoutes({ users, clients, retainers, me }: RetainerState) {
     if (part === 'archive' || part === 'restore') {
       retainer.archived = part === 'archive';
       return json(route, detail(retainer));
+    }
+    if (part === 'terms') {
+      retainer.terms ??= [];
+      const terms = retainer.terms;
+      const view = (term: TermRecord) => termOf(retainer, term, seesMoney(retainer), today);
+      if (!childId && method === 'GET') {
+        return json(route, { items: [...terms].reverse().map(view) });
+      }
+      if (!allowed.canEditMoney) return fail(route, 403, null);
+      if (!childId) {
+        const input = body<CreateRetainerTerm>();
+        const sum = input.schedule.reduce((total, amount) => total + amount, 0);
+        if (input.schedule.length !== input.months || sum !== input.agreedTotalMinor) {
+          return fail(route, 409, 'SCHEDULE_TOTAL_MISMATCH');
+        }
+        if (
+          terms.some(
+            (t) =>
+              t.status === 'scheduled' ||
+              (t.status !== 'cancelled' && termEndMonthOf(t) >= input.startMonth),
+          )
+        ) {
+          return fail(route, 409, 'TERM_OVERLAP');
+        }
+        const created: TermRecord = {
+          id: id(next++),
+          number: terms.length + 1,
+          status: input.startMonth <= firstOfMonth(today) ? 'active' : 'scheduled',
+          startMonth: input.startMonth,
+          months: input.months,
+          endAction: input.endAction ?? 'renew',
+          schedule: input.schedule,
+          renewedFromId: null,
+          cancelReason: null,
+          cancelledAt: null,
+          createdAt: new Date().toISOString(),
+        };
+        terms.push(created);
+        syncRenewal(retainer);
+        return json(route, view(created), 201);
+      }
+      const term = terms.find((t) => t.id === childId);
+      if (!term) return fail(route, 404, null);
+      if (childPart === 'cancel') {
+        if (term.status !== 'scheduled') return fail(route, 409, 'TERM_STARTED');
+        Object.assign(term, {
+          status: 'cancelled',
+          cancelReason: body<{ reason: string }>().reason,
+          cancelledAt: new Date().toISOString(),
+        });
+        syncRenewal(retainer);
+        return json(route, view(term));
+      }
+      const input = body<UpdateRetainerTerm>();
+      if (term.status === 'active') {
+        if (input.months !== undefined && input.months !== term.months) {
+          return fail(route, 409, 'TERM_STARTED');
+        }
+        if (input.endAction) term.endAction = input.endAction;
+        return json(route, view(term));
+      }
+      Object.assign(term, {
+        ...(input.startMonth && { startMonth: input.startMonth }),
+        ...(input.months && { months: input.months }),
+        ...(input.schedule && { schedule: input.schedule }),
+        ...(input.endAction && { endAction: input.endAction }),
+      });
+      syncRenewal(retainer);
+      return json(route, view(term));
     }
     if (part === 'cycles') {
       if (!childId) {
@@ -11472,18 +11721,22 @@ function invoiceRoutes({
     record ? { id: record.id, name: record.name } : null;
   const live = (i: InvoiceRecord) => !i.archivedAt && i.status !== 'void';
   const chargesOf = (r: RetainerRecord) =>
-    (r.monthlyFeeMinor ?? 0) > 0
-      ? [...r.cycles]
-          .sort((a, b) => b.month.localeCompare(a.month))
-          .map((c) => ({
-            id: retainerChargeId(c.id),
-            month: c.month,
-            kind: 'monthly' as const,
-            amountMinor: r.monthlyFeeMinor ?? 0,
-            status: 'pending' as const,
-            due: true,
-          }))
-      : [];
+    [
+      ...((r.monthlyFeeMinor ?? 0) > 0
+        ? r.cycles
+            .filter((c) => !termCovers(r, c.month))
+            .map((c) => ({
+              id: retainerChargeId(c.id),
+              month: c.month,
+              kind: 'monthly' as const,
+              amountMinor: r.monthlyFeeMinor ?? 0,
+              status: 'pending' as const,
+              term: null,
+              due: true,
+            }))
+        : []),
+      ...termChargesOf(r, PROJECTS_TODAY),
+    ].sort((a, b) => b.month.localeCompare(a.month));
   const chargeById = (chargeId: string) => {
     for (const retainer of retainers) {
       const charge = chargesOf(retainer).find((c) => c.id === chargeId);

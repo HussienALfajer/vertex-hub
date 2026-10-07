@@ -9,9 +9,12 @@ import {
 import {
   behindAlert,
   canChangeRetainerStatus,
+  cancelRetainerTermSchema,
   createCycleAdjustmentSchema,
   createCycleLineSchema,
   createRetainerSchema,
+  createRetainerTermSchema,
+  dayAfterTerm,
   deliveryRate,
   duplicateDeliverables,
   isLineBehind,
@@ -19,8 +22,14 @@ import {
   renewalState,
   retainerDeliverablesSchema,
   retainerListQuerySchema,
+  retainerStatusChangeSchema,
+  scheduleMatches,
+  splitEvenly,
+  termEndMonth,
+  termMonths,
   updateCycleLineSchema,
   updateRetainerSchema,
+  updateRetainerTermSchema,
 } from './retainers.js';
 
 const retainer = {
@@ -326,5 +335,63 @@ describe('extra work', () => {
       'billed',
       'waived',
     ]);
+  });
+});
+
+describe('terms (F05B T1–T11)', () => {
+  it('splits a total evenly with the remainder on the last month (T3)', () => {
+    expect(splitEvenly(100000, 3)).toEqual([33333, 33333, 33334]);
+    expect(splitEvenly(100000, 1)).toEqual([100000]);
+    expect(splitEvenly(0, 4)).toEqual([0, 0, 0, 0]);
+    const long = splitEvenly(100001, 36);
+    expect(long).toHaveLength(36);
+    expect(long.reduce((sum, amount) => sum + amount, 0)).toBe(100001);
+    expect(long[0]).toBe(2777);
+    expect(long[35]).toBe(2806);
+    expect(splitEvenly(2, 3)).toEqual([0, 0, 2]);
+  });
+
+  it('checks the schedule against the months and the total', () => {
+    const term = { months: 3, agreedTotalMinor: 100000, schedule: [30000, 30000, 40000] };
+    expect(scheduleMatches(term)).toBe(true);
+    expect(scheduleMatches({ ...term, schedule: [30000, 30000, 39999] })).toBe(false);
+    expect(scheduleMatches({ ...term, schedule: [30000, 70000] })).toBe(false);
+    expect(scheduleMatches({ months: 3, agreedTotalMinor: 100000, schedule: [100000, 0, 0] })).toBe(
+      true,
+    );
+  });
+
+  it('places the months of a term across years', () => {
+    expect(termMonths('2026-11-01', 3)).toEqual(['2026-11-01', '2026-12-01', '2027-01-01']);
+    expect(termEndMonth('2026-11-01', 3)).toBe('2027-01-01');
+    expect(termEndMonth('2026-11-01', 1)).toBe('2026-11-01');
+    expect(dayAfterTerm('2027-01-01')).toBe('2027-02-01');
+  });
+
+  it('takes a term from the first of a month, 1 to 36 months, renewing by default', () => {
+    const input = { startMonth: '2026-11-01', months: 3, agreedTotalMinor: 0, schedule: [0, 0, 0] };
+    expect(createRetainerTermSchema.parse(input).endAction).toBe('renew');
+    expect(createRetainerTermSchema.safeParse({ ...input, startMonth: '2026-11-02' }).success).toBe(
+      false,
+    );
+    expect(createRetainerTermSchema.safeParse({ ...input, months: 0 }).success).toBe(false);
+    expect(createRetainerTermSchema.safeParse({ ...input, months: 37 }).success).toBe(false);
+    expect(createRetainerTermSchema.safeParse({ ...input, schedule: [-1, 0, 1] }).success).toBe(
+      false,
+    );
+    expect(updateRetainerTermSchema.parse({ endAction: 'end' })).toEqual({ endAction: 'end' });
+    expect(cancelRetainerTermSchema.safeParse({ reason: '  ' }).success).toBe(false);
+  });
+
+  it('takes a term on a new retainer and a fee when it ends (E2)', () => {
+    const parsed = createRetainerSchema.parse({
+      ...retainer,
+      term: { months: 2, agreedTotalMinor: 1000, schedule: [500, 500] },
+    });
+    expect(parsed.term?.endAction).toBe('renew');
+    const ended = { status: 'ended', termination: { feeMinor: 20000, reason: ' early end ' } };
+    expect(retainerStatusChangeSchema.parse(ended).termination?.reason).toBe('early end');
+    const free = { status: 'ended', termination: { feeMinor: 0, reason: 'x' } };
+    expect(retainerStatusChangeSchema.safeParse(free).success).toBe(false);
   });
 });

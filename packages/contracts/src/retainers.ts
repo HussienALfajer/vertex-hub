@@ -1,5 +1,12 @@
 import { z } from 'zod';
-import { addDays, type CalendarDate, calendarDateSchema, daysInclusive } from './dates.js';
+import {
+  addDays,
+  addMonths,
+  type CalendarDate,
+  calendarDateSchema,
+  daysInclusive,
+  firstOfMonth,
+} from './dates.js';
 import { departmentCodeSchema } from './departments.js';
 import {
   pageQuerySchema,
@@ -57,6 +64,204 @@ export const retainerChargeStatusSchema = z
   .meta({ id: 'RetainerChargeStatus' });
 
 export type RetainerChargeStatus = z.infer<typeof retainerChargeStatusSchema>;
+
+// Terms (spec F05B T1–T12)
+
+/** What happens when a term's last month ends (T7–T9). */
+export const TERM_END_ACTIONS = ['renew', 'end', 'continue'] as const;
+
+export const termEndActionSchema = z.enum(TERM_END_ACTIONS).meta({ id: 'TermEndAction' });
+
+export type TermEndAction = z.infer<typeof termEndActionSchema>;
+
+export const TERM_STATUSES = ['scheduled', 'active', 'completed', 'cancelled'] as const;
+
+export const termStatusSchema = z.enum(TERM_STATUSES).meta({ id: 'TermStatus' });
+
+export type TermStatus = z.infer<typeof termStatusSchema>;
+
+export const TERM_LIMITS = { minMonths: 1, maxMonths: 36 } as const;
+
+/** T7: the renewal term is created this many days before the current term ends. */
+export const TERM_RENEWAL_DAYS = 30;
+
+/**
+ * T3: the default schedule, an even split of the total with the remainder on the last month
+ * (100000 over 3 months is 33333 / 33333 / 33334).
+ */
+export function splitEvenly(totalMinor: number, months: number): number[] {
+  if (months < 1) return [];
+  const each = Math.floor(totalMinor / months);
+  return Array.from({ length: months }, (_, index) =>
+    index === months - 1 ? totalMinor - each * (months - 1) : each,
+  );
+}
+
+/** The months of a term, first days, from its start month. */
+export function termMonths(startMonth: CalendarDate, months: number): CalendarDate[] {
+  return Array.from({ length: months }, (_, index) => addMonths(startMonth, index));
+}
+
+/** The position (1…months) of `month` in a term starting in `startMonth`. */
+export function termPosition(startMonth: CalendarDate, month: CalendarDate): number {
+  const [startYear, start] = startMonth.split('-').map(Number) as [number, number];
+  const [year, current] = month.split('-').map(Number) as [number, number];
+  return (year - startYear) * 12 + current - start + 1;
+}
+
+/** The last month of a term (its first day). */
+export function termEndMonth(startMonth: CalendarDate, months: number): CalendarDate {
+  return addMonths(startMonth, months - 1);
+}
+
+/** T11: the renewal date of a retainer whose last term ends in `endMonth`: the day after. */
+export function dayAfterTerm(endMonth: CalendarDate): CalendarDate {
+  return addMonths(endMonth, 1);
+}
+
+/** T3: one amount per month, summing to the agreed total (`SCHEDULE_TOTAL_MISMATCH`). */
+export function scheduleMatches(term: {
+  months: number;
+  agreedTotalMinor: number;
+  schedule: readonly number[];
+}): boolean {
+  return (
+    term.schedule.length === term.months &&
+    term.schedule.reduce((sum, amount) => sum + amount, 0) === term.agreedTotalMinor
+  );
+}
+
+const monthSchema = calendarDateSchema.refine(
+  (date) => firstOfMonth(date) === date,
+  'Expected the first day of a month',
+);
+
+const termMonthCountSchema = z.number().int().min(TERM_LIMITS.minMonths).max(TERM_LIMITS.maxMonths);
+
+/**
+ * A term without its start month: the new retainer form (it starts in the start date's month)
+ * and quote acceptance (F04, Q1). The sum and length of the schedule are checked by the API.
+ */
+export const retainerTermInputSchema = z
+  .object({
+    months: termMonthCountSchema,
+    /** Money field. */
+    agreedTotalMinor: minorAmountSchema,
+    /** One amount per month, in order (T3); money field. */
+    schedule: z.array(minorAmountSchema).min(1).max(TERM_LIMITS.maxMonths),
+    endAction: termEndActionSchema.default('renew'),
+  })
+  .meta({ id: 'RetainerTermInput' });
+
+export type RetainerTermInput = z.infer<typeof retainerTermInputSchema>;
+
+export const createRetainerTermSchema = retainerTermInputSchema
+  .extend({ startMonth: monthSchema })
+  .meta({ id: 'CreateRetainerTerm' });
+
+export type CreateRetainerTerm = z.infer<typeof createRetainerTermSchema>;
+
+export type CreateRetainerTermInput = z.input<typeof createRetainerTermSchema>;
+
+/** T5: every field of a scheduled term; an active term takes `endAction` only (`TERM_STARTED`). */
+export const updateRetainerTermSchema = createRetainerTermSchema
+  .partial()
+  .extend({ endAction: termEndActionSchema.optional() })
+  .meta({ id: 'UpdateRetainerTerm' });
+
+export type UpdateRetainerTerm = z.infer<typeof updateRetainerTermSchema>;
+
+export const cancelRetainerTermSchema = z
+  .object({ reason: z.string().trim().min(1).max(500) })
+  .meta({ id: 'CancelRetainerTerm' });
+
+export type CancelRetainerTerm = z.infer<typeof cancelRetainerTermSchema>;
+
+/** The active term of a retainer, else its scheduled one (header chip, list renewal column). */
+export const retainerTermSummarySchema = z
+  .object({
+    id: z.uuid(),
+    number: z.number().int().min(1),
+    status: termStatusSchema,
+    startMonth: calendarDateSchema,
+    endMonth: calendarDateSchema,
+    months: z.number().int().min(1),
+    endAction: termEndActionSchema,
+    /** Detail only, for callers with money access (G3). */
+    money: z
+      .object({
+        agreedTotalMinor: z.number().int().min(0),
+        /** T6: Σ of its months' non-cancelled monthly, addition and credit charges. */
+        currentTotalMinor: z.number().int(),
+      })
+      .optional(),
+  })
+  .meta({ id: 'RetainerTermSummary' });
+
+export type RetainerTermSummary = z.infer<typeof retainerTermSummarySchema>;
+
+/**
+ * A month of a term: its `monthly` charge (C1). The invoice that bills it is on the retainer's
+ * billing (`RetainerCharge`, money access), by `chargeId`.
+ */
+export const retainerTermMonthSchema = z
+  .object({
+    month: calendarDateSchema,
+    /** 1…months. */
+    position: z.number().int().min(1),
+    /** Null when the month has no charge (a cancelled term's month that never had one). */
+    chargeId: z.uuid().nullable(),
+    status: retainerChargeStatusSchema.nullable(),
+    /** The month began and its charge became due (C3). */
+    due: z.boolean(),
+    /** Present only for callers with money access (G3). */
+    money: z
+      .object({
+        /** The month's `monthly` charge. */
+        amountMinor: z.number().int().min(0),
+        /** The schedule amount plus onward amendments (what a renewal copies, T7). */
+        baseAmountMinor: z.number().int().min(0),
+        /** Σ of the month's non-cancelled monthly, addition and credit charges (T6). */
+        totalMinor: z.number().int(),
+      })
+      .optional(),
+  })
+  .meta({ id: 'RetainerTermMonth' });
+
+export type RetainerTermMonth = z.infer<typeof retainerTermMonthSchema>;
+
+export const retainerTermSchema = retainerTermSummarySchema
+  .omit({ money: true })
+  .extend({
+    /** The term this one renews automatically (T7). */
+    renewedFrom: z.object({ id: z.uuid(), number: z.number().int().min(1) }).nullable(),
+    cancelledAt: z.iso.datetime().nullable(),
+    cancelReason: z.string().nullable(),
+    createdAt: z.iso.datetime(),
+    money: retainerTermSummarySchema.shape.money,
+    /** Its months in order, each with its `monthly` charge (T3). */
+    schedule: z.array(retainerTermMonthSchema),
+  })
+  .meta({ id: 'RetainerTerm' });
+
+export type RetainerTerm = z.infer<typeof retainerTermSchema>;
+
+export const retainerTermListSchema = z
+  .object({ items: z.array(retainerTermSchema) })
+  .meta({ id: 'RetainerTermList', description: 'Terms, newest first' });
+
+export type RetainerTermList = z.infer<typeof retainerTermListSchema>;
+
+/** E2: an optional early termination fee when a retainer ends (money access). */
+export const retainerTerminationSchema = z
+  .object({
+    /** Money field. */
+    feeMinor: minorAmountSchema.min(1),
+    reason: z.string().trim().min(1).max(500),
+  })
+  .meta({ id: 'RetainerTermination' });
+
+export type RetainerTermination = z.infer<typeof retainerTerminationSchema>;
 
 /** `post` covers single posts and carousels; `other` needs a label. */
 export const DELIVERABLE_KINDS = [
@@ -379,12 +584,17 @@ const retainerFieldsSchema = z.object({
   monthlyFeeMinor: minorAmountSchema.nullable(),
 });
 
-/** `renewalDate` > `startDate` is checked by the API (`INVALID_DATES`). */
+/**
+ * `renewalDate` > `startDate` is checked by the API (`INVALID_DATES`). A `term` starts in the
+ * start date's month and sets the renewal date (F05B T11: `RENEWAL_DATE_FROM_TERM` with both).
+ */
 export const createRetainerSchema = retainerFieldsSchema
   .extend({
     clientId: z.uuid(),
     /** At most `RETAINER_LIMITS.deliverables`; the API answers `LIMIT_REACHED`. */
     deliverables: z.array(newDeliverableLineSchema).default([]),
+    /** Money field (F05B). */
+    term: retainerTermInputSchema.optional(),
   })
   .partial({ renewalDate: true, currency: true, monthlyFeeMinor: true })
   .meta({ id: 'CreateRetainer' });
@@ -401,7 +611,11 @@ export type UpdateRetainer = z.infer<typeof updateRetainerSchema>;
 export type UpdateRetainerInput = z.input<typeof updateRetainerSchema>;
 
 export const retainerStatusChangeSchema = z
-  .object({ status: retainerStatusSchema })
+  .object({
+    status: retainerStatusSchema,
+    /** `ended` only (F05B E2); money field. */
+    termination: retainerTerminationSchema.optional(),
+  })
   .meta({ id: 'RetainerStatusChange' });
 
 export type RetainerStatusChange = z.infer<typeof retainerStatusChangeSchema>;
@@ -415,8 +629,11 @@ export const retainerSchema = z
     accountManager: z.object({ id: z.uuid(), name: z.string() }),
     departments: z.array(departmentCodeSchema),
     status: retainerStatusSchema,
+    /** With an active or scheduled term, the day after its last term (F05B T11). */
     renewalDate: calendarDateSchema.nullable(),
     renewal: renewalStateSchema.nullable(),
+    /** The active term, else the scheduled one (F05B). */
+    term: retainerTermSummarySchema.nullable(),
     /** The newest open cycle, or null (paused across a month, ended, not started). */
     currentCycle: cycleSchema.nullable(),
   })

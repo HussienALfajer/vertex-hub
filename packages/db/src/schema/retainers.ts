@@ -5,9 +5,12 @@ import {
   RETAINER_CHARGE_KINDS,
   RETAINER_CHARGE_STATUSES,
   RETAINER_STATUSES,
+  TERM_END_ACTIONS,
+  TERM_STATUSES,
 } from '@vertex-hub/contracts';
 import { sql } from 'drizzle-orm';
 import {
+  type AnyPgColumn,
   check,
   date,
   index,
@@ -25,7 +28,7 @@ import { archivedAt, id, minorAmount, timestamps } from './columns.js';
 import { currencyEnum, projects } from './projects.js';
 
 /*
- * Retainers, their monthly cycles, their charges (F05B) and the extra work log of projects and retainers (F05), owned
+ * Retainers, their monthly cycles, their terms and charges (F05B) and the extra work log of projects and retainers (F05), owned
  * by the api `projects` module. Dates without a time are calendar days in Asia/Damascus.
  */
 
@@ -40,6 +43,10 @@ export const extraWorkBillingEnum = pgEnum('extra_work_billing', EXTRA_WORK_BILL
 export const retainerChargeKindEnum = pgEnum('retainer_charge_kind', RETAINER_CHARGE_KINDS);
 
 export const retainerChargeStatusEnum = pgEnum('retainer_charge_status', RETAINER_CHARGE_STATUSES);
+
+export const termEndActionEnum = pgEnum('term_end_action', TERM_END_ACTIONS);
+
+export const termStatusEnum = pgEnum('term_status', TERM_STATUSES);
 
 export const retainers = pgTable(
   'retainers',
@@ -198,6 +205,52 @@ export const retainerCycleAdjustments = pgTable(
 );
 
 /**
+ * A fixed agreement of a retainer (F05B T1–T12): months, the agreed total and an end action; its
+ * schedule is its `monthly` charges. Never archived; it goes with its retainer. Terms of a
+ * retainer never overlap (checked by the service under the retainer lock).
+ */
+export const retainerTerms = pgTable(
+  'retainer_terms',
+  {
+    id: id(),
+    retainerId: uuid('retainer_id')
+      .notNull()
+      .references(() => retainers.id),
+    /** 1, 2, 3… per retainer. */
+    number: integer('number').notNull(),
+    /** The first day of its first month. */
+    startMonth: date('start_month', { mode: 'string' }).notNull(),
+    months: integer('months').notNull(),
+    /** The first day of its last month, `start_month` + `months` − 1, set by the service. */
+    endMonth: date('end_month', { mode: 'string' }).notNull(),
+    /** Frozen when the term is created, editable while it is scheduled; a money field. */
+    agreedTotalMinor: minorAmount('agreed_total_minor').notNull(),
+    endAction: termEndActionEnum('end_action').notNull().default('renew'),
+    status: termStatusEnum('status').notNull(),
+    /** The term this one renews automatically (T7). */
+    renewedFromId: uuid('renewed_from_id').references((): AnyPgColumn => retainerTerms.id),
+    cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
+    cancelReason: text('cancel_reason'),
+    ...timestamps(),
+  },
+  (table) => [
+    uniqueIndex('retainer_terms_retainer_number_idx').on(table.retainerId, table.number),
+    // At most one active and one scheduled term per retainer.
+    uniqueIndex('retainer_terms_active_idx')
+      .on(table.retainerId)
+      .where(sql`${table.status} = 'active'`),
+    uniqueIndex('retainer_terms_scheduled_idx')
+      .on(table.retainerId)
+      .where(sql`${table.status} = 'scheduled'`),
+    index('retainer_terms_renewed_from_id_idx').on(table.renewedFromId),
+    check('retainer_terms_months_check', sql`${table.months} between 1 and 36`),
+    check('retainer_terms_agreed_total_check', sql`${table.agreedTotalMinor} >= 0`),
+    check('retainer_terms_start_month_check', sql`extract(day from ${table.startMonth}) = 1`),
+    check('retainer_terms_end_month_check', sql`${table.endMonth} >= ${table.startMonth}`),
+  ],
+);
+
+/**
  * A billable amount of a retainer in its currency (F05B, ADR 0029): invoices bill charges. Never
  * archived or deleted; cancelled or settled through its status.
  */
@@ -214,6 +267,13 @@ export const retainerCharges = pgTable(
     /** Negative for a credit. */
     amountMinor: minorAmount('amount_minor').notNull(),
     status: retainerChargeStatusEnum('status').notNull().default('pending'),
+    /** A term month's `monthly` charge; null for open-ended months and other kinds. */
+    termId: uuid('term_id').references(() => retainerTerms.id),
+    /**
+     * A term month's `monthly` charge only: the schedule amount plus onward amendments, without
+     * one-month ones (what a renewal copies, T7); a money field.
+     */
+    baseAmountMinor: minorAmount('base_amount_minor'),
     /** Set once, when the charge became due and its due hooks ran (C3). */
     dueAt: timestamp('due_at', { withTimezone: true }),
     ...timestamps(),
@@ -221,6 +281,7 @@ export const retainerCharges = pgTable(
   (table) => [
     index('retainer_charges_retainer_month_idx').on(table.retainerId, table.month),
     index('retainer_charges_status_idx').on(table.status),
+    index('retainer_charges_term_id_idx').on(table.termId),
     // One live monthly charge per retainer and month keeps the job and the API from creating two.
     uniqueIndex('retainer_charges_monthly_idx')
       .on(table.retainerId, table.month)
@@ -230,6 +291,10 @@ export const retainerCharges = pgTable(
       sql`case when ${table.kind} = 'credit' then ${table.amountMinor} < 0 else ${table.amountMinor} >= 0 end`,
     ),
     check('retainer_charges_month_check', sql`extract(day from ${table.month}) = 1`),
+    check(
+      'retainer_charges_term_check',
+      sql`(${table.termId} is null and ${table.baseAmountMinor} is null) or (${table.kind} = 'monthly' and ${table.baseAmountMinor} >= 0)`,
+    ),
   ],
 );
 

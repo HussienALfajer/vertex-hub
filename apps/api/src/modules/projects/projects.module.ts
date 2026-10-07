@@ -23,6 +23,8 @@ import { RetainerCharges } from './retainer-charges.js';
 import { RetainerCyclesController } from './retainer-cycles.controller.js';
 import { RetainerCyclesService } from './retainer-cycles.service.js';
 import { RetainerRenewals } from './retainer-renewals.js';
+import { RetainerTermsController } from './retainer-terms.controller.js';
+import { RetainerTermsService } from './retainer-terms.service.js';
 import { RetainersController } from './retainers.controller.js';
 import { RetainersService } from './retainers.service.js';
 import { WorkProgress } from './work-progress.js';
@@ -46,6 +48,7 @@ import { WorkProgress } from './work-progress.js';
     ProjectMilestonesController,
     RetainersController,
     RetainerCyclesController,
+    RetainerTermsController,
     ExtraWorkController,
   ],
   providers: [
@@ -53,6 +56,7 @@ import { WorkProgress } from './work-progress.js';
     ProjectMilestonesService,
     RetainersService,
     RetainerCyclesService,
+    RetainerTermsService,
     ExtraWorkService,
     WorkProgress,
     EngagementDirectory,

@@ -41,6 +41,7 @@ import { CycleOpenedHooks } from './cycle-opened-hooks.js';
 import { actorOf } from './project-access.js';
 import { readableRetainer, workableRetainer } from './retainer-access.js';
 import { RetainerCharges } from './retainer-charges.js';
+import { RetainerTermsService } from './retainer-terms.service.js';
 import { NO_TASKS, WorkProgress } from './work-progress.js';
 
 type Executor = Database | Transaction;
@@ -107,26 +108,34 @@ export class RetainerCyclesService implements OnModuleInit {
     private readonly jobs: JobQueue,
     private readonly openedHooks: CycleOpenedHooks,
     private readonly charges: RetainerCharges,
+    private readonly terms: RetainerTermsService,
   ) {}
 
   onModuleInit(): void {
     this.jobs.work(RETAINER_CYCLES_JOB.queue, async () => {
       const result = await this.runDaily();
       this.logger.log(
-        `Retainer cycles: ${result.closed} closed, ${result.opened} opened, ${result.due} charges due`,
+        `Retainer cycles: ${result.closed} closed, ${result.opened} opened, ` +
+          `${result.due} charges due, ${result.ended} ended, ${result.renewed} terms renewed`,
       );
     });
   }
 
   /**
-   * R2: for every non-archived retainer of a non-archived client, closes open cycles that ended
-   * before `today` and opens the current month's for an active, started retainer (with its
-   * open-ended charge, F05B C2); then marks the charges that became due and runs their hooks
-   * (C3), unless the retainer ended. Idempotent.
+   * R2 and F05B "Jobs": for every non-archived retainer of a non-archived client, in one
+   * transaction under its lock and in this order: starts and completes terms, ends the retainer
+   * when a term ending with `end` completed (T8), closes open cycles that ended before `today`
+   * and opens the current month's for an active, started retainer (with its open-ended charge,
+   * C2), marks the charges that became due and runs their hooks (C3), unless the retainer ended,
+   * and schedules renewal terms (T7). Idempotent.
    */
-  async runDaily(
-    today: string = businessDate(),
-  ): Promise<{ closed: number; opened: number; due: number }> {
+  async runDaily(today: string = businessDate()): Promise<{
+    closed: number;
+    opened: number;
+    due: number;
+    ended: number;
+    renewed: number;
+  }> {
     const candidates = await this.db
       .select({ id: retainers.id })
       .from(retainers)
@@ -135,6 +144,8 @@ export class RetainerCyclesService implements OnModuleInit {
     let closed = 0;
     let opened = 0;
     let due = 0;
+    let endedCount = 0;
+    let renewed = 0;
     // One retainer failing does not hold back the others (ADR 0015); the run fails at the end.
     await runEach(
       candidates,
@@ -146,6 +157,8 @@ export class RetainerCyclesService implements OnModuleInit {
           await lockAccessChanges(tx);
           const [retainer] = await tx
             .select({
+              id: retainers.id,
+              name: retainers.name,
               status: retainers.status,
               startDate: retainers.startDate,
               archivedAt: retainers.archivedAt,
@@ -157,6 +170,12 @@ export class RetainerCyclesService implements OnModuleInit {
           if (!retainer || retainer.archivedAt) return;
           const client = await this.clients.summary(retainer.clientId, tx);
           if (!client || client.archived) return;
+          const { endOn } = await this.terms.advance(tx, id, retainer.status, today);
+          if (endOn) {
+            await this.endAfterTerm(tx, id, retainer.status, endOn, today);
+            retainer.status = 'ended';
+            endedCount += 1;
+          }
           const ended = await tx
             .select(cycleColumns)
             .from(retainerCycles)
@@ -175,10 +194,38 @@ export class RetainerCyclesService implements OnModuleInit {
             if (await this.open(tx, id, retainer.startDate, today, null)) opened += 1;
           }
           if (retainer.status !== 'ended') due += await this.charges.runDue(tx, id, today, null);
+          if (await this.terms.renew(tx, retainer, today)) renewed += 1;
         });
       },
     );
-    return { closed, opened, due };
+    return { closed, opened, due, ended: endedCount, renewed };
+  }
+
+  /**
+   * T8: the job ends a retainer whose term ending with `end` completed, on the term's last day,
+   * with a null actor, closing its cycles (F05 R5) and cancelling later months (E1).
+   */
+  private async endAfterTerm(
+    tx: Transaction,
+    retainerId: string,
+    from: RetainerStatus,
+    endOn: CalendarDate,
+    today: CalendarDate,
+  ): Promise<void> {
+    await tx
+      .update(retainers)
+      .set({ status: 'ended', endedOn: endOn })
+      .where(eq(retainers.id, retainerId));
+    await recordAudit(tx, {
+      actor: null,
+      action: 'retainer.status_changed',
+      entityType: 'retainer',
+      entityId: retainerId,
+      before: { status: from },
+      after: { status: 'ended', endedOn: endOn },
+    });
+    await this.closeAll(tx, retainerId, endOn, null);
+    await this.terms.endEarly(tx, retainerId, today, null);
   }
 
   /**
@@ -263,7 +310,7 @@ export class RetainerCyclesService implements OnModuleInit {
   }
 
   /** R5: ending closes every open cycle; the current one ends `today`. */
-  async closeAll(tx: Transaction, retainerId: string, today: string, actor: AuditActor) {
+  async closeAll(tx: Transaction, retainerId: string, today: string, actor: AuditActor | null) {
     const openCycles = await tx
       .select(cycleColumns)
       .from(retainerCycles)

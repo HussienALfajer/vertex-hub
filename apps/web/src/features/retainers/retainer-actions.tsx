@@ -1,5 +1,6 @@
 import { standardSchemaResolver } from '@hookform/resolvers/standard-schema';
 import {
+  addMonths,
   businessDate,
   type CreateRetainer,
   type CreateRetainerInput,
@@ -23,6 +24,11 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldLabel,
+  Textarea,
   toast,
 } from '@vertex-hub/ui';
 import {
@@ -35,14 +41,15 @@ import {
   PlayIcon,
   RotateCcwIcon,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '../../components/confirm-dialog';
 import { FormAlert } from '../../components/form-alert';
+import { MoneyInput } from '../../components/money-input';
 import { ApiError } from '../../lib/api/client';
 import { errorMessage } from '../../lib/errors';
-import { formatNumber } from '../../lib/format';
+import { formatMonth, formatNumber } from '../../lib/format';
 import {
   checkDuplicateLines,
   checkRenewal,
@@ -135,19 +142,7 @@ export function RetainerActions({ retainer }: { retainer: RetainerDetail }) {
           </DropdownMenuContent>
         </DropdownMenu>
       )}
-      <ConfirmDialog
-        open={dialog === 'end'}
-        onClose={() => setDialog(null)}
-        title={t('retainers.end.title', { name: retainer.name })}
-        body={t('retainers.end.body')}
-        action={t('retainers.actions.end')}
-        destructive
-        pending={change.isPending}
-        onConfirm={async () => {
-          await change.mutateAsync({ status: 'ended' });
-          toast.add({ title: t('retainers.actions.done.ended'), type: 'success' });
-        }}
-      />
+      <EndDialog retainer={retainer} open={dialog === 'end'} onClose={() => setDialog(null)} />
       <ConfirmDialog
         open={dialog === 'reactivate'}
         onClose={() => setDialog(null)}
@@ -166,6 +161,126 @@ export function RetainerActions({ retainer }: { retainer: RetainerDetail }) {
         onClose={() => setDialog(null)}
       />
     </div>
+  );
+}
+
+/**
+ * F05 R5 with F05B E1, E2: ending closes this month's cycle; with a term, later unbilled months
+ * are cancelled and an optional termination fee (money access) drafts an invoice.
+ */
+function EndDialog({
+  retainer,
+  open,
+  onClose,
+}: {
+  retainer: RetainerDetail;
+  open: boolean;
+  onClose: () => void;
+}) {
+  const { t } = useTranslation();
+  const ids = { fee: useId(), reason: useId() };
+  const change = useChangeRetainerStatus(retainer.id);
+  const [feeMinor, setFeeMinor] = useState<number | null>(null);
+  const [reason, setReason] = useState('');
+  const [missingReason, setMissingReason] = useState(false);
+  const [failure, setFailure] = useState<string | null>(null);
+  const withFee = !!retainer.term && retainer.permissions.canEditMoney;
+  const currency = retainer.money?.currency ?? 'USD';
+  // The last month of the retainer's terms: the month before the derived renewal date (T11).
+  const lastMonth =
+    retainer.term && retainer.renewalDate ? addMonths(retainer.renewalDate, -1) : null;
+  const laterMonths = lastMonth !== null && lastMonth.slice(0, 7) > businessDate().slice(0, 7);
+
+  function close() {
+    setFeeMinor(null);
+    setReason('');
+    setMissingReason(false);
+    setFailure(null);
+    onClose();
+  }
+
+  async function submit(event: React.FormEvent) {
+    event.preventDefault();
+    setFailure(null);
+    const fee = withFee && feeMinor ? feeMinor : null;
+    if (fee && !reason.trim()) {
+      setMissingReason(true);
+      return;
+    }
+    try {
+      await change.mutateAsync({
+        status: 'ended',
+        ...(fee && { termination: { feeMinor: fee, reason: reason.trim() } }),
+      });
+      toast.add({ title: t('retainers.actions.done.ended'), type: 'success' });
+      close();
+    } catch (error) {
+      setFailure(errorMessage(t, error));
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(next) => !next && close()}>
+      <DialogContent closeLabel={t('common.close')}>
+        <form className="grid gap-5" onSubmit={submit} noValidate>
+          <DialogHeader>
+            <DialogTitle>{t('retainers.end.title', { name: retainer.name })}</DialogTitle>
+            <DialogDescription>{t('retainers.end.body')}</DialogDescription>
+          </DialogHeader>
+          {laterMonths && lastMonth && (
+            <p className="text-sm">
+              {t('retainers.end.termMonths', { month: formatMonth(lastMonth) })}
+            </p>
+          )}
+          {withFee && (
+            <div className="flex flex-col gap-4 rounded-lg border border-border p-4">
+              <Field>
+                <FieldLabel htmlFor={ids.fee}>
+                  {t('retainers.end.fee')}
+                  <span className="ms-1 font-normal text-muted-foreground">
+                    ({t('common.optional')})
+                  </span>
+                </FieldLabel>
+                <MoneyInput
+                  id={ids.fee}
+                  currency={currency}
+                  value={feeMinor}
+                  onValueChange={setFeeMinor}
+                />
+                <FieldDescription>{t('retainers.end.feeHint')}</FieldDescription>
+              </Field>
+              {!!feeMinor && (
+                <Field invalid={missingReason}>
+                  <FieldLabel htmlFor={ids.reason}>{t('retainers.end.feeReason')}</FieldLabel>
+                  <Textarea
+                    id={ids.reason}
+                    rows={2}
+                    maxLength={500}
+                    value={reason}
+                    onChange={(event) => {
+                      setReason(event.target.value);
+                      setMissingReason(false);
+                    }}
+                  />
+                  <FieldError match={missingReason}>
+                    {t('retainers.end.feeReasonRequired')}
+                  </FieldError>
+                </Field>
+              )}
+            </div>
+          )}
+          {failure && <FormAlert>{failure}</FormAlert>}
+          <DialogFooter>
+            <DialogClose render={<Button variant="outline" type="button" />}>
+              {t('common.cancel')}
+            </DialogClose>
+            <Button type="submit" variant="destructive" disabled={change.isPending}>
+              {t('retainers.actions.end')}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -268,7 +383,7 @@ function EditRetainer({ retainer }: { retainer: RetainerDetail }) {
             </DialogHeader>
             <NameField form={form} />
             <DepartmentsField form={form} />
-            <DatesFields form={form} startLocked={started} />
+            <DatesFields form={form} startLocked={started} renewalLocked={!!retainer.term} />
             {canEditMoney && (
               <MoneyFields
                 form={form}

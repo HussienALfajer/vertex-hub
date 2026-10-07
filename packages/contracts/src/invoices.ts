@@ -773,6 +773,14 @@ export const retainerChargeSchema = z
     /** Negative for a credit. */
     amountMinor: signedMinorAmountSchema,
     status: retainerChargeStatusSchema,
+    /** A term month's `monthly` charge: "2 of 3" of term 1 (F05B C4). */
+    term: z
+      .object({
+        number: z.number().int().min(1),
+        position: z.number().int().min(1),
+        months: z.number().int().min(1),
+      })
+      .nullable(),
     /** Its month began (`monthly`) or it was created (other kinds), and its due hooks ran (C3). */
     due: z.boolean(),
     invoice: sourceInvoiceSchema.nullable(),
