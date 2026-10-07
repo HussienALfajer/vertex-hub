@@ -1,4 +1,6 @@
 import {
+  AMENDMENT_SCOPES,
+  AMENDMENT_STATUSES,
   APPROVAL_WITHDRAWN_REASONS,
   type AuditEntityType,
   BRAND_FILE_KINDS,
@@ -101,6 +103,8 @@ function enumLabel(
     if (term) return t(`retainers.terms.statuses.${term}`);
     const charge = entityType === 'retainer_charge' ? find(RETAINER_CHARGE_STATUSES) : undefined;
     if (charge) return t(`retainers.chargeStatuses.${charge}`);
+    const amendment = entityType === 'retainer_amendment' ? find(AMENDMENT_STATUSES) : undefined;
+    if (amendment) return t(`retainers.amendments.statuses.${amendment}`);
     const task = entityType === 'task' ? find(TASK_STATUSES) : undefined;
     if (task) return t(`tasks.statuses.${task}`);
     const shoot = entityType === 'shoot' ? find(SHOOT_STATUSES) : undefined;
@@ -167,6 +171,10 @@ function enumLabel(
   if (field === 'endAction') {
     const action = find(TERM_END_ACTIONS);
     if (action) return t(`retainers.terms.endActions.${action}`);
+  }
+  if (field === 'scope' && entityType === 'retainer_amendment') {
+    const scope = find(AMENDMENT_SCOPES);
+    if (scope) return t(`retainers.amendments.scopes.${scope}`);
   }
   if (field === 'kind' && entityType === 'retainer_charge') {
     const kind = find(RETAINER_CHARGE_KINDS);

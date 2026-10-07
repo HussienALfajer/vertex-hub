@@ -52,6 +52,7 @@ import { formatMoney } from '../../lib/money';
 import { retainerBillingQuery } from '../invoices/invoices.queries';
 import { SourceInvoiceCell } from '../invoices/source-invoice';
 import { Money } from '../quotes/quote-badges';
+import { AmendmentsSection, RescheduleDialog } from './amendments-section';
 import {
   retainerTermsQuery,
   useCancelTerm,
@@ -146,6 +147,7 @@ export function ContractTab({ retainer }: { retainer: RetainerDetail }) {
           {add && <div>{add}</div>}
         </>
       )}
+      <AmendmentsSection retainer={retainer} />
       {past.length > 0 && (
         <section className="flex flex-col gap-3">
           <h2 className="text-lg font-bold">{t('retainers.terms.past')}</h2>
@@ -218,10 +220,20 @@ function TermCard({
             </p>
           )}
         </div>
-        {editable && term.status === 'scheduled' && (
+        {editable && open && (
           <div className="flex flex-wrap gap-2">
-            <TermDialog retainer={retainer} term={term} />
-            <CancelTermDialog retainerId={retainer.id} term={term} />
+            <RescheduleDialog
+              retainerId={retainer.id}
+              term={term}
+              currency={currency}
+              invoices={invoices}
+            />
+            {term.status === 'scheduled' && (
+              <>
+                <TermDialog retainer={retainer} term={term} />
+                <CancelTermDialog retainerId={retainer.id} term={term} />
+              </>
+            )}
           </div>
         )}
       </div>

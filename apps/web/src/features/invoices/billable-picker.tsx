@@ -71,7 +71,10 @@ function optionsOf(items: BillableItems, t: (key: string) => string): Option[] {
       group: charge.retainer.name,
       detail: t(`retainers.chargeKinds.${charge.kind}`),
       line: {
-        description: `${charge.retainer.name} — ${formatMonth(charge.month)}`,
+        description:
+          charge.kind === 'monthly'
+            ? `${charge.retainer.name} — ${formatMonth(charge.month)}`
+            : `${charge.retainer.name} — ${t(`retainers.chargeKinds.${charge.kind}`)} — ${formatMonth(charge.month)}`,
         unitPriceMinor: charge.amountMinor,
         source: {
           type: 'retainer_charge' as const,

@@ -7,9 +7,13 @@ import {
   extraWorkListQuerySchema,
 } from './extra-work.js';
 import {
+  amendmentMoneyDelta,
+  amendmentNeedsApproval,
+  approveAmendmentSchema,
   behindAlert,
   canChangeRetainerStatus,
   cancelRetainerTermSchema,
+  createAmendmentSchema,
   createCycleAdjustmentSchema,
   createCycleLineSchema,
   createRetainerSchema,
@@ -18,13 +22,18 @@ import {
   deliveryRate,
   duplicateDeliverables,
   isLineBehind,
+  type MonthChargeState,
+  planMonthChange,
   RETAINER_STATUSES,
+  rejectAmendmentSchema,
   renewalState,
+  rescheduleTermSchema,
   retainerDeliverablesSchema,
   retainerListQuerySchema,
   retainerStatusChangeSchema,
   scheduleMatches,
   splitEvenly,
+  takeCredits,
   termEndMonth,
   termMonths,
   updateCycleLineSchema,
@@ -393,5 +402,186 @@ describe('terms (F05B T1–T11)', () => {
     expect(retainerStatusChangeSchema.parse(ended).termination?.reason).toBe('early end');
     const free = { status: 'ended', termination: { feeMinor: 0, reason: 'x' } };
     expect(retainerStatusChangeSchema.safeParse(free).success).toBe(false);
+  });
+});
+
+describe('amendments (F05B A1–A6)', () => {
+  const amendment = {
+    scope: 'month',
+    effectiveMonth: '2026-11-01',
+    lines: [{ kind: 'reel', quantityDelta: 2 }],
+    amountDeltaMinor: 10000,
+    reason: ' extra reels ',
+  };
+
+  it('parses an amendment with defaults and a trimmed reason', () => {
+    const parsed = createAmendmentSchema.parse({
+      ...amendment,
+      lines: undefined,
+      amountDeltaMinor: undefined,
+    });
+    expect(parsed.lines).toEqual([]);
+    expect(parsed.amountDeltaMinor).toBe(0);
+    expect(createAmendmentSchema.parse(amendment).reason).toBe('extra reels');
+    expect(
+      createAmendmentSchema.parse({ ...amendment, amountDeltaMinor: -8000 }).amountDeltaMinor,
+    ).toBe(-8000);
+  });
+
+  it('refuses a month that is not a first day, a zero line delta, an other line without label', () => {
+    const bad = (patch: object) =>
+      createAmendmentSchema.safeParse({ ...amendment, ...patch }).success;
+    expect(bad({ effectiveMonth: '2026-11-02' })).toBe(false);
+    expect(bad({ lines: [{ kind: 'reel', quantityDelta: 0 }] })).toBe(false);
+    expect(bad({ lines: [{ kind: 'reel', quantityDelta: 1000 }] })).toBe(false);
+    expect(bad({ lines: [{ kind: 'other', quantityDelta: 1 }] })).toBe(false);
+    expect(bad({ reason: ' ' })).toBe(false);
+    expect(bad({ scope: 'all' })).toBe(false);
+    const many = Array.from({ length: 21 }, (_, index) => ({
+      kind: 'other',
+      label: `line ${index}`,
+      quantityDelta: 1,
+    }));
+    expect(bad({ lines: many })).toBe(false);
+  });
+
+  it('needs a note to reject, not to approve', () => {
+    expect(approveAmendmentSchema.safeParse({}).success).toBe(true);
+    expect(rejectAmendmentSchema.safeParse({}).success).toBe(false);
+    expect(rejectAmendmentSchema.safeParse({ note: ' ' }).success).toBe(false);
+    expect(rejectAmendmentSchema.parse({ note: ' no ' }).note).toBe('no');
+  });
+
+  it('takes a reschedule of first-day months with amounts ≥ 0', () => {
+    const schedule = [
+      { month: '2026-11-01', amountMinor: 40000 },
+      { month: '2026-12-01', amountMinor: 40000 },
+    ];
+    expect(rescheduleTermSchema.safeParse({ schedule, reason: 'x' }).success).toBe(true);
+    expect(
+      rescheduleTermSchema.safeParse({
+        schedule: [{ month: '2026-11-01', amountMinor: -1 }],
+        reason: 'x',
+      }).success,
+    ).toBe(false);
+    expect(rescheduleTermSchema.safeParse({ schedule: [], reason: 'x' }).success).toBe(false);
+  });
+
+  describe('planMonthChange (C6, A3)', () => {
+    const month = (patch: Partial<MonthChargeState> = {}): MonthChargeState => ({
+      month: '2026-11-01',
+      amountMinor: 30000,
+      invoice: null,
+      extrasMinor: 0,
+      ...patch,
+    });
+    const draft = {
+      id: '01a0e97d-0028-7d46-8479-9fa1ea9ffcd7',
+      displayNumber: null,
+      issued: false,
+    };
+    const issued = { ...draft, displayNumber: 'INV-2026-0012', issued: true };
+
+    it('changes an amount no invoice bills', () => {
+      expect(planMonthChange(month(), 10000)).toEqual({
+        month: '2026-11-01',
+        effect: 'charge_changed',
+        beforeMinor: 30000,
+        afterMinor: 40000,
+        invoice: null,
+      });
+    });
+
+    it('syncs a draft', () => {
+      expect(planMonthChange(month({ invoice: draft }), -5000)).toMatchObject({
+        effect: 'draft_synced',
+        afterMinor: 25000,
+        invoice: { id: draft.id, displayNumber: null },
+      });
+    });
+
+    it('adds to or credits an issued month, paid or not', () => {
+      expect(planMonthChange(month({ invoice: issued }), 10000)).toMatchObject({
+        effect: 'addition',
+        beforeMinor: 30000,
+        afterMinor: 40000,
+        invoice: { displayNumber: 'INV-2026-0012' },
+      });
+      expect(planMonthChange(month({ invoice: issued, extrasMinor: 10000 }), -8000)).toMatchObject({
+        effect: 'credit',
+        beforeMinor: 40000,
+        afterMinor: 32000,
+      });
+    });
+
+    it('refuses a month total or a changed charge below 0', () => {
+      expect(planMonthChange(month({ invoice: issued }), -30001)).toBe('negative');
+      expect(planMonthChange(month({ invoice: issued }), -30000)).toMatchObject({ afterMinor: 0 });
+      // The month's addition keeps the total ≥ 0, but the charge itself cannot go negative.
+      expect(planMonthChange(month({ extrasMinor: 10000 }), -35000)).toBe('negative');
+      expect(planMonthChange(month({ amountMinor: 0 }), -1)).toBe('negative');
+    });
+
+    it('does nothing without an amount change', () => {
+      expect(planMonthChange(month(), 0)).toBeNull();
+    });
+  });
+
+  it('sums the change over its months; an open-ended fee counts once (A4)', () => {
+    expect(amendmentMoneyDelta({ amountDeltaMinor: 5000, months: 2, changesFee: false })).toBe(
+      10000,
+    );
+    expect(amendmentMoneyDelta({ amountDeltaMinor: -8000, months: 1, changesFee: false })).toBe(
+      -8000,
+    );
+    expect(amendmentMoneyDelta({ amountDeltaMinor: -1000, months: 0, changesFee: true })).toBe(
+      -1000,
+    );
+    expect(amendmentMoneyDelta({ amountDeltaMinor: 0, months: 3, changesFee: true })).toBe(0);
+  });
+
+  it('sends reductions to the General Manager unless the creator may approve (A4)', () => {
+    expect(amendmentNeedsApproval(-1, false)).toBe(true);
+    expect(amendmentNeedsApproval(-1, true)).toBe(false);
+    expect(amendmentNeedsApproval(0, false)).toBe(false);
+    expect(amendmentNeedsApproval(500, false)).toBe(false);
+  });
+
+  describe('takeCredits (C5)', () => {
+    it('takes credits oldest first while the total stays ≥ 0', () => {
+      expect(
+        takeCredits(30000, [
+          { id: 'a', amountMinor: -8000 },
+          { id: 'b', amountMinor: -2000 },
+        ]),
+      ).toEqual({
+        taken: [
+          { id: 'a', amountMinor: -8000 },
+          { id: 'b', amountMinor: -2000 },
+        ],
+        split: null,
+      });
+    });
+
+    it('splits a credit larger than what is left', () => {
+      expect(
+        takeCredits(10000, [
+          { id: 'a', amountMinor: -8000 },
+          { id: 'b', amountMinor: -5000 },
+          { id: 'c', amountMinor: -1000 },
+        ]),
+      ).toEqual({
+        taken: [
+          { id: 'a', amountMinor: -8000 },
+          { id: 'b', amountMinor: -2000 },
+        ],
+        split: { id: 'b', appliedMinor: -2000, remainderMinor: -3000 },
+      });
+    });
+
+    it('takes a credit equal to the total whole, and none from a total of 0', () => {
+      expect(takeCredits(5000, [{ id: 'a', amountMinor: -5000 }]).split).toBeNull();
+      expect(takeCredits(0, [{ id: 'a', amountMinor: -5000 }])).toEqual({ taken: [], split: null });
+    });
   });
 });

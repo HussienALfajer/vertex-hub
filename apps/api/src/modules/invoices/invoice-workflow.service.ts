@@ -55,7 +55,9 @@ export class InvoiceWorkflowService {
       }
       assertClientNotArchived(client);
       const lines = await this.invoices.lines(tx, id);
-      if (lines.length === 0 || invoice.totalMinor <= 0) {
+      // F05B C7: a total of 0 is issued (and paid at once) when a credit takes the whole amount.
+      const credited = lines.some((line) => line.unitPriceMinor < 0);
+      if (lines.length === 0 || invoice.totalMinor < 0 || (invoice.totalMinor === 0 && !credited)) {
         throw new CodedException(409, 'INVOICE_EMPTY', 'An invoice needs lines and a total');
       }
       const settings = await this.settings.row(tx);
@@ -83,7 +85,7 @@ export class InvoiceWorkflowService {
           dueOn,
           sypPerUsd: rate,
           snapshot,
-          status: 'sent',
+          status: invoice.totalMinor === 0 ? 'paid' : 'sent',
           issuedById: actor.id,
           pdfStatus: 'pending',
           ...NO_DRAFT_PDF,

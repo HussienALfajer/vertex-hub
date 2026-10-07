@@ -179,7 +179,8 @@ const invoiceLineInputSchema = z.object({
   id: z.uuid().optional(),
   description: z.string().trim().min(1).max(300),
   quantity: z.number().int().min(1).max(INVOICE_LIMITS.quantity),
-  unitPriceMinor: minorAmountSchema,
+  /** Negative only on a line billing a credit charge (spec F05B C7). */
+  unitPriceMinor: signedMinorAmountSchema,
   source: invoiceSourceSchema.nullable().default(null),
   /** The catalog service the line bills, for revenue by service (F15 rule 21); never printed. */
   serviceId: z.uuid().nullable().default(null),
@@ -374,8 +375,9 @@ export const invoiceLineSchema = z
     id: z.uuid(),
     description: z.string(),
     quantity: z.number().int().min(1),
-    unitPriceMinor: minorAmountSchema,
-    totalMinor: minorAmountSchema,
+    /** Negative for a credit (spec F05B C7). */
+    unitPriceMinor: signedMinorAmountSchema,
+    totalMinor: signedMinorAmountSchema,
     /** The billed milestone, retainer charge or extra work item, with where it lives. */
     source: invoiceSourceSchema
       .extend({
@@ -544,8 +546,8 @@ export const invoiceSnapshotSchema = z
       z.object({
         description: z.string(),
         quantity: z.number().int(),
-        unitPriceMinor: minorAmountSchema,
-        totalMinor: minorAmountSchema,
+        unitPriceMinor: signedMinorAmountSchema,
+        totalMinor: signedMinorAmountSchema,
       }),
     ),
     totalMinor: minorAmountSchema,
@@ -781,6 +783,10 @@ export const retainerChargeSchema = z
         months: z.number().int().min(1),
       })
       .nullable(),
+    /** The amendment an addition or a credit comes from (F05B C6). */
+    amendment: z.object({ id: z.uuid(), number: z.number().int().min(1) }).nullable(),
+    /** Why a credit was settled outside the system (C9). */
+    settleNote: z.string().nullable(),
     /** Its month began (`monthly`) or it was created (other kinds), and its due hooks ran (C3). */
     due: z.boolean(),
     invoice: sourceInvoiceSchema.nullable(),
@@ -824,7 +830,16 @@ export const retainerBillingSchema = z
     ),
     /** Non-archived invoices of the retainer, newest first. */
     invoices: z.array(invoiceSchema),
+    /** `invoices.manage` covering the client: may settle a pending credit outside (F05B C9). */
+    canSettleCredits: z.boolean(),
   })
   .meta({ id: 'RetainerBilling' });
 
 export type RetainerBilling = z.infer<typeof retainerBillingSchema>;
+
+/** F05B C9: a pending credit refunded or settled outside the system. */
+export const settleRetainerChargeSchema = z
+  .object({ note: z.string().trim().min(1).max(300) })
+  .meta({ id: 'SettleRetainerCharge' });
+
+export type SettleRetainerCharge = z.infer<typeof settleRetainerChargeSchema>;

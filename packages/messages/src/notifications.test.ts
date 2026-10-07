@@ -106,6 +106,20 @@ const SAMPLES: Record<NotificationType, unknown> = {
     startMonth: '2026-11-01',
     endMonth: '2027-01-01',
   },
+  retainer_amendment_pending: {
+    retainer: 'عقد شهري',
+    client: 'مطعم الشام',
+    number: 3,
+    moneyDeltaMinor: -8_000,
+    currency: 'USD',
+    creator: 'سارة',
+  },
+  retainer_amendment_decided: {
+    retainer: 'عقد شهري',
+    number: 3,
+    approved: false,
+    note: 'ليس الآن',
+  },
   retainer_behind: {
     retainer: 'عقد شهري',
     client: 'مطعم الشام',
@@ -189,6 +203,15 @@ describe('notification texts', () => {
     );
     const due = notificationText(sample('retainer_renewal_due'), departmentName);
     expect(due.context).toBe('مطعم الشام · 10 تشرين الأول 2026 · يتجدد تلقائيًا');
+  });
+
+  it('names an amendment waiting for approval and its decision (F05B A4)', () => {
+    const pending = notificationText(sample('retainer_amendment_pending'), departmentName);
+    expect(pending.text).toContain('التعديل 3 على عقد «عقد شهري»');
+    expect(pending.context).toBe('مطعم الشام');
+    const decided = notificationText(sample('retainer_amendment_decided'), departmentName);
+    expect(decided.text).toContain('رفض');
+    expect(decided.text).toContain('ليس الآن');
   });
 
   it('writes the department of generated tasks by its current name', () => {

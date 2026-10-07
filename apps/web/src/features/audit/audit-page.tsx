@@ -744,6 +744,15 @@ const KNOWN_FIELDS = [
   'appliedMinor',
   'method',
   'spentOn',
+  'effectiveMonth',
+  'scope',
+  'amountDeltaMinor',
+  'moneyDeltaMinor',
+  'effects',
+  'decisionNote',
+  'cause',
+  'settleNote',
+  'remainderMinor',
 ] as const;
 
 function fieldLabel(t: TFunction, field: string): string {
@@ -780,10 +789,11 @@ const RETAINER_PARTS: AuditEntityType[] = [
   'retainer_cycle',
   'retainer_charge',
   'retainer_term',
+  'retainer_amendment',
   'extra_work',
 ];
 
-/** The retainer a retainer, cycle, charge, term or extra work entry belongs to. */
+/** The retainer a retainer, cycle, charge, term, amendment or extra work entry belongs to. */
 function retainerIdOf(entry: AuditEntry): string | undefined {
   if (entry.entityType === 'retainer') return entry.entityId;
   if (entry.entityType === 'file_item') return fileOwnerOf(entry, 'retainer');
@@ -797,7 +807,9 @@ function retainerTabOf(
   entry: AuditEntry,
 ): 'contract' | 'history' | 'extra-work' | 'billing' | 'documents' | undefined {
   if (entry.entityType === 'extra_work') return 'extra-work';
-  if (entry.entityType === 'retainer_term') return 'contract';
+  if (entry.entityType === 'retainer_term' || entry.entityType === 'retainer_amendment') {
+    return 'contract';
+  }
   if (entry.entityType === 'retainer_charge') return 'billing';
   if (entry.entityType === 'file_item') return 'documents';
   if (entry.action === 'retainer_cycle.closed') return 'history';

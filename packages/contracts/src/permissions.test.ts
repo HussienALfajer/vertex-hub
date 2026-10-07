@@ -49,6 +49,14 @@ describe('permission map', () => {
     expect(hasPermission(access(others), 'quotes.approve_discount')).toBe(false);
   });
 
+  it('reserves approving retainer reductions for the General Manager (F05B A4)', () => {
+    const others = ROLES.filter((role) => role !== 'general_manager');
+    expect(hasPermission(access(others), 'retainers.approve_reduction')).toBe(false);
+    expect(permissionScopes(access(['general_manager']), 'retainers.approve_reduction')).toEqual([
+      'all',
+    ]);
+  });
+
   it('lets every employee read the team directory', () => {
     expect(permissionScopes(access(['employee']), 'users.read')).toEqual(['all']);
     expect(PERMISSION_MAP.department_manager['users.read']).toBeUndefined();

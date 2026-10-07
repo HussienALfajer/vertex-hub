@@ -1,9 +1,17 @@
-import { Injectable } from '@nestjs/common';
-import { type CalendarDate, firstOfMonth } from '@vertex-hub/contracts';
-import { retainerCharges, retainerCycles, type Transaction } from '@vertex-hub/db';
-import { and, asc, eq, isNull, lte, ne, or } from 'drizzle-orm';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { type CalendarDate, firstOfMonth, type MonthEffect } from '@vertex-hub/contracts';
+import {
+  type Database,
+  retainerCharges,
+  retainerCycles,
+  retainers,
+  type Transaction,
+} from '@vertex-hub/db';
+import { and, asc, eq, isNotNull, isNull, lte, ne, or } from 'drizzle-orm';
+import { CodedException } from '../../core/errors/index.js';
 import { type AuditActor, recordAudit } from '../audit/index.js';
 import { BillingLocks } from './billing-locks.js';
+import { ChargeInvoices } from './charge-invoices.js';
 import { RetainerChargeDueHooks } from './retainer-charge-due-hooks.js';
 
 /**
@@ -15,6 +23,7 @@ export class RetainerCharges {
   constructor(
     private readonly dueHooks: RetainerChargeDueHooks,
     private readonly locks: BillingLocks,
+    private readonly invoices: ChargeInvoices,
   ) {}
 
   /** T4: a term's `monthly` charges, one per month, its schedule (`base` = the amount). */
@@ -191,6 +200,253 @@ export class RetainerCharges {
       .where(eq(retainerCharges.retainerId, retainerId))
       .limit(1);
     return !!row;
+  }
+
+  /**
+   * C6 for one month, as planned by `planMonthChange`: a free charge changes; a draft's charge
+   * changes and the draft follows; an issued month gets an `addition` or a `credit` of the
+   * difference, due at once (its draft follows, C4). `onward` amounts also move the month's base
+   * (what a renewal copies, A3, T7); `amendmentId` names the addition or credit's amendment.
+   */
+  async changeMonth(
+    tx: Transaction,
+    retainerId: string,
+    charge: { id: string; month: CalendarDate; amountMinor: number; dueAt: Date | null },
+    effect: MonthEffect,
+    options: {
+      deltaMinor: number;
+      onward: boolean;
+      amendmentId: string;
+      today: CalendarDate;
+      actor: AuditActor | null;
+    },
+  ): Promise<void> {
+    const { deltaMinor, onward, actor } = options;
+    if (effect.effect === 'addition' || effect.effect === 'credit') {
+      if (onward) await this.moveBase(tx, charge.id, deltaMinor);
+      const [created] = await tx
+        .insert(retainerCharges)
+        .values({
+          retainerId,
+          month: charge.month,
+          kind: effect.effect,
+          amountMinor: deltaMinor,
+          amendmentId: options.amendmentId,
+        })
+        .returning({ id: retainerCharges.id });
+      if (!created) throw new Error('Charge insert returned no row');
+      await recordAudit(tx, {
+        actor,
+        action: 'retainer_charge.created',
+        entityType: 'retainer_charge',
+        entityId: created.id,
+        after: {
+          month: charge.month,
+          kind: effect.effect,
+          amountMinor: deltaMinor,
+          amendmentId: options.amendmentId,
+          retainerId,
+        },
+      });
+      await this.runDue(tx, retainerId, options.today, actor);
+      return;
+    }
+    const amountMinor = charge.amountMinor + deltaMinor;
+    await tx
+      .update(retainerCharges)
+      .set({ amountMinor, updatedAt: new Date() })
+      .where(eq(retainerCharges.id, charge.id));
+    if (onward) await this.moveBase(tx, charge.id, deltaMinor);
+    await recordAudit(tx, {
+      actor,
+      action: 'retainer_charge.amount_changed',
+      entityType: 'retainer_charge',
+      entityId: charge.id,
+      before: { amountMinor: charge.amountMinor },
+      after: { month: charge.month, amountMinor, amendmentId: options.amendmentId, retainerId },
+    });
+    if (effect.effect === 'draft_synced') {
+      await this.invoices.syncDraft(tx, charge.id, amountMinor, actor);
+      return;
+    }
+    // C6: a due month that never drafted (its amount was 0) drafts once its amount is > 0.
+    if (charge.dueAt && charge.amountMinor <= 0 && amountMinor > 0) {
+      await this.dueHooks.run(tx, {
+        chargeId: charge.id,
+        retainerId,
+        kind: 'monthly',
+        month: charge.month,
+        amountMinor,
+        actor,
+      });
+    }
+  }
+
+  /** A6: a reschedule's new amount for a month that no issued invoice bills (C6, base follows). */
+  async reschedule(
+    tx: Transaction,
+    retainerId: string,
+    charge: { id: string; month: CalendarDate; amountMinor: number; dueAt: Date | null },
+    amountMinor: number,
+    options: { amendmentId: string; draft: boolean; today: CalendarDate; actor: AuditActor },
+  ): Promise<void> {
+    const deltaMinor = amountMinor - charge.amountMinor;
+    if (deltaMinor === 0) return;
+    await this.changeMonth(
+      tx,
+      retainerId,
+      charge,
+      {
+        month: charge.month,
+        effect: options.draft ? 'draft_synced' : 'charge_changed',
+        beforeMinor: charge.amountMinor,
+        afterMinor: amountMinor,
+        invoice: null,
+      },
+      { ...options, deltaMinor, onward: true },
+    );
+  }
+
+  /**
+   * C5: the retainer's due, pending credits that no live invoice bills, oldest first (what a
+   * month's draft takes, and what is owed to the client, C9).
+   */
+  async pendingCredits(
+    executor: Database | Transaction,
+    retainerId: string,
+    tx?: Transaction,
+  ): Promise<{ id: string; month: CalendarDate; amountMinor: number }[]> {
+    const rows = await executor
+      .select({
+        id: retainerCharges.id,
+        month: retainerCharges.month,
+        amountMinor: retainerCharges.amountMinor,
+      })
+      .from(retainerCharges)
+      .where(
+        and(
+          eq(retainerCharges.retainerId, retainerId),
+          eq(retainerCharges.kind, 'credit'),
+          eq(retainerCharges.status, 'pending'),
+          isNotNull(retainerCharges.dueAt),
+        ),
+      )
+      .orderBy(asc(retainerCharges.month), asc(retainerCharges.createdAt), asc(retainerCharges.id));
+    if (!tx) return rows;
+    const free = [];
+    for (const row of rows) if (!(await this.locks.chargeInvoiced(tx, row.id))) free.push(row);
+    return free;
+  }
+
+  /**
+   * C5: a credit larger than what its draft could take keeps `appliedMinor`; the remainder
+   * becomes a new pending credit of the same month, due at once, split from it.
+   */
+  async splitCredit(
+    tx: Transaction,
+    chargeId: string,
+    split: { appliedMinor: number; remainderMinor: number },
+    actor: AuditActor | null,
+  ): Promise<void> {
+    const [credit] = await tx
+      .update(retainerCharges)
+      .set({ amountMinor: split.appliedMinor, updatedAt: new Date() })
+      .where(eq(retainerCharges.id, chargeId))
+      .returning();
+    if (!credit) throw new NotFoundException();
+    const [remainder] = await tx
+      .insert(retainerCharges)
+      .values({
+        retainerId: credit.retainerId,
+        month: credit.month,
+        kind: 'credit',
+        amountMinor: split.remainderMinor,
+        amendmentId: credit.amendmentId,
+        splitFromId: credit.id,
+        dueAt: new Date(),
+      })
+      .returning({ id: retainerCharges.id });
+    if (!remainder) throw new Error('Charge insert returned no row');
+    await recordAudit(tx, {
+      actor,
+      action: 'retainer_charge.split',
+      entityType: 'retainer_charge',
+      entityId: credit.id,
+      before: { amountMinor: split.appliedMinor + split.remainderMinor },
+      after: {
+        amountMinor: split.appliedMinor,
+        remainderId: remainder.id,
+        remainderMinor: split.remainderMinor,
+        retainerId: credit.retainerId,
+      },
+    });
+  }
+
+  /**
+   * C9: a pending credit that no live invoice bills is marked settled outside the system, with a
+   * note (`INVALID_TRANSITION` otherwise).
+   */
+  async settleOutside(
+    tx: Transaction,
+    retainerId: string,
+    chargeId: string,
+    note: string,
+    actor: AuditActor,
+  ): Promise<void> {
+    // G2: the retainer lock orders this with the month drafts that take credits (C5).
+    await tx
+      .select({ id: retainers.id })
+      .from(retainers)
+      .where(eq(retainers.id, retainerId))
+      .for('update');
+    const [charge] = await tx
+      .select()
+      .from(retainerCharges)
+      .where(and(eq(retainerCharges.id, chargeId), eq(retainerCharges.retainerId, retainerId)))
+      .for('update');
+    if (!charge) throw new NotFoundException();
+    if (
+      charge.kind !== 'credit' ||
+      charge.status !== 'pending' ||
+      (await this.locks.chargeInvoiced(tx, chargeId))
+    ) {
+      throw new CodedException(
+        409,
+        'INVALID_TRANSITION',
+        'Only a pending credit that no live invoice bills is settled outside',
+      );
+    }
+    await tx
+      .update(retainerCharges)
+      .set({ status: 'settled_outside', settleNote: note, updatedAt: new Date() })
+      .where(eq(retainerCharges.id, chargeId));
+    await recordAudit(tx, {
+      actor,
+      action: 'retainer_charge.settled_outside',
+      entityType: 'retainer_charge',
+      entityId: chargeId,
+      before: { status: 'pending' },
+      after: {
+        status: 'settled_outside',
+        settleNote: note,
+        month: charge.month,
+        amountMinor: charge.amountMinor,
+        retainerId,
+      },
+    });
+  }
+
+  /** A3, T7: an onward amount moves a term month's base (open-ended months have none). */
+  private async moveBase(tx: Transaction, chargeId: string, deltaMinor: number): Promise<void> {
+    const [charge] = await tx
+      .select({ baseAmountMinor: retainerCharges.baseAmountMinor })
+      .from(retainerCharges)
+      .where(eq(retainerCharges.id, chargeId));
+    if (charge?.baseAmountMinor == null) return;
+    await tx
+      .update(retainerCharges)
+      .set({ baseAmountMinor: Math.max(0, charge.baseAmountMinor + deltaMinor) })
+      .where(eq(retainerCharges.id, chargeId));
   }
 
   /**

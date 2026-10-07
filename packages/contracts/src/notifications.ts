@@ -4,7 +4,7 @@ import { calendarDateSchema, timeOfDaySchema } from './dates.js';
 import { departmentCodeSchema } from './departments.js';
 import { clientEmailKindSchema } from './email-basics.js';
 import { pageQuerySchema, pageSchema, queryBooleanSchema } from './lists.js';
-import { minorAmountSchema, signedMinorAmountSchema } from './money.js';
+import { currencySchema, minorAmountSchema, signedMinorAmountSchema } from './money.js';
 import {
   BEHIND_ALERT_DAYS,
   deliverableKindSchema,
@@ -68,6 +68,8 @@ export const NOTIFICATION_TYPES = [
   'retainer_renewal_due',
   'retainer_behind',
   'retainer_term_renewed',
+  'retainer_amendment_pending',
+  'retainer_amendment_decided',
   'quote_approval_requested',
   'quote_approval_decided',
   'quote_accepted',
@@ -189,6 +191,16 @@ const CATALOG: Record<
   retainer_renewal_due: { category: 'reminders', subject: 'retainer', mutable: true },
   retainer_behind: { category: 'reminders', subject: 'retainer', mutable: false },
   retainer_term_renewed: { category: 'reminders', subject: 'retainer', mutable: true },
+  retainer_amendment_pending: {
+    category: 'clients_projects',
+    subject: 'retainer',
+    mutable: false,
+  },
+  retainer_amendment_decided: {
+    category: 'clients_projects',
+    subject: 'retainer',
+    mutable: false,
+  },
   quote_approval_requested: { category: 'clients_projects', subject: 'quote', mutable: false },
   quote_approval_decided: { category: 'clients_projects', subject: 'quote', mutable: false },
   quote_accepted: { category: 'clients_projects', subject: 'quote', mutable: true },
@@ -416,6 +428,23 @@ export const NOTIFICATION_DATA_SCHEMAS = {
     termNumber: z.number().int().min(1),
     startMonth: calendarDateSchema,
     endMonth: calendarDateSchema,
+  }),
+  /** F05B A4: an amendment that reduces agreed amounts waits for the General Manager. */
+  retainer_amendment_pending: z.object({
+    retainer: nameSchema,
+    client: nameSchema,
+    number: z.number().int().min(1),
+    /** Negative: the reduction over the months it affects. */
+    moneyDeltaMinor: signedMinorAmountSchema,
+    currency: currencySchema,
+    creator: nameSchema,
+  }),
+  /** F05B A4: the General Manager approved or rejected the creator's amendment. */
+  retainer_amendment_decided: z.object({
+    retainer: nameSchema,
+    number: z.number().int().min(1),
+    approved: z.boolean(),
+    note: z.string().nullable(),
   }),
   /** P2A rule 6: the lines of an open cycle that are behind, by position. */
   retainer_behind: z.object({

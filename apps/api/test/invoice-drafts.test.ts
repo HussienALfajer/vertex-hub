@@ -529,10 +529,12 @@ describe('automatic invoice drafts and billing locks (F13 PR 2)', () => {
         [firstOfMonth(today), 35000],
       ]);
       expect((await cycleDrafts(retainer.id)).map((row) => row.totalMinor)).toEqual([35000]);
-      // A later fee change leaves the month's charge as it is (amendments arrive with F05B PR 3).
-      expect(
-        (await patch(`/api/retainers/${retainer.id}`, { monthlyFeeMinor: 36000 })).status,
-      ).toBe(200);
+      // Once charged, the fee changes only by amendment (F05B A9).
+      await expectError(
+        await patch(`/api/retainers/${retainer.id}`, { monthlyFeeMinor: 36000 }),
+        409,
+        'FEE_CHANGE_NEEDS_AMENDMENT',
+      );
       expect((await chargesOf(retainer.id)).map((row) => row.amountMinor)).toEqual([35000]);
     });
 
@@ -540,8 +542,10 @@ describe('automatic invoice drafts and billing locks (F13 PR 2)', () => {
       const retainer = await cast.createRetainer(clientId, { monthlyFeeMinor: 10000 });
       const [draft] = await cycleDrafts(retainer.id);
       expect((await discard(draft?.id ?? '')).status).toBe(204);
-      expect((await patch(`/api/retainers/${retainer.id}`, { monthlyFeeMinor: null })).status).toBe(
-        200,
+      await expectError(
+        await patch(`/api/retainers/${retainer.id}`, { monthlyFeeMinor: null }),
+        409,
+        'FEE_CHANGE_NEEDS_AMENDMENT',
       );
       await expectError(
         await patch(`/api/retainers/${retainer.id}`, { currency: 'SYP' }),
@@ -552,9 +556,17 @@ describe('automatic invoice drafts and billing locks (F13 PR 2)', () => {
 
     it('drafts each month the daily job opens, at the fee of that moment (edge case 5)', async () => {
       const retainer = await cast.createRetainer(clientId, { monthlyFeeMinor: 40000 });
+      // F05B A9: the fee changes from next month by an onward amendment.
       expect(
-        (await patch(`/api/retainers/${retainer.id}`, { monthlyFeeMinor: 45000 })).status,
-      ).toBe(200);
+        (
+          await client.post(`/api/retainers/${retainer.id}/amendments`, cast.gm.cookie, {
+            scope: 'onward',
+            effectiveMonth: addMonths(firstOfMonth(today), 1),
+            amountDeltaMinor: 5000,
+            reason: 'رفع الرسوم',
+          })
+        ).status,
+      ).toBe(201);
       await app.get(RetainerCyclesService).runDaily(addMonths(firstOfMonth(today), 1));
       expect((await cycleDrafts(retainer.id)).map((row) => row.totalMinor)).toEqual([40000, 45000]);
     });
