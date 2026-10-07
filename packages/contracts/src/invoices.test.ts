@@ -14,6 +14,7 @@ import {
   rateIsStale,
   receiptDisplayNumber,
   recordPaymentSchema,
+  retainerChargeListQuerySchema,
   updateInvoiceServicesSchema,
   updateInvoiceSettingsSchema,
   updateProjectExpenseSchema,
@@ -222,6 +223,37 @@ describe('invoiceListQuerySchema', () => {
       'overdue',
     ]);
     expect(invoiceListQuerySchema.parse({ status: 'void' }).status).toEqual(['void']);
+  });
+});
+
+describe('retainerChargeListQuerySchema (spec F05B)', () => {
+  it('filters by none, one or several statuses and kinds', () => {
+    expect(retainerChargeListQuerySchema.parse({})).toMatchObject({ page: 1 });
+    expect(retainerChargeListQuerySchema.parse({}).status).toBeUndefined();
+    const parsed = retainerChargeListQuerySchema.parse({
+      status: 'pending',
+      kind: ['monthly', 'credit'],
+    });
+    expect(parsed.status).toEqual(['pending']);
+    expect(parsed.kind).toEqual(['monthly', 'credit']);
+    expect(retainerChargeListQuerySchema.safeParse({ kind: 'cycle' }).success).toBe(false);
+  });
+});
+
+describe('invoice sources (spec F05B C1)', () => {
+  it('bills retainer charges, not cycles', () => {
+    const line = { description: 'x', quantity: 1, unitPriceMinor: 100 };
+    const draft = {
+      updatedAt: '2026-10-10T09:00:00.000Z',
+      projectId: null,
+      retainerId: null,
+      paymentTermsDays: 7,
+      notes: null,
+      lines: [{ ...line, source: { type: 'retainer_charge', id } }],
+    };
+    expect(invoiceDraftSchema.safeParse(draft).success).toBe(true);
+    const cycle = { ...draft, lines: [{ ...line, source: { type: 'retainer_cycle', id } }] };
+    expect(invoiceDraftSchema.safeParse(cycle).success).toBe(false);
   });
 });
 

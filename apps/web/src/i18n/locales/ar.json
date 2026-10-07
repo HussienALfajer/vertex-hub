@@ -744,6 +744,7 @@
       "project_milestone": "مرحلة مشروع",
       "retainer": "عقد شهري",
       "retainer_cycle": "دورة شهرية",
+      "retainer_charge": "رسم عقد شهري",
       "extra_work": "عمل إضافي",
       "task": "مهمة",
       "task_checklist_item": "بند قائمة مهمة",
@@ -850,6 +851,9 @@
         "line_updated": "غيّر الكمية المتفق عليها",
         "line_added": "أضاف بندًا لهذا الشهر",
         "adjusted": "عدّل عدد المسلَّم"
+      },
+      "retainer_charge": {
+        "created": "أنشأ رسمًا على عقد شهري"
       },
       "extra_work": {
         "created": "سجّل عملًا إضافيًا",
@@ -2635,6 +2639,17 @@
     "cycleStatuses": {
       "open": "مفتوحة",
       "closed": "مغلقة"
+    },
+    "chargeKinds": {
+      "monthly": "رسم الشهر",
+      "addition": "إضافة",
+      "credit": "رصيد دائن",
+      "termination_fee": "رسم إنهاء"
+    },
+    "chargeStatuses": {
+      "pending": "قائم",
+      "cancelled": "ملغى",
+      "settled_outside": "سُوّي خارج النظام"
     },
     "kinds": {
       "design": "تصاميم",
@@ -4920,11 +4935,13 @@
       "quote_accepted": "من عرض سعر",
       "milestone_done": "مرحلة منجزة",
       "cycle_opened": "شهرية",
-      "manual": "يدوية"
+      "manual": "يدوية",
+      "retainer_amendment": "ملحق عقد",
+      "retainer_termination": "إنهاء عقد"
     },
     "sources": {
       "milestone": "مرحلة: {{name}}",
-      "retainer_cycle": "شهر: {{name}}",
+      "retainer_charge": "شهر: {{name}}",
       "extra_work": "عمل إضافي: {{name}}"
     },
     "currencies": {
@@ -5049,7 +5066,6 @@
       "emptyTitle": "لا بنود قابلة للفوترة",
       "emptyHint": "كل ما يخص هذا العميل بهذه العملة موجود في فواتير قائمة. أضف بندًا حرًا بدلًا من ذلك.",
       "extraWork": "أعمال إضافية",
-      "noFee": "لا رسوم شهرية محددة",
       "otherEngagement": "من مشروع أو عقد آخر: لكل فاتورة مشروع أو عقد واحد.",
       "add_zero": "أضف",
       "add_one": "أضف بندًا واحدًا",
@@ -5232,11 +5248,13 @@
       "planned": "مجموع الدفعات المخططة:",
       "monthlyFee": "الرسم الشهري:",
       "noFee": "لم يُحدَّد بعد",
-      "cycles": "الأشهر",
+      "charges": "الرسوم الشهرية",
       "month": "الشهر",
-      "cycleStatus": "الحالة",
-      "noCycles": "لا أشهر بعد",
-      "noCyclesHint": "يبدأ أول شهر مع بداية العقد.",
+      "chargeKind": "النوع",
+      "amount": "المبلغ",
+      "notDue": "لم يُستحق بعد",
+      "noCharges": "لا رسوم بعد",
+      "noChargesHint": "يُنشأ رسم كل شهر في أوله من الرسم الشهري للعقد.",
       "extraWork": "العمل الإضافي",
       "extraWorkTitle": "العمل",
       "billingStatus": "الفوترة",

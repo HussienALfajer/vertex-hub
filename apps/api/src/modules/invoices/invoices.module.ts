@@ -28,11 +28,11 @@ import { PaymentsService } from './payments.service.js';
 import { ProjectExpensesService } from './project-expenses.service.js';
 
 /**
- * Invoices (F13): settings with the current rate, drafts billed from milestones, retainer cycles
- * and extra work (through `projects`' `BillingSources`), numbering and issue, due dates and voids.
+ * Invoices (F13): settings with the current rate, drafts billed from milestones, retainer charges
+ * (F05B) and extra work (through `projects`' `BillingSources`), numbering and issue, due dates and voids.
  * Reads clients through `ClientDirectory` and company details and quote numbers through `quotes`'
  * `QuoteDirectory`. Drafts automatically through `QuoteAcceptedHooks`, `MilestoneDoneHooks` and
- * `CycleOpenedHooks`, and answers `projects`' `BillingLocks`. Records and voids payments with
+ * `RetainerChargeDueHooks`, and answers `projects`' `BillingLocks`. Records and voids payments with
  * receipt numbers, keeps payment proofs as invoice documents (`files`' `GeneratedFiles`, owner
  * type `invoice`), renders invoice, draft, receipt and statement PDFs through the worker
  * (`invoices.pdf`, `invoices.pdf-ready`; statement renders purged through `files`' `FilePurges`),

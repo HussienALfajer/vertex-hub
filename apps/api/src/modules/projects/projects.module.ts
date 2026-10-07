@@ -18,6 +18,8 @@ import { ProjectMilestonesService } from './project-milestones.service.js';
 import { ProjectsController } from './projects.controller.js';
 import { ProjectsService } from './projects.service.js';
 import { RetainerBehindAlerts } from './retainer-behind.js';
+import { RetainerChargeDueHooks } from './retainer-charge-due-hooks.js';
+import { RetainerCharges } from './retainer-charges.js';
 import { RetainerCyclesController } from './retainer-cycles.controller.js';
 import { RetainerCyclesService } from './retainer-cycles.service.js';
 import { RetainerRenewals } from './retainer-renewals.js';
@@ -33,7 +35,7 @@ import { WorkProgress } from './work-progress.js';
  * registers the renewal reminder and the behind alert (A09) in `notifications`' daily job (F14). Exports `EngagementDirectory` for
  * the `tasks` and `templates` modules, `CycleOpenedHooks` for `templates` (F07 rule 16) and
  * `EngagementFactory` for `quotes` (F04 A01), and `BillingSources`, `BillingLocks`,
- * `MilestoneDoneHooks` and `CycleOpenedHooks` for `invoices` (F13).
+ * `MilestoneDoneHooks` and `RetainerChargeDueHooks` for `invoices` (F13, F05B).
  * Registers the `project` and `retainer` owner policies in `files` (F10). Exports
  * `EngagementReports` for `reports` (F15).
  */
@@ -59,6 +61,8 @@ import { WorkProgress } from './work-progress.js';
     BillingLocks,
     CycleOpenedHooks,
     MilestoneDoneHooks,
+    RetainerCharges,
+    RetainerChargeDueHooks,
     RetainerRenewals,
     RetainerBehindAlerts,
     EngagementFileOwners,
@@ -72,6 +76,7 @@ import { WorkProgress } from './work-progress.js';
     BillingLocks,
     CycleOpenedHooks,
     MilestoneDoneHooks,
+    RetainerChargeDueHooks,
     EngagementReports,
   ],
 })

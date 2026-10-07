@@ -74,6 +74,7 @@ import {
   retainerPermissions,
   workableRetainer,
 } from './retainer-access.js';
+import { RetainerCharges } from './retainer-charges.js';
 import { RetainerCyclesService } from './retainer-cycles.service.js';
 
 type Executor = Database | Transaction;
@@ -118,6 +119,7 @@ export class RetainersService {
     private readonly clients: ClientDirectory,
     private readonly cycles: RetainerCyclesService,
     private readonly locks: BillingLocks,
+    private readonly charges: RetainerCharges,
   ) {}
 
   async list(actor: CurrentUserInfo, query: RetainerListQuery): Promise<RetainerPage> {
@@ -375,6 +377,9 @@ export class RetainersService {
       );
       if (money?.after.currency !== undefined) {
         await this.assertCurrencyFree(tx, id, current.monthlyFeeMinor);
+        if (await this.charges.hasCharges(tx, id)) {
+          throw new CodedException(409, 'CURRENCY_LOCKED', 'The retainer has charges');
+        }
         await this.locks.assertCurrencyFree(tx, { type: 'retainer', id });
       }
       if (!basics && !money) return;
@@ -404,6 +409,16 @@ export class RetainersService {
         retainer.status === 'active'
       ) {
         await this.cycles.open(tx, id, input.startDate, today, actorOf(actor));
+      }
+      // F05B C2: a fee set while the month's open cycle has none charges that month.
+      if (money?.after.monthlyFeeMinor && !current.monthlyFeeMinor) {
+        await this.charges.chargeOpenMonth(
+          tx,
+          id,
+          today,
+          money.after.monthlyFeeMinor,
+          actorOf(actor),
+        );
       }
     });
     return this.detail(actor, id);

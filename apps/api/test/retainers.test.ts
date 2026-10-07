@@ -308,7 +308,7 @@ describe('retainers', () => {
       expect(actions).toEqual(['retainer.created', 'retainer.updated', 'retainer.money_updated']);
     });
 
-    it('locks the currency once a fee is set (M2) or an invoice exists (F13 rule 24)', async () => {
+    it('locks the currency once a fee is set (M2), an invoice or a charge exists (F13, F05B)', async () => {
       const { id: clientId } = await cast.createClient();
       const created = await cast.createRetainer(clientId, { monthlyFeeMinor: 1000 });
       await expectError(
@@ -327,7 +327,15 @@ describe('retainers', () => {
       expect((await client.post(`/api/invoices/${draft?.id}/archive`, cast.gm.cookie)).status).toBe(
         204,
       );
-      expect((await patch(created.id, cast.gm.cookie, { currency: 'SYP' })).status).toBe(200);
+      // The month's charge keeps the currency it was created in (F05B edge case 12).
+      await expectError(
+        await patch(created.id, cast.gm.cookie, { currency: 'SYP' }),
+        409,
+        'CURRENCY_LOCKED',
+      );
+      // Without a fee, invoice or charge it changes.
+      const free = await cast.createRetainer(clientId);
+      expect((await patch(free.id, cast.gm.cookie, { currency: 'SYP' })).status).toBe(200);
     });
 
     it('fixes the start date once a cycle exists; an earlier start opens the cycle', async () => {

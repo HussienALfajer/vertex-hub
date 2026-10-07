@@ -23,6 +23,7 @@ import {
   payments,
   quoteLines,
   quotes,
+  retainerCharges,
   taskRevisions,
   tasks,
   users,
@@ -418,7 +419,15 @@ describe('reports (F15 rules 8–16)', () => {
 
       clientId = (await cast.createClient()).id;
       const retainer = await cast.createRetainer(clientId);
-      const cycleId = retainer.currentCycle?.id ?? '';
+      const [charge] = await db
+        .insert(retainerCharges)
+        .values({
+          retainerId: retainer.id,
+          month: '2001-03-01',
+          kind: 'monthly',
+          amountMinor: 40_000,
+        })
+        .returning();
       // The retainer's accepted quote: the monthly service 3 parts, the package 1 part (rule 14).
       const [quote] = await db
         .insert(quotes)
@@ -477,12 +486,12 @@ describe('reports (F15 rules 8–16)', () => {
         ],
         '2001-03-05',
       );
-      const cycleLine = main.lines[1];
+      const chargeLine = main.lines[1];
       await db.update(invoices).set({ retainerId: retainer.id }).where(eq(invoices.id, main.id));
       await db
         .update(invoiceLines)
-        .set({ retainerCycleId: cycleId })
-        .where(eq(invoiceLines.id, cycleLine?.id ?? ''));
+        .set({ retainerChargeId: charge?.id })
+        .where(eq(invoiceLines.id, chargeLine?.id ?? ''));
       await pay(main.id, '2001-03-20', 35_000);
 
       // SYP at the invoice's own rate, Unclassified.

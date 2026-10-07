@@ -10,6 +10,7 @@ import {
   invoiceDetailSchema,
   type RetainerDetail,
   retainerBillingSchema,
+  retainerChargePageSchema,
 } from '@vertex-hub/contracts';
 import { createDatabase, invoiceSettings, invoices, payments } from '@vertex-hub/db';
 import { testDatabaseUrl } from '@vertex-hub/db/testing';
@@ -243,7 +244,7 @@ describe('client balances, statements, retainer billing and invoice due dates (F
     );
   });
 
-  it('shows the cycles and extra work of a retainer with their invoices', async () => {
+  it('shows the charges and extra work of a retainer with their invoices', async () => {
     const work = await client.post(`/api/retainers/${retainer.id}/extra-work`, cast.gm.cookie, {
       title: 'تصميم إضافي',
       estimateMinor: 8_000,
@@ -270,9 +271,16 @@ describe('client balances, statements, retainer billing and invoice due dates (F
       retainerBillingSchema,
     );
     expect(result.retainer).toMatchObject({ id: retainer.id, monthlyFeeMinor: 40_000 });
-    // The cycle that opened with the retainer drafted its month (A02).
-    expect(result.cycles).toHaveLength(1);
-    expect(result.cycles[0]?.invoice).toMatchObject({ displayNumber: null, status: 'draft' });
+    // The month's charge, created when the retainer's first cycle opened, drafted its month (A02).
+    expect(result.charges).toEqual([
+      expect.objectContaining({
+        kind: 'monthly',
+        amountMinor: 40_000,
+        status: 'pending',
+        due: true,
+        invoice: expect.objectContaining({ displayNumber: null, status: 'draft' }),
+      }),
+    ]);
     expect(result.extraWork).toEqual([
       {
         id: extraWorkId,
@@ -291,6 +299,28 @@ describe('client balances, statements, retainer billing and invoice due dates (F
     ).toBe(403);
     expect(
       (await client.get(`/api/retainers/${randomUUID()}/billing`, finance.cookie)).status,
+    ).toBe(404);
+  });
+
+  it('pages the charges of a retainer with their invoices for money readers (F05B)', async () => {
+    const charges = (query = '', cookie = finance.cookie) =>
+      client.get(`/api/retainers/${retainer.id}/charges${query}`, cookie);
+    const page = await ok(await charges(), retainerChargePageSchema);
+    expect(page).toMatchObject({ total: 1, page: 1 });
+    expect(page.items[0]).toMatchObject({
+      kind: 'monthly',
+      amountMinor: 40_000,
+      invoice: expect.objectContaining({ status: 'draft' }),
+    });
+    expect((await ok(await charges('?kind=credit'), retainerChargePageSchema)).total).toBe(0);
+    expect((await ok(await charges('?status=pending'), retainerChargePageSchema)).total).toBe(1);
+    expect((await ok(await charges('', cast.am.cookie), retainerChargePageSchema)).total).toBe(1);
+    expect((await charges('?kind=cycle')).status).toBe(400);
+    expect((await charges('', cast.employee.cookie)).status).toBe(403);
+    expect((await charges('', cast.otherAm.cookie)).status).toBe(403);
+    expect((await client.get(`/api/retainers/${retainer.id}/charges`)).status).toBe(401);
+    expect(
+      (await client.get(`/api/retainers/${randomUUID()}/charges`, finance.cookie)).status,
     ).toBe(404);
   });
 

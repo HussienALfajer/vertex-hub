@@ -50,6 +50,7 @@ import {
   quoteLineItems,
   quoteLines,
   quotes,
+  retainerCharges,
   retainerCycleAdjustments,
   retainerCycleLines,
   retainerCycles,
@@ -653,8 +654,8 @@ export async function removeProjects(db: Database, ids: string[]): Promise<void>
 }
 
 /**
- * Removes seeded retainers, their lines, cycles, template link and runs, extra work and audit
- * entries (test cleanup only).
+ * Removes seeded retainers, their lines, cycles, charges, template link and runs, extra work and
+ * audit entries (test cleanup only; their invoices go first, with `removeInvoices`).
  */
 export async function removeRetainers(db: Database, ids: string[]): Promise<void> {
   if (ids.length === 0) return;
@@ -692,9 +693,16 @@ export async function removeRetainers(db: Database, ids: string[]): Promise<void
       .from(extraWorkItems)
       .where(inArray(extraWorkItems.retainerId, ids))
   ).map((row) => row.id);
+  const charges = (
+    await db
+      .select({ id: retainerCharges.id })
+      .from(retainerCharges)
+      .where(inArray(retainerCharges.retainerId, ids))
+  ).map((row) => row.id);
   await db
     .delete(auditEntries)
-    .where(inArray(auditEntries.entityId, [...ids, ...cycles, ...extraWork]));
+    .where(inArray(auditEntries.entityId, [...ids, ...cycles, ...extraWork, ...charges]));
+  await db.delete(retainerCharges).where(inArray(retainerCharges.retainerId, ids));
   if (lines.length) {
     await db
       .delete(retainerCycleAdjustments)

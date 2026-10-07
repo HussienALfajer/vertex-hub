@@ -37,6 +37,27 @@ export const cycleStatusSchema = z.enum(CYCLE_STATUSES).meta({ id: 'CycleStatus'
 
 export type CycleStatus = z.infer<typeof cycleStatusSchema>;
 
+/**
+ * What a retainer charge bills (spec F05B, ADR 0029): a month's amount, an amendment's addition
+ * or credit, or an early termination fee. Invoices bill charges, not cycles.
+ */
+export const RETAINER_CHARGE_KINDS = ['monthly', 'addition', 'credit', 'termination_fee'] as const;
+
+export const retainerChargeKindSchema = z
+  .enum(RETAINER_CHARGE_KINDS)
+  .meta({ id: 'RetainerChargeKind' });
+
+export type RetainerChargeKind = z.infer<typeof retainerChargeKindSchema>;
+
+/** Being invoiced is read from invoice lines, as for other sources; this is the charge's own state. */
+export const RETAINER_CHARGE_STATUSES = ['pending', 'cancelled', 'settled_outside'] as const;
+
+export const retainerChargeStatusSchema = z
+  .enum(RETAINER_CHARGE_STATUSES)
+  .meta({ id: 'RetainerChargeStatus' });
+
+export type RetainerChargeStatus = z.infer<typeof retainerChargeStatusSchema>;
+
 /** `post` covers single posts and carousels; `other` needs a label. */
 export const DELIVERABLE_KINDS = [
   'design',

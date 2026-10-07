@@ -1028,7 +1028,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await page.setViewportSize({ width: 1280, height: 1400 });
       await mockApi(page, { signedIn: true });
       await page.goto(`/retainers/${seedIds.socialRetainer}?tab=billing`);
-      await expect(page.getByText(ar.invoices.billing.cycles)).toBeVisible();
+      await expect(page.getByText(ar.invoices.billing.charges)).toBeVisible();
       await screenshot(page, testInfo, `retainer-billing-${colorScheme}`);
     });
 
