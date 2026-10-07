@@ -99,6 +99,7 @@ Business decisions are recorded in `docs/decisions/` (see ADR 0007 and ADR 0006)
 ### F05 — Projects and retainers
 - **Projects:** milestones (e.g. discovery → design → build → test → delivery), start and due dates, project manager, participating departments, a payment installment per milestone, progress computed from tasks.
 - **Retainers:** a monthly cycle created automatically on the 1st of each month; a **deliverables counter** ("designs 9/12, reels 2/4, monthly report not delivered"); an alert before month end when deliverables are behind; out-of-scope extra work logged for separate billing; status (active / paused / ended) and renewal date.
+- **Retainer terms (F05B, added 2026-10-07):** an optional fixed term (months, agreed total, per-month billing schedule; renew, end or continue at its end), and numbered amendments for one month or onward (extra lines with a price, amount changes) that never rewrite an issued invoice: supplementary invoices for increases, a credit on the next month for decreases; reductions need the General Manager. Spec: `docs/specs/F05B-retainer-terms.md`.
 
 ### F06 — Task engine and workflow (the core)
 - Task: title, brief, client and project, department, assignee, priority, due date, attachments, subtasks.
