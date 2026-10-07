@@ -97,6 +97,14 @@ const SAMPLES: Record<NotificationType, unknown> = {
     client: 'مطعم الشام',
     renewalDate: '2026-10-10',
     daysLeft: 5,
+    endAction: 'renew',
+  },
+  retainer_term_renewed: {
+    retainer: 'عقد شهري',
+    client: 'مطعم الشام',
+    termNumber: 2,
+    startMonth: '2026-11-01',
+    endMonth: '2027-01-01',
   },
   retainer_behind: {
     retainer: 'عقد شهري',
@@ -172,6 +180,15 @@ describe('notification texts', () => {
     const { text, context } = notificationText(sample('retainer_behind'), departmentName);
     expect(text).toBe('عقد «عقد شهري» متأخر: بقيت 3 أيام على نهاية الشهر');
     expect(context).toBe('مطعم الشام · تصاميم 2/12 (1 جاهزة)، ريلز العروض 0/4، ستوري 1/8، +1');
+  });
+
+  it('names a renewed term and the end action of a renewal (F05B)', () => {
+    const renewed = notificationText(sample('retainer_term_renewed'), departmentName);
+    expect(renewed.text).toBe(
+      'جُدّد عقد «عقد شهري» تلقائيًا: المدة 2 من تشرين الثاني 2026 إلى كانون الثاني 2027',
+    );
+    const due = notificationText(sample('retainer_renewal_due'), departmentName);
+    expect(due.context).toBe('مطعم الشام · 10 تشرين الأول 2026 · يتجدد تلقائيًا');
   });
 
   it('writes the department of generated tasks by its current name', () => {

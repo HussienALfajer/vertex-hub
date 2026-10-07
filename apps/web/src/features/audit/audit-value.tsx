@@ -24,6 +24,8 @@ import {
   QUOTE_STATUSES,
   REQUEST_SCOPES,
   RESPONSE_CHANNELS,
+  RETAINER_CHARGE_KINDS,
+  RETAINER_CHARGE_STATUSES,
   RETAINER_STATUSES,
   REVIEW_OUTCOMES,
   REVIEW_STAGES,
@@ -36,6 +38,8 @@ import {
   TASK_STATUSES,
   TASK_TYPES,
   TEMPLATE_KINDS,
+  TERM_END_ACTIONS,
+  TERM_STATUSES,
   USER_STATUSES,
 } from '@vertex-hub/contracts';
 import { Badge, ColorSwatch } from '@vertex-hub/ui';
@@ -93,6 +97,10 @@ function enumLabel(
     if (retainer) return t(`retainers.statuses.${retainer}`);
     const cycle = entityType === 'retainer_cycle' ? find(CYCLE_STATUSES) : undefined;
     if (cycle) return t(`retainers.cycleStatuses.${cycle}`);
+    const term = entityType === 'retainer_term' ? find(TERM_STATUSES) : undefined;
+    if (term) return t(`retainers.terms.statuses.${term}`);
+    const charge = entityType === 'retainer_charge' ? find(RETAINER_CHARGE_STATUSES) : undefined;
+    if (charge) return t(`retainers.chargeStatuses.${charge}`);
     const task = entityType === 'task' ? find(TASK_STATUSES) : undefined;
     if (task) return t(`tasks.statuses.${task}`);
     const shoot = entityType === 'shoot' ? find(SHOOT_STATUSES) : undefined;
@@ -155,6 +163,14 @@ function enumLabel(
   if (field === 'channel') {
     const channel = find(NOTE_CHANNELS);
     if (channel) return t(`clients.notes.channels.${channel}`);
+  }
+  if (field === 'endAction') {
+    const action = find(TERM_END_ACTIONS);
+    if (action) return t(`retainers.terms.endActions.${action}`);
+  }
+  if (field === 'kind' && entityType === 'retainer_charge') {
+    const kind = find(RETAINER_CHARGE_KINDS);
+    if (kind) return t(`retainers.chargeKinds.${kind}`);
   }
   if (field === 'kind' && entityType === 'retainer_cycle') {
     const kind = find(DELIVERABLE_KINDS);

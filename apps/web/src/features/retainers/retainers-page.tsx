@@ -47,7 +47,7 @@ import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LoadError } from '../../components/load-error';
 import { canAll, scopesOf, useMe } from '../../lib/auth';
-import { formatNumber } from '../../lib/format';
+import { formatMonth, formatNumber } from '../../lib/format';
 import {
   ALL,
   flagParam,
@@ -567,6 +567,13 @@ function RetainersTable({ retainers, archived }: { retainers: Retainer[]; archiv
                 <RetainerStatusBadge status={retainer.status} />
                 {retainer.renewal && <RenewalBadge state={retainer.renewal} />}
                 {archived && <ArchivedBadge />}
+                {retainer.term && (
+                  <span className="text-xs text-muted-foreground">
+                    {t('retainers.terms.until', { month: formatMonth(retainer.term.endMonth) })}
+                    {' · '}
+                    {t(`retainers.terms.endActions.${retainer.term.endAction}`)}
+                  </span>
+                )}
               </span>
             </TableCell>
             <TableCell className="min-w-56 whitespace-normal">

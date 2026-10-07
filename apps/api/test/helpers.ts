@@ -57,6 +57,7 @@ import {
   retainerDeliverables,
   retainers,
   retainerTemplates,
+  retainerTerms,
   shootCrew,
   shootShots,
   shoots,
@@ -699,10 +700,22 @@ export async function removeRetainers(db: Database, ids: string[]): Promise<void
       .from(retainerCharges)
       .where(inArray(retainerCharges.retainerId, ids))
   ).map((row) => row.id);
+  const terms = (
+    await db
+      .select({ id: retainerTerms.id })
+      .from(retainerTerms)
+      .where(inArray(retainerTerms.retainerId, ids))
+  ).map((row) => row.id);
   await db
     .delete(auditEntries)
-    .where(inArray(auditEntries.entityId, [...ids, ...cycles, ...extraWork, ...charges]));
+    .where(inArray(auditEntries.entityId, [...ids, ...cycles, ...extraWork, ...charges, ...terms]));
   await db.delete(retainerCharges).where(inArray(retainerCharges.retainerId, ids));
+  // Renewal terms point to the term they renew.
+  await db
+    .update(retainerTerms)
+    .set({ renewedFromId: null })
+    .where(inArray(retainerTerms.retainerId, ids));
+  await db.delete(retainerTerms).where(inArray(retainerTerms.retainerId, ids));
   if (lines.length) {
     await db
       .delete(retainerCycleAdjustments)

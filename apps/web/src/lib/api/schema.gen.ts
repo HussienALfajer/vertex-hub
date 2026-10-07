@@ -1204,6 +1204,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/retainers/{retainerId}/terms": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["RetainerTermsController_list"];
+        put?: never;
+        post: operations["RetainerTermsController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/retainers/{retainerId}/terms/{termId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["RetainerTermsController_update"];
+        trace?: never;
+    };
+    "/api/retainers/{retainerId}/terms/{termId}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["RetainerTermsController_cancel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/projects/{id}/extra-work": {
         parameters: {
             query?: never;
@@ -4121,9 +4169,9 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         /** @enum {string} */
-        AuditEntityType: "user" | "department" | "client" | "client_contact" | "client_platform_account" | "client_note" | "project" | "project_milestone" | "retainer" | "retainer_cycle" | "retainer_charge" | "extra_work" | "task" | "task_checklist_item" | "task_link" | "task_comment" | "template" | "template_run" | "file_item" | "approval_request" | "post" | "shoot" | "meeting" | "catalog_service" | "catalog_package" | "quote_settings" | "quote" | "invoice_settings" | "invoice" | "payment" | "project_expense" | "ad_campaign" | "ad_campaign_update" | "ad_wallet" | "ad_wallet_entry" | "lead" | "lead_note" | "client_report";
+        AuditEntityType: "user" | "department" | "client" | "client_contact" | "client_platform_account" | "client_note" | "project" | "project_milestone" | "retainer" | "retainer_cycle" | "retainer_charge" | "retainer_term" | "extra_work" | "task" | "task_checklist_item" | "task_link" | "task_comment" | "template" | "template_run" | "file_item" | "approval_request" | "post" | "shoot" | "meeting" | "catalog_service" | "catalog_package" | "quote_settings" | "quote" | "invoice_settings" | "invoice" | "payment" | "project_expense" | "ad_campaign" | "ad_campaign_update" | "ad_wallet" | "ad_wallet_entry" | "lead" | "lead_note" | "client_report";
         /** @enum {string} */
-        AuditAction: "user.created" | "user.updated" | "user.roles_changed" | "user.departments_changed" | "user.archived" | "user.restored" | "user.link_issued" | "user.password_set" | "user.password_changed" | "user.two_factor_enabled" | "user.two_factor_disabled" | "user.two_factor_reset" | "user.profile_updated" | "department.updated" | "client.created" | "client.updated" | "client.status_changed" | "client.account_manager_changed" | "client.healthcare_changed" | "client.archived" | "client.restored" | "client.brand_kit_updated" | "client.emailed" | "client_contact.created" | "client_contact.updated" | "client_contact.archived" | "client_platform_account.created" | "client_platform_account.updated" | "client_platform_account.archived" | "client_note.created" | "client_note.updated" | "client_note.archived" | "project.created" | "project.updated" | "project.project_manager_changed" | "project.status_changed" | "project.money_updated" | "project.archived" | "project.restored" | "project_milestone.created" | "project_milestone.updated" | "project_milestone.reordered" | "project_milestone.completed" | "project_milestone.reopened" | "project_milestone.archived" | "retainer.created" | "retainer.updated" | "retainer.status_changed" | "retainer.deliverables_updated" | "retainer.money_updated" | "retainer.archived" | "retainer.restored" | "retainer_cycle.created" | "retainer_cycle.closed" | "retainer_cycle.line_updated" | "retainer_cycle.line_added" | "retainer_cycle.adjusted" | "retainer_charge.created" | "extra_work.created" | "extra_work.updated" | "extra_work.billing_changed" | "extra_work.archived" | "task.created" | "task.updated" | "task.assigned" | "task.department_changed" | "task.status_changed" | "task.dependencies_updated" | "task.archived" | "task.restored" | "task.revision_decided" | "task.request_scope_changed" | "task.extra_work_moved" | "task.reviewed" | "task.client_text_updated" | "task.client_response_recorded" | "task_checklist_item.created" | "task_checklist_item.updated" | "task_checklist_item.reordered" | "task_checklist_item.archived" | "task_link.created" | "task_link.archived" | "task_comment.created" | "task_comment.updated" | "task_comment.archived" | "template.created" | "template.updated" | "template.assignees_updated" | "template.archived" | "template.restored" | "template_run.created" | "retainer.template_changed" | "file_item.created" | "file_item.renamed" | "file_item.confidential_changed" | "file_item.archived" | "file_item.restored" | "file_version.created" | "file_version.archived" | "file_version.restored" | "file_version.final_set" | "file_version.final_cleared" | "approval_request.created" | "approval_request.link_reissued" | "approval_request.revoked" | "approval_request.emailed" | "approval_item.responded" | "approval_item.withdrawn" | "post.created" | "post.updated" | "post.status_changed" | "post.reviewed" | "post.client_response_recorded" | "post.task_linked" | "post.task_unlinked" | "post.task_returned" | "post.duplicated" | "post.archived" | "post.restored" | "shoot.created" | "shoot.updated" | "shoot.shots_changed" | "shoot.shot_ticked" | "shoot.shot_unticked" | "shoot.completed" | "shoot.cancelled" | "shoot.reopened" | "shoot.archived" | "shoot.restored" | "meeting.created" | "meeting.updated" | "meeting.cancelled" | "meeting.archived" | "meeting.restored" | "catalog_service.created" | "catalog_service.updated" | "catalog_service.archived" | "catalog_service.restored" | "catalog_package.created" | "catalog_package.updated" | "catalog_package.archived" | "catalog_package.restored" | "quote_settings.updated" | "quote.created" | "quote.updated" | "quote.approval_requested" | "quote.approval_withdrawn" | "quote.approval_approved" | "quote.approval_returned" | "quote.sent" | "quote.extended" | "quote.expired" | "quote.rejected" | "quote.accepted" | "quote.version_created" | "quote.superseded" | "quote.archived" | "quote.emailed" | "invoice_settings.updated" | "invoice.created" | "invoice.updated" | "invoice.archived" | "invoice.issued" | "invoice.due_date_changed" | "invoice.voided" | "invoice.overdue" | "invoice.services_changed" | "invoice.emailed" | "payment.recorded" | "payment.voided" | "payment.emailed" | "project_expense.created" | "project_expense.updated" | "project_expense.archived" | "ad_campaign.created" | "ad_campaign.updated" | "ad_campaign.status_changed" | "ad_campaign.archived" | "ad_campaign.restored" | "ad_campaign_update.created" | "ad_campaign_update.updated" | "ad_campaign_update.archived" | "ad_wallet.threshold_changed" | "ad_wallet.low_balance" | "ad_wallet.low_balance_cleared" | "ad_wallet_entry.recorded" | "ad_wallet_entry.voided" | "ad_wallet_entry.emailed" | "lead.created" | "lead.updated" | "lead.stage_changed" | "lead.owner_changed" | "lead.follow_up_changed" | "lead.lost" | "lead.reopened" | "lead.converted" | "lead.archived" | "lead.restored" | "lead_note.created" | "lead_note.updated" | "lead_note.archived" | "client_report.summary_changed";
+        AuditAction: "user.created" | "user.updated" | "user.roles_changed" | "user.departments_changed" | "user.archived" | "user.restored" | "user.link_issued" | "user.password_set" | "user.password_changed" | "user.two_factor_enabled" | "user.two_factor_disabled" | "user.two_factor_reset" | "user.profile_updated" | "department.updated" | "client.created" | "client.updated" | "client.status_changed" | "client.account_manager_changed" | "client.healthcare_changed" | "client.archived" | "client.restored" | "client.brand_kit_updated" | "client.emailed" | "client_contact.created" | "client_contact.updated" | "client_contact.archived" | "client_platform_account.created" | "client_platform_account.updated" | "client_platform_account.archived" | "client_note.created" | "client_note.updated" | "client_note.archived" | "project.created" | "project.updated" | "project.project_manager_changed" | "project.status_changed" | "project.money_updated" | "project.archived" | "project.restored" | "project_milestone.created" | "project_milestone.updated" | "project_milestone.reordered" | "project_milestone.completed" | "project_milestone.reopened" | "project_milestone.archived" | "retainer.created" | "retainer.updated" | "retainer.status_changed" | "retainer.deliverables_updated" | "retainer.money_updated" | "retainer.archived" | "retainer.restored" | "retainer_cycle.created" | "retainer_cycle.closed" | "retainer_cycle.line_updated" | "retainer_cycle.line_added" | "retainer_cycle.adjusted" | "retainer_charge.created" | "retainer_charge.amount_changed" | "retainer_charge.cancelled" | "retainer_term.created" | "retainer_term.updated" | "retainer_term.end_action_changed" | "retainer_term.cancelled" | "retainer_term.started" | "retainer_term.completed" | "retainer_term.renewed" | "extra_work.created" | "extra_work.updated" | "extra_work.billing_changed" | "extra_work.archived" | "task.created" | "task.updated" | "task.assigned" | "task.department_changed" | "task.status_changed" | "task.dependencies_updated" | "task.archived" | "task.restored" | "task.revision_decided" | "task.request_scope_changed" | "task.extra_work_moved" | "task.reviewed" | "task.client_text_updated" | "task.client_response_recorded" | "task_checklist_item.created" | "task_checklist_item.updated" | "task_checklist_item.reordered" | "task_checklist_item.archived" | "task_link.created" | "task_link.archived" | "task_comment.created" | "task_comment.updated" | "task_comment.archived" | "template.created" | "template.updated" | "template.assignees_updated" | "template.archived" | "template.restored" | "template_run.created" | "retainer.template_changed" | "file_item.created" | "file_item.renamed" | "file_item.confidential_changed" | "file_item.archived" | "file_item.restored" | "file_version.created" | "file_version.archived" | "file_version.restored" | "file_version.final_set" | "file_version.final_cleared" | "approval_request.created" | "approval_request.link_reissued" | "approval_request.revoked" | "approval_request.emailed" | "approval_item.responded" | "approval_item.withdrawn" | "post.created" | "post.updated" | "post.status_changed" | "post.reviewed" | "post.client_response_recorded" | "post.task_linked" | "post.task_unlinked" | "post.task_returned" | "post.duplicated" | "post.archived" | "post.restored" | "shoot.created" | "shoot.updated" | "shoot.shots_changed" | "shoot.shot_ticked" | "shoot.shot_unticked" | "shoot.completed" | "shoot.cancelled" | "shoot.reopened" | "shoot.archived" | "shoot.restored" | "meeting.created" | "meeting.updated" | "meeting.cancelled" | "meeting.archived" | "meeting.restored" | "catalog_service.created" | "catalog_service.updated" | "catalog_service.archived" | "catalog_service.restored" | "catalog_package.created" | "catalog_package.updated" | "catalog_package.archived" | "catalog_package.restored" | "quote_settings.updated" | "quote.created" | "quote.updated" | "quote.approval_requested" | "quote.approval_withdrawn" | "quote.approval_approved" | "quote.approval_returned" | "quote.sent" | "quote.extended" | "quote.expired" | "quote.rejected" | "quote.accepted" | "quote.version_created" | "quote.superseded" | "quote.archived" | "quote.emailed" | "invoice_settings.updated" | "invoice.created" | "invoice.updated" | "invoice.archived" | "invoice.issued" | "invoice.due_date_changed" | "invoice.voided" | "invoice.overdue" | "invoice.services_changed" | "invoice.emailed" | "payment.recorded" | "payment.voided" | "payment.emailed" | "project_expense.created" | "project_expense.updated" | "project_expense.archived" | "ad_campaign.created" | "ad_campaign.updated" | "ad_campaign.status_changed" | "ad_campaign.archived" | "ad_campaign.restored" | "ad_campaign_update.created" | "ad_campaign_update.updated" | "ad_campaign_update.archived" | "ad_wallet.threshold_changed" | "ad_wallet.low_balance" | "ad_wallet.low_balance_cleared" | "ad_wallet_entry.recorded" | "ad_wallet_entry.voided" | "ad_wallet_entry.emailed" | "lead.created" | "lead.updated" | "lead.stage_changed" | "lead.owner_changed" | "lead.follow_up_changed" | "lead.lost" | "lead.reopened" | "lead.converted" | "lead.archived" | "lead.restored" | "lead_note.created" | "lead_note.updated" | "lead_note.archived" | "client_report.summary_changed";
         /** @description Audit entries, newest first */
         AuditPage: {
             items: components["schemas"]["AuditEntry"][];
@@ -5732,6 +5780,7 @@ export interface components {
                 /** Format: date */
                 renewalDate: string;
                 daysLeft: number;
+                endAction?: components["schemas"]["TermEndAction"] | null;
             };
         } | {
             /** Format: uuid */
@@ -5768,6 +5817,36 @@ export interface components {
                     committed: number;
                     ready: number;
                 }[];
+            };
+        } | {
+            /** Format: uuid */
+            id: string;
+            actor: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            subject: {
+                type: components["schemas"]["NotificationSubjectType"];
+                /** Format: uuid */
+                id: string;
+            };
+            count: number;
+            read: boolean;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @enum {string} */
+            type: "retainer_term_renewed";
+            data: {
+                retainer: string;
+                client: string;
+                termNumber: number;
+                /** Format: date */
+                startMonth: string;
+                /** Format: date */
+                endMonth: string;
             };
         } | {
             /** Format: uuid */
@@ -6072,6 +6151,8 @@ export interface components {
         /** @enum {string} */
         NotificationSubjectType: "task" | "client" | "project" | "retainer" | "template_run" | "approval_request" | "post" | "shoot" | "meeting" | "quote" | "invoice" | "lead";
         /** @enum {string} */
+        TermEndAction: "renew" | "end" | "continue";
+        /** @enum {string} */
         DeliverableKind: "design" | "reel" | "story" | "post" | "video" | "photo_shoot" | "ad_campaign" | "monthly_report" | "other";
         /** @enum {string} */
         ClientEmailKind: "client_quote" | "client_quote_reminder" | "client_approval_link" | "client_approval_reminder" | "client_invoice" | "client_invoice_reminder" | "client_receipt" | "client_statement" | "client_report" | "client_ad_receipt" | "client_ad_budget_low";
@@ -6093,7 +6174,7 @@ export interface components {
             digestEnabled: boolean;
         };
         /** @enum {string} */
-        NotificationType: "task_assigned" | "task_mentioned" | "task_returned" | "task_review_requested" | "task_medical_review_requested" | "task_awaiting_client" | "task_over_limit" | "approval_responded" | "approval_no_response" | "approval_expired" | "task_changed" | "task_commented" | "task_file_added" | "task_requested" | "tasks_generated" | "task_approved" | "task_opened" | "request_finished" | "post_returned" | "post_review_requested" | "post_medical_review_requested" | "post_awaiting_client" | "post_assigned" | "post_approved" | "post_task_ready" | "post_task_unlinked" | "shoot_booked" | "shoot_dropped" | "shoot_changed" | "meeting_invited" | "meeting_dropped" | "meeting_changed" | "task_due_soon" | "task_overdue" | "task_overdue_escalated" | "task_over_limit_pending" | "post_publish_today" | "post_publish_overdue" | "shoot_upcoming" | "shoot_not_closed" | "meeting_upcoming" | "client_account_manager_assigned" | "project_manager_assigned" | "retainer_renewal_due" | "retainer_behind" | "quote_approval_requested" | "quote_approval_decided" | "quote_accepted" | "invoice_overdue" | "invoice_paid" | "ad_budget_low" | "email_failed" | "lead_assigned" | "lead_won" | "lead_follow_up_overdue" | "lead_follow_up_due";
+        NotificationType: "task_assigned" | "task_mentioned" | "task_returned" | "task_review_requested" | "task_medical_review_requested" | "task_awaiting_client" | "task_over_limit" | "approval_responded" | "approval_no_response" | "approval_expired" | "task_changed" | "task_commented" | "task_file_added" | "task_requested" | "tasks_generated" | "task_approved" | "task_opened" | "request_finished" | "post_returned" | "post_review_requested" | "post_medical_review_requested" | "post_awaiting_client" | "post_assigned" | "post_approved" | "post_task_ready" | "post_task_unlinked" | "shoot_booked" | "shoot_dropped" | "shoot_changed" | "meeting_invited" | "meeting_dropped" | "meeting_changed" | "task_due_soon" | "task_overdue" | "task_overdue_escalated" | "task_over_limit_pending" | "post_publish_today" | "post_publish_overdue" | "shoot_upcoming" | "shoot_not_closed" | "meeting_upcoming" | "client_account_manager_assigned" | "project_manager_assigned" | "retainer_renewal_due" | "retainer_behind" | "retainer_term_renewed" | "quote_approval_requested" | "quote_approval_decided" | "quote_accepted" | "invoice_overdue" | "invoice_paid" | "ad_budget_low" | "email_failed" | "lead_assigned" | "lead_won" | "lead_follow_up_overdue" | "lead_follow_up_due";
         UpdateNotificationSettings: {
             mutedTypes: components["schemas"]["NotificationType"][];
             emailTypes?: components["schemas"]["NotificationType"][];
@@ -6738,10 +6819,29 @@ export interface components {
             /** Format: date */
             renewalDate: string | null;
             renewal: components["schemas"]["RenewalState"] | null;
+            term: components["schemas"]["RetainerTermSummary"] | null;
             currentCycle: components["schemas"]["Cycle"] | null;
         };
         /** @enum {string} */
         RenewalState: "due" | "overdue";
+        RetainerTermSummary: {
+            /** Format: uuid */
+            id: string;
+            number: number;
+            status: components["schemas"]["TermStatus"];
+            /** Format: date */
+            startMonth: string;
+            /** Format: date */
+            endMonth: string;
+            months: number;
+            endAction: components["schemas"]["TermEndAction"];
+            money?: {
+                agreedTotalMinor: number;
+                currentTotalMinor: number;
+            };
+        };
+        /** @enum {string} */
+        TermStatus: "scheduled" | "active" | "completed" | "cancelled";
         Cycle: {
             /** Format: uuid */
             id: string;
@@ -6798,6 +6898,7 @@ export interface components {
             /** Format: date */
             renewalDate: string | null;
             renewal: components["schemas"]["RenewalState"] | null;
+            term: components["schemas"]["RetainerTermSummary"] | null;
             currentCycle: components["schemas"]["Cycle"] | null;
             /** Format: date */
             startDate: string;
@@ -6842,12 +6943,20 @@ export interface components {
             /** Format: uuid */
             clientId: string;
             deliverables?: components["schemas"]["NewDeliverableLine"][];
+            term?: components["schemas"]["RetainerTermInput"];
         };
         NewDeliverableLine: {
             kind: components["schemas"]["DeliverableKind"];
             label?: string | null;
             monthlyQuantity: number;
             revisionLimit?: number | null;
+        };
+        RetainerTermInput: {
+            months: number;
+            agreedTotalMinor: number;
+            schedule: number[];
+            /** @default renew */
+            endAction: components["schemas"]["TermEndAction"];
         };
         UpdateRetainer: {
             name?: string;
@@ -6876,6 +6985,11 @@ export interface components {
         };
         RetainerStatusChange: {
             status: components["schemas"]["RetainerStatus"];
+            termination?: components["schemas"]["RetainerTermination"];
+        };
+        RetainerTermination: {
+            feeMinor: number;
+            reason: string;
         };
         /** @description Cycles, newest month first */
         CyclePage: {
@@ -6946,6 +7060,73 @@ export interface components {
         };
         CreateCycleAdjustment: {
             delta: number;
+            reason: string;
+        };
+        /** @description Terms, newest first */
+        RetainerTermList: {
+            items: components["schemas"]["RetainerTerm"][];
+        };
+        RetainerTerm: {
+            /** Format: uuid */
+            id: string;
+            number: number;
+            status: components["schemas"]["TermStatus"];
+            /** Format: date */
+            startMonth: string;
+            /** Format: date */
+            endMonth: string;
+            months: number;
+            endAction: components["schemas"]["TermEndAction"];
+            renewedFrom: {
+                /** Format: uuid */
+                id: string;
+                number: number;
+            } | null;
+            /** Format: date-time */
+            cancelledAt: string | null;
+            cancelReason: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            money?: {
+                agreedTotalMinor: number;
+                currentTotalMinor: number;
+            };
+            schedule: components["schemas"]["RetainerTermMonth"][];
+        };
+        RetainerTermMonth: {
+            /** Format: date */
+            month: string;
+            position: number;
+            /** Format: uuid */
+            chargeId: string | null;
+            status: components["schemas"]["RetainerChargeStatus"] | null;
+            due: boolean;
+            money?: {
+                amountMinor: number;
+                baseAmountMinor: number;
+                totalMinor: number;
+            };
+        };
+        /** @enum {string} */
+        RetainerChargeStatus: "pending" | "cancelled" | "settled_outside";
+        CreateRetainerTerm: {
+            months: number;
+            agreedTotalMinor: number;
+            schedule: number[];
+            /** @default renew */
+            endAction: components["schemas"]["TermEndAction"];
+            /** Format: date */
+            startMonth: string;
+        };
+        UpdateRetainerTerm: {
+            months?: number;
+            agreedTotalMinor?: number;
+            schedule?: number[];
+            endAction?: components["schemas"]["TermEndAction"];
+            /** Format: date */
+            startMonth?: string;
+        };
+        CancelRetainerTerm: {
             reason: string;
         };
         /** @enum {string} */
@@ -8948,11 +9129,14 @@ export interface components {
             kind: components["schemas"]["RetainerChargeKind"];
             amountMinor: number;
             status: components["schemas"]["RetainerChargeStatus"];
+            term: {
+                number: number;
+                position: number;
+                months: number;
+            } | null;
             due: boolean;
             invoice: components["schemas"]["SourceInvoice"] | null;
         };
-        /** @enum {string} */
-        RetainerChargeStatus: "pending" | "cancelled" | "settled_outside";
         RetainerChargePage: {
             items: components["schemas"]["RetainerCharge"][];
             total: number;
@@ -14224,6 +14408,108 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CycleLine"];
+                };
+            };
+        };
+    };
+    RetainerTermsController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                retainerId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The retainer’s terms, newest first; amounts only with money access */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RetainerTermList"];
+                };
+            };
+        };
+    };
+    RetainerTermsController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                retainerId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateRetainerTerm"];
+            };
+        };
+        responses: {
+            /** @description The new term with its schedule (client scope and money access). A term starting this month is active at once and drafts the month’s invoice */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RetainerTerm"];
+                };
+            };
+        };
+    };
+    RetainerTermsController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                retainerId: string;
+                termId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateRetainerTerm"];
+            };
+        };
+        responses: {
+            /** @description A scheduled term changes every field; an active term its end action only */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RetainerTerm"];
+                };
+            };
+        };
+    };
+    RetainerTermsController_cancel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                retainerId: string;
+                termId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CancelRetainerTerm"];
+            };
+        };
+        responses: {
+            /** @description The cancelled term (scheduled terms only) with its charges cancelled */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RetainerTerm"];
                 };
             };
         };

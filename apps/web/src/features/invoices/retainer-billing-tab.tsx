@@ -13,7 +13,7 @@ import { ReceiptTextIcon, SparklesIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { LoadError } from '../../components/load-error';
 import { can, useMe } from '../../lib/auth';
-import { formatMonth } from '../../lib/format';
+import { formatMonth, formatNumber } from '../../lib/format';
 import { BillingBadge } from '../projects/extra-work-tab';
 import { Money } from '../quotes/quote-badges';
 import { retainerBillingQuery } from './invoices.queries';
@@ -91,7 +91,21 @@ function RetainerBillingView({
             <TableBody>
               {billing.charges.map((charge) => (
                 <TableRow key={charge.id}>
-                  <TableCell className="font-medium">{formatMonth(charge.month)}</TableCell>
+                  <TableCell>
+                    <span className="flex flex-col">
+                      <span className="font-medium">{formatMonth(charge.month)}</span>
+                      {charge.term && (
+                        <span className="text-xs text-muted-foreground">
+                          {t('retainers.terms.name', { number: formatNumber(charge.term.number) })}
+                          {' · '}
+                          {t('retainers.terms.position', {
+                            position: formatNumber(charge.term.position),
+                            months: formatNumber(charge.term.months),
+                          })}
+                        </span>
+                      )}
+                    </span>
+                  </TableCell>
                   <TableCell>{t(`retainers.chargeKinds.${charge.kind}`)}</TableCell>
                   <TableCell className="text-end">
                     <Money minor={charge.amountMinor} currency={currency} />

@@ -184,13 +184,18 @@ export function DepartmentsField({ form }: { form: RetainerFormMethods }) {
   );
 }
 
-/** Start and renewal dates side by side. The start date is locked once a cycle exists. */
+/**
+ * Start and renewal dates side by side. The start date is locked once a cycle exists; the renewal
+ * date while a term sets it (F05B T11).
+ */
 export function DatesFields({
   form,
   startLocked = false,
+  renewalLocked = false,
 }: {
   form: RetainerFormMethods;
   startLocked?: boolean;
+  renewalLocked?: boolean;
 }) {
   const { t } = useTranslation();
   const start = useWatch({ control: form.control, name: 'startDate' });
@@ -216,9 +221,12 @@ export function DatesFields({
         <Input
           type="date"
           min={start || undefined}
+          disabled={renewalLocked}
           {...form.register('renewalDate', { setValueAs: (value: string | null) => value || null })}
         />
-        <FieldDescription>{t('retainers.form.renewalHint')}</FieldDescription>
+        <FieldDescription>
+          {renewalLocked ? t('retainers.terms.renewalFromTerm') : t('retainers.form.renewalHint')}
+        </FieldDescription>
         <FieldError match={!!renewalError}>
           {fieldError(renewalError, t('projects.form.errors.date'))}
         </FieldError>

@@ -6,13 +6,16 @@ import {
   useQueryClient,
 } from '@tanstack/react-query';
 import type {
+  CancelRetainerTerm,
   CreateCycleAdjustment,
   CreateCycleLine,
   CreateRetainer,
+  CreateRetainerTerm,
   RetainerDeliverables,
   RetainerStatusChange,
   UpdateCycleLine,
   UpdateRetainer,
+  UpdateRetainerTerm,
 } from '@vertex-hub/contracts';
 import { api, call } from '../../lib/api/client';
 import type { paths } from '../../lib/api/schema.gen';
@@ -29,6 +32,7 @@ export const retainersKeys = {
   cycles: (id: string) => ['retainers', 'cycles', id] as const,
   cycle: (id: string, cycleId: string) => ['retainers', 'cycle', id, cycleId] as const,
   extraWork: (id: string) => ['retainers', 'extra-work', id] as const,
+  terms: (id: string) => ['retainers', 'terms', id] as const,
 };
 
 export const retainerListQuery = (filters: RetainerListFilters) =>
@@ -42,6 +46,13 @@ export const retainerQuery = (id: string) =>
   queryOptions({
     queryKey: retainersKeys.detail(id),
     queryFn: () => call(api.GET('/api/retainers/{id}', { params: { path: { id } } })),
+  });
+
+/** The retainer's terms, newest first (F05B). */
+export const retainerTermsQuery = (id: string) =>
+  queryOptions({
+    queryKey: retainersKeys.terms(id),
+    queryFn: () => call(api.GET('/api/retainers/{retainerId}/terms', retainerPath(id))),
   });
 
 const CYCLE_PAGE_SIZE = 12;
@@ -77,7 +88,8 @@ export const retainerCycleQuery = (id: string, cycleId: string) =>
  * A mutation on retainer data. Every one refreshes the whole `retainers` cache, also on failure:
  * a 403 after the client changed account manager (edge case 9) reloads the page without edit
  * actions. Committed quantities and status also drive the monthly template's line counts (F07),
- * and archiving or reopening a month hides or generates tasks, so task views refresh too.
+ * and archiving or reopening a month hides or generates tasks, so task views refresh too. Terms,
+ * starting a month and ending with a fee draft invoices (F05B C4), so invoice views refresh too.
  */
 function useRetainersMutation<Input, Output>(mutationFn: (input: Input) => Promise<Output>) {
   const queryClient = useQueryClient();
@@ -88,11 +100,45 @@ function useRetainersMutation<Input, Output>(mutationFn: (input: Input) => Promi
         queryClient.invalidateQueries({ queryKey: retainersKeys.all }),
         queryClient.invalidateQueries({ queryKey: ['templates', 'retainer'] }),
         queryClient.invalidateQueries({ queryKey: ['tasks'] }),
+        queryClient.invalidateQueries({ queryKey: ['invoices'] }),
       ]),
   });
 }
 
 const path = (id: string) => ({ params: { path: { id } } });
+
+const retainerPath = (retainerId: string) => ({ params: { path: { retainerId } } });
+
+const termPath = (retainerId: string, termId: string) => ({
+  params: { path: { retainerId, termId } },
+});
+
+export const useCreateTerm = (retainerId: string) =>
+  useRetainersMutation((input: CreateRetainerTerm) =>
+    call(
+      api.POST('/api/retainers/{retainerId}/terms', { ...retainerPath(retainerId), body: input }),
+    ),
+  );
+
+export const useUpdateTerm = (retainerId: string) =>
+  useRetainersMutation(({ termId, ...input }: UpdateRetainerTerm & { termId: string }) =>
+    call(
+      api.PATCH('/api/retainers/{retainerId}/terms/{termId}', {
+        ...termPath(retainerId, termId),
+        body: input,
+      }),
+    ),
+  );
+
+export const useCancelTerm = (retainerId: string) =>
+  useRetainersMutation(({ termId, ...input }: CancelRetainerTerm & { termId: string }) =>
+    call(
+      api.POST('/api/retainers/{retainerId}/terms/{termId}/cancel', {
+        ...termPath(retainerId, termId),
+        body: input,
+      }),
+    ),
+  );
 
 export const useCreateRetainer = () =>
   useRetainersMutation((input: CreateRetainer) =>

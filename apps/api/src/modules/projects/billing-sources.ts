@@ -1,13 +1,14 @@
 import { Inject, Injectable } from '@nestjs/common';
-import type {
-  Currency,
-  ExtraWorkBilling,
-  InvoiceSource,
-  InvoiceSourceType,
-  MilestoneStatus,
-  RetainerChargeKind,
-  RetainerChargeListQuery,
-  RetainerChargeStatus,
+import {
+  type Currency,
+  type ExtraWorkBilling,
+  type InvoiceSource,
+  type InvoiceSourceType,
+  type MilestoneStatus,
+  type RetainerChargeKind,
+  type RetainerChargeListQuery,
+  type RetainerChargeStatus,
+  termPosition,
 } from '@vertex-hub/contracts';
 import {
   type Database,
@@ -16,6 +17,7 @@ import {
   projects,
   retainerCharges,
   retainers,
+  retainerTerms,
   type Transaction,
 } from '@vertex-hub/db';
 import { and, asc, count, desc, eq, gt, inArray, isNotNull, isNull, type SQL } from 'drizzle-orm';
@@ -92,7 +94,34 @@ export interface RetainerChargeRow {
   kind: RetainerChargeKind;
   amountMinor: number;
   status: RetainerChargeStatus;
+  /** A term month's `monthly` charge: its place in the term (F05B C4). */
+  term: ChargeTerm | null;
   due: boolean;
+}
+
+export interface ChargeTerm {
+  number: number;
+  position: number;
+  months: number;
+}
+
+const chargeTermColumns = {
+  number: retainerTerms.number,
+  startMonth: retainerTerms.startMonth,
+  months: retainerTerms.months,
+};
+
+/** "2 of 3" of the charge's term, read from the joined term columns. */
+function chargeTerm(
+  month: string,
+  term: { number: number; startMonth: string; months: number } | null,
+): ChargeTerm | null {
+  if (!term) return null;
+  return {
+    number: term.number,
+    position: termPosition(term.startMonth, month),
+    months: term.months,
+  };
 }
 
 /** What a retainer's billing summary lists (F13). */
@@ -228,9 +257,11 @@ export class BillingSources {
           status: retainerCharges.status,
           dueAt: retainerCharges.dueAt,
           engagement: engagementColumns(retainers),
+          term: chargeTermColumns,
         })
         .from(retainerCharges)
         .innerJoin(retainers, eq(retainers.id, retainerCharges.retainerId))
+        .leftJoin(retainerTerms, eq(retainerTerms.id, retainerCharges.termId))
         .where(inArray(retainerCharges.id, chargeIds));
       // Locked like milestones: a draft waits for a change of the charge's amount or status.
       const rows = options.lock ? await query.for('share', { of: retainerCharges }) : await query;
@@ -239,7 +270,10 @@ export class BillingSources {
           type: 'retainer',
           ...withoutArchivedAt(row.engagement),
         };
-        const month = cycleMonthName(row.month);
+        const term = chargeTerm(row.month, row.term);
+        const month = term
+          ? `${cycleMonthName(row.month)} (${term.position} من ${term.months})`
+          : cycleMonthName(row.month);
         result.set(sourceKey({ type: 'retainer_charge', id: row.id }), {
           type: 'retainer_charge',
           id: row.id,
@@ -480,8 +514,10 @@ export class BillingSources {
         amountMinor: retainerCharges.amountMinor,
         status: retainerCharges.status,
         dueAt: retainerCharges.dueAt,
+        term: chargeTermColumns,
       })
       .from(retainerCharges)
+      .leftJoin(retainerTerms, eq(retainerTerms.id, retainerCharges.termId))
       .where(where)
       .orderBy(
         desc(retainerCharges.month),
@@ -489,7 +525,11 @@ export class BillingSources {
         asc(retainerCharges.id),
       );
     const rows = page ? await query.limit(page.limit).offset(page.offset) : await query;
-    return rows.map(({ dueAt, ...row }) => ({ ...row, due: dueAt !== null }));
+    return rows.map(({ dueAt, term, ...row }) => ({
+      ...row,
+      term: chargeTerm(row.month, term),
+      due: dueAt !== null,
+    }));
   }
 
   /**

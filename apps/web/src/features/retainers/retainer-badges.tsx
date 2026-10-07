@@ -1,8 +1,14 @@
-import type { DeliverableKind, RenewalState, RetainerStatus } from '@vertex-hub/contracts';
+import type {
+  DeliverableKind,
+  RenewalState,
+  RetainerStatus,
+  RetainerTermSummary,
+} from '@vertex-hub/contracts';
 import { Badge, cn, Meter } from '@vertex-hub/ui';
 import type { TFunction } from 'i18next';
 import {
   CalendarClockIcon,
+  CalendarRangeIcon,
   CameraIcon,
   ClapperboardIcon,
   FileChartColumnIcon,
@@ -17,7 +23,7 @@ import {
   VideoIcon,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { formatNumber } from '../../lib/format';
+import { formatMonth, formatNumber } from '../../lib/format';
 
 const statusTone = { active: 'info', paused: 'warning', ended: 'neutral' } as const;
 
@@ -54,6 +60,25 @@ export function OverDeliveredBadge() {
 }
 
 /** R6: renewal due from 30 days before the date, overdue after it. */
+/** F05B screen 2: "Term 2 · Nov 2026 – Jan 2027 · renews automatically". */
+export function TermChip({ term }: { term: RetainerTermSummary }) {
+  const { t } = useTranslation();
+  return (
+    <Badge tone="outline" className="h-auto min-h-6 whitespace-normal py-0.5">
+      <CalendarRangeIcon aria-hidden="true" />
+      {t('retainers.terms.chip', {
+        number: formatNumber(term.number),
+        start: formatMonth(term.startMonth),
+        end: formatMonth(term.endMonth),
+      })}
+      {' · '}
+      {term.status === 'scheduled'
+        ? t('retainers.terms.statuses.scheduled')
+        : t(`retainers.terms.endActions.${term.endAction}`)}
+    </Badge>
+  );
+}
+
 export function RenewalBadge({ state }: { state: RenewalState }) {
   const { t } = useTranslation();
   return (

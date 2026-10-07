@@ -3875,6 +3875,170 @@
         ]
       }
     },
+    "/api/retainers/{retainerId}/terms": {
+      "get": {
+        "operationId": "RetainerTermsController_list",
+        "parameters": [
+          {
+            "name": "retainerId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The retainer’s terms, newest first; amounts only with money access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RetainerTermList"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "retainers"
+        ]
+      },
+      "post": {
+        "operationId": "RetainerTermsController_create",
+        "parameters": [
+          {
+            "name": "retainerId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRetainerTerm"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The new term with its schedule (client scope and money access). A term starting this month is active at once and drafts the month’s invoice",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RetainerTerm"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "retainers"
+        ]
+      }
+    },
+    "/api/retainers/{retainerId}/terms/{termId}": {
+      "patch": {
+        "operationId": "RetainerTermsController_update",
+        "parameters": [
+          {
+            "name": "retainerId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "termId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateRetainerTerm"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "A scheduled term changes every field; an active term its end action only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RetainerTerm"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "retainers"
+        ]
+      }
+    },
+    "/api/retainers/{retainerId}/terms/{termId}/cancel": {
+      "post": {
+        "operationId": "RetainerTermsController_cancel",
+        "parameters": [
+          {
+            "name": "retainerId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "termId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CancelRetainerTerm"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The cancelled term (scheduled terms only) with its charges cancelled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RetainerTerm"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "retainers"
+        ]
+      }
+    },
     "/api/projects/{id}/extra-work": {
       "get": {
         "operationId": "ExtraWorkController_listOfProject",
@@ -13871,6 +14035,7 @@
           "retainer",
           "retainer_cycle",
           "retainer_charge",
+          "retainer_term",
           "extra_work",
           "task",
           "task_checklist_item",
@@ -13961,6 +14126,15 @@
           "retainer_cycle.line_added",
           "retainer_cycle.adjusted",
           "retainer_charge.created",
+          "retainer_charge.amount_changed",
+          "retainer_charge.cancelled",
+          "retainer_term.created",
+          "retainer_term.updated",
+          "retainer_term.end_action_changed",
+          "retainer_term.cancelled",
+          "retainer_term.started",
+          "retainer_term.completed",
+          "retainer_term.renewed",
           "extra_work.created",
           "extra_work.updated",
           "extra_work.billing_changed",
@@ -20638,6 +20812,14 @@
                     "type": "integer",
                     "minimum": 0,
                     "maximum": 9007199254740991
+                  },
+                  "endAction": {
+                    "nullable": true,
+                    "allOf": [
+                      {
+                        "$ref": "#/components/schemas/TermEndAction"
+                      }
+                    ]
                   }
                 },
                 "required": [
@@ -20801,6 +20983,123 @@
                   "daysLeft",
                   "final",
                   "lines"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "id",
+              "actor",
+              "subject",
+              "count",
+              "read",
+              "createdAt",
+              "updatedAt",
+              "type",
+              "data"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "actor": {
+                "nullable": true,
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "name"
+                ],
+                "additionalProperties": false
+              },
+              "subject": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "$ref": "#/components/schemas/NotificationSubjectType"
+                  },
+                  "id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  }
+                },
+                "required": [
+                  "type",
+                  "id"
+                ],
+                "additionalProperties": false
+              },
+              "count": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "read": {
+                "type": "boolean"
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+              },
+              "updatedAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "retainer_term_renewed"
+                ]
+              },
+              "data": {
+                "type": "object",
+                "properties": {
+                  "retainer": {
+                    "type": "string"
+                  },
+                  "client": {
+                    "type": "string"
+                  },
+                  "termNumber": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  },
+                  "startMonth": {
+                    "type": "string",
+                    "format": "date",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                  },
+                  "endMonth": {
+                    "type": "string",
+                    "format": "date",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                  }
+                },
+                "required": [
+                  "retainer",
+                  "client",
+                  "termNumber",
+                  "startMonth",
+                  "endMonth"
                 ],
                 "additionalProperties": false
               }
@@ -22037,6 +22336,14 @@
           "lead"
         ]
       },
+      "TermEndAction": {
+        "type": "string",
+        "enum": [
+          "renew",
+          "end",
+          "continue"
+        ]
+      },
       "DeliverableKind": {
         "type": "string",
         "enum": [
@@ -22191,6 +22498,7 @@
           "project_manager_assigned",
           "retainer_renewal_due",
           "retainer_behind",
+          "retainer_term_renewed",
           "quote_approval_requested",
           "quote_approval_decided",
           "quote_accepted",
@@ -22208,14 +22516,14 @@
         "type": "object",
         "properties": {
           "mutedTypes": {
-            "maxItems": 56,
+            "maxItems": 57,
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/NotificationType"
             }
           },
           "emailTypes": {
-            "maxItems": 56,
+            "maxItems": 57,
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/NotificationType"
@@ -24851,6 +25159,14 @@
               }
             ]
           },
+          "term": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RetainerTermSummary"
+              }
+            ]
+          },
           "currentCycle": {
             "nullable": true,
             "allOf": [
@@ -24869,6 +25185,7 @@
           "status",
           "renewalDate",
           "renewal",
+          "term",
           "currentCycle"
         ],
         "additionalProperties": false
@@ -24878,6 +25195,81 @@
         "enum": [
           "due",
           "overdue"
+        ]
+      },
+      "RetainerTermSummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "number": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "status": {
+            "$ref": "#/components/schemas/TermStatus"
+          },
+          "startMonth": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+          },
+          "endMonth": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+          },
+          "months": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "endAction": {
+            "$ref": "#/components/schemas/TermEndAction"
+          },
+          "money": {
+            "type": "object",
+            "properties": {
+              "agreedTotalMinor": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "currentTotalMinor": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "agreedTotalMinor",
+              "currentTotalMinor"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "status",
+          "startMonth",
+          "endMonth",
+          "months",
+          "endAction"
+        ],
+        "additionalProperties": false
+      },
+      "TermStatus": {
+        "type": "string",
+        "enum": [
+          "scheduled",
+          "active",
+          "completed",
+          "cancelled"
         ]
       },
       "Cycle": {
@@ -25099,6 +25491,14 @@
               }
             ]
           },
+          "term": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RetainerTermSummary"
+              }
+            ]
+          },
           "currentCycle": {
             "nullable": true,
             "allOf": [
@@ -25162,6 +25562,7 @@
           "status",
           "renewalDate",
           "renewal",
+          "term",
           "currentCycle",
           "startDate",
           "endedOn",
@@ -25294,6 +25695,13 @@
             "items": {
               "$ref": "#/components/schemas/NewDeliverableLine"
             }
+          },
+          "term": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RetainerTermInput"
+              }
+            ]
           }
         },
         "required": [
@@ -25329,6 +25737,44 @@
         "required": [
           "kind",
           "monthlyQuantity"
+        ]
+      },
+      "RetainerTermInput": {
+        "type": "object",
+        "properties": {
+          "months": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 36
+          },
+          "agreedTotalMinor": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "schedule": {
+            "minItems": 1,
+            "maxItems": 36,
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "endAction": {
+            "default": "renew",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TermEndAction"
+              }
+            ]
+          }
+        },
+        "required": [
+          "months",
+          "agreedTotalMinor",
+          "schedule"
         ]
       },
       "UpdateRetainer": {
@@ -25439,10 +25885,36 @@
         "properties": {
           "status": {
             "$ref": "#/components/schemas/RetainerStatus"
+          },
+          "termination": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RetainerTermination"
+              }
+            ]
           }
         },
         "required": [
           "status"
+        ]
+      },
+      "RetainerTermination": {
+        "type": "object",
+        "properties": {
+          "feeMinor": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "feeMinor",
+          "reason"
         ]
       },
       "CyclePage": {
@@ -25741,6 +26213,303 @@
         },
         "required": [
           "delta",
+          "reason"
+        ]
+      },
+      "RetainerTermList": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RetainerTerm"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "additionalProperties": false,
+        "description": "Terms, newest first"
+      },
+      "RetainerTerm": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "number": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "status": {
+            "$ref": "#/components/schemas/TermStatus"
+          },
+          "startMonth": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+          },
+          "endMonth": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+          },
+          "months": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "endAction": {
+            "$ref": "#/components/schemas/TermEndAction"
+          },
+          "renewedFrom": {
+            "nullable": true,
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "number": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "id",
+              "number"
+            ],
+            "additionalProperties": false
+          },
+          "cancelledAt": {
+            "nullable": true,
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "cancelReason": {
+            "nullable": true,
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "money": {
+            "type": "object",
+            "properties": {
+              "agreedTotalMinor": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "currentTotalMinor": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "agreedTotalMinor",
+              "currentTotalMinor"
+            ],
+            "additionalProperties": false
+          },
+          "schedule": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RetainerTermMonth"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "status",
+          "startMonth",
+          "endMonth",
+          "months",
+          "endAction",
+          "renewedFrom",
+          "cancelledAt",
+          "cancelReason",
+          "createdAt",
+          "schedule"
+        ],
+        "additionalProperties": false
+      },
+      "RetainerTermMonth": {
+        "type": "object",
+        "properties": {
+          "month": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+          },
+          "position": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "chargeId": {
+            "nullable": true,
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "status": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RetainerChargeStatus"
+              }
+            ]
+          },
+          "due": {
+            "type": "boolean"
+          },
+          "money": {
+            "type": "object",
+            "properties": {
+              "amountMinor": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "baseAmountMinor": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "totalMinor": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "amountMinor",
+              "baseAmountMinor",
+              "totalMinor"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "month",
+          "position",
+          "chargeId",
+          "status",
+          "due"
+        ],
+        "additionalProperties": false
+      },
+      "RetainerChargeStatus": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "cancelled",
+          "settled_outside"
+        ]
+      },
+      "CreateRetainerTerm": {
+        "type": "object",
+        "properties": {
+          "months": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 36
+          },
+          "agreedTotalMinor": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "schedule": {
+            "minItems": 1,
+            "maxItems": 36,
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "endAction": {
+            "default": "renew",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TermEndAction"
+              }
+            ]
+          },
+          "startMonth": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+          }
+        },
+        "required": [
+          "months",
+          "agreedTotalMinor",
+          "schedule",
+          "startMonth"
+        ]
+      },
+      "UpdateRetainerTerm": {
+        "type": "object",
+        "properties": {
+          "months": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 36
+          },
+          "agreedTotalMinor": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "schedule": {
+            "minItems": 1,
+            "maxItems": 36,
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "endAction": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TermEndAction"
+              }
+            ]
+          },
+          "startMonth": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+          }
+        }
+      },
+      "CancelRetainerTerm": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          }
+        },
+        "required": [
           "reason"
         ]
       },
@@ -33775,6 +34544,33 @@
           "status": {
             "$ref": "#/components/schemas/RetainerChargeStatus"
           },
+          "term": {
+            "nullable": true,
+            "type": "object",
+            "properties": {
+              "number": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "position": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "months": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "number",
+              "position",
+              "months"
+            ],
+            "additionalProperties": false
+          },
           "due": {
             "type": "boolean"
           },
@@ -33793,18 +34589,11 @@
           "kind",
           "amountMinor",
           "status",
+          "term",
           "due",
           "invoice"
         ],
         "additionalProperties": false
-      },
-      "RetainerChargeStatus": {
-        "type": "string",
-        "enum": [
-          "pending",
-          "cancelled",
-          "settled_outside"
-        ]
       },
       "RetainerChargePage": {
         "type": "object",

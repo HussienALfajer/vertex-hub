@@ -776,18 +776,29 @@ function fileOwnerOf(entry: AuditEntry, type: FileOwnerType): string | undefined
   return entry.after?.ownerType === type && typeof ownerId === 'string' ? ownerId : undefined;
 }
 
-/** The retainer a retainer, cycle or extra work entry belongs to. */
+const RETAINER_PARTS: AuditEntityType[] = [
+  'retainer_cycle',
+  'retainer_charge',
+  'retainer_term',
+  'extra_work',
+];
+
+/** The retainer a retainer, cycle, charge, term or extra work entry belongs to. */
 function retainerIdOf(entry: AuditEntry): string | undefined {
   if (entry.entityType === 'retainer') return entry.entityId;
   if (entry.entityType === 'file_item') return fileOwnerOf(entry, 'retainer');
-  if (entry.entityType !== 'retainer_cycle' && entry.entityType !== 'extra_work') return;
+  if (!RETAINER_PARTS.includes(entry.entityType)) return;
   const retainerId = entry.after?.retainerId ?? entry.before?.retainerId;
   return typeof retainerId === 'string' ? retainerId : undefined;
 }
 
 /** The retainer tab an entry's change shows on. */
-function retainerTabOf(entry: AuditEntry): 'history' | 'extra-work' | 'documents' | undefined {
+function retainerTabOf(
+  entry: AuditEntry,
+): 'contract' | 'history' | 'extra-work' | 'billing' | 'documents' | undefined {
   if (entry.entityType === 'extra_work') return 'extra-work';
+  if (entry.entityType === 'retainer_term') return 'contract';
+  if (entry.entityType === 'retainer_charge') return 'billing';
   if (entry.entityType === 'file_item') return 'documents';
   if (entry.action === 'retainer_cycle.closed') return 'history';
   return undefined;
