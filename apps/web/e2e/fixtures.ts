@@ -2225,6 +2225,9 @@ interface DeliverableRecord {
   archived: boolean;
 }
 
+/** F05B: each cycle of a retainer with a fee holds one monthly charge, keyed off the cycle. */
+const retainerChargeId = (cycleId: string) => `c${cycleId.slice(1)}`;
+
 interface RetainerRecord {
   id: string;
   clientId: string;
@@ -11335,7 +11338,7 @@ export function invoicesSeed(): InvoiceRecords {
             description: 'إدارة السوشيال ميديا — أكتوبر 2026',
             quantity: 1,
             unitPriceMinor: 150_000,
-            source: { type: 'retainer_cycle', id: id(921) },
+            source: { type: 'retainer_charge', id: retainerChargeId(id(921)) },
           },
         ],
       }),
@@ -11468,6 +11471,26 @@ function invoiceRoutes({
   const named = (record: { id: string; name: string } | undefined) =>
     record ? { id: record.id, name: record.name } : null;
   const live = (i: InvoiceRecord) => !i.archivedAt && i.status !== 'void';
+  const chargesOf = (r: RetainerRecord) =>
+    (r.monthlyFeeMinor ?? 0) > 0
+      ? [...r.cycles]
+          .sort((a, b) => b.month.localeCompare(a.month))
+          .map((c) => ({
+            id: retainerChargeId(c.id),
+            month: c.month,
+            kind: 'monthly' as const,
+            amountMinor: r.monthlyFeeMinor ?? 0,
+            status: 'pending' as const,
+            due: true,
+          }))
+      : [];
+  const chargeById = (chargeId: string) => {
+    for (const retainer of retainers) {
+      const charge = chargesOf(retainer).find((c) => c.id === chargeId);
+      if (charge) return { retainer, charge };
+    }
+    return undefined;
+  };
   const heldBy = (sourceId: string) =>
     invoices.find((i) => live(i) && i.lines.some((line) => line.source?.id === sourceId));
 
@@ -11477,10 +11500,14 @@ function invoiceRoutes({
       const found = project?.milestones.find((m) => m.id === source.id);
       return { ...source, name: found?.name ?? '', project: named(project), retainer: null };
     }
-    if (source.type === 'retainer_cycle') {
-      const retainer = retainers.find((r) => r.cycles.some((c) => c.id === source.id));
-      const cycle = retainer?.cycles.find((c) => c.id === source.id);
-      return { ...source, name: cycle?.month ?? '', project: null, retainer: named(retainer) };
+    if (source.type === 'retainer_charge') {
+      const found = chargeById(source.id);
+      return {
+        ...source,
+        name: found?.charge.month ?? '',
+        project: null,
+        retainer: named(found?.retainer),
+      };
     }
     const project = projects.find((p) => p.extraWork.some((w) => w.id === source.id));
     const retainer = retainers.find((r) => r.extraWork.some((w) => w.id === source.id));
@@ -11784,9 +11811,7 @@ function invoiceRoutes({
       monthlyFeeMinor: retainer.monthlyFeeMinor,
       archived: retainer.archived,
     },
-    cycles: [...retainer.cycles]
-      .sort((a, b) => b.month.localeCompare(a.month))
-      .map((c) => ({ id: c.id, month: c.month, status: c.status, invoice: sourceInvoiceOf(c.id) })),
+    charges: chargesOf(retainer).map((c) => ({ ...c, invoice: sourceInvoiceOf(c.id) })),
     extraWork: retainer.extraWork
       .filter((w) => !w.archived)
       .map((w) => ({
@@ -11999,14 +12024,15 @@ function invoiceRoutes({
               installmentMinor: m.installmentMinor ?? 0,
             })),
         ),
-        cycles: ownRetainers.flatMap((r) =>
-          r.cycles
+        charges: ownRetainers.flatMap((r) =>
+          chargesOf(r)
             .filter((c) => !heldBy(c.id))
             .map((c) => ({
               id: c.id,
               retainer: { id: r.id, name: r.name },
               month: c.month,
-              feeMinor: r.monthlyFeeMinor,
+              kind: c.kind,
+              amountMinor: c.amountMinor,
             })),
         ),
         extraWork: [...ownProjects, ...ownRetainers].flatMap((e) =>
@@ -12038,8 +12064,8 @@ function invoiceRoutes({
         const amount =
           source.type === 'milestone'
             ? (project?.milestones.find((m) => m.id === source.id)?.installmentMinor ?? 0)
-            : source.type === 'retainer_cycle'
-              ? (retainer?.monthlyFeeMinor ?? 0)
+            : source.type === 'retainer_charge'
+              ? (chargeById(source.id)?.charge.amountMinor ?? 0)
               : (work?.estimateMinor ?? 0);
         return {
           id: id(nextId++),

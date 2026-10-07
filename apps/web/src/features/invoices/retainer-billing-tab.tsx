@@ -22,8 +22,8 @@ import { BillingSection, BillingSkeleton } from './project-billing-tab';
 import { CreateFromSource, SourceInvoiceCell } from './source-invoice';
 
 /**
- * Spec screen 7: the retainer's money for money access — each month with its invoice, the extra
- * work with the invoice that bills it, and the retainer's invoices.
+ * Spec screen 7: the retainer's money for money access — each charge by month with its invoice
+ * (F05B screen 5), the extra work with the invoice that bills it, and the retainer's invoices.
  */
 export function RetainerBillingTab({ retainer }: { retainer: RetainerDetail }) {
   const { t } = useTranslation();
@@ -66,19 +66,20 @@ function RetainerBillingView({
         )}
       </p>
 
-      <BillingSection title={t('invoices.billing.cycles')}>
-        {billing.cycles.length === 0 ? (
+      <BillingSection title={t('invoices.billing.charges')}>
+        {billing.charges.length === 0 ? (
           <EmptyState
             icon={<ReceiptTextIcon />}
-            title={t('invoices.billing.noCycles')}
-            description={t('invoices.billing.noCyclesHint')}
+            title={t('invoices.billing.noCharges')}
+            description={t('invoices.billing.noChargesHint')}
           />
         ) : (
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>{t('invoices.billing.month')}</TableHead>
-                <TableHead>{t('invoices.billing.cycleStatus')}</TableHead>
+                <TableHead>{t('invoices.billing.chargeKind')}</TableHead>
+                <TableHead className="text-end">{t('invoices.billing.amount')}</TableHead>
                 <TableHead>{t('invoices.billing.invoice')}</TableHead>
                 {canInvoice && (
                   <TableHead>
@@ -88,21 +89,32 @@ function RetainerBillingView({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {billing.cycles.map((cycle) => (
-                <TableRow key={cycle.id}>
-                  <TableCell className="font-medium">{formatMonth(cycle.month)}</TableCell>
-                  <TableCell>{t(`retainers.cycleStatuses.${cycle.status}`)}</TableCell>
+              {billing.charges.map((charge) => (
+                <TableRow key={charge.id}>
+                  <TableCell className="font-medium">{formatMonth(charge.month)}</TableCell>
+                  <TableCell>{t(`retainers.chargeKinds.${charge.kind}`)}</TableCell>
+                  <TableCell className="text-end">
+                    <Money minor={charge.amountMinor} currency={currency} />
+                  </TableCell>
                   <TableCell>
-                    <SourceInvoiceCell invoice={cycle.invoice} />
+                    {charge.status !== 'pending' ? (
+                      <span className="text-muted-foreground">
+                        {t(`retainers.chargeStatuses.${charge.status}`)}
+                      </span>
+                    ) : !charge.due ? (
+                      <span className="text-muted-foreground">{t('invoices.billing.notDue')}</span>
+                    ) : (
+                      <SourceInvoiceCell invoice={charge.invoice} />
+                    )}
                   </TableCell>
                   {canInvoice && (
                     <TableCell className="text-end">
-                      {!cycle.invoice && (
+                      {!charge.invoice && charge.due && charge.status === 'pending' && (
                         <CreateFromSource
                           clientId={clientId}
                           currency={currency}
-                          source={{ type: 'retainer_cycle', id: cycle.id }}
-                          name={formatMonth(cycle.month)}
+                          source={{ type: 'retainer_charge', id: charge.id }}
+                          name={formatMonth(charge.month)}
                         />
                       )}
                     </TableCell>

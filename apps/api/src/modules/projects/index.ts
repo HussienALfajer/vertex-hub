@@ -7,6 +7,7 @@ export {
   type BillingSource,
   BillingSources,
   cycleMonthName,
+  type RetainerChargeRow,
   type RetainerWork,
   sourceKey,
 } from './billing-sources.js';
@@ -32,4 +33,5 @@ export {
 } from './engagement-reports.js';
 export { type MilestoneDone, MilestoneDoneHooks } from './milestone-done-hooks.js';
 export { ProjectsModule } from './projects.module.js';
+export { type RetainerChargeDue, RetainerChargeDueHooks } from './retainer-charge-due-hooks.js';
 export { type CycleLineCounts, WorkProgress, type WorkProgressSource } from './work-progress.js';

@@ -11,6 +11,9 @@ import {
   type ProjectBilling,
   type ProjectExpense,
   type RetainerBilling,
+  type RetainerCharge,
+  type RetainerChargeListQuery,
+  type RetainerChargePage,
   receiptDisplayNumber,
   type SourceInvoice,
   statementRows,
@@ -23,7 +26,12 @@ import { DATABASE } from '../../core/database/database.module.js';
 import { CodedException } from '../../core/errors/index.js';
 import { type CurrentUserInfo, UserDirectory } from '../auth/index.js';
 import { ClientDirectory, type ClientSummary } from '../clients/index.js';
-import { BillingSources, EngagementDirectory } from '../projects/index.js';
+import {
+  type BillingEngagement,
+  BillingSources,
+  EngagementDirectory,
+  type RetainerChargeRow,
+} from '../projects/index.js';
 import { covers } from './invoice-access.js';
 import { InvoicesService } from './invoices.service.js';
 
@@ -250,15 +258,11 @@ export class InvoiceBillingService {
   }
 
   /**
-   * The retainer's cycles and extra work with their live invoice, and its invoices: 404 when the
-   * retainer is unreadable, 403 without money access.
+   * The retainer's charges (F05B) and extra work with their live invoice, and its invoices: 404
+   * when the retainer is unreadable, 403 without money access.
    */
   async retainerBilling(actor: CurrentUserInfo, retainerId: string): Promise<RetainerBilling> {
-    await this.engagements.readableRetainer(actor, retainerId);
-    const retainer = await this.sources.engagement('retainer', retainerId);
-    const client = retainer ? await this.clients.summary(retainer.clientId) : null;
-    if (!retainer || !client) throw new NotFoundException();
-    if (!covers(actor, 'invoices.read', client)) throw new ForbiddenException();
+    const retainer = await this.moneyRetainer(actor, retainerId);
     const [work, invoiceRows] = await Promise.all([
       this.sources.retainerWork(retainer.id),
       this.db
@@ -267,11 +271,8 @@ export class InvoiceBillingService {
         .where(and(eq(invoices.retainerId, retainer.id), isNull(invoices.archivedAt)))
         .orderBy(desc(invoices.createdAt), asc(invoices.id)),
     ]);
-    const [cycleInvoices, extraWorkInvoices] = await Promise.all([
-      this.liveInvoices(
-        invoiceLines.retainerCycleId,
-        work.cycles.map((cycle) => cycle.id),
-      ),
+    const [charges, extraWorkInvoices] = await Promise.all([
+      this.withInvoices(work.charges),
       this.liveInvoices(
         invoiceLines.extraWorkItemId,
         work.extraWork.map((item) => item.id),
@@ -285,16 +286,50 @@ export class InvoiceBillingService {
         monthlyFeeMinor: work.monthlyFeeMinor,
         archived: retainer.archived,
       },
-      cycles: work.cycles.map((cycle) => ({
-        ...cycle,
-        invoice: cycleInvoices.get(cycle.id) ?? null,
-      })),
+      charges,
       extraWork: work.extraWork.map((item) => ({
         ...item,
         invoice: extraWorkInvoices.get(item.id) ?? null,
       })),
       invoices: await this.invoicesService.summaries(invoiceRows),
     };
+  }
+
+  /** F05B: a page of the retainer's charges with their live invoice; 404 and 403 as billing. */
+  async retainerCharges(
+    actor: CurrentUserInfo,
+    retainerId: string,
+    query: RetainerChargeListQuery,
+  ): Promise<RetainerChargePage> {
+    const retainer = await this.moneyRetainer(actor, retainerId);
+    const page = await this.sources.retainerCharges(retainer.id, query);
+    return {
+      items: await this.withInvoices(page.items),
+      total: page.total,
+      page: query.page,
+      pageSize: query.pageSize,
+    };
+  }
+
+  /** A retainer the actor may read (else 404) with money access over its client (else 403). */
+  private async moneyRetainer(
+    actor: CurrentUserInfo,
+    retainerId: string,
+  ): Promise<BillingEngagement> {
+    await this.engagements.readableRetainer(actor, retainerId);
+    const retainer = await this.sources.engagement('retainer', retainerId);
+    const client = retainer ? await this.clients.summary(retainer.clientId) : null;
+    if (!retainer || !client) throw new NotFoundException();
+    if (!covers(actor, 'invoices.read', client)) throw new ForbiddenException();
+    return retainer;
+  }
+
+  private async withInvoices(charges: RetainerChargeRow[]): Promise<RetainerCharge[]> {
+    const held = await this.liveInvoices(
+      invoiceLines.retainerChargeId,
+      charges.map((charge) => charge.id),
+    );
+    return charges.map((charge) => ({ ...charge, invoice: held.get(charge.id) ?? null }));
   }
 
   async presentExpenses(rows: ExpenseRow[]): Promise<ProjectExpense[]> {

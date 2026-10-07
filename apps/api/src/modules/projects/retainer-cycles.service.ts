@@ -40,6 +40,7 @@ import { ClientDirectory } from '../clients/index.js';
 import { CycleOpenedHooks } from './cycle-opened-hooks.js';
 import { actorOf } from './project-access.js';
 import { readableRetainer, workableRetainer } from './retainer-access.js';
+import { RetainerCharges } from './retainer-charges.js';
 import { NO_TASKS, WorkProgress } from './work-progress.js';
 
 type Executor = Database | Transaction;
@@ -105,20 +106,27 @@ export class RetainerCyclesService implements OnModuleInit {
     private readonly progress: WorkProgress,
     private readonly jobs: JobQueue,
     private readonly openedHooks: CycleOpenedHooks,
+    private readonly charges: RetainerCharges,
   ) {}
 
   onModuleInit(): void {
     this.jobs.work(RETAINER_CYCLES_JOB.queue, async () => {
       const result = await this.runDaily();
-      this.logger.log(`Retainer cycles: ${result.closed} closed, ${result.opened} opened`);
+      this.logger.log(
+        `Retainer cycles: ${result.closed} closed, ${result.opened} opened, ${result.due} charges due`,
+      );
     });
   }
 
   /**
    * R2: for every non-archived retainer of a non-archived client, closes open cycles that ended
-   * before `today` and opens the current month's for an active, started retainer. Idempotent.
+   * before `today` and opens the current month's for an active, started retainer (with its
+   * open-ended charge, F05B C2); then marks the charges that became due and runs their hooks
+   * (C3), unless the retainer ended. Idempotent.
    */
-  async runDaily(today: string = businessDate()): Promise<{ closed: number; opened: number }> {
+  async runDaily(
+    today: string = businessDate(),
+  ): Promise<{ closed: number; opened: number; due: number }> {
     const candidates = await this.db
       .select({ id: retainers.id })
       .from(retainers)
@@ -126,6 +134,7 @@ export class RetainerCyclesService implements OnModuleInit {
       .orderBy(asc(retainers.id));
     let closed = 0;
     let opened = 0;
+    let due = 0;
     // One retainer failing does not hold back the others (ADR 0015); the run fails at the end.
     await runEach(
       candidates,
@@ -165,17 +174,20 @@ export class RetainerCyclesService implements OnModuleInit {
           if (retainer.status === 'active' && retainer.startDate <= today) {
             if (await this.open(tx, id, retainer.startDate, today, null)) opened += 1;
           }
+          if (retainer.status !== 'ended') due += await this.charges.runDue(tx, id, today, null);
         });
       },
     );
-    return { closed, opened };
+    return { closed, opened, due };
   }
 
   /**
    * R3, R4: opens the retainer's cycle for the month of `today` unless one exists, copying the
    * retainer's lines with their full quantities. The period starts on the 1st or on `from`,
    * whichever is later, then runs the `CycleOpenedHooks` in the same transaction (F07 rule 16).
-   * Returns the new cycle's id, or null when the month already has one.
+   * Creates the month's open-ended charge at the retainer's fee (F05B C2) and, the month having
+   * begun, marks it due at once (C3). Returns the new cycle's id, or null when the month already
+   * has one.
    */
   async open(
     tx: Transaction,
@@ -235,6 +247,18 @@ export class RetainerCyclesService implements OnModuleInit {
       },
     });
     await this.openedHooks.run(tx, { cycleId: created.id, retainerId, today, actor });
+    const [retainer] = await tx
+      .select({ monthlyFeeMinor: retainers.monthlyFeeMinor })
+      .from(retainers)
+      .where(eq(retainers.id, retainerId));
+    await this.charges.createMonthly(
+      tx,
+      retainerId,
+      month,
+      retainer?.monthlyFeeMinor ?? null,
+      actor,
+    );
+    await this.charges.runDue(tx, retainerId, today, actor);
     return created.id;
   }
 

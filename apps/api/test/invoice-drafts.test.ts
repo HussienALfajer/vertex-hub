@@ -19,6 +19,7 @@ import {
   extraWorkItems,
   invoiceLines,
   invoices,
+  retainerCharges,
   tasks,
 } from '@vertex-hub/db';
 import { testDatabaseUrl } from '@vertex-hub/db/testing';
@@ -54,7 +55,7 @@ describe('automatic invoice drafts and billing locks (F13 PR 2)', () => {
     client.request('PATCH', path, { cookie, body });
 
   /** Invoices billing a source, oldest first. */
-  async function invoicesOf(column: 'milestoneId' | 'retainerCycleId', id: string) {
+  async function invoicesOf(column: 'milestoneId' | 'retainerChargeId', id: string) {
     const rows = await db
       .select({ invoice: invoices, line: invoiceLines })
       .from(invoiceLines)
@@ -379,7 +380,7 @@ describe('automatic invoice drafts and billing locks (F13 PR 2)', () => {
     });
   });
 
-  describe('cycle opened (rule 4)', () => {
+  describe('retainer charges become due (rule 4, spec F05B C2–C4)', () => {
     const cycleDrafts = async (retainerId: string) =>
       db
         .select()
@@ -387,10 +388,26 @@ describe('automatic invoice drafts and billing locks (F13 PR 2)', () => {
         .where(and(eq(invoices.retainerId, retainerId), eq(invoices.origin, 'cycle_opened')))
         .orderBy(asc(invoices.createdAt));
 
-    it('drafts the month in full for a new retainer, and none without a fee', async () => {
+    const chargesOf = (retainerId: string) =>
+      db
+        .select()
+        .from(retainerCharges)
+        .where(eq(retainerCharges.retainerId, retainerId))
+        .orderBy(asc(retainerCharges.month));
+
+    it('charges and drafts the month in full for a new retainer, and none without a fee', async () => {
       const retainer = await cast.createRetainer(clientId, {
         currency: 'SYP',
         monthlyFeeMinor: 5000000,
+      });
+      const [charge, ...others] = await chargesOf(retainer.id);
+      expect(others).toEqual([]);
+      expect(charge).toMatchObject({
+        month: firstOfMonth(today),
+        kind: 'monthly',
+        amountMinor: 5000000,
+        status: 'pending',
+        dueAt: expect.any(Date),
       });
       const [month] = await cycleDrafts(retainer.id);
       expect(month).toMatchObject({ currency: 'SYP', totalMinor: 5000000, createdById: null });
@@ -399,11 +416,138 @@ describe('automatic invoice drafts and billing locks (F13 PR 2)', () => {
         .from(invoiceLines)
         .where(eq(invoiceLines.invoiceId, month?.id ?? ''));
       expect(line).toMatchObject({
-        retainerCycleId: retainer.currentCycle?.id,
+        retainerChargeId: charge?.id,
+        retainerCycleId: null,
         description: expect.stringContaining(`${retainer.name} — `),
       });
+      const [created] = await db
+        .select()
+        .from(auditEntries)
+        .where(eq(auditEntries.entityId, charge?.id ?? ''));
+      expect(created).toMatchObject({
+        action: 'retainer_charge.created',
+        entityType: 'retainer_charge',
+        after: expect.objectContaining({ amountMinor: 5000000, retainerId: retainer.id }),
+      });
       const free = await cast.createRetainer(clientId);
+      expect(await chargesOf(free.id)).toEqual([]);
       expect(await cycleDrafts(free.id)).toEqual([]);
+      const zero = await cast.createRetainer(clientId, { monthlyFeeMinor: 0 });
+      expect(await chargesOf(zero.id)).toEqual([]);
+    });
+
+    it('marks a charge due once: the job drafts a missed one and never twice (C3)', async () => {
+      const retainer = await cast.createRetainer(clientId, { monthlyFeeMinor: 20000 });
+      const [current] = await cycleDrafts(retainer.id);
+      expect((await discard(current?.id ?? '')).status).toBe(204);
+      // A charge that was never marked due, as the daily job may find one after a failure.
+      const [missed] = await db
+        .insert(retainerCharges)
+        .values({
+          retainerId: retainer.id,
+          month: addMonths(firstOfMonth(today), -1),
+          kind: 'monthly',
+          amountMinor: 15000,
+        })
+        .returning();
+      const jobs = app.get(RetainerCyclesService);
+      await jobs.runDaily(today);
+      await jobs.runDaily(today);
+      const drafts = await cycleDrafts(retainer.id);
+      // The discarded draft is not recreated (rule 8); the missed month drafts once.
+      expect(drafts.map((row) => [row.totalMinor, !!row.archivedAt])).toEqual([
+        [20000, true],
+        [15000, false],
+      ]);
+      const [marked] = await db
+        .select()
+        .from(retainerCharges)
+        .where(eq(retainerCharges.id, missed?.id ?? ''));
+      expect(marked?.dueAt).toBeInstanceOf(Date);
+    });
+
+    it('lists due, pending charges in the picker and refuses a cancelled one (C7, C10)', async () => {
+      const retainer = await cast.createRetainer(clientId, { monthlyFeeMinor: 12000 });
+      const [current] = await cycleDrafts(retainer.id);
+      expect((await discard(current?.id ?? '')).status).toBe(204);
+      const [charge] = await chargesOf(retainer.id);
+      const [future] = await db
+        .insert(retainerCharges)
+        .values({
+          retainerId: retainer.id,
+          month: addMonths(firstOfMonth(today), 2),
+          kind: 'monthly',
+          amountMinor: 12000,
+        })
+        .returning();
+      const billable = async () =>
+        (
+          await ok(
+            await client.get(
+              `/api/invoices/billable?clientId=${clientId}&currency=USD`,
+              finance.cookie,
+            ),
+            (body) => body as { charges: { id: string; amountMinor: number }[] },
+          )
+        ).charges.filter((item) => item.id === charge?.id || item.id === future?.id);
+      expect(await billable()).toEqual([
+        expect.objectContaining({ id: charge?.id, amountMinor: 12000 }),
+      ]);
+      await db
+        .update(retainerCharges)
+        .set({ status: 'cancelled' })
+        .where(eq(retainerCharges.id, charge?.id ?? ''));
+      expect(await billable()).toEqual([]);
+      expect(
+        (
+          await client.post('/api/invoices', finance.cookie, {
+            clientId,
+            currency: 'USD',
+            sources: [{ type: 'retainer_charge', id: charge?.id }],
+          })
+        ).status,
+      ).toBe(400);
+      // A charge whose month has not begun is not billable yet (C7).
+      expect(
+        (
+          await client.post('/api/invoices', finance.cookie, {
+            clientId,
+            currency: 'USD',
+            sources: [{ type: 'retainer_charge', id: future?.id }],
+          })
+        ).status,
+      ).toBe(400);
+    });
+
+    it('charges and drafts the open month when its fee is set later (C2)', async () => {
+      const retainer = await cast.createRetainer(clientId);
+      expect(await chargesOf(retainer.id)).toEqual([]);
+      expect(
+        (await patch(`/api/retainers/${retainer.id}`, { monthlyFeeMinor: 35000 })).status,
+      ).toBe(200);
+      expect((await chargesOf(retainer.id)).map((row) => [row.month, row.amountMinor])).toEqual([
+        [firstOfMonth(today), 35000],
+      ]);
+      expect((await cycleDrafts(retainer.id)).map((row) => row.totalMinor)).toEqual([35000]);
+      // A later fee change leaves the month's charge as it is (amendments arrive with F05B PR 3).
+      expect(
+        (await patch(`/api/retainers/${retainer.id}`, { monthlyFeeMinor: 36000 })).status,
+      ).toBe(200);
+      expect((await chargesOf(retainer.id)).map((row) => row.amountMinor)).toEqual([35000]);
+    });
+
+    it('locks the currency of a retainer with a charge (edge case 12)', async () => {
+      const retainer = await cast.createRetainer(clientId, { monthlyFeeMinor: 10000 });
+      const [draft] = await cycleDrafts(retainer.id);
+      expect((await discard(draft?.id ?? '')).status).toBe(204);
+      expect((await patch(`/api/retainers/${retainer.id}`, { monthlyFeeMinor: null })).status).toBe(
+        200,
+      );
+      await expectError(
+        await patch(`/api/retainers/${retainer.id}`, { currency: 'SYP' }),
+        409,
+        'CURRENCY_LOCKED',
+      );
     });
 
     it('drafts each month the daily job opens, at the fee of that moment (edge case 5)', async () => {

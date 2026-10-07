@@ -323,6 +323,20 @@
       "when": 1791163523551,
       "tag": "0045_premium_mesmero",
       "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "7",
+      "when": 1791369253551,
+      "tag": "0046_known_whirlwind",
+      "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1791369267868,
+      "tag": "0047_f05b_charges_backfill",
+      "breakpoints": true
     }
   ]
 }

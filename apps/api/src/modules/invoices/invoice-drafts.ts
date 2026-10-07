@@ -1,5 +1,5 @@
 import { Injectable, type OnModuleInit } from '@nestjs/common';
-import type { InvoiceOrigin, InvoiceSource } from '@vertex-hub/contracts';
+import type { InvoiceOrigin, InvoiceSource, RetainerChargeKind } from '@vertex-hub/contracts';
 import { invoiceLines, invoices, type Transaction } from '@vertex-hub/db';
 import { and, eq, isNotNull, isNull } from 'drizzle-orm';
 import type { PgColumn } from 'drizzle-orm/pg-core';
@@ -8,8 +8,8 @@ import { ClientDirectory } from '../clients/index.js';
 import {
   BillingLocks,
   BillingSources,
-  CycleOpenedHooks,
   MilestoneDoneHooks,
+  RetainerChargeDueHooks,
   sourceKey,
 } from '../projects/index.js';
 import { QuoteAcceptedHooks } from '../quotes/index.js';
@@ -18,14 +18,22 @@ import { identity } from './invoices.service.js';
 
 const SOURCE_COLUMNS: Record<InvoiceSource['type'], PgColumn> = {
   milestone: invoiceLines.milestoneId,
-  retainer_cycle: invoiceLines.retainerCycleId,
+  retainer_charge: invoiceLines.retainerChargeId,
   extra_work: invoiceLines.extraWorkItemId,
+};
+
+/** The draft a due retainer charge starts (spec F05B C4); a credit drafts nothing (C5). */
+const CHARGE_ORIGINS: Record<RetainerChargeKind, Exclude<InvoiceOrigin, 'manual'> | null> = {
+  monthly: 'cycle_opened',
+  addition: 'retainer_amendment',
+  termination_fee: 'retainer_termination',
+  credit: null,
 };
 
 /**
  * Automatic drafts (spec F13, rules 2–5) inside the transaction of their trigger: the deposit
- * when a quote is accepted, a milestone's installment when it is done, a retainer month when its
- * cycle opens. Also answers `projects`' billing locks (rules 24 and 25).
+ * when a quote is accepted, a milestone's installment when it is done, a retainer charge when it
+ * becomes due (F05B C4). Also answers `projects`' billing locks (rules 24 and 25).
  */
 @Injectable()
 export class InvoiceDrafts implements OnModuleInit {
@@ -35,7 +43,7 @@ export class InvoiceDrafts implements OnModuleInit {
     private readonly settings: InvoiceSettingsService,
     private readonly quoteAccepted: QuoteAcceptedHooks,
     private readonly milestoneDone: MilestoneDoneHooks,
-    private readonly cycleOpened: CycleOpenedHooks,
+    private readonly chargeDue: RetainerChargeDueHooks,
     private readonly locks: BillingLocks,
   ) {}
 
@@ -48,9 +56,10 @@ export class InvoiceDrafts implements OnModuleInit {
     this.milestoneDone.register((tx, event) =>
       this.draft(tx, 'milestone_done', { type: 'milestone', id: event.milestoneId }),
     );
-    this.cycleOpened.register((tx, event) =>
-      this.draft(tx, 'cycle_opened', { type: 'retainer_cycle', id: event.cycleId }),
-    );
+    this.chargeDue.register(async (tx, event) => {
+      const origin = CHARGE_ORIGINS[event.kind];
+      if (origin) await this.draft(tx, origin, { type: 'retainer_charge', id: event.chargeId });
+    });
     this.locks.register({
       invoiced: async (tx, source) => (await this.holder(tx, source)) !== null,
       engagementInvoiced: async (tx, engagement) => {
@@ -106,7 +115,7 @@ export class InvoiceDrafts implements OnModuleInit {
       quantity: 1,
       unitPriceMinor: source.amountMinor,
       milestoneId: ref.type === 'milestone' ? ref.id : null,
-      retainerCycleId: ref.type === 'retainer_cycle' ? ref.id : null,
+      retainerChargeId: ref.type === 'retainer_charge' ? ref.id : null,
       extraWorkItemId: ref.type === 'extra_work' ? ref.id : null,
     });
     await recordAudit(tx, {

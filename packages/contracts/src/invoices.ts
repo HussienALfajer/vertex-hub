@@ -10,7 +10,7 @@ import {
 } from './money.js';
 import { milestoneStatusSchema } from './projects.js';
 import { quotePdfStateSchema } from './quotes.js';
-import { cycleStatusSchema } from './retainers.js';
+import { retainerChargeKindSchema, retainerChargeStatusSchema } from './retainers.js';
 import { optionalText } from './text.js';
 
 /*
@@ -38,12 +38,17 @@ export const OPEN_INVOICE_STATUSES = [
   'overdue',
 ] as const satisfies InvoiceStatus[];
 
-/** How a draft started (rules 2–6). */
+/**
+ * How a draft started (rules 2–6). A retainer's month (`cycle_opened`, the name kept from F13),
+ * amendment addition or termination fee drafts from its charge (spec F05B C4).
+ */
 export const INVOICE_ORIGINS = [
   'quote_accepted',
   'milestone_done',
   'cycle_opened',
   'manual',
+  'retainer_amendment',
+  'retainer_termination',
 ] as const;
 
 export const invoiceOriginSchema = z.enum(INVOICE_ORIGINS).meta({ id: 'InvoiceOrigin' });
@@ -51,7 +56,7 @@ export const invoiceOriginSchema = z.enum(INVOICE_ORIGINS).meta({ id: 'InvoiceOr
 export type InvoiceOrigin = z.infer<typeof invoiceOriginSchema>;
 
 /** What a line can bill: one source is on at most one live invoice (rule 4). */
-export const INVOICE_SOURCE_TYPES = ['milestone', 'retainer_cycle', 'extra_work'] as const;
+export const INVOICE_SOURCE_TYPES = ['milestone', 'retainer_charge', 'extra_work'] as const;
 
 export const invoiceSourceTypeSchema = z
   .enum(INVOICE_SOURCE_TYPES)
@@ -304,14 +309,18 @@ export const billableItemsSchema = z
         installmentMinor: minorAmountSchema,
       }),
     ),
-    /** Cycles not on a live invoice; the default amount is the retainer's current fee. */
-    cycles: z.array(
+    /**
+     * Due, `pending` retainer charges not on a live invoice (spec F05B C7), by retainer name and
+     * newest month; the default amount is the charge's.
+     */
+    charges: z.array(
       z.object({
         id: z.uuid(),
         retainer: namedSchema,
-        /** The first day of the month. */
+        /** The first day of the month the charge belongs to. */
         month: calendarDateSchema,
-        feeMinor: minorAmountSchema.nullable(),
+        kind: retainerChargeKindSchema,
+        amountMinor: signedMinorAmountSchema,
       }),
     ),
     /** `unbilled` extra work not on a live invoice; the default amount is its estimate. */
@@ -367,7 +376,7 @@ export const invoiceLineSchema = z
     quantity: z.number().int().min(1),
     unitPriceMinor: minorAmountSchema,
     totalMinor: minorAmountSchema,
-    /** The billed milestone, cycle or extra work item, with where it lives. */
+    /** The billed milestone, retainer charge or extra work item, with where it lives. */
     source: invoiceSourceSchema
       .extend({
         name: z.string(),
@@ -754,6 +763,38 @@ export const projectBillingSchema = z
 
 export type ProjectBilling = z.infer<typeof projectBillingSchema>;
 
+/** A retainer's charge with the live invoice that bills it (spec F05B, money access). */
+export const retainerChargeSchema = z
+  .object({
+    id: z.uuid(),
+    /** The first day of the month the charge belongs to. */
+    month: calendarDateSchema,
+    kind: retainerChargeKindSchema,
+    /** Negative for a credit. */
+    amountMinor: signedMinorAmountSchema,
+    status: retainerChargeStatusSchema,
+    /** Its month began (`monthly`) or it was created (other kinds), and its due hooks ran (C3). */
+    due: z.boolean(),
+    invoice: sourceInvoiceSchema.nullable(),
+  })
+  .meta({ id: 'RetainerCharge' });
+
+export type RetainerCharge = z.infer<typeof retainerChargeSchema>;
+
+export const retainerChargeListQuerySchema = pageQuerySchema.extend({
+  status: queryListSchema(retainerChargeStatusSchema).optional(),
+  kind: queryListSchema(retainerChargeKindSchema).optional(),
+});
+
+export type RetainerChargeListQuery = z.infer<typeof retainerChargeListQuerySchema>;
+
+/** Newest month first, then by kind and creation. */
+export const retainerChargePageSchema = pageSchema(retainerChargeSchema).meta({
+  id: 'RetainerChargePage',
+});
+
+export type RetainerChargePage = z.infer<typeof retainerChargePageSchema>;
+
 export const retainerBillingSchema = z
   .object({
     retainer: namedSchema.extend({
@@ -761,16 +802,8 @@ export const retainerBillingSchema = z
       monthlyFeeMinor: minorAmountSchema.nullable(),
       archived: z.boolean(),
     }),
-    /** Newest month first. */
-    cycles: z.array(
-      z.object({
-        id: z.uuid(),
-        /** The first day of the month. */
-        month: calendarDateSchema,
-        status: cycleStatusSchema,
-        invoice: sourceInvoiceSchema.nullable(),
-      }),
-    ),
+    /** Every charge of the retainer, newest month first (cancelled ones included). */
+    charges: z.array(retainerChargeSchema),
     /** Non-archived extra work, newest first. */
     extraWork: z.array(
       z.object({

@@ -2,6 +2,8 @@ import {
   CYCLE_STATUSES,
   DELIVERABLE_KINDS,
   EXTRA_WORK_BILLING,
+  RETAINER_CHARGE_KINDS,
+  RETAINER_CHARGE_STATUSES,
   RETAINER_STATUSES,
 } from '@vertex-hub/contracts';
 import { sql } from 'drizzle-orm';
@@ -23,7 +25,7 @@ import { archivedAt, id, minorAmount, timestamps } from './columns.js';
 import { currencyEnum, projects } from './projects.js';
 
 /*
- * Retainers, their monthly cycles and the extra work log of projects and retainers (F05), owned
+ * Retainers, their monthly cycles, their charges (F05B) and the extra work log of projects and retainers (F05), owned
  * by the api `projects` module. Dates without a time are calendar days in Asia/Damascus.
  */
 
@@ -34,6 +36,10 @@ export const deliverableKindEnum = pgEnum('deliverable_kind', DELIVERABLE_KINDS)
 export const cycleStatusEnum = pgEnum('cycle_status', CYCLE_STATUSES);
 
 export const extraWorkBillingEnum = pgEnum('extra_work_billing', EXTRA_WORK_BILLING);
+
+export const retainerChargeKindEnum = pgEnum('retainer_charge_kind', RETAINER_CHARGE_KINDS);
+
+export const retainerChargeStatusEnum = pgEnum('retainer_charge_status', RETAINER_CHARGE_STATUSES);
 
 export const retainers = pgTable(
   'retainers',
@@ -188,6 +194,42 @@ export const retainerCycleAdjustments = pgTable(
       'retainer_cycle_adjustments_delta_check',
       sql`${table.delta} <> 0 and ${table.delta} between -999 and 999`,
     ),
+  ],
+);
+
+/**
+ * A billable amount of a retainer in its currency (F05B, ADR 0029): invoices bill charges. Never
+ * archived or deleted; cancelled or settled through its status.
+ */
+export const retainerCharges = pgTable(
+  'retainer_charges',
+  {
+    id: id(),
+    retainerId: uuid('retainer_id')
+      .notNull()
+      .references(() => retainers.id),
+    /** The first day of the calendar month the charge belongs to. */
+    month: date('month', { mode: 'string' }).notNull(),
+    kind: retainerChargeKindEnum('kind').notNull(),
+    /** Negative for a credit. */
+    amountMinor: minorAmount('amount_minor').notNull(),
+    status: retainerChargeStatusEnum('status').notNull().default('pending'),
+    /** Set once, when the charge became due and its due hooks ran (C3). */
+    dueAt: timestamp('due_at', { withTimezone: true }),
+    ...timestamps(),
+  },
+  (table) => [
+    index('retainer_charges_retainer_month_idx').on(table.retainerId, table.month),
+    index('retainer_charges_status_idx').on(table.status),
+    // One live monthly charge per retainer and month keeps the job and the API from creating two.
+    uniqueIndex('retainer_charges_monthly_idx')
+      .on(table.retainerId, table.month)
+      .where(sql`${table.kind} = 'monthly' and ${table.status} <> 'cancelled'`),
+    check(
+      'retainer_charges_amount_check',
+      sql`case when ${table.kind} = 'credit' then ${table.amountMinor} < 0 else ${table.amountMinor} >= 0 end`,
+    ),
+    check('retainer_charges_month_check', sql`extract(day from ${table.month}) = 1`),
   ],
 );
 

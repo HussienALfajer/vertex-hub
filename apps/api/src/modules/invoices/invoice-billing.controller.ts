@@ -28,7 +28,11 @@ import {
   type QuotePdfRender,
   quotePdfRenderSchema,
   type RetainerBilling,
+  type RetainerChargeListQuery,
+  type RetainerChargePage,
   retainerBillingSchema,
+  retainerChargeListQuerySchema,
+  retainerChargePageSchema,
   type UpdateProjectExpense,
   updateProjectExpenseSchema,
 } from '@vertex-hub/contracts';
@@ -173,7 +177,7 @@ export class InvoiceBillingController {
   @RequirePermissions('invoices.read')
   @SerializeOptions({ schema: retainerBillingSchema })
   @ApiOkResponse({
-    description: 'Cycles and extra work with their invoices, and invoices (money access)',
+    description: 'Charges and extra work with their invoices, and invoices (money access)',
     standardSchema: retainerBillingSchema,
   })
   retainerBilling(
@@ -181,5 +185,21 @@ export class InvoiceBillingController {
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<RetainerBilling> {
     return this.billing.retainerBilling(actor, id);
+  }
+
+  @Get('retainers/:id/charges')
+  @RequirePermissions('invoices.read')
+  @SerializeOptions({ schema: retainerChargePageSchema })
+  @ApiOkResponse({
+    description: "The retainer's charges with their invoices, newest month first (money access)",
+    standardSchema: retainerChargePageSchema,
+  })
+  @ApiNotFoundResponse({ description: 'No such retainer, or outside read access' })
+  retainerCharges(
+    @CurrentUser() actor: CurrentUserInfo,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query({ schema: retainerChargeListQuerySchema }) query: RetainerChargeListQuery,
+  ): Promise<RetainerChargePage> {
+    return this.billing.retainerCharges(actor, id, query);
   }
 }

@@ -325,7 +325,7 @@ export class InvoiceReports {
 
   /**
    * Rule 14: each invoice's lines with where their share goes — the line's service; else, for a
-   * milestone line, the project's accepted quote's one-off lines and, for a retainer cycle line,
+   * milestone line, the project's accepted quote's one-off lines and, for a retainer charge line,
    * the retainer's accepted quote's monthly lines (packages as themselves); else "Unclassified".
    */
   private async revenueLines(
@@ -340,7 +340,7 @@ export class InvoiceReports {
         unitPriceMinor: invoiceLines.unitPriceMinor,
         serviceId: invoiceLines.serviceId,
         milestoneId: invoiceLines.milestoneId,
-        retainerCycleId: invoiceLines.retainerCycleId,
+        retainerChargeId: invoiceLines.retainerChargeId,
       })
       .from(invoiceLines)
       .where(
@@ -376,7 +376,7 @@ export class InvoiceReports {
         targets = [{ key: `service:${line.serviceId}`, weight: 1 }];
       } else if (line.milestoneId && invoice?.projectId) {
         targets = fromQuote(`project:${invoice.projectId}`, 'one_off');
-      } else if (line.retainerCycleId && invoice?.retainerId) {
+      } else if (line.retainerChargeId && invoice?.retainerId) {
         targets = fromQuote(`retainer:${invoice.retainerId}`, 'monthly');
       }
       const list = result.get(line.invoiceId) ?? [];

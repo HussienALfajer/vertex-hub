@@ -8500,7 +8500,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Cycles and extra work with their invoices, and invoices (money access)",
+            "description": "Charges and extra work with their invoices, and invoices (money access)",
             "content": {
               "application/json": {
                 "schema": {
@@ -8508,6 +8508,97 @@
                 }
               }
             }
+          }
+        },
+        "tags": [
+          "invoices"
+        ]
+      }
+    },
+    "/api/retainers/{id}/charges": {
+      "get": {
+        "operationId": "InvoiceBillingController_retainerCharges",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 1,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 50,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/RetainerChargeStatus"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RetainerChargeStatus"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "name": "kind",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/RetainerChargeKind"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RetainerChargeKind"
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The retainer's charges with their invoices, newest month first (money access)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RetainerChargePage"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such retainer, or outside read access"
           }
         },
         "tags": [
@@ -13779,6 +13870,7 @@
           "project_milestone",
           "retainer",
           "retainer_cycle",
+          "retainer_charge",
           "extra_work",
           "task",
           "task_checklist_item",
@@ -13868,6 +13960,7 @@
           "retainer_cycle.line_updated",
           "retainer_cycle.line_added",
           "retainer_cycle.adjusted",
+          "retainer_charge.created",
           "extra_work.created",
           "extra_work.updated",
           "extra_work.billing_changed",
@@ -31527,7 +31620,9 @@
           "quote_accepted",
           "milestone_done",
           "cycle_opened",
-          "manual"
+          "manual",
+          "retainer_amendment",
+          "retainer_termination"
         ]
       },
       "InvoicePage": {
@@ -31833,7 +31928,7 @@
               "additionalProperties": false
             }
           },
-          "cycles": {
+          "charges": {
             "type": "array",
             "items": {
               "type": "object",
@@ -31866,10 +31961,12 @@
                   "format": "date",
                   "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
                 },
-                "feeMinor": {
-                  "nullable": true,
+                "kind": {
+                  "$ref": "#/components/schemas/RetainerChargeKind"
+                },
+                "amountMinor": {
                   "type": "integer",
-                  "minimum": 0,
+                  "minimum": -9007199254740991,
                   "maximum": 9007199254740991
                 }
               },
@@ -31877,7 +31974,8 @@
                 "id",
                 "retainer",
                 "month",
-                "feeMinor"
+                "kind",
+                "amountMinor"
               ],
               "additionalProperties": false
             }
@@ -31953,10 +32051,19 @@
         },
         "required": [
           "milestones",
-          "cycles",
+          "charges",
           "extraWork"
         ],
         "additionalProperties": false
+      },
+      "RetainerChargeKind": {
+        "type": "string",
+        "enum": [
+          "monthly",
+          "addition",
+          "credit",
+          "termination_fee"
+        ]
       },
       "InvoiceDetail": {
         "type": "object",
@@ -32449,7 +32556,7 @@
         "type": "string",
         "enum": [
           "milestone",
-          "retainer_cycle",
+          "retainer_charge",
           "extra_work"
         ]
       },
@@ -33582,40 +33689,10 @@
             ],
             "additionalProperties": false
           },
-          "cycles": {
+          "charges": {
             "type": "array",
             "items": {
-              "type": "object",
-              "properties": {
-                "id": {
-                  "type": "string",
-                  "format": "uuid",
-                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                },
-                "month": {
-                  "type": "string",
-                  "format": "date",
-                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
-                },
-                "status": {
-                  "$ref": "#/components/schemas/CycleStatus"
-                },
-                "invoice": {
-                  "nullable": true,
-                  "allOf": [
-                    {
-                      "$ref": "#/components/schemas/SourceInvoice"
-                    }
-                  ]
-                }
-              },
-              "required": [
-                "id",
-                "month",
-                "status",
-                "invoice"
-              ],
-              "additionalProperties": false
+              "$ref": "#/components/schemas/RetainerCharge"
             }
           },
           "extraWork": {
@@ -33668,9 +33745,97 @@
         },
         "required": [
           "retainer",
-          "cycles",
+          "charges",
           "extraWork",
           "invoices"
+        ],
+        "additionalProperties": false
+      },
+      "RetainerCharge": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "month": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/RetainerChargeKind"
+          },
+          "amountMinor": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "status": {
+            "$ref": "#/components/schemas/RetainerChargeStatus"
+          },
+          "due": {
+            "type": "boolean"
+          },
+          "invoice": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SourceInvoice"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "month",
+          "kind",
+          "amountMinor",
+          "status",
+          "due",
+          "invoice"
+        ],
+        "additionalProperties": false
+      },
+      "RetainerChargeStatus": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "cancelled",
+          "settled_outside"
+        ]
+      },
+      "RetainerChargePage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RetainerCharge"
+            }
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "page",
+          "pageSize"
         ],
         "additionalProperties": false
       },

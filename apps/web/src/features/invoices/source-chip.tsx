@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next';
 
 type LineSource = NonNullable<InvoiceLine['source']>;
 
-const icons = { milestone: FlagIcon, retainer_cycle: RepeatIcon, extra_work: SparklesIcon };
+const icons = { milestone: FlagIcon, retainer_charge: RepeatIcon, extra_work: SparklesIcon };
 
 /** What a line bills, linking to the project or retainer it lives on (rule 11). */
 export function SourceChip({ source }: { source: LineSource }) {
