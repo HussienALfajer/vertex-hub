@@ -7,7 +7,7 @@ import { expect, test } from './test';
 test('activation link: set a password, then sign in', async ({ page }) => {
   await mockApi(page, { signedIn: false, acceptPassword: 'a-long-new-password' });
   await page.goto(`/activate#token=${VALID_LINK_TOKEN}`);
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText(ar.activate.title);
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(ar.activate.activation.title);
   // The token leaves the address bar once read.
   await expect(page).toHaveURL(/\/activate$/);
 
@@ -19,11 +19,13 @@ test('activation link: set a password, then sign in', async ({ page }) => {
   await page.getByLabel(ar.activate.password, { exact: true }).fill('a-long-new-password');
   await page.getByLabel(ar.activate.confirm).fill('a-long-new-password');
   await page.getByRole('button', { name: ar.activate.submit }).click();
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText(ar.activate.doneTitle);
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(
+    ar.activate.activation.doneTitle,
+  );
 
   await page.getByRole('link', { name: ar.activate.toLogin }).click();
   await page.getByLabel(ar.login.email).fill(manager.user.email);
-  await page.getByLabel(ar.login.password).fill('a-long-new-password');
+  await page.getByLabel(ar.login.password, { exact: true }).fill('a-long-new-password');
   await page.getByRole('button', { name: ar.login.submit }).click();
   await expect(page.getByRole('navigation', { name: ar.nav.label })).toBeVisible();
 });
@@ -36,20 +38,22 @@ test('an activation link opened where someone else is signed in leads to the sig
   await page.getByLabel(ar.activate.password, { exact: true }).fill('a-long-new-password');
   await page.getByLabel(ar.activate.confirm).fill('a-long-new-password');
   await page.getByRole('button', { name: ar.activate.submit }).click();
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText(ar.activate.doneTitle);
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(
+    ar.activate.activation.doneTitle,
+  );
 
   await page.getByRole('link', { name: ar.activate.toLogin }).click();
   await expect(page).toHaveURL(/\/login$/);
   await expect(page.getByLabel(ar.login.email)).toBeVisible();
 });
 
-test('an invalid or used link explains what to do', async ({ page }) => {
+test('an invalid or used link explains what to do before anything is typed', async ({ page }) => {
   await mockApi(page, { signedIn: false });
   await page.goto('/activate#token=expired-token');
-  await page.getByLabel(ar.activate.password, { exact: true }).fill('a-long-new-password');
-  await page.getByLabel(ar.activate.confirm).fill('a-long-new-password');
-  await page.getByRole('button', { name: ar.activate.submit }).click();
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(ar.activate.invalidTitle);
+  await expect(page.getByLabel(ar.activate.password, { exact: true })).toHaveCount(0);
+  await page.getByRole('link', { name: ar.activate.requestNew }).click();
+  await expect(page).toHaveURL(/\/forgot-password$/);
 });
 
 test('a user who must use 2FA sets it up before anything else', async ({ page }) => {
@@ -58,7 +62,7 @@ test('a user who must use 2FA sets it up before anything else', async ({ page })
   await expect(page).toHaveURL(/\/setup-two-factor$/);
   await expect(page.getByText(ar.twoFactorSetup.requiredNotice)).toBeVisible();
 
-  await page.getByLabel(ar.twoFactorSetup.password).fill('my-password-123');
+  await page.getByLabel(ar.twoFactorSetup.password, { exact: true }).fill('my-password-123');
   await page.getByRole('button', { name: ar.twoFactorSetup.start }).click();
   await expect(page.getByRole('img', { name: ar.twoFactorSetup.qrLabel })).toBeVisible();
 
@@ -80,7 +84,7 @@ test('sign-in asks for the code, and a wrong code is explained', async ({ page }
   });
   await page.goto('/login');
   await page.getByLabel(ar.login.email).fill(manager.user.email);
-  await page.getByLabel(ar.login.password).fill('right-password');
+  await page.getByLabel(ar.login.password, { exact: true }).fill('right-password');
   await page.getByRole('button', { name: ar.login.submit }).click();
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(ar.login.twoFactor.title);
 
@@ -91,7 +95,9 @@ test('sign-in asks for the code, and a wrong code is explained', async ({ page }
   await expect(page.getByRole('navigation', { name: ar.nav.label })).toBeVisible();
 });
 
-test('archiving is blocked while the user manages a department, then allowed', async ({ page }) => {
+test('archiving is blocked while the user manages a department, then allowed and undone', async ({
+  page,
+}) => {
   await mockApi(page, { signedIn: true });
   await page.goto(`/team/${seedIds.omar}`);
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('عمر حداد');
@@ -107,7 +113,10 @@ test('archiving is blocked while the user manages a department, then allowed', a
 
   await archive();
   const dialog = page.getByRole('alertdialog');
-  await expect(dialog.getByText(ar.users.responsibilities.title)).toBeVisible();
+  // The archive button is gone: the focus moves to the new title.
+  await expect(
+    dialog.getByRole('heading', { name: ar.users.responsibilities.title }),
+  ).toBeFocused();
   await expect(dialog.getByText('إدارة قسم العمليات الداخلية')).toBeVisible();
   await dialog.getByRole('link', { name: ar.users.responsibilities.open }).click();
 
@@ -122,6 +131,22 @@ test('archiving is blocked while the user manages a department, then allowed', a
   await archive();
   await expect(page.getByText(ar.users.confirm.archived)).toBeVisible();
   await expect(page.getByText(ar.users.profile.archivedNotice)).toBeVisible();
+  const actions = page.getByRole('button', { name: ar.users.profile.actions });
+  await expect(actions).toBeFocused();
+
+  // Restoring opens the link dialog: it keeps the focus, then gives it back to the menu button.
+  await actions.click();
+  await page.getByRole('menuitem', { name: ar.users.profile.restore }).click();
+  await page
+    .getByRole('alertdialog')
+    .getByRole('button', { name: ar.users.confirm.restoreAction })
+    .click();
+  const link = page.getByRole('dialog');
+  await expect(link.getByRole('button', { name: ar.users.link.copy })).toBeFocused();
+  await page.waitForTimeout(500);
+  await expect(link.getByRole('button', { name: ar.users.link.copy })).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(actions).toBeFocused();
 });
 
 test('a user manager creates a user and gets the activation link', async ({ page }) => {
@@ -162,6 +187,26 @@ test('the sidebar link clears the team search', async ({ page }) => {
   await expect(page).toHaveURL(/\/team$/);
 });
 
+test('the team search keeps a space typed after a pause', async ({ page }) => {
+  await mockApi(page, { signedIn: true });
+  await page.goto('/team');
+  const search = page.getByRole('searchbox', { name: ar.users.search });
+  await search.pressSequentially('ليان ');
+  await expect(page).toHaveURL(/search=/);
+  await search.pressSequentially('الأحمد');
+  await expect(search).toHaveValue('ليان الأحمد');
+});
+
+test('leaving the edit form gives the focus back to its button', async ({ page }) => {
+  await mockApi(page, { signedIn: true });
+  await page.goto(`/team/${seedIds.omar}`);
+  const edit = page.getByRole('button', { name: ar.users.profile.edit });
+  await edit.click();
+  await expect(page.getByLabel(ar.users.form.name)).toBeFocused();
+  await page.getByRole('button', { name: ar.common.cancel }).click();
+  await expect(edit).toBeFocused();
+});
+
 test('the manager picker starts from the current manager each time', async ({ page }) => {
   await mockApi(page, { signedIn: true });
   await page.goto(`/departments/${seedIds.design}`);
@@ -175,4 +220,18 @@ test('the manager picker starts from the current manager each time', async ({ pa
   await page.getByRole('dialog').getByRole('button', { name: ar.common.cancel }).click();
   await open();
   await expect(page.getByRole('dialog').getByRole('combobox')).toHaveText('ليان الأحمد');
+});
+
+test('the rename dialog starts from the saved name and gives the focus back', async ({ page }) => {
+  await mockApi(page, { signedIn: true });
+  await page.goto(`/departments/${seedIds.design}`);
+  const rename = page.getByRole('button', { name: ar.departments.detail.rename });
+  await rename.click();
+  const name = page.getByRole('dialog').getByLabel(ar.departments.detail.name);
+  const saved = await name.inputValue();
+  await name.fill('اسم لم يُحفظ');
+  await page.keyboard.press('Escape');
+  await expect(rename).toBeFocused();
+  await rename.click();
+  await expect(page.getByRole('dialog').getByLabel(ar.departments.detail.name)).toHaveValue(saved);
 });

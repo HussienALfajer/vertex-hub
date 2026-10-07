@@ -45,6 +45,9 @@ import {
   TabsTrigger,
   ToggleGroup,
   ToggleGroupItem,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
   toast,
 } from '@vertex-hub/ui';
 import {
@@ -63,7 +66,17 @@ import {
   SearchIcon,
   TargetIcon,
 } from 'lucide-react';
-import { type DragEvent, type ReactNode, useCallback, useEffect, useId, useState } from 'react';
+import {
+  type ComponentProps,
+  type DragEvent,
+  type ReactNode,
+  type RefObject,
+  useCallback,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '../../components/confirm-dialog';
 import { LoadError } from '../../components/load-error';
@@ -72,7 +85,9 @@ import { errorMessage } from '../../lib/errors';
 import { formatDate, formatNumber } from '../../lib/format';
 import { ALL, idParam, listParam, oneOfParam, pageParam, textParam } from '../../lib/search-params';
 import { usePageInRange } from '../../lib/use-page-in-range';
+import { useReturnFocus } from '../../lib/use-return-focus';
 import { useSearchText } from '../../lib/use-search-text';
+import { useShownWhileClosing } from '../../lib/use-shown-while-closing';
 import { ChoiceSelect } from '../quotes/choice-select';
 import { Budget, FollowUpDate, LeadStageBadge, SourceMark } from './lead-badges';
 import { LeadDialog } from './lead-dialog';
@@ -148,6 +163,8 @@ export function LeadsPage({ search }: { search: LeadsSearch }) {
   // Archived leads have no stage column: they are listed only.
   const view: LeadView = archived ? 'list' : (search.view ?? storedView(me.user.id));
   const [creating, setCreating] = useState(false);
+  // Where the focus goes when an archived or restored row leaves the list.
+  const archivedToggle = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (!search.view) return;
@@ -228,6 +245,7 @@ export function LeadsPage({ search }: { search: LeadsSearch }) {
         scopeAll={scopeAll}
         filtered={filtered}
         onChange={setFilter}
+        archivedToggle={archivedToggle}
       />
       {view === 'board' ? (
         <BoardView filters={filters} filtered={filtered} newLead={newLead} />
@@ -238,6 +256,7 @@ export function LeadsPage({ search }: { search: LeadsSearch }) {
           archived={archived}
           filtered={filtered}
           newLead={newLead}
+          rowGone={archivedToggle}
         />
       )}
       {manager && <LeadDialog open={creating} onClose={() => setCreating(false)} />}
@@ -252,6 +271,7 @@ function Filters({
   scopeAll,
   filtered,
   onChange,
+  archivedToggle,
 }: {
   search: LeadsSearch;
   view: LeadView;
@@ -259,6 +279,7 @@ function Filters({
   scopeAll: boolean;
   filtered: boolean;
   onChange: (next: Partial<LeadsSearch>) => void;
+  archivedToggle: RefObject<HTMLButtonElement | null>;
 }) {
   const { t } = useTranslation();
   const me = useMe();
@@ -302,7 +323,7 @@ function Filters({
           className="ps-9"
         />
       </div>
-      <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid items-start gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <ChoiceSelect
           label={t('leads.filters.owner')}
           items={ownerItems}
@@ -354,6 +375,7 @@ function Filters({
         <div className="flex flex-wrap items-center justify-end gap-2">
           {scopeAll && (
             <Button
+              ref={archivedToggle}
               variant={archived ? 'secondary' : 'outline'}
               size="sm"
               aria-pressed={archived}
@@ -452,7 +474,30 @@ function Board({ board, filters }: { board: LeadBoard; filters: LeadBoardFilters
   const [dragged, setDragged] = useState<Lead | null>(null);
   const [over, setOver] = useState<LeadStage | null>(null);
   const [pending, setPending] = useState<Pending | null>(null);
+  const shown = useShownWhileClosing(pending);
   const [phoneStage, setPhoneStage] = useState<LeadStage>('new');
+  const root = useRef<HTMLDivElement>(null);
+  // A moved card mounts again in its new column: the focus goes there once the board shows it.
+  const [moved, setMoved] = useState<{ id: string; stage: LeadStage } | null>(null);
+
+  /** The shown copy of a card's move button, or its name once closed (won, lost). */
+  const cardControl = useCallback((id: string, stage?: LeadStage): HTMLElement | null => {
+    for (const card of root.current?.querySelectorAll<HTMLElement>(`[data-lead="${id}"]`) ?? []) {
+      // Phones show the stage tabs, wider screens the columns: one copy is hidden.
+      if (card.offsetParent === null || (stage && card.dataset.stage !== stage)) continue;
+      return card.querySelector<HTMLElement>('[data-move-menu]') ?? card.querySelector('a');
+    }
+    return null;
+  }, []);
+
+  useEffect(() => {
+    if (!moved || !board) return;
+    // The refreshed board renders a moment after the move resolves: wait for the card there.
+    const control = cardControl(moved.id, moved.stage);
+    if (!control) return;
+    control.focus();
+    setMoved(null);
+  }, [moved, board, cardControl]);
 
   async function act(lead: Lead, to: LeadStage) {
     const action = dropAction(lead, to, manager);
@@ -470,8 +515,11 @@ function Board({ board, filters }: { board: LeadBoard; filters: LeadBoardFilters
         title: t('leads.board.moved', { name: lead.displayName, stage: t(`leads.stages.${to}`) }),
         type: 'success',
       });
+      setMoved({ id: lead.id, stage: to });
     } catch (error) {
       toast.add({ title: errorMessage(t, error), type: 'error' });
+      // Snapped back: the card's button takes the focus where it was.
+      setMoved({ id: lead.id, stage: lead.stage });
     }
   }
 
@@ -523,7 +571,7 @@ function Board({ board, filters }: { board: LeadBoard; filters: LeadBoardFilters
   );
 
   return (
-    <>
+    <div ref={root} className="contents">
       {/* Phones: one stage at a time (screen 1). */}
       <Tabs
         className="md:hidden"
@@ -627,21 +675,23 @@ function Board({ board, filters }: { board: LeadBoard; filters: LeadBoardFilters
           })}
         </ol>
       </div>
-      {pending && (
+      {shown && (
         <>
           <ConvertDialog
-            lead={pending.lead}
-            open={pending.action === 'convert'}
+            lead={shown.lead}
+            open={pending?.action === 'convert'}
             onClose={() => setPending(null)}
+            finalFocus={() => cardControl(shown.lead.id)}
           />
           <LoseDialog
-            lead={pending.lead}
-            open={pending.action === 'lose'}
+            lead={shown.lead}
+            open={pending?.action === 'lose'}
             onClose={() => setPending(null)}
+            finalFocus={() => cardControl(shown.lead.id)}
           />
         </>
       )}
-    </>
+    </div>
   );
 }
 
@@ -670,6 +720,7 @@ function LeadCard({
       onDragStart={draggable ? onDragStart : undefined}
       onDragEnd={draggable ? onDragEnd : undefined}
       data-lead={lead.id}
+      data-stage={lead.stage}
       className={cn(
         'flex flex-col gap-2 rounded-md border border-border bg-surface p-3',
         draggable && 'cursor-grab active:cursor-grabbing',
@@ -709,7 +760,12 @@ function LeadCard({
       )}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
         <Budget lead={lead} className="font-medium text-foreground" />
-        <span>{t('leads.card.daysInStage', { n: formatNumber(lead.daysInStage) })}</span>
+        <span>
+          {t('leads.card.daysInStage', {
+            count: lead.daysInStage,
+            n: formatNumber(lead.daysInStage),
+          })}
+        </span>
         {lead.quoteCount > 0 && (
           <span className="flex items-center gap-1">
             <FileTextIcon aria-hidden="true" className="size-3.5" />
@@ -723,10 +779,17 @@ function LeadCard({
         ) : (
           <FollowUpDate lead={lead} />
         )}
-        <span title={lead.owner.name} className="flex">
-          <Avatar name={lead.owner.name} size="sm" tone={lead.owner.archived ? 'muted' : 'brand'} />
-          <span className="sr-only">{t('leads.card.owner', { name: lead.owner.name })}</span>
-        </span>
+        <Tooltip>
+          <TooltipTrigger render={<span className="flex" />}>
+            <Avatar
+              name={lead.owner.name}
+              size="sm"
+              tone={lead.owner.archived ? 'muted' : 'brand'}
+            />
+            <span className="sr-only">{t('leads.card.owner', { name: lead.owner.name })}</span>
+          </TooltipTrigger>
+          <TooltipContent>{lead.owner.name}</TooltipContent>
+        </Tooltip>
       </div>
     </li>
   );
@@ -738,32 +801,44 @@ function MoveMenu({ lead, onMove }: { lead: Lead; onMove: (to: LeadStage) => voi
   const moves = (['new', 'contacted', 'meeting'] as const).filter(
     (to) => dropAction(lead, to, true) === 'move',
   );
+  const label = t('leads.board.moveTo', { name: lead.displayName });
+  // A chosen move owns the focus from then on: the board gives it to the card in its new column,
+  // a dialog gives it back when it closes. Escape still returns it to this button.
+  const chosen = useRef(false);
+  const choose = (to: LeadStage) => () => {
+    chosen.current = true;
+    onMove(to);
+  };
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
-        render={
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            aria-label={t('leads.board.moveTo', { name: lead.displayName })}
-            title={t('leads.board.moveTo', { name: lead.displayName })}
-          />
-        }
-      >
-        <MoveIcon />
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
+    <DropdownMenu
+      onOpenChange={(open) => {
+        if (open) chosen.current = false;
+      }}
+    >
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <DropdownMenuTrigger
+              render={<Button variant="ghost" size="icon-sm" aria-label={label} data-move-menu />}
+            />
+          }
+        >
+          <MoveIcon />
+        </TooltipTrigger>
+        <TooltipContent>{label}</TooltipContent>
+      </Tooltip>
+      <DropdownMenuContent align="end" finalFocus={() => !chosen.current}>
         {moves.map((to) => (
-          <DropdownMenuItem key={to} onClick={() => onMove(to)}>
+          <DropdownMenuItem key={to} onClick={choose(to)}>
             <LeadStageBadge stage={to} />
           </DropdownMenuItem>
         ))}
         {moves.length > 0 && <DropdownMenuSeparator />}
-        <DropdownMenuItem onClick={() => onMove('won')}>
+        <DropdownMenuItem onClick={choose('won')}>
           <CircleCheckBigIcon />
           {t('leads.actions.convert')}
         </DropdownMenuItem>
-        <DropdownMenuItem variant="destructive" onClick={() => onMove('lost')}>
+        <DropdownMenuItem variant="destructive" onClick={choose('lost')}>
           <CircleXIcon />
           {t('leads.actions.lose')}
         </DropdownMenuItem>
@@ -790,12 +865,14 @@ function ListView({
   archived,
   filtered,
   newLead,
+  rowGone,
 }: {
   search: LeadsSearch;
   filters: LeadBoardFilters;
   archived: boolean;
   filtered: boolean;
   newLead: ReactNode;
+  rowGone: RefObject<HTMLElement | null>;
 }) {
   const { t } = useTranslation();
   const navigate = useNavigate({ from: '/leads/' });
@@ -851,7 +928,13 @@ function ListView({
   }
   return (
     <div className="flex flex-col gap-4">
-      <LeadsTable leads={leads.data.items} sort={sort} order={order} onSort={sortBy} />
+      <LeadsTable
+        leads={leads.data.items}
+        sort={sort}
+        order={order}
+        onSort={sortBy}
+        rowGone={rowGone}
+      />
       <Pagination
         page={page}
         pageCount={Math.ceil(leads.data.total / PAGE_SIZE)}
@@ -873,11 +956,13 @@ function LeadsTable({
   sort,
   order,
   onSort,
+  rowGone,
 }: {
   leads: Lead[];
   sort: LeadSort;
   order: SortDirection;
   onSort: (column: LeadSort) => void;
+  rowGone: RefObject<HTMLElement | null>;
 }) {
   const { t } = useTranslation();
   const me = useMe();
@@ -886,6 +971,7 @@ function LeadsTable({
   const [confirming, setConfirming] = useState<{ lead: Lead; restore: boolean } | null>(null);
   const archive = useArchiveLead();
   const restore = useRestoreLead();
+  const returnFocus = useReturnFocus(rowGone);
 
   return (
     <>
@@ -921,7 +1007,7 @@ function LeadsTable({
         <TableBody>
           {leads.map((lead) => (
             <TableRow key={lead.id}>
-              <TableCell className="whitespace-normal">
+              <TableCell className="min-w-48 whitespace-normal">
                 <Link
                   to="/leads/$leadId"
                   params={{ leadId: lead.id }}
@@ -943,7 +1029,10 @@ function LeadsTable({
                     {lead.archivedAt && <Badge tone="neutral">{t('leads.archivedBadge')}</Badge>}
                   </span>
                   <span className="text-xs text-muted-foreground">
-                    {t('leads.card.daysInStage', { n: formatNumber(lead.daysInStage) })}
+                    {t('leads.card.daysInStage', {
+                      count: lead.daysInStage,
+                      n: formatNumber(lead.daysInStage),
+                    })}
                   </span>
                 </span>
               </TableCell>
@@ -982,35 +1071,13 @@ function LeadsTable({
               {scopeAll && (
                 <TableCell>
                   {lead.stage !== 'won' && (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger
-                        render={
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            aria-label={t('leads.actions.menu', { name: lead.displayName })}
-                          />
-                        }
-                      >
-                        <EllipsisIcon />
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        {lead.archivedAt ? (
-                          <DropdownMenuItem onClick={() => setConfirming({ lead, restore: true })}>
-                            <ArchiveRestoreIcon />
-                            {t('leads.actions.restore')}
-                          </DropdownMenuItem>
-                        ) : (
-                          <DropdownMenuItem
-                            variant="destructive"
-                            onClick={() => setConfirming({ lead, restore: false })}
-                          >
-                            <ArchiveIcon />
-                            {t('leads.actions.archive')}
-                          </DropdownMenuItem>
-                        )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    <RowMenu
+                      lead={lead}
+                      onChoose={(restore, opener) => {
+                        returnFocus.from(opener);
+                        setConfirming({ lead, restore });
+                      }}
+                    />
                   )}
                 </TableCell>
               )}
@@ -1026,8 +1093,63 @@ function LeadsTable({
           if (target.restore) await restore.mutateAsync(target.lead.id);
           else await archive.mutateAsync(target.lead.id);
         }}
+        finalFocus={returnFocus.target}
       />
     </>
+  );
+}
+
+/**
+ * A row's archive or restore menu. The chosen action's dialog gives the focus back, so the menu
+ * does not return it to its button, which leaves with the row once the action is done.
+ */
+function RowMenu({
+  lead,
+  onChoose,
+}: {
+  lead: Lead;
+  onChoose: (restore: boolean, opener: HTMLElement | null) => void;
+}) {
+  const { t } = useTranslation();
+  const button = useRef<HTMLButtonElement>(null);
+  const chosen = useRef(false);
+  const choose = (restore: boolean) => () => {
+    chosen.current = true;
+    onChoose(restore, button.current);
+  };
+  const label = t('leads.actions.menu', { name: lead.displayName });
+  return (
+    <DropdownMenu
+      onOpenChange={(open) => {
+        if (open) chosen.current = false;
+      }}
+    >
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <DropdownMenuTrigger
+              render={<Button ref={button} variant="ghost" size="icon-sm" aria-label={label} />}
+            />
+          }
+        >
+          <EllipsisIcon />
+        </TooltipTrigger>
+        <TooltipContent>{label}</TooltipContent>
+      </Tooltip>
+      <DropdownMenuContent align="end" finalFocus={() => !chosen.current}>
+        {lead.archivedAt ? (
+          <DropdownMenuItem onClick={choose(true)}>
+            <ArchiveRestoreIcon />
+            {t('leads.actions.restore')}
+          </DropdownMenuItem>
+        ) : (
+          <DropdownMenuItem variant="destructive" onClick={choose(false)}>
+            <ArchiveIcon />
+            {t('leads.actions.archive')}
+          </DropdownMenuItem>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -1037,19 +1159,24 @@ export function ArchiveConfirm({
   onClose,
   pending,
   onConfirm,
+  finalFocus,
 }: {
   target: { lead: LeadRef; restore: boolean } | null;
   onClose: () => void;
   pending: boolean;
   onConfirm: (target: { lead: LeadRef; restore: boolean }) => Promise<void>;
+  finalFocus: ComponentProps<typeof ConfirmDialog>['finalFocus'];
 }) {
   const { t } = useTranslation();
-  const restore = target?.restore ?? false;
-  const name = target?.lead.displayName ?? '';
+  // The text stays while the dialog fades out.
+  const shown = useShownWhileClosing(target);
+  const restore = shown?.restore ?? false;
+  const name = shown?.lead.displayName ?? '';
   return (
     <ConfirmDialog
       open={target !== null}
       onClose={onClose}
+      finalFocus={finalFocus}
       title={
         restore ? t('leads.archive.restoreTitle', { name }) : t('leads.archive.title', { name })
       }

@@ -362,7 +362,6 @@ function Filters({
         <Input
           type="date"
           dir="ltr"
-          className="text-end"
           value={search.from ?? ''}
           max={search.to}
           onChange={(event) => onChange({ from: event.target.value || undefined })}
@@ -373,7 +372,6 @@ function Filters({
         <Input
           type="date"
           dir="ltr"
-          className="text-end"
           value={search.to ?? ''}
           min={search.from}
           onChange={(event) => onChange({ to: event.target.value || undefined })}

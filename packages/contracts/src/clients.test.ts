@@ -42,6 +42,24 @@ describe('updateBrandKitSchema', () => {
     expect(kit.forbiddenWords).toEqual(['رخيص', 'Cheap']);
   });
 
+  it('keeps a repeated color or link once', () => {
+    const file = { kind: 'logo', label: 'Logo', url: 'https://drive.example/logo' };
+    const kit = updateBrandKitSchema.parse({
+      colors: [{ hex: '#0f3d3e' }, { hex: '#0F3D3E', name: 'Green' }, { hex: '#C9A961' }],
+      files: [file, { ...file, label: 'Logo again' }],
+      references: [
+        { kind: 'liked', url: 'https://example.com/a' },
+        { kind: 'disliked', url: 'https://example.com/a' },
+      ],
+    });
+    expect(kit.colors).toEqual([
+      { name: null, hex: '#0F3D3E' },
+      { name: null, hex: '#C9A961' },
+    ]);
+    expect(kit.files).toEqual([file]);
+    expect(kit.references).toEqual([{ kind: 'liked', url: 'https://example.com/a', note: null }]);
+  });
+
   it('enforces the limits and names the field', () => {
     const colors = Array.from({ length: 21 }, () => ({ hex: '#000000' }));
     const result = updateBrandKitSchema.safeParse({ colors });
@@ -149,6 +167,15 @@ describe('clients', () => {
       status: 'active',
       isHealthcare: false,
     });
+  });
+
+  it('counts the spaces inside a trade name once, in names and searches', () => {
+    const input = { tradeName: ' شركة   البناء\tالحديث ', accountManagerId: manager };
+    expect(createClientSchema.parse(input).tradeName).toBe('شركة البناء الحديث');
+    expect(clientListQuerySchema.parse({ search: 'شركة   البناء' }).search).toBe('شركة البناء');
+    expect(
+      createClientSchema.safeParse({ ...input, tradeName: ` ${'x'.repeat(120)}   ` }).success,
+    ).toBe(true);
   });
 
   it('lists active and paused clients by name by default', () => {

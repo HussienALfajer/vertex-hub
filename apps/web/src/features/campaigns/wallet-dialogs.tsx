@@ -235,7 +235,7 @@ export function WalletEntryDialog({
               dir="ltr"
               inputMode="decimal"
               autoComplete="off"
-              className="text-end tabular-nums"
+              className="tabular-nums"
               {...form.register('sypPerUsd', { validate: (value) => validRate(value) })}
             />
             <RateHint settings={settings.data} />

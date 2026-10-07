@@ -11,7 +11,7 @@ export function BackupCodes({ codes }: { codes: string[] }) {
     <div className="flex flex-col gap-3">
       <ol
         dir="ltr"
-        className="grid grid-cols-2 gap-2 rounded-lg border border-border bg-muted/40 p-4 sm:grid-cols-2"
+        className="grid grid-cols-2 gap-2 rounded-lg border border-border bg-muted/40 p-4"
       >
         {codes.map((code, index) => (
           <li key={code} className="flex items-center gap-3 rounded-md bg-surface px-3 py-2">

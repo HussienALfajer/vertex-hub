@@ -32,6 +32,7 @@ import {
   Field,
   FieldError,
   FieldLabel,
+  IconButton,
   Input,
   toast,
 } from '@vertex-hub/ui';
@@ -52,7 +53,15 @@ import {
   Trash2Icon,
   WalletIcon,
 } from 'lucide-react';
-import { type DragEvent, type LiHTMLAttributes, type ReactNode, useId, useState } from 'react';
+import {
+  type DragEvent,
+  type LiHTMLAttributes,
+  type ReactNode,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+} from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '../../components/confirm-dialog';
@@ -63,6 +72,8 @@ import { ApiError } from '../../lib/api/client';
 import { errorMessage } from '../../lib/errors';
 import { formatCalendarDate, formatDateTime, formatNumber } from '../../lib/format';
 import { formatMoney } from '../../lib/money';
+import { useReturnFocus } from '../../lib/use-return-focus';
+import { useShownWhileClosing } from '../../lib/use-shown-while-closing';
 import { OverdueBadge } from './project-badges';
 import {
   useArchiveMilestone,
@@ -88,12 +99,23 @@ export function MilestonesTab({
 }) {
   const { t } = useTranslation();
   const reorder = useReorderMilestones(project.id);
-  const [adding, setAdding] = useState(false);
+  const archive = useArchiveMilestone(project.id);
+  /** `null` while closed, `'new'` to add, or the milestone being edited. */
+  const [editing, setEditing] = useState<Milestone | 'new' | null>(null);
+  const [removing, setRemoving] = useState<{ milestone: Milestone; index: number } | null>(null);
+  // The removed milestone stays named while the confirmation fades out.
+  const shownRemoving = useShownWhileClosing(removing);
   // While a new order is being saved, the list shows it already.
   const [pendingOrder, setPendingOrder] = useState<string[] | null>(null);
   const [dragged, setDragged] = useState<string | null>(null);
   const [target, setTarget] = useState<string | null>(null);
   const currency = project.money?.currency ?? null;
+  // Only one "add" button shows at a time (header or empty state): the focus falls back to it
+  // when the button that opened a dialog left with the change.
+  const addButton = useRef<HTMLButtonElement>(null);
+  const heading = useRef<HTMLHeadingElement>(null);
+  const list = useRef<HTMLOListElement>(null);
+  const returnFocus = useReturnFocus(addButton);
 
   const milestones = pendingOrder
     ? pendingOrder.flatMap(
@@ -113,6 +135,13 @@ export function MilestonesTab({
       onError: (error) => notifyError(errorMessage(t, error)),
       onSettled: () => setPendingOrder(null),
     });
+  }
+
+  /** After a removal: the menu of the milestone now in its place, the one before, or "add". */
+  function afterRemoval() {
+    const menus = list.current?.querySelectorAll<HTMLElement>('[data-focus="menu"]') ?? [];
+    const index = shownRemoving?.index ?? 0;
+    return menus[Math.min(index, menus.length - 1)] ?? returnFocus.target() ?? heading.current;
   }
 
   const dragProps = (milestone: Milestone, index: number) =>
@@ -141,6 +170,21 @@ export function MilestonesTab({
         }
       : {};
 
+  const addAction = editable && (
+    <Button
+      ref={addButton}
+      size={milestones.length > 0 ? 'sm' : undefined}
+      disabled={full}
+      onClick={(event) => {
+        returnFocus.from(event.currentTarget);
+        setEditing('new');
+      }}
+    >
+      <PlusIcon />
+      {t('projects.milestones.add')}
+    </Button>
+  );
+
   return (
     <>
       <TabHeader
@@ -148,14 +192,8 @@ export function MilestonesTab({
         description={
           reorderable ? t('projects.milestones.hintReorder') : t('projects.milestones.hint')
         }
-        action={
-          editable && (
-            <Button size="sm" disabled={full} onClick={() => setAdding(true)}>
-              <PlusIcon />
-              {t('projects.milestones.add')}
-            </Button>
-          )
-        }
+        action={milestones.length > 0 && addAction}
+        headingRef={heading}
       />
 
       {project.money && <MoneySummary project={project} currency={project.money.currency} />}
@@ -165,17 +203,10 @@ export function MilestonesTab({
           icon={<MilestoneIcon />}
           title={t('projects.milestones.emptyTitle')}
           description={editable ? t('projects.milestones.emptyHint') : undefined}
-          action={
-            editable && (
-              <Button onClick={() => setAdding(true)}>
-                <PlusIcon />
-                {t('projects.milestones.add')}
-              </Button>
-            )
-          }
+          action={addAction}
         />
       ) : (
-        <ol aria-label={t('projects.milestones.title')} className="flex flex-col">
+        <ol ref={list} aria-label={t('projects.milestones.title')} className="flex flex-col">
           {milestones.map((milestone, index) => (
             <MilestoneStep
               key={milestone.id}
@@ -190,6 +221,14 @@ export function MilestonesTab({
               dropTarget={target === milestone.id && dragged !== milestone.id}
               currency={currency}
               onMove={(to) => moveTo(milestone.id, to)}
+              onEdit={(opener) => {
+                returnFocus.from(opener);
+                setEditing(milestone);
+              }}
+              onRemove={(opener) => {
+                returnFocus.from(opener);
+                setRemoving({ milestone, index });
+              }}
               {...dragProps(milestone, index)}
             />
           ))}
@@ -201,7 +240,31 @@ export function MilestonesTab({
         </p>
       )}
 
-      <MilestoneDialog project={project} open={adding} onClose={() => setAdding(false)} />
+      {editable && (
+        <MilestoneDialog
+          project={project}
+          editing={editing}
+          onClose={() => setEditing(null)}
+          finalFocus={() => returnFocus.target() ?? heading.current ?? true}
+        />
+      )}
+      {/* Only a pending milestone can be removed (rule 8); it is archived, not deleted. */}
+      <ConfirmDialog
+        open={removing !== null}
+        onClose={() => setRemoving(null)}
+        title={t('projects.milestones.removeTitle', { name: shownRemoving?.milestone.name ?? '' })}
+        body={t('projects.milestones.removeBody')}
+        action={t('projects.milestones.remove')}
+        destructive
+        pending={archive.isPending}
+        // Back to the menu that opened it, or the next milestone's once it is gone.
+        finalFocus={() => afterRemoval() ?? true}
+        onConfirm={async () => {
+          if (!removing) return;
+          await archive.mutateAsync(removing.milestone.id);
+          toast.add({ title: t('projects.milestones.removed'), type: 'success' });
+        }}
+      />
     </>
   );
 }
@@ -298,6 +361,9 @@ interface MilestoneStepProps extends LiHTMLAttributes<HTMLLIElement> {
   dropTarget: boolean;
   currency: Currency | null;
   onMove: (index: number) => void;
+  /** Each gets the menu's button, where the focus returns. */
+  onEdit: (opener: HTMLElement | null) => void;
+  onRemove: (opener: HTMLElement | null) => void;
 }
 
 function MilestoneStep({
@@ -312,17 +378,34 @@ function MilestoneStep({
   dropTarget,
   currency,
   onMove,
+  onEdit,
+  onRemove,
   ...props
 }: MilestoneStepProps) {
   const { t } = useTranslation();
   const done = milestone.status === 'done';
   const late = !!milestone.dueDate && milestone.dueDate > project.dueDate;
   const installment = milestone.money?.installmentMinor ?? null;
-  const [dialog, setDialog] = useState<'edit' | 'remove' | 'complete' | null>(null);
+  const [confirming, setConfirming] = useState(false);
   const [openTasks, setOpenTasks] = useState(0);
   const complete = useCompleteMilestone(project.id);
   const reopen = useReopenMilestone(project.id);
   const busy = complete.isPending || reopen.isPending;
+  const menuButton = useRef<HTMLButtonElement>(null);
+  const completeButton = useRef<HTMLButtonElement>(null);
+  // Completing takes the "complete" button off the row, a menu item leaves the focus on the page
+  // body, and a move takes the row elsewhere: once the row shows its new place or status, a focus
+  // left on the body goes to the row's menu. Only for this row's own actions.
+  const state = `${index}:${milestone.status}`;
+  const refocusFrom = useRef<string | null>(null);
+  useEffect(() => {
+    if (refocusFrom.current === null || refocusFrom.current === state) return;
+    refocusFrom.current = null;
+    if (document.activeElement === document.body) menuButton.current?.focus();
+  }, [state]);
+  const refocusAfterChange = () => {
+    refocusFrom.current = state;
+  };
 
   async function markDone(confirmOpenTasks: boolean) {
     await complete.mutateAsync({ milestoneId: milestone.id, confirmOpenTasks });
@@ -333,16 +416,17 @@ function MilestoneStep({
     // Rule 8: ask first when the milestone still has open tasks (F06).
     if (milestone.tasks.open > 0) {
       setOpenTasks(milestone.tasks.open);
-      setDialog('complete');
+      setConfirming(true);
       return;
     }
     try {
+      refocusAfterChange();
       await markDone(false);
     } catch (error) {
       const refused = openTasksOf(error);
       if (refused) {
         setOpenTasks(refused);
-        setDialog('complete');
+        setConfirming(true);
       } else {
         notifyError(errorMessage(t, error));
       }
@@ -351,6 +435,7 @@ function MilestoneStep({
 
   async function onReopen() {
     try {
+      refocusAfterChange();
       await reopen.mutateAsync(milestone.id);
       toast.add({ title: t('projects.milestones.reopened'), type: 'success' });
     } catch (error) {
@@ -458,7 +543,14 @@ function MilestoneStep({
             </span>
           )}
           {editable && !done && (
-            <Button variant="outline" size="sm" disabled={busy} onClick={onComplete}>
+            <Button
+              ref={completeButton}
+              variant="outline"
+              size="sm"
+              disabled={busy}
+              aria-label={t('projects.milestones.completeOf', { name: milestone.name })}
+              onClick={onComplete}
+            >
               <CheckIcon />
               {t('projects.milestones.complete')}
             </Button>
@@ -467,17 +559,17 @@ function MilestoneStep({
             <DropdownMenu>
               <DropdownMenuTrigger
                 render={
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    aria-label={t('projects.milestones.actions', { name: milestone.name })}
+                  <IconButton
+                    ref={menuButton}
+                    data-focus="menu"
+                    label={t('projects.milestones.actions', { name: milestone.name })}
                   />
                 }
               >
                 <EllipsisIcon />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => setDialog('edit')}>
+                <DropdownMenuItem onClick={() => onEdit(menuButton.current)}>
                   <PencilIcon />
                   {t('common.edit')}
                 </DropdownMenuItem>
@@ -490,13 +582,22 @@ function MilestoneStep({
                 {count > 1 && (
                   <>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem disabled={index === 0} onClick={() => onMove(index - 1)}>
+                    <DropdownMenuItem
+                      disabled={index === 0}
+                      onClick={() => {
+                        refocusAfterChange();
+                        onMove(index - 1);
+                      }}
+                    >
                       <ArrowUpIcon />
                       {t('projects.milestones.moveUp')}
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       disabled={index === count - 1}
-                      onClick={() => onMove(index + 1)}
+                      onClick={() => {
+                        refocusAfterChange();
+                        onMove(index + 1);
+                      }}
                     >
                       <ArrowDownIcon />
                       {t('projects.milestones.moveDown')}
@@ -506,7 +607,10 @@ function MilestoneStep({
                 {!done && (
                   <>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem variant="destructive" onClick={() => setDialog('remove')}>
+                    <DropdownMenuItem
+                      variant="destructive"
+                      onClick={() => onRemove(menuButton.current)}
+                    >
                       <Trash2Icon />
                       {t('projects.milestones.remove')}
                     </DropdownMenuItem>
@@ -524,21 +628,11 @@ function MilestoneStep({
         </div>
       </div>
 
-      <MilestoneDialog
-        project={project}
-        milestone={milestone}
-        open={dialog === 'edit'}
-        onClose={() => setDialog(null)}
-      />
-      <RemoveDialog
-        project={project}
-        milestone={milestone}
-        open={dialog === 'remove'}
-        onClose={() => setDialog(null)}
-      />
       <ConfirmDialog
-        open={dialog === 'complete'}
-        onClose={() => setDialog(null)}
+        open={confirming}
+        onClose={() => setConfirming(false)}
+        // Done: the "complete" button left the row, so its menu.
+        finalFocus={() => completeButton.current ?? menuButton.current ?? true}
         title={t('projects.milestones.openTasksTitle', { name: milestone.name })}
         body={t('projects.milestones.openTasksBody', {
           count: openTasks,
@@ -590,51 +684,21 @@ function StepNode({
   );
 }
 
-/** Only a pending milestone can be removed (rule 8); it is archived, not deleted. */
-function RemoveDialog({
-  project,
-  milestone,
-  open,
-  onClose,
-}: {
-  project: ProjectDetail;
-  milestone: Milestone;
-  open: boolean;
-  onClose: () => void;
-}) {
-  const { t } = useTranslation();
-  const archive = useArchiveMilestone(project.id);
-  return (
-    <ConfirmDialog
-      open={open}
-      onClose={onClose}
-      title={t('projects.milestones.removeTitle', { name: milestone.name })}
-      body={t('projects.milestones.removeBody')}
-      action={t('projects.milestones.remove')}
-      destructive
-      pending={archive.isPending}
-      onConfirm={async () => {
-        await archive.mutateAsync(milestone.id);
-        toast.add({ title: t('projects.milestones.removed'), type: 'success' });
-      }}
-    />
-  );
-}
-
 /**
  * Adds a milestone at the end, or edits one. The installment is shown and sent only with money
  * access, so a save without it keeps the stored amount (edge case 11).
  */
 function MilestoneDialog({
   project,
-  milestone,
-  open,
+  editing,
   onClose,
+  finalFocus,
 }: {
   project: ProjectDetail;
-  milestone?: Milestone;
-  open: boolean;
+  editing: Milestone | 'new' | null;
   onClose: () => void;
+  /** Where the focus goes when it closes: the button that opened it, or a fallback. */
+  finalFocus: () => HTMLElement | true;
 }) {
   const { t } = useTranslation();
   const ids = { name: useId(), due: useId(), installment: useId() };
@@ -642,22 +706,22 @@ function MilestoneDialog({
   const update = useUpdateMilestone(project.id);
   const money = project.permissions.canEditMoney ? (project.money?.currency ?? null) : null;
   const [failure, setFailure] = useState<string | null>(null);
+  // The title and fields stay while the dialog fades out.
+  const shown = useShownWhileClosing(editing);
+  const milestone = shown === 'new' ? undefined : (shown ?? undefined);
   const form = useForm<CreateMilestoneInput, unknown, CreateMilestone>({
     resolver: standardSchemaResolver(createMilestoneSchema),
     // A refetch keeps what the user already changed.
     resetOptions: { keepDirtyValues: true },
-    values: {
-      name: milestone?.name ?? '',
-      dueDate: milestone?.dueDate ?? null,
-      installmentMinor: milestone?.money?.installmentMinor ?? null,
-    },
+    values: milestoneValues(milestone),
   });
   const nameError = form.formState.errors.name;
 
-  function close() {
+  // After the exit animation, so the next opening starts afresh. A plain `reset()` would apply
+  // `keepDirtyValues` and keep what was typed.
+  function closed() {
     setFailure(null);
-    form.reset();
-    onClose();
+    form.reset(milestoneValues(milestone), { keepDirtyValues: false });
   }
 
   const submit = form.handleSubmit(async (values) => {
@@ -671,23 +735,27 @@ function MilestoneDialog({
           ...(money &&
             dirty.installmentMinor && { installmentMinor: values.installmentMinor ?? null }),
         };
-        if (Object.keys(changes).length > 0) {
-          await update.mutateAsync({ milestoneId: milestone.id, ...changes });
-        }
+        // Nothing changed: close without a request or a "saved" toast.
+        if (Object.keys(changes).length === 0) return onClose();
+        await update.mutateAsync({ milestoneId: milestone.id, ...changes });
         toast.add({ title: t('projects.milestones.saved'), type: 'success' });
       } else {
         await create.mutateAsync(money ? values : { ...values, installmentMinor: undefined });
         toast.add({ title: t('projects.milestones.added'), type: 'success' });
       }
-      close();
+      onClose();
     } catch (error) {
       setFailure(errorMessage(t, error));
     }
   });
 
   return (
-    <Dialog open={open} onOpenChange={(next) => !next && close()}>
-      <DialogContent closeLabel={t('common.close')}>
+    <Dialog
+      open={editing !== null}
+      onOpenChange={(open) => !open && onClose()}
+      onOpenChangeComplete={(open) => !open && closed()}
+    >
+      <DialogContent closeLabel={t('common.close')} finalFocus={finalFocus}>
         <form className="grid gap-5" onSubmit={submit} noValidate>
           <DialogHeader>
             <DialogTitle>
@@ -717,6 +785,7 @@ function MilestoneDialog({
             <Input
               id={ids.due}
               type="date"
+              dir="ltr"
               {...form.register('dueDate', { setValueAs: (value: string | null) => value || null })}
             />
           </Field>
@@ -757,3 +826,9 @@ function MilestoneDialog({
     </Dialog>
   );
 }
+
+const milestoneValues = (milestone: Milestone | undefined): CreateMilestoneInput => ({
+  name: milestone?.name ?? '',
+  dueDate: milestone?.dueDate ?? null,
+  installmentMinor: milestone?.money?.installmentMinor ?? null,
+});

@@ -98,6 +98,46 @@ test('create a project template, edit it, archive and restore it', async ({ page
   await expect(page.getByRole('button', { name: ar.templates.archive })).toBeVisible();
 });
 
+test('the template editor shows every step error and keeps the focus', async ({ page }) => {
+  await mockApi(page, { signedIn: true });
+  await page.goto('/templates/new');
+  const name = page.getByLabel(ar.templates.form.name, { exact: true });
+  await expect(name).toBeFocused();
+  await name.fill('موقع إلكتروني');
+
+  // A new stage's name takes the focus.
+  await page.getByRole('button', { name: ar.templates.addStage }).click();
+  const stageName = page.getByLabel(fill(ar.templates.stageName, { position: '1' }));
+  await expect(stageName).toBeFocused();
+  await stageName.fill('التصميم');
+
+  // An empty step: the title and the department at once, the focus on the first.
+  const addToStage = fill(ar.templates.addStepTo, { stage: 'التصميم' });
+  await page.getByRole('button', { name: addToStage }).click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByRole('button', { name: ar.templates.step.add }).click();
+  await expect(dialog.getByText(ar.templates.step.errors.title)).toBeVisible();
+  await expect(dialog.getByText(ar.templates.step.errors.department)).toBeVisible();
+  await expect(dialog.getByLabel(ar.templates.step.title)).toBeFocused();
+  await dialog.getByRole('button', { name: ar.common.cancel }).click();
+  await expect(page.getByRole('button', { name: addToStage })).toBeFocused();
+
+  await addStep(page, addToStage, { title: 'مسودات الشعار', department: 'التصميم', day: '3' });
+  await addStep(page, addToStage, { title: 'الشعار النهائي', department: 'التصميم', day: '6' });
+
+  // Removing a step moves the focus to its stage's add button, not the page.
+  await page
+    .getByRole('button', { name: fill(ar.templates.stepActions, { title: 'الشعار النهائي' }) })
+    .click();
+  await page.getByRole('menuitem', { name: ar.templates.removeStep }).click();
+  await expect(page.getByRole('button', { name: addToStage })).toBeFocused();
+
+  // A taken name is the name field's error, with the focus back in it.
+  await page.getByRole('button', { name: ar.templates.form.create }).click();
+  await expect(page.getByText(ar.errors.TEMPLATE_NAME_TAKEN)).toBeVisible();
+  await expect(name).toBeFocused();
+});
+
 test('a monthly template lists repeated steps and warns about an invalid default', async ({
   page,
 }) => {

@@ -143,6 +143,22 @@ describe('clients', () => {
         409,
         'CLIENT_NAME_TAKEN',
       );
+      // The spaces inside a name count once, also in searches.
+      await expectError(
+        await client.post('/api/clients', cast.gm.cookie, {
+          tradeName: `Cafe   ${cast.run}`,
+          accountManagerId: cast.am.id,
+        }),
+        409,
+        'CLIENT_NAME_TAKEN',
+      );
+      const spaced = await cast.createClient({ tradeName: `Spaced  \t name ${cast.run}` });
+      expect(spaced.tradeName).toBe(`Spaced name ${cast.run}`);
+      const found = await list(
+        `search=${encodeURIComponent(`spaced    name ${cast.run}`)}`,
+        cast.gm.cookie,
+      );
+      expect(found.items.map((item) => item.id)).toEqual([spaced.id]);
       const second = await cast.createClient();
       await expectError(
         await patch(second.id, cast.gm.cookie, { tradeName: first.tradeName.toUpperCase() }),

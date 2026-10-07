@@ -36,6 +36,7 @@ import {
   FieldDescription,
   FieldError,
   FieldLabel,
+  IconButton,
   Select,
   SelectContent,
   SelectItem,
@@ -53,9 +54,8 @@ import {
   PauseIcon,
   PencilIcon,
   PlayIcon,
-  RotateCcwIcon,
 } from 'lucide-react';
-import { useId, useState } from 'react';
+import { type RefObject, useId, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '../../components/confirm-dialog';
@@ -73,7 +73,7 @@ import {
   projectFormFailure,
   useProjectManagerOptions,
 } from './project-form';
-import { useArchiveProject, useChangeProjectStatus, useUpdateProject } from './projects.queries';
+import { useChangeProjectStatus, useUpdateProject } from './projects.queries';
 
 type StatusTarget = ProjectStatusChange['status'];
 
@@ -93,21 +93,53 @@ const NEXT_STEP = {
 >;
 
 /**
+ * The project page's controls that take the focus when an action removes the one that held it:
+ * a status change swaps the header's buttons and notices (archive → restore → actions menu).
+ */
+export interface ProjectFocus {
+  heading: RefObject<HTMLHeadingElement | null>;
+  /** The next step forward (start, complete, resume). */
+  next: RefObject<HTMLButtonElement | null>;
+  menu: RefObject<HTMLButtonElement | null>;
+  reopen: RefObject<HTMLButtonElement | null>;
+  restore: RefObject<HTMLButtonElement | null>;
+  /** The Milestones tab, where a refused completion sends the user. */
+  milestones: RefObject<HTMLButtonElement | null>;
+}
+
+type FocusTarget = Exclude<keyof ProjectFocus, 'heading'>;
+
+/** The first of these controls still on the page, else the heading: a dialog's `finalFocus`. */
+export function focusTarget(focus: ProjectFocus, ...order: FocusTarget[]) {
+  for (const name of order) {
+    const element = focus[name].current;
+    if (element?.isConnected) return element;
+  }
+  return focus.heading.current ?? true;
+}
+
+/**
  * The header's actions: edit, the project's next step as the primary button, and the rest in a
  * menu. Only what the caller may do on this status is offered (rule 6); the API enforces it.
  */
 export function ProjectActions({
   project,
+  focus,
   onShowMilestones,
+  onArchive,
 }: {
   project: ProjectDetail;
+  focus: ProjectFocus;
   onShowMilestones: () => void;
+  /** The confirmation lives on the page: the menu leaves with the archive. */
+  onArchive: () => void;
 }) {
   const { t } = useTranslation();
   const { permissions, status } = project;
   const archived = project.archivedAt !== null;
   const change = useChangeProjectStatus(project.id);
-  const [dialog, setDialog] = useState<'cancel' | 'complete' | 'archive' | null>(null);
+  const [dialog, setDialog] = useState<'cancel' | 'complete' | null>(null);
+  const showingMilestones = useRef(false);
 
   if (archived) return null;
   const manage = permissions.canManage && isOpen(status);
@@ -130,7 +162,10 @@ export function ProjectActions({
       {manage && <EditProject project={project} />}
       {next && (
         <Button
+          ref={focus.next}
           disabled={change.isPending}
+          // Starting or resuming keeps the button (as the next step): it keeps the focus.
+          focusableWhenDisabled
           onClick={() => (next.status === 'completed' ? setDialog('complete') : move(next.status))}
         >
           <next.icon />
@@ -141,7 +176,12 @@ export function ProjectActions({
         <DropdownMenu>
           <DropdownMenuTrigger
             render={
-              <Button variant="outline" size="icon" aria-label={t('projects.actions.more')} />
+              <IconButton
+                ref={focus.menu}
+                variant="outline"
+                size="icon"
+                label={t('projects.actions.more')}
+              />
             }
           >
             <EllipsisIcon />
@@ -162,7 +202,7 @@ export function ProjectActions({
             {permissions.canArchive && (
               <>
                 {(canHold || canCancel) && <DropdownMenuSeparator />}
-                <DropdownMenuItem variant="destructive" onClick={() => setDialog('archive')}>
+                <DropdownMenuItem variant="destructive" onClick={onArchive}>
                   <ArchiveIcon />
                   {t('projects.actions.archive')}
                 </DropdownMenuItem>
@@ -171,21 +211,36 @@ export function ProjectActions({
           </DropdownMenuContent>
         </DropdownMenu>
       )}
-      <CancelDialog project={project} open={dialog === 'cancel'} onClose={() => setDialog(null)} />
+      <CancelDialog
+        project={project}
+        open={dialog === 'cancel'}
+        onClose={() => setDialog(null)}
+        // Cancelled: the reopen button, or the menu (archive) for those who may not reopen.
+        finalFocus={() => focusTarget(focus, 'reopen', 'menu')}
+      />
       <CompleteDialog
         project={project}
         open={dialog === 'complete'}
         onClose={() => setDialog(null)}
-        onShowMilestones={onShowMilestones}
-      />
-      <ArchiveDialog
-        project={project}
-        open={dialog === 'archive'}
-        onClose={() => setDialog(null)}
+        onShowMilestones={() => {
+          showingMilestones.current = true;
+          onShowMilestones();
+        }}
+        // "Open milestones" sends the focus to their tab.
+        finalFocus={() => {
+          const toMilestones = showingMilestones.current;
+          showingMilestones.current = false;
+          return toMilestones
+            ? focusTarget(focus, 'milestones')
+            : focusTarget(focus, 'next', 'reopen', 'menu');
+        }}
       />
     </div>
   );
 }
+
+/** Where a dialog of the header sends the focus when it closes. */
+type FinalFocus = () => HTMLElement | true;
 
 /**
  * Completing needs every milestone done (rule 6). Open ones are listed before any request, and
@@ -197,11 +252,13 @@ function CompleteDialog({
   open,
   onClose,
   onShowMilestones,
+  finalFocus,
 }: {
   project: ProjectDetail;
   open: boolean;
   onClose: () => void;
   onShowMilestones: () => void;
+  finalFocus: FinalFocus;
 }) {
   const { t } = useTranslation();
   const change = useChangeProjectStatus(project.id);
@@ -213,14 +270,11 @@ function CompleteDialog({
     return (
       <AlertDialog
         open={open}
-        onOpenChange={(next) => {
-          if (!next) {
-            setRefused(null);
-            onClose();
-          }
-        }}
+        onOpenChange={(next) => !next && onClose()}
+        // After the exit animation, so the list does not change while the dialog fades.
+        onOpenChangeComplete={(next) => !next && setRefused(null)}
       >
-        <AlertDialogContent>
+        <AlertDialogContent finalFocus={finalFocus}>
           <AlertDialogHeader>
             <AlertDialogTitle>{t('projects.complete.blockedTitle')}</AlertDialogTitle>
             <AlertDialogDescription>{t('projects.complete.blockedBody')}</AlertDialogDescription>
@@ -242,7 +296,6 @@ function CompleteDialog({
             </AlertDialogClose>
             <Button
               onClick={() => {
-                setRefused(null);
                 onClose();
                 onShowMilestones();
               }}
@@ -263,6 +316,7 @@ function CompleteDialog({
       body={t('projects.complete.body')}
       action={t('projects.actions.complete')}
       pending={change.isPending}
+      finalFocus={finalFocus}
       onConfirm={async () => {
         try {
           await change.mutateAsync({ status: 'completed' });
@@ -294,10 +348,12 @@ function CancelDialog({
   project,
   open,
   onClose,
+  finalFocus,
 }: {
   project: ProjectDetail;
   open: boolean;
   onClose: () => void;
+  finalFocus: FinalFocus;
 }) {
   const { t } = useTranslation();
   const id = useId();
@@ -309,10 +365,10 @@ function CancelDialog({
   });
   const error = form.formState.errors.reason;
 
-  function close() {
+  // After the exit animation, so the reason does not vanish while the dialog fades.
+  function closed() {
     setFailure(null);
     form.reset();
-    onClose();
   }
 
   const submit = form.handleSubmit(async (values) => {
@@ -320,15 +376,19 @@ function CancelDialog({
     try {
       await change.mutateAsync(values);
       toast.add({ title: t('projects.actions.done.cancelled'), type: 'success' });
-      close();
+      onClose();
     } catch (failed) {
       setFailure(errorMessage(t, failed));
     }
   });
 
   return (
-    <Dialog open={open} onOpenChange={(next) => !next && close()}>
-      <DialogContent closeLabel={t('common.close')}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => !next && onClose()}
+      onOpenChangeComplete={(next) => !next && closed()}
+    >
+      <DialogContent closeLabel={t('common.close')} finalFocus={finalFocus}>
         <form className="grid gap-5" onSubmit={submit} noValidate>
           <DialogHeader>
             <DialogTitle>{t('projects.cancel.title', { name: project.name })}</DialogTitle>
@@ -359,39 +419,22 @@ function CancelDialog({
   );
 }
 
-function ArchiveDialog({
+/**
+ * Reopens a completed or cancelled project (scope all). An archived project manager must be
+ * replaced in the same step (edge case 8), so the dialog asks for one then. It lives on the page:
+ * the notice that opens it leaves with the reopening.
+ */
+export function ReopenDialog({
   project,
   open,
   onClose,
+  finalFocus,
 }: {
   project: ProjectDetail;
   open: boolean;
   onClose: () => void;
+  finalFocus: FinalFocus;
 }) {
-  const { t } = useTranslation();
-  const archive = useArchiveProject(project.id);
-  return (
-    <ConfirmDialog
-      open={open}
-      onClose={onClose}
-      title={t('projects.archive.title', { name: project.name })}
-      body={t('projects.archive.body')}
-      action={t('projects.actions.archive')}
-      destructive
-      pending={archive.isPending}
-      onConfirm={async () => {
-        await archive.mutateAsync(undefined);
-        toast.add({ title: t('projects.archive.done'), type: 'success' });
-      }}
-    />
-  );
-}
-
-/**
- * Reopens a completed or cancelled project (scope all). An archived project manager must be
- * replaced in the same step (edge case 8), so the dialog asks for one then.
- */
-export function ReopenButton({ project }: { project: ProjectDetail }) {
   const { t } = useTranslation();
   const id = useId();
   const change = useChangeProjectStatus(project.id);
@@ -399,21 +442,25 @@ export function ReopenButton({ project }: { project: ProjectDetail }) {
     (option) => option.id !== project.projectManager.id,
   );
   const needsManager = project.projectManager.archived;
-  const [open, setOpen] = useState(false);
   const [managerId, setManagerId] = useState<string | null>(null);
+  const [managerError, setManagerError] = useState<{ message: string; refused: boolean } | null>(
+    null,
+  );
   const [failure, setFailure] = useState<string | null>(null);
+  const managerTrigger = useRef<HTMLButtonElement>(null);
   const items = options.map((option) => ({ value: option.id, label: option.name }));
 
-  function close() {
-    setOpen(false);
+  function closed() {
     setManagerId(null);
+    setManagerError(null);
     setFailure(null);
   }
 
   async function reopen() {
     setFailure(null);
     if (needsManager && !managerId) {
-      setFailure(t('projects.reopen.managerRequired'));
+      setManagerError({ message: t('projects.reopen.managerRequired'), refused: false });
+      managerTrigger.current?.focus();
       return;
     }
     try {
@@ -422,62 +469,74 @@ export function ReopenButton({ project }: { project: ProjectDetail }) {
         ...(needsManager && managerId && { projectManagerId: managerId }),
       });
       toast.add({ title: t('projects.actions.done.reopened'), type: 'success' });
-      close();
+      onClose();
     } catch (error) {
-      setFailure(errorMessage(t, error));
+      // The chosen manager was archived meanwhile: the field says so and takes the focus.
+      if (needsManager && error instanceof ApiError && error.code === 'INVALID_PROJECT_MANAGER') {
+        setManagerError({ message: errorMessage(t, error), refused: true });
+        managerTrigger.current?.focus();
+      } else {
+        setFailure(errorMessage(t, error));
+      }
     }
   }
 
   return (
-    <>
-      <Button variant="outline" size="sm" onClick={() => setOpen(true)}>
-        <RotateCcwIcon />
-        {t('projects.actions.reopen')}
-      </Button>
-      <AlertDialog open={open} onOpenChange={(next) => !next && close()}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {t('projects.reopen.title', { name: project.name })}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {needsManager ? t('projects.reopen.bodyNewManager') : t('projects.reopen.body')}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          {needsManager && (
-            <Field>
-              <FieldLabel id={id} render={<span />}>
-                {t('projects.form.projectManager')}
-              </FieldLabel>
-              <Select items={items} value={managerId} onValueChange={setManagerId}>
-                <SelectTrigger aria-labelledby={id}>
-                  <SelectValue placeholder={t('projects.form.projectManagerPlaceholder')} />
-                </SelectTrigger>
-                <SelectContent>
-                  {items.map((item) => (
-                    <SelectItem key={item.value} value={item.value}>
-                      {item.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <FieldDescription>
-                {t('projects.reopen.archivedManager', { name: project.projectManager.name })}
-              </FieldDescription>
-            </Field>
-          )}
-          {failure && <FormAlert>{failure}</FormAlert>}
-          <AlertDialogFooter>
-            <AlertDialogClose render={<Button variant="outline" />}>
-              {t('common.cancel')}
-            </AlertDialogClose>
-            <Button disabled={change.isPending} onClick={reopen}>
-              {t('projects.actions.reopen')}
-            </Button>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </>
+    <AlertDialog
+      open={open}
+      onOpenChange={(next) => !next && onClose()}
+      onOpenChangeComplete={(next) => !next && closed()}
+    >
+      <AlertDialogContent finalFocus={finalFocus}>
+        <AlertDialogHeader>
+          <AlertDialogTitle>{t('projects.reopen.title', { name: project.name })}</AlertDialogTitle>
+          <AlertDialogDescription>
+            {needsManager ? t('projects.reopen.bodyNewManager') : t('projects.reopen.body')}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        {needsManager && (
+          <Field invalid={!!managerError}>
+            <FieldLabel id={id} render={<span />}>
+              {t('projects.form.projectManager')}
+            </FieldLabel>
+            <Select
+              items={items}
+              value={managerId}
+              onValueChange={(value) => {
+                setManagerId(value);
+                setManagerError(null);
+              }}
+            >
+              <SelectTrigger ref={managerTrigger} aria-labelledby={id}>
+                <SelectValue placeholder={t('projects.form.projectManagerPlaceholder')} />
+              </SelectTrigger>
+              <SelectContent>
+                {items.map((item) => (
+                  <SelectItem key={item.value} value={item.value}>
+                    {item.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <FieldDescription>
+              {t('projects.reopen.archivedManager', { name: project.projectManager.name })}
+            </FieldDescription>
+            <FieldError match={!!managerError} role={managerError?.refused ? 'alert' : undefined}>
+              {managerError?.message}
+            </FieldError>
+          </Field>
+        )}
+        {failure && <FormAlert>{failure}</FormAlert>}
+        <AlertDialogFooter>
+          <AlertDialogClose render={<Button variant="outline" />}>
+            {t('common.cancel')}
+          </AlertDialogClose>
+          <Button disabled={change.isPending} onClick={reopen}>
+            {t('projects.actions.reopen')}
+          </Button>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }
 
@@ -489,6 +548,7 @@ function EditProject({ project }: { project: ProjectDetail }) {
   const { t } = useTranslation();
   const update = useUpdateProject(project.id);
   const { canChangeManager, canEditMoney } = project.permissions;
+  const editButton = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
   const form = useForm<CreateProjectInput, unknown, CreateProject>({
@@ -508,10 +568,11 @@ function EditProject({ project }: { project: ProjectDetail }) {
     },
   });
 
-  function close() {
-    setOpen(false);
+  // After the exit animation: the next opening starts from the saved project. A plain `reset()`
+  // would apply `keepDirtyValues` and keep what was typed.
+  function closed() {
     setFailure(null);
-    form.reset();
+    form.reset(undefined, { keepDirtyValues: false });
   }
 
   const submit = form.handleSubmit(async (values) => {
@@ -528,10 +589,12 @@ function EditProject({ project }: { project: ProjectDetail }) {
         dirty.projectManagerId && { projectManagerId: values.projectManagerId }),
       ...(canEditMoney && dirty.currency && { currency: values.currency }),
     };
+    // Nothing changed: close without a request or a "saved" toast.
+    if (Object.keys(changes).length === 0) return setOpen(false);
     try {
-      if (Object.keys(changes).length > 0) await update.mutateAsync(changes);
+      await update.mutateAsync(changes);
       toast.add({ title: t('projects.edit.saved'), type: 'success' });
-      close();
+      setOpen(false);
     } catch (error) {
       setFailure(projectFormFailure(form, t, error));
     }
@@ -539,12 +602,12 @@ function EditProject({ project }: { project: ProjectDetail }) {
 
   return (
     <>
-      <Button variant="outline" onClick={() => setOpen(true)}>
+      <Button ref={editButton} variant="outline" onClick={() => setOpen(true)}>
         <PencilIcon />
         {t('common.edit')}
       </Button>
-      <Dialog open={open} onOpenChange={(next) => !next && close()}>
-        <DialogContent closeLabel={t('common.close')} className="max-w-2xl">
+      <Dialog open={open} onOpenChange={setOpen} onOpenChangeComplete={(next) => !next && closed()}>
+        <DialogContent closeLabel={t('common.close')} className="max-w-2xl" finalFocus={editButton}>
           <form className="grid gap-5" onSubmit={submit} noValidate>
             <DialogHeader>
               <DialogTitle>{t('projects.edit.title')}</DialogTitle>

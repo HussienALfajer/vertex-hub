@@ -10,9 +10,10 @@ type OtpFieldProps = Omit<OTPFieldPrimitive.Root.Props, 'length'> & {
 
 /**
  * One-time code slots (two-factor sign-in). Codes read left to right in every language, so the
- * slots are laid out LTR; the middle gap groups a 6-digit code as 3 + 3.
+ * slots are laid out LTR; the middle gap groups a 6-digit code as 3 + 3. `autoFocus` focuses the
+ * first slot (on the root it would do nothing).
  */
-function OtpField({ length = 6, slotLabel, className, ...props }: OtpFieldProps) {
+function OtpField({ length = 6, slotLabel, className, autoFocus, ...props }: OtpFieldProps) {
   const middle = length % 2 === 0 ? length / 2 : -1;
   const positions = Array.from({ length }, (_, index) => index);
   return (
@@ -32,6 +33,7 @@ function OtpField({ length = 6, slotLabel, className, ...props }: OtpFieldProps)
             />
           )}
           <OTPFieldPrimitive.Input
+            autoFocus={autoFocus && position === 0}
             aria-label={position === 0 ? undefined : slotLabel(position + 1)}
             className={cn(
               'h-12 w-11 rounded-md border border-input bg-surface text-center text-xl font-medium tabular-nums text-foreground',

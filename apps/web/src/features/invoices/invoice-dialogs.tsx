@@ -180,7 +180,7 @@ export function IssueDialog({
             dir="ltr"
             inputMode="decimal"
             autoComplete="off"
-            className="text-end tabular-nums"
+            className="tabular-nums"
             {...form.register('sypPerUsd', { validate: (value) => validRate(value) })}
           />
           <RateHint settings={settings} />
@@ -354,7 +354,7 @@ export function PaymentDialog({
               dir="ltr"
               inputMode="decimal"
               autoComplete="off"
-              className="text-end tabular-nums"
+              className="tabular-nums"
               {...form.register('sypPerUsd', { validate: (value) => validRate(value) })}
             />
             <RateHint settings={settings} />

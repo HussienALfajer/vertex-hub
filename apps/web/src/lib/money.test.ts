@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { amountText, formatMoney, isAmountDraft, parseAmount } from './money';
+import { amountText, formatMoney, isAmountDraft, parseAmount, rateInput, rateText } from './money';
 
 describe('money', () => {
   it('formats minor units with two decimals, Latin digits and the currency code', () => {
@@ -37,5 +37,18 @@ describe('money', () => {
     expect(amountText(null)).toBe('');
     for (const minor of [0, 1, 99, 100, 123_456])
       expect(parseAmount(amountText(minor))).toBe(minor);
+  });
+
+  it('reads a typed rate with Arabic-Indic digits, and keeps a thousands comma invalid', () => {
+    expect(rateInput(' ١١٨٫٥ ')).toBe('118.5');
+    expect(rateInput('13,000')).toBe('13,000');
+  });
+
+  it('writes a stored rate without trailing zeros', () => {
+    expect(rateText('118.5000')).toBe('118.5');
+    expect(rateText('13000.0000')).toBe('13000');
+    expect(rateText('0.0001')).toBe('0.0001');
+    expect(rateText('13000')).toBe('13000');
+    expect(rateText(null)).toBe('');
   });
 });

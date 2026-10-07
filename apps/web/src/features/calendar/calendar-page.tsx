@@ -288,7 +288,7 @@ export function CalendarPage({ search }: { search: CalendarSearch }) {
         )}
       </div>
 
-      {creatingMeeting && <MeetingDialog onClose={() => setCreatingMeeting(false)} />}
+      <MeetingDialog open={creatingMeeting} onClose={() => setCreatingMeeting(false)} />
       {openDay && (
         <Dialog open onOpenChange={(open) => !open && setOpenDay(null)}>
           <DialogContent closeLabel={t('common.close')} className="max-w-2xl p-0">

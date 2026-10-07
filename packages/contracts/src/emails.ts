@@ -111,6 +111,7 @@ export const SECURITY_CHANGES = [
   'two_factor_enabled',
   'two_factor_disabled',
   'two_factor_reset',
+  'backup_codes_regenerated',
   'roles_changed',
   'archived',
 ] as const;

@@ -36,6 +36,9 @@ import {
   Tabs,
   TabsList,
   TabsTrigger,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
   toast,
 } from '@vertex-hub/ui';
 import {
@@ -50,7 +53,7 @@ import {
   SettingsIcon,
   TriangleAlertIcon,
 } from 'lucide-react';
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '../../components/confirm-dialog';
 import { LoadError } from '../../components/load-error';
@@ -61,6 +64,7 @@ import { formatList, formatNumber } from '../../lib/format';
 import { formatMoney } from '../../lib/money';
 import { ALL, flagParam, oneOfParam, pageParam, textParam } from '../../lib/search-params';
 import { usePageInRange } from '../../lib/use-page-in-range';
+import { type ReturnFocus, useReturnFocus } from '../../lib/use-return-focus';
 import { useSearchText } from '../../lib/use-search-text';
 import { useDepartmentNames } from '../projects/project-badges';
 import {
@@ -69,6 +73,7 @@ import {
   useSetPackageArchived,
   useSetServiceArchived,
 } from './catalog.queries';
+import type { Editing } from './catalog-dialog';
 import { PackageDialog } from './package-dialog';
 import { ServiceDialog } from './service-dialog';
 
@@ -99,9 +104,6 @@ export function parseCatalogSearch(search: Record<string, unknown>): CatalogSear
   };
 }
 
-/** `null` while closed, `'new'` to add, or the record being edited. */
-type Editing<T> = T | 'new' | null;
-
 /** Spec screen 1: the catalog's services and packages; managers add, edit and archive. */
 export function CatalogPage({ search }: { search: CatalogSearch }) {
   const { t } = useTranslation();
@@ -111,6 +113,16 @@ export function CatalogPage({ search }: { search: CatalogSearch }) {
   const tab = search.tab ?? 'services';
   const [editingService, setEditingService] = useState<Editing<CatalogService>>(null);
   const [editingPackage, setEditingPackage] = useState<Editing<CatalogPackage>>(null);
+  const activeTab = useRef<HTMLButtonElement>(null);
+  const returnFocus = useReturnFocus(activeTab);
+  const openService = (service: CatalogService | 'new', opener: HTMLElement | null) => {
+    returnFocus.from(opener);
+    setEditingService(service);
+  };
+  const openPackage = (pkg: CatalogPackage | 'new', opener: HTMLElement | null) => {
+    returnFocus.from(opener);
+    setEditingPackage(pkg);
+  };
 
   const setFilter = useCallback(
     (next: Partial<CatalogSearch>) =>
@@ -136,12 +148,12 @@ export function CatalogPage({ search }: { search: CatalogSearch }) {
             )}
             {manager &&
               (tab === 'services' ? (
-                <Button onClick={() => setEditingService('new')}>
+                <Button onClick={(event) => openService('new', event.currentTarget)}>
                   <PlusIcon />
                   {t('catalog.services.new')}
                 </Button>
               ) : (
-                <Button onClick={() => setEditingPackage('new')}>
+                <Button onClick={(event) => openPackage('new', event.currentTarget)}>
                   <PlusIcon />
                   {t('catalog.packages.new')}
                 </Button>
@@ -157,11 +169,11 @@ export function CatalogPage({ search }: { search: CatalogSearch }) {
         }
       >
         <TabsList aria-label={t('catalog.title')}>
-          <TabsTrigger value="services">
+          <TabsTrigger value="services" ref={tab === 'services' ? activeTab : undefined}>
             <BoxesIcon />
             {t('catalog.tabs.services')}
           </TabsTrigger>
-          <TabsTrigger value="packages">
+          <TabsTrigger value="packages" ref={tab === 'packages' ? activeTab : undefined}>
             <PackageIcon />
             {t('catalog.tabs.packages')}
           </TabsTrigger>
@@ -174,22 +186,30 @@ export function CatalogPage({ search }: { search: CatalogSearch }) {
         <ServicesTab
           search={search}
           manager={manager}
-          onNew={() => setEditingService('new')}
-          onEdit={setEditingService}
+          onOpen={openService}
+          returnFocus={returnFocus}
         />
       ) : (
         <PackagesTab
           search={search}
           manager={manager}
-          onNew={() => setEditingPackage('new')}
-          onEdit={setEditingPackage}
+          onOpen={openPackage}
+          returnFocus={returnFocus}
         />
       )}
 
       {manager && (
         <>
-          <ServiceDialog editing={editingService} onClose={() => setEditingService(null)} />
-          <PackageDialog editing={editingPackage} onClose={() => setEditingPackage(null)} />
+          <ServiceDialog
+            editing={editingService}
+            onClose={() => setEditingService(null)}
+            finalFocus={returnFocus.target}
+          />
+          <PackageDialog
+            editing={editingPackage}
+            onClose={() => setEditingPackage(null)}
+            finalFocus={returnFocus.target}
+          />
         </>
       )}
     </>
@@ -228,8 +248,9 @@ function Filters({
   ];
 
   return (
-    <div className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-3 md:flex-row md:items-center">
-      <div className="relative flex-1">
+    <div className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-3 md:flex-row md:flex-wrap md:items-center">
+      {/* Keeps room to type; the selects wrap under it when the row is narrow. */}
+      <div className="relative flex-1 md:min-w-64">
         <SearchIcon
           aria-hidden="true"
           className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
@@ -344,13 +365,13 @@ function ListPagination({
 function ServicesTab({
   search,
   manager,
-  onNew,
-  onEdit,
+  onOpen,
+  returnFocus,
 }: {
   search: CatalogSearch;
   manager: boolean;
-  onNew: () => void;
-  onEdit: (service: CatalogService) => void;
+  onOpen: (service: CatalogService | 'new', opener: HTMLElement | null) => void;
+  returnFocus: ReturnFocus;
 }) {
   const { t } = useTranslation();
   const archived = manager && !!search.archived;
@@ -387,7 +408,7 @@ function ServicesTab({
         action={
           !filtered &&
           manager && (
-            <Button onClick={onNew}>
+            <Button onClick={(event) => onOpen('new', event.currentTarget)}>
               <PlusIcon />
               {t('catalog.services.new')}
             </Button>
@@ -398,7 +419,12 @@ function ServicesTab({
   }
   return (
     <div className="flex flex-col gap-4">
-      <ServicesTable services={services.data.items} manager={manager} onEdit={onEdit} />
+      <ServicesTable
+        services={services.data.items}
+        manager={manager}
+        onEdit={onOpen}
+        returnFocus={returnFocus}
+      />
       <ListPagination
         page={paging.page}
         total={services.data.total}
@@ -424,22 +450,27 @@ function ServicesTable({
   services,
   manager,
   onEdit,
+  returnFocus,
 }: {
   services: CatalogService[];
   manager: boolean;
-  onEdit: (service: CatalogService) => void;
+  onEdit: (service: CatalogService, opener: HTMLElement | null) => void;
+  returnFocus: ReturnFocus;
 }) {
   const { t } = useTranslation();
   const nameOf = useDepartmentNames();
   const [archiving, setArchiving] = useState<CatalogService | null>(null);
   const setArchived = useSetServiceArchived();
 
-  async function restore(service: CatalogService) {
+  async function restore(service: CatalogService, opener: HTMLElement | null) {
     try {
       await setArchived.mutateAsync({ id: service.id, archive: false });
       toast.add({ title: t('catalog.services.restored'), type: 'success' });
+      // The restored row leaves the list of archived ones.
+      returnFocus.toFallback();
     } catch (error) {
       toast.add({ title: errorMessage(t, error), type: 'error' });
+      opener?.focus();
     }
   }
 
@@ -448,7 +479,7 @@ function ServicesTable({
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>{t('catalog.columns.name')}</TableHead>
+            <TableHead className="min-w-48">{t('catalog.columns.name')}</TableHead>
             <TableHead>{t('catalog.department')}</TableHead>
             <TableHead>{t('catalog.billing')}</TableHead>
             <TableHead className="text-end">{t('catalog.columns.priceUsd')}</TableHead>
@@ -468,7 +499,7 @@ function ServicesTable({
             <TableRow key={service.id}>
               <TableCell className="whitespace-normal">
                 <div className="flex min-w-0 flex-col gap-1">
-                  <span className="flex flex-wrap items-center gap-2 font-medium">
+                  <span className="flex flex-wrap items-center gap-2 font-medium wrap-anywhere">
                     {service.name}
                     {service.archivedAt && (
                       <Badge tone="outline">{t('catalog.archivedBadge')}</Badge>
@@ -511,9 +542,12 @@ function ServicesTable({
                   <RowActions
                     name={service.name}
                     archived={!!service.archivedAt}
-                    onEdit={() => onEdit(service)}
-                    onArchive={() => setArchiving(service)}
-                    onRestore={() => restore(service)}
+                    onEdit={(opener) => onEdit(service, opener)}
+                    onArchive={(opener) => {
+                      returnFocus.from(opener);
+                      setArchiving(service);
+                    }}
+                    onRestore={(opener) => restore(service, opener)}
                   />
                 </TableCell>
               )}
@@ -529,6 +563,7 @@ function ServicesTable({
         action={t('catalog.archive')}
         destructive
         pending={setArchived.isPending}
+        finalFocus={returnFocus.target}
         describeFailure={(error) => {
           // C1: name the active packages that hold the service.
           if (!(error instanceof ApiError) || error.knownCode !== 'SERVICE_IN_PACKAGE') return;
@@ -575,6 +610,11 @@ function TemplateName({ template }: { template: CatalogService['template'] }) {
   );
 }
 
+/**
+ * A row's menu. A chosen action owns the focus from then on (its dialog gives it back, or the
+ * action moves it once the row is gone), so the menu does not return it to its button; each action
+ * gets that button to come back to.
+ */
 function RowActions({
   name,
   archived,
@@ -584,33 +624,49 @@ function RowActions({
 }: {
   name: string;
   archived: boolean;
-  onEdit: () => void;
-  onArchive: () => void;
-  onRestore: () => void;
+  onEdit: (opener: HTMLElement | null) => void;
+  onArchive: (opener: HTMLElement | null) => void;
+  onRestore: (opener: HTMLElement | null) => void;
 }) {
   const { t } = useTranslation();
+  const menuButton = useRef<HTMLButtonElement>(null);
+  const chosen = useRef(false);
+  const choose = (action: (opener: HTMLElement | null) => void) => () => {
+    chosen.current = true;
+    action(menuButton.current);
+  };
+  const label = t('catalog.actions', { name });
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
-        render={
-          <Button variant="ghost" size="icon-sm" aria-label={t('catalog.actions', { name })} />
-        }
-      >
-        <EllipsisIcon />
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
+    <DropdownMenu
+      onOpenChange={(open) => {
+        if (open) chosen.current = false;
+      }}
+    >
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <DropdownMenuTrigger
+              render={<Button ref={menuButton} variant="ghost" size="icon-sm" aria-label={label} />}
+            />
+          }
+        >
+          <EllipsisIcon />
+        </TooltipTrigger>
+        <TooltipContent>{label}</TooltipContent>
+      </Tooltip>
+      <DropdownMenuContent align="end" finalFocus={() => !chosen.current}>
         {archived ? (
-          <DropdownMenuItem onClick={onRestore}>
+          <DropdownMenuItem onClick={choose(onRestore)}>
             <ArchiveRestoreIcon />
             {t('catalog.restore')}
           </DropdownMenuItem>
         ) : (
           <>
-            <DropdownMenuItem onClick={onEdit}>
+            <DropdownMenuItem onClick={choose(onEdit)}>
               <PencilIcon />
               {t('catalog.edit')}
             </DropdownMenuItem>
-            <DropdownMenuItem variant="destructive" onClick={onArchive}>
+            <DropdownMenuItem variant="destructive" onClick={choose(onArchive)}>
               <ArchiveIcon />
               {t('catalog.archive')}
             </DropdownMenuItem>
@@ -624,13 +680,13 @@ function RowActions({
 function PackagesTab({
   search,
   manager,
-  onNew,
-  onEdit,
+  onOpen,
+  returnFocus,
 }: {
   search: CatalogSearch;
   manager: boolean;
-  onNew: () => void;
-  onEdit: (pkg: CatalogPackage) => void;
+  onOpen: (pkg: CatalogPackage | 'new', opener: HTMLElement | null) => void;
+  returnFocus: ReturnFocus;
 }) {
   const { t } = useTranslation();
   const archived = manager && !!search.archived;
@@ -649,12 +705,15 @@ function PackagesTab({
   const setArchived = useSetPackageArchived();
   const filtered = !!(search.search || search.billing || archived);
 
-  async function restore(pkg: CatalogPackage) {
+  async function restore(pkg: CatalogPackage, opener: HTMLElement | null) {
     try {
       await setArchived.mutateAsync({ id: pkg.id, archive: false });
       toast.add({ title: t('catalog.packages.restored'), type: 'success' });
+      // The restored row leaves the list of archived ones.
+      returnFocus.toFallback();
     } catch (error) {
       toast.add({ title: errorMessage(t, error), type: 'error' });
+      opener?.focus();
     }
   }
 
@@ -677,7 +736,7 @@ function PackagesTab({
         action={
           !filtered &&
           manager && (
-            <Button onClick={onNew}>
+            <Button onClick={(event) => onOpen('new', event.currentTarget)}>
               <PlusIcon />
               {t('catalog.packages.new')}
             </Button>
@@ -694,9 +753,12 @@ function PackagesTab({
             <PackageCard
               pkg={pkg}
               manager={manager}
-              onEdit={() => onEdit(pkg)}
-              onArchive={() => setArchiving(pkg)}
-              onRestore={() => restore(pkg)}
+              onEdit={(opener) => onOpen(pkg, opener)}
+              onArchive={(opener) => {
+                returnFocus.from(opener);
+                setArchiving(pkg);
+              }}
+              onRestore={(opener) => restore(pkg, opener)}
             />
           </li>
         ))}
@@ -715,6 +777,7 @@ function PackagesTab({
         action={t('catalog.archive')}
         destructive
         pending={setArchived.isPending}
+        finalFocus={returnFocus.target}
         onConfirm={async () => {
           if (!archiving) return;
           await setArchived.mutateAsync({ id: archiving.id, archive: true });
@@ -734,9 +797,9 @@ function PackageCard({
 }: {
   pkg: CatalogPackage;
   manager: boolean;
-  onEdit: () => void;
-  onArchive: () => void;
-  onRestore: () => void;
+  onEdit: (opener: HTMLElement | null) => void;
+  onArchive: (opener: HTMLElement | null) => void;
+  onRestore: (opener: HTMLElement | null) => void;
 }) {
   const { t } = useTranslation();
   const items = pkg.items.map((item) =>
@@ -746,7 +809,7 @@ function PackageCard({
     <Card className="h-full gap-4 p-5">
       <div className="flex items-start gap-3">
         <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <h3 className="text-lg font-bold">{pkg.name}</h3>
+          <h3 className="text-lg font-bold wrap-anywhere">{pkg.name}</h3>
           <span className="flex flex-wrap items-center gap-2">
             <BillingBadge billing={pkg.billing} />
             {pkg.archivedAt && <Badge tone="outline">{t('catalog.archivedBadge')}</Badge>}
@@ -762,6 +825,11 @@ function PackageCard({
           />
         )}
       </div>
+      {pkg.description && (
+        <p className="text-sm whitespace-pre-line text-muted-foreground wrap-anywhere">
+          {pkg.description}
+        </p>
+      )}
       <dl className="flex flex-col gap-1">
         <dt className="sr-only">{t('catalog.packages.price')}</dt>
         <dd className="text-xl font-bold">
@@ -791,9 +859,6 @@ function PackageCard({
         <span className="text-muted-foreground">{t('catalog.columns.template')}</span>
         <TemplateName template={pkg.template} />
       </div>
-      {pkg.description && (
-        <p className="text-sm whitespace-pre-line text-muted-foreground">{pkg.description}</p>
-      )}
     </Card>
   );
 }

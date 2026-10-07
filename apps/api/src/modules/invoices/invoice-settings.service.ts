@@ -27,6 +27,12 @@ const auditFields = (row: InvoiceSettingsRow) => ({
 export const sameRate = (a: string | null, b: string | null) =>
   a === b || (a !== null && b !== null && Number(a) === Number(b));
 
+/** A valid rate as `numeric(12,4)` stores it (`118.5` → `118.5000`), so audit entries compare. */
+const storedRate = (rate: string) => {
+  const [whole = '0', fraction = ''] = rate.split('.');
+  return `${BigInt(whole)}.${fraction.padEnd(4, '0')}`;
+};
+
 /** Invoice settings (F13): the current rate, payment terms, payment details and footer. */
 @Injectable()
 export class InvoiceSettingsService {
@@ -54,12 +60,12 @@ export class InvoiceSettingsService {
   async update(actor: CurrentUserInfo, input: UpdateInvoiceSettings): Promise<InvoiceSettings> {
     const row = await this.db.transaction(async (tx) => {
       const current = await this.row(tx, { forUpdate: true });
-      const rateChanges =
-        input.sypPerUsd !== undefined && !sameRate(current.sypPerUsd, input.sypPerUsd);
-      const changes = changedFields(auditFields(current), {
-        ...input,
-        sypPerUsd: rateChanges ? input.sypPerUsd : undefined,
-      });
+      const rate =
+        input.sypPerUsd !== undefined && !sameRate(current.sypPerUsd, input.sypPerUsd)
+          ? storedRate(input.sypPerUsd)
+          : undefined;
+      const rateChanges = rate !== undefined;
+      const changes = changedFields(auditFields(current), { ...input, sypPerUsd: rate });
       if (!changes) return current;
       const now = new Date();
       const [updated] = await tx

@@ -574,7 +574,10 @@ export type QuoteDetail = z.infer<typeof quoteDetailSchema>;
 export const QUOTE_SORTS = ['updatedAt', 'number', 'validUntil'] as const;
 
 export const quoteListQuerySchema = pageQuerySchema.extend({
-  /** Matches the number (`Q-2026-0007` or `7`), the title, the client's or the lead's name. */
+  /**
+   * Matches the number (`Q-2026-0007`, `Q-2026-0007 v2` or `7`), the title, the client's or the
+   * lead's name.
+   */
   search: z.string().trim().min(1).max(100).optional(),
   status: queryListSchema(quoteStatusSchema).default([...OPEN_QUOTE_STATUSES]),
   clientId: z.uuid().optional(),

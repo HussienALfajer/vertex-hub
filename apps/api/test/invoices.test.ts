@@ -246,7 +246,8 @@ describe('invoices', () => {
       expect(entry).toMatchObject({
         action: 'invoice_settings.updated',
         before: { sypPerUsd: '13000.0000', paymentDetails: '' },
-        after: { sypPerUsd: '13500.5', paymentDetails: 'بنك سوريا الدولي' },
+        // The rate as stored, so before and after read alike.
+        after: { sypPerUsd: '13500.5000', paymentDetails: 'بنك سوريا الدولي' },
       });
       // The same rate written another way is no change.
       const again = await patch('/api/invoice-settings', finance.cookie, { sypPerUsd: '13500.50' });

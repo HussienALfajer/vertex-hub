@@ -28,19 +28,27 @@ import {
   FieldDescription,
   FieldError,
   FieldLabel,
+  IconTile,
   Input,
   PageHeader,
+  PasswordInput,
   Skeleton,
   toast,
 } from '@vertex-hub/ui';
 import { KeyRoundIcon, LockIcon, ShieldCheckIcon, ShieldIcon } from 'lucide-react';
-import { useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { FormAlert } from '../../components/form-alert';
 import { LoadError } from '../../components/load-error';
-import { authClient, useMe } from '../../lib/auth';
-import { errorMessage } from '../../lib/errors';
+import { authClient, meQuery, useMe } from '../../lib/auth';
+import {
+  errorMessage,
+  type Failure,
+  fieldError,
+  passwordFailure,
+  SCREEN_ERROR,
+} from '../../lib/errors';
 import { DepartmentChips } from '../users/user-badges';
 import { SkillsInput } from '../users/user-form';
 import { skillsQuery, userQuery, useUpdateOwnProfile } from '../users/users.queries';
@@ -112,6 +120,7 @@ function ContactForm({ user }: { user: UserResponse }) {
   const { t } = useTranslation();
   const update = useUpdateOwnProfile();
   const skills = useQuery(skillsQuery);
+  const skillsId = useId();
   const [failure, setFailure] = useState<string | null>(null);
   const {
     register,
@@ -144,17 +153,18 @@ function ContactForm({ user }: { user: UserResponse }) {
       <form className="flex flex-col gap-5" onSubmit={submit} noValidate>
         <Field invalid={!!errors.phone}>
           <FieldLabel>{t('users.form.phone')}</FieldLabel>
-          <Input type="tel" dir="ltr" className="text-end" {...register('phone')} />
+          <Input type="tel" dir="ltr" {...register('phone')} />
           <FieldDescription>{t('users.form.phoneHint')}</FieldDescription>
           <FieldError match={!!errors.phone}>{t('users.form.errors.phone')}</FieldError>
         </Field>
         <Field invalid={!!errors.skills}>
-          <FieldLabel>{t('users.form.skills')}</FieldLabel>
+          <FieldLabel htmlFor={skillsId}>{t('users.form.skills')}</FieldLabel>
           <Controller
             control={control}
             name="skills"
             render={({ field }) => (
               <SkillsInput
+                id={skillsId}
                 value={field.value ?? []}
                 onChange={field.onChange}
                 suggestions={skills.data?.items ?? []}
@@ -180,6 +190,7 @@ function PasswordForm() {
     register,
     handleSubmit,
     reset,
+    setError,
     formState: { errors, isSubmitting },
   } = useForm<ChangePasswordForm>({
     resolver: standardSchemaResolver(changePasswordFormSchema),
@@ -194,7 +205,15 @@ function PasswordForm() {
       revokeOtherSessions: true,
     });
     if (error) {
-      setFailure(errorMessage(t, error));
+      const refused = passwordFailure(t, error);
+      // A wrong current password belongs to its field: mark it and put the cursor back there.
+      if (refused.field) {
+        setError(
+          'currentPassword',
+          { type: SCREEN_ERROR, message: refused.message },
+          { shouldFocus: true },
+        );
+      } else setFailure(refused.message);
       return;
     }
     reset();
@@ -210,14 +229,17 @@ function PasswordForm() {
         </CardTitle>
         <CardDescription className="text-sm">{t('account.password.hint')}</CardDescription>
       </CardHeader>
-      <form className="grid gap-5 md:grid-cols-3" onSubmit={submit} noValidate>
-        <PasswordField
-          label={t('account.password.current')}
-          autoComplete="current-password"
-          invalid={!!errors.currentPassword}
-          error={t('account.password.errors.current')}
-          {...register('currentPassword')}
-        />
+      {/* The current password on its own row; the new one and its confirmation side by side. */}
+      <form className="grid gap-5 sm:grid-cols-2" onSubmit={submit} noValidate>
+        <div className="grid gap-5 sm:col-span-2 sm:grid-cols-2">
+          <PasswordField
+            label={t('account.password.current')}
+            autoComplete="current-password"
+            invalid={!!errors.currentPassword}
+            error={fieldError(errors.currentPassword, t('account.password.errors.current'))}
+            {...register('currentPassword')}
+          />
+        </div>
         <PasswordField
           label={t('account.password.next')}
           autoComplete="new-password"
@@ -233,11 +255,11 @@ function PasswordForm() {
           {...register('confirm')}
         />
         {failure && (
-          <div className="md:col-span-3">
+          <div className="sm:col-span-2">
             <FormAlert>{failure}</FormAlert>
           </div>
         )}
-        <Button type="submit" className="justify-self-end md:col-span-3" disabled={isSubmitting}>
+        <Button type="submit" className="justify-self-end sm:col-span-2" disabled={isSubmitting}>
           {isSubmitting ? t('common.saving') : t('account.password.submit')}
         </Button>
       </form>
@@ -250,11 +272,19 @@ function PasswordField({
   invalid,
   error,
   ...props
-}: { label: string; invalid: boolean; error: string } & React.ComponentProps<typeof Input>) {
+}: { label: string; invalid: boolean; error: string } & Omit<
+  React.ComponentProps<typeof PasswordInput>,
+  'showLabel' | 'hideLabel'
+>) {
+  const { t } = useTranslation();
   return (
     <Field invalid={invalid}>
       <FieldLabel>{label}</FieldLabel>
-      <Input type="password" dir="ltr" className="text-end" {...props} />
+      <PasswordInput
+        showLabel={t('common.showPassword')}
+        hideLabel={t('common.hidePassword')}
+        {...props}
+      />
       <FieldError match={invalid}>{error}</FieldError>
     </Field>
   );
@@ -269,15 +299,9 @@ function TwoFactorCard() {
   return (
     <Card className="lg:sticky lg:top-24">
       <div className="flex items-start justify-between gap-3">
-        <span
-          className={`flex size-11 items-center justify-center rounded-lg ${
-            enabled
-              ? 'bg-status-success text-status-success-foreground'
-              : 'bg-muted text-muted-foreground'
-          }`}
-        >
-          {enabled ? <ShieldCheckIcon className="size-5" /> : <ShieldIcon className="size-5" />}
-        </span>
+        <IconTile tone={enabled ? 'success' : 'muted'}>
+          {enabled ? <ShieldCheckIcon /> : <ShieldIcon />}
+        </IconTile>
         <div className="flex flex-wrap justify-end gap-1.5">
           <Badge tone={enabled ? 'success' : 'neutral'}>
             {enabled ? t('account.twoFactor.on') : t('account.twoFactor.off')}
@@ -288,7 +312,11 @@ function TwoFactorCard() {
       <CardHeader>
         <CardTitle className="text-lg">{t('account.twoFactor.title')}</CardTitle>
         <CardDescription className="text-sm">
-          {required ? t('account.twoFactor.requiredHint') : t('account.twoFactor.optionalHint')}
+          {required
+            ? t('account.twoFactor.requiredHint')
+            : enabled
+              ? t('account.twoFactor.onHint')
+              : t('account.twoFactor.offHint')}
         </CardDescription>
       </CardHeader>
       <div className="flex flex-col gap-2">
@@ -299,7 +327,7 @@ function TwoFactorCard() {
             </Button>
             {!required && (
               <Button variant="ghost" onClick={() => setDialog('disable')}>
-                {t('account.twoFactor.disable')}
+                {t('account.twoFactor.disableAction')}
               </Button>
             )}
           </>
@@ -324,14 +352,23 @@ function PasswordDialog({
   const queryClient = useQueryClient();
   const [password, setPassword] = useState('');
   const [codes, setCodes] = useState<string[] | null>(null);
-  const [failure, setFailure] = useState<string | null>(null);
+  const [failure, setFailure] = useState<Failure | null>(null);
   const [pending, setPending] = useState(false);
+  const passwordInput = useRef<HTMLInputElement>(null);
+  // The content stays as it was while the dialog fades out.
+  const [shown, setShown] = useState(mode);
+  if (mode && mode !== shown) setShown(mode);
 
-  function close() {
+  function reset() {
     setPassword('');
     setCodes(null);
     setFailure(null);
-    onClose();
+  }
+
+  function refuse(error: unknown) {
+    const refused = passwordFailure(t, error);
+    setFailure(refused);
+    if (refused.field) passwordInput.current?.focus();
   }
 
   async function confirm(event: React.FormEvent) {
@@ -339,15 +376,15 @@ function PasswordDialog({
     setFailure(null);
     setPending(true);
     try {
-      if (mode === 'disable') {
+      if (shown === 'disable') {
         const { error } = await authClient.twoFactor.disable({ password });
-        if (error) return setFailure(errorMessage(t, error));
-        await queryClient.invalidateQueries({ queryKey: ['me'] });
+        if (error) return refuse(error);
+        await queryClient.invalidateQueries({ queryKey: meQuery.queryKey });
         toast.add({ title: t('account.twoFactor.disabled'), type: 'success' });
-        close();
+        onClose();
       } else {
         const { data, error } = await authClient.twoFactor.generateBackupCodes({ password });
-        if (error || !data) return setFailure(errorMessage(t, error));
+        if (error || !data) return refuse(error);
         setCodes(data.backupCodes);
       }
     } finally {
@@ -356,18 +393,27 @@ function PasswordDialog({
   }
 
   return (
-    <Dialog open={mode !== null} onOpenChange={(open) => !open && close()}>
-      <DialogContent closeLabel={t('common.close')}>
+    <Dialog
+      open={mode !== null}
+      // The new codes are shown once and the old ones are gone: only the "saved" button closes.
+      disablePointerDismissal={!!codes}
+      onOpenChange={(open, details) => {
+        if (open || (codes && details.reason !== 'close-press')) return;
+        onClose();
+      }}
+      onOpenChangeComplete={(open) => !open && reset()}
+    >
+      <DialogContent closeLabel={codes ? undefined : t('common.close')}>
         <DialogHeader>
           <DialogTitle>
-            {mode === 'disable'
+            {shown === 'disable'
               ? t('account.twoFactor.disableTitle')
               : t('account.twoFactor.regenerateTitle')}
           </DialogTitle>
           <DialogDescription>
             {codes
               ? t('twoFactorSetup.codesIntro')
-              : mode === 'disable'
+              : shown === 'disable'
                 ? t('account.twoFactor.disableBody')
                 : t('account.twoFactor.regenerateBody')}
           </DialogDescription>
@@ -381,29 +427,32 @@ function PasswordDialog({
           </>
         ) : (
           <form className="grid gap-4" onSubmit={confirm}>
-            <Field>
+            <Field invalid={failure?.field}>
               <FieldLabel>{t('account.twoFactor.password')}</FieldLabel>
-              <Input
-                type="password"
-                dir="ltr"
-                className="text-end"
+              <PasswordInput
+                showLabel={t('common.showPassword')}
+                hideLabel={t('common.hidePassword')}
                 autoComplete="current-password"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
                 autoFocus
+                ref={passwordInput}
               />
+              <FieldError match={!!failure?.field} role="alert">
+                {failure?.message}
+              </FieldError>
             </Field>
-            {failure && <FormAlert>{failure}</FormAlert>}
+            {failure && !failure.field && <FormAlert>{failure.message}</FormAlert>}
             <DialogFooter>
               <DialogClose render={<Button variant="outline" type="button" />}>
                 {t('common.cancel')}
               </DialogClose>
               <Button
                 type="submit"
-                variant={mode === 'disable' ? 'destructive' : 'primary'}
+                variant={shown === 'disable' ? 'destructive' : 'primary'}
                 disabled={pending || !password}
               >
-                {mode === 'disable'
+                {shown === 'disable'
                   ? t('account.twoFactor.disable')
                   : t('account.twoFactor.regenerateSubmit')}
               </Button>

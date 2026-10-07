@@ -1,16 +1,17 @@
 import { standardSchemaResolver } from '@hookform/resolvers/standard-schema';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link, useRouter } from '@tanstack/react-router';
-import { backupCodeSchema, type SignIn, signInSchema, totpCodeSchema } from '@vertex-hub/contracts';
-import { Button, Field, FieldError, FieldLabel, Input, OtpField } from '@vertex-hub/ui';
+import { backupCodeSchema, type SignIn, signInSchema } from '@vertex-hub/contracts';
+import { Button, Field, FieldError, FieldLabel, Input, PasswordInput } from '@vertex-hub/ui';
 import { ArrowRightIcon, KeyRoundIcon, SmartphoneIcon } from 'lucide-react';
-import { useId, useState } from 'react';
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { AuthHeading, AuthLayout } from '../../components/auth-layout';
 import { FormAlert } from '../../components/form-alert';
 import { authClient, meQuery, needsTwoFactorSetup, safeRedirect } from '../../lib/auth';
 import { errorMessage } from '../../lib/errors';
+import { TotpForm } from './totp-form';
 
 type Step = 'password' | 'totp' | 'backup';
 
@@ -46,7 +47,7 @@ export function LoginPage({ redirect }: { redirect?: string }) {
             title={t('login.twoFactor.title')}
             subtitle={t('login.twoFactor.subtitle')}
           />
-          <TotpForm onVerified={enter} />
+          <TotpForm label={t('login.twoFactor.code')} autoFocus onVerified={enter} />
           <StepLinks
             onSwitch={() => setStep('backup')}
             switchLabel={t('login.twoFactor.useBackup')}
@@ -96,9 +97,8 @@ function SignInForm({
     setFailure(null);
     const { data, error } = await authClient.signIn.email(values);
     if (error) {
-      if (error.status === 401) setFailure(t('login.errors.invalid'));
-      else if (error.status === 429) setFailure(t('login.errors.tooMany'));
-      else setFailure(t('login.errors.generic'));
+      // Wrong email and password together, or a block (account or address): about the whole form.
+      setFailure(errorMessage(t, error));
       return;
     }
     // Users with 2FA get a second step before the session exists (F01 rule 16).
@@ -110,22 +110,14 @@ function SignInForm({
     <form className="flex flex-col gap-5" onSubmit={onSubmit} noValidate>
       <Field invalid={!!errors.email}>
         <FieldLabel>{t('login.email')}</FieldLabel>
-        <Input
-          type="email"
-          dir="ltr"
-          className="text-end"
-          autoComplete="username"
-          autoFocus
-          {...register('email')}
-        />
+        <Input type="email" dir="ltr" autoComplete="username" autoFocus {...register('email')} />
         <FieldError match={!!errors.email}>{t('login.errors.email')}</FieldError>
       </Field>
       <Field invalid={!!errors.password}>
         <FieldLabel>{t('login.password')}</FieldLabel>
-        <Input
-          type="password"
-          dir="ltr"
-          className="text-end"
+        <PasswordInput
+          showLabel={t('common.showPassword')}
+          hideLabel={t('common.hidePassword')}
           autoComplete="current-password"
           {...register('password')}
         />
@@ -142,62 +134,6 @@ function SignInForm({
       {failure && <FormAlert>{failure}</FormAlert>}
       <Button type="submit" size="lg" className="w-full" disabled={isSubmitting}>
         {isSubmitting ? t('login.submitting') : t('login.submit')}
-      </Button>
-    </form>
-  );
-}
-
-function TotpForm({ onVerified }: { onVerified: () => Promise<void> }) {
-  const { t } = useTranslation();
-  const id = useId();
-  const [code, setCode] = useState('');
-  const [failure, setFailure] = useState<string | null>(null);
-  const [pending, setPending] = useState(false);
-
-  async function verify(value: string) {
-    if (!totpCodeSchema.safeParse(value).success || pending) return;
-    setFailure(null);
-    setPending(true);
-    const { error } = await authClient.twoFactor.verifyTotp({ code: value });
-    if (error) {
-      setPending(false);
-      setCode('');
-      return setFailure(errorMessage(t, error));
-    }
-    await onVerified();
-  }
-
-  return (
-    <form
-      className="flex flex-col gap-5"
-      onSubmit={(event) => {
-        event.preventDefault();
-        void verify(code);
-      }}
-    >
-      <div className="flex flex-col gap-2">
-        <label htmlFor={id} className="text-sm font-medium">
-          {t('login.twoFactor.code')}
-        </label>
-        <OtpField
-          id={id}
-          autoFocus
-          value={code}
-          onValueChange={setCode}
-          onValueComplete={(value) => void verify(value)}
-          slotLabel={(position) => t('twoFactorSetup.digit', { position })}
-          disabled={pending}
-          aria-invalid={failure ? true : undefined}
-        />
-      </div>
-      {failure && <FormAlert>{failure}</FormAlert>}
-      <Button
-        type="submit"
-        size="lg"
-        className="w-full"
-        disabled={pending || !totpCodeSchema.safeParse(code).success}
-      >
-        {pending ? t('login.twoFactor.submitting') : t('login.twoFactor.submit')}
       </Button>
     </form>
   );
@@ -231,12 +167,18 @@ function BackupCodeForm({ onVerified }: { onVerified: () => Promise<void> }) {
           dir="ltr"
           className="text-center text-lg tabular-nums"
           autoComplete="one-time-code"
+          // Codes are compared exactly: phone keyboards must not capitalise or correct them.
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
           autoFocus
           value={code}
           onChange={(event) => setCode(event.target.value)}
         />
+        <FieldError match={!!failure} role="alert">
+          {failure}
+        </FieldError>
       </Field>
-      {failure && <FormAlert>{failure}</FormAlert>}
       <Button type="submit" size="lg" className="w-full" disabled={pending}>
         {pending ? t('login.twoFactor.submitting') : t('login.twoFactor.submit')}
       </Button>

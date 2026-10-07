@@ -42,7 +42,29 @@ export function formatMoney(minor: number, currency: Currency): string {
 /** A titled block of free text (notes, terms, payment details); nothing when empty. */
 export function textBlock(title: string, text: string | null): string {
   if (!text?.trim()) return '';
-  return `<section class="text"><h3>${title}</h3><p>${escapeHtml(text)}</p></section>`;
+  return `<section class="text"><h3>${title}</h3><p>${textLines(text)}</p></section>`;
+}
+
+const ARABIC_LETTER = /\p{Script=Arabic}/u;
+
+/** A phone, an amount or a date inside an Arabic line: digits split by spaces or dashes. */
+const NUMBER_GROUP = /\+?\d[\d\s\-/.]*\d/g;
+
+/**
+ * Text typed on several lines (company details, terms, payment details), each line isolated with
+ * its own direction. In the page's right-to-left direction a line without Arabic letters (a phone
+ * `+963 11 …`, an IBAN, an email) would print its groups backwards, and so would a phone inside an
+ * Arabic line.
+ */
+export function textLines(text: string): string {
+  return text
+    .split('\n')
+    .map((line) =>
+      ARABIC_LETTER.test(line)
+        ? `<bdi dir="rtl">${escapeHtml(line).replace(NUMBER_GROUP, (group) => `<bdi dir="ltr">${group}</bdi>`)}</bdi>`
+        : `<bdi dir="ltr">${escapeHtml(line)}</bdi>`,
+    )
+    .join('<br>');
 }
 
 /** A `dl.meta` entry; `num` for dates and numbers, which read left to right. */
@@ -63,7 +85,7 @@ body {
 header { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px;
   padding-bottom: 12px; border-bottom: 2px solid #004139; }
 header img { width: auto; height: 72px; }
-.company { margin: 0; font-size: 8.5pt; color: #616866; white-space: pre-line; text-align: end; }
+.company { margin: 0; font-size: 8.5pt; color: #616866; text-align: end; }
 .title { display: flex; align-items: center; gap: 10px; margin: 20px 0 4px; }
 .title::before { content: ''; width: 5px; height: 26px; background: #B9A87A; transform: skewX(-30deg); }
 h1 { margin: 0; font-size: 18pt; font-weight: 700; color: #004139; }
@@ -90,9 +112,9 @@ table.sums td { padding: 3px 8px; }
 table.sums td.amount { text-align: start; white-space: nowrap; }
 table.sums tr.net th, table.sums tr.net td { font-weight: 700; color: #004139;
   border-top: 1px solid #D4DBD9; padding-top: 6px; }
-.text p { margin: 0; white-space: pre-line; font-size: 9pt; }
+.text p { margin: 0; font-size: 9pt; }
 footer.note { margin-top: 24px; padding-top: 8px; border-top: 1px solid #D4DBD9;
-  font-size: 8.5pt; color: #616866; white-space: pre-line; }
+  font-size: 8.5pt; color: #616866; }
 .watermark { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
   pointer-events: none; z-index: 10; }
 .watermark span { font-size: 120pt; font-weight: 700; color: rgba(185, 168, 122, 0.22);
@@ -113,7 +135,7 @@ export function documentHtml(input: {
   styles?: string;
 }): string {
   const company = input.companyDetails.trim()
-    ? `<p class="company">${escapeHtml(input.companyDetails)}</p>`
+    ? `<p class="company">${textLines(input.companyDetails)}</p>`
     : '';
   const watermark = input.watermark
     ? `<div class="watermark"><span>${input.watermark}</span></div>`

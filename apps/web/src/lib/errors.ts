@@ -52,3 +52,25 @@ export const SCREEN_ERROR = 'screen';
 export function fieldError(error: FieldError | undefined, fallback: string): string {
   return error?.type === SCREEN_ERROR && error.message ? error.message : fallback;
 }
+
+/**
+ * The `role` of a field's `FieldError`: a refusal a screen set (`SCREEN_ERROR`) is announced; the
+ * schema's own errors show as the user fixes them.
+ */
+export const errorRole = (error: { type?: string } | undefined) =>
+  error?.type === SCREEN_ERROR ? ('alert' as const) : undefined;
+
+/**
+ * A refused request, and where to show it: `field` when the password the user just typed was
+ * wrong (under that field), otherwise for the whole form (`FormAlert`).
+ */
+export interface Failure {
+  message: string;
+  field: boolean;
+}
+
+/** For the forms that confirm an action with the current password. */
+export function passwordFailure(t: TFunction, error: unknown): Failure {
+  const code = (error as Partial<AuthClientError> | null)?.code;
+  return { message: errorMessage(t, error), field: code === 'INVALID_PASSWORD' };
+}

@@ -34,12 +34,17 @@ import {
   Textarea,
   ToggleGroup,
   ToggleGroupItem,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
 } from '@vertex-hub/ui';
 import { PlusIcon, XIcon } from 'lucide-react';
-import { useId, useState } from 'react';
+import { type ComponentProps, useId, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { Controller, useForm, useWatch } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { formatNumber } from '../../lib/format';
+import { useShownWhileClosing } from '../../lib/use-shown-while-closing';
 import { useDepartments } from '../tasks/task-form';
 import {
   dependencyOptions,
@@ -129,28 +134,75 @@ const FIELD_OF_ISSUE: Record<string, keyof StepDraft> = {
   stageKey: 'stageKey',
 };
 
+/** The fields in the order the dialog shows them. */
+const FIELD_ORDER: (keyof StepDraft)[] = [
+  'title',
+  'department',
+  'stageKey',
+  'repeatKind',
+  'spreadFromDay',
+  'repeatLabel',
+  'dueDay',
+  'revisionLimit',
+  'dependsOn',
+  'checklist',
+  'brief',
+];
+
+/** The step the dialog opened with; `isNew` is fixed at opening, so the title holds while closing. */
+export interface EditingStep {
+  step: NewOrStoredStep;
+  isNew: boolean;
+}
+
+interface StepFormProps {
+  kind: TemplateKind;
+  stages: StageValues[];
+  steps: StepValues[];
+  onSave: (step: StepValues) => void;
+}
+
 /**
  * Adds or edits one step. The step is checked in its place in the whole template with the same
  * schema the API uses, so an error shows here rather than on save.
  */
 export function StepDialog({
+  editing,
+  onClose,
+  finalFocus,
+  ...props
+}: StepFormProps & {
+  /** The step being added or edited; null while closed. */
+  editing: EditingStep | null;
+  onClose: () => void;
+  /** Where the focus goes once the dialog closes. */
+  finalFocus: ComponentProps<typeof DialogContent>['finalFocus'];
+}) {
+  const { t } = useTranslation();
+  const shown = useShownWhileClosing(editing);
+  return (
+    <Dialog open={editing !== null} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent
+        closeLabel={t('common.close')}
+        className="sm:max-w-2xl"
+        finalFocus={finalFocus}
+      >
+        {shown && <StepForm key={shown.step.key} {...props} {...shown} onDone={onClose} />}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/** Mounts on each opening, so it starts from the step's saved values. */
+function StepForm({
   kind,
   stages,
   steps,
   step,
   isNew,
-  onClose,
   onSave,
-}: {
-  kind: TemplateKind;
-  stages: StageValues[];
-  steps: StepValues[];
-  /** The step to edit, or the new step's starting values. */
-  step: NewOrStoredStep;
-  isNew: boolean;
-  onClose: () => void;
-  onSave: (step: StepValues) => void;
-}) {
+  onDone,
+}: StepFormProps & EditingStep & { onDone: () => void }) {
   const { t } = useTranslation();
   const ids = {
     title: useId(),
@@ -187,14 +239,10 @@ export function StepDialog({
 
   const submit = form.handleSubmit((draft) => {
     form.clearErrors();
-    if (!draft.department) {
-      form.setError('department', { type: 'required' });
-      return;
-    }
-    if (kind === 'retainer_cycle' && draft.repeated && !draft.repeatKind) {
-      form.setError('repeatKind', { type: 'required' });
-      return;
-    }
+    const invalid = new Set<keyof StepDraft>();
+    if (!draft.department) invalid.add('department');
+    const kindMissing = kind === 'retainer_cycle' && draft.repeated && !draft.repeatKind;
+    if (kindMissing) invalid.add('repeatKind');
     const next = stepOf(kind, draft, allowed);
     const placed = withStep(kind, stages, steps, next);
     const index = placed.findIndex((other) => other.key === next.key);
@@ -205,18 +253,22 @@ export function StepDialog({
       steps: placed,
       assignees: [],
     });
-    const issues = result.success
-      ? []
-      : result.error.issues.filter((issue) => issue.path[0] === 'steps' && issue.path[1] === index);
-    if (issues.length > 0) {
-      for (const issue of issues) {
-        const field = FIELD_OF_ISSUE[String(issue.path[2])];
-        if (field) form.setError(field, { type: 'schema' });
+    for (const issue of result.success ? [] : result.error.issues) {
+      if (issue.path[0] !== 'steps' || issue.path[1] !== index) continue;
+      const field = FIELD_OF_ISSUE[String(issue.path[2])];
+      // Without a kind the step reads as a fixed one: its missing due day is not the problem.
+      if (field && !(kindMissing && field === 'dueDay')) invalid.add(field);
+    }
+    if (invalid.size > 0) {
+      // Every problem at once, the focus on the first one in the dialog.
+      const first = FIELD_ORDER.find((field) => invalid.has(field));
+      for (const field of invalid) {
+        form.setError(field, { type: 'schema' }, { shouldFocus: field === first });
       }
       return;
     }
     onSave(next);
-    onClose();
+    onDone();
   });
 
   const departmentItems = departments.map(({ code, name }) => ({ value: code, label: name }));
@@ -234,9 +286,7 @@ export function StepDialog({
   const maxDay = kind === 'project' ? TEMPLATE_LIMITS.projectDueDay : TEMPLATE_LIMITS.cycleDueDay;
 
   return (
-    <Dialog open onOpenChange={(next) => !next && onClose()}>
-      <DialogContent closeLabel={t('common.close')} className="sm:max-w-2xl">
-        <form
+    <form
           className="grid gap-5"
           // The dialog renders in a portal inside the page form: its submit must not reach that form.
           onSubmit={(event) => {
@@ -471,7 +521,8 @@ export function StepDialog({
 
           <div className="grid gap-5 sm:grid-cols-2">
             <Field>
-              <label htmlFor={ids.approval} className="flex items-center justify-between gap-3">
+              {/* The switch stays beside its own label, away from the next column's field. */}
+              <label htmlFor={ids.approval} className="flex items-center gap-3">
                 <span className="text-sm font-medium">{t('tasks.form.needsClientApproval')}</span>
                 <Controller
                   control={form.control}
@@ -498,6 +549,7 @@ export function StepDialog({
                 className="w-28"
                 {...form.register('revisionLimit', { valueAsNumber: true })}
               />
+              <FieldDescription>{t('tasks.form.revisionLimitHint')}</FieldDescription>
               <FieldError match={!!errors.revisionLimit}>
                 {t('tasks.form.errors.revisionLimit', {
                   max: formatNumber(TASK_LIMITS.revisionLimit),
@@ -582,9 +634,7 @@ export function StepDialog({
               {isNew ? t('templates.step.add') : t('templates.step.apply')}
             </Button>
           </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+    </form>
   );
 }
 
@@ -600,18 +650,25 @@ function ChecklistEditor({
 }) {
   const { t } = useTranslation();
   const id = useId();
+  const input = useRef<HTMLInputElement>(null);
   const [draft, setDraft] = useState('');
   const full = items.length >= TEMPLATE_LIMITS.checklist;
+  // The focus stays in the field: the add button turns disabled, a removed item's button leaves.
   const add = () => {
     const text = draft.trim();
     if (!text || full) return;
     onChange([...items, text.slice(0, 200)]);
     setDraft('');
+    input.current?.focus();
+  };
+  const remove = (index: number) => {
+    flushSync(() => onChange(items.filter((_, other) => other !== index)));
+    input.current?.focus();
   };
   return (
     <Field invalid={invalid}>
       <FieldLabel htmlFor={id}>
-        {t('tasks.form.checklist')}
+        {t('templates.step.checklist')}
         <span className="ms-1 font-normal text-muted-foreground">({t('common.optional')})</span>
       </FieldLabel>
       {items.length > 0 && (
@@ -624,26 +681,34 @@ function ChecklistEditor({
             >
               <span className="text-muted-foreground tabular-nums">{formatNumber(index + 1)}.</span>
               <span className="flex-1">{item}</span>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                aria-label={t('common.remove', { label: item })}
-                onClick={() => onChange(items.filter((_, other) => other !== index))}
-              >
-                <XIcon />
-              </Button>
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label={t('common.remove', { label: item })}
+                      onClick={() => remove(index)}
+                    />
+                  }
+                >
+                  <XIcon />
+                </TooltipTrigger>
+                <TooltipContent>{t('common.remove', { label: item })}</TooltipContent>
+              </Tooltip>
             </li>
           ))}
         </ol>
       )}
       <div className="flex items-center gap-2">
         <Input
+          ref={input}
           id={id}
           value={draft}
           maxLength={200}
           disabled={full}
-          placeholder={t('tasks.form.checklistPlaceholder')}
+          placeholder={t('templates.step.checklistPlaceholder')}
           onChange={(event) => setDraft(event.target.value)}
           onKeyDown={(event) => {
             if (event.key === 'Enter') {
@@ -657,6 +722,11 @@ function ChecklistEditor({
           {t('tasks.form.addItem')}
         </Button>
       </div>
+      {full && (
+        <FieldDescription>
+          {t('templates.step.checklistFull', { max: formatNumber(TEMPLATE_LIMITS.checklist) })}
+        </FieldDescription>
+      )}
     </Field>
   );
 }

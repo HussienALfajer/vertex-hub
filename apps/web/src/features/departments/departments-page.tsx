@@ -47,8 +47,8 @@ function DepartmentCard({ department }: { department: DepartmentResponse }) {
     >
       <div className="flex items-start gap-3">
         <AscentBar className="mt-0.5 h-5 opacity-60 transition-opacity duration-150 group-hover:opacity-100" />
-        <div className="flex flex-col gap-1">
-          <h2 className="text-lg font-bold">{department.name}</h2>
+        <div className="flex min-w-0 flex-col gap-1">
+          <h2 className="text-lg font-bold wrap-anywhere">{department.name}</h2>
           {capability && <p className="text-xs text-accent-text">{t(capability)}</p>}
         </div>
       </div>
@@ -64,13 +64,12 @@ function DepartmentCard({ department }: { department: DepartmentResponse }) {
         ) : (
           <span className="text-muted-foreground">{t('departments.noManager')}</span>
         )}
-        <span
-          className="flex shrink-0 items-center gap-1.5 text-muted-foreground tabular-nums"
-          title={t('departments.members')}
-        >
+        <span className="flex shrink-0 items-center gap-1.5 text-muted-foreground tabular-nums">
           <UsersIcon className="size-4" />
-          <span className="sr-only">{t('departments.members')}</span>
-          {formatNumber(department.memberCount)}
+          {t('departments.memberCount', {
+            count: department.memberCount,
+            n: formatNumber(department.memberCount),
+          })}
         </span>
       </div>
     </Link>

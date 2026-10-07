@@ -7,6 +7,7 @@ import {
   CardTitle,
   ColorSwatch,
   EmptyState,
+  IconButton,
 } from '@vertex-hub/ui';
 import {
   BanIcon,
@@ -23,7 +24,8 @@ import {
   ThumbsUpIcon,
   TypeIcon,
 } from 'lucide-react';
-import { type ReactNode, useState } from 'react';
+import { type ReactNode, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { TabHeader } from '../../components/tab-header';
 import { useCopy } from '../../lib/clipboard';
@@ -48,31 +50,51 @@ export function BrandKitTab({
 }) {
   const { t } = useTranslation();
   const [editing, setEditing] = useState(false);
+  const editButton = useRef<HTMLButtonElement>(null);
   const kit = client.brandKit;
 
   if (editing) {
-    return <BrandKitForm client={client} onDone={() => setEditing(false)} />;
+    return (
+      <BrandKitForm
+        client={client}
+        onDone={() => {
+          // The view comes back with the button that opened the form: the focus returns to it.
+          flushSync(() => setEditing(false));
+          editButton.current?.focus();
+        }}
+      />
+    );
   }
 
-  const editButton = editable && (
-    <Button variant={isEmpty(kit) ? 'primary' : 'outline'} onClick={() => setEditing(true)}>
+  const editAction = editable && (
+    <Button
+      ref={editButton}
+      variant={isEmpty(kit) ? 'primary' : 'outline'}
+      onClick={() => setEditing(true)}
+    >
       <PencilIcon />
       {isEmpty(kit) ? t('clients.brandKit.fill') : t('clients.brandKit.edit')}
     </Button>
   );
 
+  // The button stays in the header whether the kit is empty or not, so it is the same element
+  // after the first save fills the kit, and keeps the focus.
+  const header = (
+    <TabHeader
+      title={t('clients.brandKit.title')}
+      description={t('clients.brandKit.description')}
+      action={editAction}
+    />
+  );
+
   if (isEmpty(kit)) {
     return (
       <>
-        <TabHeader
-          title={t('clients.brandKit.title')}
-          description={t('clients.brandKit.description')}
-        />
+        {header}
         <EmptyState
           icon={<PaletteIcon />}
           title={t('clients.brandKit.emptyTitle')}
           description={t('clients.brandKit.emptyHint')}
-          action={editButton}
         />
         <BrandFilesCard clientId={client.id} />
       </>
@@ -81,11 +103,7 @@ export function BrandKitTab({
 
   return (
     <>
-      <TabHeader
-        title={t('clients.brandKit.title')}
-        description={t('clients.brandKit.description')}
-        action={editButton}
-      />
+      {header}
       <div className="grid gap-6 lg:grid-cols-3">
         <KitCard icon={PaletteIcon} title={t('clients.brandKit.colors')} className="lg:col-span-2">
           {kit.colors.length === 0 ? (
@@ -93,7 +111,7 @@ export function BrandKitTab({
           ) : (
             <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 2xl:grid-cols-4">
               {kit.colors.map((color) => (
-                <li key={`${color.hex}-${color.name ?? ''}`}>
+                <li key={color.hex}>
                   <ColorTile hex={color.hex} name={color.name} />
                 </li>
               ))}
@@ -229,17 +247,14 @@ function ColorTile({ hex, name }: { hex: string; name: string | null }) {
             {hex}
           </span>
         </div>
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          onClick={() => copy(hex)}
-          aria-label={
+        <IconButton
+          label={
             copied ? t('clients.brandKit.copied', { hex }) : t('clients.brandKit.copyHex', { hex })
           }
-          title={t('clients.brandKit.copyHex', { hex })}
+          onClick={() => copy(hex)}
         >
           {copied ? <CheckIcon /> : <CopyIcon />}
-        </Button>
+        </IconButton>
       </div>
     </div>
   );
@@ -258,7 +273,7 @@ function FileLinks({ files }: { files: BrandKit['files'] }) {
             {files
               .filter((file) => file.kind === kind)
               .map((file) => (
-                <li key={`${file.url}-${file.label}`}>
+                <li key={file.url}>
                   <ExternalLink url={file.url} label={file.label} />
                 </li>
               ))}
@@ -320,7 +335,7 @@ function ReferenceColumn({
       ) : (
         <ul className="flex flex-col gap-2">
           {items.map((reference) => (
-            <li key={`${reference.url}-${reference.note ?? ''}`}>
+            <li key={reference.url}>
               <ExternalLink
                 url={reference.url}
                 label={reference.note ?? formatLink(reference.url)}

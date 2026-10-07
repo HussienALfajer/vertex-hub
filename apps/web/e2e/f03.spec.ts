@@ -63,6 +63,24 @@ test('a new lead warns about a duplicate, saves anyway, and is archived from the
     .click();
   await expect(page.getByText(ar.leads.archive.archived)).toBeVisible();
   await expect(page.getByRole('link', { name: 'أحمد', exact: true })).toHaveCount(0);
+  // The row and its menu are gone: the focus goes to the Archived filter.
+  await expect(page.getByRole('button', { name: ar.leads.filters.archived })).toBeFocused();
+});
+
+test('the lead dialog shows every problem at once, the focus on the first', async ({ page }) => {
+  await mockApi(page, { signedIn: true, me: manager });
+  await page.goto('/leads?view=board');
+  await page.getByRole('button', { name: ar.leads.newLead }).click();
+  const dialog = page.getByRole('dialog', { name: ar.leads.form.newTitle });
+  await dialog.getByRole('button', { name: ar.leads.form.create }).click();
+  await expect(dialog.getByText(ar.leads.form.errors.contactName)).toBeVisible();
+  // Rule 1's contact method is checked with the rest, not after the name is fixed.
+  await expect(dialog.getByText(ar.leads.form.errors.contact)).toBeVisible();
+  await expect(dialog.getByLabel(ar.leads.form.contactName)).toBeFocused();
+
+  await dialog.getByLabel(ar.leads.form.contactName).fill('أحمد');
+  await dialog.getByRole('button', { name: ar.leads.form.create }).click();
+  await expect(dialog.getByLabel(ar.leads.form.phone)).toBeFocused();
 });
 
 test('cards move by menu and by dragging; a lead with a sent quote snaps back', async ({
@@ -80,6 +98,11 @@ test('cards move by menu and by dragging; a lead with a sent quote snaps back', 
     page.getByRole('dialog', { name: fill(ar.leads.lose.title, { name: 'متجر لمسة' }) }),
   ).toBeVisible();
   await page.keyboard.press('Escape');
+  await expect(
+    column(page, 'meeting').getByRole('button', {
+      name: fill(ar.leads.board.moveTo, { name: 'متجر لمسة' }),
+    }),
+  ).toBeFocused();
 
   // The keyboard way: "Move to…" on the card.
   await column(page, 'contacted')
@@ -89,6 +112,12 @@ test('cards move by menu and by dragging; a lead with a sent quote snaps back', 
   await expect(
     column(page, 'meeting').getByRole('link', { name: 'عيادة النور لطب الأسنان' }),
   ).toBeVisible();
+  // The card mounts again in its new column, and its button keeps the focus.
+  await expect(
+    column(page, 'meeting').getByRole('button', {
+      name: fill(ar.leads.board.moveTo, { name: 'عيادة النور لطب الأسنان' }),
+    }),
+  ).toBeFocused();
 
   // Dragging: New → Contacted.
   await card(page, 'new', seedIds.sindyanLead).dragTo(column(page, 'contacted'), onHeader);
@@ -138,6 +167,8 @@ test('an activity sets the next follow-up; a loss rejects the sent quote and reo
   await reopen.getByRole('button', { name: ar.leads.reopen.submit }).click();
   await expect(page.getByText(ar.leads.reopen.done)).toBeVisible();
   await expect(stageOf(page)).toHaveText(ar.leads.stages.contacted);
+  // The reopen buttons left with the loss: the focus goes to the heading.
+  await expect(page.getByRole('heading', { level: 1 })).toBeFocused();
 });
 
 test('a lead is converted by linking an ended client, which becomes active', async ({ page }) => {

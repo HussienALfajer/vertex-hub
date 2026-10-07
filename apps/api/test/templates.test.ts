@@ -407,9 +407,11 @@ describe('templates', () => {
       });
     });
 
-    it('writes nothing to the audit log when nothing changed', async () => {
+    it('keeps the version and writes nothing to the audit log when nothing changed', async () => {
       const created = await create(projectInput());
-      expect((await put(created.id, cast.operations.cookie, asInput(created))).status).toBe(200);
+      const response = await put(created.id, cast.operations.cookie, asInput(created));
+      expect(response.status).toBe(200);
+      expect(templateDetailSchema.parse(await response.json()).updatedAt).toBe(created.updatedAt);
       expect((await auditOf(created.id)).map((entry) => entry.action)).toEqual([
         'template.created',
         'template.assignees_updated',

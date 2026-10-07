@@ -10,13 +10,14 @@ import {
   daysInclusive,
   type TemplateDetail,
 } from '@vertex-hub/contracts';
-import { AscentLines, AscentMeter, Avatar, Button, PageHeader, toast } from '@vertex-hub/ui';
+import { AscentLines, AscentMeter, Avatar, Button, cn, PageHeader, toast } from '@vertex-hub/ui';
 import { ArrowRightIcon, CalendarRangeIcon } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { FormAlert } from '../../components/form-alert';
 import { FormSection } from '../../components/form-section';
+import { UnsavedChangesGuard } from '../../components/unsaved-changes-guard';
 import { useMe } from '../../lib/auth';
 import { formatCalendarDate, formatNumber } from '../../lib/format';
 import { formatMoney } from '../../lib/money';
@@ -82,6 +83,9 @@ export function NewProjectPage({ search }: { search: NewProjectSearch }) {
     name: ['clientId', 'currency', 'startDate'],
   });
   const client = clients.data?.items.find((item) => item.id === clientId);
+  // The first field to fill: the client, or the name when the client profile preset it.
+  const presetClient = !!search.clientId;
+  useEffect(() => form.setFocus(presetClient ? 'name' : 'clientId'), [form, presetClient]);
   // F07 screen 4: the template's stages become the milestones, due in work days from the start
   // (rule 7), and follow the start date; runs start today at the earliest (rule 6).
   useEffect(() => {
@@ -178,6 +182,7 @@ export function NewProjectPage({ search }: { search: NewProjectSearch }) {
         </div>
         <Preview form={form} client={client} money={money} />
       </form>
+      <UnsavedChangesGuard dirty={form.formState.isDirty && !form.formState.isSubmitting} />
     </>
   );
 }
@@ -196,7 +201,8 @@ function Preview({
   const values = useWatch({ control: form.control });
   const managers = useProjectManagerOptions();
   const manager = managers.find((option) => option.id === values.projectManagerId);
-  const name = values.name?.trim() || t('projects.form.namePlaceholder');
+  // Until a name is typed, the preview names the field rather than showing the example as a name.
+  const name = values.name?.trim();
   const milestones = (values.milestones ?? []).filter((milestone) => milestone?.name?.trim());
   const total = milestones.reduce((sum, milestone) => sum + (milestone?.installmentMinor ?? 0), 0);
   const { startDate, dueDate } = values;
@@ -214,13 +220,15 @@ function Preview({
       </p>
       <div className="relative flex items-center gap-3">
         <Avatar
-          name={client?.tradeName ?? name}
+          name={client?.tradeName ?? t('projects.form.client')}
           shape="square"
           size="lg"
           tone={client ? 'brand' : 'muted'}
         />
         <div className="flex min-w-0 flex-col gap-1">
-          <p className="truncate text-lg font-bold">{name}</p>
+          <p className={cn('truncate text-lg font-bold', !name && 'text-muted-foreground')}>
+            {name || t('projects.form.name')}
+          </p>
           <p className="truncate text-sm text-muted-foreground">
             {client?.tradeName ?? t('projects.form.clientPlaceholder')}
           </p>

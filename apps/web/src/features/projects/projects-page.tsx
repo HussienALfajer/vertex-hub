@@ -295,7 +295,7 @@ function Pulse({
                 <span className="text-2xl font-bold tabular-nums">
                   {total === undefined ? t('common.none') : formatNumber(total)}
                 </span>
-                <span className="truncate text-sm text-muted-foreground">
+                <span className="text-sm text-muted-foreground">
                   {t(`projects.pulse.${tile.key}`)}
                 </span>
               </span>
@@ -517,7 +517,7 @@ function ProjectsTable({ projects, archived }: { projects: Project[]; archived: 
       <TableBody>
         {projects.map((project) => (
           <TableRow key={project.id}>
-            <TableCell className="whitespace-normal">
+            <TableCell className="min-w-56 whitespace-normal">
               <Link
                 to="/projects/$projectId"
                 params={{ projectId: project.id }}

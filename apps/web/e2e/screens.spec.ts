@@ -173,14 +173,16 @@ for (const colorScheme of ['light', 'dark'] as const) {
     test('activation', async ({ page }, testInfo) => {
       await mockApi(page, { signedIn: false });
       await page.goto(`/activate#token=${VALID_LINK_TOKEN}`);
-      await expect(page.getByRole('heading', { level: 1 })).toHaveText(ar.activate.title);
+      await expect(page.getByRole('heading', { level: 1 })).toHaveText(
+        ar.activate.activation.title,
+      );
       await screenshot(page, testInfo, `activate-${colorScheme}`);
     });
 
     test('two-factor setup', async ({ page }, testInfo) => {
       await mockApi(page, { signedIn: true, me: financeWithoutTwoFactor });
       await page.goto('/setup-two-factor');
-      await page.getByLabel(ar.twoFactorSetup.password).fill('my-password-123');
+      await page.getByLabel(ar.twoFactorSetup.password, { exact: true }).fill('my-password-123');
       await page.getByRole('button', { name: ar.twoFactorSetup.start }).click();
       await expect(page.getByRole('img', { name: ar.twoFactorSetup.qrLabel })).toBeVisible();
       await screenshot(page, testInfo, `two-factor-scan-${colorScheme}`);
@@ -193,7 +195,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await mockApi(page, { signedIn: false, acceptPassword: 'pw', twoFactorOnSignIn: true });
       await page.goto('/login');
       await page.getByLabel(ar.login.email).fill('sara@vertex.example');
-      await page.getByLabel(ar.login.password).fill('pw');
+      await page.getByLabel(ar.login.password, { exact: true }).fill('pw');
       await page.getByRole('button', { name: ar.login.submit }).click();
       await expect(page.getByRole('heading', { level: 1 })).toHaveText(ar.login.twoFactor.title);
       await screenshot(page, testInfo, `login-code-${colorScheme}`);
@@ -949,7 +951,8 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await page.setViewportSize({ width: 1280, height: 1000 });
       await mockApi(page, { signedIn: true });
       await page.goto('/invoices/settings');
-      await expect(page.getByLabel(ar.invoices.settings.sypPerUsd)).toHaveValue('118.5000');
+      // The stored `118.5000` without trailing zeros.
+      await expect(page.getByLabel(ar.invoices.settings.sypPerUsd)).toHaveValue('118.5');
       await screenshot(page, testInfo, `invoice-settings-${colorScheme}`);
     });
 

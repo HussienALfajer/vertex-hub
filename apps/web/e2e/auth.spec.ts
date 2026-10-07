@@ -12,11 +12,11 @@ test('sends visitors without a session to the login page and back after signing 
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(ar.login.title);
 
   await page.getByLabel(ar.login.email).fill(manager.user.email);
-  await page.getByLabel(ar.login.password).fill('wrong-password');
+  await page.getByLabel(ar.login.password, { exact: true }).fill('wrong-password');
   await page.getByRole('button', { name: ar.login.submit }).click();
-  await expect(page.getByRole('alert')).toHaveText(ar.login.errors.invalid);
+  await expect(page.getByRole('alert')).toHaveText(ar.errors.auth.INVALID_EMAIL_OR_PASSWORD);
 
-  await page.getByLabel(ar.login.password).fill('right-password');
+  await page.getByLabel(ar.login.password, { exact: true }).fill('right-password');
   await page.getByRole('button', { name: ar.login.submit }).click();
   await expect(page).toHaveURL(/\/design-system$/);
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(ar.designSystem.title);

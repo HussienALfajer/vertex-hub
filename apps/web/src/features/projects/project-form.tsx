@@ -31,7 +31,7 @@ import { Controller, type UseFormReturn, useWatch } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { ApiError } from '../../lib/api/client';
 import { can, useMe } from '../../lib/auth';
-import { errorMessage, fieldError, SCREEN_ERROR } from '../../lib/errors';
+import { errorMessage, errorRole, fieldError, SCREEN_ERROR } from '../../lib/errors';
 import { formatNumber } from '../../lib/format';
 import { ClientStatusBadge } from '../clients/client-badges';
 import { clientListQuery } from '../clients/clients.queries';
@@ -42,8 +42,8 @@ import { projectCreateScope } from './project-access';
 export type ProjectFormMethods = UseFormReturn<CreateProjectInput, unknown, CreateProject>;
 
 /**
- * Puts a failed save on the field it concerns and returns the form-level message for anything
- * else (null when a field took it).
+ * Puts a failed save on the field it concerns, which takes the focus back, and returns the
+ * form-level message for anything else (null when a field took it).
  */
 export function projectFormFailure(
   form: ProjectFormMethods,
@@ -52,10 +52,11 @@ export function projectFormFailure(
 ): string | null {
   const field = error instanceof ApiError ? FIELD_OF_CODE[error.code ?? ''] : undefined;
   if (field) {
-    form.setError(field, {
-      type: SCREEN_ERROR,
-      message: errorMessage(t, error),
-    });
+    form.setError(
+      field,
+      { type: SCREEN_ERROR, message: errorMessage(t, error) },
+      { shouldFocus: true },
+    );
     return null;
   }
   return errorMessage(t, error);
@@ -71,10 +72,11 @@ const FIELD_OF_CODE: Record<string, 'name' | 'projectManagerId' | 'dueDate' | 'c
 /** Rule 5 before the round trip: the due date is on or after the start date. */
 export function checkDates(form: ProjectFormMethods, t: TFunction, start: string, due: string) {
   if (due >= start) return true;
-  form.setError('dueDate', {
-    type: SCREEN_ERROR,
-    message: t('errors.INVALID_DATES'),
-  });
+  form.setError(
+    'dueDate',
+    { type: SCREEN_ERROR, message: t('errors.INVALID_DATES') },
+    { shouldFocus: true },
+  );
   return false;
 }
 
@@ -148,7 +150,9 @@ export function NameField({ form }: { form: ProjectFormMethods }) {
         placeholder={t('projects.form.namePlaceholder')}
         {...form.register('name')}
       />
-      <FieldError match={!!error}>{fieldError(error, t('projects.form.errors.name'))}</FieldError>
+      <FieldError match={!!error} role={errorRole(error)}>
+        {fieldError(error, t('projects.form.errors.name'))}
+      </FieldError>
     </Field>
   );
 }
@@ -251,7 +255,7 @@ export function ProjectManagerField({
         )}
       />
       <FieldDescription>{t('projects.form.projectManagerHint')}</FieldDescription>
-      <FieldError match={!!error}>
+      <FieldError match={!!error} role={errorRole(error)}>
         {fieldError(error, t('projects.form.errors.projectManager'))}
       </FieldError>
     </Field>
@@ -304,13 +308,13 @@ export function DatesFields({ form }: { form: ProjectFormMethods }) {
       <div className="grid gap-5 sm:grid-cols-2">
         <Field invalid={!!startError}>
           <FieldLabel>{t('projects.form.startDate')}</FieldLabel>
-          <Input type="date" {...form.register('startDate')} />
+          <Input type="date" dir="ltr" {...form.register('startDate')} />
           <FieldError match={!!startError}>{t('projects.form.errors.date')}</FieldError>
         </Field>
         <Field invalid={!!dueError}>
           <FieldLabel>{t('projects.form.dueDate')}</FieldLabel>
-          <Input type="date" min={start || undefined} {...form.register('dueDate')} />
-          <FieldError match={!!dueError}>
+          <Input type="date" dir="ltr" min={start || undefined} {...form.register('dueDate')} />
+          <FieldError match={!!dueError} role={errorRole(dueError)}>
             {fieldError(dueError, t('projects.form.errors.date'))}
           </FieldError>
         </Field>
@@ -389,7 +393,9 @@ export function CurrencyField({ form, locked }: { form: ProjectFormMethods; lock
       <FieldDescription>
         {locked ? t('projects.form.currencyLocked') : t('projects.form.currencyHint')}
       </FieldDescription>
-      <FieldError match={!!error}>{fieldError(error, t('errors.CURRENCY_LOCKED'))}</FieldError>
+      <FieldError match={!!error} role={errorRole(error)}>
+        {fieldError(error, t('errors.CURRENCY_LOCKED'))}
+      </FieldError>
     </Field>
   );
 }

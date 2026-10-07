@@ -27,6 +27,7 @@ import {
   FieldDescription,
   FieldError,
   FieldLabel,
+  IconButton,
   Input,
   Switch,
   Textarea,
@@ -43,13 +44,15 @@ import {
   UserPlusIcon,
   UsersRoundIcon,
 } from 'lucide-react';
-import { useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '../../components/confirm-dialog';
 import { FormAlert } from '../../components/form-alert';
 import { TabHeader } from '../../components/tab-header';
 import { errorMessage } from '../../lib/errors';
+import { useReturnFocus } from '../../lib/use-return-focus';
+import { useShownWhileClosing } from '../../lib/use-shown-while-closing';
 import { useArchiveContact, useCreateContact, useUpdateContact } from './clients.queries';
 
 /** `null` while closed, `'new'` to add, or the contact being edited. */
@@ -63,22 +66,37 @@ export function ContactsTab({
 }: {
   client: ClientDetailResponse;
   editable: boolean;
-  /** The profile asks to add a contact (from the "no approval contact" notice). */
-  adding: boolean;
-  onAddingChange: (adding: boolean) => void;
+  /** The button that asked to add a contact from outside the tab (the "no approval" notice). */
+  adding: HTMLElement | null;
+  onAddingChange: (adding: HTMLElement | null) => void;
 }) {
   const { t } = useTranslation();
   const [editing, setEditing] = useState<Editing>(null);
   const [removing, setRemoving] = useState<Contact | null>(null);
+  // The removed contact stays named while the confirmation fades out.
+  const shownRemoving = useShownWhileClosing(removing);
   const archive = useArchiveContact(client.id);
+  // Only one "add" button shows at a time (header or empty state): the focus falls back to it
+  // when the button that opened a dialog left with the change (the notice, a removed card).
+  const addButton = useRef<HTMLButtonElement>(null);
+  const returnFocus = useReturnFocus(addButton);
+  useEffect(() => {
+    if (adding) returnFocus.from(adding);
+  }, [adding, returnFocus]);
   // People who can approve first, then by name as the API sorts them.
   const contacts = [...client.contacts].sort(
     (a, b) => Number(b.hasFinalApproval) - Number(a.hasFinalApproval),
   );
   const dialog = adding ? 'new' : editing;
 
-  const addButton = editable && (
-    <Button onClick={() => setEditing('new')}>
+  const addAction = editable && (
+    <Button
+      ref={addButton}
+      onClick={(event) => {
+        returnFocus.from(event.currentTarget);
+        setEditing('new');
+      }}
+    >
       <UserPlusIcon />
       {t('clients.contacts.add')}
     </Button>
@@ -89,14 +107,16 @@ export function ContactsTab({
       <TabHeader
         title={t('clients.contacts.title')}
         description={t('clients.contacts.description')}
-        action={contacts.length > 0 && addButton}
+        action={contacts.length > 0 && addAction}
       />
       {contacts.length === 0 ? (
         <EmptyState
           icon={<UsersRoundIcon />}
           title={t('clients.contacts.emptyTitle')}
-          description={t('clients.contacts.emptyHint')}
-          action={addButton}
+          description={
+            editable ? t('clients.contacts.emptyHint') : t('clients.contacts.emptyReadOnlyHint')
+          }
+          action={addAction}
         />
       ) : (
         <ul className="grid gap-4 md:grid-cols-2">
@@ -105,8 +125,14 @@ export function ContactsTab({
               <ContactCard
                 contact={contact}
                 editable={editable}
-                onEdit={() => setEditing(contact)}
-                onRemove={() => setRemoving(contact)}
+                onEdit={(opener) => {
+                  returnFocus.from(opener);
+                  setEditing(contact);
+                }}
+                onRemove={(opener) => {
+                  returnFocus.from(opener);
+                  setRemoving(contact);
+                }}
               />
             </li>
           ))}
@@ -119,18 +145,20 @@ export function ContactsTab({
           editing={dialog}
           onClose={() => {
             setEditing(null);
-            onAddingChange(false);
+            onAddingChange(null);
           }}
+          finalFocus={returnFocus.target}
         />
       )}
       <ConfirmDialog
         open={removing !== null}
         onClose={() => setRemoving(null)}
-        title={t('clients.contacts.removeTitle', { name: removing?.name ?? '' })}
+        title={t('clients.contacts.removeTitle', { name: shownRemoving?.name ?? '' })}
         body={t('clients.contacts.removeBody')}
         action={t('clients.contacts.remove')}
         destructive
         pending={archive.isPending}
+        finalFocus={() => returnFocus.target() ?? true}
         onConfirm={async () => {
           if (!removing) return;
           await archive.mutateAsync(removing.id);
@@ -152,10 +180,12 @@ function ContactCard({
 }: {
   contact: Contact;
   editable: boolean;
-  onEdit: () => void;
-  onRemove: () => void;
+  /** Each gets the menu's button, where the focus returns. */
+  onEdit: (opener: HTMLElement | null) => void;
+  onRemove: (opener: HTMLElement | null) => void;
 }) {
   const { t } = useTranslation();
+  const menuButton = useRef<HTMLButtonElement>(null);
   const name = contact.name;
   return (
     <Card
@@ -183,22 +213,18 @@ function ContactCard({
           <DropdownMenu>
             <DropdownMenuTrigger
               render={
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label={t('clients.contacts.actions', { name })}
-                />
+                <IconButton ref={menuButton} label={t('clients.contacts.actions', { name })} />
               }
             >
               <EllipsisIcon />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={onEdit}>
+              <DropdownMenuItem onClick={() => onEdit(menuButton.current)}>
                 <PencilIcon />
                 {t('clients.contacts.edit')}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem variant="destructive" onClick={onRemove}>
+              <DropdownMenuItem variant="destructive" onClick={() => onRemove(menuButton.current)}>
                 <Trash2Icon />
                 {t('clients.contacts.remove')}
               </DropdownMenuItem>
@@ -219,24 +245,20 @@ function ContactCard({
               >
                 {contact.phone}
               </a>
-              <Button
+              <IconButton
                 variant="outline"
-                size="icon-sm"
-                aria-label={t('clients.contacts.call', { name })}
-                title={t('clients.contacts.call', { name })}
+                label={t('clients.contacts.call', { name })}
                 render={<a href={`tel:${contact.phone}`} />}
               >
                 <PhoneIcon />
-              </Button>
-              <Button
+              </IconButton>
+              <IconButton
                 variant="outline"
-                size="icon-sm"
-                aria-label={t('clients.contacts.whatsapp', { name })}
-                title={t('clients.contacts.whatsapp', { name })}
+                label={t('clients.contacts.whatsapp', { name })}
                 render={<a href={whatsappUrl(contact.phone)} target="_blank" rel="noreferrer" />}
               >
                 <MessageCircleIcon />
-              </Button>
+              </IconButton>
             </div>
           )}
           {contact.email && (
@@ -272,46 +294,58 @@ const emptyContact: CreateContactInput = {
   notes: '',
 };
 
+const contactValues = (contact: Contact | null): CreateContactInput =>
+  contact
+    ? {
+        name: contact.name,
+        jobTitle: contact.jobTitle ?? '',
+        phone: contact.phone ?? '',
+        email: contact.email ?? '',
+        hasFinalApproval: contact.hasFinalApproval,
+        notes: contact.notes ?? '',
+      }
+    : emptyContact;
+
 function ContactDialog({
   clientId,
   editing,
   onClose,
+  finalFocus,
 }: {
   clientId: string;
   editing: Editing;
   onClose: () => void;
+  /** Where the focus goes when it closes: the button that opened it, or a fallback. */
+  finalFocus: () => HTMLElement | null;
 }) {
   const { t } = useTranslation();
   const ids = { approval: useId() };
   const create = useCreateContact(clientId);
   const update = useUpdateContact(clientId);
   const [failure, setFailure] = useState<string | null>(null);
-  const contact = editing === 'new' ? null : editing;
+  // The title and fields stay while the dialog fades out.
+  const shown = useShownWhileClosing(editing);
+  const contact = shown === 'new' ? null : shown;
   const form = useForm<CreateContactInput, unknown, CreateContact>({
     resolver: standardSchemaResolver(createContactSchema),
     // A refetch keeps what the user already changed.
     resetOptions: { keepDirtyValues: true },
-    values: contact
-      ? {
-          name: contact.name,
-          jobTitle: contact.jobTitle ?? '',
-          phone: contact.phone ?? '',
-          email: contact.email ?? '',
-          hasFinalApproval: contact.hasFinalApproval,
-          notes: contact.notes ?? '',
-        }
-      : emptyContact,
+    values: contactValues(contact),
   });
-  const { errors } = form.formState;
+  // Read while rendering: React Hook Form updates only the state a component reads.
+  const { errors, isDirty } = form.formState;
 
-  function close() {
+  // After the exit animation, so the next opening starts afresh. A plain `reset()` would apply
+  // `keepDirtyValues` and keep what was typed.
+  function closed() {
     setFailure(null);
-    form.reset(emptyContact);
-    onClose();
+    form.reset(contactValues(contact), { keepDirtyValues: false });
   }
 
   const submit = form.handleSubmit(async (values) => {
     setFailure(null);
+    // Nothing changed: close without a request or a "saved" toast.
+    if (contact && !isDirty) return onClose();
     try {
       if (contact) {
         await update.mutateAsync({ contactId: contact.id, ...values });
@@ -320,15 +354,23 @@ function ContactDialog({
         await create.mutateAsync(values);
         toast.add({ title: t('clients.contacts.added'), type: 'success' });
       }
-      close();
+      onClose();
     } catch (error) {
       setFailure(errorMessage(t, error));
     }
   });
 
   return (
-    <Dialog open={editing !== null} onOpenChange={(open) => !open && close()}>
-      <DialogContent closeLabel={t('common.close')} className="max-w-xl">
+    <Dialog
+      open={editing !== null}
+      onOpenChange={(open) => !open && onClose()}
+      onOpenChangeComplete={(open) => !open && closed()}
+    >
+      <DialogContent
+        closeLabel={t('common.close')}
+        className="max-w-xl"
+        finalFocus={() => finalFocus() ?? true}
+      >
         <form className="grid gap-5" onSubmit={submit} noValidate>
           <DialogHeader>
             <DialogTitle>
@@ -356,13 +398,7 @@ function ContactDialog({
             </Field>
             <Field invalid={!!errors.phone}>
               <FieldLabel>{t('clients.contacts.form.phone')}</FieldLabel>
-              <Input
-                type="tel"
-                dir="ltr"
-                className="text-end"
-                autoComplete="off"
-                {...form.register('phone')}
-              />
+              <Input type="tel" dir="ltr" autoComplete="off" {...form.register('phone')} />
               <FieldDescription>{t('clients.contacts.form.phoneHint')}</FieldDescription>
               <FieldError match={!!errors.phone}>
                 {t('clients.contacts.form.errors.phone')}
@@ -370,13 +406,7 @@ function ContactDialog({
             </Field>
             <Field invalid={!!errors.email}>
               <FieldLabel>{t('clients.contacts.form.email')}</FieldLabel>
-              <Input
-                type="email"
-                dir="ltr"
-                className="text-end"
-                autoComplete="off"
-                {...form.register('email')}
-              />
+              <Input type="email" dir="ltr" autoComplete="off" {...form.register('email')} />
               <FieldError match={!!errors.email}>
                 {t('clients.contacts.form.errors.email')}
               </FieldError>

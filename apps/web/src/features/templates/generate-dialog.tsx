@@ -36,7 +36,7 @@ import {
 } from '@vertex-hub/ui';
 import type { TFunction } from 'i18next';
 import { CalendarIcon, LinkIcon, MilestoneIcon, TriangleAlertIcon, UsersIcon } from 'lucide-react';
-import { useId, useState } from 'react';
+import { type ComponentProps, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FormAlert } from '../../components/form-alert';
 import { ApiError } from '../../lib/api/client';
@@ -71,18 +71,32 @@ export function GenerateTasksDialog({
   initialTemplateId,
   open,
   onClose,
+  finalFocus,
 }: {
   target: GenerateTarget;
   /** Projects: the template to start with (from the new project form). */
   initialTemplateId?: string;
   open: boolean;
   onClose: () => void;
+  /** Where the focus goes when it closes; needed when no button opened it (after creating). */
+  finalFocus?: ComponentProps<typeof DialogContent>['finalFocus'];
 }) {
   const { t } = useTranslation();
+  // The form stays while the dialog fades out, and starts afresh at the next opening.
+  const [mounted, setMounted] = useState(open);
+  if (open && !mounted) setMounted(true);
   return (
-    <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
-      <DialogContent closeLabel={t('common.close')} className="sm:max-w-3xl">
-        {open && (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => !next && onClose()}
+      onOpenChangeComplete={(next) => !next && setMounted(false)}
+    >
+      <DialogContent
+        closeLabel={t('common.close')}
+        className="sm:max-w-3xl"
+        finalFocus={finalFocus}
+      >
+        {mounted && (
           <GenerateForm target={target} initialTemplateId={initialTemplateId} onDone={onClose} />
         )}
       </DialogContent>

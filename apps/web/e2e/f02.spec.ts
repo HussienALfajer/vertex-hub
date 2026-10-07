@@ -61,9 +61,11 @@ test('an employee reads the profile and logs a note, with no edit actions', asyn
   const note = page.getByRole('article').filter({ hasText: 'اتصلت هالة لتأكيد موعد التصوير.' });
   await expect(note).toBeVisible();
   // Only the author edits a note (rule 11): the employee's own note has actions, others do not.
-  await expect(note.getByRole('button', { name: ar.clients.notes.actions })).toBeVisible();
+  // The menu is named by the note's time.
+  const actions = ar.clients.notes.actions.replace(' {{time}}', '');
+  await expect(note.getByRole('button', { name: actions })).toBeVisible();
   const others = page.getByRole('article').filter({ hasText: 'طلب سامر تعديل موعد' });
-  await expect(others.getByRole('button', { name: ar.clients.notes.actions })).toHaveCount(0);
+  await expect(others.getByRole('button', { name: actions })).toHaveCount(0);
 });
 
 test('an account manager edits their own client but creates none', async ({ page }) => {

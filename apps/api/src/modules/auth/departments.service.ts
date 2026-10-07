@@ -27,6 +27,16 @@ const memberCount = sql<number>`(
   inner join ${users} on ${users.id} = ${departmentMembers.userId}
   where ${departmentMembers.departmentId} = ${departments.id} and ${users.archivedAt} is null)`;
 
+/** A department with its manager and member count, as lists and pages show it. */
+const departmentFields = {
+  id: departments.id,
+  code: departments.code,
+  name: departments.name,
+  managerId: managers.id,
+  managerName: managers.name,
+  memberCount,
+};
+
 /** The ten fixed departments (ADR 0014): names and managers are editable. */
 @Injectable()
 export class DepartmentsService {
@@ -34,14 +44,7 @@ export class DepartmentsService {
 
   async list(): Promise<DepartmentListResponse> {
     const rows = await this.db
-      .select({
-        id: departments.id,
-        code: departments.code,
-        name: departments.name,
-        managerId: managers.id,
-        managerName: managers.name,
-        memberCount,
-      })
+      .select(departmentFields)
       .from(departments)
       .leftJoin(managers, eq(managers.id, departments.managerId))
       // Ids are UUIDv7 literals in seed order.
@@ -52,14 +55,7 @@ export class DepartmentsService {
   /** Member status (invited or active) is shown to user managers only. */
   async detail(actor: CurrentUserInfo, id: string): Promise<DepartmentDetailResponse> {
     const [row] = await this.db
-      .select({
-        id: departments.id,
-        code: departments.code,
-        name: departments.name,
-        managerId: managers.id,
-        managerName: managers.name,
-        memberCount,
-      })
+      .select(departmentFields)
       .from(departments)
       .leftJoin(managers, eq(managers.id, departments.managerId))
       .where(eq(departments.id, id));
@@ -109,7 +105,12 @@ export class DepartmentsService {
         const [taken] = await tx
           .select({ id: departments.id })
           .from(departments)
-          .where(and(eq(departments.name, input.name), ne(departments.id, id)));
+          .where(
+            and(
+              sql`lower(${departments.name}) = lower(${input.name})`,
+              ne(departments.id, id),
+            ),
+          );
         if (taken) {
           throw new CodedException(
             409,

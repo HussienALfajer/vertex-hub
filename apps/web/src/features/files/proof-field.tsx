@@ -1,6 +1,17 @@
-import { Button, cn, Field, FieldDescription, FieldLabel, Progress } from '@vertex-hub/ui';
+import {
+  Button,
+  cn,
+  Field,
+  FieldDescription,
+  FieldLabel,
+  Progress,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@vertex-hub/ui';
 import { PaperclipIcon, XIcon } from 'lucide-react';
 import { useId, useRef } from 'react';
+import { flushSync } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { errorMessage } from '../../lib/errors';
 import { formatFileSize } from '../../lib/format';
@@ -65,9 +76,12 @@ export function ProofField({
     }
   }
 
+  // The remove button leaves with the file: the focus goes to "choose" that replaces it.
+  const choose = useRef<HTMLButtonElement>(null);
   function remove() {
     proof?.controller?.abort();
-    onProof(null);
+    flushSync(() => onProof(null));
+    choose.current?.focus();
   }
 
   return (
@@ -94,15 +108,22 @@ export function ProofField({
             <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
               {formatFileSize(proof.file.size)}
             </span>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              aria-label={t('files.proof.remove', { name: proof.file.name })}
-              onClick={remove}
-            >
-              <XIcon />
-            </Button>
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label={t('files.proof.remove', { name: proof.file.name })}
+                    onClick={remove}
+                  />
+                }
+              >
+                <XIcon />
+              </TooltipTrigger>
+              <TooltipContent>{t('files.proof.remove', { name: proof.file.name })}</TooltipContent>
+            </Tooltip>
           </div>
           {!proof.error && !proof.uploadId && (
             <Progress aria-labelledby={progressId} value={Math.round(proof.sent * 100)} />
@@ -116,6 +137,7 @@ export function ProofField({
       ) : (
         <div>
           <Button
+            ref={choose}
             type="button"
             variant="outline"
             size="sm"

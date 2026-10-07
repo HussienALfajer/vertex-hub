@@ -60,6 +60,7 @@ import {
 } from '../auth/index.js';
 import { ClientDirectory, type ClientSummary } from '../clients/index.js';
 import { BillingLocks } from './billing-locks.js';
+import { changedDepartments } from './engagement-departments.js';
 import {
   actorOf,
   assertCanEditMoney,
@@ -364,7 +365,7 @@ export class RetainersService {
         },
         {
           name: input.name,
-          departments: input.departments,
+          departments: changedDepartments(current.departments, input.departments),
           startDate: input.startDate,
           renewalDate: input.renewalDate,
         },

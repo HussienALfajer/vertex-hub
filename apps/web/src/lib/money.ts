@@ -37,3 +37,18 @@ export function amountText(minor: number | null | undefined): string {
   const cents = minor % MINOR_PER_UNIT;
   return cents === 0 ? String(units) : `${units}.${String(cents).padStart(2, '0')}`;
 }
+
+/**
+ * A typed exchange rate in the contract's form: trimmed, Latin digits, `٫` as `.`. A comma stays
+ * and fails validation: in `13,000` it groups thousands, and reading it as a decimal mark would
+ * turn the rate into 13.
+ */
+export function rateInput(text: string): string {
+  return latinDigits(text.trim()).replace('٫', '.');
+}
+
+/** A stored rate as editable text, without trailing zeros: `118.5000` → `118.5`. */
+export function rateText(rate: string | null): string {
+  if (rate === null) return '';
+  return rate.includes('.') ? rate.replace(/0+$/, '').replace(/\.$/, '') : rate;
+}

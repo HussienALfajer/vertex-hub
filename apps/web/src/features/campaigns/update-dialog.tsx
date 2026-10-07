@@ -146,7 +146,7 @@ export function UpdateDialog({
         dir="ltr"
         inputMode="numeric"
         autoComplete="off"
-        className="text-end tabular-nums"
+        className="tabular-nums"
         {...form.register(name)}
       />
       {hint && <FieldDescription>{hint}</FieldDescription>}

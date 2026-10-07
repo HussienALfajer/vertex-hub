@@ -375,14 +375,17 @@ function QuotesTable({ quotes }: { quotes: Quote[] }) {
       <TableBody>
         {quotes.map((quote) => (
           <TableRow key={quote.id}>
-            <TableCell className="whitespace-normal">
+            <TableCell className="min-w-48 whitespace-normal">
               <Link
                 to="/quotes/$quoteId"
                 params={{ quoteId: quote.id }}
                 className="group flex min-w-0 flex-col rounded-md outline-offset-4"
               >
                 <span className="font-medium group-hover:underline">{quote.title}</span>
-                <span dir="ltr" className="text-start text-xs text-muted-foreground tabular-nums">
+                <span
+                  dir="ltr"
+                  className="text-start text-xs whitespace-nowrap text-muted-foreground tabular-nums"
+                >
                   {quote.displayNumber}
                 </span>
               </Link>

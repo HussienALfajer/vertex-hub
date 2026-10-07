@@ -147,6 +147,29 @@ describe('departments', () => {
     );
   });
 
+  it('compares names without letter case', async () => {
+    const [design] = await db
+      .select({ id: departments.id, name: departments.name })
+      .from(departments)
+      .where(eq(departments.code, 'design'));
+    if (!design) throw new Error('The design department is missing');
+    const latin = `Design ${randomUUID().slice(0, 6)}`;
+    await db.update(departments).set({ name: latin }).where(eq(departments.id, design.id));
+    try {
+      await expectError(
+        await patch(photography, operations.cookie, { name: latin.toLowerCase() }),
+        409,
+        'DEPARTMENT_NAME_TAKEN',
+      );
+      // A department may change the case of its own name.
+      const own = await patch(design.id, operations.cookie, { name: latin.toUpperCase() });
+      expect(own.status).toBe(200);
+    } finally {
+      await db.update(departments).set({ name: design.name }).where(eq(departments.id, design.id));
+      await db.delete(auditEntries).where(eq(auditEntries.entityId, design.id));
+    }
+  });
+
   it('accepts only an active member as manager', async () => {
     const outsider = await seedUser(db, { departments: [{ code: 'design' }] });
     const invited = await seedUser(db, { password: null, departments: [{ code: 'photography' }] });

@@ -15,6 +15,7 @@ export const AUDIT_ACTIONS = [
   'user.two_factor_enabled',
   'user.two_factor_disabled',
   'user.two_factor_reset',
+  'user.backup_codes_regenerated',
   'user.profile_updated',
   'department.updated',
   'client.created',

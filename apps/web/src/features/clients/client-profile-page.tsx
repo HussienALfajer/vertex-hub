@@ -30,6 +30,7 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuTrigger,
+  IconButton,
   Skeleton,
   Tabs,
   TabsContent,
@@ -63,7 +64,7 @@ import {
   UserPlusIcon,
   UsersRoundIcon,
 } from 'lucide-react';
-import { type ReactNode, useCallback, useState } from 'react';
+import { type ReactNode, type RefObject, useCallback, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '../../components/confirm-dialog';
@@ -72,6 +73,7 @@ import { isMissing, LoadError } from '../../components/load-error';
 import { can, canAll, useMe } from '../../lib/auth';
 import { errorMessage } from '../../lib/errors';
 import { formatNumber } from '../../lib/format';
+import { useShownWhileClosing } from '../../lib/use-shown-while-closing';
 import { ClientApprovalsTab } from '../approvals/client-approvals-tab';
 import { ClientAdsTab, hasCampaignAccess } from '../campaigns/client-ads-tab';
 import { ClientContentTab } from '../content/client-content-tab';
@@ -197,7 +199,16 @@ function Profile({
   const archived = client.archivedAt !== null;
   // Archived clients are read-only (rule 7); the API refuses every change but restore.
   const editable = client.canManage && !archived;
-  const [addingContact, setAddingContact] = useState(false);
+  // The notice's button, while the contact dialog it opened is open.
+  const [addingContact, setAddingContact] = useState<HTMLElement | null>(null);
+  const [confirming, setConfirming] = useState<'archive' | 'restore' | null>(null);
+  // The action stays named while its dialog fades out.
+  const shownConfirm = useShownWhileClosing(confirming);
+  const archive = useArchiveClient(client.id);
+  const restore = useRestoreClient(client.id);
+  const heading = useRef<HTMLHeadingElement>(null);
+  const menuButton = useRef<HTMLButtonElement>(null);
+  const restoreButton = useRef<HTMLButtonElement>(null);
 
   const openTab = (next: ClientTab) =>
     navigate({
@@ -212,10 +223,34 @@ function Profile({
 
   return (
     <>
-      <ClientHero client={client} editable={editable} scopeAll={scopeAll} />
+      <ClientHero
+        client={client}
+        editable={editable}
+        scopeAll={scopeAll}
+        heading={heading}
+        menuButton={menuButton}
+        onArchive={() => setConfirming('archive')}
+      />
 
       {archived ? (
-        <ArchivedCallout client={client} scopeAll={scopeAll} />
+        <Callout
+          icon={<ArchiveIcon />}
+          title={t('clients.profile.archivedTitle')}
+          description={t('clients.profile.archivedBody')}
+          action={
+            scopeAll && (
+              <Button
+                ref={restoreButton}
+                variant="outline"
+                size="sm"
+                onClick={() => setConfirming('restore')}
+              >
+                <ArchiveRestoreIcon />
+                {t('clients.profile.restore')}
+              </Button>
+            )
+          }
+        />
       ) : (
         !client.hasApprovalContact && (
           <Callout
@@ -228,9 +263,9 @@ function Profile({
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => {
+                  onClick={(event) => {
                     void openTab('contacts');
-                    setAddingContact(true);
+                    setAddingContact(event.currentTarget);
                   }}
                 >
                   <UserPlusIcon />
@@ -358,6 +393,30 @@ function Profile({
           <CommunicationTab client={client} archived={archived} />
         </TabsContent>
       </Tabs>
+
+      {/* Outside the menu and the notice: both leave the page with the action. */}
+      <ConfirmDialog
+        open={confirming !== null}
+        onClose={() => setConfirming(null)}
+        title={t(`clients.profile.confirm.${shownConfirm ?? 'archive'}Title`, {
+          name: client.tradeName,
+        })}
+        body={t(`clients.profile.confirm.${shownConfirm ?? 'archive'}Body`)}
+        action={t(`clients.profile.confirm.${shownConfirm ?? 'archive'}Action`)}
+        destructive={shownConfirm === 'archive'}
+        pending={archive.isPending || restore.isPending}
+        // The focus goes to the button that undoes the change, or back to the one that opened it.
+        finalFocus={() => restoreButton.current ?? menuButton.current ?? heading.current ?? true}
+        onConfirm={async () => {
+          if (confirming === 'restore') {
+            await restore.mutateAsync(undefined);
+            toast.add({ title: t('clients.profile.confirm.restored'), type: 'success' });
+          } else {
+            await archive.mutateAsync(undefined);
+            toast.add({ title: t('clients.profile.confirm.archived'), type: 'success' });
+          }
+        }}
+      />
     </>
   );
 }
@@ -379,10 +438,16 @@ function ClientHero({
   client,
   editable,
   scopeAll,
+  heading,
+  menuButton,
+  onArchive,
 }: {
   client: ClientDetailResponse;
   editable: boolean;
   scopeAll: boolean;
+  heading: RefObject<HTMLHeadingElement | null>;
+  menuButton: RefObject<HTMLButtonElement | null>;
+  onArchive: () => void;
 }) {
   const { t } = useTranslation();
   const archived = client.archivedAt !== null;
@@ -394,7 +459,7 @@ function ClientHero({
   return (
     <section className="relative overflow-hidden rounded-lg border border-border bg-surface">
       <AscentLines className="absolute inset-y-0 end-0 hidden h-full w-32 text-border md:block" />
-      <div className="relative flex flex-col gap-6 p-6 lg:flex-row lg:items-center">
+      <div className="relative flex flex-col gap-6 p-6 xl:flex-row xl:items-center">
         <Avatar
           name={client.tradeName}
           shape="square"
@@ -403,7 +468,9 @@ function ClientHero({
         />
         <div className="flex min-w-0 flex-1 flex-col gap-3">
           <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-2xl font-bold">{client.tradeName}</h1>
+            <h1 ref={heading} tabIndex={-1} className="min-w-0 text-2xl font-bold wrap-anywhere">
+              {client.tradeName}
+            </h1>
             <ClientStatusBadge status={client.status} />
             {client.isHealthcare && <HealthcareBadge />}
             {archived && <Badge tone="neutral">{t('clients.archivedBadge')}</Badge>}
@@ -450,7 +517,7 @@ function ClientHero({
             )}
             {editable && <EditBasics client={client} scopeAll={scopeAll} />}
             {editable && <StatusMenu client={client} />}
-            {scopeAll && !archived && <ClientMenu client={client} />}
+            {scopeAll && !archived && <ClientMenu menuButton={menuButton} onArchive={onArchive} />}
           </div>
         )}
       </div>
@@ -483,15 +550,7 @@ function StatusMenu({ client }: { client: ClientDetailResponse }) {
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger
-        render={
-          <Button
-            variant="outline"
-            disabled={update.isPending}
-            title={t('clients.profile.changeStatus')}
-          />
-        }
-      >
+      <DropdownMenuTrigger render={<Button variant="outline" disabled={update.isPending} />}>
         {t('clients.profile.status', { status: t(`clients.statuses.${client.status}`) })}
         <ChevronDownIcon className="size-4 text-muted-foreground" />
       </DropdownMenuTrigger>
@@ -514,82 +573,35 @@ function StatusMenu({ client }: { client: ClientDetailResponse }) {
   );
 }
 
-function ClientMenu({ client }: { client: ClientDetailResponse }) {
-  const { t } = useTranslation();
-  const archive = useArchiveClient(client.id);
-  const [confirming, setConfirming] = useState(false);
-  return (
-    <>
-      <DropdownMenu>
-        <DropdownMenuTrigger
-          render={
-            <Button variant="outline" size="icon" aria-label={t('clients.profile.actions')} />
-          }
-        >
-          <EllipsisIcon />
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem variant="destructive" onClick={() => setConfirming(true)}>
-            <ArchiveIcon />
-            {t('clients.profile.archive')}
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-      <ConfirmDialog
-        open={confirming}
-        onClose={() => setConfirming(false)}
-        title={t('clients.profile.confirm.archiveTitle', { name: client.tradeName })}
-        body={t('clients.profile.confirm.archiveBody')}
-        action={t('clients.profile.confirm.archiveAction')}
-        destructive
-        pending={archive.isPending}
-        onConfirm={async () => {
-          await archive.mutateAsync(undefined);
-          toast.add({ title: t('clients.profile.confirm.archived'), type: 'success' });
-        }}
-      />
-    </>
-  );
-}
-
-function ArchivedCallout({
-  client,
-  scopeAll,
+function ClientMenu({
+  menuButton,
+  onArchive,
 }: {
-  client: ClientDetailResponse;
-  scopeAll: boolean;
+  menuButton: RefObject<HTMLButtonElement | null>;
+  onArchive: () => void;
 }) {
   const { t } = useTranslation();
-  const restore = useRestoreClient(client.id);
-  const [confirming, setConfirming] = useState(false);
   return (
-    <>
-      <Callout
-        icon={<ArchiveIcon />}
-        title={t('clients.profile.archivedTitle')}
-        description={t('clients.profile.archivedBody')}
-        action={
-          scopeAll && (
-            <Button variant="outline" size="sm" onClick={() => setConfirming(true)}>
-              <ArchiveRestoreIcon />
-              {t('clients.profile.restore')}
-            </Button>
-          )
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        render={
+          <IconButton
+            ref={menuButton}
+            variant="outline"
+            size="icon"
+            label={t('clients.profile.actions')}
+          />
         }
-      />
-      <ConfirmDialog
-        open={confirming}
-        onClose={() => setConfirming(false)}
-        title={t('clients.profile.confirm.restoreTitle', { name: client.tradeName })}
-        body={t('clients.profile.confirm.restoreBody')}
-        action={t('clients.profile.confirm.restoreAction')}
-        pending={restore.isPending}
-        onConfirm={async () => {
-          await restore.mutateAsync(undefined);
-          toast.add({ title: t('clients.profile.confirm.restored'), type: 'success' });
-        }}
-      />
-    </>
+      >
+        <EllipsisIcon />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem variant="destructive" onClick={onArchive}>
+          <ArchiveIcon />
+          {t('clients.profile.archive')}
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -612,10 +624,11 @@ function EditBasics({ client, scopeAll }: { client: ClientDetailResponse; scopeA
     },
   });
 
-  function close() {
-    setOpen(false);
+  // After the exit animation: the next opening starts from the saved client. A plain `reset()`
+  // would apply `keepDirtyValues` and keep what was typed (or typed before the API trimmed it).
+  function closed() {
     setFailure(null);
-    form.reset();
+    form.reset(undefined, { keepDirtyValues: false });
   }
 
   // Only what changed is sent, so an unchanged scope-all field never reaches the API.
@@ -628,10 +641,12 @@ function EditBasics({ client, scopeAll }: { client: ClientDetailResponse; scopeA
       ...(dirty.accountManagerId && { accountManagerId: values.accountManagerId }),
       ...(dirty.isHealthcare && { isHealthcare: values.isHealthcare }),
     };
+    // Nothing changed: close without a request or a "saved" toast.
+    if (Object.keys(changes).length === 0) return setOpen(false);
     try {
-      if (Object.keys(changes).length > 0) await update.mutateAsync(changes);
+      await update.mutateAsync(changes);
       toast.add({ title: t('clients.profile.saved'), type: 'success' });
-      close();
+      setOpen(false);
     } catch (error) {
       setFailure(clientFormFailure(form, t, error));
     }
@@ -643,7 +658,7 @@ function EditBasics({ client, scopeAll }: { client: ClientDetailResponse; scopeA
         <PencilIcon />
         {t('clients.profile.edit')}
       </Button>
-      <Dialog open={open} onOpenChange={(next) => !next && close()}>
+      <Dialog open={open} onOpenChange={setOpen} onOpenChangeComplete={(next) => !next && closed()}>
         <DialogContent closeLabel={t('common.close')} className="max-w-xl">
           <form className="grid gap-5" onSubmit={submit} noValidate>
             <DialogHeader>

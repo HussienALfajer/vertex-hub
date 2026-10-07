@@ -61,6 +61,49 @@ test('add a service, edit its price, and keep a packaged service from being arch
   );
 });
 
+test('the service dialog starts over, refuses a taken name at the field, and gives the focus back', async ({
+  page,
+}) => {
+  await mockApi(page, { signedIn: true });
+  await page.goto('/catalog');
+  const newButton = page.getByRole('button', { name: ar.catalog.services.new });
+  await newButton.click();
+  const dialog = page.getByRole('dialog', { name: ar.catalog.services.addTitle });
+  const name = dialog.getByLabel(ar.catalog.form.name, { exact: true });
+  await expect(name).toBeFocused();
+  await name.fill('مسودة لم تُحفظ');
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+  await expect(newButton).toBeFocused();
+
+  await newButton.click();
+  await expect(name).toHaveValue('');
+  await name.fill('تصميم سوشال ميديا');
+  await dialog.getByRole('button', { name: ar.common.save }).click();
+  await expect(dialog.getByRole('alert')).toHaveText(ar.errors.SERVICE_NAME_TAKEN);
+  await expect(name).toBeFocused();
+});
+
+test('archiving a service returns the focus to the list once its row is gone', async ({ page }) => {
+  await mockApi(page, { signedIn: true });
+  await page.goto('/catalog');
+  const menu = page.getByRole('button', { name: fill(ar.catalog.actions, { name: 'هوية بصرية' }) });
+  const confirm = page.getByRole('alertdialog');
+
+  await menu.click();
+  await page.getByRole('menuitem', { name: ar.catalog.archive }).click();
+  await confirm.getByRole('button', { name: ar.common.cancel }).click();
+  await expect(confirm).toBeHidden();
+  await expect(menu).toBeFocused();
+
+  await menu.click();
+  await page.getByRole('menuitem', { name: ar.catalog.archive }).click();
+  await confirm.getByRole('button', { name: ar.catalog.archive }).click();
+  await expect(confirm).toBeHidden();
+  await expect(menu).toBeHidden();
+  await expect(page.getByRole('tab', { name: ar.catalog.tabs.services })).toBeFocused();
+});
+
 test('build a monthly package from services', async ({ page }) => {
   await mockApi(page, { signedIn: true });
   await page.goto('/catalog?tab=packages');

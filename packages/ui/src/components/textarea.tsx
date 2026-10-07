@@ -15,7 +15,7 @@ function Textarea({ className, ...props }: ComponentProps<'textarea'>) {
           className={cn(
             'field-sizing-content min-h-24 w-full min-w-0 rounded-md border border-input bg-surface px-3 py-2 text-base text-foreground',
             'transition-colors duration-150 ease-out placeholder:text-muted-foreground',
-            'disabled:cursor-not-allowed disabled:opacity-50',
+            'disabled:cursor-not-allowed disabled:opacity-50 read-only:bg-muted',
             'aria-invalid:border-destructive-text',
             className,
           )}

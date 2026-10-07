@@ -1,17 +1,28 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { useRouter } from '@tanstack/react-router';
-import { totpCodeSchema } from '@vertex-hub/contracts';
-import { Button, Checkbox, cn, Field, FieldLabel, Input, OtpField, toast } from '@vertex-hub/ui';
-import { CheckIcon, CopyIcon, LogOutIcon, ShieldAlertIcon } from 'lucide-react';
+import { Link, useBlocker, useRouter } from '@tanstack/react-router';
+import {
+  Button,
+  Callout,
+  Checkbox,
+  cn,
+  Field,
+  FieldError,
+  FieldLabel,
+  PasswordInput,
+  toast,
+} from '@vertex-hub/ui';
+import { ArrowRightIcon, CheckIcon, CopyIcon, LogOutIcon, ShieldAlertIcon } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
-import { useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AuthHeading, AuthLayout } from '../../components/auth-layout';
+import { ConfirmDialog } from '../../components/confirm-dialog';
 import { FormAlert } from '../../components/form-alert';
 import { authClient, meQuery } from '../../lib/auth';
 import { useCopy } from '../../lib/clipboard';
-import { errorMessage } from '../../lib/errors';
+import { type Failure, passwordFailure } from '../../lib/errors';
 import { BackupCodes } from './backup-codes';
+import { TotpForm } from './totp-form';
 
 type Step = 'password' | 'scan' | 'codes';
 const STEPS: Step[] = ['password', 'scan', 'codes'];
@@ -40,10 +51,11 @@ export function TwoFactorSetupPage({ required }: { required: boolean }) {
       <div className="flex flex-col gap-4">
         <AuthHeading title={t('twoFactorSetup.title')} subtitle={t('twoFactorSetup.subtitle')} />
         {required && (
-          <p className="flex items-start gap-2 rounded-md bg-status-gold px-3 py-2 text-sm text-status-gold-foreground">
-            <ShieldAlertIcon className="mt-0.5 size-4 shrink-0" />
-            {t('twoFactorSetup.requiredNotice')}
-          </p>
+          <Callout
+            tone="info"
+            icon={<ShieldAlertIcon />}
+            title={t('twoFactorSetup.requiredNotice')}
+          />
         )}
       </div>
       <Stepper current={step} />
@@ -76,10 +88,19 @@ export function TwoFactorSetupPage({ required }: { required: boolean }) {
         />
       )}
 
-      <Button variant="ghost" size="sm" className="self-start" onClick={signOut}>
-        <LogOutIcon className="rtl:-scale-x-100" />
-        {t('twoFactorSetup.signOut')}
-      </Button>
+      {/* Once the codes show, 2FA is on: the only way on is past them. */}
+      {step !== 'codes' &&
+        (required ? (
+          <Button variant="ghost" size="sm" className="self-start" onClick={signOut}>
+            <LogOutIcon className="rtl:-scale-x-100" />
+            {t('twoFactorSetup.signOut')}
+          </Button>
+        ) : (
+          <Button variant="ghost" size="sm" className="self-start" render={<Link to="/account" />}>
+            <ArrowRightIcon className="ltr:-scale-x-100" />
+            {t('twoFactorSetup.backToAccount')}
+          </Button>
+        ))}
     </AuthLayout>
   );
 }
@@ -88,9 +109,17 @@ export function TwoFactorSetupPage({ required }: { required: boolean }) {
 function Stepper({ current }: { current: Step }) {
   const { t } = useTranslation();
   const index = STEPS.indexOf(current);
+  const label = useRef<HTMLParagraphElement>(null);
+  const shown = useRef(current);
+  // The finished step's form is gone with its focus: start the next step from its label.
+  useEffect(() => {
+    if (shown.current === current) return;
+    shown.current = current;
+    label.current?.focus();
+  }, [current]);
   return (
     <div className="flex flex-col gap-2">
-      <p className="text-sm text-muted-foreground">
+      <p ref={label} tabIndex={-1} className="text-sm text-muted-foreground outline-none">
         {t('twoFactorSetup.stepOf', { step: index + 1, total: STEPS.length })}
         {' · '}
         <span className="font-medium text-foreground">{t(`twoFactorSetup.steps.${current}`)}</span>
@@ -114,8 +143,9 @@ function Stepper({ current }: { current: Step }) {
 function PasswordStep({ onEnrolled }: { onEnrolled: (enrollment: Enrollment) => void }) {
   const { t } = useTranslation();
   const [password, setPassword] = useState('');
-  const [failure, setFailure] = useState<string | null>(null);
+  const [failure, setFailure] = useState<Failure | null>(null);
   const [pending, setPending] = useState(false);
+  const passwordInput = useRef<HTMLInputElement>(null);
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -123,26 +153,34 @@ function PasswordStep({ onEnrolled }: { onEnrolled: (enrollment: Enrollment) => 
     setPending(true);
     const { data, error } = await authClient.twoFactor.enable({ password });
     setPending(false);
-    if (error || !data || !('totpURI' in data)) return setFailure(errorMessage(t, error));
+    if (error || !data || !('totpURI' in data)) {
+      const refused = passwordFailure(t, error);
+      setFailure(refused);
+      if (refused.field) passwordInput.current?.focus();
+      return;
+    }
     onEnrolled({ totpURI: data.totpURI, backupCodes: data.backupCodes });
   }
 
   return (
     <form className="flex flex-col gap-5" onSubmit={submit}>
       <p className="text-muted-foreground">{t('twoFactorSetup.passwordIntro')}</p>
-      <Field>
+      <Field invalid={failure?.field}>
         <FieldLabel>{t('twoFactorSetup.password')}</FieldLabel>
-        <Input
-          type="password"
-          dir="ltr"
-          className="text-end"
+        <PasswordInput
+          showLabel={t('common.showPassword')}
+          hideLabel={t('common.hidePassword')}
           autoComplete="current-password"
           autoFocus
+          ref={passwordInput}
           value={password}
           onChange={(event) => setPassword(event.target.value)}
         />
+        <FieldError match={!!failure?.field} role="alert">
+          {failure?.message}
+        </FieldError>
       </Field>
-      {failure && <FormAlert>{failure}</FormAlert>}
+      {failure && !failure.field && <FormAlert>{failure.message}</FormAlert>}
       <Button type="submit" size="lg" className="w-full" disabled={pending || !password}>
         {pending ? t('twoFactorSetup.starting') : t('twoFactorSetup.start')}
       </Button>
@@ -157,25 +195,8 @@ function groupKey(secret: string): string {
 
 function ScanStep({ totpURI, onVerified }: { totpURI: string; onVerified: () => Promise<void> }) {
   const { t } = useTranslation();
-  const codeId = useId();
   const { copy, copied } = useCopy();
   const secret = new URL(totpURI).searchParams.get('secret') ?? '';
-  const [code, setCode] = useState('');
-  const [failure, setFailure] = useState<string | null>(null);
-  const [pending, setPending] = useState(false);
-
-  async function verify(value: string) {
-    if (!totpCodeSchema.safeParse(value).success || pending) return;
-    setFailure(null);
-    setPending(true);
-    const { error } = await authClient.twoFactor.verifyTotp({ code: value });
-    if (error) {
-      setPending(false);
-      setCode('');
-      return setFailure(errorMessage(t, error));
-    }
-    await onVerified();
-  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -204,37 +225,7 @@ function ScanStep({ totpURI, onVerified }: { totpURI: string; onVerified: () => 
           </Button>
         </div>
       </div>
-      <form
-        className="flex flex-col gap-4"
-        onSubmit={(event) => {
-          event.preventDefault();
-          void verify(code);
-        }}
-      >
-        <div className="flex flex-col gap-2">
-          <label htmlFor={codeId} className="text-sm font-medium">
-            {t('twoFactorSetup.code')}
-          </label>
-          <OtpField
-            id={codeId}
-            value={code}
-            onValueChange={setCode}
-            onValueComplete={(value) => void verify(value)}
-            slotLabel={(position) => t('twoFactorSetup.digit', { position })}
-            disabled={pending}
-            aria-invalid={failure ? true : undefined}
-          />
-        </div>
-        {failure && <FormAlert>{failure}</FormAlert>}
-        <Button
-          type="submit"
-          size="lg"
-          className="w-full"
-          disabled={pending || !totpCodeSchema.safeParse(code).success}
-        >
-          {pending ? t('twoFactorSetup.verifying') : t('twoFactorSetup.verify')}
-        </Button>
-      </form>
+      <TotpForm label={t('twoFactorSetup.code')} onVerified={onVerified} />
     </div>
   );
 }
@@ -243,6 +234,13 @@ function CodesStep({ codes, onFinish }: { codes: string[]; onFinish: () => Promi
   const { t } = useTranslation();
   const savedId = useId();
   const [saved, setSaved] = useState(false);
+  const [finishing, setFinishing] = useState(false);
+  // The codes are shown once: leaving before saving them (back, reload, closing the tab) asks first.
+  const blocker = useBlocker({
+    shouldBlockFn: () => !saved,
+    enableBeforeUnload: () => !saved,
+    withResolver: true,
+  });
   return (
     <div className="flex flex-col gap-5">
       <p className="text-muted-foreground">{t('twoFactorSetup.codesIntro')}</p>
@@ -254,9 +252,27 @@ function CodesStep({ codes, onFinish }: { codes: string[]; onFinish: () => Promi
         <Checkbox id={savedId} checked={saved} onCheckedChange={(value) => setSaved(value)} />
         {t('twoFactorSetup.confirmSaved')}
       </label>
-      <Button size="lg" className="w-full" disabled={!saved} onClick={() => void onFinish()}>
+      <Button
+        size="lg"
+        className="w-full"
+        disabled={!saved || finishing}
+        onClick={() => {
+          setFinishing(true);
+          void onFinish();
+        }}
+      >
         {t('twoFactorSetup.finish')}
       </Button>
+      <ConfirmDialog
+        open={blocker.status === 'blocked'}
+        onClose={() => blocker.reset?.()}
+        title={t('twoFactorSetup.leaveCodes.title')}
+        body={t('twoFactorSetup.leaveCodes.body')}
+        action={t('twoFactorSetup.leaveCodes.leave')}
+        destructive
+        pending={false}
+        onConfirm={async () => blocker.proceed?.()}
+      />
     </div>
   );
 }

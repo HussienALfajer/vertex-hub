@@ -6,7 +6,7 @@ import { CodedException } from './index.js';
 /** The unique indexes behind a "name taken" check, and the code the check itself answers. */
 const UNIQUE_CODES: Record<string, ErrorCode> = {
   users_email_unique: 'EMAIL_TAKEN',
-  departments_name_unique: 'DEPARTMENT_NAME_TAKEN',
+  departments_name_idx: 'DEPARTMENT_NAME_TAKEN',
   clients_trade_name_idx: 'CLIENT_NAME_TAKEN',
   projects_client_name_idx: 'PROJECT_NAME_TAKEN',
   retainers_client_name_idx: 'RETAINER_NAME_TAKEN',
