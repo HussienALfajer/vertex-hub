@@ -455,7 +455,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
 
       await page.setViewportSize({ width: 1280, height: 1200 });
       await page.goto(`/retainers/${seedIds.adsRetainer}?tab=billing`);
-      await expect(page.getByText(ar.invoices.billing.creditOwed)).toBeVisible();
+      await expect(page.getByText(ar.invoices.billing.creditNextMonth)).toBeVisible();
       await screenshot(page, testInfo, `retainer-billing-credit-${colorScheme}`);
     });
 

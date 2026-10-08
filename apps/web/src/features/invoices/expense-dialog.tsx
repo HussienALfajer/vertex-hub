@@ -76,7 +76,8 @@ export function ExpenseDialog({
       };
   const form = useForm<ExpenseValues>({ values: defaults });
   const [failure, setFailure] = useState<string | null>(null);
-  const { errors } = form.formState;
+  // `isDirty` read during render: the form tracks it only for a component that reads it.
+  const { errors, isDirty } = form.formState;
   const currency = form.watch('currency');
 
   // After the exit animation, so the fields do not change while the dialog fades.
@@ -110,7 +111,7 @@ export function ExpenseDialog({
     try {
       if (expense) {
         // Nothing changed: close without a request or a "saved" toast.
-        if (!form.formState.isDirty) return onClose();
+        if (!isDirty) return onClose();
         const changes = checked(updateProjectExpenseSchema.safeParse(input));
         if (!changes) return;
         await update.mutateAsync({ expenseId: expense.id, ...changes });

@@ -30,7 +30,7 @@ test('a manager issues a drafted invoice, records two payments and sees it paid'
 
   await page.getByRole('button', { name: ar.invoices.issue.action }).click();
   const issue = page.getByRole('dialog', { name: ar.invoices.issue.title });
-  await expect(issue.getByLabel(ar.invoices.rate.label)).toHaveValue('118.5000');
+  await expect(issue.getByLabel(ar.invoices.rate.label)).toHaveValue('118.5');
   await issue.getByRole('button', { name: ar.invoices.issue.confirm }).click();
   await expect(page.getByRole('heading', { level: 1 })).toContainText('INV-2026-0004');
   await expect(page.getByRole('heading', { level: 1 })).toContainText(ar.invoices.statuses.sent);
@@ -57,7 +57,7 @@ test('a manager issues a drafted invoice, records two payments and sees it paid'
   await page.getByRole('button', { name: ar.invoices.payments.action }).click();
   await pay.getByRole('combobox', { name: ar.invoices.payments.currency }).click();
   await page.getByRole('option', { name: ar.invoices.currencies.SYP }).click();
-  await expect(pay.getByLabel(ar.invoices.rate.label)).toHaveValue('118.5000');
+  await expect(pay.getByLabel(ar.invoices.rate.label)).toHaveValue('118.5');
   await pay.getByRole('button', { name: ar.invoices.payments.payTheRest }).click();
   await expect(pay.getByLabel(ar.invoices.payments.amount)).toHaveValue('59250');
   await expect(balanceAfter).toContainText(/(^|[^\d,.])0\.00/);

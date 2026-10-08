@@ -460,6 +460,9 @@ function EditLines({ retainer }: { retainer: RetainerDetail }) {
     },
   });
 
+  // Read during render: the form tracks `isDirty` only for a component that reads it.
+  const { isDirty } = form.formState;
+
   // After the exit animation: the next opening starts from the saved lines (see EditRetainer).
   function closed() {
     setFailure(null);
@@ -469,7 +472,7 @@ function EditLines({ retainer }: { retainer: RetainerDetail }) {
   const submit = form.handleSubmit(async (values) => {
     setFailure(null);
     // Nothing changed: close without a request or a "saved" toast.
-    if (!form.formState.isDirty) return setOpen(false);
+    if (!isDirty) return setOpen(false);
     const lines = parseLines(form, values.deliverables, () =>
       setFailure(
         t('retainers.lines.errors.invalid', {

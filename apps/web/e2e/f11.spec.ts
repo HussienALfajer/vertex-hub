@@ -291,8 +291,8 @@ test('create a meeting with a conflict warning → open it → edit → cancel',
   await expect(page.getByRole('button', { name: ar.calendar.meetings.actions.edit })).toHaveCount(
     0,
   );
-  // The menu left with the meeting's actions: the focus goes to the heading.
-  await expect(page.getByRole('heading', { level: 1 })).toBeFocused();
+  // The menu stays for archiving, so the focus goes back to it.
+  await expect(page.getByRole('button', { name: ar.calendar.actions.more })).toBeFocused();
 });
 
 test('an employee creates meetings and edits only the ones they organize', async ({ page }) => {

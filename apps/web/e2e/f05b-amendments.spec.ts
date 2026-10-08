@@ -78,7 +78,7 @@ test('Finance settles a pending credit outside the system (C9)', async ({ page }
   await onProjectsToday(page);
   await mockApi(page, { signedIn: true, me: financeMe });
   await page.goto(`/retainers/${seedIds.adsRetainer}?tab=billing`);
-  await expect(page.getByText(ar.invoices.billing.creditOwed)).toBeVisible();
+  await expect(page.getByText(ar.invoices.billing.creditNextMonth)).toBeVisible();
   await page.getByRole('button', { name: ar.invoices.billing.settle }).click();
   const dialog = page.getByRole('dialog');
   await dialog.getByRole('button', { name: ar.invoices.billing.settle }).click();
