@@ -1,8 +1,17 @@
-import { Body, Controller, HttpCode, Post } from '@nestjs/common';
-import { ApiBadRequestResponse, ApiNoContentResponse, ApiTags } from '@nestjs/swagger';
+import { Body, Controller, HttpCode, Post, SerializeOptions } from '@nestjs/common';
+import {
+  ApiBadRequestResponse,
+  ApiNoContentResponse,
+  ApiOkResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { AllowAnonymous } from '@thallesp/nestjs-better-auth';
 import {
+  type CheckLink,
+  checkLinkSchema,
   errorResponseSchema,
+  type LinkInfoResponse,
+  linkInfoResponseSchema,
   type RedeemLink,
   type RequestPasswordLink,
   redeemLinkSchema,
@@ -14,6 +23,20 @@ import { UserLinksService } from './user-links.service.js';
 @Controller('password-links')
 export class PasswordLinksController {
   constructor(private readonly links: UserLinksService) {}
+
+  /** The activation page checks the link on opening, so a dead link shows before any typing. */
+  @Post('check')
+  @HttpCode(200)
+  @AllowAnonymous()
+  @SerializeOptions({ schema: linkInfoResponseSchema })
+  @ApiOkResponse({ description: 'The link works', standardSchema: linkInfoResponseSchema })
+  @ApiBadRequestResponse({
+    description: 'LINK_INVALID: unknown, used, expired or replaced link',
+    standardSchema: errorResponseSchema,
+  })
+  check(@Body({ schema: checkLinkSchema }) input: CheckLink): Promise<LinkInfoResponse> {
+    return this.links.check(input);
+  }
 
   /** The activation page sends the token from the link with the new password. */
   @Post('redeem')

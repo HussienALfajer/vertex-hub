@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import {
   Button,
+  IconButton,
   Popover,
   PopoverContent,
   PopoverTitle,
@@ -73,21 +74,19 @@ function BellPanel({ onClose, unread }: { onClose: () => void; unread: number })
             variant="ghost"
             size="sm"
             disabled={unread === 0 || markAll.isPending}
+            focusableWhenDisabled
             onClick={() => markAll.mutate()}
           >
             <CheckCheckIcon />
             {t('notifications.markAllRead')}
           </Button>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            aria-label={t('notifications.settingsLink')}
-            title={t('notifications.settingsLink')}
+          <IconButton
+            label={t('notifications.settingsLink')}
             render={<Link to="/notifications/settings" />}
             onClick={onClose}
           >
             <SettingsIcon />
-          </Button>
+          </IconButton>
         </div>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto">

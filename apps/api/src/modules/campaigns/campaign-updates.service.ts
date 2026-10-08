@@ -61,7 +61,7 @@ export class CampaignUpdatesService {
         throw new CodedException(
           409,
           'INVALID_TRANSITION',
-          `A ${campaign.status} campaign takes no updates`,
+          `A campaign in ${campaign.status} takes no updates`,
         );
       }
       await this.assertPeriod(tx, campaign.id, input, null);
@@ -176,7 +176,11 @@ export class CampaignUpdatesService {
     updateId: string | null,
   ): Promise<void> {
     if (period.periodStart > period.periodEnd || period.periodEnd > businessDate()) {
-      throw new CodedException(400, 'INVALID_DATES', 'The period must end on or before today');
+      throw new CodedException(
+        400,
+        'INVALID_DATES',
+        'The period starts after it ends, or ends after today',
+      );
     }
     if (!periodInOneMonth(period)) {
       throw new CodedException(400, 'PERIOD_CROSSES_MONTH', 'The period crosses a month');

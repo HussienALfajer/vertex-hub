@@ -71,7 +71,7 @@ test('a manager sees a project’s margin, adds and archives expenses and invoic
   await add.getByRole('combobox', { name: ar.invoices.expenses.currency }).click();
   await page.getByRole('option', { name: ar.invoices.currencies.SYP }).click();
   await add.getByLabel(ar.invoices.expenses.amount).fill('2370');
-  await expect(add.getByLabel(ar.invoices.rate.label)).toHaveValue('118.5000');
+  await expect(add.getByLabel(ar.invoices.rate.label)).toHaveValue('118.5');
   await add.getByRole('button', { name: ar.invoices.expenses.add }).click();
   await expect(page.getByText(ar.invoices.expenses.added)).toBeVisible();
   await expect(page.getByRole('row', { name: /تصوير المنتجات/ })).toContainText('20.00 USD');
@@ -124,7 +124,8 @@ test('invoice due dates on the calendar open the invoice for invoice readers onl
   const dueOn = addDays(businessDate(), -18);
   await page.goto(`/calendar?date=${dueOn}&kinds=invoice_due`);
   const chip = page.getByRole('link', { name: /INV-2026-0001/ }).first();
-  await expect(chip).toContainText(ar.calendar.keyDates.invoice_due);
+  // A month cell names the kind by its icon.
+  await expect(chip).toHaveAccessibleName(new RegExp(ar.calendar.keyDates.invoice_due));
   await chip.click();
   await expect(page).toHaveURL(new RegExp(`/invoices/${seedIds.overdueInvoice}$`));
 

@@ -1,8 +1,7 @@
+import { standardSchemaResolver } from '@hookform/resolvers/standard-schema';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import {
-  addDays,
-  businessDate,
   type CatalogPackage,
   type CatalogService,
   CURRENCIES,
@@ -14,6 +13,7 @@ import {
   type QuoteTotals,
   quoteDraftSchema,
   quoteTotals,
+  TASK_LIMITS,
 } from '@vertex-hub/contracts';
 import {
   Badge,
@@ -21,11 +21,15 @@ import {
   Callout,
   Field,
   FieldDescription,
+  FieldError,
   FieldLabel,
   Input,
   Textarea,
   ToggleGroup,
   ToggleGroupItem,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
   toast,
 } from '@vertex-hub/ui';
 import {
@@ -38,10 +42,13 @@ import {
   TriangleAlertIcon,
   Undo2Icon,
 } from 'lucide-react';
-import { useEffect, useId, useState } from 'react';
+import { type RefObject, useEffect, useId, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import {
   Controller,
+  type FieldErrors,
   get,
+  type Resolver,
   type UseFieldArrayReturn,
   type UseFormReturn,
   useFieldArray,
@@ -57,8 +64,11 @@ import { UnsavedChangesGuard } from '../../components/unsaved-changes-guard';
 import { ApiError } from '../../lib/api/client';
 import { can, useMe } from '../../lib/auth';
 import { errorMessage } from '../../lib/errors';
-import { formatCalendarDate, formatDateTime, formatNumber, isolateLtr } from '../../lib/format';
+import { focusAfterRemoval } from '../../lib/focus-after-removal';
+import { useFocusFirstError } from '../../lib/focus-first-invalid';
+import { formatDateTime, formatNumber, isolateLtr } from '../../lib/format';
 import { formatMoney } from '../../lib/money';
+import { useReturnFocus } from '../../lib/use-return-focus';
 import { packageListQuery, serviceListQuery } from '../catalog/catalog.queries';
 import { clientQuery } from '../clients/clients.queries';
 import { ChoiceSelect } from './choice-select';
@@ -80,7 +90,6 @@ import {
   useDecideApproval,
   useQuoteApproval,
   useSaveDraft,
-  useSendQuote,
 } from './quotes.queries';
 
 type BuilderForm = UseFormReturn<BuilderValues>;
@@ -90,38 +99,138 @@ type LinesArray = UseFieldArrayReturn<BuilderValues, 'lines', 'key'>;
 const NONE = 'none';
 
 /**
+ * The contract over the draft the API saves. Its paths are the form's, so every problem shows on
+ * its field at once and the focus goes to the first.
+ */
+function draftResolver(updatedAt: string): Resolver<BuilderValues> {
+  const schema = standardSchemaResolver(quoteDraftSchema);
+  return async (values, context, options) => {
+    const result = await schema(
+      draftInput(values, updatedAt),
+      context,
+      options as unknown as Parameters<typeof schema>[2],
+    );
+    return Object.keys(result.errors).length > 0
+      ? { values: {}, errors: result.errors as FieldErrors<BuilderValues> }
+      : { values, errors: {} };
+  };
+}
+
+/**
  * Spec screen 4: a draft as one document, saved whole. Holds the stored version the form started
  * from: a refetch never restarts the form under unsaved work; the builder offers the newer
  * version instead (edge case 1).
  */
-export function QuoteBuilder({ quote }: { quote: QuoteDetail }) {
+export function QuoteBuilder({
+  quote,
+  heading,
+  onSend,
+}: {
+  quote: QuoteDetail;
+  /** Where the focus goes when the control that held it leaves the page. */
+  heading: RefObject<HTMLHeadingElement | null>;
+  /** Opens the send confirmation, which outlives the builder. */
+  onSend: (opener: HTMLElement) => void;
+}) {
   const [base, setBase] = useState(quote);
+  // "Discard changes" starts the form again from the same version, local state included.
+  const [discards, setDiscards] = useState(0);
+  // Every saved change starts the form again: the `data-focus` of the control that then takes the
+  // focus, the one that started the change or the one that replaced it.
+  const focus = useRef<string | null>(null);
+  const focusAfter = (name: string | null) => {
+    focus.current = name;
+  };
+  const [returning, setReturning] = useState(false);
+  const returnFocus = useReturnFocus(heading);
   if (base.archivedAt !== quote.archivedAt || base.discountApproval !== quote.discountApproval) {
     setBase(quote);
   }
-  return <Builder key={base.updatedAt} base={base} quote={quote} onLoad={setBase} />;
+  return (
+    <>
+      <Builder
+        key={`${base.updatedAt}:${discards}`}
+        base={base}
+        quote={quote}
+        onLoad={setBase}
+        onSaved={(version) => {
+          focusAfter('save');
+          setBase(version);
+        }}
+        onDiscard={() => {
+          focusAfter('discard');
+          setDiscards((count) => count + 1);
+        }}
+        focus={focus}
+        focusAfter={focusAfter}
+        heading={heading}
+        onSend={onSend}
+        onReturn={(opener) => {
+          returnFocus.from(opener);
+          setReturning(true);
+        }}
+      />
+      {/* Out of the form, which starts again once the discount is returned. */}
+      <ReturnApprovalDialog
+        quote={quote}
+        open={returning}
+        onClose={() => setReturning(false)}
+        finalFocus={returnFocus.target}
+      />
+    </>
+  );
 }
+
+/** What the builder's parts take to move the focus once the form starts again. */
+type FocusAfter = (name: string | null) => void;
 
 function Builder({
   base,
   quote,
   onLoad,
+  onSaved,
+  onDiscard,
+  focus,
+  focusAfter,
+  heading,
+  onSend,
+  onReturn,
 }: {
   /** The version the form started from. */
   base: QuoteDetail;
   /** The latest stored version. */
   quote: QuoteDetail;
   onLoad: (version: QuoteDetail) => void;
+  onSaved: (version: QuoteDetail) => void;
+  onDiscard: () => void;
+  /** The `data-focus` of the control to focus as this form starts. */
+  focus: RefObject<string | null>;
+  focusAfter: FocusAfter;
+  heading: RefObject<HTMLHeadingElement | null>;
+  onSend: (opener: HTMLElement) => void;
+  onReturn: (opener: HTMLElement) => void;
 }) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const readOnly = !quote.permissions.canEdit;
-  const form = useForm<BuilderValues>({ defaultValues: builderValues(base) });
+  const form = useForm<BuilderValues>({
+    defaultValues: builderValues(base),
+    resolver: draftResolver(base.updatedAt),
+    shouldFocusError: false,
+  });
+  useEffect(() => {
+    const name = focus.current;
+    focus.current = null;
+    if (!name) return;
+    (document.querySelector<HTMLElement>(`[data-focus="${name}"]`) ?? heading.current)?.focus();
+  }, [focus, heading]);
   const lines = useFieldArray({ control: form.control, name: 'lines', keyName: 'key' });
   const save = useSaveDraft(quote.id);
   const [failure, setFailure] = useState<string | null>(null);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
-  const { isDirty: dirty, isSubmitting } = form.formState;
+  const { isDirty: dirty, isSubmitting, submitCount } = form.formState;
+  const formRef = useRef<HTMLFormElement>(null);
+  useFocusFirstError(submitCount, formRef);
   const newer = quote.updatedAt > base.updatedAt;
 
   // Nothing to lose: take the newer version at once.
@@ -141,19 +250,14 @@ function Builder({
 
   const submit = form.handleSubmit(async (current) => {
     setFailure(null);
-    const draft = draftInput(current, base.updatedAt);
-    const checked = quoteDraftSchema.safeParse(draft);
-    if (!checked.success) {
-      for (const issue of checked.error.issues) {
-        form.setError(issue.path.join('.') as 'title', { type: 'schema' });
-      }
-      setFailure(t('quotes.builder.errors.invalid'));
-      return;
-    }
     try {
-      const saved = await save.mutateAsync(checked.data);
+      const stored = await save.mutateAsync(
+        quoteDraftSchema.parse(draftInput(current, base.updatedAt)),
+      );
       toast.add({ title: t('quotes.builder.saved'), type: 'success' });
-      onLoad(saved);
+      // Nothing changed (text that only differed by spaces): the same version, so no new form.
+      if (stored.updatedAt === base.updatedAt) form.reset(builderValues(stored));
+      else onSaved(stored);
     } catch (error) {
       setFailure(errorMessage(t, error));
       // Another save came first: fetch it, so the builder offers it.
@@ -165,7 +269,13 @@ function Builder({
 
   return (
     <>
-      <BuilderNotices quote={quote} needsApproval={needsApproval} dirty={dirty} />
+      <BuilderNotices
+        quote={quote}
+        needsApproval={needsApproval}
+        dirty={dirty}
+        focusAfter={focusAfter}
+        onReturn={onReturn}
+      />
 
       {newer && dirty && (
         <Callout
@@ -182,11 +292,17 @@ function Builder({
       )}
 
       {!quote.archivedAt && (
-        <DraftActions quote={quote} dirty={dirty} needsApproval={needsApproval} />
+        <DraftActions
+          quote={quote}
+          dirty={dirty}
+          needsApproval={needsApproval}
+          focusAfter={focusAfter}
+          onSend={onSend}
+        />
       )}
       {!quote.archivedAt && <DraftPreview quote={quote} saved={!dirty} />}
 
-      <form className="flex flex-col gap-6" onSubmit={submit} noValidate>
+      <form ref={formRef} className="flex flex-col gap-6" onSubmit={submit} noValidate>
         <fieldset disabled={readOnly} className="flex min-w-0 flex-col gap-6">
           <legend className="sr-only">{t('quotes.builder.legend')}</legend>
           <BasicsSection form={form} quote={quote} lines={lines} />
@@ -206,17 +322,7 @@ function Builder({
             totals={totals}
             readOnly={readOnly}
           />
-          <FormSection title={t('quotes.builder.notes')} hint={t('quotes.builder.notesHint')}>
-            <Field>
-              <FieldLabel>{t('quotes.builder.clientNotes')}</FieldLabel>
-              <Textarea rows={3} {...form.register('clientNotes')} />
-            </Field>
-            <Field invalid={!!form.formState.errors.terms}>
-              <FieldLabel>{t('quotes.builder.terms')}</FieldLabel>
-              <Textarea rows={6} {...form.register('terms')} />
-              <FieldDescription>{t('quotes.builder.termsHint')}</FieldDescription>
-            </Field>
-          </FormSection>
+          <NotesSection form={form} />
         </fieldset>
         {!readOnly && (
           <>
@@ -230,13 +336,20 @@ function Builder({
                 </p>
               )}
               <Button
+                data-focus="discard"
                 variant="outline"
                 disabled={!dirty || isSubmitting}
+                focusableWhenDisabled
                 onClick={() => setConfirmDiscard(true)}
               >
                 {t('quotes.builder.discardChanges')}
               </Button>
-              <Button type="submit" disabled={!dirty || isSubmitting}>
+              <Button
+                data-focus="save"
+                type="submit"
+                disabled={!dirty || isSubmitting}
+                focusableWhenDisabled
+              >
                 {isSubmitting ? t('common.saving') : t('quotes.builder.save')}
               </Button>
             </div>
@@ -252,13 +365,35 @@ function Builder({
         action={t('common.unsaved.discard')}
         destructive
         pending={false}
-        onConfirm={async () => {
-          setFailure(null);
-          form.reset();
-        }}
+        onConfirm={async () => onDiscard()}
       />
       <UnsavedChangesGuard dirty={dirty && !isSubmitting} />
     </>
+  );
+}
+
+/** Printed as they are; checked for length only. */
+function NotesSection({ form }: { form: BuilderForm }) {
+  const { t } = useTranslation();
+  const { errors } = form.formState;
+  return (
+    <FormSection title={t('quotes.builder.notes')} hint={t('quotes.builder.notesHint')}>
+      <Field invalid={!!errors.clientNotes}>
+        <FieldLabel>{t('quotes.builder.clientNotes')}</FieldLabel>
+        <Textarea rows={3} {...form.register('clientNotes')} />
+        <FieldError match={!!errors.clientNotes}>
+          {t('quotes.builder.errors.text', { max: formatNumber(2000) })}
+        </FieldError>
+      </Field>
+      <Field invalid={!!errors.terms}>
+        <FieldLabel>{t('quotes.builder.terms')}</FieldLabel>
+        <Textarea rows={6} {...form.register('terms')} />
+        <FieldDescription>{t('quotes.builder.termsHint')}</FieldDescription>
+        <FieldError match={!!errors.terms}>
+          {t('quotes.builder.errors.text', { max: formatNumber(4000) })}
+        </FieldError>
+      </Field>
+    </FormSection>
   );
 }
 
@@ -267,15 +402,18 @@ function BuilderNotices({
   quote,
   needsApproval,
   dirty,
+  focusAfter,
+  onReturn,
 }: {
   quote: QuoteDetail;
   needsApproval: boolean;
   dirty: boolean;
+  focusAfter: FocusAfter;
+  onReturn: (opener: HTMLElement) => void;
 }) {
   const { t } = useTranslation();
   const me = useMe();
   const decide = useDecideApproval(quote.id);
-  const [returning, setReturning] = useState(false);
   const decision = quote.discountDecision;
   const effective = {
     oneOff: formatBasisPoints(quote.totals.oneOff.effectiveDiscountBasisPoints),
@@ -294,40 +432,44 @@ function BuilderNotices({
   }
   if (quote.discountApproval === 'pending') {
     return (
-      <>
-        <Callout
-          tone="warning"
-          icon={<StampIcon />}
-          title={t('quotes.approval.pendingTitle')}
-          description={t('quotes.approval.pendingBody', effective)}
-          action={
-            quote.permissions.canDecideApproval && (
-              <span className="flex flex-wrap gap-2">
-                <Button
-                  size="sm"
-                  disabled={decide.isPending}
-                  onClick={async () => {
-                    try {
-                      await decide.mutateAsync({ decision: 'approve', note: null });
-                      toast.add({ title: t('quotes.approval.approvedToast'), type: 'success' });
-                    } catch (error) {
-                      toast.add({ title: errorMessage(t, error), type: 'error' });
-                    }
-                  }}
-                >
-                  <CircleCheckIcon />
-                  {t('quotes.approval.approve')}
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => setReturning(true)}>
-                  <Undo2Icon />
-                  {t('quotes.approval.return')}
-                </Button>
-              </span>
-            )
-          }
-        />
-        <ReturnApprovalDialog quote={quote} open={returning} onClose={() => setReturning(false)} />
-      </>
+      <Callout
+        tone="warning"
+        icon={<StampIcon />}
+        title={t('quotes.approval.pendingTitle')}
+        description={t('quotes.approval.pendingBody', effective)}
+        action={
+          quote.permissions.canDecideApproval && (
+            <span className="flex flex-wrap gap-2">
+              <Button
+                size="sm"
+                disabled={decide.isPending}
+                onClick={async () => {
+                  // The approved draft can be sent at once: the focus goes to "Send".
+                  focusAfter('send');
+                  try {
+                    await decide.mutateAsync({ decision: 'approve', note: null });
+                    toast.add({ title: t('quotes.approval.approvedToast'), type: 'success' });
+                  } catch (error) {
+                    focusAfter(null);
+                    toast.add({ title: errorMessage(t, error), type: 'error' });
+                  }
+                }}
+              >
+                <CircleCheckIcon />
+                {t('quotes.approval.approve')}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={(event) => onReturn(event.currentTarget)}
+              >
+                <Undo2Icon />
+                {t('quotes.approval.return')}
+              </Button>
+            </span>
+          )
+        }
+      />
     );
   }
   if (quote.discountApproval === 'returned' && decision) {
@@ -375,24 +517,27 @@ function DraftActions({
   quote,
   dirty,
   needsApproval,
+  focusAfter,
+  onSend,
 }: {
   quote: QuoteDetail;
   dirty: boolean;
   needsApproval: boolean;
+  focusAfter: FocusAfter;
+  onSend: (opener: HTMLElement) => void;
 }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const approval = useQuoteApproval(quote.id);
-  const send = useSendQuote(quote.id);
   const archive = useArchiveQuote(quote.id);
-  const [confirm, setConfirm] = useState<'send' | 'discard' | null>(null);
+  const [discarding, setDiscarding] = useState(false);
   const approver = can(useMe(), 'quotes.approve_discount');
   const { permissions } = quote;
   const blocked = needsApproval && quote.discountApproval !== 'approved' && !approver;
-  const zeroPriced = quote.lines.some((line) => line.unitPriceMinor === 0);
-  const validUntil = addDays(businessDate(), quote.validityDays);
 
   async function changeApproval(action: 'request' | 'withdraw') {
+    // Each button takes the place of the other.
+    focusAfter(action === 'request' ? 'withdraw-approval' : 'request-approval');
     try {
       await approval.mutateAsync({ action });
       toast.add({
@@ -400,6 +545,7 @@ function DraftActions({
         type: 'success',
       });
     } catch (error) {
+      focusAfter(null);
       toast.add({ title: errorMessage(t, error), type: 'error' });
     }
   }
@@ -414,13 +560,18 @@ function DraftActions({
   return (
     <div className="flex flex-wrap items-center gap-2">
       {permissions.canSend && (
-        <Button disabled={dirty || blocked} onClick={() => setConfirm('send')}>
+        <Button
+          data-focus="send"
+          disabled={dirty || blocked}
+          onClick={(event) => onSend(event.currentTarget)}
+        >
           <SendIcon />
           {t('quotes.send.action')}
         </Button>
       )}
       {permissions.canRequestApproval && needsApproval && !approver && (
         <Button
+          data-focus="request-approval"
           variant="outline"
           disabled={dirty || approval.isPending}
           onClick={() => changeApproval('request')}
@@ -431,6 +582,7 @@ function DraftActions({
       )}
       {permissions.canWithdrawApproval && (
         <Button
+          data-focus="withdraw-approval"
           variant="outline"
           disabled={approval.isPending}
           onClick={() => changeApproval('withdraw')}
@@ -440,7 +592,7 @@ function DraftActions({
         </Button>
       )}
       {permissions.canArchive && (
-        <Button variant="ghost" className="ms-auto" onClick={() => setConfirm('discard')}>
+        <Button variant="ghost" className="ms-auto" onClick={() => setDiscarding(true)}>
           <Trash2Icon />
           {t('quotes.discard.action')}
         </Button>
@@ -448,23 +600,8 @@ function DraftActions({
       {dirty && <p className="text-sm text-muted-foreground">{t('quotes.builder.saveFirst')}</p>}
 
       <ConfirmDialog
-        open={confirm === 'send'}
-        onClose={() => setConfirm(null)}
-        title={t('quotes.send.title', { number: quote.displayNumber })}
-        body={[
-          t('quotes.send.body', { date: formatCalendarDate(validUntil) }),
-          ...(zeroPriced ? [t('quotes.send.zeroPrice')] : []),
-        ].join(' ')}
-        action={t('quotes.send.confirm')}
-        pending={send.isPending}
-        onConfirm={async () => {
-          await send.mutateAsync(zeroPriced);
-          toast.add({ title: t('quotes.send.done'), type: 'success' });
-        }}
-      />
-      <ConfirmDialog
-        open={confirm === 'discard'}
-        onClose={() => setConfirm(null)}
+        open={discarding}
+        onClose={() => setDiscarding(false)}
         title={t('quotes.discard.title', { number: quote.displayNumber })}
         body={t('quotes.discard.body')}
         action={t('quotes.discard.action')}
@@ -546,6 +683,7 @@ function BasicsSection({
         <FieldLabel>{t('quotes.form.title')}</FieldLabel>
         <Input autoComplete="off" {...form.register('title')} />
         <FieldDescription>{t('quotes.form.titleHint')}</FieldDescription>
+        <FieldError match={!!errors.title}>{t('quotes.form.errors.title')}</FieldError>
       </Field>
       <div className="grid gap-5 sm:grid-cols-3">
         <Controller
@@ -611,6 +749,11 @@ function BasicsSection({
             {...form.register('validityDays', { valueAsNumber: true })}
           />
           <FieldDescription>{t('quotes.builder.validityHint')}</FieldDescription>
+          <FieldError match={!!errors.validityDays}>
+            {t('quotes.builder.errors.validityDays', {
+              max: formatNumber(QUOTE_LIMITS.validityDays),
+            })}
+          </FieldError>
         </Field>
       </div>
     </FormSection>
@@ -642,13 +785,17 @@ function LinesSection({
     .map((field, index) => ({ field, index }))
     .filter(({ field }) => field.section === section);
   const full = lines.fields.length >= QUOTE_LIMITS.lines;
+  const list = useRef<HTMLUListElement>(null);
+  const addService = useRef<HTMLButtonElement>(null);
 
   function add(line: BuilderLine) {
     lines.append(line);
   }
 
   function remove(index: number) {
-    lines.remove(index);
+    const position = rows.findIndex((row) => row.index === index);
+    flushSync(() => lines.remove(index));
+    focusAfterRemoval(list.current, position, addService.current);
     if (form.getValues('lines').some((line) => line.section === section)) return;
     // An empty section has no discount (rule 5), installments or term.
     const dirty = { shouldDirty: true };
@@ -676,7 +823,7 @@ function LinesSection({
       {rows.length === 0 ? (
         <p className="text-sm text-muted-foreground">{t('quotes.builder.noLines')}</p>
       ) : (
-        <ul className="flex flex-col gap-3">
+        <ul ref={list} className="flex flex-col gap-3">
           {rows.map(({ field, index }) => (
             <LineCard
               key={field.key}
@@ -702,6 +849,7 @@ function LinesSection({
       {!readOnly && !full && serviceItems.length + packageItems.length > 0 && (
         <div className="flex flex-col gap-3 sm:flex-row">
           <ChoiceSelect
+            ref={addService}
             label={t('quotes.builder.addService')}
             placeholder={t('quotes.builder.addService')}
             items={serviceItems}
@@ -780,6 +928,16 @@ function LineCard({
   const invalid = (path: string) => !!get(errors, `lines.${index}.${path}`);
   const listPrice = form.watch(`lines.${index}.listUnitPriceMinor`);
   const isPackage = line.packageId !== null;
+  const quantityError = t('quotes.builder.errors.quantity', {
+    max: formatNumber(QUOTE_LIMITS.quantity),
+  });
+  const roundsError = t('quotes.builder.errors.revisionRounds', {
+    max: formatNumber(TASK_LIMITS.revisionLimit),
+  });
+  const itemsInvalid = line.items.some(
+    (_, itemIndex) =>
+      invalid(`items.${itemIndex}.quantity`) || invalid(`items.${itemIndex}.revisionRounds`),
+  );
 
   return (
     <li>
@@ -802,20 +960,31 @@ function LineCard({
             <Money minor={total} currency={currency} />
           </span>
           {!readOnly && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              aria-label={t('quotes.builder.removeLine', { name: line.name })}
-              onClick={onRemove}
-            >
-              <Trash2Icon />
-            </Button>
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label={t('quotes.builder.removeLine', { name: line.name })}
+                    data-focus="remove"
+                    onClick={onRemove}
+                  />
+                }
+              >
+                <Trash2Icon />
+              </TooltipTrigger>
+              <TooltipContent>{t('quotes.builder.removeLine', { name: line.name })}</TooltipContent>
+            </Tooltip>
           )}
         </div>
         <Field invalid={invalid('description')}>
           <FieldLabel>{t('quotes.builder.description')}</FieldLabel>
           <Input autoComplete="off" {...form.register(`lines.${index}.description`)} />
+          <FieldError match={invalid('description')}>
+            {t('quotes.builder.errors.description')}
+          </FieldError>
         </Field>
         <div className="grid gap-4 sm:grid-cols-3">
           {!isPackage && (
@@ -829,6 +998,7 @@ function LineCard({
                 className="text-end tabular-nums"
                 {...form.register(`lines.${index}.quantity`, { valueAsNumber: true })}
               />
+              <FieldError match={invalid('quantity')}>{quantityError}</FieldError>
             </Field>
           )}
           <Controller
@@ -840,6 +1010,7 @@ function LineCard({
                   {isPackage ? t('quotes.builder.packagePrice') : t('quotes.builder.unitPrice')}
                 </FieldLabel>
                 <MoneyInput
+                  ref={field.ref}
                   id={ids.price}
                   currency={currency}
                   value={field.value}
@@ -867,6 +1038,7 @@ function LineCard({
                 className="text-end tabular-nums"
                 {...form.register(`lines.${index}.revisionRounds`, { valueAsNumber: true })}
               />
+              <FieldError match={invalid('revisionRounds')}>{roundsError}</FieldError>
             </Field>
           )}
         </div>
@@ -924,6 +1096,14 @@ function LineCard({
               ))}
             </tbody>
           </table>
+        )}
+        {itemsInvalid && (
+          <p className="text-sm text-destructive-text">
+            {t('quotes.builder.errors.items', {
+              quantity: formatNumber(QUOTE_LIMITS.quantity),
+              rounds: formatNumber(TASK_LIMITS.revisionLimit),
+            })}
+          </p>
         )}
       </fieldset>
     </li>
@@ -989,6 +1169,7 @@ function SectionTotals({
             name={name}
             render={({ field }) => (
               <MoneyInput
+                ref={field.ref}
                 aria-label={t('quotes.builder.discountAmount', { section: sectionName })}
                 aria-invalid={invalid}
                 currency={currency}
@@ -1077,6 +1258,13 @@ function InstallmentsEditor({
   const values = form.watch('installments');
   const sum = values.reduce((total, item) => total + (Number(item.percent) || 0), 0);
   const { errors } = form.formState;
+  const list = useRef<HTMLUListElement>(null);
+  const addButton = useRef<HTMLButtonElement>(null);
+
+  function remove(index: number) {
+    flushSync(() => installments.remove(index));
+    focusAfterRemoval(list.current, index, addButton.current);
+  }
 
   return (
     <div className="flex flex-col gap-3">
@@ -1087,7 +1275,7 @@ function InstallmentsEditor({
       {installments.fields.length === 0 ? (
         <p className="text-sm text-muted-foreground">{t('quotes.installments.none')}</p>
       ) : (
-        <ul className="flex flex-col gap-2">
+        <ul ref={list} className="flex flex-col gap-2">
           {installments.fields.map((field, index) => (
             <li key={field.id} className="flex flex-wrap items-center gap-3">
               <Input
@@ -1121,23 +1309,37 @@ function InstallmentsEditor({
                 className="w-36 text-end"
               />
               {!readOnly && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label={t('quotes.installments.remove', { n: formatNumber(index + 1) })}
-                  onClick={() => installments.remove(index)}
-                >
-                  <Trash2Icon />
-                </Button>
+                <Tooltip>
+                  <TooltipTrigger
+                    render={
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label={t('quotes.installments.remove', { n: formatNumber(index + 1) })}
+                        data-focus="remove"
+                        onClick={() => remove(index)}
+                      />
+                    }
+                  >
+                    <Trash2Icon />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    {t('quotes.installments.remove', { n: formatNumber(index + 1) })}
+                  </TooltipContent>
+                </Tooltip>
               )}
             </li>
           ))}
         </ul>
       )}
+      {errors.installments && (
+        <p className="text-sm text-destructive-text">{t('quotes.installments.errors.invalid')}</p>
+      )}
       <div className="flex flex-wrap items-center gap-3">
         {!readOnly && installments.fields.length < QUOTE_LIMITS.installments && (
           <Button
+            ref={addButton}
             type="button"
             variant="outline"
             size="sm"
@@ -1187,6 +1389,9 @@ function TermField({
           })}
         />
         <FieldDescription>{t('quotes.builder.termHint')}</FieldDescription>
+        <FieldError match={!!form.formState.errors.monthlyTermMonths}>
+          {t('quotes.builder.errors.termMonths', { max: formatNumber(QUOTE_LIMITS.termMonths) })}
+        </FieldError>
       </Field>
       {totals.monthlyTermTotalMinor !== null && (
         <p className="text-sm text-muted-foreground">

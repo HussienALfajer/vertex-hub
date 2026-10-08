@@ -1,9 +1,32 @@
 import { z } from 'zod';
 
+/**
+ * The years a date may fall in. ISO allows years 0000 to 9999, but the database has no year 0
+ * and the time zone conversions of years near either end fail, so a typed year 0001 or 9999 is
+ * refused instead of failing the request.
+ */
+export const CALENDAR_YEARS = { min: 1900, max: 2999 } as const;
+
+const inCalendarYears = (date: string) => {
+  const year = Number(date.slice(0, 4));
+  return year >= CALENDAR_YEARS.min && year <= CALENDAR_YEARS.max;
+};
+
 /** A calendar day without a time, as `YYYY-MM-DD`, in the business timezone (Asia/Damascus). */
-export const calendarDateSchema = z.iso.date();
+export const calendarDateSchema = z.iso.date().refine(inCalendarYears, 'Year out of range');
 
 export type CalendarDate = z.infer<typeof calendarDateSchema>;
+
+/** A calendar month, as `YYYY-MM`, in the same years as dates. */
+export const calendarMonthSchema = z
+  .string()
+  .regex(/^\d{4}-(0[1-9]|1[0-2])$/)
+  .refine(inCalendarYears, 'Year out of range');
+
+/** An instant with its UTC offset (ISO 8601), in the same years as dates. */
+export const instantSchema = z.iso
+  .datetime({ offset: true })
+  .refine(inCalendarYears, 'Year out of range');
 
 /**
  * The business time zone. Dates and times follow the time zone database, as the scheduled jobs

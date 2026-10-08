@@ -15,7 +15,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
   EmptyState,
+  IconButton,
   Skeleton,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
   toast,
 } from '@vertex-hub/ui';
 import {
@@ -38,7 +42,7 @@ import {
   ShieldAlertIcon,
   UserRoundCogIcon,
 } from 'lucide-react';
-import { type ReactNode, useState } from 'react';
+import { type ReactNode, type RefObject, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '../../components/confirm-dialog';
 import { isMissing, LoadError } from '../../components/load-error';
@@ -51,6 +55,8 @@ import {
   formatNumber,
   formatTime,
 } from '../../lib/format';
+import { useReturnFocus } from '../../lib/use-return-focus';
+import { useShownWhileClosing } from '../../lib/use-shown-while-closing';
 import { HealthcareBadge } from '../clients/client-badges';
 import { channelIcon } from '../clients/communication-tab';
 import { NewQuoteDialog } from '../quotes/new-quote-dialog';
@@ -119,18 +125,28 @@ export function LeadPage({ leadId }: { leadId: string }) {
 
 function LeadView({ lead }: { lead: LeadDetail }) {
   const { t } = useTranslation();
-  const [open, setOpen] = useState<Open | null>(null);
+  const [open, setOpenState] = useState<Open | null>(null);
   const [editingNote, setEditingNote] = useState<LeadNote | null>(null);
+  // The edited note stays while its dialog fades out, so the title does not turn to "log".
+  const shownNote = useShownWhileClosing(editingNote);
   const [archivingNote, setArchivingNote] = useState<LeadNote | null>(null);
   const archive = useArchiveLead();
   const restore = useRestoreLead();
   const archiveNote = useArchiveLeadNote(lead.id);
-  const close = () => setOpen(null);
+  const heading = useRef<HTMLHeadingElement>(null);
+  const returnFocus = useReturnFocus(heading);
+  const logActivity = useRef<HTMLButtonElement>(null);
+  const setOpen = (next: Open, opener: HTMLElement | null) => {
+    returnFocus.from(opener);
+    setOpenState(next);
+  };
+  const close = () => setOpenState(null);
+  const dialog = { onClose: close, finalFocus: returnFocus.target };
   const archived = lead.archivedAt !== null;
 
   return (
     <>
-      <Header lead={lead} onOpen={setOpen} />
+      <Header lead={lead} onOpen={setOpen} heading={heading} />
 
       {archived ? (
         <Callout
@@ -139,7 +155,11 @@ function LeadView({ lead }: { lead: LeadDetail }) {
           description={t('leads.page.archivedBody')}
           action={
             lead.permissions.canRestore && (
-              <Button variant="outline" size="sm" onClick={() => setOpen('restore')}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={(event) => setOpen('restore', event.currentTarget)}
+              >
                 <ArchiveRestoreIcon />
                 {t('leads.actions.restore')}
               </Button>
@@ -175,7 +195,11 @@ function LeadView({ lead }: { lead: LeadDetail }) {
           description={lead.lostNote ?? t('leads.page.lostNoNote')}
           action={
             lead.permissions.canReopen && (
-              <Button variant="outline" size="sm" onClick={() => setOpen('reopen')}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={(event) => setOpen('reopen', event.currentTarget)}
+              >
                 <RotateCcwIcon />
                 {t('leads.actions.reopen')}
               </Button>
@@ -193,15 +217,16 @@ function LeadView({ lead }: { lead: LeadDetail }) {
         />
       )}
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
         <div className="flex min-w-0 flex-col gap-6">
           <ActivitySection
             lead={lead}
-            onLog={() => setOpen('note')}
+            logButton={logActivity}
+            onLog={(opener) => setOpen('note', opener)}
             onEdit={setEditingNote}
             onArchive={setArchivingNote}
           />
-          <QuotesSection lead={lead} onNew={() => setOpen('quote')} />
+          <QuotesSection lead={lead} onNew={(opener) => setOpen('quote', opener)} />
         </div>
         <div className="flex flex-col gap-6">
           <ContactSection lead={lead} />
@@ -209,19 +234,21 @@ function LeadView({ lead }: { lead: LeadDetail }) {
         </div>
       </div>
 
-      <LeadDialog open={open === 'edit'} onClose={close} lead={lead} />
-      <NoteDialog lead={lead} open={open === 'note'} onClose={close} />
-      <NoteDialog
-        lead={lead}
-        note={editingNote ?? undefined}
-        open={editingNote !== null}
-        onClose={() => setEditingNote(null)}
-      />
-      <ConvertDialog lead={lead} open={open === 'convert'} onClose={close} />
-      <LoseDialog lead={lead} open={open === 'lose'} onClose={close} />
-      <ReopenDialog lead={lead} open={open === 'reopen'} onClose={close} />
-      <OwnerDialog lead={lead} open={open === 'owner'} onClose={close} />
-      <FollowUpDialog lead={lead} open={open === 'followUp'} onClose={close} />
+      <LeadDialog open={open === 'edit'} {...dialog} lead={lead} />
+      <NoteDialog lead={lead} open={open === 'note'} {...dialog} />
+      {shownNote && (
+        <NoteDialog
+          lead={lead}
+          note={shownNote}
+          open={editingNote !== null}
+          onClose={() => setEditingNote(null)}
+        />
+      )}
+      <ConvertDialog lead={lead} open={open === 'convert'} {...dialog} />
+      <LoseDialog lead={lead} open={open === 'lose'} {...dialog} />
+      <ReopenDialog lead={lead} open={open === 'reopen'} {...dialog} />
+      <OwnerDialog lead={lead} open={open === 'owner'} {...dialog} />
+      <FollowUpDialog lead={lead} open={open === 'followUp'} {...dialog} />
       {lead.permissions.canNewQuote && (
         <NewQuoteDialog open={open === 'quote'} onClose={close} leadId={lead.id} />
       )}
@@ -229,7 +256,7 @@ function LeadView({ lead }: { lead: LeadDetail }) {
         target={
           open === 'archive' || open === 'restore' ? { lead, restore: open === 'restore' } : null
         }
-        onClose={close}
+        {...dialog}
         pending={archive.isPending || restore.isPending}
         onConfirm={async (target) => {
           if (target.restore) await restore.mutateAsync(lead.id);
@@ -239,15 +266,17 @@ function LeadView({ lead }: { lead: LeadDetail }) {
       <ConfirmDialog
         open={archivingNote !== null}
         onClose={() => setArchivingNote(null)}
-        title={t('clients.notes.archiveTitle')}
-        body={t('clients.notes.archiveBody')}
-        action={t('clients.notes.archiveAction')}
+        title={t('leads.activity.archiveTitle')}
+        body={t('leads.activity.archiveBody')}
+        action={t('leads.activity.archiveAction')}
         destructive
         pending={archiveNote.isPending}
+        // The note's menu leaves with it: the focus goes to "log activity" above the list.
+        finalFocus={() => logActivity.current ?? true}
         onConfirm={async () => {
           if (!archivingNote) return;
           await archiveNote.mutateAsync(archivingNote.id);
-          toast.add({ title: t('clients.notes.archived'), type: 'success' });
+          toast.add({ title: t('leads.activity.archived'), type: 'success' });
         }}
       />
     </>
@@ -289,10 +318,23 @@ function StageStepper({ stage }: { stage: LeadStage }) {
   );
 }
 
-function Header({ lead, onOpen }: { lead: LeadDetail; onOpen: (open: Open) => void }) {
+function Header({
+  lead,
+  onOpen,
+  heading,
+}: {
+  lead: LeadDetail;
+  onOpen: (open: Open, opener: HTMLElement | null) => void;
+  heading: RefObject<HTMLHeadingElement | null>;
+}) {
   const { t } = useTranslation();
   const move = useMoveLead();
   const { permissions } = lead;
+  // A dialog started from the menu gives the focus back to the menu's button.
+  const menuButton = useRef<HTMLButtonElement>(null);
+  const fromMenu = (open: Open) => () => onOpen(open, menuButton.current);
+  const opens = (open: Open) => (event: { currentTarget: HTMLElement }) =>
+    onOpen(open, event.currentTarget);
 
   async function moveTo(stage: (typeof MANUAL_LEAD_STAGES)[number]) {
     try {
@@ -319,10 +361,12 @@ function Header({ lead, onOpen }: { lead: LeadDetail; onOpen: (open: Open) => vo
     <section className="relative overflow-hidden rounded-lg border border-border bg-surface">
       <AscentLines className="absolute inset-y-0 end-0 hidden h-full w-32 text-border md:block" />
       <div className="relative flex flex-col gap-5 p-6">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-start">
           <div className="flex min-w-0 flex-1 flex-col gap-3">
             <div className="flex flex-wrap items-center gap-3">
-              <h1 className="text-2xl font-bold">{lead.displayName}</h1>
+              <h1 ref={heading} tabIndex={-1} className="text-2xl font-bold wrap-anywhere">
+                {lead.displayName}
+              </h1>
               <LeadStageBadge stage={lead.stage} />
               {lead.isHealthcare && <HealthcareBadge />}
               {lead.archivedAt && <Badge tone="neutral">{t('leads.archivedBadge')}</Badge>}
@@ -347,7 +391,7 @@ function Header({ lead, onOpen }: { lead: LeadDetail; onOpen: (open: Open) => vo
                 <Fact label={t('leads.followUp.label')}>
                   <FollowUpDate lead={lead} />
                   {permissions.canEdit && (
-                    <Button variant="link" size="sm" onClick={() => onOpen('followUp')}>
+                    <Button variant="link" size="sm" onClick={opens('followUp')}>
                       {t('leads.followUp.set')}
                     </Button>
                   )}
@@ -355,51 +399,66 @@ function Header({ lead, onOpen }: { lead: LeadDetail; onOpen: (open: Open) => vo
               )}
               <Fact label={t('leads.page.inStage')}>
                 <span className="text-muted-foreground">
-                  {t('leads.card.daysInStage', { n: formatNumber(lead.daysInStage) })}
+                  {t('leads.card.daysInStage', {
+                    count: lead.daysInStage,
+                    n: formatNumber(lead.daysInStage),
+                  })}
                 </span>
               </Fact>
             </dl>
           </div>
           <div className="flex shrink-0 flex-wrap items-center gap-2">
             {permissions.canLogActivity && (
-              <Button onClick={() => onOpen('note')}>
+              <Button onClick={opens('note')}>
                 <MessagesSquareIcon />
                 {t('leads.activity.log')}
               </Button>
             )}
             {permissions.canConvert && (
-              <Button variant="outline" onClick={() => onOpen('convert')}>
+              <Button variant="outline" onClick={opens('convert')}>
                 <CircleCheckBigIcon />
                 {t('leads.actions.convert')}
               </Button>
             )}
             {permissions.canNewQuote && (
-              <Button variant="outline" onClick={() => onOpen('quote')}>
+              <Button variant="outline" onClick={opens('quote')}>
                 <PlusIcon />
                 {t('leads.quotes.new')}
               </Button>
             )}
             {permissions.canEdit && (
-              <Button variant="outline" onClick={() => onOpen('edit')}>
+              <Button variant="outline" onClick={opens('edit')}>
                 <PencilIcon />
                 {t('leads.actions.edit')}
               </Button>
             )}
             {permissions.canReopen && (
-              <Button variant="outline" onClick={() => onOpen('reopen')}>
+              <Button variant="outline" onClick={opens('reopen')}>
                 <RotateCcwIcon />
                 {t('leads.actions.reopen')}
               </Button>
             )}
             {more && (
               <DropdownMenu>
-                <DropdownMenuTrigger
-                  render={
-                    <Button variant="outline" size="icon" aria-label={t('leads.actions.more')} />
-                  }
-                >
-                  <EllipsisIcon />
-                </DropdownMenuTrigger>
+                <Tooltip>
+                  <TooltipTrigger
+                    render={
+                      <DropdownMenuTrigger
+                        render={
+                          <Button
+                            ref={menuButton}
+                            variant="outline"
+                            size="icon"
+                            aria-label={t('leads.actions.more')}
+                          />
+                        }
+                      />
+                    }
+                  >
+                    <EllipsisIcon />
+                  </TooltipTrigger>
+                  <TooltipContent>{t('leads.actions.more')}</TooltipContent>
+                </Tooltip>
                 <DropdownMenuContent align="end">
                   {permissions.moves.map((stage) => (
                     <DropdownMenuItem
@@ -412,20 +471,20 @@ function Header({ lead, onOpen }: { lead: LeadDetail; onOpen: (open: Open) => vo
                     </DropdownMenuItem>
                   ))}
                   {permissions.canChangeOwner && (
-                    <DropdownMenuItem onClick={() => onOpen('owner')}>
+                    <DropdownMenuItem onClick={fromMenu('owner')}>
                       <UserRoundCogIcon />
                       {t('leads.actions.changeOwner')}
                     </DropdownMenuItem>
                   )}
                   {(permissions.canLose || permissions.canArchive) && <DropdownMenuSeparator />}
                   {permissions.canLose && (
-                    <DropdownMenuItem variant="destructive" onClick={() => onOpen('lose')}>
+                    <DropdownMenuItem variant="destructive" onClick={fromMenu('lose')}>
                       <CircleXIcon />
                       {t('leads.actions.lose')}
                     </DropdownMenuItem>
                   )}
                   {permissions.canArchive && (
-                    <DropdownMenuItem variant="destructive" onClick={() => onOpen('archive')}>
+                    <DropdownMenuItem variant="destructive" onClick={fromMenu('archive')}>
                       <ArchiveIcon />
                       {t('leads.actions.archive')}
                     </DropdownMenuItem>
@@ -482,24 +541,20 @@ function ContactSection({ lead }: { lead: LeadDetail }) {
             <a dir="ltr" href={`tel:${lead.phone}`} className="flex-1 text-end hover:underline">
               {lead.phone}
             </a>
-            <Button
+            <IconButton
               variant="outline"
-              size="icon-sm"
-              aria-label={t('clients.contacts.call', { name: lead.contactName })}
-              title={t('clients.contacts.call', { name: lead.contactName })}
+              label={t('clients.contacts.call', { name: lead.contactName })}
               render={<a href={`tel:${lead.phone}`} />}
             >
               <PhoneIcon />
-            </Button>
-            <Button
+            </IconButton>
+            <IconButton
               variant="outline"
-              size="icon-sm"
-              aria-label={t('clients.contacts.whatsapp', { name: lead.contactName })}
-              title={t('clients.contacts.whatsapp', { name: lead.contactName })}
+              label={t('clients.contacts.whatsapp', { name: lead.contactName })}
               render={<a href={whatsappUrl(lead.phone)} target="_blank" rel="noreferrer" />}
             >
               <MessageCircleIcon />
-            </Button>
+            </IconButton>
           </div>
         )}
         {lead.email && (
@@ -568,12 +623,14 @@ function RequestSection({ lead }: { lead: LeadDetail }) {
 
 function ActivitySection({
   lead,
+  logButton,
   onLog,
   onEdit,
   onArchive,
 }: {
   lead: LeadDetail;
-  onLog: () => void;
+  logButton: RefObject<HTMLButtonElement | null>;
+  onLog: (opener: HTMLElement) => void;
   onEdit: (note: LeadNote) => void;
   onArchive: (note: LeadNote) => void;
 }) {
@@ -589,7 +646,12 @@ function ActivitySection({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg font-bold">{t('leads.activity.title')}</h2>
         {lead.permissions.canLogActivity && (
-          <Button variant="outline" size="sm" onClick={onLog}>
+          <Button
+            ref={logButton}
+            variant="outline"
+            size="sm"
+            onClick={(event) => onLog(event.currentTarget)}
+          >
             <PlusIcon />
             {t('leads.activity.log')}
           </Button>
@@ -599,7 +661,7 @@ function ActivitySection({
         <EmptyState
           icon={<MessagesSquareIcon />}
           title={t('leads.activity.emptyTitle')}
-          description={t('leads.activity.emptyHint')}
+          description={lead.permissions.canLogActivity ? t('leads.activity.emptyHint') : undefined}
         />
       ) : (
         <div className="flex flex-col gap-6">
@@ -638,17 +700,11 @@ function ActivitySection({
                             <span className="text-muted-foreground">{note.author.name}</span>
                             {(canEdit || canArchive) && (
                               <DropdownMenu>
-                                <DropdownMenuTrigger
-                                  render={
-                                    <Button
-                                      variant="ghost"
-                                      size="icon-sm"
-                                      aria-label={t('clients.notes.actions')}
-                                    />
-                                  }
-                                >
-                                  <EllipsisIcon />
-                                </DropdownMenuTrigger>
+                                <NoteMenuTrigger
+                                  label={t('leads.activity.actions', {
+                                    time: formatTime(note.occurredAt),
+                                  })}
+                                />
                                 <DropdownMenuContent align="end">
                                   {canEdit && (
                                     <DropdownMenuItem onClick={() => onEdit(note)}>
@@ -685,7 +741,31 @@ function ActivitySection({
   );
 }
 
-function QuotesSection({ lead, onNew }: { lead: LeadDetail; onNew: () => void }) {
+/** A note's menu button, named by the note's time so each one reads apart. */
+function NoteMenuTrigger({ label }: { label: string }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <DropdownMenuTrigger
+            render={<Button variant="ghost" size="icon-sm" aria-label={label} />}
+          />
+        }
+      >
+        <EllipsisIcon />
+      </TooltipTrigger>
+      <TooltipContent>{label}</TooltipContent>
+    </Tooltip>
+  );
+}
+
+function QuotesSection({
+  lead,
+  onNew,
+}: {
+  lead: LeadDetail;
+  onNew: (opener: HTMLElement) => void;
+}) {
   const { t } = useTranslation();
   const me = useMe();
   const quotes = useQuery(leadQuotesQuery(lead.id));
@@ -696,7 +776,7 @@ function QuotesSection({ lead, onNew }: { lead: LeadDetail; onNew: () => void })
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg font-bold">{t('leads.quotes.title')}</h2>
         {lead.permissions.canNewQuote && (
-          <Button variant="outline" size="sm" onClick={onNew}>
+          <Button variant="outline" size="sm" onClick={(event) => onNew(event.currentTarget)}>
             <PlusIcon />
             {t('leads.quotes.new')}
           </Button>

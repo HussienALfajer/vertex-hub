@@ -62,6 +62,7 @@ import {
 import { ClientDirectory, type ClientSummary } from '../clients/index.js';
 import { NotificationCenter } from '../notifications/index.js';
 import { BillingLocks } from './billing-locks.js';
+import { changedDepartments } from './engagement-departments.js';
 import {
   actorOf,
   assertCanEditMoney,
@@ -373,7 +374,7 @@ export class ProjectsService implements OnModuleInit {
         {
           name: input.name,
           description: input.description,
-          departments: input.departments,
+          departments: changedDepartments(current.departments, input.departments),
           startDate: input.startDate,
           dueDate: input.dueDate,
         },

@@ -5,6 +5,7 @@ import {
   Card,
   cn,
   EmptyState,
+  IconButton,
   Skeleton,
   Table,
   TableBody,
@@ -14,12 +15,14 @@ import {
   TableRow,
 } from '@vertex-hub/ui';
 import { ArchiveIcon, PencilIcon, PlusIcon, ReceiptTextIcon, WalletIcon } from 'lucide-react';
-import { type ReactNode, useState } from 'react';
+import { type ReactNode, type RefObject, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '../../components/confirm-dialog';
 import { LoadError } from '../../components/load-error';
 import { can, useMe } from '../../lib/auth';
 import { formatCalendarDate } from '../../lib/format';
+import { useReturnFocus } from '../../lib/use-return-focus';
+import { useShownWhileClosing } from '../../lib/use-shown-while-closing';
 import { PersonName } from '../projects/project-badges';
 import { Money } from '../quotes/quote-badges';
 import { ExpenseDialog } from './expense-dialog';
@@ -194,13 +197,28 @@ function ExpensesSection({ billing }: { billing: ProjectBilling }) {
   const [archiving, setArchiving] = useState<ProjectExpense | null>(null);
   const archive = useArchiveExpense(billing.project.id);
   const manage = billing.canManageExpenses;
+  // The expense stays shown while its dialog fades out.
+  const shownEditing = useShownWhileClosing(editing);
+  const shownArchiving = useShownWhileClosing(archiving);
+  // The focus goes back to the button that opened a dialog, or to "add" once its row is gone.
+  const addButton = useRef<HTMLButtonElement>(null);
+  const returnFocus = useReturnFocus(addButton);
+  const finalFocus = () => returnFocus.target() ?? true;
 
   return (
     <BillingSection
       title={t('invoices.expenses.heading')}
       action={
         manage && (
-          <Button variant="outline" size="sm" onClick={() => setAdding(true)}>
+          <Button
+            ref={addButton}
+            variant="outline"
+            size="sm"
+            onClick={(event) => {
+              returnFocus.from(event.currentTarget);
+              setAdding(true);
+            }}
+          >
             <PlusIcon />
             {t('invoices.expenses.add')}
           </Button>
@@ -253,24 +271,26 @@ function ExpensesSection({ billing }: { billing: ProjectBilling }) {
                 {manage && (
                   <TableCell className="text-end">
                     <span className="flex justify-end gap-1">
-                      <Button
-                        variant="ghost"
+                      <IconButton
                         size="icon"
-                        aria-label={t('invoices.expenses.editOf', { name: expense.description })}
-                        onClick={() => setEditing(expense)}
+                        label={t('invoices.expenses.editOf', { name: expense.description })}
+                        onClick={(event) => {
+                          returnFocus.from(event.currentTarget);
+                          setEditing(expense);
+                        }}
                       >
                         <PencilIcon />
-                      </Button>
-                      <Button
-                        variant="ghost"
+                      </IconButton>
+                      <IconButton
                         size="icon"
-                        aria-label={t('invoices.expenses.archiveOf', {
-                          name: expense.description,
-                        })}
-                        onClick={() => setArchiving(expense)}
+                        label={t('invoices.expenses.archiveOf', { name: expense.description })}
+                        onClick={(event) => {
+                          returnFocus.from(event.currentTarget);
+                          setArchiving(expense);
+                        }}
                       >
                         <ArchiveIcon />
-                      </Button>
+                      </IconButton>
                     </span>
                   </TableCell>
                 )}
@@ -286,23 +306,28 @@ function ExpensesSection({ billing }: { billing: ProjectBilling }) {
             projectCurrency={billing.project.currency}
             open={adding}
             onClose={() => setAdding(false)}
+            finalFocus={finalFocus}
           />
           <ExpenseDialog
-            key={editing?.id}
+            key={shownEditing?.id}
             projectId={billing.project.id}
             projectCurrency={billing.project.currency}
-            expense={editing ?? undefined}
+            expense={shownEditing ?? undefined}
             open={editing !== null}
             onClose={() => setEditing(null)}
+            finalFocus={finalFocus}
           />
           <ConfirmDialog
             open={archiving !== null}
             onClose={() => setArchiving(null)}
-            title={t('invoices.expenses.archiveTitle', { name: archiving?.description ?? '' })}
+            title={t('invoices.expenses.archiveTitle', {
+              name: shownArchiving?.description ?? '',
+            })}
             body={t('invoices.expenses.archiveBody')}
             action={t('invoices.expenses.archive')}
             destructive
             pending={archive.isPending}
+            finalFocus={finalFocus}
             onConfirm={async () => {
               if (archiving) await archive.mutateAsync(archiving.id);
             }}
@@ -317,16 +342,21 @@ function ExpensesSection({ billing }: { billing: ProjectBilling }) {
 export function BillingSection({
   title,
   action,
+  headingRef,
   children,
 }: {
   title: string;
   action?: ReactNode;
+  /** Makes the heading focusable, for an action that takes its own button away. */
+  headingRef?: RefObject<HTMLHeadingElement | null>;
   children: ReactNode;
 }) {
   return (
     <section className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-lg font-bold">{title}</h2>
+        <h2 ref={headingRef} tabIndex={headingRef ? -1 : undefined} className="text-lg font-bold">
+          {title}
+        </h2>
         {action}
       </div>
       {children}

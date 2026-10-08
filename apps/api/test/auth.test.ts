@@ -222,6 +222,36 @@ describe('authentication and permissions', () => {
       expect(actions.sort()).toEqual(['user.two_factor_disabled', 'user.two_factor_enabled']);
     });
 
+    it('audits new backup codes, and not a refused attempt', async () => {
+      const user = await client.signInWithTwoFactor(db, {});
+      seeded.push(user.id);
+      const refused = await client.post('/api/auth/two-factor/generate-backup-codes', user.cookie, {
+        password: 'not-the-password',
+      });
+      expect(refused.status).toBeGreaterThanOrEqual(400);
+      const generated = await client.post(
+        '/api/auth/two-factor/generate-backup-codes',
+        user.cookie,
+        {
+          password: PASSWORD,
+        },
+      );
+      expect(generated.status).toBe(200);
+      // Written by hand: lowercase letters and digits without look-alikes (i, l, o, 0, 1).
+      const { backupCodes } = (await generated.json()) as { backupCodes: string[] };
+      expect(backupCodes).toHaveLength(10);
+      for (const code of backupCodes) {
+        expect(code).toMatch(/^[a-hjkmnp-z2-9]{5}-[a-hjkmnp-z2-9]{5}$/);
+      }
+      const actions = (
+        await db
+          .select({ action: auditEntries.action })
+          .from(auditEntries)
+          .where(eq(auditEntries.entityId, user.id))
+      ).map((row) => row.action);
+      expect(actions.sort()).toEqual(['user.backup_codes_regenerated', 'user.two_factor_enabled']);
+    });
+
     it('does not offer "trust this device"', async () => {
       const user = await client.signInWithTwoFactor(db, {});
       seeded.push(user.id);

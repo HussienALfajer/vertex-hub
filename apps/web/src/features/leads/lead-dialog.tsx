@@ -15,8 +15,6 @@ import {
   type LeadDetail,
   type LeadDuplicateQuery,
   type LeadSource,
-  leadHasContactMethod,
-  leadSourceDetailMissing,
   optionalEmailSchema,
   phoneSchema,
   type UpdateLead,
@@ -45,18 +43,19 @@ import {
 } from '@vertex-hub/ui';
 import { StethoscopeIcon, UsersRoundIcon } from 'lucide-react';
 import { useId, useState } from 'react';
-import { Controller, type Resolver, useForm, useWatch } from 'react-hook-form';
+import { Controller, type FieldErrors, type Resolver, useForm, useWatch } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { FormAlert } from '../../components/form-alert';
 import { MoneyInput } from '../../components/money-input';
 import { ApiError } from '../../lib/api/client';
 import { can, canAll, useMe } from '../../lib/auth';
-import { errorMessage, fieldError, SCREEN_ERROR } from '../../lib/errors';
+import { errorMessage, errorRole, fieldError, SCREEN_ERROR } from '../../lib/errors';
 import { useDebouncedValue } from '../../lib/use-search-text';
 import { ClientStatusBadge } from '../clients/client-badges';
 import { sectorsQuery } from '../clients/clients.queries';
 import { ChoiceSelect } from '../quotes/choice-select';
 import { LeadStageBadge } from './lead-badges';
+import type { LeadDialogProps } from './lead-dialogs';
 import {
   interestOptionsQuery,
   leadDuplicatesQuery,
@@ -78,16 +77,47 @@ interface InterestItem {
 const interestKey = (interest: { serviceId?: string; packageId?: string }) =>
   interest.serviceId ? `service:${interest.serviceId}` : `package:${interest.packageId}`;
 
-/** The budget's currency goes with an amount only: without one, both are cleared. */
-const resolver: Resolver<LeadValues, unknown, CreateLead> = (values, context, options) =>
-  standardSchemaResolver(createLeadSchema)(
-    {
-      ...values,
-      budgetCurrency: values.budgetMinor == null ? null : (values.budgetCurrency ?? 'USD'),
-    },
-    context,
-    options,
-  ) as ReturnType<Resolver<LeadValues, unknown, CreateLead>>;
+const blank = (text: string | null | undefined) => !text?.trim();
+
+/**
+ * The contract, then the rules the API checks across fields (contact method, the "other" source's
+ * detail, the follow-up range, the interest limit), so every problem shows at once and the focus
+ * goes to the first. The budget's currency goes with an amount only: without one, both are cleared.
+ * An edit checks the date only when it changes: an overdue lead keeps its past date (rule 3).
+ */
+function leadResolver(
+  lead: LeadDetail | undefined,
+  today: string,
+): Resolver<LeadValues, unknown, CreateLead> {
+  const schema = standardSchemaResolver(createLeadSchema);
+  return async (values, context, options) => {
+    const result = await schema(
+      {
+        ...values,
+        budgetCurrency: values.budgetMinor == null ? null : (values.budgetCurrency ?? 'USD'),
+      },
+      context,
+      options,
+    );
+    const across: FieldErrors<LeadValues> = {};
+    if (blank(values.phone) && blank(values.email) && blank(values.socialHandle)) {
+      across.phone = { type: 'contact', message: '' };
+    }
+    if (values.source === 'other' && blank(values.sourceDetail)) {
+      across.sourceDetail = { type: 'required', message: '' };
+    }
+    const dateChanged = !lead || values.nextFollowUpOn !== lead.nextFollowUpOn;
+    if (dateChanged && !followUpDateInRange(values.nextFollowUpOn, today)) {
+      across.nextFollowUpOn = { type: 'range', message: '' };
+    }
+    if ((values.interests?.length ?? 0) > LEAD_LIMITS.interests) {
+      across.interests = { type: 'limit', message: '' };
+    }
+    if (Object.keys(across).length === 0) return result;
+    // The contract's own error on a field comes first.
+    return { values: {}, errors: { ...across, ...result.errors } };
+  };
+}
 
 function valuesOf(lead: LeadDetail | undefined, ownerId: string, today: string): LeadValues {
   if (!lead) {
@@ -147,23 +177,22 @@ const FIELD_OF_CODE = {
 export function LeadDialog({
   open,
   onClose,
+  finalFocus,
   lead,
-}: {
-  open: boolean;
-  onClose: () => void;
+}: LeadDialogProps & {
   /** The lead to edit; a new lead otherwise. */
   lead?: LeadDetail;
 }) {
   const { t } = useTranslation();
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
-      <DialogContent closeLabel={t('common.close')} className="max-w-3xl">
+      <DialogContent closeLabel={t('common.close')} className="max-w-3xl" finalFocus={finalFocus}>
         <DialogHeader>
           <DialogTitle>{lead ? t('leads.form.editTitle') : t('leads.form.newTitle')}</DialogTitle>
           <DialogDescription>{t('leads.form.hint')}</DialogDescription>
         </DialogHeader>
-        {/* Mounted while open: each opening starts from the lead as it is now. */}
-        {open && <LeadForm lead={lead} onClose={onClose} />}
+        {/* Unmounted once the dialog has faded out: each opening starts from the lead as it is. */}
+        <LeadForm lead={lead} onClose={onClose} />
       </DialogContent>
     </Dialog>
   );
@@ -189,10 +218,11 @@ function LeadForm({ lead, onClose }: { lead?: LeadDetail; onClose: () => void })
   const sectors = useQuery({ ...sectorsQuery, enabled: can(me, 'clients.read') });
   const [failure, setFailure] = useState<string | null>(null);
   const form = useForm<LeadValues, unknown, CreateLead>({
-    resolver,
+    resolver: leadResolver(lead, today),
     defaultValues: valuesOf(lead, me.user.id, today),
   });
-  const { errors } = form.formState;
+  // Read while rendering: React Hook Form updates only the form state a component reads.
+  const { errors, isDirty, dirtyFields } = form.formState;
   const [source, budgetMinor, budgetCurrency] = useWatch({
     control: form.control,
     name: ['source', 'budgetMinor', 'budgetCurrency'],
@@ -237,39 +267,16 @@ function LeadForm({ lead, onClose }: { lead?: LeadDetail; onClose: () => void })
     label: t(`quotes.currencies.${currency}`),
   }));
 
-  /** Rules the API checks across fields, put on the field they concern before sending. */
-  function checkAcross(values: CreateLead): boolean {
-    let ok = true;
-    if (!leadHasContactMethod(values)) {
-      form.setError('phone', { type: SCREEN_ERROR, message: t('leads.form.errors.contact') });
-      ok = false;
-    }
-    if (leadSourceDetailMissing(values)) {
-      form.setError('sourceDetail', {
-        type: SCREEN_ERROR,
-        message: t('leads.form.errors.sourceDetailRequired'),
-      });
-      ok = false;
-    }
-    // An edit checks the date only when it changes: an overdue lead keeps its past date (rule 3).
-    const dateChanged = !lead || !!form.formState.dirtyFields.nextFollowUpOn;
-    if (dateChanged && !followUpDateInRange(values.nextFollowUpOn, today)) {
-      form.setError('nextFollowUpOn', { type: 'range' });
-      ok = false;
-    }
-    if (values.interests.length > LEAD_LIMITS.interests) {
-      form.setError('interests', { type: 'limit' });
-      ok = false;
-    }
-    return ok;
-  }
-
   function refused(error: unknown) {
     const code = error instanceof ApiError ? error.knownCode : undefined;
     const field =
       code && code in FIELD_OF_CODE ? FIELD_OF_CODE[code as keyof typeof FIELD_OF_CODE] : null;
     if (field) {
-      form.setError(field, { type: SCREEN_ERROR, message: errorMessage(t, error) });
+      form.setError(
+        field,
+        { type: SCREEN_ERROR, message: errorMessage(t, error) },
+        { shouldFocus: true },
+      );
       return;
     }
     setFailure(errorMessage(t, error));
@@ -277,11 +284,12 @@ function LeadForm({ lead, onClose }: { lead?: LeadDetail; onClose: () => void })
 
   const submit = form.handleSubmit(async (values) => {
     setFailure(null);
-    if (!checkAcross(values)) return;
+    // An edit that changes nothing closes without a request or a "saved" toast.
+    if (lead && !isDirty) return onClose();
     try {
       if (lead) {
         // Only what changed is sent; the budget's amount and currency travel together.
-        const dirty = form.formState.dirtyFields;
+        const dirty = dirtyFields;
         const budgetDirty = !!(dirty.budgetMinor || dirty.budgetCurrency);
         const changes: UpdateLead = {
           updatedAt: lead.updatedAt,
@@ -302,7 +310,7 @@ function LeadForm({ lead, onClose }: { lead?: LeadDetail; onClose: () => void })
           ...(dirty.interests && { interests: values.interests }),
           ...(dirty.nextFollowUpOn && { nextFollowUpOn: values.nextFollowUpOn }),
         };
-        if (Object.keys(changes).length > 1) await update.mutateAsync(changes);
+        await update.mutateAsync(changes);
         toast.add({ title: t('leads.form.saved'), type: 'success' });
       } else {
         await create.mutateAsync(values);
@@ -330,34 +338,23 @@ function LeadForm({ lead, onClose }: { lead?: LeadDetail; onClose: () => void })
         </Field>
         <Field invalid={!!errors.phone}>
           <FieldLabel>{t('leads.form.phone')}</FieldLabel>
-          <Input
-            type="tel"
-            dir="ltr"
-            className="text-end"
-            autoComplete="off"
-            {...form.register('phone')}
-          />
+          <Input type="tel" dir="ltr" autoComplete="off" {...form.register('phone')} />
           <FieldDescription>{t('clients.contacts.form.phoneHint')}</FieldDescription>
-          <FieldError match={!!errors.phone}>
-            {fieldError(errors.phone, t('clients.contacts.form.errors.phone'))}
+          <FieldError match={!!errors.phone} role={errorRole(errors.phone)}>
+            {errors.phone?.type === 'contact'
+              ? t('leads.form.errors.contact')
+              : fieldError(errors.phone, t('clients.contacts.form.errors.phone'))}
           </FieldError>
         </Field>
         <Field invalid={!!errors.email}>
           <FieldLabel>{t('leads.form.email')}</FieldLabel>
-          <Input
-            type="email"
-            dir="ltr"
-            className="text-end"
-            autoComplete="off"
-            {...form.register('email')}
-          />
+          <Input type="email" dir="ltr" autoComplete="off" {...form.register('email')} />
           <FieldError match={!!errors.email}>{t('clients.contacts.form.errors.email')}</FieldError>
         </Field>
         <Field invalid={!!errors.socialHandle} className="sm:col-span-2">
           <FieldLabel>{t('leads.form.socialHandle')}</FieldLabel>
           <Input
             dir="ltr"
-            className="text-end"
             autoComplete="off"
             placeholder={t('leads.form.socialHandlePlaceholder')}
             {...form.register('socialHandle')}
@@ -398,8 +395,10 @@ function LeadForm({ lead, onClose }: { lead?: LeadDetail; onClose: () => void })
             placeholder={t('leads.form.sourceDetailPlaceholder')}
             {...form.register('sourceDetail')}
           />
-          <FieldError match={!!errors.sourceDetail}>
-            {fieldError(errors.sourceDetail, t('leads.form.errors.name'))}
+          <FieldError match={!!errors.sourceDetail} role={errorRole(errors.sourceDetail)}>
+            {errors.sourceDetail?.type === 'required'
+              ? t('leads.form.errors.sourceDetailRequired')
+              : fieldError(errors.sourceDetail, t('leads.form.errors.name'))}
           </FieldError>
         </Field>
         <Controller
@@ -433,7 +432,7 @@ function LeadForm({ lead, onClose }: { lead?: LeadDetail; onClose: () => void })
               <FieldDescription>
                 {t('leads.form.interestsHint', { n: LEAD_LIMITS.interests })}
               </FieldDescription>
-              <FieldError match={!!errors.interests}>
+              <FieldError match={!!errors.interests} role={errorRole(errors.interests)}>
                 {fieldError(
                   errors.interests as Parameters<typeof fieldError>[0],
                   t('leads.form.errors.interests', { n: LEAD_LIMITS.interests }),
@@ -511,12 +510,13 @@ function LeadForm({ lead, onClose }: { lead?: LeadDetail; onClose: () => void })
           <FieldLabel>{t('leads.form.nextFollowUpOn')}</FieldLabel>
           <Input
             type="date"
+            dir="ltr"
             min={today}
             max={addDays(today, LEAD_LIMITS.followUpDays)}
             {...form.register('nextFollowUpOn')}
           />
           <FieldDescription>{t('leads.form.nextFollowUpHint')}</FieldDescription>
-          <FieldError match={!!errors.nextFollowUpOn}>
+          <FieldError match={!!errors.nextFollowUpOn} role={errorRole(errors.nextFollowUpOn)}>
             {fieldError(
               errors.nextFollowUpOn,
               t('leads.form.errors.followUp', { n: LEAD_LIMITS.followUpDays }),
@@ -559,6 +559,7 @@ function LeadForm({ lead, onClose }: { lead?: LeadDetail; onClose: () => void })
                   {t('leads.form.owner')}
                 </FieldLabel>
                 <ChoiceSelect
+                  ref={field.ref}
                   labelledBy={ids.owner}
                   items={ownerItems}
                   value={field.value || null}
@@ -569,7 +570,7 @@ function LeadForm({ lead, onClose }: { lead?: LeadDetail; onClose: () => void })
                 <FieldDescription>
                   {pickOwner ? t('leads.form.ownerHint') : t('leads.form.ownerSelfHint')}
                 </FieldDescription>
-                <FieldError match={!!errors.ownerId}>
+                <FieldError match={!!errors.ownerId} role={errorRole(errors.ownerId)}>
                   {fieldError(errors.ownerId, t('leads.form.errors.owner'))}
                 </FieldError>
               </Field>

@@ -37,7 +37,7 @@ import {
   UserRoundCheckIcon,
   WalletIcon,
 } from 'lucide-react';
-import { useCallback, useState } from 'react';
+import { type RefObject, useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LoadError } from '../../components/load-error';
 import { can, canAll, useMe } from '../../lib/auth';
@@ -127,6 +127,7 @@ export function CampaignsPage({ search }: { search: CampaignsSearch }) {
   const navigate = useNavigate({ from: '/campaigns/' });
   const tab = search.tab ?? 'campaigns';
   const [creating, setCreating] = useState(false);
+  const newButton = useRef<HTMLButtonElement>(null);
 
   const setFilter = useCallback(
     (next: Partial<CampaignsSearch>) =>
@@ -149,7 +150,7 @@ export function CampaignsPage({ search }: { search: CampaignsSearch }) {
         description={t('campaigns.subtitle')}
         actions={
           manages && (
-            <Button onClick={() => setCreating(true)}>
+            <Button ref={newButton} onClick={() => setCreating(true)}>
               <PlusIcon />
               {t('campaigns.new.action')}
             </Button>
@@ -182,7 +183,9 @@ export function CampaignsPage({ search }: { search: CampaignsSearch }) {
         <BudgetsTab search={search} onChange={setFilter} onPage={setPage} />
       )}
 
-      {manages && <CampaignDialog open={creating} onClose={() => setCreating(false)} />}
+      {manages && (
+        <CampaignDialog open={creating} onClose={() => setCreating(false)} finalFocus={newButton} />
+      )}
     </>
   );
 }
@@ -288,10 +291,12 @@ function SearchBox({
   value,
   onChange,
   label,
+  inputRef,
 }: {
   value: string | undefined;
   onChange: (next: { search: string | undefined }) => void;
   label: string;
+  inputRef?: RefObject<HTMLInputElement | null>;
 }) {
   const [text, setText] = useSearchText(value, onChange);
   return (
@@ -301,6 +306,7 @@ function SearchBox({
         className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
       />
       <Input
+        ref={inputRef}
         type="search"
         value={text}
         onChange={(event) => setText(event.target.value)}
@@ -347,6 +353,7 @@ function CampaignFilters({
   );
   const users = useQuery(userListQuery({ pageSize: 100 }));
   const managerItems = useAccountManagerItems(scopeAll);
+  const searchField = useRef<HTMLInputElement>(null);
 
   const statusItems: Choice[] = STATUS_FILTERS.map((status) => ({
     value: status,
@@ -375,7 +382,12 @@ function CampaignFilters({
   return (
     <div className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-3">
       <div className="flex flex-col gap-3 md:flex-row md:flex-wrap md:items-center">
-        <SearchBox value={search.search} onChange={onChange} label={t('campaigns.search')} />
+        <SearchBox
+          value={search.search}
+          onChange={onChange}
+          label={t('campaigns.search')}
+          inputRef={searchField}
+        />
         <ChoiceSelect
           label={t('campaigns.filters.status')}
           items={statusItems}
@@ -442,7 +454,9 @@ function CampaignFilters({
             <Button
               variant="ghost"
               size="sm"
-              onClick={() =>
+              onClick={() => {
+                // The button leaves with the filters: the focus goes to the first filter.
+                searchField.current?.focus();
                 onChange({
                   search: undefined,
                   status: undefined,
@@ -452,8 +466,8 @@ function CampaignFilters({
                   ownerId: undefined,
                   accountManagerId: undefined,
                   mine: undefined,
-                })
-              }
+                });
+              }}
             >
               <FilterXIcon />
               {t('campaigns.filters.clear')}

@@ -260,15 +260,18 @@ export class TemplatesService {
       const summary = await this.saveDocument(tx, id, input, before, beforeStages);
       const currentAssignees = await this.assigneeRows([id], tx);
       const assignees = await this.saveAssignees(tx, id, input.assignees, currentAssignees);
-      await tx
-        .update(workTemplates)
-        .set({ name: input.name, description: input.description, updatedAt: new Date() })
-        .where(eq(workTemplates.id, id));
 
       const basics = { name: current.name, description: current.description };
       const changedBasics = (['name', 'description'] as const).filter(
         (key) => basics[key] !== input[key],
       );
+      // A save that changes nothing keeps the version: another editor is not told of a newer one.
+      if (changedBasics.length > 0 || summary || assignees.length > 0) {
+        await tx
+          .update(workTemplates)
+          .set({ name: input.name, description: input.description, updatedAt: new Date() })
+          .where(eq(workTemplates.id, id));
+      }
       if (changedBasics.length > 0 || summary) {
         await recordAudit(tx, {
           actor: toActor(actor),

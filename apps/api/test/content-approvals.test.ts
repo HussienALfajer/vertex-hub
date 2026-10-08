@@ -170,6 +170,20 @@ describe('posts in approval requests (F08 rules 20–27)', () => {
       ).toEqual([later.id]);
     });
 
+    it('keeps posts and tasks ready while an open link holds an item of the other kind', async () => {
+      const { id: clientId } = await cast.createClient();
+      const sentTask = await cast.taskAt('awaiting_client', { clientId });
+      const sentPost = await readyPost(clientId);
+      await requestOk(clientId, [{ taskId: sentTask.id }]);
+      await requestOk(clientId, [{ postId: sentPost.id }]);
+      // A pending item holds null in the column of the other kind, which `not in` must skip.
+      const task = await cast.taskAt('awaiting_client', { clientId });
+      const post = await readyPost(clientId);
+      const [group] = (await ready(cast.am.cookie, `?clientId=${clientId}`)).clients;
+      expect(group?.tasks.map((ready) => ready.id)).toEqual([task.id]);
+      expect(group?.posts.map((ready) => ready.id)).toEqual([post.id]);
+    });
+
     it('lists the medical queue of posts', async () => {
       const { id: healthcareId } = await cast.createClient({ isHealthcare: true });
       const waiting = await cast.postAt('internal_review', { clientId: healthcareId });

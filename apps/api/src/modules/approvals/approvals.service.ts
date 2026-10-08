@@ -824,13 +824,15 @@ const qualified = (column: PgColumn) =>
 /**
  * SQL: `column` holds a task or a post (the `subject` column of the items) whose pending item is
  * in a request still open (rule 8). Every column is qualified, because the subquery joins two
- * tables inside another table's select.
+ * tables inside another table's select. The items of the other kind hold null in `subject`: they
+ * stay out of the subquery, or `not in` would be null for every row.
  */
 function waitingSql(column: PgColumn, subject: SubjectColumn): SQL {
   const q = qualified;
   return sql`${q(column)} in (select ${q(subject)} from ${approvalItems}
     inner join ${approvalRequests} on ${q(approvalRequests.id)} = ${q(approvalItems.requestId)}
-    where ${q(approvalItems.status)} = 'pending'
+    where ${q(subject)} is not null
+      and ${q(approvalItems.status)} = 'pending'
       and ${q(approvalRequests.revokedAt)} is null
       and ${q(approvalRequests.completedAt)} is null
       and ${q(approvalRequests.expiresAt)} > now())`;

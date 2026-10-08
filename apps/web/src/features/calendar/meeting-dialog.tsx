@@ -40,13 +40,14 @@ import {
   toast,
 } from '@vertex-hub/ui';
 import { TriangleAlertIcon } from 'lucide-react';
-import { useId, useState } from 'react';
+import { type ComponentProps, useEffect, useId, useRef, useState } from 'react';
 import { Controller, useForm, useWatch } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { FormAlert } from '../../components/form-alert';
 import { ApiError } from '../../lib/api/client';
 import { useMe } from '../../lib/auth';
 import { errorMessage } from '../../lib/errors';
+import { focusFirstInvalid } from '../../lib/focus-first-invalid';
 import { clientListQuery, clientQuery } from '../clients/clients.queries';
 import { userListQuery } from '../users/users.queries';
 import { conflictsQuery, useCreateMeeting, useUpdateMeeting } from './calendar.queries';
@@ -134,14 +135,34 @@ function defaultsOf(meeting: MeetingDetail | undefined, me: string): MeetingForm
   };
 }
 
-/** A new meeting, or the edit of a scheduled one by those with meeting scope. */
+/**
+ * A new meeting, or the edit of a scheduled one by those with meeting scope. It stays mounted, so
+ * it fades out and gives the focus back; its form starts afresh on each opening.
+ */
 export function MeetingDialog({
-  meeting,
+  open,
   onClose,
+  finalFocus,
+  meeting,
 }: {
-  meeting?: MeetingDetail;
+  open: boolean;
   onClose: () => void;
+  /** Where the focus goes when it closes, when the button that opened it may be gone. */
+  finalFocus?: ComponentProps<typeof DialogContent>['finalFocus'];
+  meeting?: MeetingDetail;
 }) {
+  const { t } = useTranslation();
+  return (
+    <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
+      <DialogContent closeLabel={t('common.close')} className="max-w-2xl" finalFocus={finalFocus}>
+        {/* Unmounted once the dialog has faded out. */}
+        <MeetingForm meeting={meeting} onClose={onClose} />
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function MeetingForm({ meeting, onClose }: { meeting?: MeetingDetail; onClose: () => void }) {
   const { t } = useTranslation();
   const me = useMe();
   const ids = { attendees: useId(), contacts: useId() };
@@ -150,6 +171,11 @@ export function MeetingDialog({
   const form = useForm<MeetingFormValues>({ defaultValues: defaultsOf(meeting, me.user.id) });
   const [problems, setProblems] = useState<Problems>({});
   const [failure, setFailure] = useState<string | null>(null);
+  const formRef = useRef<HTMLFormElement>(null);
+  // Every problem shows at once; the focus goes to the first one.
+  useEffect(() => {
+    if (Object.keys(problems).length > 0) focusFirstInvalid(formRef.current);
+  }, [problems]);
   /** The conflicts to accept before the save goes through (rule 5). */
   const [confirming, setConfirming] = useState<ScheduleConflict[] | null>(null);
 
@@ -158,7 +184,8 @@ export function MeetingDialog({
     name: ['client', 'date', 'startTime', 'endTime', 'organizerId', 'attendeeIds'],
   });
   const clientId = client === INTERNAL ? null : client;
-  const { dirtyFields } = form.formState;
+  // Read while rendering: React Hook Form updates only the form state a component reads.
+  const { dirtyFields, isDirty } = form.formState;
   const timeChanged = !!(dirtyFields.date || dirtyFields.startTime || dirtyFields.endTime);
   // An edit that leaves the time alone keeps the meeting's own instants.
   const instants =
@@ -219,6 +246,8 @@ export function MeetingDialog({
   async function save(values: MeetingFormValues, acceptConflicts: boolean) {
     setProblems({});
     setFailure(null);
+    // An edit that changes nothing closes without a request or a "saved" toast.
+    if (meeting && !isDirty) return onClose();
     const fields = {
       title: values.title,
       clientId: values.client === INTERNAL ? null : values.client,
@@ -270,239 +299,236 @@ export function MeetingDialog({
 
   return (
     <>
-      <Dialog open onOpenChange={(next) => !next && onClose()}>
-        <DialogContent closeLabel={t('common.close')} className="max-w-2xl">
-          <form
-            className="grid gap-5"
-            noValidate
-            onSubmit={form.handleSubmit((values) => save(values, false))}
-          >
-            <DialogHeader>
-              <DialogTitle>
-                {meeting ? t('calendar.meetings.form.editTitle') : t('calendar.actions.newMeeting')}
-              </DialogTitle>
-              <DialogDescription>{t('calendar.meetings.form.body')}</DialogDescription>
-            </DialogHeader>
-            <Field invalid={!!problems.title}>
-              <FieldLabel>{t('calendar.meetings.form.title')}</FieldLabel>
-              <Input
-                autoComplete="off"
-                maxLength={CALENDAR_LIMITS.title}
-                placeholder={t('calendar.meetings.form.titlePlaceholder')}
-                {...form.register('title')}
-              />
-              <FieldError match={!!problems.title}>{problems.title}</FieldError>
-            </Field>
-            <Field invalid={!!problems.client}>
-              <FieldLabel>{t('calendar.form.client')}</FieldLabel>
-              <Controller
-                control={form.control}
-                name="client"
-                render={({ field }) => (
-                  <Select
-                    items={clientItems}
-                    value={field.value}
-                    onValueChange={(value) => {
-                      if (!value || value === field.value) return;
-                      field.onChange(value);
-                      // Contacts belong to the client they were picked under.
-                      form.setValue('contactIds', [], { shouldDirty: true });
-                    }}
-                  >
-                    <SelectTrigger onBlur={field.onBlur} ref={field.ref}>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {clientItems.map((item) => (
-                        <SelectItem key={item.value} value={item.value}>
-                          {item.value === INTERNAL ? (
-                            <span className="text-muted-foreground">{item.label}</span>
-                          ) : (
-                            <span className="flex items-center gap-2">
-                              <Avatar name={item.label} shape="square" size="sm" />
-                              {item.label}
-                            </span>
-                          )}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-              />
-              <FieldError match={!!problems.client}>{problems.client}</FieldError>
-            </Field>
-            <div className="grid gap-5 sm:grid-cols-3">
-              <Field invalid={!!problems.time}>
-                <FieldLabel>{t('calendar.form.date')}</FieldLabel>
-                <Input type="date" {...form.register('date')} />
-              </Field>
-              <Field invalid={!!problems.time}>
-                <FieldLabel>{t('calendar.form.startTime')}</FieldLabel>
-                <Input type="time" {...form.register('startTime')} />
-              </Field>
-              <Field invalid={!!problems.time}>
-                <FieldLabel>{t('calendar.form.endTime')}</FieldLabel>
-                <Input type="time" {...form.register('endTime')} />
-              </Field>
-            </div>
-            {problems.time ? (
-              <p role="alert" className="text-sm text-destructive-text">
-                {problems.time}
-              </p>
-            ) : (
-              startTime &&
-              endTime &&
-              endTime <= startTime && (
-                <p className="text-sm text-muted-foreground">
-                  {t('calendar.meetings.form.endsNextDay')}
-                </p>
-              )
+      <form
+        ref={formRef}
+        className="grid gap-5"
+        noValidate
+        onSubmit={form.handleSubmit((values) => save(values, false))}
+      >
+        <DialogHeader>
+          <DialogTitle>
+            {meeting ? t('calendar.meetings.form.editTitle') : t('calendar.actions.newMeeting')}
+          </DialogTitle>
+          <DialogDescription>{t('calendar.meetings.form.body')}</DialogDescription>
+        </DialogHeader>
+        <Field invalid={!!problems.title}>
+          <FieldLabel>{t('calendar.meetings.form.title')}</FieldLabel>
+          <Input
+            autoComplete="off"
+            maxLength={CALENDAR_LIMITS.title}
+            placeholder={t('calendar.meetings.form.titlePlaceholder')}
+            {...form.register('title')}
+          />
+          <FieldError match={!!problems.title}>{problems.title}</FieldError>
+        </Field>
+        <Field invalid={!!problems.client}>
+          <FieldLabel>{t('calendar.form.client')}</FieldLabel>
+          <Controller
+            control={form.control}
+            name="client"
+            render={({ field }) => (
+              <Select
+                items={clientItems}
+                value={field.value}
+                onValueChange={(value) => {
+                  if (!value || value === field.value) return;
+                  field.onChange(value);
+                  // Contacts belong to the client they were picked under.
+                  form.setValue('contactIds', [], { shouldDirty: true });
+                }}
+              >
+                <SelectTrigger onBlur={field.onBlur} ref={field.ref}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {clientItems.map((item) => (
+                    <SelectItem key={item.value} value={item.value}>
+                      {item.value === INTERNAL ? (
+                        <span className="text-muted-foreground">{item.label}</span>
+                      ) : (
+                        <span className="flex items-center gap-2">
+                          <Avatar name={item.label} shape="square" size="sm" />
+                          {item.label}
+                        </span>
+                      )}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             )}
-            <div className="grid gap-5 sm:grid-cols-2">
-              <Field invalid={!!problems.location}>
-                <FieldLabel>
-                  {t('calendar.form.location')}
-                  <Optional />
-                </FieldLabel>
-                <Input
-                  maxLength={CALENDAR_LIMITS.location}
-                  placeholder={t('calendar.meetings.form.locationPlaceholder')}
-                  {...form.register('location')}
-                />
-                <FieldError match={!!problems.location}>{problems.location}</FieldError>
-              </Field>
-              <Field invalid={!!problems.onlineUrl}>
-                <FieldLabel>
-                  {t('calendar.meetings.form.onlineUrl')}
-                  <Optional />
-                </FieldLabel>
-                <Input
-                  type="url"
-                  dir="ltr"
-                  placeholder="https://meet.google.com/…"
-                  {...form.register('onlineUrl')}
-                />
-                <FieldError match={!!problems.onlineUrl}>{problems.onlineUrl}</FieldError>
-              </Field>
-            </div>
-            <Field invalid={!!problems.agenda}>
-              <FieldLabel>
-                {t('calendar.meetings.agenda')}
-                <Optional />
-              </FieldLabel>
-              <Textarea
-                rows={3}
-                maxLength={CALENDAR_LIMITS.brief}
-                placeholder={t('calendar.meetings.form.agendaPlaceholder')}
-                {...form.register('agenda')}
-              />
-              <FieldError match={!!problems.agenda}>{problems.agenda}</FieldError>
-            </Field>
-            {meeting && (
-              <Field invalid={!!problems.organizer}>
-                <FieldLabel>{t('calendar.meetings.organizer')}</FieldLabel>
-                <Controller
-                  control={form.control}
-                  name="organizerId"
-                  render={({ field }) => (
-                    <Select
-                      items={organizerItems}
-                      value={field.value}
-                      onValueChange={(value) => value && field.onChange(value)}
-                    >
-                      <SelectTrigger onBlur={field.onBlur} ref={field.ref}>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {organizerItems.map((item) => (
-                          <SelectItem key={item.value} value={item.value}>
-                            <span className="flex items-center gap-2">
-                              <Avatar name={item.label} size="sm" />
-                              {item.label}
-                            </span>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-                />
-                <FieldError match={!!problems.organizer}>{problems.organizer}</FieldError>
-              </Field>
-            )}
-            <Field invalid={!!problems.attendees}>
-              <FieldLabel htmlFor={ids.attendees}>
-                {t('calendar.meetings.attendees')}
-                <Optional />
-              </FieldLabel>
-              <Controller
-                control={form.control}
-                name="attendeeIds"
-                render={({ field }) => (
-                  <MultiCombobox
-                    id={ids.attendees}
-                    // The organizer attends without being listed (rule 14).
-                    items={people.filter((person) => person.id !== organizerId)}
-                    value={field.value.flatMap((id) => personOf.get(id) ?? [])}
-                    onValueChange={(next) => field.onChange(next.map((person) => person.id))}
-                    itemToLabel={(person) => person.name}
-                    itemToKey={(person) => person.id}
-                    placeholder={t('calendar.meetings.form.attendeesPlaceholder')}
-                    emptyLabel={t('common.noMatches')}
-                    removeLabel={(label) => t('common.remove', { label })}
-                    invalid={!!problems.attendees}
-                  />
-                )}
-              />
-              <FieldDescription>{t('calendar.meetings.form.attendeesHint')}</FieldDescription>
-              <FieldError match={!!problems.attendees}>{problems.attendees}</FieldError>
-            </Field>
-            {conflicts.length > 0 && (
-              <Callout
-                tone="warning"
-                icon={<TriangleAlertIcon />}
-                title={t('calendar.form.conflictsTitle')}
-                description={t('calendar.meetings.form.conflictsBody')}
-                className="sm:flex-col sm:items-stretch"
-                action={<ConflictList conflicts={conflicts} />}
+          />
+          <FieldError match={!!problems.client}>{problems.client}</FieldError>
+        </Field>
+        <div className="grid gap-5 sm:grid-cols-3">
+          <Field invalid={!!problems.time}>
+            <FieldLabel>{t('calendar.form.date')}</FieldLabel>
+            <Input type="date" dir="ltr" {...form.register('date')} />
+          </Field>
+          <Field invalid={!!problems.time}>
+            <FieldLabel>{t('calendar.form.startTime')}</FieldLabel>
+            <Input type="time" dir="ltr" {...form.register('startTime')} />
+          </Field>
+          <Field invalid={!!problems.time}>
+            <FieldLabel>{t('calendar.form.endTime')}</FieldLabel>
+            <Input type="time" dir="ltr" {...form.register('endTime')} />
+          </Field>
+        </div>
+        {problems.time ? (
+          <p role="alert" className="text-sm text-destructive-text">
+            {problems.time}
+          </p>
+        ) : (
+          startTime &&
+          endTime &&
+          endTime <= startTime && (
+            <p className="text-sm text-muted-foreground">
+              {t('calendar.meetings.form.endsNextDay')}
+            </p>
+          )
+        )}
+        <div className="grid gap-5 sm:grid-cols-2">
+          <Field invalid={!!problems.location}>
+            <FieldLabel>
+              {t('calendar.form.location')}
+              <Optional />
+            </FieldLabel>
+            <Input
+              maxLength={CALENDAR_LIMITS.location}
+              placeholder={t('calendar.meetings.form.locationPlaceholder')}
+              {...form.register('location')}
+            />
+            <FieldError match={!!problems.location}>{problems.location}</FieldError>
+          </Field>
+          <Field invalid={!!problems.onlineUrl}>
+            <FieldLabel>
+              {t('calendar.meetings.form.onlineUrl')}
+              <Optional />
+            </FieldLabel>
+            <Input
+              type="url"
+              dir="ltr"
+              placeholder="https://meet.google.com/…"
+              {...form.register('onlineUrl')}
+            />
+            <FieldError match={!!problems.onlineUrl}>{problems.onlineUrl}</FieldError>
+          </Field>
+        </div>
+        <Field invalid={!!problems.agenda}>
+          <FieldLabel>
+            {t('calendar.meetings.agenda')}
+            <Optional />
+          </FieldLabel>
+          <Textarea
+            rows={3}
+            maxLength={CALENDAR_LIMITS.brief}
+            placeholder={t('calendar.meetings.form.agendaPlaceholder')}
+            {...form.register('agenda')}
+          />
+          <FieldError match={!!problems.agenda}>{problems.agenda}</FieldError>
+        </Field>
+        {meeting && (
+          <Field invalid={!!problems.organizer}>
+            <FieldLabel>{t('calendar.meetings.organizer')}</FieldLabel>
+            <Controller
+              control={form.control}
+              name="organizerId"
+              render={({ field }) => (
+                <Select
+                  items={organizerItems}
+                  value={field.value}
+                  onValueChange={(value) => value && field.onChange(value)}
+                >
+                  <SelectTrigger onBlur={field.onBlur} ref={field.ref}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {organizerItems.map((item) => (
+                      <SelectItem key={item.value} value={item.value}>
+                        <span className="flex items-center gap-2">
+                          <Avatar name={item.label} size="sm" />
+                          {item.label}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            />
+            <FieldError match={!!problems.organizer}>{problems.organizer}</FieldError>
+          </Field>
+        )}
+        <Field invalid={!!problems.attendees}>
+          <FieldLabel htmlFor={ids.attendees}>
+            {t('calendar.meetings.attendees')}
+            <Optional />
+          </FieldLabel>
+          <Controller
+            control={form.control}
+            name="attendeeIds"
+            render={({ field }) => (
+              <MultiCombobox
+                id={ids.attendees}
+                // The organizer attends without being listed (rule 14).
+                items={people.filter((person) => person.id !== organizerId)}
+                value={field.value.flatMap((id) => personOf.get(id) ?? [])}
+                onValueChange={(next) => field.onChange(next.map((person) => person.id))}
+                itemToLabel={(person) => person.name}
+                itemToKey={(person) => person.id}
+                placeholder={t('calendar.meetings.form.attendeesPlaceholder')}
+                emptyLabel={t('common.noMatches')}
+                removeLabel={(label) => t('common.remove', { label })}
+                invalid={!!problems.attendees}
               />
             )}
-            {clientId && (
-              <Field invalid={!!problems.contacts}>
-                <FieldLabel htmlFor={ids.contacts}>
-                  {t('calendar.meetings.contacts')}
-                  <Optional />
-                </FieldLabel>
-                <Controller
-                  control={form.control}
-                  name="contactIds"
-                  render={({ field }) => (
-                    <MultiCombobox
-                      id={ids.contacts}
-                      items={[...contactOf.values()]}
-                      value={field.value.flatMap((id) => contactOf.get(id) ?? [])}
-                      onValueChange={(next) => field.onChange(next.map((contact) => contact.id))}
-                      itemToLabel={(contact) => contact.name}
-                      itemToKey={(contact) => contact.id}
-                      placeholder={t('calendar.meetings.form.contactsPlaceholder')}
-                      emptyLabel={t('common.noMatches')}
-                      removeLabel={(label) => t('common.remove', { label })}
-                      invalid={!!problems.contacts}
-                    />
-                  )}
+          />
+          <FieldDescription>{t('calendar.meetings.form.attendeesHint')}</FieldDescription>
+          <FieldError match={!!problems.attendees}>{problems.attendees}</FieldError>
+        </Field>
+        {conflicts.length > 0 && (
+          <Callout
+            tone="warning"
+            icon={<TriangleAlertIcon />}
+            title={t('calendar.form.conflictsTitle')}
+            description={t('calendar.meetings.form.conflictsBody')}
+            className="sm:flex-col sm:items-stretch"
+            action={<ConflictList conflicts={conflicts} />}
+          />
+        )}
+        {clientId && (
+          <Field invalid={!!problems.contacts}>
+            <FieldLabel htmlFor={ids.contacts}>
+              {t('calendar.meetings.contacts')}
+              <Optional />
+            </FieldLabel>
+            <Controller
+              control={form.control}
+              name="contactIds"
+              render={({ field }) => (
+                <MultiCombobox
+                  id={ids.contacts}
+                  items={[...contactOf.values()]}
+                  value={field.value.flatMap((id) => contactOf.get(id) ?? [])}
+                  onValueChange={(next) => field.onChange(next.map((contact) => contact.id))}
+                  itemToLabel={(contact) => contact.name}
+                  itemToKey={(contact) => contact.id}
+                  placeholder={t('calendar.meetings.form.contactsPlaceholder')}
+                  emptyLabel={t('common.noMatches')}
+                  removeLabel={(label) => t('common.remove', { label })}
+                  invalid={!!problems.contacts}
                 />
-                <FieldError match={!!problems.contacts}>{problems.contacts}</FieldError>
-              </Field>
-            )}
-            {failure && <FormAlert>{failure}</FormAlert>}
-            <DialogFooter>
-              <DialogClose render={<Button variant="outline" />}>{t('common.cancel')}</DialogClose>
-              <Button type="submit" disabled={pending}>
-                {meeting ? t('calendar.form.save') : t('calendar.meetings.form.create')}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+              )}
+            />
+            <FieldError match={!!problems.contacts}>{problems.contacts}</FieldError>
+          </Field>
+        )}
+        {failure && <FormAlert>{failure}</FormAlert>}
+        <DialogFooter>
+          <DialogClose render={<Button variant="outline" />}>{t('common.cancel')}</DialogClose>
+          <Button type="submit" disabled={pending}>
+            {meeting ? t('calendar.form.save') : t('calendar.meetings.form.create')}
+          </Button>
+        </DialogFooter>
+      </form>
 
       <AlertDialog open={confirming !== null} onOpenChange={(open) => !open && setConfirming(null)}>
         <AlertDialogContent>

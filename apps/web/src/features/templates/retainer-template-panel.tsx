@@ -22,7 +22,7 @@ import {
   toast,
 } from '@vertex-hub/ui';
 import { CalendarSyncIcon, LayersIcon, ListPlusIcon, TriangleAlertIcon } from 'lucide-react';
-import { useId, useState } from 'react';
+import { type RefObject, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FormAlert } from '../../components/form-alert';
 import { LoadError } from '../../components/load-error';
@@ -50,6 +50,9 @@ export function RetainerTemplatePanel({ retainer }: { retainer: RetainerDetail }
   const { t } = useTranslation();
   const state = useQuery(retainerTemplateQuery(retainer.id));
   const [dialog, setDialog] = useState<'link' | 'generate' | null>(null);
+  const panel = useRef<HTMLElement>(null);
+  const linkButton = useRef<HTMLButtonElement>(null);
+  const generateButton = useRef<HTMLButtonElement>(null);
 
   if (state.isPending) return <Skeleton className="h-16" />;
   if (state.isError) {
@@ -63,6 +66,8 @@ export function RetainerTemplatePanel({ retainer }: { retainer: RetainerDetail }
 
   return (
     <section
+      ref={panel}
+      tabIndex={-1}
       aria-label={t('templates.retainer.title')}
       className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-4"
     >
@@ -85,13 +90,13 @@ export function RetainerTemplatePanel({ retainer }: { retainer: RetainerDetail }
           )}
         </div>
         {canGenerate && (
-          <Button size="sm" onClick={() => setDialog('generate')}>
+          <Button ref={generateButton} size="sm" onClick={() => setDialog('generate')}>
             <LayersIcon />
             {t('templates.retainer.generate')}
           </Button>
         )}
         {canLink && (
-          <Button size="sm" variant="outline" onClick={() => setDialog('link')}>
+          <Button ref={linkButton} size="sm" variant="outline" onClick={() => setDialog('link')}>
             {template ? t('templates.retainer.change') : t('templates.retainer.link')}
           </Button>
         )}
@@ -130,6 +135,7 @@ export function RetainerTemplatePanel({ retainer }: { retainer: RetainerDetail }
         current={template}
         open={dialog === 'link'}
         onClose={() => setDialog(null)}
+        finalFocus={linkButton}
       />
       {template && cycle && (
         <GenerateTasksDialog
@@ -141,6 +147,12 @@ export function RetainerTemplatePanel({ retainer }: { retainer: RetainerDetail }
           }}
           open={dialog === 'generate'}
           onClose={() => setDialog(null)}
+          // Generating takes its button away: the link button, else the panel.
+          finalFocus={() =>
+            generateButton.current?.isConnected
+              ? generateButton.current
+              : (linkButton.current ?? panel.current ?? true)
+          }
         />
       )}
     </section>
@@ -210,12 +222,14 @@ function LinkTemplateDialog({
   current,
   open,
   onClose,
+  finalFocus,
 }: {
   retainer: RetainerDetail;
   /** The linked template; an archived one is kept as an option until another is picked. */
   current: RetainerTemplate['template'];
   open: boolean;
   onClose: () => void;
+  finalFocus: RefObject<HTMLButtonElement | null>;
 }) {
   const { t } = useTranslation();
   const id = useId();
@@ -238,29 +252,35 @@ function LinkTemplateDialog({
     });
   }
 
-  function close() {
+  // After the exit animation, so the choice does not jump back while the dialog fades.
+  function closed() {
     setChoice(null);
     setFailure(null);
-    onClose();
   }
 
   async function save() {
     setFailure(null);
+    // The same template: nothing changes, so nothing is saved.
+    if (value === (current?.id ?? NONE)) return onClose();
     try {
       await link.mutateAsync({
         retainerId: retainer.id,
         templateId: value === NONE ? null : value,
       });
       toast.add({ title: t('templates.retainer.saved'), type: 'success' });
-      close();
+      onClose();
     } catch (error) {
       setFailure(errorMessage(t, error));
     }
   }
 
   return (
-    <Dialog open={open} onOpenChange={(next) => !next && close()}>
-      <DialogContent closeLabel={t('common.close')}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => !next && onClose()}
+      onOpenChangeComplete={(next) => !next && closed()}
+    >
+      <DialogContent closeLabel={t('common.close')} finalFocus={finalFocus}>
         <div className="grid gap-5">
           <DialogHeader>
             <DialogTitle>{t('templates.retainer.linkTitle', { name: retainer.name })}</DialogTitle>

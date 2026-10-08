@@ -6,7 +6,7 @@ import {
   queryListSchema,
   sortOrderSchema,
 } from './lists.js';
-import { httpUrlSchema, optionalText, uniqueTexts } from './text.js';
+import { httpUrlSchema, optionalText, singleSpaced, uniqueTexts } from './text.js';
 import { phoneSchema } from './users.js';
 
 export const CLIENT_STATUSES = ['active', 'paused', 'ended'] as const;
@@ -80,12 +80,26 @@ export const brandKitSchema = z
 
 export type BrandKit = z.infer<typeof brandKitSchema>;
 
+/** Keeps the first item for each key: the same color or link twice adds nothing. */
+const firstOfEach =
+  <Item>(key: (item: Item) => string) =>
+  (items: Item[]) => {
+    const seen = new Set<string>();
+    return items.filter((item) => {
+      const value = key(item);
+      if (seen.has(value)) return false;
+      seen.add(value);
+      return true;
+    });
+  };
+
 /** The brand kit is read and replaced as a whole; missing lists are empty. */
 export const updateBrandKitSchema = z
   .object({
     colors: z
       .array(z.object({ name: optionalText(40).default(null), hex: hexColorSchema }))
       .max(20)
+      .transform(firstOfEach((color) => color.hex))
       .default([]),
     fonts: uniqueTexts(z.string().trim().min(1).max(60), 10).default([]),
     toneOfVoice: optionalText(2000).default(null),
@@ -99,6 +113,7 @@ export const updateBrandKitSchema = z
         }),
       )
       .max(30)
+      .transform(firstOfEach((file) => file.url))
       .default([]),
     references: z
       .array(
@@ -109,6 +124,7 @@ export const updateBrandKitSchema = z
         }),
       )
       .max(50)
+      .transform(firstOfEach((reference) => reference.url))
       .default([]),
   })
   .meta({ id: 'UpdateBrandKit' });
@@ -216,7 +232,12 @@ export type PlatformAccount = z.infer<typeof platformAccountSchema>;
 
 // Clients
 
-export const tradeNameSchema = z.string().trim().min(1).max(120);
+/** Spaces inside a name count once: "شركة   البناء" and "شركة البناء" are one client (rule 6). */
+export const tradeNameSchema = z
+  .string()
+  .trim()
+  .transform(singleSpaced)
+  .pipe(z.string().min(1).max(120));
 
 export const sectorSchema = optionalText(60);
 
@@ -289,8 +310,8 @@ export type ClientDetailResponse = z.infer<typeof clientDetailResponseSchema>;
 export const CLIENT_SORTS = ['tradeName', 'createdAt'] as const;
 
 export const clientListQuerySchema = pageQuerySchema.extend({
-  /** Matches the trade name. */
-  search: z.string().trim().min(1).max(100).optional(),
+  /** Matches the trade name, whose inner spaces are single. */
+  search: z.string().trim().transform(singleSpaced).pipe(z.string().min(1).max(100)).optional(),
   status: queryListSchema(clientStatusSchema).default(['active', 'paused']),
   accountManagerId: z.uuid().optional(),
   /** Matches case-insensitively. */

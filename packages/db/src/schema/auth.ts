@@ -128,12 +128,16 @@ export const departments = pgTable(
   {
     id: id(),
     code: departmentCodeEnum('code').notNull().unique(),
-    name: text('name').notNull().unique(),
+    name: text('name').notNull(),
     managerId: uuid('manager_id').references(() => users.id),
     ...timestamps(),
     archivedAt: archivedAt(),
   },
-  (table) => [index('departments_manager_id_idx').on(table.managerId)],
+  (table) => [
+    // "Design" and "design" are the same name (F01 rule 21).
+    uniqueIndex('departments_name_idx').on(sql`lower(${table.name})`),
+    index('departments_manager_id_idx').on(table.managerId),
+  ],
 );
 
 /** Who belongs to which department; each active user has exactly one primary department. */

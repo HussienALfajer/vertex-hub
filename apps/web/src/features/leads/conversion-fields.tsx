@@ -20,7 +20,8 @@ import {
   TabsTrigger,
 } from '@vertex-hub/ui';
 import { BadgeCheckIcon, InfoIcon, StethoscopeIcon } from 'lucide-react';
-import { type ReactNode, useEffect, useId, useRef, useState } from 'react';
+import { type ReactNode, type RefObject, useEffect, useId, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { formatNumber } from '../../lib/format';
 import { ClientStatusBadge } from '../clients/client-badges';
@@ -92,6 +93,10 @@ export function toConversion(values: ConversionValues): ConvertLeadInput {
     : { mode: 'existing', clientId: values.clientId, contact };
 }
 
+/** A refusal from the server is a message, announced when it shows; a failed check is `true`. */
+const refusal = (problem: string | true | undefined) =>
+  typeof problem === 'string' ? 'alert' : undefined;
+
 /** The fields the contract refuses, keyed as `ConversionFields` shows them. */
 export function conversionProblems(values: ConversionValues): ConversionProblems {
   const parsed = convertLeadSchema.safeParse(toConversion(values));
@@ -154,6 +159,8 @@ export function ConversionFields({
 }) {
   const { t } = useTranslation();
   const set = (next: Partial<ConversionValues>) => onChange({ ...values, ...next });
+  // "Link instead" leaves with the new-client fields: the focus goes to the client it picked.
+  const picker = useRef<HTMLButtonElement>(null);
 
   return (
     <div className="grid gap-5">
@@ -176,12 +183,14 @@ export function ConversionFields({
           set={set}
           problems={problems}
           onLink={(clientId) => {
-            set({ mode: 'existing', clientId });
+            flushSync(() => set({ mode: 'existing', clientId }));
+            picker.current?.focus();
             onClient(clientId);
           }}
         />
       ) : (
         <ExistingClientFields
+          picker={picker}
           plan={plan}
           values={values}
           problems={problems}
@@ -244,7 +253,7 @@ function NewClientFields({
           value={values.tradeName}
           onChange={(event) => set({ tradeName: event.target.value })}
         />
-        <FieldError match={!!nameProblem}>
+        <FieldError match={!!nameProblem} role={refusal(nameProblem)}>
           {typeof nameProblem === 'string' ? nameProblem : t('clients.form.errors.tradeName')}
         </FieldError>
       </Field>
@@ -282,7 +291,7 @@ function NewClientFields({
           onChange={(accountManagerId) => set({ accountManagerId })}
         />
         <FieldDescription>{t('leads.convert.accountManagerHint')}</FieldDescription>
-        <FieldError match={!!problems.accountManagerId}>
+        <FieldError match={!!problems.accountManagerId} role={refusal(problems.accountManagerId)}>
           {typeof problems.accountManagerId === 'string'
             ? problems.accountManagerId
             : t('clients.form.errors.accountManager')}
@@ -302,11 +311,13 @@ function NewClientFields({
 }
 
 function ExistingClientFields({
+  picker,
   plan,
   values,
   problems,
   onPick,
 }: {
+  picker: RefObject<HTMLButtonElement | null>;
   plan: LeadConversionPlan;
   values: ConversionValues;
   problems: ConversionProblems;
@@ -357,13 +368,14 @@ function ExistingClientFields({
           {t('leads.convert.client')}
         </FieldLabel>
         <ChoiceSelect
+          ref={picker}
           labelledBy={id}
           items={items}
           value={values.clientId || null}
           placeholder={t('leads.convert.pickClient')}
           onChange={onPick}
         />
-        <FieldError match={!!problems.clientId}>
+        <FieldError match={!!problems.clientId} role={refusal(problems.clientId)}>
           {typeof problems.clientId === 'string'
             ? problems.clientId
             : t('leads.convert.errors.client')}
@@ -438,7 +450,6 @@ function ContactFields({
             <Input
               type="tel"
               dir="ltr"
-              className="text-end"
               autoComplete="off"
               value={contact.phone}
               onChange={(event) => set({ phone: event.target.value })}
@@ -452,7 +463,6 @@ function ContactFields({
             <Input
               type="email"
               dir="ltr"
-              className="text-end"
               autoComplete="off"
               value={contact.email}
               onChange={(event) => set({ email: event.target.value })}

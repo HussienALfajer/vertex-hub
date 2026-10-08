@@ -173,14 +173,16 @@ for (const colorScheme of ['light', 'dark'] as const) {
     test('activation', async ({ page }, testInfo) => {
       await mockApi(page, { signedIn: false });
       await page.goto(`/activate#token=${VALID_LINK_TOKEN}`);
-      await expect(page.getByRole('heading', { level: 1 })).toHaveText(ar.activate.title);
+      await expect(page.getByRole('heading', { level: 1 })).toHaveText(
+        ar.activate.activation.title,
+      );
       await screenshot(page, testInfo, `activate-${colorScheme}`);
     });
 
     test('two-factor setup', async ({ page }, testInfo) => {
       await mockApi(page, { signedIn: true, me: financeWithoutTwoFactor });
       await page.goto('/setup-two-factor');
-      await page.getByLabel(ar.twoFactorSetup.password).fill('my-password-123');
+      await page.getByLabel(ar.twoFactorSetup.password, { exact: true }).fill('my-password-123');
       await page.getByRole('button', { name: ar.twoFactorSetup.start }).click();
       await expect(page.getByRole('img', { name: ar.twoFactorSetup.qrLabel })).toBeVisible();
       await screenshot(page, testInfo, `two-factor-scan-${colorScheme}`);
@@ -193,7 +195,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await mockApi(page, { signedIn: false, acceptPassword: 'pw', twoFactorOnSignIn: true });
       await page.goto('/login');
       await page.getByLabel(ar.login.email).fill('sara@vertex.example');
-      await page.getByLabel(ar.login.password).fill('pw');
+      await page.getByLabel(ar.login.password, { exact: true }).fill('pw');
       await page.getByRole('button', { name: ar.login.submit }).click();
       await expect(page.getByRole('heading', { level: 1 })).toHaveText(ar.login.twoFactor.title);
       await screenshot(page, testInfo, `login-code-${colorScheme}`);
@@ -453,7 +455,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
 
       await page.setViewportSize({ width: 1280, height: 1200 });
       await page.goto(`/retainers/${seedIds.adsRetainer}?tab=billing`);
-      await expect(page.getByText(ar.invoices.billing.creditOwed)).toBeVisible();
+      await expect(page.getByText(ar.invoices.billing.creditNextMonth)).toBeVisible();
       await screenshot(page, testInfo, `retainer-billing-credit-${colorScheme}`);
     });
 
@@ -846,6 +848,17 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await screenshot(page, testInfo, `quote-new-dialog-${colorScheme}`);
     });
 
+    test('quote list (Finance: no "My clients")', async ({ page }, testInfo) => {
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await mockApi(page, { signedIn: true, me: financeMe });
+      await page.goto('/quotes');
+      await expect(page.getByRole('link', { name: /هوية وسوشال الياسمين/ })).toBeVisible();
+      await expect(
+        page.getByRole('button', { name: ar.quotes.filters.mine, exact: true }),
+      ).toHaveCount(0);
+      await screenshot(page, testInfo, `quotes-list-finance-${colorScheme}`);
+    });
+
     test('quote builder', async ({ page }, testInfo) => {
       await page.setViewportSize({ width: 1440, height: 1600 });
       await mockApi(page, { signedIn: true });
@@ -1027,7 +1040,8 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await page.setViewportSize({ width: 1280, height: 1000 });
       await mockApi(page, { signedIn: true });
       await page.goto('/invoices/settings');
-      await expect(page.getByLabel(ar.invoices.settings.sypPerUsd)).toHaveValue('118.5000');
+      // The stored `118.5000` without trailing zeros.
+      await expect(page.getByLabel(ar.invoices.settings.sypPerUsd)).toHaveValue('118.5');
       await screenshot(page, testInfo, `invoice-settings-${colorScheme}`);
     });
 
@@ -1238,7 +1252,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await page.keyboard.press('Escape');
 
       await page.setViewportSize({ width: 1440, height: 1100 });
-      await page.getByRole('button', { name: ar.content.calendar.views.week }).click();
+      await page.getByRole('button', { name: ar.calendar.views.week }).click();
       await expect(page).toHaveURL(/view=week/);
       await expect(page.getByRole('link', { name: /ريل كواليس المطبخ/ })).toBeVisible();
       await screenshot(page, testInfo, `content-week-${colorScheme}`);

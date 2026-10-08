@@ -22,6 +22,7 @@ import {
   FieldDescription,
   FieldError,
   FieldLabel,
+  IconButton,
   Input,
   MultiCombobox,
   Select,
@@ -34,12 +35,14 @@ import {
 } from '@vertex-hub/ui';
 import type { TFunction } from 'i18next';
 import { ArrowDownIcon, ArrowUpIcon, ListPlusIcon, PlusIcon, Trash2Icon } from 'lucide-react';
-import { useId } from 'react';
+import { useId, useRef } from 'react';
+import { flushSync } from 'react-dom';
 import { Controller, type UseFormReturn, useFieldArray, useWatch } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { MoneyInput } from '../../components/money-input';
 import { ApiError } from '../../lib/api/client';
-import { errorMessage, fieldError, SCREEN_ERROR } from '../../lib/errors';
+import { errorMessage, errorRole, fieldError, SCREEN_ERROR } from '../../lib/errors';
+import { focusAfterRemoval } from '../../lib/focus-after-removal';
 import { formatNumber } from '../../lib/format';
 import { ClientStatusBadge } from '../clients/client-badges';
 import { departmentListQuery } from '../departments/departments.queries';
@@ -48,8 +51,8 @@ import { DeliverableIcon, lineName } from './retainer-badges';
 export type RetainerFormMethods = UseFormReturn<CreateRetainerInput, unknown, CreateRetainer>;
 
 /**
- * Puts a failed save on the field it concerns and returns the form-level message for anything
- * else (null when a field took it).
+ * Puts a failed save on the field it concerns, which takes the focus back, and returns the
+ * form-level message for anything else (null when a field took it).
  */
 export function retainerFormFailure(
   form: RetainerFormMethods,
@@ -58,20 +61,26 @@ export function retainerFormFailure(
 ): string | null {
   const field = error instanceof ApiError ? FIELD_OF_CODE[error.code ?? ''] : undefined;
   if (field) {
-    form.setError(field, {
-      type: SCREEN_ERROR,
-      message: errorMessage(t, error),
-    });
+    form.setError(
+      field,
+      { type: SCREEN_ERROR, message: errorMessage(t, error) },
+      { shouldFocus: true },
+    );
     return null;
   }
   return errorMessage(t, error);
 }
 
-const FIELD_OF_CODE: Record<string, 'name' | 'startDate' | 'renewalDate' | 'currency'> = {
+const FIELD_OF_CODE: Record<
+  string,
+  'name' | 'startDate' | 'renewalDate' | 'currency' | 'monthlyFeeMinor'
+> = {
   RETAINER_NAME_TAKEN: 'name',
   RETAINER_STARTED: 'startDate',
   INVALID_DATES: 'renewalDate',
+  RENEWAL_DATE_FROM_TERM: 'renewalDate',
   CURRENCY_LOCKED: 'currency',
+  FEE_CHANGE_NEEDS_AMENDMENT: 'monthlyFeeMinor',
 };
 
 /** R6 before the round trip: a renewal date, when set, comes after the start date. */
@@ -82,10 +91,11 @@ export function checkRenewal(
   renewal: string | null | undefined,
 ) {
   if (!renewal || renewal > start) return true;
-  form.setError('renewalDate', {
-    type: SCREEN_ERROR,
-    message: t('retainers.form.errors.renewalAfterStart'),
-  });
+  form.setError(
+    'renewalDate',
+    { type: SCREEN_ERROR, message: t('retainers.form.errors.renewalAfterStart') },
+    { shouldFocus: true },
+  );
   return false;
 }
 
@@ -145,7 +155,9 @@ export function NameField({ form }: { form: RetainerFormMethods }) {
         placeholder={t('retainers.form.namePlaceholder')}
         {...form.register('name')}
       />
-      <FieldError match={!!error}>{fieldError(error, t('projects.form.errors.name'))}</FieldError>
+      <FieldError match={!!error} role={errorRole(error)}>
+        {fieldError(error, t('projects.form.errors.name'))}
+      </FieldError>
     </Field>
   );
 }
@@ -205,11 +217,11 @@ export function DatesFields({
     <div className="grid gap-5 sm:grid-cols-2">
       <Field invalid={!!startError}>
         <FieldLabel>{t('retainers.form.startDate')}</FieldLabel>
-        <Input type="date" disabled={startLocked} {...form.register('startDate')} />
+        <Input type="date" dir="ltr" disabled={startLocked} {...form.register('startDate')} />
         <FieldDescription>
           {startLocked ? t('retainers.form.startLocked') : t('retainers.form.startHint')}
         </FieldDescription>
-        <FieldError match={!!startError}>
+        <FieldError match={!!startError} role={errorRole(startError)}>
           {fieldError(startError, t('projects.form.errors.date'))}
         </FieldError>
       </Field>
@@ -220,6 +232,7 @@ export function DatesFields({
         </FieldLabel>
         <Input
           type="date"
+          dir="ltr"
           min={start || undefined}
           disabled={renewalLocked}
           {...form.register('renewalDate', { setValueAs: (value: string | null) => value || null })}
@@ -227,7 +240,7 @@ export function DatesFields({
         <FieldDescription>
           {renewalLocked ? t('retainers.terms.renewalFromTerm') : t('retainers.form.renewalHint')}
         </FieldDescription>
-        <FieldError match={!!renewalError}>
+        <FieldError match={!!renewalError} role={errorRole(renewalError)}>
           {fieldError(renewalError, t('projects.form.errors.date'))}
         </FieldError>
       </Field>
@@ -235,18 +248,22 @@ export function DatesFields({
   );
 }
 
-/** The fee and every extra work estimate on the retainer use this currency (M2). */
+/**
+ * The fee and every extra work estimate on the retainer use this currency (M2). Both are `locked`
+ * once the retainer has a charge: the fee then changes through an amendment (F05B A9).
+ */
 export function MoneyFields({
   form,
-  currencyLocked = false,
+  locked = false,
 }: {
   form: RetainerFormMethods;
-  currencyLocked?: boolean;
+  locked?: boolean;
 }) {
   const { t } = useTranslation();
   const ids = { currency: useId(), fee: useId() };
   const currency = useWatch({ control: form.control, name: 'currency' }) ?? 'USD';
   const error = form.formState.errors.currency;
+  const feeError = form.formState.errors.monthlyFeeMinor;
   return (
     <div className="flex flex-col gap-5">
       <Field invalid={!!error}>
@@ -260,7 +277,7 @@ export function MoneyFields({
             <ToggleGroup
               aria-labelledby={ids.currency}
               value={[field.value ?? 'USD']}
-              disabled={currencyLocked}
+              disabled={locked}
               onValueChange={(next: Currency[]) => {
                 if (next[0]) field.onChange(next[0]);
               }}
@@ -277,11 +294,13 @@ export function MoneyFields({
           )}
         />
         <FieldDescription>
-          {currencyLocked ? t('projects.form.currencyLocked') : t('retainers.form.currencyHint')}
+          {locked ? t('projects.form.currencyLocked') : t('retainers.form.currencyHint')}
         </FieldDescription>
-        <FieldError match={!!error}>{fieldError(error, t('errors.CURRENCY_LOCKED'))}</FieldError>
+        <FieldError match={!!error} role={errorRole(error)}>
+          {fieldError(error, t('errors.CURRENCY_LOCKED'))}
+        </FieldError>
       </Field>
-      <Field>
+      <Field invalid={!!feeError}>
         <FieldLabel htmlFor={ids.fee}>
           {t('retainers.form.monthlyFee')}
           <span className="ms-1 font-normal text-muted-foreground">({t('common.optional')})</span>
@@ -291,15 +310,22 @@ export function MoneyFields({
           name="monthlyFeeMinor"
           render={({ field }) => (
             <MoneyInput
+              ref={field.ref}
               id={ids.fee}
               currency={currency}
+              disabled={locked}
               value={field.value}
               onValueChange={field.onChange}
               onBlur={field.onBlur}
             />
           )}
         />
-        <FieldDescription>{t('retainers.form.monthlyFeeHint')}</FieldDescription>
+        <FieldDescription>
+          {locked ? t('retainers.form.feeLocked') : t('retainers.form.monthlyFeeHint')}
+        </FieldDescription>
+        <FieldError match={!!feeError} role={errorRole(feeError)}>
+          {feeError?.message}
+        </FieldError>
       </Field>
     </div>
   );
@@ -376,9 +402,37 @@ export function DeliverablesEditor({ form }: { form: DeliverablesFormMethods }) 
     name: 'deliverables',
   });
   const lines = useWatch({ control: form.control, name: 'deliverables' }) ?? [];
+  const list = useRef<HTMLUListElement>(null);
+  const kindButtons = useRef<HTMLDivElement>(null);
+  const hintId = useId();
+  const errorId = useId();
   const full = fields.length >= RETAINER_LIMITS.deliverables;
   const total = lines.reduce((sum, line) => sum + (Number(line?.monthlyQuantity) || 0), 0);
   const add = (kind: DeliverableKind) => append({ kind, label: null, monthlyQuantity: 1 });
+
+  /** Removing a line: the focus goes to the next line's remove button, the previous one, or a kind. */
+  function removeRow(index: number) {
+    flushSync(() => remove(index));
+    focusAfterRemoval(
+      list.current,
+      index,
+      kindButtons.current?.querySelector<HTMLElement>('button:not(:disabled)') ?? null,
+    );
+  }
+
+  /**
+   * Moving a line keeps the focus on the button that moved it, in its new place; at the top or the
+   * bottom that button turns off, so the other direction's takes the focus.
+   */
+  function moveRow(from: number, to: number) {
+    flushSync(() => move(from, to));
+    const row = list.current?.children[to];
+    const [same, other] = to < from ? ['up', 'down'] : ['down', 'up'];
+    const button = (name: string) =>
+      row?.querySelector<HTMLButtonElement>(`[data-focus="${name}"]`);
+    const target = button(same);
+    (target && !target.disabled ? target : button(other))?.focus();
+  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -398,12 +452,13 @@ export function DeliverablesEditor({ form }: { form: DeliverablesFormMethods }) 
             <span>{t('retainers.lines.columns.quantity')}</span>
             <span>{t('retainers.lines.columns.revisionLimit')}</span>
           </div>
-          <ul aria-label={t('retainers.lines.title')} className="flex flex-col gap-3">
+          <ul ref={list} aria-label={t('retainers.lines.title')} className="flex flex-col gap-3">
             {fields.map((row, index) => {
               const errors = form.formState.errors.deliverables?.[index];
               const kind = lines[index]?.kind ?? row.kind;
               const position = index + 1;
               const name = lineName(t, { kind });
+              const named = { name, position: formatNumber(position) };
               return (
                 <li
                   key={row.id}
@@ -414,38 +469,36 @@ export function DeliverablesEditor({ form }: { form: DeliverablesFormMethods }) 
                       <DeliverableIcon kind={kind} />
                     </span>
                     <span className="flex-1 text-sm font-medium">{name}</span>
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
+                    <IconButton
+                      data-focus="up"
                       disabled={index === 0}
-                      aria-label={t('projects.milestones.moveUp')}
-                      onClick={() => move(index, index - 1)}
+                      label={t('retainers.lines.moveUp', named)}
+                      onClick={() => moveRow(index, index - 1)}
                     >
                       <ArrowUpIcon />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
+                    </IconButton>
+                    <IconButton
+                      data-focus="down"
                       disabled={index === fields.length - 1}
-                      aria-label={t('projects.milestones.moveDown')}
-                      onClick={() => move(index, index + 1)}
+                      label={t('retainers.lines.moveDown', named)}
+                      onClick={() => moveRow(index, index + 1)}
                     >
                       <ArrowDownIcon />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      aria-label={t('retainers.lines.remove', { name })}
-                      onClick={() => remove(index)}
+                    </IconButton>
+                    <IconButton
+                      data-focus="remove"
+                      label={t('retainers.lines.remove', named)}
+                      onClick={() => removeRow(index)}
                     >
                       <Trash2Icon />
-                    </Button>
+                    </IconButton>
                   </div>
                   <div className="grid grid-cols-[minmax(0,1fr)_6rem_6rem] items-start gap-3">
                     <div className="flex min-w-0 flex-col gap-1">
                       <Input
                         aria-label={t('retainers.lines.label', { position })}
                         aria-invalid={!!errors?.label || undefined}
+                        aria-describedby={errors?.label ? `${errorId}-label-${index}` : undefined}
                         autoComplete="off"
                         placeholder={
                           kind === 'other'
@@ -457,7 +510,11 @@ export function DeliverablesEditor({ form }: { form: DeliverablesFormMethods }) 
                         })}
                       />
                       {errors?.label && (
-                        <p className="text-sm text-destructive-text">
+                        <p
+                          id={`${errorId}-label-${index}`}
+                          role={errorRole(errors.label)}
+                          className="text-sm text-destructive-text"
+                        >
                           {fieldError(errors.label, t('retainers.lines.errors.label'))}
                         </p>
                       )}
@@ -470,13 +527,19 @@ export function DeliverablesEditor({ form }: { form: DeliverablesFormMethods }) 
                         max={999}
                         aria-label={t('retainers.lines.quantity', { position })}
                         aria-invalid={!!errors?.monthlyQuantity || undefined}
+                        aria-describedby={
+                          errors?.monthlyQuantity ? `${errorId}-quantity-${index}` : undefined
+                        }
                         className="text-end tabular-nums"
                         {...form.register(`deliverables.${index}.monthlyQuantity`, {
                           valueAsNumber: true,
                         })}
                       />
                       {errors?.monthlyQuantity && (
-                        <p className="text-sm text-destructive-text">
+                        <p
+                          id={`${errorId}-quantity-${index}`}
+                          className="text-sm text-destructive-text"
+                        >
                           {t('retainers.lines.errors.quantity')}
                         </p>
                       )}
@@ -489,8 +552,10 @@ export function DeliverablesEditor({ form }: { form: DeliverablesFormMethods }) 
                         max={RETAINER_LIMITS.revisionLimit}
                         aria-label={t('retainers.lines.revisionLimit', { position })}
                         aria-invalid={!!errors?.revisionLimit || undefined}
+                        aria-describedby={
+                          errors?.revisionLimit ? `${errorId}-revisions-${index} ${hintId}` : hintId
+                        }
                         placeholder={t('retainers.lines.revisionLimitPlaceholder')}
-                        title={t('retainers.lines.revisionLimitHint')}
                         className="text-end tabular-nums"
                         {...form.register(`deliverables.${index}.revisionLimit`, {
                           setValueAs: (value: string | number | null | undefined) =>
@@ -500,7 +565,10 @@ export function DeliverablesEditor({ form }: { form: DeliverablesFormMethods }) 
                         })}
                       />
                       {errors?.revisionLimit && (
-                        <p className="text-sm text-destructive-text">
+                        <p
+                          id={`${errorId}-revisions-${index}`}
+                          className="text-sm text-destructive-text"
+                        >
                           {t('retainers.lines.errors.revisionLimit', {
                             max: formatNumber(RETAINER_LIMITS.revisionLimit),
                           })}
@@ -512,12 +580,15 @@ export function DeliverablesEditor({ form }: { form: DeliverablesFormMethods }) 
               );
             })}
           </ul>
+          <p id={hintId} className="text-sm text-muted-foreground">
+            {t('retainers.lines.revisionLimitHint')}
+          </p>
         </div>
       )}
 
       <div className="flex flex-col gap-2">
         <p className="text-sm text-muted-foreground">{t('retainers.lines.addHint')}</p>
-        <div className="flex flex-wrap gap-2">
+        <div ref={kindButtons} className="flex flex-wrap gap-2">
           {DELIVERABLE_KINDS.map((kind) => (
             <Button
               key={kind}

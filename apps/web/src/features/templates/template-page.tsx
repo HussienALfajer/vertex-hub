@@ -16,6 +16,7 @@ import { FormAlert } from '../../components/form-alert';
 import { FormSection } from '../../components/form-section';
 import { isMissing, LoadError } from '../../components/load-error';
 import { UnsavedChangesGuard } from '../../components/unsaved-changes-guard';
+import { ApiError } from '../../lib/api/client';
 import { formatDateTime, formatList, formatNumber } from '../../lib/format';
 import { useDepartmentNames } from '../projects/project-badges';
 import { TemplateKindBadge } from './template-badges';
@@ -75,14 +76,7 @@ export function TemplatePage({ templateId }: { templateId: string }) {
 function TemplateHost({ template }: { template: TemplateDetail }) {
   const [base, setBase] = useState(template);
   if (base.archivedAt !== template.archivedAt) setBase(template);
-  return (
-    <Template
-      key={`${base.updatedAt}:${base.archivedAt ?? ''}`}
-      base={base}
-      template={template}
-      onLoad={setBase}
-    />
-  );
+  return <Template base={base} template={template} onLoad={setBase} />;
 }
 
 /** The template as one document: editors change it and save it whole, readers see it read-only. */
@@ -109,6 +103,13 @@ function Template({
   const dirty = form.formState.isDirty;
   // Later only: right after the own save, the cached template may still be the older one.
   const newer = template.updatedAt > base.updatedAt;
+
+  // A new starting version resets the form in place, so the focus stays where it is (the save
+  // button, the archive action).
+  useEffect(() => {
+    form.reset(templateFormValues(base));
+    setFailure(null);
+  }, [form, base]);
 
   // Nothing to lose: take the newer version at once.
   useEffect(() => {
@@ -177,7 +178,15 @@ function Template({
           title={t('templates.changedTitle')}
           description={t('templates.changedBody', { when: formatDateTime(template.updatedAt) })}
           action={
-            <Button variant="outline" size="sm" onClick={() => onLoad(template)}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                onLoad(template);
+                // The notice and this button leave: the form starts again from its first field.
+                form.setFocus('name');
+              }}
+            >
               {t('templates.loadLatest')}
             </Button>
           }
@@ -214,6 +223,7 @@ function Template({
               <Button
                 variant="outline"
                 disabled={!form.formState.isDirty || form.formState.isSubmitting}
+                focusableWhenDisabled
                 onClick={() => setConfirmDiscard(true)}
               >
                 {t('templates.discard')}
@@ -221,6 +231,7 @@ function Template({
               <Button
                 type="submit"
                 disabled={!form.formState.isDirty || form.formState.isSubmitting}
+                focusableWhenDisabled
               >
                 {form.formState.isSubmitting ? t('common.saving') : t('templates.save')}
               </Button>
@@ -325,6 +336,12 @@ function ArchiveDialogs({
         body={t('templates.restoreBody')}
         action={t('templates.restore')}
         pending={restore.isPending}
+        // The archived template cannot be renamed: the other one must be.
+        describeFailure={(error) =>
+          error instanceof ApiError && error.code === 'TEMPLATE_NAME_TAKEN'
+            ? t('templates.restoreNameTaken')
+            : undefined
+        }
         onConfirm={async () => {
           await restore.mutateAsync();
           toast.add({ title: t('templates.restoredToast'), type: 'success' });

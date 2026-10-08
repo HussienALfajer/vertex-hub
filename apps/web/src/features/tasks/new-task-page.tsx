@@ -26,6 +26,7 @@ import { useForm, useWatch } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { FormAlert } from '../../components/form-alert';
 import { FormSection } from '../../components/form-section';
+import { UnsavedChangesGuard } from '../../components/unsaved-changes-guard';
 import { useMe } from '../../lib/auth';
 import { SCREEN_ERROR } from '../../lib/errors';
 import { idParam, oneOfParam } from '../../lib/search-params';
@@ -114,6 +115,9 @@ export function NewTaskPage({ search }: { search: NewTaskSearch }) {
     control: form.control,
     name: ['department', 'clientId', 'type'],
   });
+  // The first field to fill: the department, or the title once it is preset (the assignee select
+  // stays off while the department's members load, so it cannot take the focus yet).
+  useEffect(() => form.setFocus(form.getValues('department') ? 'title' : 'department'), [form]);
   const client = clients.find((option) => option.id === clientId);
   const assignees = useAssigneeOptions(department ?? undefined, client?.accountManagerId ?? null);
   const clientScope = !!client && hasClientScope(me, client.accountManagerId);
@@ -146,10 +150,11 @@ export function NewTaskPage({ search }: { search: NewTaskSearch }) {
     setFailure(null);
     if (!checkDueDate(form, t, values.dueDate)) return;
     if (mode === 'assign' && !values.assigneeId) {
-      form.setError('assigneeId', {
-        type: SCREEN_ERROR,
-        message: t('tasks.form.errors.assignee'),
-      });
+      form.setError(
+        'assigneeId',
+        { type: SCREEN_ERROR, message: t('tasks.form.errors.assignee') },
+        { shouldFocus: true },
+      );
       return;
     }
     try {
@@ -235,6 +240,7 @@ export function NewTaskPage({ search }: { search: NewTaskSearch }) {
           </Button>
         </div>
       </form>
+      <UnsavedChangesGuard dirty={form.formState.isDirty && !form.formState.isSubmitting} />
     </>
   );
 }
@@ -285,7 +291,8 @@ function ClientRequestSwitch({
   const id = useId();
   return (
     <Field>
-      <label htmlFor={id} className="flex items-center justify-between gap-3">
+      {/* The switch stays beside its own label, not at the far end of the row. */}
+      <label htmlFor={id} className="flex items-center gap-3">
         <span className="text-sm font-medium">{t('tasks.form.clientRequest')}</span>
         <Switch id={id} checked={on && allowed} disabled={!allowed} onCheckedChange={onChange} />
       </label>

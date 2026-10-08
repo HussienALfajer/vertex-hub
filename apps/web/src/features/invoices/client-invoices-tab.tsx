@@ -184,11 +184,15 @@ function BillingDetails({ client }: { client: ClientDetailResponse }) {
   const { errors } = form.formState;
   const editable = client.canManage && client.archivedAt === null;
 
-  // Back to the latest saved details: after a save, `values` already holds the new ones.
   function close() {
     setOpen(false);
+  }
+
+  // Back to the latest saved details once it has faded out (after a save, `values` holds the new
+  // ones); without `keepDirtyValues`, which would keep the unsaved text for the next opening.
+  function closed() {
     setFailure(null);
-    form.reset();
+    form.reset(defaults, { keepDirtyValues: false });
   }
 
   const submit = form.handleSubmit(async (values) => {
@@ -237,6 +241,7 @@ function BillingDetails({ client }: { client: ClientDetailResponse }) {
       <FormDialog
         open={open}
         onClose={close}
+        onClosed={closed}
         submitting={form.formState.isSubmitting}
         title={t('invoices.client.billingTitle')}
         description={t('invoices.client.billingHint')}

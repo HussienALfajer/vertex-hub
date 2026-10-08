@@ -32,7 +32,7 @@ import {
   SearchIcon,
   UserRoundCheckIcon,
 } from 'lucide-react';
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LoadError } from '../../components/load-error';
 import { canAll, useMe } from '../../lib/auth';
@@ -41,7 +41,7 @@ import { ALL, flagParam, idParam, listParam, pageParam, textParam } from '../../
 import { usePageInRange } from '../../lib/use-page-in-range';
 import { useSearchText } from '../../lib/use-search-text';
 import { ClientStatusBadge, HealthcareBadge, NoApprovalContactBadge } from './client-badges';
-import { clientListQuery, sectorsQuery } from './clients.queries';
+import { clientListQuery, sectorsQuery, useClientAccountManagers } from './clients.queries';
 
 export interface ClientsSearch {
   search?: string;
@@ -184,26 +184,16 @@ function Filters({
 }) {
   const { t } = useTranslation();
   const me = useMe();
-  // The users list filters by role for user managers only, so the choices come from the clients
-  // every reader can list: the account managers they actually have.
-  const everyClient = useQuery(clientListQuery({ status: [...CLIENT_STATUSES], pageSize: 100 }));
+  const managers = useClientAccountManagers();
   const sectors = useQuery(sectorsQuery);
   const [text, setText] = useSearchText(search.search, onChange);
+  const searchField = useRef<HTMLInputElement>(null);
   const isAccountManager = me.roles.includes('account_manager');
   const mine = search.accountManagerId === me.user.id;
 
   const managerItems = [
     { value: ALL, label: t('clients.filters.allManagers') },
-    ...[
-      ...new Map(
-        (everyClient.data?.items ?? []).map(({ accountManager }) => [
-          accountManager.id,
-          accountManager.name,
-        ]),
-      ),
-    ]
-      .sort(([, a], [, b]) => a.localeCompare(b, 'ar'))
-      .map(([value, label]) => ({ value, label })),
+    ...managers.map(({ id, name }) => ({ value: id, label: name })),
   ];
   const sectorItems = [
     { value: ALL, label: t('clients.filters.allSectors') },
@@ -225,6 +215,7 @@ function Filters({
           />
           <Input
             type="search"
+            ref={searchField}
             value={text}
             onChange={(event) => setText(event.target.value)}
             placeholder={t('clients.search')}
@@ -301,15 +292,17 @@ function Filters({
             <Button
               variant="ghost"
               size="sm"
-              onClick={() =>
+              onClick={() => {
                 onChange({
                   search: undefined,
                   status: undefined,
                   accountManagerId: undefined,
                   sector: undefined,
                   healthcare: undefined,
-                })
-              }
+                });
+                // The button leaves with the filters: the focus goes to the search field.
+                searchField.current?.focus();
+              }}
             >
               <FilterXIcon />
               {t('clients.filters.clear')}
@@ -361,54 +354,58 @@ function ClientsTable({ clients, archived }: { clients: ClientResponse[]; archiv
         </TableRow>
       </TableHeader>
       <TableBody>
-        {clients.map((client) => (
-          <TableRow key={client.id}>
-            <TableCell className="whitespace-normal">
-              <Link
-                to="/clients/$clientId"
-                params={{ clientId: client.id }}
-                className="group flex items-center gap-3 rounded-md outline-offset-4"
-              >
-                <Avatar
-                  name={client.tradeName}
-                  shape="square"
-                  tone={archived || client.status === 'ended' ? 'muted' : 'brand'}
-                />
-                <span className="flex min-w-0 flex-col gap-1">
-                  <span className="font-medium group-hover:underline">{client.tradeName}</span>
-                  {(client.isHealthcare || !client.hasApprovalContact) && (
-                    <span className="flex flex-wrap gap-1">
-                      {client.isHealthcare && <HealthcareBadge />}
-                      {!client.hasApprovalContact && !archived && <NoApprovalContactBadge />}
-                    </span>
+        {clients.map((client) => {
+          // The approval warning is about live work: an archived client has none.
+          const noApproval = !client.hasApprovalContact && !archived;
+          return (
+            <TableRow key={client.id}>
+              <TableCell className="whitespace-normal">
+                <Link
+                  to="/clients/$clientId"
+                  params={{ clientId: client.id }}
+                  className="group flex items-center gap-3 rounded-md outline-offset-4"
+                >
+                  <Avatar
+                    name={client.tradeName}
+                    shape="square"
+                    tone={archived || client.status === 'ended' ? 'muted' : 'brand'}
+                  />
+                  <span className="flex min-w-0 flex-col gap-1">
+                    <span className="font-medium group-hover:underline">{client.tradeName}</span>
+                    {(client.isHealthcare || noApproval) && (
+                      <span className="flex flex-wrap gap-1">
+                        {client.isHealthcare && <HealthcareBadge />}
+                        {noApproval && <NoApprovalContactBadge />}
+                      </span>
+                    )}
+                  </span>
+                </Link>
+              </TableCell>
+              <TableCell>
+                {client.sector ?? <span className="text-muted-foreground">{t('common.none')}</span>}
+              </TableCell>
+              <TableCell>
+                <span className="flex items-center gap-2">
+                  <Avatar
+                    name={client.accountManager.name}
+                    size="sm"
+                    tone={client.accountManager.archived ? 'muted' : 'brand'}
+                  />
+                  <span>{client.accountManager.name}</span>
+                  {client.accountManager.archived && (
+                    <Badge tone="outline">{t('clients.archivedBadge')}</Badge>
                   )}
                 </span>
-              </Link>
-            </TableCell>
-            <TableCell>
-              {client.sector ?? <span className="text-muted-foreground">{t('common.none')}</span>}
-            </TableCell>
-            <TableCell>
-              <span className="flex items-center gap-2">
-                <Avatar
-                  name={client.accountManager.name}
-                  size="sm"
-                  tone={client.accountManager.archived ? 'muted' : 'brand'}
-                />
-                <span>{client.accountManager.name}</span>
-                {client.accountManager.archived && (
-                  <Badge tone="outline">{t('clients.archivedBadge')}</Badge>
-                )}
-              </span>
-            </TableCell>
-            <TableCell>
-              <span className="flex flex-wrap items-center gap-1.5">
-                <ClientStatusBadge status={client.status} />
-                {archived && <Badge tone="neutral">{t('clients.archivedBadge')}</Badge>}
-              </span>
-            </TableCell>
-          </TableRow>
-        ))}
+              </TableCell>
+              <TableCell>
+                <span className="flex flex-wrap items-center gap-1.5">
+                  <ClientStatusBadge status={client.status} />
+                  {archived && <Badge tone="neutral">{t('clients.archivedBadge')}</Badge>}
+                </span>
+              </TableCell>
+            </TableRow>
+          );
+        })}
       </TableBody>
     </Table>
   );

@@ -206,15 +206,33 @@ function KeyDateLink({
   );
 }
 
-/** An all-day chip: "Project due", "Milestone due" or "Renewal", then what it is about. */
-function KeyDateChip({ keyDate, me }: { keyDate: KeyDate; me: MeResponse }) {
+/**
+ * An all-day chip: "Project due", "Milestone due" or "Renewal", then what it is about. In a
+ * month cell (`compact`) the kind is its icon, named for assistive technology, so the title
+ * keeps the room.
+ */
+function KeyDateChip({
+  keyDate,
+  me,
+  compact,
+}: {
+  keyDate: KeyDate;
+  me: MeResponse;
+  compact?: boolean;
+}) {
   const { t } = useTranslation();
   const Icon = KEY_DATE_ICONS[keyDate.kind];
-  const body = (
+  const kind = t(`calendar.keyDates.${keyDate.kind}`);
+  const body = compact ? (
+    <>
+      <Icon role="img" aria-label={kind} className="size-3.5 shrink-0" />
+      <span className="truncate">{keyDate.title}</span>
+    </>
+  ) : (
     <>
       <Icon aria-hidden="true" className="size-3.5 shrink-0" />
       <span className="truncate">
-        {t(`calendar.keyDates.${keyDate.kind}`)}: {keyDate.title}
+        {kind}: {keyDate.title}
       </span>
     </>
   );
@@ -239,13 +257,13 @@ function KeyDateChip({ keyDate, me }: { keyDate: KeyDate; me: MeResponse }) {
 
 /**
  * An entry on a calendar day: a key date as a chip; a shoot or meeting as a card with its start
- * time first (a month cell has no room for the range; a long title is cut, never the time), its client, who leads or organizes it and the
- * conflict mark. Cancelled ones are dimmed.
+ * time first (a month cell has no room for the range; a long title is cut, never the time), its
+ * client, who leads or organizes it and the conflict mark. Cancelled ones are dimmed.
  */
 export function EntryCard({ entry, me }: { entry: CalendarEntry; me: MeResponse }) {
   const { t } = useTranslation();
   const clientLabel = useClientLabel();
-  if (entry.kind === 'keyDate') return <KeyDateChip keyDate={entry.keyDate} me={me} />;
+  if (entry.kind === 'keyDate') return <KeyDateChip keyDate={entry.keyDate} me={me} compact />;
   if (entry.kind === 'meeting') {
     const { meeting } = entry;
     const cancelled = meeting.status === 'cancelled';

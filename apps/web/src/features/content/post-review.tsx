@@ -23,7 +23,7 @@ import {
   Textarea,
   toast,
 } from '@vertex-hub/ui';
-import { useId, useState } from 'react';
+import { type ComponentProps, useId, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { FormAlert } from '../../components/form-alert';
@@ -106,11 +106,15 @@ export type MedicalDecision = MedicalReview['decision'];
 export function PostMedicalReviewDialog({
   post,
   decision,
+  open,
   onClose,
+  finalFocus,
 }: {
   post: PostDetail;
   decision: MedicalDecision;
+  open: boolean;
   onClose: () => void;
+  finalFocus: ComponentProps<typeof DialogContent>['finalFocus'];
 }) {
   const { t } = useTranslation();
   const id = useId();
@@ -141,8 +145,17 @@ export function PostMedicalReviewDialog({
     }
   });
   return (
-    <Dialog open onOpenChange={(next) => !next && onClose()}>
-      <DialogContent closeLabel={t('common.close')}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => !next && onClose()}
+      // After the exit animation, so the note does not empty while the dialog fades.
+      onOpenChangeComplete={(next) => {
+        if (next) return;
+        form.reset();
+        setFailure(null);
+      }}
+    >
+      <DialogContent closeLabel={t('common.close')} finalFocus={finalFocus}>
         <form className="grid gap-5" onSubmit={submit} noValidate>
           <DialogHeader>
             <DialogTitle>

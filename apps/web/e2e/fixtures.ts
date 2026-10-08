@@ -1250,6 +1250,16 @@ export async function mockApi(page: Page, options: MockOptions): Promise<MockedA
       signedIn = false;
       return json(route, { success: true });
     }
+    if (path === '/api/password-links/check') {
+      const { token } = request.postDataJSON() as { token: string };
+      return token === VALID_LINK_TOKEN
+        ? json(route, {
+            kind: 'activation',
+            email: manager.user.email,
+            expiresAt: '2026-01-04T10:00:00.000Z',
+          })
+        : fail(route, 400, 'LINK_INVALID');
+    }
     if (path === '/api/password-links/redeem') {
       const { token } = request.postDataJSON() as { token: string };
       return token === VALID_LINK_TOKEN

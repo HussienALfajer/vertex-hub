@@ -19,7 +19,16 @@ import {
  * Tasks as compact rows: title with where it belongs, then status, priority, due date and the
  * signals that need attention (overdue, blocked, over the revision limit).
  */
-export function TaskRows({ tasks, showAssignee }: { tasks: Task[]; showAssignee?: boolean }) {
+export function TaskRows({
+  tasks,
+  showAssignee,
+  inEngagement,
+}: {
+  tasks: Task[];
+  showAssignee?: boolean;
+  /** Rows on a project's page, grouped by milestone: only the department says where they belong. */
+  inEngagement?: boolean;
+}) {
   const { t } = useTranslation();
   const engagementOf = useEngagementLabel();
   const departmentName = useDepartmentNames();
@@ -45,8 +54,8 @@ export function TaskRows({ tasks, showAssignee }: { tasks: Task[]; showAssignee?
               </Link>
               <span className="truncate text-xs text-muted-foreground">
                 {[
-                  task.client?.name ?? t('tasks.internal'),
-                  engagement,
+                  !inEngagement && (task.client?.name ?? t('tasks.internal')),
+                  !inEngagement && engagement,
                   departmentName(task.department),
                 ]
                   .filter(Boolean)

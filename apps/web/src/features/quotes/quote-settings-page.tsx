@@ -39,9 +39,9 @@ export function QuoteSettingsPage() {
   return (
     <>
       <div>
-        <Button variant="ghost" size="sm" render={<Link to="/quotes" />}>
+        <Button variant="ghost" size="sm" render={<Link to="/catalog" />}>
           <ArrowRightIcon className="ltr:-scale-x-100" />
-          {t('quotes.back')}
+          {t('quotes.settings.back')}
         </Button>
       </div>
       <PageHeader title={t('quotes.settings.title')} description={t('quotes.settings.subtitle')} />
@@ -53,11 +53,18 @@ export function QuoteSettingsPage() {
       ) : settings.isError ? (
         <LoadError message={t('quotes.settings.loadError')} onRetry={() => settings.refetch()} />
       ) : (
-        <SettingsForm key={settings.data.updatedAt} settings={settings.data} />
+        <SettingsForm settings={settings.data} />
       )}
     </>
   );
 }
+
+const fieldsOf = (settings: QuoteSettings): UpdateQuoteSettings => ({
+  companyDetails: settings.companyDetails,
+  defaultTerms: settings.defaultTerms,
+  defaultValidityDays: settings.defaultValidityDays,
+  discountThresholdPercent: settings.discountThresholdPercent,
+});
 
 function SettingsForm({ settings }: { settings: QuoteSettings }) {
   const { t } = useTranslation();
@@ -65,12 +72,9 @@ function SettingsForm({ settings }: { settings: QuoteSettings }) {
   const [failure, setFailure] = useState<string | null>(null);
   const form = useForm<UpdateQuoteSettings>({
     resolver: standardSchemaResolver(updateQuoteSettingsSchema),
-    defaultValues: {
-      companyDetails: settings.companyDetails,
-      defaultTerms: settings.defaultTerms,
-      defaultValidityDays: settings.defaultValidityDays,
-      discountThresholdPercent: settings.discountThresholdPercent,
-    },
+    // A refetch (another manager saved) keeps what this user already changed.
+    resetOptions: { keepDirtyValues: true },
+    values: fieldsOf(settings),
   });
   const { errors, isDirty, isSubmitting } = form.formState;
   const readOnly = !settings.canEdit && !settings.canEditThreshold;
@@ -89,7 +93,9 @@ function SettingsForm({ settings }: { settings: QuoteSettings }) {
       }),
     };
     try {
-      await update.mutateAsync(input);
+      // The saved values, trimmed by the API, become the form's clean state; the focus stays put.
+      // `reset` would otherwise apply `keepDirtyValues` too and keep the text as typed.
+      form.reset(fieldsOf(await update.mutateAsync(input)), { keepDirtyValues: false });
       toast.add({ title: t('quotes.settings.saved'), type: 'success' });
     } catch (error) {
       setFailure(errorMessage(t, error));
@@ -108,7 +114,14 @@ function SettingsForm({ settings }: { settings: QuoteSettings }) {
       <FormSection title={t('quotes.settings.printed')} hint={t('quotes.settings.printedHint')}>
         <Field invalid={!!errors.companyDetails}>
           <FieldLabel>{t('quotes.settings.companyDetails')}</FieldLabel>
-          <Textarea rows={5} readOnly={!settings.canEdit} {...form.register('companyDetails')} />
+          {/* One item per line, Arabic or not: each line takes its own direction (a phone
+              `+963 …` would otherwise read backwards). */}
+          <Textarea
+            rows={5}
+            readOnly={!settings.canEdit}
+            className="[unicode-bidi:plaintext]"
+            {...form.register('companyDetails')}
+          />
           <FieldDescription>{t('quotes.settings.companyDetailsHint')}</FieldDescription>
           <FieldError match={!!errors.companyDetails}>
             {t('quotes.settings.errors.companyDetails')}
@@ -177,7 +190,8 @@ function SettingsForm({ settings }: { settings: QuoteSettings }) {
             {isDirty && (
               <p className="me-auto text-sm text-muted-foreground">{t('quotes.builder.unsaved')}</p>
             )}
-            <Button type="submit" disabled={!isDirty || isSubmitting}>
+            {/* Focusable while disabled, so saving does not drop the focus. */}
+            <Button type="submit" disabled={!isDirty || isSubmitting} focusableWhenDisabled>
               {isSubmitting ? t('common.saving') : t('common.save')}
             </Button>
           </div>

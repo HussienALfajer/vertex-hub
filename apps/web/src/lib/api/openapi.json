@@ -733,6 +733,47 @@
         ]
       }
     },
+    "/api/password-links/check": {
+      "post": {
+        "operationId": "PasswordLinksController_check",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CheckLink"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The link works",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LinkInfo"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "LINK_INVALID: unknown, used, expired or replaced link",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
     "/api/password-links/redeem": {
       "post": {
         "operationId": "PasswordLinksController_redeem",
@@ -1856,9 +1897,7 @@
             "required": false,
             "in": "query",
             "schema": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 100
+              "type": "string"
             }
           },
           {
@@ -13974,6 +14013,12 @@
         "responses": {
           "200": {
             "description": "The productivity report as an Excel file (rule 24)"
+          },
+          "400": {
+            "description": "`INVALID_DATES`: to before from, or over 366 days"
+          },
+          "403": {
+            "description": "A department outside your `reports.read` scope"
           }
         },
         "tags": [
@@ -14054,6 +14099,9 @@
         "responses": {
           "200": {
             "description": "The revenue report as an Excel file with three sheets (rule 15)"
+          },
+          "400": {
+            "description": "`INVALID_DATES`: to before from, or over 366 days"
           }
         },
         "tags": [
@@ -14212,6 +14260,12 @@
         "responses": {
           "200": {
             "description": "The report as an Excel file (rule 24)"
+          },
+          "400": {
+            "description": "`INVALID_MONTH`: a month after the current one"
+          },
+          "404": {
+            "description": "No such client in your `reports.read` scope"
           }
         },
         "tags": [
@@ -14297,6 +14351,12 @@
                 }
               }
             }
+          },
+          "400": {
+            "description": "`INVALID_MONTH`: a month after the current one"
+          },
+          "404": {
+            "description": "No such client in your `reports.read` scope"
           }
         },
         "tags": [
@@ -14527,6 +14587,7 @@
           "user.two_factor_enabled",
           "user.two_factor_disabled",
           "user.two_factor_reset",
+          "user.backup_codes_regenerated",
           "user.profile_updated",
           "department.updated",
           "client.created",
@@ -15496,9 +15557,7 @@
             "maxLength": 100
           },
           "email": {
-            "type": "string",
-            "format": "email",
-            "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+            "type": "string"
           },
           "primaryDepartmentId": {
             "type": "string",
@@ -15595,9 +15654,7 @@
             "maxLength": 100
           },
           "email": {
-            "type": "string",
-            "format": "email",
-            "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+            "type": "string"
           },
           "primaryDepartmentId": {
             "type": "string",
@@ -15803,24 +15860,46 @@
           }
         }
       },
-      "RedeemLink": {
+      "CheckLink": {
         "type": "object",
         "properties": {
           "token": {
             "type": "string",
             "minLength": 1,
             "maxLength": 200
-          },
-          "password": {
-            "type": "string",
-            "minLength": 12,
-            "maxLength": 128
           }
         },
         "required": [
-          "token",
-          "password"
+          "token"
         ]
+      },
+      "LinkInfo": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "activation",
+              "reset"
+            ]
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+          }
+        },
+        "required": [
+          "kind",
+          "expiresAt",
+          "email"
+        ],
+        "additionalProperties": false
       },
       "ErrorResponse": {
         "type": "object",
@@ -15843,6 +15922,25 @@
         ],
         "additionalProperties": false,
         "description": "An error; `code` tells errors apart"
+      },
+      "RedeemLink": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "password": {
+            "type": "string",
+            "minLength": 12,
+            "maxLength": 128
+          }
+        },
+        "required": [
+          "token",
+          "password"
+        ]
       },
       "RequestPasswordLink": {
         "type": "object",
@@ -24499,9 +24597,7 @@
         "type": "object",
         "properties": {
           "tradeName": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 120
+            "type": "string"
           },
           "sector": {
             "nullable": true,
@@ -24535,9 +24631,7 @@
         "type": "object",
         "properties": {
           "tradeName": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 120
+            "type": "string"
           },
           "sector": {
             "nullable": true,
@@ -24617,7 +24711,6 @@
             }
           },
           "files": {
-            "default": [],
             "maxItems": 30,
             "type": "array",
             "items": {
@@ -40601,9 +40694,7 @@
                 "type": "object",
                 "properties": {
                   "tradeName": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 120
+                    "type": "string"
                   },
                   "sector": {
                     "nullable": true,

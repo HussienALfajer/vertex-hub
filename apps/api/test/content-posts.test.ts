@@ -447,6 +447,18 @@ describe('content posts (F08 rules 1–5, 16, 28)', () => {
         (await client.post(`${posts}/${randomUUID()}/duplicate`, cast.gm.cookie, {})).status,
       ).toBe(404);
     });
+
+    it('refuses a copy dated in the past, given or kept from the source', async () => {
+      const source = await cast.createPost(cast.writer.cookie, { clientId });
+      const yesterday = addDays(businessDate(), -1);
+      const duplicate = (body: object) =>
+        client.post(`${posts}/${source.id}/duplicate`, cast.am.cookie, body);
+      await expectError(await duplicate({ publishDate: yesterday }), 400, 'INVALID_DATES');
+
+      expect((await patch(source.id, cast.am.cookie, { publishDate: yesterday })).status).toBe(200);
+      await expectError(await duplicate({}), 400, 'INVALID_DATES');
+      expect((await duplicate({ publishDate: cast.inDays(2) })).status).toBe(201);
+    });
   });
 
   describe('archive and restore', () => {

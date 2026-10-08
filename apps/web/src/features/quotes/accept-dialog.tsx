@@ -40,13 +40,22 @@ import {
   toast,
 } from '@vertex-hub/ui';
 import { TriangleAlertIcon } from 'lucide-react';
-import { type ReactNode, useEffect, useId, useRef, useState } from 'react';
+import {
+  type ComponentProps,
+  type ReactNode,
+  type RefObject,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+} from 'react';
 import { Controller, type FieldPath, type UseFormReturn, useForm, useWatch } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { FormAlert } from '../../components/form-alert';
 import { LoadError } from '../../components/load-error';
 import { ApiError } from '../../lib/api/client';
 import { errorMessage, fieldError, SCREEN_ERROR } from '../../lib/errors';
+import { focusFirstInvalid } from '../../lib/focus-first-invalid';
 import { formatCalendarDate, formatMonth, formatNumber } from '../../lib/format';
 import { clientQuery } from '../clients/clients.queries';
 import { departmentListQuery } from '../departments/departments.queries';
@@ -222,21 +231,24 @@ export function AcceptDialog({
   quote,
   open,
   onClose,
+  finalFocus,
 }: {
   quote: QuoteDetail;
   open: boolean;
   onClose: () => void;
+  /** Where the focus goes when it closes: the button that opened it, or the page heading. */
+  finalFocus?: ComponentProps<typeof DialogContent>['finalFocus'];
 }) {
   const { t } = useTranslation();
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
-      <DialogContent closeLabel={t('common.close')} className="max-w-3xl">
+      <DialogContent closeLabel={t('common.close')} className="max-w-3xl" finalFocus={finalFocus}>
         <DialogHeader>
           <DialogTitle>{t('quotes.accept.title', { number: quote.displayNumber })}</DialogTitle>
           <DialogDescription>{t('quotes.accept.hint')}</DialogDescription>
         </DialogHeader>
-        {/* Mounted while open: closing starts the next acceptance afresh. */}
-        {open && <AcceptFlow quote={quote} onClose={onClose} />}
+        {/* Unmounted once the dialog has faded out: each acceptance starts afresh. */}
+        <AcceptFlow quote={quote} onClose={onClose} />
       </DialogContent>
     </Dialog>
   );
@@ -322,6 +334,24 @@ function AcceptSteps({
   ];
   const [step, setStep] = useState<Step>(plan.conversion ? 'client' : 'response');
   const index = steps.indexOf(step);
+
+  // After each move between steps the focus goes to the new step's label; after a failed check,
+  // to the first field to fix.
+  const container = useRef<HTMLDivElement>(null);
+  const stepLabel = useRef<HTMLParagraphElement>(null);
+  const focusOn = useRef<'step' | 'invalid' | null>(null);
+  const [moves, setMoves] = useState(0);
+  const moveFocus = (target: 'step' | 'invalid') => {
+    focusOn.current = target;
+    setMoves((count) => count + 1);
+  };
+  useEffect(() => {
+    if (moves === 0) return;
+    const target = focusOn.current;
+    focusOn.current = null;
+    if (target === 'step') stepLabel.current?.focus();
+    else if (target === 'invalid') focusFirstInvalid(container.current);
+  }, [moves]);
 
   // Dates the user typed stay; the rest follows the plan of the current choices (A2, A3, A5).
   const edited = useRef({
@@ -430,7 +460,10 @@ function AcceptSteps({
   }
 
   function next() {
-    if (!check(step)) return;
+    if (!check(step)) {
+      moveFocus('invalid');
+      return;
+    }
     // A2: the project manager defaults to the account manager of the client step 0 creates or
     // links, until the user picks one.
     if (step === 'client' && conversion && !edited.current.projectManager) {
@@ -441,12 +474,14 @@ function AcceptSteps({
       if (manager) form.setValue('project.projectManagerId', manager);
     }
     setStep(steps[index + 1] ?? 'summary');
+    moveFocus('step');
   }
 
   function back() {
     form.clearErrors();
     setFailure(null);
     setStep(steps[index - 1] ?? steps[0] ?? 'response');
+    moveFocus('step');
   }
 
   async function submit() {
@@ -476,6 +511,7 @@ function AcceptSteps({
       if (field) {
         setConversionIssues(field);
         setStep('client');
+        moveFocus('invalid');
         return;
       }
       setFailure(errorMessage(t, error));
@@ -483,8 +519,8 @@ function AcceptSteps({
   }
 
   return (
-    <div className="grid gap-5">
-      <Stepper steps={steps} current={step} />
+    <div ref={container} className="grid gap-5">
+      <Stepper steps={steps} current={step} label={stepLabel} />
       {step === 'client' && plan.conversion && conversion && (
         <ConversionFields
           plan={plan.conversion}
@@ -566,13 +602,21 @@ function AcceptSteps({
 }
 
 /** The steps drawn as rising bars, like the strokes of the mark (as in two-factor setup). */
-function Stepper({ steps, current }: { steps: Step[]; current: Step }) {
+function Stepper({
+  steps,
+  current,
+  label,
+}: {
+  steps: Step[];
+  current: Step;
+  label: RefObject<HTMLParagraphElement | null>;
+}) {
   const { t } = useTranslation();
   const index = steps.indexOf(current);
   const heights = ['h-1.5', 'h-2', 'h-2.5', 'h-3'];
   return (
     <div className="flex flex-col gap-2">
-      <p className="text-sm text-muted-foreground">
+      <p ref={label} tabIndex={-1} className="text-sm text-muted-foreground outline-none">
         {t('quotes.accept.stepOf', {
           step: formatNumber(index + 1),
           total: formatNumber(steps.length),
@@ -625,6 +669,7 @@ function ResponseStep({
           <Input
             id={ids.date}
             type="date"
+            dir="ltr"
             min={plan.sentOn}
             max={businessDate()}
             {...form.register('respondedOn')}
@@ -777,7 +822,7 @@ function ProjectStep({
         <div className="grid gap-5 sm:grid-cols-2">
           <Field invalid={!!errors?.startDate}>
             <FieldLabel htmlFor={ids.start}>{t('projects.form.startDate')}</FieldLabel>
-            <Input id={ids.start} type="date" {...form.register('project.startDate')} />
+            <Input id={ids.start} type="date" dir="ltr" {...form.register('project.startDate')} />
             <FieldError match={!!errors?.startDate}>{t('projects.form.errors.date')}</FieldError>
           </Field>
           <Field invalid={!!errors?.dueDate}>
@@ -785,6 +830,7 @@ function ProjectStep({
             <Input
               id={ids.due}
               type="date"
+              dir="ltr"
               {...form.register('project.dueDate', { onChange: () => onEdited('dueDate') })}
             />
             <FieldDescription>{t('quotes.accept.project.dueHint')}</FieldDescription>
@@ -1090,7 +1136,12 @@ function RetainerStep({
           <div className="grid gap-5 sm:grid-cols-2">
             <Field invalid={!!errors?.startDate}>
               <FieldLabel htmlFor={ids.start}>{t('retainers.form.startDate')}</FieldLabel>
-              <Input id={ids.start} type="date" {...form.register('retainer.startDate')} />
+              <Input
+                id={ids.start}
+                type="date"
+                dir="ltr"
+                {...form.register('retainer.startDate')}
+              />
               <FieldDescription>{t('quotes.accept.retainer.startHint')}</FieldDescription>
               <FieldError match={!!errors?.startDate}>{t('projects.form.errors.date')}</FieldError>
             </Field>
@@ -1099,6 +1150,7 @@ function RetainerStep({
               <Input
                 id={ids.renewal}
                 type="date"
+                dir="ltr"
                 disabled={term !== null}
                 {...form.register('retainer.renewalDate', { onChange: onRenewalEdited })}
               />
@@ -1269,8 +1321,10 @@ function Summary({
         <Fact label={t('quotes.response.respondedOn')}>
           {formatCalendarDate(values.respondedOn)}
         </Fact>
-        {values.note.trim() && <Fact label={t('quotes.response.note')}>{values.note.trim()}</Fact>}
-        {proof && <Fact label={t('quotes.accept.proof.label')}>{proof.file.name}</Fact>}
+        {values.note.trim() && (
+          <Fact label={t('quotes.accept.summary.note')}>{values.note.trim()}</Fact>
+        )}
+        {proof && <Fact label={t('quotes.accept.summary.proof')}>{proof.file.name}</Fact>}
       </SummaryBlock>
       {plan.project && (
         <SummaryBlock title={t('quotes.accept.summary.project', { name: values.project.name })}>

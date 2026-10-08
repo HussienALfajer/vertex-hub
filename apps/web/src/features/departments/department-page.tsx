@@ -16,6 +16,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
   EmptyState,
   Field,
   FieldError,
@@ -31,13 +32,14 @@ import {
   toast,
 } from '@vertex-hub/ui';
 import { ArrowRightIcon, PencilIcon, UserCogIcon, UsersIcon } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { type FormEvent, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { FormAlert } from '../../components/form-alert';
 import { isMissing, LoadError } from '../../components/load-error';
+import { ApiError } from '../../lib/api/client';
 import { can, useMe } from '../../lib/auth';
-import { errorMessage } from '../../lib/errors';
+import { errorMessage, errorRole, type Failure, fieldError, SCREEN_ERROR } from '../../lib/errors';
 import { formatNumber } from '../../lib/format';
 import { capabilityKey } from './capabilities';
 import { departmentQuery, useUpdateDepartment } from './departments.queries';
@@ -80,24 +82,15 @@ export function DepartmentPage({ departmentId }: { departmentId: string }) {
 
 function Department({ department }: { department: DepartmentDetailResponse }) {
   const { t } = useTranslation();
-  const me = useMe();
-  const manager = can(me, 'users.manage');
+  const canManage = can(useMe(), 'users.manage');
   const capability = capabilityKey(department.code);
-  const [editing, setEditing] = useState<'name' | 'manager' | null>(null);
 
   return (
     <>
       <PageHeader
         title={department.name}
         description={capability ? t(capability) : undefined}
-        actions={
-          manager && (
-            <Button variant="outline" onClick={() => setEditing('name')}>
-              <PencilIcon />
-              {t('departments.detail.rename')}
-            </Button>
-          )
-        }
+        actions={canManage && <RenameDialog department={department} />}
       />
       <div className="grid items-start gap-6 lg:grid-cols-3">
         <Card>
@@ -108,28 +101,19 @@ function Department({ department }: { department: DepartmentDetailResponse }) {
             <Link
               to="/team/$userId"
               params={{ userId: department.manager.id }}
-              className="group flex items-center gap-3"
+              className="group flex min-w-0 items-center gap-3"
             >
               <Avatar name={department.manager.name} size="lg" />
-              <span className="text-lg font-bold group-hover:underline">
+              <span className="min-w-0 text-lg font-bold wrap-anywhere group-hover:underline">
                 {department.manager.name}
               </span>
             </Link>
           ) : (
             <p className="text-muted-foreground">
-              {manager ? t('departments.detail.noManagerHint') : t('departments.noManager')}
+              {canManage ? t('departments.detail.noManagerHint') : t('departments.noManager')}
             </p>
           )}
-          {manager && (
-            <Button
-              variant="secondary"
-              className="self-start"
-              onClick={() => setEditing('manager')}
-            >
-              <UserCogIcon />
-              {t('departments.detail.changeManager')}
-            </Button>
-          )}
+          {canManage && <ManagerDialog department={department} />}
         </Card>
 
         <Card className="lg:col-span-2">
@@ -143,7 +127,7 @@ function Department({ department }: { department: DepartmentDetailResponse }) {
             <EmptyState
               icon={<UsersIcon />}
               title={t('departments.detail.noMembers')}
-              description={manager ? t('departments.detail.noMembersHint') : undefined}
+              description={canManage ? t('departments.detail.noMembersHint') : undefined}
               className="py-8"
             />
           ) : (
@@ -182,35 +166,37 @@ function Department({ department }: { department: DepartmentDetailResponse }) {
           )}
         </Card>
       </div>
-
-      {manager && (
-        <>
-          <RenameDialog
-            department={department}
-            open={editing === 'name'}
-            onClose={() => setEditing(null)}
-          />
-          <ManagerDialog
-            department={department}
-            open={editing === 'manager'}
-            onClose={() => setEditing(null)}
-          />
-        </>
-      )}
     </>
+  );
+}
+
+// Each dialog owns its trigger, so closing it puts the focus back on the button that opened it,
+// and its form mounts on every opening, so it starts from the saved department.
+
+function RenameDialog({ department }: { department: DepartmentDetailResponse }) {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger render={<Button variant="outline" />}>
+        <PencilIcon />
+        {t('departments.detail.rename')}
+      </DialogTrigger>
+      <DialogContent closeLabel={t('common.close')}>
+        <RenameForm department={department} onDone={() => setOpen(false)} />
+      </DialogContent>
+    </Dialog>
   );
 }
 
 const renameSchema = updateDepartmentSchema.pick({ name: true }).required();
 
-function RenameDialog({
+function RenameForm({
   department,
-  open,
-  onClose,
+  onDone,
 }: {
   department: DepartmentDetailResponse;
-  open: boolean;
-  onClose: () => void;
+  onDone: () => void;
 }) {
   const { t } = useTranslation();
   const update = useUpdateDepartment(department.id);
@@ -218,57 +204,68 @@ function RenameDialog({
   const {
     register,
     handleSubmit,
-    reset,
+    setError,
     formState: { errors, isSubmitting },
   } = useForm({
     resolver: standardSchemaResolver(renameSchema),
-    // A refetch keeps what the user already changed.
-    resetOptions: { keepDirtyValues: true },
-    values: { name: department.name },
+    defaultValues: { name: department.name },
   });
 
   const submit = handleSubmit(async ({ name }) => {
     setFailure(null);
+    if (name === department.name) return onDone();
     try {
       await update.mutateAsync({ name });
       toast.add({ title: t('departments.detail.saved'), type: 'success' });
-      onClose();
+      onDone();
     } catch (error) {
-      setFailure(errorMessage(t, error));
+      // A taken name belongs to the field: mark it and put the cursor back there.
+      if (error instanceof ApiError && error.code === 'DEPARTMENT_NAME_TAKEN') {
+        setError(
+          'name',
+          { type: SCREEN_ERROR, message: errorMessage(t, error) },
+          { shouldFocus: true },
+        );
+      } else setFailure(errorMessage(t, error));
     }
   });
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(next) => {
-        if (!next) {
-          reset();
-          setFailure(null);
-          onClose();
-        }
-      }}
-    >
+    <form className="grid gap-4" onSubmit={submit} noValidate>
+      <DialogHeader>
+        <DialogTitle>{t('departments.detail.renameTitle')}</DialogTitle>
+      </DialogHeader>
+      <Field invalid={!!errors.name}>
+        <FieldLabel>{t('departments.detail.name')}</FieldLabel>
+        <Input autoFocus autoComplete="off" {...register('name')} />
+        <FieldError match={!!errors.name} role={errorRole(errors.name)}>
+          {fieldError(errors.name, t('departments.detail.nameError'))}
+        </FieldError>
+      </Field>
+      {failure && <FormAlert>{failure}</FormAlert>}
+      <DialogFooter>
+        <DialogClose render={<Button variant="outline" type="button" />}>
+          {t('common.cancel')}
+        </DialogClose>
+        <Button type="submit" disabled={isSubmitting}>
+          {isSubmitting ? t('common.saving') : t('common.save')}
+        </Button>
+      </DialogFooter>
+    </form>
+  );
+}
+
+function ManagerDialog({ department }: { department: DepartmentDetailResponse }) {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger render={<Button variant="secondary" className="self-start" />}>
+        <UserCogIcon />
+        {t('departments.detail.changeManager')}
+      </DialogTrigger>
       <DialogContent closeLabel={t('common.close')}>
-        <form className="grid gap-4" onSubmit={submit} noValidate>
-          <DialogHeader>
-            <DialogTitle>{t('departments.detail.renameTitle')}</DialogTitle>
-          </DialogHeader>
-          <Field invalid={!!errors.name}>
-            <FieldLabel>{t('departments.detail.name')}</FieldLabel>
-            <Input autoFocus {...register('name')} />
-            <FieldError match={!!errors.name}>{t('departments.detail.nameError')}</FieldError>
-          </Field>
-          {failure && <FormAlert>{failure}</FormAlert>}
-          <DialogFooter>
-            <DialogClose render={<Button variant="outline" type="button" />}>
-              {t('common.cancel')}
-            </DialogClose>
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? t('common.saving') : t('common.save')}
-            </Button>
-          </DialogFooter>
-        </form>
+        <ManagerForm department={department} onDone={() => setOpen(false)} />
       </DialogContent>
     </Dialog>
   );
@@ -276,25 +273,19 @@ function RenameDialog({
 
 const NO_MANAGER = 'none';
 
-function ManagerDialog({
+function ManagerForm({
   department,
-  open,
-  onClose,
+  onDone,
 }: {
   department: DepartmentDetailResponse;
-  open: boolean;
-  onClose: () => void;
+  onDone: () => void;
 }) {
   const { t } = useTranslation();
   const update = useUpdateDepartment(department.id);
-  const currentManager = department.manager?.id ?? NO_MANAGER;
-  const [choice, setChoice] = useState(currentManager);
-  const [failure, setFailure] = useState<string | null>(null);
-
-  // Start from the current manager each time the dialog opens.
-  useEffect(() => {
-    if (open) setChoice(currentManager);
-  }, [open, currentManager]);
+  const current = department.manager?.id ?? NO_MANAGER;
+  const [choice, setChoice] = useState(current);
+  const [failure, setFailure] = useState<Failure | null>(null);
+  const picker = useRef<HTMLButtonElement>(null);
   // Only active members can manage (F01 rule 8).
   const items = [
     { value: NO_MANAGER, label: t('departments.detail.noManagerOption') },
@@ -303,61 +294,61 @@ function ManagerDialog({
       .map((member) => ({ value: member.id, label: member.name })),
   ];
 
-  async function save() {
+  async function save(event: FormEvent) {
+    event.preventDefault();
     setFailure(null);
+    if (choice === current) return onDone();
     try {
       await update.mutateAsync({ managerId: choice === NO_MANAGER ? null : choice });
       toast.add({ title: t('departments.detail.saved'), type: 'success' });
-      onClose();
+      onDone();
     } catch (error) {
-      setFailure(errorMessage(t, error));
+      // The chosen member left or was archived meanwhile: that is the picker's error.
+      const field = error instanceof ApiError && error.code === 'MANAGER_NOT_MEMBER';
+      setFailure({ message: errorMessage(t, error), field });
+      if (field) picker.current?.focus();
     }
   }
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(next) => {
-        if (!next) {
-          setFailure(null);
-          onClose();
-        }
-      }}
-    >
-      <DialogContent closeLabel={t('common.close')}>
-        <DialogHeader>
-          <DialogTitle>
-            {t('departments.detail.changeManagerTitle', { name: department.name })}
-          </DialogTitle>
-          <DialogDescription>{t('departments.detail.managerHint')}</DialogDescription>
-        </DialogHeader>
-        <Field>
-          <FieldLabel>{t('departments.detail.managerLabel')}</FieldLabel>
-          <Select
-            items={items}
-            value={choice}
-            onValueChange={(value) => setChoice(value ?? NO_MANAGER)}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {items.map((item) => (
-                <SelectItem key={item.value} value={item.value}>
-                  {item.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </Field>
-        {failure && <FormAlert>{failure}</FormAlert>}
-        <DialogFooter>
-          <DialogClose render={<Button variant="outline" />}>{t('common.cancel')}</DialogClose>
-          <Button onClick={save} disabled={update.isPending}>
-            {update.isPending ? t('common.saving') : t('common.save')}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <form className="grid gap-4" onSubmit={save} noValidate>
+      <DialogHeader>
+        <DialogTitle>
+          {t('departments.detail.changeManagerTitle', { name: department.name })}
+        </DialogTitle>
+        <DialogDescription>{t('departments.detail.managerHint')}</DialogDescription>
+      </DialogHeader>
+      <Field invalid={!!failure?.field}>
+        <FieldLabel>{t('departments.detail.managerLabel')}</FieldLabel>
+        <Select
+          items={items}
+          value={choice}
+          onValueChange={(value) => setChoice(value ?? NO_MANAGER)}
+        >
+          <SelectTrigger ref={picker}>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {items.map((item) => (
+              <SelectItem key={item.value} value={item.value}>
+                {item.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <FieldError match={!!failure?.field} role="alert">
+          {failure?.message}
+        </FieldError>
+      </Field>
+      {failure && !failure.field && <FormAlert>{failure.message}</FormAlert>}
+      <DialogFooter>
+        <DialogClose render={<Button variant="outline" type="button" />}>
+          {t('common.cancel')}
+        </DialogClose>
+        <Button type="submit" disabled={update.isPending}>
+          {update.isPending ? t('common.saving') : t('common.save')}
+        </Button>
+      </DialogFooter>
+    </form>
   );
 }

@@ -29,7 +29,7 @@ import { Controller, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { FormAlert } from '../../components/form-alert';
 import { ApiError } from '../../lib/api/client';
-import { errorMessage, fieldError, SCREEN_ERROR } from '../../lib/errors';
+import { errorMessage, errorRole, fieldError, SCREEN_ERROR } from '../../lib/errors';
 import { departmentListQuery } from '../departments/departments.queries';
 import { skillsQuery } from './users.queries';
 
@@ -57,6 +57,8 @@ interface UserFormProps {
   ownAccount?: boolean;
   /** Extra actions beside the submit button, such as cancel. */
   actions?: ReactNode;
+  /** Says more about a refusal than its code's message (the records it names); else undefined. */
+  describeFailure?: (error: unknown) => string | undefined;
 }
 
 /** Roles only a General Manager grants or removes (F01 rule 5; the API enforces it). */
@@ -71,6 +73,7 @@ export function UserForm({
   canGrantGeneralManager,
   ownAccount = false,
   actions,
+  describeFailure,
 }: UserFormProps) {
   const { t } = useTranslation();
   const ids = { secondary: useId(), skills: useId() };
@@ -83,6 +86,8 @@ export function UserForm({
     control,
     handleSubmit,
     watch,
+    setValue,
+    getValues,
     setError,
     formState: { errors, isSubmitting },
   } = useForm<UserFormInput, unknown, CreateUser>({
@@ -108,10 +113,15 @@ export function UserForm({
     try {
       await onSubmit(values);
     } catch (error) {
+      // A taken email belongs to the field: mark it and put the cursor back there.
       if (error instanceof ApiError && error.code === 'EMAIL_TAKEN') {
-        setError('email', { type: SCREEN_ERROR, message: errorMessage(t, error) });
+        setError(
+          'email',
+          { type: SCREEN_ERROR, message: errorMessage(t, error) },
+          { shouldFocus: true },
+        );
       } else {
-        setFailure(errorMessage(t, error));
+        setFailure(describeFailure?.(error) ?? errorMessage(t, error));
       }
     }
   });
@@ -121,27 +131,21 @@ export function UserForm({
       <FormSection title={t('users.form.identity')} hint={t('users.form.identityHint')}>
         <Field invalid={!!errors.name}>
           <FieldLabel>{t('users.form.name')}</FieldLabel>
-          <Input autoComplete="off" {...register('name')} />
+          <Input autoFocus autoComplete="off" {...register('name')} />
           <FieldError match={!!errors.name}>{t('users.form.errors.name')}</FieldError>
         </Field>
         <Field invalid={!!errors.email}>
           <FieldLabel>{t('users.form.email')}</FieldLabel>
-          <Input
-            type="email"
-            dir="ltr"
-            className="text-end"
-            autoComplete="off"
-            {...register('email')}
-          />
+          <Input type="email" dir="ltr" autoComplete="off" {...register('email')} />
           <FieldDescription>{t('users.form.emailHint')}</FieldDescription>
-          <FieldError match={!!errors.email}>
+          <FieldError match={!!errors.email} role={errorRole(errors.email)}>
             {fieldError(errors.email, t('users.form.errors.email'))}
           </FieldError>
         </Field>
       </FormSection>
 
       <FormSection title={t('users.form.organization')} hint={t('users.form.organizationHint')}>
-        <div className="grid gap-5 md:grid-cols-2">
+        <div className="grid gap-5 @lg:grid-cols-2">
           <Field invalid={!!errors.primaryDepartmentId}>
             <FieldLabel>{t('users.form.primaryDepartment')}</FieldLabel>
             <Controller
@@ -151,7 +155,17 @@ export function UserForm({
                 <Select
                   items={departmentItems}
                   value={field.value || null}
-                  onValueChange={(value) => field.onChange(value ?? '')}
+                  onValueChange={(value) => {
+                    field.onChange(value ?? '');
+                    // The new primary department leaves the secondary ones (rule 1).
+                    const secondary = getValues('secondaryDepartmentIds') ?? [];
+                    if (value && secondary.includes(value)) {
+                      setValue(
+                        'secondaryDepartmentIds',
+                        secondary.filter((id) => id !== value),
+                      );
+                    }
+                  }}
                 >
                   <SelectTrigger onBlur={field.onBlur}>
                     <SelectValue placeholder={t('users.form.primaryPlaceholder')} />
@@ -203,7 +217,7 @@ export function UserForm({
             control={control}
             name="roles"
             render={({ field }) => (
-              <div className="grid gap-3 sm:grid-cols-3">
+              <div className="grid gap-3 @xl:grid-cols-3">
                 {roles.map((role) => (
                   <RoleOption
                     key={role}
@@ -228,7 +242,7 @@ export function UserForm({
       </FormSection>
 
       <FormSection title={t('users.form.details')} hint={t('users.form.detailsHint')}>
-        <div className="grid gap-5 md:grid-cols-2">
+        <div className="grid gap-5 @lg:grid-cols-2">
           <Field invalid={!!errors.title}>
             <FieldLabel>{t('users.form.title')}</FieldLabel>
             <Input placeholder={t('users.form.titlePlaceholder')} {...register('title')} />
@@ -236,13 +250,7 @@ export function UserForm({
           </Field>
           <Field invalid={!!errors.phone}>
             <FieldLabel>{t('users.form.phone')}</FieldLabel>
-            <Input
-              type="tel"
-              dir="ltr"
-              className="text-end"
-              autoComplete="off"
-              {...register('phone')}
-            />
+            <Input type="tel" dir="ltr" autoComplete="off" {...register('phone')} />
             <FieldDescription>{t('users.form.phoneHint')}</FieldDescription>
             <FieldError match={!!errors.phone}>{t('users.form.errors.phone')}</FieldError>
           </Field>
@@ -282,7 +290,8 @@ function FormSection({
         <h2 className="text-lg font-bold">{title}</h2>
         <p className="text-sm text-muted-foreground">{hint}</p>
       </div>
-      <div className="flex min-w-0 flex-col gap-5">{children}</div>
+      {/* Field grids follow this column's width, which the sidebar and the hint column narrow. */}
+      <div className="@container flex min-w-0 flex-col gap-5">{children}</div>
     </section>
   );
 }

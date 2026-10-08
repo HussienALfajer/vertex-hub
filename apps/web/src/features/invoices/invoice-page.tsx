@@ -26,11 +26,13 @@ import {
   PaperclipIcon,
   RepeatIcon,
 } from 'lucide-react';
-import { useState } from 'react';
+import { type RefObject, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { isMissing, LoadError } from '../../components/load-error';
 import { can, useMe } from '../../lib/auth';
 import { formatCalendarDate, formatDateTime, formatNumber } from '../../lib/format';
+import { rateText } from '../../lib/money';
+import { useFocusAfterChange } from '../../lib/use-focus-after-change';
 import { EmailHistory } from '../email/email-history';
 import { Money } from '../quotes/quote-badges';
 import {
@@ -78,24 +80,47 @@ export function InvoicePage({ invoiceId }: { invoiceId: string }) {
           error={invoice.error}
         />
       ) : (
-        <>
-          <InvoiceHeader invoice={invoice.data} />
-          {invoice.data.status === 'draft' ? (
-            <InvoiceEditor invoice={invoice.data} settings={settings.data} />
-          ) : (
-            <IssuedInvoice invoice={invoice.data} settings={settings.data} />
-          )}
-        </>
+        <LoadedInvoice invoice={invoice.data} settings={settings.data} />
       )}
     </>
   );
 }
 
-function InvoiceHeader({ invoice }: { invoice: InvoiceDetail }) {
+function LoadedInvoice({
+  invoice,
+  settings,
+}: {
+  invoice: InvoiceDetail;
+  settings: InvoiceSettings | undefined;
+}) {
+  const heading = useRef<HTMLHeadingElement>(null);
+  // Issuing replaces the editor, and voiding or settling the invoice removes the buttons: a focus
+  // left on the page body goes to the heading.
+  useFocusAfterChange(invoice.status, () => heading.current);
+  return (
+    <>
+      <InvoiceHeader invoice={invoice} headingRef={heading} />
+      {invoice.status === 'draft' ? (
+        <InvoiceEditor invoice={invoice} settings={settings} />
+      ) : (
+        <IssuedInvoice invoice={invoice} settings={settings} heading={heading} />
+      )}
+    </>
+  );
+}
+
+function InvoiceHeader({
+  invoice,
+  headingRef,
+}: {
+  invoice: InvoiceDetail;
+  headingRef: RefObject<HTMLHeadingElement | null>;
+}) {
   const { t } = useTranslation();
   const { engagement } = invoice;
   return (
     <PageHeader
+      headingRef={headingRef}
       title={
         <span className="flex flex-wrap items-center gap-3">
           {invoice.displayNumber ? (
@@ -163,14 +188,19 @@ function InvoiceHeader({ invoice }: { invoice: InvoiceDetail }) {
 function IssuedInvoice({
   invoice,
   settings,
+  heading,
 }: {
   invoice: InvoiceDetail;
   settings: InvoiceSettings | undefined;
+  /** The page heading: the focus goes there when an action removes its own button. */
+  heading: RefObject<HTMLHeadingElement | null>;
 }) {
   const { t } = useTranslation();
   const manages = can(useMe(), 'invoices.manage');
   const [open, setOpen] = useState<'payment' | 'dueDate' | 'services' | 'void' | null>(null);
   const [voidingPayment, setVoidingPayment] = useState<Payment | null>(null);
+  const recordButton = useRef<HTMLButtonElement>(null);
+  const paymentsHeading = useRef<HTMLHeadingElement>(null);
   const { permissions } = invoice;
   const livePayments = invoice.payments.some((payment) => !payment.voided);
   // Rule 14: void is offered on sent and overdue invoices, and waits for their payments' voids.
@@ -196,7 +226,7 @@ function IssuedInvoice({
         <IssuedPdf invoice={invoice} />
         <InvoiceEmailActions invoice={invoice} />
         {permissions.canRecordPayment && (
-          <Button onClick={() => setOpen('payment')}>
+          <Button ref={recordButton} onClick={() => setOpen('payment')}>
             <BanknoteIcon />
             {t('invoices.payments.action')}
           </Button>
@@ -229,48 +259,50 @@ function IssuedInvoice({
         )}
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[1fr_20rem]">
-        <div className="flex min-w-0 flex-col gap-6">
-          <LinesCard invoice={invoice} />
-          <PaymentsCard
-            invoice={invoice}
-            onVoid={permissions.canVoidPayments ? setVoidingPayment : undefined}
-          />
-          {invoice.notes && (
-            <Card className="gap-2 p-6">
-              <h2 className="font-bold">{t('invoices.editor.notes')}</h2>
-              <p className="text-sm whitespace-pre-line">{invoice.notes}</p>
-            </Card>
-          )}
-        </div>
-        <aside className="flex flex-col gap-6">
-          <Facts invoice={invoice} showUsd={manages} />
-          <EmailHistory target={{ type: 'invoice', id: invoice.id }} />
-        </aside>
-      </div>
+      <Facts invoice={invoice} showUsd={manages} />
+      <LinesCard invoice={invoice} />
+      <PaymentsCard
+        invoice={invoice}
+        headingRef={paymentsHeading}
+        onVoid={permissions.canVoidPayments ? setVoidingPayment : undefined}
+      />
+      {invoice.notes && (
+        <Card className="gap-2 p-6">
+          <h2 className="font-bold">{t('invoices.editor.notes')}</h2>
+          <p className="text-sm whitespace-pre-line">{invoice.notes}</p>
+        </Card>
+      )}
+      <EmailHistory target={{ type: 'invoice', id: invoice.id }} />
 
       <PaymentDialog
         invoice={invoice}
         settings={settings}
         open={open === 'payment'}
         onClose={() => setOpen(null)}
+        // A payment that settles the invoice takes its button away.
+        finalFocus={() =>
+          recordButton.current?.isConnected ? recordButton.current : heading.current
+        }
       />
-      <DueDateDialog
-        key={invoice.dueOn}
-        invoice={invoice}
-        open={open === 'dueDate'}
-        onClose={() => setOpen(null)}
-      />
+      <DueDateDialog invoice={invoice} open={open === 'dueDate'} onClose={() => setOpen(null)} />
       {permissions.canEditServices && (
         <ServicesDialog
-          key={invoice.lines.map((line) => line.service?.id ?? '').join()}
           invoice={invoice}
           open={open === 'services'}
           onClose={() => setOpen(null)}
         />
       )}
-      <VoidInvoiceDialog invoice={invoice} open={open === 'void'} onClose={() => setOpen(null)} />
-      <VoidPaymentDialog payment={voidingPayment} onClose={() => setVoidingPayment(null)} />
+      <VoidInvoiceDialog
+        invoice={invoice}
+        open={open === 'void'}
+        onClose={() => setOpen(null)}
+        finalFocus={heading}
+      />
+      <VoidPaymentDialog
+        payment={voidingPayment}
+        onClose={() => setVoidingPayment(null)}
+        finalFocus={paymentsHeading}
+      />
     </>
   );
 }
@@ -327,16 +359,20 @@ function LinesCard({ invoice }: { invoice: InvoiceDetail }) {
 
 function PaymentsCard({
   invoice,
+  headingRef,
   onVoid,
 }: {
   invoice: InvoiceDetail;
+  headingRef: RefObject<HTMLHeadingElement | null>;
   onVoid?: (payment: Payment) => void;
 }) {
   const { t } = useTranslation();
   const none = <span className="text-muted-foreground">{t('common.none')}</span>;
   return (
     <Card className="gap-4 p-6">
-      <h2 className="text-lg font-bold">{t('invoices.payments.heading')}</h2>
+      <h2 ref={headingRef} tabIndex={-1} className="text-lg font-bold outline-none">
+        {t('invoices.payments.heading')}
+      </h2>
       {invoice.payments.length === 0 ? (
         <p className="text-sm text-muted-foreground">{t('invoices.payments.empty')}</p>
       ) : (
@@ -376,7 +412,7 @@ function PaymentsCard({
                     <Money minor={payment.amountMinor} currency={payment.currency} />
                     {payment.currency !== invoice.currency && (
                       <span className="text-xs text-muted-foreground">
-                        {t('invoices.payments.atRate', { rate: payment.sypPerUsd })}
+                        {t('invoices.payments.atRate', { rate: rateText(payment.sypPerUsd) })}
                       </span>
                     )}
                   </span>
@@ -422,7 +458,7 @@ function PaymentsCard({
                         <span dir="auto">{payment.proof.name}</span>
                       </Link>
                     ) : (
-                      !payment.receiptPdf && none
+                      (!payment.receiptPdf || payment.voided) && none
                     )}
                   </span>
                 </TableCell>
@@ -466,7 +502,7 @@ function Facts({ invoice, showUsd }: { invoice: InvoiceDetail; showUsd: boolean 
   );
   return (
     <Card className="gap-3 p-5">
-      <dl className="grid grid-cols-[auto_1fr] items-baseline gap-x-4 gap-y-2 text-sm">
+      <dl className="grid grid-cols-[auto_1fr] items-baseline gap-x-4 gap-y-2 text-sm sm:grid-cols-[auto_1fr_auto_1fr] sm:gap-x-8">
         {invoice.issuedOn && (
           <>
             <dt className="text-muted-foreground">{t('invoices.facts.issued')}</dt>
@@ -493,7 +529,7 @@ function Facts({ invoice, showUsd }: { invoice: InvoiceDetail; showUsd: boolean 
             <dt className="text-muted-foreground">{t('invoices.rate.label')}</dt>
             <dd className="text-end">
               <span dir="ltr" className="tabular-nums">
-                {invoice.sypPerUsd}
+                {rateText(invoice.sypPerUsd)}
               </span>
             </dd>
           </>

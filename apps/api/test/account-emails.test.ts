@@ -208,8 +208,21 @@ describe('account emails (F14 email rules 13–15)', () => {
       expect(await notices(user.id)).toMatchObject([{ change: 'password_changed', by: null }]);
 
       const fresh = await client.signIn(user.email, { password: `${PASSWORD}-new` });
-      await client.enableTwoFactor(fresh, `${PASSWORD}-new`);
+      const { cookie: verified } = await client.enableTwoFactor(fresh, `${PASSWORD}-new`);
       expect((await notices(user.id))[0]).toMatchObject({ change: 'two_factor_enabled', by: null });
+
+      const regenerated = await client.post(
+        '/api/auth/two-factor/generate-backup-codes',
+        verified,
+        {
+          password: `${PASSWORD}-new`,
+        },
+      );
+      expect(regenerated.status).toBe(200);
+      expect((await notices(user.id))[0]).toMatchObject({
+        change: 'backup_codes_regenerated',
+        by: null,
+      });
     });
 
     it('names the user manager who changed roles, reset two-factor or archived', async () => {

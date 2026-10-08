@@ -23,12 +23,13 @@ import {
   ThumbsDownIcon,
   ThumbsUpIcon,
 } from 'lucide-react';
-import { useState } from 'react';
+import { type RefObject, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { isMissing, LoadError } from '../../components/load-error';
 import { can, useMe } from '../../lib/auth';
 import { errorMessage } from '../../lib/errors';
 import { formatCalendarDate, formatDateTime, formatNumber } from '../../lib/format';
+import { useReturnFocus } from '../../lib/use-return-focus';
 import { EmailHistory } from '../email/email-history';
 import { LeadBadge } from '../leads/lead-badges';
 import { AcceptDialog } from './accept-dialog';
@@ -41,7 +42,7 @@ import {
   QuoteStatusBadge,
 } from './quote-badges';
 import { QuoteBuilder } from './quote-builder';
-import { ExtendDialog, RejectDialog } from './quote-dialogs';
+import { ExtendDialog, RejectDialog, SendDialog } from './quote-dialogs';
 import { QuoteEmailActions } from './quote-email';
 import { SentPdf } from './quote-pdf';
 import { quoteQuery, useCreateVersion } from './quotes.queries';
@@ -71,24 +72,55 @@ export function QuotePage({ quoteId }: { quoteId: string }) {
           error={quote.error}
         />
       ) : (
-        <>
-          <QuoteHeader quote={quote.data} />
-          {quote.data.status === 'draft' ? (
-            <QuoteBuilder quote={quote.data} />
-          ) : (
-            <SentQuote quote={quote.data} />
-          )}
-        </>
+        <QuoteView quote={quote.data} />
       )}
     </>
   );
 }
 
-function QuoteHeader({ quote }: { quote: QuoteDetail }) {
+function QuoteView({ quote }: { quote: QuoteDetail }) {
+  const heading = useRef<HTMLHeadingElement>(null);
+  const returnFocus = useReturnFocus(heading);
+  const [sending, setSending] = useState(false);
+  return (
+    <>
+      <QuoteHeader quote={quote} heading={heading} />
+      {quote.status === 'draft' && <DraftVersions quote={quote} />}
+      {quote.status === 'draft' ? (
+        <QuoteBuilder
+          quote={quote}
+          heading={heading}
+          onSend={(opener) => {
+            returnFocus.from(opener);
+            setSending(true);
+          }}
+        />
+      ) : (
+        <SentQuote quote={quote} heading={heading} />
+      )}
+      {/* Out of the builder, which leaves the page once the quote is sent. */}
+      <SendDialog
+        quote={quote}
+        open={sending}
+        onClose={() => setSending(false)}
+        finalFocus={returnFocus.target}
+      />
+    </>
+  );
+}
+
+function QuoteHeader({
+  quote,
+  heading,
+}: {
+  quote: QuoteDetail;
+  heading: RefObject<HTMLHeadingElement | null>;
+}) {
   const { t } = useTranslation();
   const me = useMe();
   return (
     <PageHeader
+      headingRef={heading}
       title={
         <span className="flex flex-wrap items-center gap-3">
           {quote.title}
@@ -132,11 +164,24 @@ function QuoteHeader({ quote }: { quote: QuoteDetail }) {
 }
 
 /** A quote that left the builder: as the client sees it, with its state and what comes next. */
-function SentQuote({ quote }: { quote: QuoteDetail }) {
+function SentQuote({
+  quote,
+  heading,
+}: {
+  quote: QuoteDetail;
+  heading: RefObject<HTMLHeadingElement | null>;
+}) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const version = useCreateVersion(quote.id);
-  const [open, setOpen] = useState<'accept' | 'extend' | 'reject' | null>(null);
+  const [open, setOpenState] = useState<'accept' | 'extend' | 'reject' | null>(null);
+  // Extending or rejecting takes the buttons off the page: the focus then goes to the heading.
+  const returnFocus = useReturnFocus(heading);
+  const setOpen = (next: 'accept' | 'extend' | 'reject', opener: HTMLElement) => {
+    returnFocus.from(opener);
+    setOpenState(next);
+  };
+  const close = () => setOpenState(null);
   const { permissions } = quote;
 
   async function newVersion() {
@@ -155,19 +200,19 @@ function SentQuote({ quote }: { quote: QuoteDetail }) {
         <SentPdf quote={quote} />
         <QuoteEmailActions quote={quote} />
         {permissions.canAccept && (
-          <Button onClick={() => setOpen('accept')}>
+          <Button onClick={(event) => setOpen('accept', event.currentTarget)}>
             <ThumbsUpIcon />
             {t('quotes.accept.action')}
           </Button>
         )}
         {permissions.canExtend && (
-          <Button variant="outline" onClick={() => setOpen('extend')}>
+          <Button variant="outline" onClick={(event) => setOpen('extend', event.currentTarget)}>
             <CalendarPlusIcon />
             {t('quotes.extend.action')}
           </Button>
         )}
         {permissions.canReject && (
-          <Button variant="outline" onClick={() => setOpen('reject')}>
+          <Button variant="outline" onClick={(event) => setOpen('reject', event.currentTarget)}>
             <ThumbsDownIcon />
             {t('quotes.reject.action')}
           </Button>
@@ -184,7 +229,7 @@ function SentQuote({ quote }: { quote: QuoteDetail }) {
             render={<Link to="/projects/$projectId" params={{ projectId: quote.project.id }} />}
           >
             <FolderKanbanIcon />
-            {quote.project.name}
+            {t('quotes.links.project', { name: quote.project.name })}
           </Button>
         )}
         {quote.retainer && (
@@ -193,7 +238,7 @@ function SentQuote({ quote }: { quote: QuoteDetail }) {
             render={<Link to="/retainers/$retainerId" params={{ retainerId: quote.retainer.id }} />}
           >
             <RepeatIcon />
-            {quote.retainer.name}
+            {t('quotes.links.retainer', { name: quote.retainer.name })}
           </Button>
         )}
       </div>
@@ -227,9 +272,24 @@ function SentQuote({ quote }: { quote: QuoteDetail }) {
         </aside>
       </div>
 
-      <AcceptDialog quote={quote} open={open === 'accept'} onClose={() => setOpen(null)} />
-      <ExtendDialog quote={quote} open={open === 'extend'} onClose={() => setOpen(null)} />
-      <RejectDialog quote={quote} open={open === 'reject'} onClose={() => setOpen(null)} />
+      <AcceptDialog
+        quote={quote}
+        open={open === 'accept'}
+        onClose={close}
+        finalFocus={returnFocus.target}
+      />
+      <ExtendDialog
+        quote={quote}
+        open={open === 'extend'}
+        onClose={close}
+        finalFocus={returnFocus.target}
+      />
+      <RejectDialog
+        quote={quote}
+        open={open === 'reject'}
+        onClose={close}
+        finalFocus={returnFocus.target}
+      />
     </>
   );
 }
@@ -413,6 +473,32 @@ function Response({ quote }: { quote: QuoteDetail }) {
       </dl>
       {response.note && <p className="text-sm whitespace-pre-line">{response.note}</p>}
     </Card>
+  );
+}
+
+/** A new version's draft links to the versions before it: a rejected one keeps the reason. */
+function DraftVersions({ quote }: { quote: QuoteDetail }) {
+  const { t } = useTranslation();
+  const others = quote.versions.filter((version) => version.id !== quote.id);
+  if (others.length === 0) return null;
+  return (
+    <nav
+      aria-label={t('quotes.versions.title')}
+      className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm"
+    >
+      <span className="text-muted-foreground">{t('quotes.versions.title')}</span>
+      {others.map((version) => (
+        <Link
+          key={version.id}
+          to="/quotes/$quoteId"
+          params={{ quoteId: version.id }}
+          className="flex items-center gap-2 hover:underline"
+        >
+          {t('quotes.versions.version', { n: formatNumber(version.version) })}
+          <QuoteStatusBadge status={version.status} />
+        </Link>
+      ))}
+    </nav>
   );
 }
 

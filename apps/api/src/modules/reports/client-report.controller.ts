@@ -75,6 +75,8 @@ export class ClientReportController {
   @RequirePermissions('reports.read')
   @ApiProduces(XLSX_MIME_TYPE)
   @ApiOkResponse({ description: 'The report as an Excel file (rule 24)' })
+  @ApiBadRequestResponse({ description: '`INVALID_MONTH`: a month after the current one' })
+  @ApiNotFoundResponse({ description: 'No such client in your `reports.read` scope' })
   async export(
     @CurrentUser() actor: CurrentUserInfo,
     @Param('id', ParseUUIDPipe) id: string,
@@ -114,6 +116,8 @@ export class ClientReportController {
     description: 'Queues the PDF of the report as it is now (rule 20), or finds it ready',
     standardSchema: quotePdfRenderSchema,
   })
+  @ApiBadRequestResponse({ description: '`INVALID_MONTH`: a month after the current one' })
+  @ApiNotFoundResponse({ description: 'No such client in your `reports.read` scope' })
   renderPdf(
     @CurrentUser() actor: CurrentUserInfo,
     @Param('id', ParseUUIDPipe) id: string,

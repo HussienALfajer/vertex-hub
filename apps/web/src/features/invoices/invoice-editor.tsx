@@ -14,7 +14,9 @@ import {
   Callout,
   Field,
   FieldDescription,
+  FieldError,
   FieldLabel,
+  IconButton,
   Input,
   Textarea,
   toast,
@@ -27,7 +29,8 @@ import {
   Trash2Icon,
   TriangleAlertIcon,
 } from 'lucide-react';
-import { useEffect, useId, useState } from 'react';
+import { type RefObject, useCallback, useEffect, useId, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import {
   Controller,
   get,
@@ -44,7 +47,10 @@ import { MoneyInput } from '../../components/money-input';
 import { UnsavedChangesGuard } from '../../components/unsaved-changes-guard';
 import { ApiError } from '../../lib/api/client';
 import { errorMessage } from '../../lib/errors';
+import { focusAfterRemoval } from '../../lib/focus-after-removal';
+import { useFocusFirstError } from '../../lib/focus-first-invalid';
 import { formatDateTime, formatNumber } from '../../lib/format';
+import { rateText } from '../../lib/money';
 import { projectListQuery } from '../projects/projects.queries';
 import { ChoiceSelect } from '../quotes/choice-select';
 import { Money } from '../quotes/quote-badges';
@@ -127,14 +133,21 @@ export function InvoiceEditor({
   settings: InvoiceSettings | undefined;
 }) {
   const [base, setBase] = useState(invoice);
+  // A save or a chosen newer version restarts the form, and the button that did it goes.
+  const [focusNext, setFocusNext] = useState(false);
   if (base.archivedAt !== invoice.archivedAt) setBase(invoice);
+  const load = useCallback((version: InvoiceDetail, focus = false) => {
+    setFocusNext(focus);
+    setBase(version);
+  }, []);
   return (
     <Editor
       key={base.updatedAt}
       base={base}
       invoice={invoice}
       settings={settings}
-      onLoad={setBase}
+      onLoad={load}
+      focusNext={focusNext}
     />
   );
 }
@@ -144,24 +157,49 @@ function Editor({
   invoice,
   settings,
   onLoad,
+  focusNext,
 }: {
   /** The version the form started from. */
   base: InvoiceDetail;
   /** The latest stored version. */
   invoice: InvoiceDetail;
   settings: InvoiceSettings | undefined;
-  onLoad: (version: InvoiceDetail) => void;
+  /** Starts the form from `version`; `focus` moves the focus to the next step once it has. */
+  onLoad: (version: InvoiceDetail, focus?: boolean) => void;
+  /** The form started again after a save or a chosen version: focus the next step. */
+  focusNext: boolean;
 }) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const readOnly = !invoice.permissions.canEdit;
-  const form = useForm<EditorValues>({ defaultValues: editorValues(base) });
+  // The first invalid field takes the focus, the price and the selects included (they register no
+  // element).
+  const form = useForm<EditorValues>({
+    defaultValues: editorValues(base),
+    shouldFocusError: false,
+  });
+  const formRef = useRef<HTMLFormElement>(null);
+  useFocusFirstError(form.formState.submitCount, formRef);
   const lines = useFieldArray({ control: form.control, name: 'lines', keyName: 'key' });
   const save = useSaveInvoiceDraft(invoice.id);
   const [failure, setFailure] = useState<string | null>(null);
   const [confirmReset, setConfirmReset] = useState(false);
   const { isDirty: dirty, isSubmitting } = form.formState;
   const newer = invoice.updatedAt > base.updatedAt;
+  const issueButton = useRef<HTMLButtonElement>(null);
+  const addBillable = useRef<HTMLButtonElement>(null);
+  /** The next step: issuing when the saved draft can be issued, else adding items. */
+  const nextStep = useCallback(
+    () =>
+      issueButton.current && !issueButton.current.disabled
+        ? issueButton.current
+        : addBillable.current,
+    [],
+  );
+
+  useEffect(() => {
+    if (focusNext) nextStep()?.focus();
+  }, [focusNext, nextStep]);
 
   // Nothing to lose: take the newer version at once.
   useEffect(() => {
@@ -172,16 +210,18 @@ function Editor({
     setFailure(null);
     const checked = invoiceDraftSchema.safeParse(draftInput(current, base.updatedAt));
     if (!checked.success) {
+      // Each refused value shows under its field; the engagement rule has none.
       for (const issue of checked.error.issues) {
-        form.setError(issue.path.join('.') as 'notes', { type: 'schema' });
+        if (issue.path.length > 0)
+          form.setError(issue.path.join('.') as 'notes', { type: 'schema' });
+        else setFailure(t('invoices.editor.errors.invalid'));
       }
-      setFailure(t('invoices.editor.errors.invalid'));
       return;
     }
     try {
       const saved = await save.mutateAsync(checked.data);
       toast.add({ title: t('invoices.editor.saved'), type: 'success' });
-      onLoad(saved);
+      onLoad(saved, true);
     } catch (error) {
       setFailure(errorMessage(t, error));
       // Another save came first: fetch it, so the editor offers it.
@@ -211,22 +251,30 @@ function Editor({
             when: formatDateTime(invoice.updatedAt),
           })}
           action={
-            <Button variant="outline" size="sm" onClick={() => onLoad(invoice)}>
+            <Button variant="outline" size="sm" onClick={() => onLoad(invoice, true)}>
               {t('invoices.editor.loadLatest')}
             </Button>
           }
         />
       )}
 
-      {!invoice.archivedAt && <DraftActions invoice={invoice} settings={settings} dirty={dirty} />}
+      {!invoice.archivedAt && (
+        <DraftActions invoice={invoice} settings={settings} dirty={dirty} issueRef={issueButton} />
+      )}
       {!invoice.archivedAt && invoice.permissions.canEdit && (
         <DraftPreview invoice={invoice} saved={!dirty} />
       )}
 
-      <form className="flex flex-col gap-6" onSubmit={submit} noValidate>
+      <form ref={formRef} className="flex flex-col gap-6" onSubmit={submit} noValidate>
         <fieldset disabled={readOnly} className="flex min-w-0 flex-col gap-6">
           <legend className="sr-only">{t('invoices.editor.legend')}</legend>
-          <LinesSection form={form} invoice={invoice} lines={lines} readOnly={readOnly} />
+          <LinesSection
+            form={form}
+            invoice={invoice}
+            lines={lines}
+            readOnly={readOnly}
+            addBillableRef={addBillable}
+          />
           <TermsSection form={form} invoice={invoice} settings={settings} lines={lines} />
         </fieldset>
         {!readOnly && (
@@ -259,6 +307,8 @@ function Editor({
         action={t('common.unsaved.discard')}
         destructive
         pending={false}
+        // The button that opened it is disabled once nothing is left to discard.
+        finalFocus={nextStep}
         onConfirm={async () => {
           setFailure(null);
           form.reset();
@@ -274,10 +324,12 @@ function DraftActions({
   invoice,
   settings,
   dirty,
+  issueRef,
 }: {
   invoice: InvoiceDetail;
   settings: InvoiceSettings | undefined;
   dirty: boolean;
+  issueRef: RefObject<HTMLButtonElement | null>;
 }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -285,12 +337,15 @@ function DraftActions({
   const [open, setOpen] = useState<'issue' | 'discard' | null>(null);
   const { permissions } = invoice;
   if (!permissions.canIssue && !permissions.canArchive) return null;
-  const empty = invoice.lines.length === 0 || invoice.totalMinor === 0;
+  // F05B C7: a total of 0 is issued when a credit takes the whole amount.
+  const credited = invoice.lines.some((line) => line.unitPriceMinor < 0);
+  const empty =
+    invoice.lines.length === 0 || invoice.totalMinor < 0 || (invoice.totalMinor === 0 && !credited);
 
   return (
     <div className="flex flex-wrap items-center gap-2">
       {permissions.canIssue && (
-        <Button disabled={dirty || empty} onClick={() => setOpen('issue')}>
+        <Button ref={issueRef} disabled={dirty || empty} onClick={() => setOpen('issue')}>
           <SendIcon />
           {t('invoices.issue.action')}
         </Button>
@@ -339,14 +394,18 @@ function LinesSection({
   invoice,
   lines,
   readOnly,
+  addBillableRef,
 }: {
   form: EditorForm;
   invoice: InvoiceDetail;
   lines: LinesArray;
   readOnly: boolean;
+  addBillableRef: RefObject<HTMLButtonElement | null>;
 }) {
   const { t } = useTranslation();
   const [picking, setPicking] = useState(false);
+  const list = useRef<HTMLUListElement>(null);
+  const addButton = useRef<HTMLButtonElement>(null);
   const values = form.watch('lines');
   const engagement = form.watch('engagement');
   const total = invoiceTotal(values);
@@ -354,6 +413,12 @@ function LinesSection({
   const sourced = values.flatMap((line) => (line.source ? [line.source] : []));
   const locked =
     (sourced[0] && engagementKey(sourced[0])) ?? (engagement === NONE ? null : engagement);
+
+  /** The next line's remove button takes the focus, the previous one's, or "add line". */
+  function remove(index: number) {
+    flushSync(() => lines.remove(index));
+    focusAfterRemoval(list.current, index, addButton.current);
+  }
 
   function pick(picked: PickedLine[]) {
     const room = INVOICE_LIMITS.lines - lines.fields.length;
@@ -370,7 +435,7 @@ function LinesSection({
       {lines.fields.length === 0 ? (
         <p className="text-sm text-muted-foreground">{t('invoices.editor.noLines')}</p>
       ) : (
-        <ul className="flex flex-col gap-3">
+        <ul ref={list} className="flex flex-col gap-3">
           {lines.fields.map((field, index) => (
             <LineCard
               key={field.key}
@@ -379,18 +444,25 @@ function LinesSection({
               line={field}
               invoice={invoice}
               readOnly={readOnly}
-              onRemove={() => lines.remove(index)}
+              onRemove={() => remove(index)}
             />
           ))}
         </ul>
       )}
       {!readOnly && (
         <div className="flex flex-wrap gap-2">
-          <Button type="button" variant="outline" disabled={full} onClick={() => setPicking(true)}>
+          <Button
+            ref={addBillableRef}
+            type="button"
+            variant="outline"
+            disabled={full}
+            onClick={() => setPicking(true)}
+          >
             <ListPlusIcon />
             {t('invoices.editor.addBillable')}
           </Button>
           <Button
+            ref={addButton}
             type="button"
             variant="outline"
             disabled={full}
@@ -472,20 +544,21 @@ function LineCard({
             />
           </span>
           {!readOnly && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              aria-label={t('invoices.editor.removeLine', { name })}
+            <IconButton
+              data-focus="remove"
+              label={t('invoices.editor.removeLine', { name })}
               onClick={onRemove}
             >
               <Trash2Icon />
-            </Button>
+            </IconButton>
           )}
         </div>
         <Field invalid={invalid('description')}>
           <FieldLabel>{t('invoices.editor.description')}</FieldLabel>
           <Input autoComplete="off" {...form.register(`lines.${index}.description`)} />
+          <FieldError match={invalid('description')}>
+            {t('invoices.editor.errors.description')}
+          </FieldError>
         </Field>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field invalid={invalid('quantity')}>
@@ -498,6 +571,11 @@ function LineCard({
               className="text-end tabular-nums"
               {...form.register(`lines.${index}.quantity`, { valueAsNumber: true })}
             />
+            <FieldError match={invalid('quantity')}>
+              {t('invoices.editor.errors.quantity', {
+                max: formatNumber(INVOICE_LIMITS.quantity),
+              })}
+            </FieldError>
           </Field>
           <Controller
             control={form.control}
@@ -620,12 +698,16 @@ function TermsSection({
             {...form.register('paymentTermsDays', { valueAsNumber: true })}
           />
           <FieldDescription>{t('invoices.editor.paymentTermsHint')}</FieldDescription>
+          <FieldError match={!!errors.paymentTermsDays}>
+            {t('invoices.settings.errors.paymentTerms')}
+          </FieldError>
         </Field>
       </div>
       <Field invalid={!!errors.notes}>
         <FieldLabel>{t('invoices.editor.notes')}</FieldLabel>
         <Textarea rows={3} {...form.register('notes')} />
         <FieldDescription>{t('invoices.editor.notesHint')}</FieldDescription>
+        <FieldError match={!!errors.notes}>{t('invoices.settings.errors.long')}</FieldError>
       </Field>
       <RateNotice settings={settings} />
     </FormSection>
@@ -648,10 +730,10 @@ function RateNotice({ settings }: { settings: InvoiceSettings | undefined }) {
   }
   const text = settings.rateUpdatedAt
     ? t('invoices.rate.currentAt', {
-        rate: settings.sypPerUsd,
+        rate: rateText(settings.sypPerUsd),
         when: formatDateTime(settings.rateUpdatedAt),
       })
-    : t('invoices.rate.currentPlain', { rate: settings.sypPerUsd });
+    : t('invoices.rate.currentPlain', { rate: rateText(settings.sypPerUsd) });
   return settings.rateStale ? (
     <Callout
       tone="warning"

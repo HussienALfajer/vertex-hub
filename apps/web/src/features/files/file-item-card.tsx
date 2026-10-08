@@ -7,6 +7,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  IconButton,
   toast,
 } from '@vertex-hub/ui';
 import type { TFunction } from 'i18next';
@@ -88,23 +89,19 @@ export function VersionMeta({ version }: { version: FileVersion }) {
 export function OpenButton({ version, name }: { version: FileVersion; name: string }) {
   const { t } = useTranslation();
   return version.kind === 'upload' ? (
-    <Button
-      variant="ghost"
-      size="icon-sm"
-      aria-label={t('files.downloadNamed', { name })}
+    <IconButton
+      label={t('files.downloadNamed', { name })}
       render={<a href={fileDownloadUrl(version.id)} />}
     >
       <DownloadIcon />
-    </Button>
+    </IconButton>
   ) : (
-    <Button
-      variant="ghost"
-      size="icon-sm"
-      aria-label={t('files.openLinkNamed', { name })}
+    <IconButton
+      label={t('files.openLinkNamed', { name })}
       render={<a href={version.url ?? ''} target="_blank" rel="noopener noreferrer" />}
     >
       <ExternalLinkIcon />
-    </Button>
+    </IconButton>
   );
 }
 
@@ -187,14 +184,12 @@ export function FileItemCard({
           <VersionMeta version={latest} />
         </div>
         <div className="flex shrink-0 items-center">
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            aria-label={t('files.previewNamed', { name: item.name })}
+          <IconButton
+            label={t('files.previewNamed', { name: item.name })}
             onClick={() => previewAt(latest)}
           >
             <EyeIcon />
-          </Button>
+          </IconButton>
           <OpenButton version={latest} name={item.name} />
           {removed
             ? permissions.canRestore && (
@@ -255,13 +250,7 @@ function ItemMenu({ item, actions }: { item: FileItem; actions: FileItemActions 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
-        render={
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            aria-label={t('files.actionsFor', { name: item.name })}
-          />
-        }
+        render={<IconButton label={t('files.actionsFor', { name: item.name })} />}
       >
         <EllipsisIcon />
       </DropdownMenuTrigger>
@@ -352,14 +341,9 @@ function VersionRow({
       </div>
       <div className="flex shrink-0 flex-wrap items-center">
         {!removed && (
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            aria-label={t('files.previewNamed', { name: label })}
-            onClick={onPreview}
-          >
+          <IconButton label={t('files.previewNamed', { name: label })} onClick={onPreview}>
             <EyeIcon />
-          </Button>
+          </IconButton>
         )}
         <OpenButton version={version} name={label} />
         {canMark && (
@@ -397,14 +381,12 @@ function VersionRow({
           </Button>
         )}
         {canRemove && (
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            aria-label={t('common.remove', { label })}
+          <IconButton
+            label={t('common.remove', { label })}
             onClick={() => actions.onRemove({ kind: 'version', id: version.id, label })}
           >
             <XIcon />
-          </Button>
+          </IconButton>
         )}
         {removed && !item.archivedAt && item.permissions.canRestore && (
           <Button

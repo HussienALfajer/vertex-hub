@@ -1,7 +1,7 @@
 import {
   type ClientReportSnapshot,
   CLIENT_REPORT_LABELS as L,
-  responseTime,
+  responseTimeText,
   REPORT_VALUE_LABELS as VALUES,
 } from '@vertex-hub/contracts';
 import {
@@ -24,6 +24,10 @@ const monthName = new Intl.DateTimeFormat('ar-SY-u-nu-latn', {
 });
 
 const usd = (minor: number) => formatMoney(minor, 'USD');
+
+/** Counts with thousands separators, as money prints (reach runs into the tens of thousands). */
+const countFormat = new Intl.NumberFormat('ar-SY-u-nu-latn');
+const count = (value: number) => countFormat.format(value);
 
 const cell = (value: string | number | null, options: { num?: boolean } = {}) =>
   `<td${options.num ? ' class="num"' : ''}>${value === null ? '—' : escapeHtml(String(value))}</td>`;
@@ -56,7 +60,7 @@ export function clientReportHtml(snapshot: ClientReportSnapshot, assets: Templat
           [
             ...retainer.lines.map(
               (line) =>
-                `<tr>${cell(line.label ?? VALUES.deliverableKinds[line.kind])}${cell(line.committed, { num: true })}${cell(line.delivered, { num: true })}${cell(line.percent === null ? null : `${line.percent}%`, { num: true })}</tr>`,
+                `<tr>${cell(line.label ?? VALUES.deliverableKinds[line.kind])}${cell(count(line.committed), { num: true })}${cell(count(line.delivered), { num: true })}${cell(line.percent === null ? null : `${line.percent}%`, { num: true })}</tr>`,
             ),
             `<tr class="total">${cell(L.completion)}<td></td><td></td>${cell(retainer.completion === null ? null : `${retainer.completion}%`, { num: true })}</tr>`,
           ],
@@ -77,7 +81,7 @@ export function clientReportHtml(snapshot: ClientReportSnapshot, assets: Templat
           ],
           snapshot.projects.map(
             (project) =>
-              `<tr>${cell(project.project.name)}${cell(VALUES.projectStatuses[project.status])}${cell(`${project.deliveredTasks} / ${project.totalTasks}`, { num: true })}${cell(project.milestonesDone.map((m) => m.name).join('، ') || null)}</tr>`,
+              `<tr>${cell(project.project.name)}${cell(VALUES.projectStatuses[project.status])}${cell(project.totalTasks === 0 ? null : `${count(project.deliveredTasks)} / ${count(project.totalTasks)}`, { num: true })}${cell(project.milestonesDone.map((m) => m.name).join('، ') || null)}</tr>`,
           ),
         ),
       ),
@@ -129,22 +133,20 @@ export function clientReportHtml(snapshot: ClientReportSnapshot, assets: Templat
   }
   const approvals = snapshot.approvals;
   if (approvals.approved + approvals.changesRequested > 0) {
-    const time =
-      approvals.averageResponseHours === null ? null : responseTime(approvals.averageResponseHours);
     parts.push(
       section(
         L.approvals,
         `<table class="sums wide">
-  <tr><th>${L.approved}</th><td class="num">${approvals.approved}</td></tr>
-  <tr><th>${L.changesRequested}</th><td class="num">${approvals.changesRequested}</td></tr>
-  ${time ? `<tr><th>${L.averageResponse}</th><td>${time.value} ${time.unit === 'hours' ? L.hours : L.days}</td></tr>` : ''}
+  <tr><th>${L.approved}</th><td class="num">${count(approvals.approved)}</td></tr>
+  <tr><th>${L.changesRequested}</th><td class="num">${count(approvals.changesRequested)}</td></tr>
+  ${approvals.averageResponseHours === null ? '' : `<tr><th>${L.averageResponse}</th><td>${responseTimeText(approvals.averageResponseHours)}</td></tr>`}
 </table>`,
       ),
     );
   }
   if (snapshot.campaigns?.rows.length) {
     const metrics = (row: NonNullable<ClientReportSnapshot['campaigns']>['totals']) =>
-      `${cell(usd(row.spendMinor), { num: true })}${cell(row.reach, { num: true })}${cell(row.clicks, { num: true })}${cell(row.results, { num: true })}${cell(row.costPerResultMinor === null ? null : usd(row.costPerResultMinor), { num: true })}`;
+      `${cell(usd(row.spendMinor), { num: true })}${cell(count(row.reach), { num: true })}${cell(count(row.clicks), { num: true })}${cell(count(row.results), { num: true })}${cell(row.costPerResultMinor === null ? null : usd(row.costPerResultMinor), { num: true })}`;
     parts.push(
       section(
         L.campaigns,

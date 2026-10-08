@@ -70,7 +70,7 @@ Granted by position in a department. Primary and secondary memberships count the
 |---|---|---|
 | `id` | uuid | `id()` |
 | `code` | enum `department_code` | required, unique; one of `DEPARTMENT_CODES` in contracts |
-| `name` | text | required, 1–60 chars, unique; editable display name |
+| `name` | text | required, 1–60 chars, unique on `lower(name)`; editable display name |
 | `manager_id` | uuid → `users.id` | nullable, indexed; must be an active member of the department |
 | timestamps, `archived_at` | | `archived_at` stays null in V1 (departments are not archived) |
 
@@ -152,7 +152,7 @@ invited | active ──(archive)──→ archived ──(restore)──→ invi
 18. Sign-in and 2FA verification are limited to 20 attempts per minute per client IP (an office shares one public IP), and sign-in to 10 failed attempts per account in 15 minutes, whatever the IP (owner decision 2026-09-30).
 19. A user edits only their own phone and skills (plus password and 2FA). Name, email, departments, title and roles are edited by user managers.
 20. Email changes by a user manager keep the user's sessions and password.
-21. Department names are unique; codes never change.
+21. Department names are unique regardless of letter case; codes never change.
 22. Every change in this feature writes an audit entry in the same transaction (see below). Changes made inside Better Auth (password change, 2FA enable and disable) are audited from its hooks right after they commit. Password hashes, tokens, links and 2FA secrets are never written to the audit log.
 
 ## API
@@ -176,6 +176,7 @@ All request and response schemas live in `packages/contracts` (`users.ts`, `depa
 | `GET /api/departments/:id` | `users.read` | — | department with members | 404 |
 | `PATCH /api/departments/:id` | `users.manage` | `updateDepartmentSchema` (name, managerId nullable) | department | `DEPARTMENT_NAME_TAKEN`, `MANAGER_NOT_MEMBER` |
 | `GET /api/audit` | `audit.read` | `auditListQuerySchema` (`entityType`, `entityId`, `actorId`, `action`, `from`, `to`) | `auditPageSchema` (newest first, actor name included) | — |
+| `POST /api/password-links/check` | anonymous (nginx `vhsignin` limit) | `checkLinkSchema` (token) | `linkInfoResponseSchema`: `kind` (`activation` when the account has no password yet, else `reset`), the account's `email`, `expiresAt`; the link is not used up. The email goes only to the link holder, who received the link at that address. | `LINK_INVALID` (same cases as redeem) |
 | `POST /api/password-links/redeem` | anonymous | `redeemLinkSchema` (token, new password) | 204 | `LINK_INVALID` (unknown, used, expired or superseded token; archived user) |
 | Better Auth: change password, two-factor enable / verify / disable, sign-in | session or anonymous as Better Auth defines | — | — | `TWO_FACTOR_REQUIRED` on disable when required |
 
@@ -190,17 +191,17 @@ The `user:create` CLI stays for bootstrapping the first General Manager: it gain
 All screens: Arabic RTL, strings through i18next (`users.*`, `departments.*`, `account.*`, `audit.*`), loading, empty and error states. Navigation shows "Team" and "Departments" to everyone, "Audit log" to holders of `audit.read`.
 
 1. **Team directory** `/team` — table: initials avatar, name, primary department (secondary as chips), title, phone, skills. Search, filters by department and skill. With `users.manage`: status filter (active / invited / archived), roles and 2FA columns, "New user" button. Empty: "no users match".
-2. **New user** `/team/new` (`users.manage`) — form with the fields of `createUserSchema`; skills input suggests skills in use; General Manager and Finance role checkboxes shown only to General Managers; roles are not editable on one's own account. On success, a dialog shows the activation link with a copy button and its expiry, and explains it must be sent by hand.
-3. **User profile** `/team/$userId` — everyone: directory fields and the departments they manage. With `users.manage`: edit form, status, roles, 2FA state, and actions "Copy activation/reset link", "Reset 2FA", "Archive" (confirmation; on `USER_HAS_RESPONSIBILITIES` lists what must be moved first, with links), "Restore".
+2. **New user** `/team/new` (`users.manage`) — form with the fields of `createUserSchema`; skills input suggests skills in use; General Manager and Finance role checkboxes shown only to General Managers; roles are not editable on one's own account. On success, a dialog shows the activation link with a copy button and its expiry, and says it was emailed to the user (F14 email rule 13).
+3. **User profile** `/team/$userId` — everyone: directory fields and the departments they manage. With `users.manage`: edit form, status, roles, 2FA state, and actions "Copy activation/reset link", "Reset 2FA", "Archive" (confirmation; on `USER_HAS_RESPONSIBILITIES` lists what must be moved first, with links), "Restore". A refused edit that names records (`USER_HAS_RESPONSIBILITIES` when a role is removed, `MANAGER_MEMBERSHIP_REQUIRED`) names them in the form's error.
 4. **Departments** `/departments` — the ten departments: name, manager, member count. **Department** `/departments/$departmentId` — members (primary first), manager. With `users.manage`: rename, change manager (picker lists active members only).
 5. **My account** `/account` — own profile (read-only fields), edit phone and skills, change password, enable 2FA or disable it (hidden when required), regenerate backup codes.
-6. **Activate / reset password** `/activate#token=…` (public; the token is in the fragment so it never reaches server logs) — new password twice, then redirect to sign-in. Invalid or expired token: explanation and "ask your manager for a new link".
+6. **Activate / reset password** `/activate#token=…` (public; the token is in the fragment so it never reaches server logs) — the link is checked on opening (`/api/password-links/check`), so a dead link shows before any typing. The token leaves the address bar on opening and is kept in the tab's sessionStorage, so a reload works; it is cleared when done or dead. Activation and reset have their own title, intro and confirmation. The account's email shows read-only; new password twice; then a confirmation and redirect to sign-in (any other session open in the browser is signed out first). Invalid, used, expired or replaced link: explanation, "request a new link" (`/forgot-password`) and "back to sign-in".
 7. **Set up 2FA** `/setup-two-factor` — QR code and manual key, code confirmation, backup codes shown once with copy. Required users are redirected here until done.
 8. **Sign-in** `/login` — adds the 2FA code step (code or backup code).
 9. **Audit log** `/audit` (`audit.read`) — newest first: time (Asia/Damascus), actor, action (translated), entity (linked where a page exists). Filters: entity type, actor, action, date range. Row expands to show the before/after of changed fields.
 
 ## Audit, notifications and jobs
-- Audit actions: `user.created`, `user.updated` (profile fields), `user.roles_changed`, `user.departments_changed`, `user.archived`, `user.restored`, `user.link_issued` (kind only), `user.password_set` (through a link; actor = the user), `user.password_changed`, `user.two_factor_enabled`, `user.two_factor_disabled`, `user.two_factor_reset`, `user.profile_updated` (own phone and skills), `department.updated`.
+- Audit actions: `user.created`, `user.updated` (profile fields), `user.roles_changed`, `user.departments_changed`, `user.archived`, `user.restored`, `user.link_issued` (kind only), `user.password_set` (through a link; actor = the user), `user.password_changed`, `user.two_factor_enabled`, `user.two_factor_disabled`, `user.two_factor_reset`, `user.backup_codes_regenerated` (owner decision 2026-10-06), `user.profile_updated` (own phone and skills), `department.updated`.
 - Sign-ins are not audited; sessions are recorded in `sessions`.
 - Notifications: none in F01 (F14 is not built). When F14 email exists, links are also emailed (depends on Q5).
 - Jobs: none.

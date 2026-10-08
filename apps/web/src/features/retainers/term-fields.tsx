@@ -125,9 +125,11 @@ export function TermPlanEditor({
   problems: TermProblems;
 }) {
   const { t } = useTranslation();
-  const ids = { months: useId(), total: useId(), schedule: useId() };
+  const ids = { months: useId(), total: useId(), schedule: useId(), scheduleError: useId() };
   const scheduled = value.schedule.reduce<number>((sum, amount) => sum + (amount ?? 0), 0);
   const remaining = (value.agreedTotalMinor ?? 0) - scheduled;
+  // The mismatch shows until the amounts add up again, without another save.
+  const scheduleInvalid = !!problems.schedule && remaining !== 0;
 
   return (
     <div className="flex flex-col gap-5">
@@ -202,6 +204,8 @@ export function TermPlanEditor({
                   </span>
                   <MoneyInput
                     aria-label={t('retainers.terms.monthAmount', { month: month ?? label })}
+                    aria-invalid={scheduleInvalid || undefined}
+                    aria-describedby={scheduleInvalid ? ids.scheduleError : undefined}
                     currency={currency}
                     value={amount}
                     onValueChange={(minor) =>
@@ -237,8 +241,8 @@ export function TermPlanEditor({
             )}
           </p>
           <p className="text-sm text-muted-foreground">{t('retainers.terms.scheduleHint')}</p>
-          {problems.schedule && (
-            <p role="alert" className="text-sm text-destructive-text">
+          {scheduleInvalid && (
+            <p id={ids.scheduleError} role="alert" className="text-sm text-destructive-text">
               {t('retainers.terms.errors.schedule')}
             </p>
           )}

@@ -21,6 +21,9 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
 } from '@vertex-hub/ui';
 import { SearchIcon, UserPlusIcon, UsersIcon } from 'lucide-react';
 import { useCallback } from 'react';
@@ -28,7 +31,7 @@ import { useTranslation } from 'react-i18next';
 import { LoadError } from '../../components/load-error';
 import { can, useMe } from '../../lib/auth';
 import { formatList, formatNumber } from '../../lib/format';
-import { idParam, oneOfParam, pageParam, textParam } from '../../lib/search-params';
+import { ALL, idParam, oneOfParam, pageParam, textParam } from '../../lib/search-params';
 import { usePageInRange } from '../../lib/use-page-in-range';
 import { useSearchText } from '../../lib/use-search-text';
 import { departmentListQuery } from '../departments/departments.queries';
@@ -44,7 +47,6 @@ export interface TeamSearch {
 }
 
 const PAGE_SIZE = 25;
-const ALL = 'all';
 
 /** Reads the directory filters from the URL, dropping anything malformed. */
 export function parseTeamSearch(search: Record<string, unknown>): TeamSearch {
@@ -172,8 +174,9 @@ function Filters({
   }));
 
   return (
-    <div className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-3 md:flex-row md:items-center">
-      <div className="relative flex-1">
+    <div className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-3 md:flex-row md:flex-wrap md:items-center">
+      {/* Keeps room to type; the selects wrap under it when the row is narrow. */}
+      <div className="relative flex-1 md:min-w-64">
         <SearchIcon
           aria-hidden="true"
           className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
@@ -326,6 +329,7 @@ function SkillList({ skills }: { skills: string[] }) {
   const { t } = useTranslation();
   if (skills.length === 0) return <span className="text-muted-foreground">{t('common.none')}</span>;
   const shown = skills.slice(0, 3);
+  const rest = skills.slice(3);
   return (
     <div className="flex max-w-64 flex-wrap gap-1">
       {shown.map((skill) => (
@@ -333,10 +337,16 @@ function SkillList({ skills }: { skills: string[] }) {
           {skill}
         </Badge>
       ))}
-      {skills.length > shown.length && (
-        <Badge tone="outline" dir="ltr" title={formatList(skills.slice(3))}>
-          {t('users.moreSkills', { count: skills.length - shown.length })}
-        </Badge>
+      {rest.length > 0 && (
+        <Tooltip>
+          <TooltipTrigger
+            render={<Badge tone="outline" render={<button type="button" />} />}
+            aria-label={t('users.moreSkillsLabel', { skills: formatList(rest) })}
+          >
+            <span dir="ltr">{t('users.moreSkills', { count: rest.length })}</span>
+          </TooltipTrigger>
+          <TooltipContent>{formatList(rest)}</TooltipContent>
+        </Tooltip>
       )}
     </div>
   );

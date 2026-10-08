@@ -5,7 +5,6 @@ import {
   type ApprovalItemKind,
   type ReadyClient,
   type ReadyPost,
-  type ReadyTask,
 } from '@vertex-hub/contracts';
 import {
   Button,
@@ -20,7 +19,7 @@ import {
   Skeleton,
 } from '@vertex-hub/ui';
 import { LinkIcon, SendToBackIcon, ShieldAlertIcon } from 'lucide-react';
-import { type ReactNode, useId, useState } from 'react';
+import { type ReactNode, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LoadError } from '../../components/load-error';
 import { formatMonth, formatNumber } from '../../lib/format';
@@ -28,14 +27,13 @@ import { HealthcareBadge } from '../clients/client-badges';
 import { formatDue, TaskOverdueBadge } from '../tasks/task-badges';
 import { ItemKindBadge } from './approval-parts';
 import { approvalReadyQuery } from './approvals.queries';
-import { PostSnapshotSummary, RequestDialog, SnapshotSummary } from './request-dialog';
-
-/** What a new request holds: kept while its dialog is open, whatever the list reloads to. */
-export interface RequestDraft {
-  client: ReadyClient;
-  tasks: ReadyTask[];
-  posts: ReadyPost[];
-}
+import {
+  PostSnapshotSummary,
+  RequestDialog,
+  type RequestDraft,
+  SnapshotSummary,
+  useRequestDialog,
+} from './request-dialog';
 
 /** A month of publishing, `YYYY-MM`. */
 const monthOf = (post: ReadyPost) => post.publishDate.slice(0, 7);
@@ -50,7 +48,11 @@ export function ReadyTab() {
   const { t } = useTranslation();
   const ready = useQuery(approvalReadyQuery());
   const [month, setMonth] = useState<string | null>(null);
-  const [draft, setDraft] = useState<RequestDraft | null>(null);
+  const cards = useRef<HTMLDivElement>(null);
+  // Once sent, the items leave the card and its button turns off: the card's first checkbox.
+  const request = useRequestDialog((draft) =>
+    firstControl(cards.current?.querySelector(`[data-client="${draft.client.client.id}"]`)),
+  );
   const months = [
     ...new Set(ready.data?.clients.flatMap((entry) => entry.posts.map(monthOf)) ?? []),
   ].sort();
@@ -77,7 +79,7 @@ export function ReadyTab() {
           description={t('approvals.ready.emptyHint')}
         />
       ) : (
-        <div className="flex flex-col gap-4">
+        <div ref={cards} className="flex flex-col gap-4">
           {months.length > 0 && <MonthPicker months={months} value={active} onChange={setMonth} />}
           {clients.length === 0 ? (
             <EmptyState
@@ -87,19 +89,12 @@ export function ReadyTab() {
             />
           ) : (
             clients.map((entry) => (
-              <ReadyClientCard key={entry.client.id} entry={entry} onCreate={setDraft} />
+              <ReadyClientCard key={entry.client.id} entry={entry} onCreate={request.open} />
             ))
           )}
         </div>
       )}
-      {draft && (
-        <RequestDialog
-          client={draft.client}
-          tasks={draft.tasks}
-          posts={draft.posts}
-          onClose={() => setDraft(null)}
-        />
-      )}
+      <RequestDialog {...request.dialog} />
     </>
   );
 }
@@ -148,6 +143,12 @@ function MonthPicker({
 
 const keyOf = (kind: ApprovalItemKind, id: string) => `${kind}:${id}`;
 
+/** A card's first checkbox, else its client link. */
+const firstControl = (card: Element | null | undefined) =>
+  card?.querySelector<HTMLElement>('[role="checkbox"]:not([data-disabled])') ??
+  card?.querySelector<HTMLElement>('a') ??
+  null;
+
 function ReadyClientCard({
   entry,
   onCreate,
@@ -191,6 +192,7 @@ function ReadyClientCard({
   return (
     <section
       aria-label={entry.client.name}
+      data-client={entry.client.id}
       className="overflow-hidden rounded-lg border border-border bg-surface"
     >
       <div className="flex flex-wrap items-center gap-3 border-b border-border px-4 py-3">

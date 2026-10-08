@@ -20,12 +20,14 @@ import {
   Textarea,
   toast,
 } from '@vertex-hub/ui';
-import { useId, useState } from 'react';
+import { type ComponentProps, useId, useRef, useState } from 'react';
 import { Controller, useForm, useWatch } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { MoneyInput } from '../../components/money-input';
+import { ApiError } from '../../lib/api/client';
 import { canAll, useMe } from '../../lib/auth';
-import { errorMessage } from '../../lib/errors';
+import { errorMessage, errorRole, fieldError, SCREEN_ERROR } from '../../lib/errors';
+import { useFocusFirstError } from '../../lib/focus-first-invalid';
 import { clientListQuery } from '../clients/clients.queries';
 import { projectListQuery } from '../projects/projects.queries';
 import { type Choice, ChoiceSelect } from '../quotes/choice-select';
@@ -36,6 +38,15 @@ import { userListQuery } from '../users/users.queries';
 import { useCreateCampaign, useUpdateCampaign } from './campaigns.queries';
 
 const NONE = 'none';
+
+/** The field a refusal concerns; any other refusal shows above the buttons. */
+const FIELD_OF_CODE: Partial<Record<string, keyof CampaignValues>> = {
+  CLIENT_ARCHIVED: 'clientId',
+  INVALID_OWNER: 'ownerId',
+  INVALID_ENGAGEMENT: 'engagement',
+  INVALID_DATES: 'endsOn',
+  FUNDING_LOCKED: 'funding',
+};
 
 interface CampaignValues {
   clientId: string;
@@ -97,6 +108,7 @@ export function CampaignDialog({
   onClose,
   clientId: fixedClientId,
   campaign,
+  finalFocus,
 }: {
   open: boolean;
   onClose: () => void;
@@ -104,6 +116,8 @@ export function CampaignDialog({
   clientId?: string;
   /** The campaign to edit. */
   campaign?: CampaignDetail;
+  /** Where the focus goes when it closes: the button that opened it, or what replaced it. */
+  finalFocus: ComponentProps<typeof FormDialog>['finalFocus'];
 }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -122,7 +136,10 @@ export function CampaignDialog({
   const create = useCreateCampaign();
   const update = useUpdateCampaign(campaign?.id ?? '');
   const defaults: CampaignValues = valuesOf(campaign, fixedClientId, me.user.id);
-  const form = useForm<CampaignValues>({ values: defaults });
+  // The first invalid field takes the focus, selects included (they register no element).
+  const form = useForm<CampaignValues>({ values: defaults, shouldFocusError: false });
+  const fields = useRef<HTMLDivElement>(null);
+  useFocusFirstError(form.formState.submitCount, fields);
   const [failure, setFailure] = useState<string | null>(null);
   const { errors } = form.formState;
   const clientId = useWatch({ control: form.control, name: 'clientId' });
@@ -154,12 +171,6 @@ export function CampaignDialog({
     enabled: open && !!clientId,
     placeholderData: undefined,
   });
-
-  function close() {
-    setFailure(null);
-    form.reset(defaults);
-    onClose();
-  }
 
   const submit = form.handleSubmit(async (values) => {
     setFailure(null);
@@ -202,17 +213,23 @@ export function CampaignDialog({
         if (!checked.success) return showIssues(checked.error.issues);
         await update.mutateAsync(checked.data);
         toast.add({ title: t('campaigns.edit.saved'), type: 'success' });
-        close();
+        onClose();
         return;
       }
       const checked = createCampaignSchema.safeParse({ ...fields, clientId: values.clientId });
       if (!checked.success) return showIssues(checked.error.issues);
       const created = await create.mutateAsync(checked.data);
       toast.add({ title: t('campaigns.new.created'), type: 'success' });
-      close();
+      onClose();
       await navigate({ to: '/campaigns/$campaignId', params: { campaignId: created.id } });
     } catch (error) {
-      setFailure(errorMessage(t, error));
+      const field = error instanceof ApiError ? FIELD_OF_CODE[error.code ?? ''] : undefined;
+      // The client is fixed on an edit and from a client's profile: no field to show it under.
+      if (field && !(field === 'clientId' && (editing || fixedClientId))) {
+        form.setError(field, { type: SCREEN_ERROR, message: errorMessage(t, error) });
+      } else {
+        setFailure(errorMessage(t, error));
+      }
     }
   });
 
@@ -274,7 +291,13 @@ export function CampaignDialog({
   return (
     <FormDialog
       open={open}
-      onClose={close}
+      onClose={onClose}
+      // Reset once it has faded out, so nothing typed is kept for the next opening.
+      onClosed={() => {
+        setFailure(null);
+        form.reset(defaults);
+      }}
+      finalFocus={finalFocus}
       submitting={form.formState.isSubmitting}
       title={editing ? t('campaigns.edit.title') : t('campaigns.new.title')}
       description={editing ? t('campaigns.edit.hint') : t('campaigns.new.hint')}
@@ -282,201 +305,215 @@ export function CampaignDialog({
       failure={failure}
       onSubmit={submit}
     >
-      {!editing && !fixedClientId && (
-        <Controller
-          control={form.control}
-          name="clientId"
-          rules={{ validate: (value) => !!value }}
-          render={({ field }) => (
-            <Field invalid={!!errors.clientId}>
-              <FieldLabel id={ids.client} render={<span />}>
-                {t('campaigns.form.client')}
-              </FieldLabel>
-              <ChoiceSelect
-                labelledBy={ids.client}
-                items={clientItems}
-                value={field.value || null}
-                placeholder={t('campaigns.form.pickClient')}
-                onChange={(next) => {
-                  field.onChange(next);
-                  form.setValue('engagement', NONE);
-                  form.setValue('taskId', NONE);
-                }}
-              />
-              <FieldError match={!!errors.clientId}>{t('campaigns.form.errors.client')}</FieldError>
-            </Field>
-          )}
-        />
-      )}
-      <Field invalid={!!errors.name}>
-        <FieldLabel>{t('campaigns.form.name')}</FieldLabel>
-        <Input autoComplete="off" {...form.register('name')} />
-        <FieldError match={!!errors.name}>{t('campaigns.form.errors.name')}</FieldError>
-      </Field>
-      <div className="grid gap-5 sm:grid-cols-2">
-        <Controller
-          control={form.control}
-          name="platform"
-          rules={{ validate: (value) => value !== null }}
-          render={({ field }) => (
-            <Field invalid={!!errors.platform}>
-              <FieldLabel id={ids.platform} render={<span />}>
-                {t('campaigns.form.platform')}
-              </FieldLabel>
-              <ChoiceSelect
-                labelledBy={ids.platform}
-                items={platformItems}
-                value={field.value}
-                placeholder={t('campaigns.form.pick')}
-                onChange={field.onChange}
-              />
-              <FieldError match={!!errors.platform}>
-                {t('campaigns.form.errors.platform')}
-              </FieldError>
-            </Field>
-          )}
-        />
-        <Controller
-          control={form.control}
-          name="objective"
-          rules={{ validate: (value) => value !== null }}
-          render={({ field }) => (
-            <Field invalid={!!errors.objective}>
-              <FieldLabel id={ids.objective} render={<span />}>
-                {t('campaigns.form.objective')}
-              </FieldLabel>
-              <ChoiceSelect
-                labelledBy={ids.objective}
-                items={objectiveItems}
-                value={field.value}
-                placeholder={t('campaigns.form.pick')}
-                onChange={field.onChange}
-              />
-              <FieldError match={!!errors.objective}>
-                {t('campaigns.form.errors.objective')}
-              </FieldError>
-            </Field>
-          )}
-        />
-        <Controller
-          control={form.control}
-          name="funding"
-          render={({ field }) => (
-            <Field>
-              <FieldLabel id={ids.funding} render={<span />}>
-                {t('campaigns.form.funding')}
-              </FieldLabel>
-              <ChoiceSelect
-                labelledBy={ids.funding}
-                items={fundingItems}
-                value={field.value}
-                disabled={fundingLocked}
-                onChange={field.onChange}
-              />
-              <FieldDescription>
-                {fundingLocked
-                  ? t('campaigns.form.fundingLocked')
-                  : t('campaigns.form.fundingHint')}
-              </FieldDescription>
-            </Field>
-          )}
-        />
-        <Controller
-          control={form.control}
-          name="budgetMinor"
-          rules={{ validate: (minor) => !!minor && minor > 0 }}
-          render={({ field }) => (
-            <Field invalid={!!errors.budgetMinor}>
-              <FieldLabel htmlFor={ids.budget}>{t('campaigns.form.budget')}</FieldLabel>
-              <MoneyInput
-                id={ids.budget}
-                currency="USD"
-                value={field.value}
-                onValueChange={field.onChange}
-              />
-              <FieldDescription>{t('campaigns.form.budgetHint')}</FieldDescription>
-              <FieldError match={!!errors.budgetMinor}>
-                {t('campaigns.form.errors.budget')}
-              </FieldError>
-            </Field>
-          )}
-        />
-        <Field invalid={!!errors.startsOn}>
-          <FieldLabel>{t('campaigns.form.startsOn')}</FieldLabel>
-          <Input type="date" {...form.register('startsOn', { required: true })} />
-          <FieldError match={!!errors.startsOn}>{t('campaigns.form.errors.startsOn')}</FieldError>
-        </Field>
-        <Field invalid={!!errors.endsOn}>
-          <FieldLabel>{t('campaigns.form.endsOn')}</FieldLabel>
-          <Input type="date" {...form.register('endsOn')} />
-          <FieldDescription>{t('campaigns.form.endsOnHint')}</FieldDescription>
-          <FieldError match={!!errors.endsOn}>{t('errors.INVALID_DATES')}</FieldError>
-        </Field>
-      </div>
-      <Controller
-        control={form.control}
-        name="ownerId"
-        rules={{ validate: (value) => !!value }}
-        render={({ field }) => (
-          <Field invalid={!!errors.ownerId}>
-            <FieldLabel id={ids.owner} render={<span />}>
-              {t('campaigns.form.owner')}
-            </FieldLabel>
-            <ChoiceSelect
-              labelledBy={ids.owner}
-              items={ownerItems}
-              value={field.value}
-              placeholder={t('campaigns.form.pickOwner')}
-              onChange={field.onChange}
-            />
-            <FieldError match={!!errors.ownerId}>{t('campaigns.form.errors.owner')}</FieldError>
-          </Field>
+      <div ref={fields} className="contents">
+        {!editing && !fixedClientId && (
+          <Controller
+            control={form.control}
+            name="clientId"
+            rules={{ validate: (value) => !!value }}
+            render={({ field }) => (
+              <Field invalid={!!errors.clientId}>
+                <FieldLabel id={ids.client} render={<span />}>
+                  {t('campaigns.form.client')}
+                </FieldLabel>
+                <ChoiceSelect
+                  labelledBy={ids.client}
+                  items={clientItems}
+                  value={field.value || null}
+                  placeholder={t('campaigns.form.pickClient')}
+                  onChange={(next) => {
+                    field.onChange(next);
+                    form.setValue('engagement', NONE);
+                    form.setValue('taskId', NONE);
+                  }}
+                />
+                <FieldError match={!!errors.clientId} role={errorRole(errors.clientId)}>
+                  {fieldError(errors.clientId, t('campaigns.form.errors.client'))}
+                </FieldError>
+              </Field>
+            )}
+          />
         )}
-      />
-      {clientId && (
+        <Field invalid={!!errors.name}>
+          <FieldLabel>{t('campaigns.form.name')}</FieldLabel>
+          <Input autoComplete="off" {...form.register('name')} />
+          <FieldError match={!!errors.name}>{t('campaigns.form.errors.name')}</FieldError>
+        </Field>
         <div className="grid gap-5 sm:grid-cols-2">
           <Controller
             control={form.control}
-            name="engagement"
+            name="platform"
+            rules={{ validate: (value) => value !== null }}
             render={({ field }) => (
-              <Field invalid={!!errors.engagement}>
-                <FieldLabel id={ids.engagement} render={<span />}>
-                  {t('campaigns.form.engagement')}
+              <Field invalid={!!errors.platform}>
+                <FieldLabel id={ids.platform} render={<span />}>
+                  {t('campaigns.form.platform')}
                 </FieldLabel>
                 <ChoiceSelect
-                  labelledBy={ids.engagement}
-                  items={engagementItems}
+                  labelledBy={ids.platform}
+                  items={platformItems}
                   value={field.value}
+                  placeholder={t('campaigns.form.pick')}
                   onChange={field.onChange}
                 />
-                <FieldDescription>{t('campaigns.form.linksHint')}</FieldDescription>
+                <FieldError match={!!errors.platform}>
+                  {t('campaigns.form.errors.platform')}
+                </FieldError>
               </Field>
             )}
           />
           <Controller
             control={form.control}
-            name="taskId"
+            name="objective"
+            rules={{ validate: (value) => value !== null }}
             render={({ field }) => (
-              <Field>
-                <FieldLabel id={ids.task} render={<span />}>
-                  {t('campaigns.form.task')}
+              <Field invalid={!!errors.objective}>
+                <FieldLabel id={ids.objective} render={<span />}>
+                  {t('campaigns.form.objective')}
                 </FieldLabel>
                 <ChoiceSelect
-                  labelledBy={ids.task}
-                  items={taskItems}
+                  labelledBy={ids.objective}
+                  items={objectiveItems}
                   value={field.value}
+                  placeholder={t('campaigns.form.pick')}
                   onChange={field.onChange}
                 />
+                <FieldError match={!!errors.objective}>
+                  {t('campaigns.form.errors.objective')}
+                </FieldError>
               </Field>
             )}
           />
+          <Controller
+            control={form.control}
+            name="funding"
+            render={({ field }) => (
+              <Field invalid={!!errors.funding}>
+                <FieldLabel id={ids.funding} render={<span />}>
+                  {t('campaigns.form.funding')}
+                </FieldLabel>
+                <ChoiceSelect
+                  labelledBy={ids.funding}
+                  items={fundingItems}
+                  value={field.value}
+                  disabled={fundingLocked}
+                  onChange={field.onChange}
+                />
+                <FieldDescription>
+                  {fundingLocked
+                    ? t('campaigns.form.fundingLocked')
+                    : t('campaigns.form.fundingHint')}
+                </FieldDescription>
+                <FieldError match={!!errors.funding} role={errorRole(errors.funding)}>
+                  {errors.funding?.message}
+                </FieldError>
+              </Field>
+            )}
+          />
+          <Controller
+            control={form.control}
+            name="budgetMinor"
+            rules={{ validate: (minor) => !!minor && minor > 0 }}
+            render={({ field }) => (
+              <Field invalid={!!errors.budgetMinor}>
+                <FieldLabel htmlFor={ids.budget}>{t('campaigns.form.budget')}</FieldLabel>
+                <MoneyInput
+                  id={ids.budget}
+                  currency="USD"
+                  value={field.value}
+                  onValueChange={field.onChange}
+                />
+                <FieldDescription>{t('campaigns.form.budgetHint')}</FieldDescription>
+                <FieldError match={!!errors.budgetMinor}>
+                  {t('campaigns.form.errors.budget')}
+                </FieldError>
+              </Field>
+            )}
+          />
+          <Field invalid={!!errors.startsOn}>
+            <FieldLabel>{t('campaigns.form.startsOn')}</FieldLabel>
+            <Input type="date" dir="ltr" {...form.register('startsOn', { required: true })} />
+            <FieldError match={!!errors.startsOn}>{t('campaigns.form.errors.startsOn')}</FieldError>
+          </Field>
+          <Field invalid={!!errors.endsOn}>
+            <FieldLabel>{t('campaigns.form.endsOn')}</FieldLabel>
+            <Input type="date" dir="ltr" {...form.register('endsOn')} />
+            <FieldDescription>{t('campaigns.form.endsOnHint')}</FieldDescription>
+            <FieldError match={!!errors.endsOn} role={errorRole(errors.endsOn)}>
+              {fieldError(errors.endsOn, t('campaigns.form.errors.endsOn'))}
+            </FieldError>
+          </Field>
         </div>
-      )}
-      <Field invalid={!!errors.notes}>
-        <FieldLabel>{t('campaigns.form.notes')}</FieldLabel>
-        <Textarea rows={3} {...form.register('notes')} />
-        <FieldError match={!!errors.notes}>{t('campaigns.form.errors.notes')}</FieldError>
-      </Field>
+        <Controller
+          control={form.control}
+          name="ownerId"
+          rules={{ validate: (value) => !!value }}
+          render={({ field }) => (
+            <Field invalid={!!errors.ownerId}>
+              <FieldLabel id={ids.owner} render={<span />}>
+                {t('campaigns.form.owner')}
+              </FieldLabel>
+              <ChoiceSelect
+                labelledBy={ids.owner}
+                items={ownerItems}
+                value={field.value}
+                placeholder={t('campaigns.form.pickOwner')}
+                onChange={field.onChange}
+              />
+              <FieldError match={!!errors.ownerId} role={errorRole(errors.ownerId)}>
+                {fieldError(errors.ownerId, t('campaigns.form.errors.owner'))}
+              </FieldError>
+            </Field>
+          )}
+        />
+        {clientId && (
+          <div className="grid gap-5 sm:grid-cols-2">
+            <Controller
+              control={form.control}
+              name="engagement"
+              render={({ field }) => (
+                <Field invalid={!!errors.engagement}>
+                  <FieldLabel id={ids.engagement} render={<span />}>
+                    {t('campaigns.form.engagement')}
+                  </FieldLabel>
+                  <ChoiceSelect
+                    labelledBy={ids.engagement}
+                    items={engagementItems}
+                    value={field.value}
+                    onChange={field.onChange}
+                  />
+                  <FieldDescription>{t('campaigns.form.linksHint')}</FieldDescription>
+                  <FieldError match={!!errors.engagement} role={errorRole(errors.engagement)}>
+                    {fieldError(errors.engagement, t('errors.INVALID_ENGAGEMENT'))}
+                  </FieldError>
+                </Field>
+              )}
+            />
+            <Controller
+              control={form.control}
+              name="taskId"
+              render={({ field }) => (
+                <Field>
+                  <FieldLabel id={ids.task} render={<span />}>
+                    {t('campaigns.form.task')}
+                  </FieldLabel>
+                  <ChoiceSelect
+                    labelledBy={ids.task}
+                    items={taskItems}
+                    value={field.value}
+                    onChange={field.onChange}
+                  />
+                </Field>
+              )}
+            />
+          </div>
+        )}
+        <Field invalid={!!errors.notes}>
+          <FieldLabel>{t('campaigns.form.notes')}</FieldLabel>
+          <Textarea rows={3} {...form.register('notes')} />
+          <FieldError match={!!errors.notes}>{t('campaigns.form.errors.notes')}</FieldError>
+        </Field>
+      </div>
     </FormDialog>
   );
 }

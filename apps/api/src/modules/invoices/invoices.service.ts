@@ -314,8 +314,6 @@ export class InvoicesService {
         input,
         id,
       );
-      await tx.delete(invoiceLines).where(eq(invoiceLines.invoiceId, id));
-      await this.insertLines(tx, id, prepared.lines);
       const fields = {
         projectId: prepared.engagement?.type === 'project' ? prepared.engagement.id : null,
         retainerId: prepared.engagement?.type === 'retainer' ? prepared.engagement.id : null,
@@ -323,6 +321,25 @@ export class InvoicesService {
         notes: input.notes,
         totalMinor: invoiceTotal(prepared.lines),
       };
+      const stored = {
+        projectId: invoice.projectId,
+        retainerId: invoice.retainerId,
+        paymentTermsDays: invoice.paymentTermsDays,
+        notes: invoice.notes,
+        totalMinor: invoice.totalMinor,
+      };
+      const sameLines =
+        before.length === prepared.lines.length &&
+        before.every((line, index) => {
+          const next = prepared.lines[index];
+          return !!next && LINE_FIELDS.every((field) => line[field] === next[field]);
+        });
+      // Nothing changed: the draft keeps its `updatedAt` and no audit entry is written.
+      if (sameLines && !changedFields(stored, fields)) {
+        return this.toDetail(actor, invoice, client, tx);
+      }
+      await tx.delete(invoiceLines).where(eq(invoiceLines.invoiceId, id));
+      await this.insertLines(tx, id, prepared.lines);
       const [updated] = await tx
         .update(invoices)
         .set({ ...fields, updatedAt: new Date() })
@@ -330,14 +347,7 @@ export class InvoicesService {
         .returning();
       if (!updated) throw new NotFoundException();
       const changes = changedFields(
-        {
-          projectId: invoice.projectId,
-          retainerId: invoice.retainerId,
-          paymentTermsDays: invoice.paymentTermsDays,
-          notes: invoice.notes,
-          totalMinor: invoice.totalMinor,
-          lineCount: before.length,
-        },
+        { ...stored, lineCount: before.length },
         { ...fields, lineCount: prepared.lines.length },
       );
       await recordAudit(tx, {
@@ -785,6 +795,17 @@ export class InvoicesService {
 }
 
 const OPEN_STATUSES: readonly InvoiceStatus[] = OPEN_INVOICE_STATUSES;
+
+/** What a saved line holds, compared to tell a draft save that changes nothing. */
+const LINE_FIELDS = [
+  'description',
+  'quantity',
+  'unitPriceMinor',
+  'milestoneId',
+  'retainerChargeId',
+  'extraWorkItemId',
+  'serviceId',
+] as const satisfies readonly (keyof NewLine)[];
 
 /** A source can be billed: not archived, and extra work still unbilled. */
 function assertBillable(source: BillingSource): void {

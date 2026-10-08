@@ -28,6 +28,7 @@ import {
   FieldDescription,
   FieldError,
   FieldLabel,
+  IconButton,
   Input,
   Select,
   SelectContent,
@@ -52,7 +53,7 @@ import {
   StickyNoteIcon,
   UsersRoundIcon,
 } from 'lucide-react';
-import { useId, useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '../../components/confirm-dialog';
@@ -68,6 +69,8 @@ import {
   toBusinessDateTimeInput,
 } from '../../lib/format';
 import { ALL } from '../../lib/search-params';
+import { useReturnFocus } from '../../lib/use-return-focus';
+import { useShownWhileClosing } from '../../lib/use-shown-while-closing';
 import {
   type NoteFilters,
   notesQuery,
@@ -96,14 +99,23 @@ export function CommunicationTab({
   const [filters, setFilters] = useState<NoteFilters>({});
   const notes = useInfiniteQuery(notesQuery(client.id, filters));
   const [editing, setEditing] = useState<Note | null>(null);
+  // The note stays in its dialog while the dialog fades out.
+  const shownNote = useShownWhileClosing(editing);
   const [withdrawing, setWithdrawing] = useState<Note | null>(null);
   const archive = useArchiveNote(client.id);
+  // A withdrawn note leaves with its menu: the focus goes to the tab's heading instead.
+  const heading = useRef<HTMLHeadingElement>(null);
+  const returnFocus = useReturnFocus(heading);
   const filtered = filters.channel !== undefined || filters.contactId !== undefined;
   const items = notes.data?.pages.flatMap((page) => page.items) ?? [];
 
   return (
     <>
-      <TabHeader title={t('clients.notes.title')} description={t('clients.notes.description')} />
+      <TabHeader
+        title={t('clients.notes.title')}
+        description={t('clients.notes.description')}
+        headingRef={heading}
+      />
 
       {!archived && (
         <Card className="gap-4 p-5">
@@ -136,8 +148,14 @@ export function CommunicationTab({
           <Timeline
             notes={items}
             readOnly={archived}
-            onEdit={setEditing}
-            onWithdraw={setWithdrawing}
+            onEdit={(note, opener) => {
+              returnFocus.from(opener);
+              setEditing(note);
+            }}
+            onWithdraw={(note, opener) => {
+              returnFocus.from(opener);
+              setWithdrawing(note);
+            }}
           />
           {notes.hasNextPage && (
             <Button
@@ -153,11 +171,18 @@ export function CommunicationTab({
       )}
 
       <Dialog open={editing !== null} onOpenChange={(open) => !open && setEditing(null)}>
-        <DialogContent closeLabel={t('common.close')} className="max-w-2xl">
+        <DialogContent
+          closeLabel={t('common.close')}
+          className="max-w-2xl"
+          finalFocus={() => returnFocus.target() ?? true}
+        >
           <DialogHeader>
             <DialogTitle>{t('clients.notes.editTitle')}</DialogTitle>
           </DialogHeader>
-          {editing && <NoteForm client={client} note={editing} onDone={() => setEditing(null)} />}
+          {/* Base UI unmounts the content after the exit animation: each opening starts afresh. */}
+          {shownNote && (
+            <NoteForm client={client} note={shownNote} onDone={() => setEditing(null)} />
+          )}
         </DialogContent>
       </Dialog>
       <ConfirmDialog
@@ -168,6 +193,7 @@ export function CommunicationTab({
         action={t('clients.notes.archiveAction')}
         destructive
         pending={archive.isPending}
+        finalFocus={() => returnFocus.target() ?? true}
         onConfirm={async () => {
           if (!withdrawing) return;
           await archive.mutateAsync(withdrawing.id);
@@ -255,8 +281,9 @@ function Timeline({
 }: {
   notes: Note[];
   readOnly: boolean;
-  onEdit: (note: Note) => void;
-  onWithdraw: (note: Note) => void;
+  /** Each gets the note's menu button, where the focus returns. */
+  onEdit: (note: Note, opener: HTMLElement | null) => void;
+  onWithdraw: (note: Note, opener: HTMLElement | null) => void;
 }) {
   const days = new Map<string, Note[]>();
   for (const note of notes) {
@@ -277,8 +304,8 @@ function Timeline({
                 key={note.id}
                 note={note}
                 readOnly={readOnly}
-                onEdit={() => onEdit(note)}
-                onWithdraw={() => onWithdraw(note)}
+                onEdit={(opener) => onEdit(note, opener)}
+                onWithdraw={(opener) => onWithdraw(note, opener)}
               />
             ))}
           </ol>
@@ -296,10 +323,11 @@ function TimelineEntry({
 }: {
   note: Note;
   readOnly: boolean;
-  onEdit: () => void;
-  onWithdraw: () => void;
+  onEdit: (opener: HTMLElement | null) => void;
+  onWithdraw: (opener: HTMLElement | null) => void;
 }) {
   const { t } = useTranslation();
+  const menuButton = useRef<HTMLButtonElement>(null);
   const Icon = channelIcon[note.channel];
   const canEdit = !readOnly && note.canEdit;
   const canWithdraw = !readOnly && note.canArchive;
@@ -340,10 +368,9 @@ function TimelineEntry({
               <DropdownMenu>
                 <DropdownMenuTrigger
                   render={
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      aria-label={t('clients.notes.actions')}
+                    <IconButton
+                      ref={menuButton}
+                      label={t('clients.notes.actions', { time: formatTime(note.occurredAt) })}
                     />
                   }
                 >
@@ -351,14 +378,17 @@ function TimelineEntry({
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   {canEdit && (
-                    <DropdownMenuItem onClick={onEdit}>
+                    <DropdownMenuItem onClick={() => onEdit(menuButton.current)}>
                       <PencilIcon />
                       {t('clients.notes.edit')}
                     </DropdownMenuItem>
                   )}
                   {canEdit && canWithdraw && <DropdownMenuSeparator />}
                   {canWithdraw && (
-                    <DropdownMenuItem variant="destructive" onClick={onWithdraw}>
+                    <DropdownMenuItem
+                      variant="destructive"
+                      onClick={() => onWithdraw(menuButton.current)}
+                    >
                       <ArchiveXIcon />
                       {t('clients.notes.archive')}
                     </DropdownMenuItem>
@@ -412,7 +442,8 @@ function NoteForm({
         }
       : freshNote(),
   });
-  const { errors } = form.formState;
+  // Read while rendering: React Hook Form updates only the state a component reads.
+  const { errors, isDirty } = form.formState;
 
   // A removed contact stays selectable on a note that already names it (rule 10).
   const contacts = [
@@ -427,6 +458,8 @@ function NoteForm({
 
   const submit = form.handleSubmit(async (values) => {
     setFailure(null);
+    // Nothing changed: close without a request or a "saved" toast.
+    if (note && !isDirty) return onDone?.();
     try {
       if (note) {
         await update.mutateAsync({ noteId: note.id, ...values });
@@ -522,10 +555,11 @@ function NoteForm({
             name="occurredAt"
             render={({ field }) => (
               <Input
+                ref={field.ref}
                 id={ids.time}
                 type="datetime-local"
                 dir="ltr"
-                className="text-end tabular-nums"
+                className="tabular-nums"
                 max={toBusinessDateTimeInput(new Date())}
                 value={field.value ? toBusinessDateTimeInput(field.value) : ''}
                 onChange={(event) =>

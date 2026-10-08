@@ -16,8 +16,7 @@ import { TabHeader } from '../../components/tab-header';
 import { useMe } from '../../lib/auth';
 import { formatMonth, formatNumber } from '../../lib/format';
 import { approvalReadyQuery } from '../approvals/approvals.queries';
-import type { RequestDraft } from '../approvals/ready-tab';
-import { RequestDialog } from '../approvals/request-dialog';
+import { RequestDialog, useRequestDialog } from '../approvals/request-dialog';
 import { hasClientScope } from '../tasks/task-access';
 import { contentCalendarQuery } from './content.queries';
 import { type CalendarState, ContentCalendar } from './content-calendar';
@@ -61,13 +60,12 @@ export function ClientContentTab({ client }: { client: ClientDetailResponse }) {
         clientId={client.id}
         emptyAction={newPost}
       />
-      {creating && (
-        <NewPostDialog
-          client={{ id: client.id, name: client.tradeName }}
-          defaultDate={state.date}
-          onClose={() => setCreating(false)}
-        />
-      )}
+      <NewPostDialog
+        open={creating}
+        client={{ id: client.id, name: client.tradeName }}
+        defaultDate={state.date}
+        onClose={() => setCreating(false)}
+      />
     </>
   );
 }
@@ -121,8 +119,7 @@ function MonthBar({
 function SendMonth({ client, date }: { client: ClientDetailResponse; date: string }) {
   const { t } = useTranslation();
   const ready = useQuery(approvalReadyQuery(client.id, date.slice(0, 7)));
-  // Kept while the dialog is open: the posts stop being ready once their link exists.
-  const [draft, setDraft] = useState<RequestDraft | null>(null);
+  const request = useRequestDialog();
   const entry = ready.data?.clients.find((candidate) => candidate.client.id === client.id);
   const posts = entry?.posts.slice(0, APPROVAL_LIMITS.items) ?? [];
   const left = (entry?.posts.length ?? 0) - posts.length;
@@ -146,21 +143,14 @@ function SendMonth({ client, date }: { client: ClientDetailResponse; date: strin
         size="sm"
         variant="outline"
         disabled={!entry || posts.length === 0 || !client.hasApprovalContact}
-        onClick={() => entry && setDraft({ client: entry, tasks: [], posts })}
+        onClick={() => entry && request.open({ client: entry, tasks: [], posts })}
       >
         <LinkIcon />
         {posts.length > 0
           ? t('content.sendMonth.actionFor', { n: formatNumber(posts.length) })
           : t('content.sendMonth.action')}
       </Button>
-      {draft && (
-        <RequestDialog
-          client={draft.client}
-          tasks={draft.tasks}
-          posts={draft.posts}
-          onClose={() => setDraft(null)}
-        />
-      )}
+      <RequestDialog {...request.dialog} />
     </div>
   );
 }

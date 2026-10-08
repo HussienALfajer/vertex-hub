@@ -1,6 +1,7 @@
-import type { ComponentProps } from 'react';
+import { type ComponentProps, type Ref, useId } from 'react';
 import { cn } from '../lib/cn';
 import { Input } from './input';
+import { Tooltip, TooltipContent, TooltipTrigger } from './tooltip';
 
 interface ColorSwatchProps extends Omit<ComponentProps<'span'>, 'color'> {
   /**
@@ -55,6 +56,8 @@ interface ColorInputProps {
   pickLabel: string;
   invalid?: boolean;
   className?: string;
+  /** The hex field, where a form puts the focus when the color is invalid. */
+  inputRef?: Ref<HTMLInputElement>;
 }
 
 /**
@@ -69,12 +72,14 @@ function ColorInput({
   pickLabel,
   invalid,
   className,
+  inputRef,
 }: ColorInputProps) {
   const complete = HEX_COLOR.test(value);
+  const pickerId = useId();
   return (
     <div data-slot="color-input" className={cn('flex items-center gap-2', className)}>
       <label
-        title={pickLabel}
+        htmlFor={pickerId}
         className="relative flex size-9 shrink-0 cursor-pointer rounded-md border border-input p-1 transition-colors duration-150 ease-out focus-within:border-primary hover:bg-muted"
       >
         <span className="sr-only">{pickLabel}</span>
@@ -83,16 +88,26 @@ function ColorInput({
         ) : (
           <span className="size-full rounded-sm bg-muted" />
         )}
-        <input
-          // Re-created when the text changes, so the picker opens on the typed color.
-          key={complete ? value : 'empty'}
-          type="color"
-          defaultValue={complete ? value.toLowerCase() : undefined}
-          onChange={(event) => onChange(event.target.value.toUpperCase())}
-          className="absolute inset-0 size-full cursor-pointer opacity-0"
-        />
+        {/* The native picker covers the swatch, so it is what the pointer and the focus reach. */}
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <input
+                // Re-created when the text changes, so the picker opens on the typed color.
+                key={complete ? value : 'empty'}
+                id={pickerId}
+                type="color"
+                defaultValue={complete ? value.toLowerCase() : undefined}
+                onChange={(event) => onChange(event.target.value.toUpperCase())}
+                className="absolute inset-0 size-full cursor-pointer opacity-0"
+              />
+            }
+          />
+          <TooltipContent>{pickLabel}</TooltipContent>
+        </Tooltip>
       </label>
       <Input
+        ref={inputRef}
         id={id}
         dir="ltr"
         value={value}
@@ -102,7 +117,7 @@ function ColorInput({
         spellCheck={false}
         autoComplete="off"
         aria-invalid={invalid || undefined}
-        className="text-end tabular-nums"
+        className="tabular-nums"
       />
     </div>
   );

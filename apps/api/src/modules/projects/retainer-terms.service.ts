@@ -994,8 +994,10 @@ function monthsOf(term: TermRow, charges: readonly ChargeRow[]): RetainerTermMon
     const own = charges.filter((row) => row.termId === term.id && row.month === month);
     const charge = own.find((row) => row.status !== 'cancelled') ?? own.at(-1);
     const live = charge && charge.status !== 'cancelled' ? charge.amountMinor : 0;
+    // T6: the month's additions and credits count while the term still charges the month. A
+    // cancelled month (an early end, a cancelled scheduled term) leaves them to whoever bills it.
     const extras =
-      term.status === 'cancelled'
+      !charge || charge.status === 'cancelled'
         ? 0
         : charges
             .filter(

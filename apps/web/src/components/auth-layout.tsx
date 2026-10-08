@@ -1,6 +1,7 @@
-import { AscentLines, VertexLogo } from '@vertex-hub/ui';
+import { AscentLines, cn, IconTile, VertexLogo } from '@vertex-hub/ui';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { ThemeToggle } from './theme-toggle';
 
 /**
  * The frame of the screens outside the app shell (sign-in, activation, 2FA setup): the form on
@@ -9,9 +10,10 @@ import { useTranslation } from 'react-i18next';
 export function AuthLayout({ children, wide }: { children: ReactNode; wide?: boolean }) {
   const { t } = useTranslation();
   return (
-    <div className="grid min-h-dvh bg-background md:grid-cols-2">
+    <div className="relative grid min-h-dvh bg-background md:grid-cols-2">
+      <ThemeToggle className="absolute top-4 start-4 z-10" />
       <main className="flex items-center justify-center px-6 py-12">
-        <div className={`flex w-full flex-col gap-8 ${wide ? 'max-w-md' : 'max-w-sm'}`}>
+        <div className={cn('flex w-full flex-col gap-8', wide ? 'max-w-md' : 'max-w-sm')}>
           <VertexLogo label={t('app.brand')} className="w-28 text-primary md:hidden" />
           {children}
         </div>
@@ -33,6 +35,31 @@ export function AuthHeading({ title, subtitle }: { title: string; subtitle?: str
     <div className="flex flex-col gap-2">
       <h1 className="text-3xl font-bold">{title}</h1>
       {subtitle && <p className="text-muted-foreground">{subtitle}</p>}
+    </div>
+  );
+}
+
+/** The end of an auth flow (link sent, password saved, dead link): icon, heading and what next. */
+export function AuthOutcome({
+  icon,
+  tone,
+  title,
+  body,
+  children,
+}: {
+  icon: ReactNode;
+  tone: 'success' | 'warning';
+  title: string;
+  body: string;
+  children: ReactNode;
+}) {
+  return (
+    <div role="status" className="flex flex-col gap-6">
+      <IconTile tone={tone} size="lg">
+        {icon}
+      </IconTile>
+      <AuthHeading title={title} subtitle={body} />
+      {children}
     </div>
   );
 }

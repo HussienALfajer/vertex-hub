@@ -23,6 +23,7 @@ import {
   FieldDescription,
   FieldError,
   FieldLabel,
+  IconButton,
   Input,
   Select,
   SelectContent,
@@ -32,6 +33,9 @@ import {
   Textarea,
   ToggleGroup,
   ToggleGroupItem,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
 } from '@vertex-hub/ui';
 import type { TFunction } from 'i18next';
 import {
@@ -50,7 +54,8 @@ import {
   TriangleAlertIcon,
   UserCheckIcon,
 } from 'lucide-react';
-import { type DragEvent, type LiHTMLAttributes, useId, useState } from 'react';
+import { type DragEvent, type LiHTMLAttributes, useEffect, useId, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { Controller, type UseFormReturn, useForm, useWatch } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { ApiError } from '../../lib/api/client';
@@ -58,7 +63,7 @@ import { errorMessage, fieldError, SCREEN_ERROR } from '../../lib/errors';
 import { formatList, formatNumber } from '../../lib/format';
 import { useDepartmentNames } from '../projects/project-badges';
 import { useDepartmentMembers } from '../tasks/task-form';
-import { StepDialog } from './step-dialog';
+import { type EditingStep, type NewOrStoredStep, StepDialog } from './step-dialog';
 import {
   laterDependencies,
   moveStage,
@@ -94,12 +99,17 @@ export function templateFormFailure(
 ): string | null {
   if (!(error instanceof ApiError)) return errorMessage(t, error);
   if (error.code === 'TEMPLATE_NAME_TAKEN') {
-    form.setError('name', { type: SCREEN_ERROR, message: errorMessage(t, error) });
+    form.setError(
+      'name',
+      { type: SCREEN_ERROR, message: errorMessage(t, error) },
+      { shouldFocus: true },
+    );
     return null;
   }
   const department = (error.details as { department?: unknown } | undefined)?.department;
   const index = (form.getValues('assignees') ?? []).findIndex((a) => a.department === department);
   if (error.code === 'INVALID_ASSIGNEE' && index !== -1) {
+    // The row focuses its picker when the error shows.
     form.setError(`assignees.${index}.userId`, {
       type: SCREEN_ERROR,
       message: errorMessage(t, error),
@@ -125,6 +135,7 @@ export function BasicsFields({ form, isNew }: { form: TemplateFormMethods; isNew
         <FieldLabel htmlFor={ids.name}>{t('templates.form.name')}</FieldLabel>
         <Input
           id={ids.name}
+          autoFocus={isNew}
           autoComplete="off"
           placeholder={t('templates.form.namePlaceholder')}
           {...form.register('name')}
@@ -210,9 +221,12 @@ export function StepsEditor({ form, readOnly }: { form: TemplateFormMethods; rea
     control: form.control,
     name: ['kind', 'stages', 'steps'],
   });
-  const [editing, setEditing] = useState<{ step: Partial<StepValues> & { key: string } } | null>(
-    null,
-  );
+  const [editing, setEditing] = useState<EditingStep | null>(null);
+  // The button that opened the step dialog, and the step: the dialog gives the focus back there.
+  const opened = useRef<{ opener: HTMLElement | null; key: string } | null>(null);
+  const list = useRef<HTMLDivElement>(null);
+  // A new stage's name field takes the focus.
+  const [newStage, setNewStage] = useState<string | null>(null);
   const [dragged, setDragged] = useState<string | null>(null);
   const [target, setTarget] = useState<string | null>(null);
   const errors = form.formState.errors;
@@ -229,6 +243,23 @@ export function StepsEditor({ form, readOnly }: { form: TemplateFormMethods; rea
     const kept = assignees.filter((assignee) => used.has(assignee.department));
     if (kept.length !== assignees.length) form.setValue('assignees', kept, change(form));
   }
+
+  /** A button of the list by its `data-focus` name, as the list shows it now. */
+  const focusTarget = (name: string) =>
+    list.current?.querySelector<HTMLElement>(`[data-focus="${CSS.escape(name)}"]`) ?? null;
+
+  /** A change that removes the focused button: the focus moves to `name` instead of the page. */
+  function removeThen(next: { stages?: StageValues[]; steps?: StepValues[] }, name: string) {
+    flushSync(() => setDocument(next));
+    focusTarget(name)?.focus();
+  }
+
+  /** Opens the step dialog, remembering the button to give the focus back to. */
+  const edit = (step: NewOrStoredStep) => {
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    opened.current = { opener, key: step.key };
+    setEditing({ step, isNew: !steps.some((other) => other.key === step.key) });
+  };
 
   const entries = steps.map((step, index) => ({ step, index }));
   const groups: StepGroup[] = project
@@ -330,7 +361,7 @@ export function StepsEditor({ form, readOnly }: { form: TemplateFormMethods; rea
   const rootError = errors.steps?.root ?? (errors.steps?.message ? errors.steps : undefined);
 
   return (
-    <div className="flex flex-col gap-5">
+    <div ref={list} className="flex flex-col gap-5">
       {steps.length === 0 && !readOnly && (
         <Callout
           icon={<ListPlusIcon />}
@@ -358,10 +389,11 @@ export function StepsEditor({ form, readOnly }: { form: TemplateFormMethods; rea
                 stage={group.stage.value}
                 index={group.stage.index}
                 count={stages.length}
+                isNew={group.stage.value.key === newStage}
                 readOnly={readOnly}
                 onMove={(to) => setDocument(moveStage(stages, steps, group.stage?.index ?? 0, to))}
                 onRemove={() =>
-                  setDocument(withoutStage(stages, steps, group.stage?.value.key ?? ''))
+                  removeThen(withoutStage(stages, steps, group.stage?.value.key ?? ''), 'add-stage')
                 }
               />
             ) : (
@@ -392,11 +424,13 @@ export function StepsEditor({ form, readOnly }: { form: TemplateFormMethods; rea
                     last={position === group.entries.length - 1}
                     dragging={dragged === step.key}
                     dropTarget={target === step.key && dragged !== step.key}
-                    onEdit={() => setEditing({ step })}
+                    onEdit={() => edit(step)}
                     onMove={(offset) =>
                       moveStep(index, group.entries[position + offset]?.index ?? index)
                     }
-                    onRemove={() => setDocument({ steps: withoutStep(steps, step.key) })}
+                    onRemove={() =>
+                      removeThen({ steps: withoutStep(steps, step.key) }, `add-step:${group.id}`)
+                    }
                     {...dragProps(step)}
                   />
                 ))}
@@ -408,7 +442,8 @@ export function StepsEditor({ form, readOnly }: { form: TemplateFormMethods; rea
                   variant="outline"
                   size="sm"
                   disabled={fullSteps}
-                  onClick={() => setEditing({ step: { key: newKey(), ...group.preset } })}
+                  data-focus={`add-step:${group.id}`}
+                  onClick={() => edit({ key: newKey(), ...group.preset })}
                 >
                   <PlusIcon />
                   {group.stage
@@ -428,7 +463,13 @@ export function StepsEditor({ form, readOnly }: { form: TemplateFormMethods; rea
             variant="outline"
             size="sm"
             disabled={stages.length >= TEMPLATE_LIMITS.stages}
-            onClick={() => setDocument({ stages: [...stages, { key: newKey(), name: '' }] })}
+            focusableWhenDisabled
+            data-focus="add-stage"
+            onClick={() => {
+              const key = newKey();
+              setNewStage(key);
+              setDocument({ stages: [...stages, { key, name: '' }] });
+            }}
           >
             <PlusIcon />
             {t('templates.addStage')}
@@ -438,7 +479,9 @@ export function StepsEditor({ form, readOnly }: { form: TemplateFormMethods; rea
               variant="ghost"
               size="sm"
               disabled={fullSteps}
-              onClick={() => setEditing({ step: { key: newKey(), stageKey: null } })}
+              // Stands in for the hidden "no stage" group's own button.
+              data-focus="add-step:none"
+              onClick={() => edit({ key: newKey(), stageKey: null })}
             >
               <PlusIcon />
               {t('templates.addStepWithoutStage')}
@@ -451,16 +494,29 @@ export function StepsEditor({ form, readOnly }: { form: TemplateFormMethods; rea
           {t('templates.stepsLimit', { max: formatNumber(TEMPLATE_LIMITS.steps) })}
         </p>
       )}
+      {project && stages.length >= TEMPLATE_LIMITS.stages && !readOnly && (
+        <p className="text-sm text-muted-foreground">
+          {t('templates.stagesLimit', { max: formatNumber(TEMPLATE_LIMITS.stages) })}
+        </p>
+      )}
 
-      {editing && (
+      {!readOnly && (
         <StepDialog
           kind={kind}
           stages={stages}
           steps={steps}
-          step={editing.step}
-          isNew={!steps.some((step) => step.key === editing.step.key)}
+          editing={editing}
           onClose={() => setEditing(null)}
-          onSave={(step) => setDocument({ steps: withStep(kind, stages, steps, step) })}
+          // Committed before the dialog closes, so a moved step's card is there to take the focus.
+          onSave={(step) =>
+            flushSync(() => setDocument({ steps: withStep(kind, stages, steps, step) }))
+          }
+          // Back to the button that opened it; a step moved to another group is a new card.
+          finalFocus={() =>
+            opened.current?.opener?.isConnected
+              ? opened.current.opener
+              : (focusTarget(`edit:${opened.current?.key}`) ?? true)
+          }
         />
       )}
     </div>
@@ -472,6 +528,7 @@ function StageHeader({
   stage,
   index,
   count,
+  isNew,
   readOnly,
   onMove,
   onRemove,
@@ -480,11 +537,14 @@ function StageHeader({
   stage: StageValues;
   index: number;
   count: number;
+  /** Just added: its name field takes the focus. */
+  isNew: boolean;
   readOnly: boolean;
   onMove: (to: number) => void;
   onRemove: () => void;
 }) {
   const { t } = useTranslation();
+  const errorId = useId();
   const error = form.formState.errors.stages?.[index]?.name;
   if (readOnly) {
     return (
@@ -503,8 +563,10 @@ function StageHeader({
           name={`stages.${index}.name`}
           render={({ field }) => (
             <Input
+              autoFocus={isNew}
               aria-label={t('templates.stageName', { position: index + 1 })}
               aria-invalid={!!error || undefined}
+              aria-describedby={error ? errorId : undefined}
               placeholder={t('templates.stageNamePlaceholder')}
               className="ms-1 me-2 flex-1 font-bold"
               value={field.value}
@@ -514,35 +576,29 @@ function StageHeader({
             />
           )}
         />
-        <Button
-          variant="ghost"
-          size="icon-sm"
+        {/* Focusable while disabled: a stage moved to the end keeps the focus on its button. */}
+        <IconButton
+          label={t('templates.moveStageUp')}
           disabled={index === 0}
-          aria-label={t('templates.moveStageUp')}
+          focusableWhenDisabled
           onClick={() => onMove(index - 1)}
         >
           <ArrowUpIcon />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon-sm"
+        </IconButton>
+        <IconButton
+          label={t('templates.moveStageDown')}
           disabled={index === count - 1}
-          aria-label={t('templates.moveStageDown')}
+          focusableWhenDisabled
           onClick={() => onMove(index + 1)}
         >
           <ArrowDownIcon />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          aria-label={t('templates.removeStage')}
-          onClick={onRemove}
-        >
+        </IconButton>
+        <IconButton label={t('templates.removeStage')} onClick={onRemove}>
           <Trash2Icon />
-        </Button>
+        </IconButton>
       </div>
       {error && (
-        <p role="alert" className="text-sm text-destructive-text">
+        <p id={errorId} role="alert" className="text-sm text-destructive-text">
           {t('templates.form.errors.stageName')}
         </p>
       )}
@@ -617,6 +673,9 @@ function StepCard({
   const known = STEP_PROBLEMS.filter((field) => problems.includes(field));
   const invalid = problems.length > 0 || later.length > 0;
   const reorderable = !!props.draggable;
+  // Removing takes the card away: the editor moves the focus, not the menu.
+  const removing = useRef(false);
+  const actions = t('templates.stepActions', { title: step.title });
 
   return (
     <li
@@ -714,27 +773,31 @@ function StepCard({
       </div>
       {!readOnly && (
         <div className="flex shrink-0 items-start gap-1">
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            aria-label={t('templates.editStep', { title: step.title })}
+          <IconButton
+            label={t('templates.editStep', { title: step.title })}
+            data-focus={`edit:${step.key}`}
             onClick={onEdit}
           >
             <PencilIcon />
-          </Button>
-          <DropdownMenu>
-            <DropdownMenuTrigger
-              render={
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label={t('templates.stepActions', { title: step.title })}
-                />
-              }
-            >
-              <EllipsisIcon />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
+          </IconButton>
+          <DropdownMenu
+            onOpenChange={(open) => {
+              if (open) removing.current = false;
+            }}
+          >
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <DropdownMenuTrigger
+                    render={<Button variant="ghost" size="icon-sm" aria-label={actions} />}
+                  />
+                }
+              >
+                <EllipsisIcon />
+              </TooltipTrigger>
+              <TooltipContent>{actions}</TooltipContent>
+            </Tooltip>
+            <DropdownMenuContent align="end" finalFocus={() => !removing.current}>
               <DropdownMenuItem disabled={first} onClick={() => onMove(-1)}>
                 <ArrowUpIcon />
                 {t('templates.moveUp')}
@@ -744,7 +807,13 @@ function StepCard({
                 {t('templates.moveDown')}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem variant="destructive" onClick={onRemove}>
+              <DropdownMenuItem
+                variant="destructive"
+                onClick={() => {
+                  removing.current = true;
+                  onRemove();
+                }}
+              >
                 <Trash2Icon />
                 {t('templates.removeStep')}
               </DropdownMenuItem>
@@ -762,6 +831,7 @@ function StepCard({
   );
 }
 
+/** An icon-only button: its label is read out and shown as a tooltip. */
 // Default assignees
 
 const UNASSIGNED = 'unassigned';
@@ -835,8 +905,14 @@ function AssigneeRow({
 }) {
   const { t } = useTranslation();
   const id = useId();
+  const errorId = useId();
+  const trigger = useRef<HTMLButtonElement>(null);
   const departmentName = useDepartmentNames();
   const members = useDepartmentMembers(department, !readOnly);
+  // A refused default (only the save reports it) puts the focus back on its picker.
+  useEffect(() => {
+    if (error) trigger.current?.focus();
+  }, [error]);
   // The stored default, kept while unchanged even when it is no longer valid.
   const kept = stored && stored.user.id === userId ? stored : undefined;
   const options = [
@@ -876,7 +952,13 @@ function AssigneeRow({
             value={userId ?? UNASSIGNED}
             onValueChange={(value) => onChange(!value || value === UNASSIGNED ? null : value)}
           >
-            <SelectTrigger id={id} className="sm:max-w-sm" aria-invalid={!!error || undefined}>
+            <SelectTrigger
+              ref={trigger}
+              id={id}
+              className="sm:max-w-sm"
+              aria-invalid={!!error || undefined}
+              aria-describedby={error ? errorId : undefined}
+            >
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -901,7 +983,7 @@ function AssigneeRow({
           </p>
         )}
         {error && (
-          <p role="alert" className="text-sm text-destructive-text">
+          <p id={errorId} role="alert" className="text-sm text-destructive-text">
             {error}
           </p>
         )}

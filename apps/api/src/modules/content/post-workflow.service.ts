@@ -434,7 +434,7 @@ export class PostWorkflowService implements OnModuleInit {
       new CodedException(
         409,
         'INVALID_TRANSITION',
-        `A ${post.status} post cannot become ${change.to}`,
+        `A post in ${post.status} cannot become ${change.to}`,
       );
     if (!move) throw invalid();
     // A cancelled post reopens to an idea, or to production when it has media.

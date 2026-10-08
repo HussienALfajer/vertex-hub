@@ -231,7 +231,7 @@ export class CampaignsService {
         throw new CodedException(
           409,
           'INVALID_TRANSITION',
-          `A ${campaign.status} campaign cannot become ${input.to}`,
+          `A campaign in ${campaign.status} cannot become ${input.to}`,
         );
       }
       const reason = input.to === 'cancelled' ? input.reason || null : null;

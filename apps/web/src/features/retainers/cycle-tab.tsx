@@ -40,6 +40,7 @@ import {
   FieldDescription,
   FieldError,
   FieldLabel,
+  IconButton,
   Input,
   Meter,
   type MeterTone,
@@ -68,7 +69,7 @@ import {
   PlusIcon,
   RepeatIcon,
 } from 'lucide-react';
-import { useId, useState } from 'react';
+import { type RefObject, useId, useRef, useState } from 'react';
 import { Controller, type UseFormRegisterReturn, useForm, useWatch } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { FormAlert } from '../../components/form-alert';
@@ -112,6 +113,7 @@ function OpenCycle({ retainer, cycleId }: { retainer: RetainerDetail; cycleId: s
   // F07: the lines' task counts against the linked monthly template (rule 18).
   const template = useQuery(retainerTemplateQuery(retainer.id)).data;
   const [adding, setAdding] = useState(false);
+  const addButton = useRef<HTMLButtonElement>(null);
   const editable = retainer.permissions.canManage;
   const templateLines =
     template?.template && template.cycle?.id === cycleId ? template.lines : undefined;
@@ -141,7 +143,13 @@ function OpenCycle({ retainer, cycleId }: { retainer: RetainerDetail; cycleId: s
         description={t('retainers.cycle.hint')}
         action={
           editable && (
-            <Button size="sm" variant="outline" disabled={full} onClick={() => setAdding(true)}>
+            <Button
+              ref={addButton}
+              size="sm"
+              variant="outline"
+              disabled={full}
+              onClick={() => setAdding(true)}
+            >
               <ListPlusIcon />
               {t('retainers.cycle.addLine')}
             </Button>
@@ -179,6 +187,7 @@ function OpenCycle({ retainer, cycleId }: { retainer: RetainerDetail; cycleId: s
         cycle={cycle.data}
         open={adding}
         onClose={() => setAdding(false)}
+        finalFocus={addButton}
       />
     </>
   );
@@ -257,6 +266,8 @@ function CycleLineRow({
   const { t } = useTranslation();
   const [dialog, setDialog] = useState<'committed' | 'adjust' | null>(null);
   const [history, setHistory] = useState(false);
+  const adjustButton = useRef<HTMLButtonElement>(null);
+  const menuButton = useRef<HTMLButtonElement>(null);
   const name = lineName(t, line);
   const over = line.delivered > line.committed;
   const done = line.committed > 0 && line.delivered >= line.committed;
@@ -327,17 +338,18 @@ function CycleLineRow({
         )}
         {editable && (
           <div className="flex items-center gap-1">
-            <Button variant="outline" size="sm" onClick={() => setDialog('adjust')}>
+            <Button
+              ref={adjustButton}
+              variant="outline"
+              size="sm"
+              onClick={() => setDialog('adjust')}
+            >
               {t('retainers.cycle.adjust')}
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger
                 render={
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    aria-label={t('retainers.cycle.lineActions', { name })}
-                  />
+                  <IconButton ref={menuButton} label={t('retainers.cycle.lineActions', { name })} />
                 }
               >
                 <EllipsisIcon />
@@ -402,6 +414,7 @@ function CycleLineRow({
         line={line}
         open={dialog === 'committed'}
         onClose={() => setDialog(null)}
+        finalFocus={menuButton}
       />
       <AdjustDialog
         retainerId={retainerId}
@@ -409,6 +422,7 @@ function CycleLineRow({
         line={line}
         open={dialog === 'adjust'}
         onClose={() => setDialog(null)}
+        finalFocus={adjustButton}
       />
     </li>
   );
@@ -453,12 +467,14 @@ function CommittedDialog({
   line,
   open,
   onClose,
+  finalFocus,
 }: {
   retainerId: string;
   cycleId: string;
   line: CycleLine;
   open: boolean;
   onClose: () => void;
+  finalFocus: RefObject<HTMLButtonElement | null>;
 }) {
   const { t } = useTranslation();
   const ids = { quantity: useId(), reason: useId() };
@@ -473,26 +489,33 @@ function CommittedDialog({
   const errors = form.formState.errors;
   const name = lineName(t, line);
 
-  function close() {
+  // After the exit animation: the next opening starts from the saved quantity. A plain `reset()`
+  // would apply `keepDirtyValues` and keep what was typed.
+  function closed() {
     setFailure(null);
-    form.reset();
-    onClose();
+    form.reset(undefined, { keepDirtyValues: false });
   }
 
   const submit = form.handleSubmit(async (values) => {
     setFailure(null);
+    // The same quantity: nothing changes, so nothing is saved.
+    if (values.committedQuantity === line.committed) return onClose();
     try {
       await update.mutateAsync({ lineId: line.id, ...values });
       toast.add({ title: t('retainers.cycle.committedSaved'), type: 'success' });
-      close();
+      onClose();
     } catch (error) {
       setFailure(errorMessage(t, error));
     }
   });
 
   return (
-    <Dialog open={open} onOpenChange={(next) => !next && close()}>
-      <DialogContent closeLabel={t('common.close')}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => !next && onClose()}
+      onOpenChangeComplete={(next) => !next && closed()}
+    >
+      <DialogContent closeLabel={t('common.close')} finalFocus={finalFocus}>
         <form className="grid gap-5" onSubmit={submit} noValidate>
           <DialogHeader>
             <DialogTitle>{t('retainers.cycle.committedTitle', { name })}</DialogTitle>
@@ -540,12 +563,14 @@ function AdjustDialog({
   line,
   open,
   onClose,
+  finalFocus,
 }: {
   retainerId: string;
   cycleId: string;
   line: CycleLine;
   open: boolean;
   onClose: () => void;
+  finalFocus: RefObject<HTMLButtonElement | null>;
 }) {
   const { t } = useTranslation();
   const ids = { direction: useId(), amount: useId(), reason: useId() };
@@ -565,11 +590,11 @@ function AdjustDialog({
   const sign = direction === 'add' ? 1 : -1;
   const after = line.delivered + sign * (Number.isFinite(amount) ? Math.abs(amount) : 0);
 
-  function close() {
+  // After the exit animation (see CommittedDialog).
+  function closed() {
     setFailure(null);
     setDirection('add');
-    form.reset();
-    onClose();
+    form.reset(undefined, { keepDirtyValues: false });
   }
 
   const submit = form.handleSubmit(async (values) => {
@@ -588,7 +613,7 @@ function AdjustDialog({
         reason: values.reason,
       });
       toast.add({ title: t('retainers.cycle.adjusted'), type: 'success' });
-      close();
+      onClose();
     } catch (error) {
       if (error instanceof ApiError && error.code === 'NEGATIVE_DELIVERED') {
         form.setError('delta', {
@@ -602,8 +627,12 @@ function AdjustDialog({
   });
 
   return (
-    <Dialog open={open} onOpenChange={(next) => !next && close()}>
-      <DialogContent closeLabel={t('common.close')}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => !next && onClose()}
+      onOpenChangeComplete={(next) => !next && closed()}
+    >
+      <DialogContent closeLabel={t('common.close')} finalFocus={finalFocus}>
         <form className="grid gap-5" onSubmit={submit} noValidate>
           <DialogHeader>
             <DialogTitle>{t('retainers.cycle.adjustTitle', { name })}</DialogTitle>
@@ -679,11 +708,13 @@ function AddLineDialog({
   cycle,
   open,
   onClose,
+  finalFocus,
 }: {
   retainerId: string;
   cycle: CycleDetail;
   open: boolean;
   onClose: () => void;
+  finalFocus: RefObject<HTMLButtonElement | null>;
 }) {
   const { t } = useTranslation();
   const ids = { kind: useId(), label: useId(), quantity: useId(), reason: useId() };
@@ -700,10 +731,10 @@ function AddLineDialog({
     label: t(`retainers.kinds.${value}`),
   }));
 
-  function close() {
+  // After the exit animation, so the fields do not empty while the dialog fades.
+  function closed() {
     setFailure(null);
     form.reset();
-    onClose();
   }
 
   const submit = form.handleSubmit(async (values) => {
@@ -711,7 +742,7 @@ function AddLineDialog({
     try {
       await add.mutateAsync(values);
       toast.add({ title: t('retainers.cycle.lineAdded'), type: 'success' });
-      close();
+      onClose();
     } catch (error) {
       if (error instanceof ApiError && error.code === 'DUPLICATE_DELIVERABLE') {
         form.setError('label', {
@@ -725,8 +756,12 @@ function AddLineDialog({
   });
 
   return (
-    <Dialog open={open} onOpenChange={(next) => !next && close()}>
-      <DialogContent closeLabel={t('common.close')}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => !next && onClose()}
+      onOpenChangeComplete={(next) => !next && closed()}
+    >
+      <DialogContent closeLabel={t('common.close')} finalFocus={finalFocus}>
         <form className="grid gap-5" onSubmit={submit} noValidate>
           <DialogHeader>
             <DialogTitle>

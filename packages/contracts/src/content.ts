@@ -5,6 +5,7 @@ import {
   type CalendarDate,
   calendarDateSchema,
   daysInclusive,
+  instantSchema,
   timeOfDaySchema,
   workDaysBefore,
 } from './dates.js';
@@ -296,8 +297,6 @@ const publishedLinksSchema = z
     message: 'One link per platform',
   });
 
-const publishedAtSchema = z.iso.datetime({ offset: true });
-
 const postFieldsSchema = z.object({
   title: postTitleSchema,
   type: postTypeSchema,
@@ -342,7 +341,7 @@ export type CreatePostInput = z.input<typeof createPostSchema>;
 export const updatePostSchema = postFieldsSchema
   .extend({
     /** Published posts only; not in the future. */
-    publishedAt: publishedAtSchema,
+    publishedAt: instantSchema,
     publishedLinks: publishedLinksSchema,
   })
   .partial()
@@ -365,7 +364,7 @@ export const postStatusChangeSchema = z
     reason: optionalText(500).optional(),
     contentToken: z.string().max(64).optional(),
     contactId: z.uuid().optional(),
-    publishedAt: publishedAtSchema.optional(),
+    publishedAt: instantSchema.optional(),
     publishedLinks: publishedLinksSchema.optional(),
   })
   .refine((change) => change.to !== 'cancelled' || !!change.reason, {

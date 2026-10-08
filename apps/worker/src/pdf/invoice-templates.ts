@@ -12,6 +12,7 @@ import {
   metaItem,
   type TemplateAssets,
   textBlock,
+  textLines,
 } from './document.js';
 
 /*
@@ -64,7 +65,7 @@ const LABELS = {
 
 /** Also printed on the ad deposit receipts (F12). */
 export const METHODS: Record<PaymentMethod, string> = {
-  cash: 'نقداً',
+  cash: 'نقدًا',
   bank_transfer: 'تحويل مصرفي',
   e_wallet: 'محفظة إلكترونية',
 };
@@ -75,7 +76,7 @@ function billTo(label: string, name: string, address: string | null): string {
 }
 
 function footer(text: string): string {
-  return text.trim() ? `<footer class="note">${escapeHtml(text)}</footer>` : '';
+  return text.trim() ? `<footer class="note">${textLines(text)}</footer>` : '';
 }
 
 /** An issued invoice, or a draft preview (no number, a "draft" watermark). */
@@ -88,7 +89,7 @@ export function invoiceHtml(
   const rows = snapshot.lines
     .map(
       (line) => `<tr>
-        <td><div class="description">${escapeHtml(line.description)}</div></td>
+        <td><div class="description">${textLines(line.description)}</div></td>
         <td class="num">${line.quantity}</td>
         <td class="num">${formatMoney(line.unitPriceMinor, currency)}</td>
         <td class="num">${formatMoney(line.totalMinor, currency)}</td>

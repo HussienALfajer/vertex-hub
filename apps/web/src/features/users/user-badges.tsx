@@ -36,11 +36,7 @@ export function DepartmentChips({ departments }: { departments: UserDepartment[]
   return (
     <div className="flex flex-wrap items-center gap-1.5">
       {departments.map((department) => (
-        <Badge
-          key={department.id}
-          tone={department.isPrimary ? 'neutral' : 'outline'}
-          title={department.isPrimary ? undefined : t('users.secondary')}
-        >
+        <Badge key={department.id} tone={department.isPrimary ? 'neutral' : 'outline'}>
           {department.isManager && (
             <span aria-hidden="true" className="inline-block h-3 w-0.5 -skew-x-30 bg-accent" />
           )}
@@ -48,6 +44,7 @@ export function DepartmentChips({ departments }: { departments: UserDepartment[]
           {department.isManager && (
             <span className="sr-only">{t('users.manages', { department: department.name })}</span>
           )}
+          {!department.isPrimary && <span className="sr-only">{t('users.secondary')}</span>}
         </Badge>
       ))}
     </div>

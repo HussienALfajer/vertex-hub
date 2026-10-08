@@ -46,9 +46,9 @@ describe('skillsSchema', () => {
 });
 
 describe('createUserSchema', () => {
-  const valid = { name: ' سارة ', email: 'Sara@Vertex.Example', primaryDepartmentId: design };
+  const valid = { name: ' سارة ', email: ' Sara@Vertex.Example ', primaryDepartmentId: design };
 
-  it('trims the name and lower-cases the email', () => {
+  it('trims the name and the email, and lower-cases the email', () => {
     expect(createUserSchema.parse(valid)).toMatchObject({
       name: 'سارة',
       email: 'sara@vertex.example',

@@ -27,7 +27,7 @@ import {
   toast,
 } from '@vertex-hub/ui';
 import { CalendarSyncIcon, CheckIcon, FilePenLineIcon, Undo2Icon, XIcon } from 'lucide-react';
-import { useId, useState } from 'react';
+import { type RefObject, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FormAlert } from '../../components/form-alert';
 import { LoadError } from '../../components/load-error';
@@ -36,6 +36,7 @@ import { can, useMe } from '../../lib/auth';
 import { errorMessage } from '../../lib/errors';
 import { formatDateTime, formatMonth, formatNumber, isolateLtr } from '../../lib/format';
 import { formatMoney } from '../../lib/money';
+import { useFocusAfterChange } from '../../lib/use-focus-after-change';
 import { AmendmentDialog, EffectText } from './amendment-dialog';
 import { lineName } from './retainer-badges';
 import {
@@ -64,11 +65,12 @@ export function AmendmentsSection({ retainer }: { retainer: RetainerDetail }) {
   const currency = retainer.money?.currency ?? 'USD';
   const canApprove = can(me, 'retainers.approve_reduction');
   const { canManage, canEditMoney } = retainer.permissions;
+  const titleId = useId();
 
   return (
-    <section className="flex flex-col gap-3" aria-labelledby="amendments-title">
+    <section className="flex flex-col gap-3" aria-labelledby={titleId}>
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 id="amendments-title" className="text-lg font-bold">
+        <h2 id={titleId} className="text-lg font-bold">
           {t('retainers.amendments.title')}
         </h2>
         {canEditMoney && <AmendmentDialog retainer={retainer} />}
@@ -123,7 +125,14 @@ function AmendmentCard({
 }) {
   const { t } = useTranslation();
   const decide = useDecideAmendment(retainerId);
+  const heading = useRef<HTMLHeadingElement>(null);
+  // Approving, rejecting or withdrawing takes the card's buttons away: its heading takes the focus.
+  useFocusAfterChange(amendment.status, () => heading.current);
   const money = amendment.money;
+  // An applied amendment shows what it did; a pending or scheduled one what it would do (the
+  // preview); a rejected, withdrawn or cancelled one changed nothing.
+  const planned = amendment.status === 'pending_approval' || amendment.status === 'scheduled';
+  const effectsShown = planned || amendment.status === 'applied';
   const title =
     amendment.kind === 'reschedule'
       ? t('retainers.amendments.reschedule')
@@ -150,7 +159,7 @@ function AmendmentCard({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex min-w-0 flex-col gap-1">
           <div className="flex flex-wrap items-center gap-2">
-            <h3 className="font-bold">
+            <h3 ref={heading} tabIndex={-1} className="font-bold">
               {t('retainers.amendments.name', { number: formatNumber(amendment.number) })}
             </h3>
             <Badge tone={STATUS_TONES[amendment.status]}>
@@ -218,14 +227,19 @@ function AmendmentCard({
         <span className="text-muted-foreground">{t('retainers.amendments.reason')}: </span>
         {amendment.reason}
       </p>
-      {amendment.effects.length > 0 && (
-        <ul className="flex flex-col gap-1.5 text-sm">
-          {amendment.effects.map((effect) => (
-            <li key={`${effect.month}-${effect.effect}`}>
-              <EffectText effect={effect} currency={currency} />
-            </li>
-          ))}
-        </ul>
+      {effectsShown && amendment.effects.length > 0 && (
+        <div className="flex flex-col gap-1.5 text-sm">
+          {planned && (
+            <p className="text-muted-foreground">{t('retainers.amendments.plannedEffects')}</p>
+          )}
+          <ul className="flex flex-col gap-1.5">
+            {amendment.effects.map((effect) => (
+              <li key={`${effect.month}-${effect.effect}`}>
+                <EffectText effect={effect} currency={currency} />
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
       {amendment.decision && (
         <p className="text-sm text-muted-foreground">
@@ -242,11 +256,16 @@ function AmendmentCard({
         <div className="flex flex-wrap gap-2">
           {canApprove && (
             <>
-              <Button size="sm" onClick={() => act('approve')} disabled={decide.isPending}>
+              <Button
+                size="sm"
+                onClick={() => act('approve')}
+                disabled={decide.isPending}
+                focusableWhenDisabled
+              >
                 <CheckIcon />
                 {t('retainers.amendments.approve')}
               </Button>
-              <RejectDialog retainerId={retainerId} amendment={amendment} />
+              <RejectDialog retainerId={retainerId} amendment={amendment} fallback={heading} />
             </>
           )}
           {canWithdraw && (
@@ -255,6 +274,7 @@ function AmendmentCard({
               variant="outline"
               onClick={() => act('withdraw')}
               disabled={decide.isPending}
+              focusableWhenDisabled
             >
               <Undo2Icon />
               {t('retainers.amendments.withdraw')}
@@ -267,10 +287,21 @@ function AmendmentCard({
 }
 
 /** A4: rejecting needs a note. */
-function RejectDialog({ retainerId, amendment }: { retainerId: string; amendment: Amendment }) {
+function RejectDialog({
+  retainerId,
+  amendment,
+  fallback,
+}: {
+  retainerId: string;
+  amendment: Amendment;
+  /** Where the focus goes once the rejection took the button away: the card's heading. */
+  fallback: RefObject<HTMLElement | null>;
+}) {
   const { t } = useTranslation();
   const id = useId();
   const decide = useDecideAmendment(retainerId);
+  const openButton = useRef<HTMLButtonElement>(null);
+  const noteRef = useRef<HTMLTextAreaElement>(null);
   const [open, setOpen] = useState(false);
   const [note, setNote] = useState('');
   const [missing, setMissing] = useState(false);
@@ -281,6 +312,7 @@ function RejectDialog({ retainerId, amendment }: { retainerId: string; amendment
     setFailure(null);
     if (!note.trim()) {
       setMissing(true);
+      noteRef.current?.focus();
       return;
     }
     try {
@@ -295,6 +327,7 @@ function RejectDialog({ retainerId, amendment }: { retainerId: string; amendment
   return (
     <>
       <Button
+        ref={openButton}
         size="sm"
         variant="outline"
         onClick={() => {
@@ -308,7 +341,12 @@ function RejectDialog({ retainerId, amendment }: { retainerId: string; amendment
         {t('retainers.amendments.reject')}
       </Button>
       <Dialog open={open} onOpenChange={(next) => !next && setOpen(false)}>
-        <DialogContent closeLabel={t('common.close')}>
+        <DialogContent
+          closeLabel={t('common.close')}
+          finalFocus={() =>
+            openButton.current?.isConnected ? openButton.current : (fallback.current ?? true)
+          }
+        >
           <form className="grid gap-5" onSubmit={submit} noValidate>
             <DialogHeader>
               <DialogTitle>
@@ -321,6 +359,7 @@ function RejectDialog({ retainerId, amendment }: { retainerId: string; amendment
             <Field invalid={missing}>
               <FieldLabel htmlFor={id}>{t('retainers.amendments.rejectNote')}</FieldLabel>
               <Textarea
+                ref={noteRef}
                 id={id}
                 rows={2}
                 maxLength={500}
@@ -357,15 +396,20 @@ export function RescheduleDialog({
   term,
   currency,
   invoices,
+  fallback,
 }: {
   retainerId: string;
   term: RetainerTerm;
   currency: Currency;
   invoices: Map<string, SourceInvoice | null>;
+  /** Where the focus goes when the button is gone (fewer than two months left to move). */
+  fallback: RefObject<HTMLElement | null>;
 }) {
   const { t } = useTranslation();
   const id = useId();
   const reschedule = useRescheduleTerm(retainerId);
+  const openButton = useRef<HTMLButtonElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
   const months = term.schedule.filter((month) => {
     if (!month.chargeId || month.status !== 'pending' || !month.money) return false;
     const invoice = invoices.get(month.chargeId);
@@ -387,7 +431,12 @@ export function RescheduleDialog({
       ...(after !== before && { total: true as const }),
     };
     setProblems(next);
-    if (next.reason || next.total) return;
+    if (next.reason || next.total) {
+      // The first month when the amounts do not add up, else the reason.
+      const target = next.total ? 'input' : 'textarea';
+      formRef.current?.querySelector<HTMLElement>(target)?.focus();
+      return;
+    }
     try {
       await reschedule.mutateAsync({
         termId: term.id,
@@ -408,6 +457,7 @@ export function RescheduleDialog({
   return (
     <>
       <Button
+        ref={openButton}
         variant="outline"
         size="sm"
         onClick={() => {
@@ -422,8 +472,14 @@ export function RescheduleDialog({
         {t('retainers.amendments.reschedule')}
       </Button>
       <Dialog open={open} onOpenChange={(next) => !next && setOpen(false)}>
-        <DialogContent closeLabel={t('common.close')} className="max-w-xl">
-          <form className="grid gap-5" onSubmit={submit} noValidate>
+        <DialogContent
+          closeLabel={t('common.close')}
+          className="max-w-xl"
+          finalFocus={() =>
+            openButton.current?.isConnected ? openButton.current : (fallback.current ?? true)
+          }
+        >
+          <form ref={formRef} className="grid gap-5" onSubmit={submit} noValidate>
             <DialogHeader>
               <DialogTitle>
                 {t('retainers.amendments.rescheduleTitle', { number: formatNumber(term.number) })}
@@ -441,20 +497,28 @@ export function RescheduleDialog({
                     aria-label={t('retainers.terms.monthAmount', {
                       month: formatMonth(month.month),
                     })}
+                    aria-invalid={!!problems.total || undefined}
                     currency={currency}
                     value={amounts[index] ?? null}
-                    onValueChange={(minor) =>
+                    onValueChange={(minor) => {
                       setAmounts((current) =>
                         current.map((amount, at) => (at === index ? minor : amount)),
-                      )
-                    }
+                      );
+                      setProblems(({ total: _, ...rest }) => rest);
+                    }}
                   />
                 </li>
               ))}
             </ol>
             <p className="flex items-center justify-between gap-2 text-sm" aria-live="polite">
               <span className="text-muted-foreground">{t('retainers.terms.remaining')}</span>
-              <span className="font-bold tabular-nums">
+              <span
+                className={
+                  before === after
+                    ? 'font-bold tabular-nums'
+                    : 'font-bold tabular-nums text-status-warning-foreground'
+                }
+              >
                 {formatMoney(before - after, currency)}
               </span>
             </p>

@@ -1,6 +1,12 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import type { RedeemLink, RequestPasswordLink, UserLink } from '@vertex-hub/contracts';
+import type {
+  CheckLink,
+  LinkInfoResponse,
+  RedeemLink,
+  RequestPasswordLink,
+  UserLink,
+} from '@vertex-hub/contracts';
 import {
   accounts,
   type Database,
@@ -119,30 +125,63 @@ export class UserLinksService {
   }
 
   /**
+   * Tells the activation page whether a link still works, before the user types a password, and
+   * for which account. It does not use the link up.
+   */
+  async check({ token }: CheckLink): Promise<LinkInfoResponse> {
+    return this.db.transaction(async (tx) => {
+      const { user, expiresAt } = await this.validLink(tx, token);
+      const [account] = await tx
+        .select({ password: accounts.password })
+        .from(accounts)
+        .where(and(eq(accounts.userId, user.id), eq(accounts.providerId, 'credential')));
+      return {
+        kind: account?.password ? 'reset' : 'activation',
+        email: user.email,
+        expiresAt: expiresAt.toISOString(),
+      };
+    });
+  }
+
+  /**
+   * The unexpired link and its user; LINK_INVALID otherwise. The row is locked for the rest of the
+   * caller's transaction, so two redeems of one link cannot both pass.
+   */
+  private async validLink(tx: Transaction, token: string) {
+    const [link] = await tx
+      .select({ userId: verifications.value, expiresAt: verifications.expiresAt })
+      .from(verifications)
+      .where(
+        and(
+          eq(verifications.identifier, `${LINK_PREFIX}${digest(token)}`),
+          gt(verifications.expiresAt, new Date()),
+        ),
+      )
+      .for('update');
+    const [user] = link
+      ? await tx
+          .select({
+            id: users.id,
+            name: users.name,
+            email: users.email,
+            archivedAt: users.archivedAt,
+          })
+          .from(users)
+          .where(eq(users.id, link.userId))
+      : [];
+    if (!link || !user || user.archivedAt) {
+      throw new CodedException(400, 'LINK_INVALID', 'The link is invalid or has expired');
+    }
+    return { user, expiresAt: link.expiresAt };
+  }
+
+  /**
    * Sets the password through a link: the user becomes active, the link is used up and every
    * session of the user ends (F01 rule 13).
    */
   async redeem({ token, password }: RedeemLink): Promise<void> {
     await this.db.transaction(async (tx) => {
-      const [link] = await tx
-        .select({ userId: verifications.value })
-        .from(verifications)
-        .where(
-          and(
-            eq(verifications.identifier, `${LINK_PREFIX}${digest(token)}`),
-            gt(verifications.expiresAt, new Date()),
-          ),
-        )
-        .for('update');
-      const [user] = link
-        ? await tx
-            .select({ id: users.id, name: users.name, archivedAt: users.archivedAt })
-            .from(users)
-            .where(eq(users.id, link.userId))
-        : [];
-      if (!user || user.archivedAt) {
-        throw new CodedException(400, 'LINK_INVALID', 'The link is invalid or has expired');
-      }
+      const { user } = await this.validLink(tx, token);
       // Hashed only for a valid link: an anonymous request with a made-up token costs no scrypt.
       const passwordHash = await hashPassword(password);
 

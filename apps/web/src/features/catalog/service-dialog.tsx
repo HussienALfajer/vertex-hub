@@ -9,6 +9,7 @@ import {
   createCatalogServiceSchema,
   DELIVERABLE_KINDS,
   DEPARTMENT_CODES,
+  type ErrorCode,
   TEMPLATE_KIND_BY_BILLING,
 } from '@vertex-hub/contracts';
 import {
@@ -38,10 +39,13 @@ import { Controller, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { FormAlert } from '../../components/form-alert';
 import { MoneyInput } from '../../components/money-input';
-import { errorMessage } from '../../lib/errors';
+import { ApiError } from '../../lib/api/client';
+import { errorMessage, errorRole, fieldError, SCREEN_ERROR } from '../../lib/errors';
+import { useShownWhileClosing } from '../../lib/use-shown-while-closing';
 import { useDepartmentNames } from '../projects/project-badges';
 import { templateListQuery } from '../templates/templates.queries';
 import { useCreateService, useUpdateService } from './catalog.queries';
+import type { CatalogDialogProps } from './catalog-dialog';
 
 const NONE = 'none';
 
@@ -71,14 +75,34 @@ const toInput = (service: CatalogService): CreateCatalogServiceInput => ({
   templateId: service.template?.id ?? null,
 });
 
+/** The field each refusal is about: it shows there, and the focus goes back to it. */
+const ERROR_FIELDS: Partial<Record<ErrorCode, 'name' | 'billing' | 'templateId'>> = {
+  SERVICE_NAME_TAKEN: 'name',
+  SERVICE_IN_USE: 'billing',
+  INVALID_TEMPLATE: 'templateId',
+};
+
 /** Spec screen 1: a service's fields, new or edited; the whole service is sent on save. */
 export function ServiceDialog({
   editing,
   onClose,
-}: {
-  editing: CatalogService | 'new' | null;
-  onClose: () => void;
-}) {
+  finalFocus,
+}: CatalogDialogProps<CatalogService>) {
+  const { t } = useTranslation();
+  const shown = useShownWhileClosing(editing);
+  return (
+    <Dialog open={editing !== null} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent closeLabel={t('common.close')} className="max-w-2xl" finalFocus={finalFocus}>
+        {shown !== null && (
+          <ServiceForm service={shown === 'new' ? null : shown} onDone={onClose} />
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/** Mounts on each opening, so it starts from the saved service (or a blank one). */
+function ServiceForm({ service, onDone }: { service: CatalogService | null; onDone: () => void }) {
   const { t } = useTranslation();
   const ids = {
     department: useId(),
@@ -93,25 +117,16 @@ export function ServiceDialog({
   const create = useCreateService();
   const update = useUpdateService();
   const [failure, setFailure] = useState<string | null>(null);
-  const service = editing === 'new' ? null : editing;
   const form = useForm<CreateCatalogServiceInput, unknown, CreateCatalogService>({
     resolver: standardSchemaResolver(createCatalogServiceSchema),
-    resetOptions: { keepDirtyValues: true },
-    values: service ? toInput(service) : emptyService,
+    defaultValues: service ? toInput(service) : emptyService,
   });
-  const { errors } = form.formState;
+  const { errors, isDirty, isSubmitting } = form.formState;
   const billing = form.watch('billing');
   const kind = form.watch('deliverableKind');
-  const templates = useQuery({
-    ...templateListQuery({ kind: TEMPLATE_KIND_BY_BILLING[billing], pageSize: 100 }),
-    enabled: editing !== null,
-  });
-
-  function close() {
-    setFailure(null);
-    form.reset(emptyService);
-    onClose();
-  }
+  const templates = useQuery(
+    templateListQuery({ kind: TEMPLATE_KIND_BY_BILLING[billing], pageSize: 100 }),
+  );
 
   /** A one-off service is never counted, and a template of the other kind no longer fits. */
   function changeBilling(next: CatalogBilling) {
@@ -125,6 +140,8 @@ export function ServiceDialog({
 
   const submit = form.handleSubmit(async (values) => {
     setFailure(null);
+    // Nothing changed: close without a request or a "saved" toast.
+    if (service && !isDirty) return onDone();
     try {
       if (service) {
         await update.mutateAsync({ id: service.id, ...values });
@@ -133,9 +150,16 @@ export function ServiceDialog({
         await create.mutateAsync(values);
         toast.add({ title: t('catalog.services.added'), type: 'success' });
       }
-      close();
+      onDone();
     } catch (error) {
-      setFailure(errorMessage(t, error));
+      const field = error instanceof ApiError && error.knownCode && ERROR_FIELDS[error.knownCode];
+      if (field) {
+        form.setError(
+          field,
+          { type: SCREEN_ERROR, message: errorMessage(t, error) },
+          { shouldFocus: true },
+        );
+      } else setFailure(errorMessage(t, error));
     }
   });
 
@@ -158,67 +182,69 @@ export function ServiceDialog({
   }
 
   return (
-    <Dialog open={editing !== null} onOpenChange={(open) => !open && close()}>
-      <DialogContent closeLabel={t('common.close')} className="max-w-2xl">
-        <form className="grid gap-5" onSubmit={submit} noValidate>
-          <DialogHeader>
-            <DialogTitle>
-              {service ? t('catalog.services.editTitle') : t('catalog.services.addTitle')}
-            </DialogTitle>
-            <DialogDescription>{t('catalog.services.formHint')}</DialogDescription>
-          </DialogHeader>
-          <Field invalid={!!errors.name}>
-            <FieldLabel>{t('catalog.form.name')}</FieldLabel>
-            <Input autoComplete="off" {...form.register('name')} />
-            <FieldError match={!!errors.name}>{t('catalog.form.errors.name')}</FieldError>
-          </Field>
-          <Field invalid={!!errors.description}>
-            <FieldLabel>{t('catalog.form.description')}</FieldLabel>
-            <Textarea {...form.register('description')} />
-            <FieldDescription>{t('catalog.form.descriptionHint')}</FieldDescription>
-            <FieldError match={!!errors.description}>
-              {t('catalog.form.errors.description')}
-            </FieldError>
-          </Field>
-          <div className="grid gap-5 sm:grid-cols-2">
-            <Controller
-              control={form.control}
-              name="department"
-              render={({ field }) => (
-                <Field>
-                  <FieldLabel id={ids.department} render={<span />}>
-                    {t('catalog.department')}
-                  </FieldLabel>
-                  <Select
-                    items={departmentItems}
-                    value={field.value}
-                    onValueChange={(next) => next && field.onChange(next)}
-                  >
-                    <SelectTrigger aria-labelledby={ids.department}>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {departmentItems.map((item) => (
-                        <SelectItem key={item.value} value={item.value}>
-                          {item.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FieldDescription>{t('catalog.form.departmentHint')}</FieldDescription>
-                </Field>
-              )}
-            />
+    <form className="grid gap-5" onSubmit={submit} noValidate>
+      <DialogHeader>
+        <DialogTitle>
+          {service ? t('catalog.services.editTitle') : t('catalog.services.addTitle')}
+        </DialogTitle>
+        <DialogDescription>{t('catalog.services.formHint')}</DialogDescription>
+      </DialogHeader>
+      <Field invalid={!!errors.name}>
+        <FieldLabel>{t('catalog.form.name')}</FieldLabel>
+        <Input autoFocus autoComplete="off" {...form.register('name')} />
+        <FieldError match={!!errors.name} role={errorRole(errors.name)}>
+          {fieldError(errors.name, t('catalog.form.errors.name'))}
+        </FieldError>
+      </Field>
+      <Field invalid={!!errors.description}>
+        <FieldLabel>{t('catalog.form.description')}</FieldLabel>
+        <Textarea {...form.register('description')} />
+        <FieldDescription>{t('catalog.form.descriptionHint')}</FieldDescription>
+        <FieldError match={!!errors.description}>{t('catalog.form.errors.description')}</FieldError>
+      </Field>
+      <div className="grid gap-5 sm:grid-cols-2">
+        <Controller
+          control={form.control}
+          name="department"
+          render={({ field }) => (
             <Field>
+              <FieldLabel id={ids.department} render={<span />}>
+                {t('catalog.department')}
+              </FieldLabel>
+              <Select
+                items={departmentItems}
+                value={field.value}
+                onValueChange={(next) => next && field.onChange(next)}
+              >
+                <SelectTrigger aria-labelledby={ids.department}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {departmentItems.map((item) => (
+                    <SelectItem key={item.value} value={item.value}>
+                      {item.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <FieldDescription>{t('catalog.form.departmentHint')}</FieldDescription>
+            </Field>
+          )}
+        />
+        <Controller
+          control={form.control}
+          name="billing"
+          render={({ field }) => (
+            <Field invalid={!!errors.billing}>
               <FieldLabel id={ids.billing} render={<span />}>
                 {t('catalog.billing')}
               </FieldLabel>
               <Select
                 items={billingItems}
-                value={billing}
+                value={field.value}
                 onValueChange={(next) => next && changeBilling(next as CatalogBilling)}
               >
-                <SelectTrigger aria-labelledby={ids.billing}>
+                <SelectTrigger ref={field.ref} aria-labelledby={ids.billing}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -230,147 +256,153 @@ export function ServiceDialog({
                 </SelectContent>
               </Select>
               <FieldDescription>{t(`catalog.form.billingHints.${billing}`)}</FieldDescription>
-            </Field>
-            <Controller
-              control={form.control}
-              name="priceUsdMinor"
-              render={({ field }) => (
-                <Field invalid={!!errors.priceUsdMinor}>
-                  <FieldLabel htmlFor={ids.priceUsd}>{t('catalog.form.priceUsd')}</FieldLabel>
-                  <MoneyInput
-                    id={ids.priceUsd}
-                    currency="USD"
-                    value={field.value}
-                    onValueChange={(minor) => field.onChange(minor)}
-                  />
-                  <FieldDescription>{t(`catalog.form.priceHints.${billing}`)}</FieldDescription>
-                  <FieldError match={!!errors.priceUsdMinor}>
-                    {t('catalog.form.errors.priceUsd')}
-                  </FieldError>
-                </Field>
-              )}
-            />
-            <Controller
-              control={form.control}
-              name="priceSypMinor"
-              render={({ field }) => (
-                <Field invalid={!!errors.priceSypMinor}>
-                  <FieldLabel htmlFor={ids.priceSyp}>{t('catalog.form.priceSyp')}</FieldLabel>
-                  <MoneyInput
-                    id={ids.priceSyp}
-                    currency="SYP"
-                    value={field.value}
-                    onValueChange={(minor) => field.onChange(minor)}
-                  />
-                  <FieldDescription>{t('catalog.form.priceSypHint')}</FieldDescription>
-                </Field>
-              )}
-            />
-            <Field invalid={!!errors.revisionRounds}>
-              <FieldLabel htmlFor={ids.rounds}>{t('catalog.form.revisionRounds')}</FieldLabel>
-              <Input
-                id={ids.rounds}
-                type="number"
-                inputMode="numeric"
-                min={0}
-                max={20}
-                className="w-32 text-end tabular-nums"
-                {...form.register('revisionRounds', { valueAsNumber: true })}
-              />
-              <FieldError match={!!errors.revisionRounds}>
-                {t('catalog.form.errors.revisionRounds')}
+              <FieldError match={!!errors.billing} role="alert">
+                {errors.billing?.message}
               </FieldError>
             </Field>
-            <Controller
-              control={form.control}
-              name="templateId"
-              render={({ field }) => (
-                <Field>
-                  <FieldLabel id={ids.template} render={<span />}>
-                    {t('catalog.form.template')}
-                  </FieldLabel>
-                  <Select
-                    items={templateItems}
-                    value={field.value ?? NONE}
-                    onValueChange={(next) => next && field.onChange(next === NONE ? null : next)}
-                  >
-                    <SelectTrigger aria-labelledby={ids.template}>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {templateItems.map((item) => (
-                        <SelectItem key={item.value} value={item.value}>
-                          {item.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FieldDescription>{t(`catalog.form.templateHints.${billing}`)}</FieldDescription>
-                </Field>
-              )}
-            />
-          </div>
-          {billing === 'monthly' && (
-            <div className="grid gap-5 rounded-lg border border-border p-4 sm:grid-cols-2">
-              <Controller
-                control={form.control}
-                name="deliverableKind"
-                render={({ field }) => (
-                  <Field>
-                    <FieldLabel id={ids.kind} render={<span />}>
-                      {t('catalog.form.counted')}
-                    </FieldLabel>
-                    <Select
-                      items={kindItems}
-                      value={field.value ?? NONE}
-                      onValueChange={(next) => {
-                        if (!next) return;
-                        field.onChange(next === NONE ? null : next);
-                        if (next === NONE) form.setValue('deliverableLabel', '');
-                      }}
-                    >
-                      <SelectTrigger aria-labelledby={ids.kind}>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {kindItems.map((item) => (
-                          <SelectItem key={item.value} value={item.value}>
-                            {item.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FieldDescription>{t('catalog.form.countedHint')}</FieldDescription>
-                  </Field>
-                )}
-              />
-              {kind && (
-                <Field invalid={!!errors.deliverableLabel}>
-                  <FieldLabel>{t('catalog.form.deliverableLabel')}</FieldLabel>
-                  <Input autoComplete="off" {...form.register('deliverableLabel')} />
-                  <FieldDescription>
-                    {kind === 'other'
-                      ? t('catalog.form.deliverableLabelRequired')
-                      : t('catalog.form.deliverableLabelHint')}
-                  </FieldDescription>
-                  <FieldError match={!!errors.deliverableLabel}>
-                    {t('catalog.form.errors.deliverableLabel')}
-                  </FieldError>
-                </Field>
-              )}
-            </div>
           )}
-          {failure && <FormAlert>{failure}</FormAlert>}
-          <DialogFooter>
-            <DialogClose render={<Button variant="outline" type="button" />}>
-              {t('common.cancel')}
-            </DialogClose>
-            <Button type="submit" disabled={form.formState.isSubmitting}>
-              {form.formState.isSubmitting ? t('common.saving') : t('common.save')}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+        />
+        <Controller
+          control={form.control}
+          name="priceUsdMinor"
+          render={({ field }) => (
+            <Field invalid={!!errors.priceUsdMinor}>
+              <FieldLabel htmlFor={ids.priceUsd}>{t('catalog.form.priceUsd')}</FieldLabel>
+              <MoneyInput
+                id={ids.priceUsd}
+                currency="USD"
+                value={field.value}
+                onValueChange={(minor) => field.onChange(minor)}
+              />
+              <FieldDescription>{t(`catalog.form.priceHints.${billing}`)}</FieldDescription>
+              <FieldError match={!!errors.priceUsdMinor}>
+                {t('catalog.form.errors.priceUsd')}
+              </FieldError>
+            </Field>
+          )}
+        />
+        <Controller
+          control={form.control}
+          name="priceSypMinor"
+          render={({ field }) => (
+            <Field invalid={!!errors.priceSypMinor}>
+              <FieldLabel htmlFor={ids.priceSyp}>{t('catalog.form.priceSyp')}</FieldLabel>
+              <MoneyInput
+                id={ids.priceSyp}
+                currency="SYP"
+                value={field.value}
+                onValueChange={(minor) => field.onChange(minor)}
+              />
+              <FieldDescription>{t('catalog.form.priceSypHint')}</FieldDescription>
+            </Field>
+          )}
+        />
+        <Field invalid={!!errors.revisionRounds}>
+          <FieldLabel htmlFor={ids.rounds}>{t('catalog.form.revisionRounds')}</FieldLabel>
+          <Input
+            id={ids.rounds}
+            type="number"
+            inputMode="numeric"
+            min={0}
+            max={20}
+            className="w-32 text-end tabular-nums"
+            {...form.register('revisionRounds', { valueAsNumber: true })}
+          />
+          <FieldError match={!!errors.revisionRounds}>
+            {t('catalog.form.errors.revisionRounds')}
+          </FieldError>
+        </Field>
+        <Controller
+          control={form.control}
+          name="templateId"
+          render={({ field }) => (
+            <Field invalid={!!errors.templateId}>
+              <FieldLabel id={ids.template} render={<span />}>
+                {t('catalog.form.template')}
+              </FieldLabel>
+              <Select
+                items={templateItems}
+                value={field.value ?? NONE}
+                onValueChange={(next) => next && field.onChange(next === NONE ? null : next)}
+              >
+                <SelectTrigger ref={field.ref} aria-labelledby={ids.template}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {templateItems.map((item) => (
+                    <SelectItem key={item.value} value={item.value}>
+                      {item.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <FieldDescription>{t(`catalog.form.templateHints.${billing}`)}</FieldDescription>
+              <FieldError match={!!errors.templateId} role="alert">
+                {errors.templateId?.message}
+              </FieldError>
+            </Field>
+          )}
+        />
+      </div>
+      {billing === 'monthly' && (
+        <div className="grid gap-5 rounded-lg border border-border p-4 sm:grid-cols-2">
+          <Controller
+            control={form.control}
+            name="deliverableKind"
+            render={({ field }) => (
+              <Field>
+                <FieldLabel id={ids.kind} render={<span />}>
+                  {t('catalog.form.counted')}
+                </FieldLabel>
+                <Select
+                  items={kindItems}
+                  value={field.value ?? NONE}
+                  onValueChange={(next) => {
+                    if (!next) return;
+                    field.onChange(next === NONE ? null : next);
+                    if (next === NONE) form.setValue('deliverableLabel', '');
+                  }}
+                >
+                  <SelectTrigger aria-labelledby={ids.kind}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {kindItems.map((item) => (
+                      <SelectItem key={item.value} value={item.value}>
+                        {item.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FieldDescription>{t('catalog.form.countedHint')}</FieldDescription>
+              </Field>
+            )}
+          />
+          {kind && (
+            <Field invalid={!!errors.deliverableLabel}>
+              <FieldLabel>{t('catalog.form.deliverableLabel')}</FieldLabel>
+              <Input autoComplete="off" {...form.register('deliverableLabel')} />
+              <FieldDescription>
+                {kind === 'other'
+                  ? t('catalog.form.deliverableLabelRequired')
+                  : t('catalog.form.deliverableLabelHint')}
+              </FieldDescription>
+              <FieldError match={!!errors.deliverableLabel}>
+                {t('catalog.form.errors.deliverableLabel')}
+              </FieldError>
+            </Field>
+          )}
+        </div>
+      )}
+      {failure && <FormAlert>{failure}</FormAlert>}
+      <DialogFooter>
+        <DialogClose render={<Button variant="outline" type="button" />}>
+          {t('common.cancel')}
+        </DialogClose>
+        <Button type="submit" disabled={isSubmitting}>
+          {isSubmitting ? t('common.saving') : t('common.save')}
+        </Button>
+      </DialogFooter>
+    </form>
   );
 }

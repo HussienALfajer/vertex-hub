@@ -23,7 +23,12 @@ export function useSearchText(
   onChange: (next: { search: string | undefined }) => void,
 ): [string, (text: string) => void] {
   const [text, setText] = useState(search ?? '');
-  useEffect(() => setText(search ?? ''), [search]);
+  // Only a URL change from outside replaces the text: the URL echoing what was typed would drop
+  // a trailing space the user is still typing after ("Audit " → "Audit").
+  useEffect(
+    () => setText((current) => (current.trim() === (search ?? '') ? current : (search ?? ''))),
+    [search],
+  );
   useEffect(() => {
     const timer = setTimeout(() => {
       if ((search ?? '') !== text.trim()) onChange({ search: text.trim() || undefined });

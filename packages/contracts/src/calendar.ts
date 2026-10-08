@@ -6,6 +6,7 @@ import {
   type CalendarDate,
   calendarDateSchema,
   daysInclusive,
+  instantSchema,
   nextWorkDay,
   nthWorkDay,
   workDaysBefore,
@@ -157,8 +158,6 @@ export function timeRangeProblem(
 }
 
 // Inputs
-
-const instantSchema = z.iso.datetime({ offset: true });
 
 const titleSchema = z.string().trim().min(1).max(CALENDAR_LIMITS.title);
 
