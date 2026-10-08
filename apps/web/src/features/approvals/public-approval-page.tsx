@@ -50,7 +50,6 @@ import { LoadError } from '../../components/load-error';
 import { ApiError } from '../../lib/api/client';
 import { errorMessage, SCREEN_ERROR } from '../../lib/errors';
 import { formatDateTime, formatFileSize, formatNumber } from '../../lib/format';
-import { useFocusAfterChange } from '../../lib/use-focus-after-change';
 import { formatPublish, POST_TYPE_ICONS, PostPlatforms } from '../content/post-parts';
 import { FileTypeIcon } from '../files/file-parts';
 import {
@@ -125,12 +124,13 @@ function ApprovalView({ token, approval }: { token: string; approval: PublicAppr
   const posts = approval.items.filter((item) => item.kind === 'post');
   const pendingPosts = posts.filter((item) => item.status === 'pending');
   const planHeading = useRef<HTMLHeadingElement>(null);
-  // A decision takes its buttons away: the focus goes to the heading of what was decided.
+  // A decision takes its buttons away: the focus goes to the heading of what was decided. The
+  // page refreshes while the dialog is still open, so the focus moves once the dialog has gone.
   const decided = useRef<HTMLElement | null>(null);
-  useFocusAfterChange(approval.items.map((item) => item.status).join(), () => decided.current);
   const setDecided = (heading: HTMLElement | null) => {
     decided.current = heading;
   };
+  const focusDecided = () => requestAnimationFrame(() => decided.current?.focus());
   return (
     <>
       <section className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-5">
@@ -154,7 +154,13 @@ function ApprovalView({ token, approval }: { token: string; approval: PublicAppr
       {tasks.length > 0 && (
         <ol className="flex flex-col gap-4">
           {tasks.map((item) => (
-            <ItemCard key={item.id} token={token} item={item} onDecide={setDecided} />
+            <ItemCard
+              key={item.id}
+              token={token}
+              item={item}
+              onDecide={setDecided}
+              onDecided={focusDecided}
+            />
           ))}
         </ol>
       )}
@@ -179,7 +185,13 @@ function ApprovalView({ token, approval }: { token: string; approval: PublicAppr
           </div>
           <ol className="flex flex-col gap-4">
             {posts.map((item) => (
-              <ItemCard key={item.id} token={token} item={item} onDecide={setDecided} />
+              <ItemCard
+                key={item.id}
+                token={token}
+                item={item}
+                onDecide={setDecided}
+                onDecided={focusDecided}
+              />
             ))}
           </ol>
         </section>
@@ -189,6 +201,7 @@ function ApprovalView({ token, approval }: { token: string; approval: PublicAppr
           token={token}
           count={pendingPosts.length}
           onClose={() => setApprovingAll(false)}
+          onDecided={focusDecided}
         />
       )}
     </>
@@ -203,11 +216,14 @@ function ItemCard({
   token,
   item,
   onDecide,
+  onDecided,
 }: {
   token: string;
   item: PublicApprovalItem;
   /** Opening a decision names the heading that takes the focus once it is sent. */
   onDecide: (heading: HTMLElement | null) => void;
+  /** After the decision was sent and its dialog closed. */
+  onDecided: () => void;
 }) {
   const { t } = useTranslation();
   const heading = useRef<HTMLHeadingElement>(null);
@@ -308,6 +324,7 @@ function ItemCard({
           item={item}
           decision={deciding}
           onClose={() => setDeciding(null)}
+          onDecided={onDecided}
         />
       )}
       {previewing && (
@@ -511,11 +528,13 @@ function DecisionDialog({
   item,
   decision,
   onClose,
+  onDecided,
 }: {
   token: string;
   item: PublicApprovalItem;
   decision: ClientDecision;
   onClose: () => void;
+  onDecided: () => void;
 }) {
   const { t } = useTranslation();
   const id = useId();
@@ -536,6 +555,7 @@ function DecisionDialog({
     try {
       await respond.mutateAsync({ itemId: item.id, decision, note: values.note || undefined });
       onClose();
+      onDecided();
     } catch (error) {
       setFailure(errorMessage(t, error));
     }
@@ -590,10 +610,12 @@ function ApproveAllDialog({
   token,
   count,
   onClose,
+  onDecided,
 }: {
   token: string;
   count: number;
   onClose: () => void;
+  onDecided: () => void;
 }) {
   const { t } = useTranslation();
   const id = useId();
@@ -609,6 +631,7 @@ function ApproveAllDialog({
     try {
       await approveAll.mutateAsync({ note: values.note || undefined });
       onClose();
+      onDecided();
     } catch (error) {
       setFailure(errorMessage(t, error));
     }
