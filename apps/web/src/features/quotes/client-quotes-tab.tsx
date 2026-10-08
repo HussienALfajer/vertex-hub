@@ -1,6 +1,11 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
-import { type ClientDetailResponse, QUOTE_STATUSES, type Quote } from '@vertex-hub/contracts';
+import {
+  type ClientDetailResponse,
+  type MeResponse,
+  QUOTE_STATUSES,
+  type Quote,
+} from '@vertex-hub/contracts';
 import { Button, EmptyState, Skeleton } from '@vertex-hub/ui';
 import { CalendarIcon, FileTextIcon, PlusIcon } from 'lucide-react';
 import { useState } from 'react';
@@ -12,6 +17,14 @@ import { formatCalendarDate } from '../../lib/format';
 import { NewQuoteDialog } from './new-quote-dialog';
 import { ApprovalBadge, ExpiresSoonBadge, Money, QuoteStatusBadge } from './quote-badges';
 import { quoteListQuery } from './quotes.queries';
+
+/** Quote readers covering the client see its Quotes tab (spec screen 7). */
+export function hasQuoteAccess(me: MeResponse, accountManagerId: string): boolean {
+  const scopes = scopesOf(me, 'quotes.read');
+  return (
+    scopes.includes('all') || (scopes.includes('own_clients') && accountManagerId === me.user.id)
+  );
+}
 
 /** Spec screen 7: the client's quotes, the latest version of each, with "New quote". */
 export function ClientQuotesTab({ client }: { client: ClientDetailResponse }) {

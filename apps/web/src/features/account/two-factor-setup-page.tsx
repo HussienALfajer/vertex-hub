@@ -234,6 +234,7 @@ function CodesStep({ codes, onFinish }: { codes: string[]; onFinish: () => Promi
   const { t } = useTranslation();
   const savedId = useId();
   const [saved, setSaved] = useState(false);
+  const savedBox = useRef<HTMLElement>(null);
   const [finishing, setFinishing] = useState(false);
   // The codes are shown once: leaving before saving them (back, reload, closing the tab) asks first.
   const blocker = useBlocker({
@@ -249,7 +250,7 @@ function CodesStep({ codes, onFinish }: { codes: string[]; onFinish: () => Promi
         htmlFor={savedId}
         className="flex cursor-pointer items-center gap-3 text-sm font-medium"
       >
-        <Checkbox id={savedId} checked={saved} onCheckedChange={(value) => setSaved(value)} />
+        <Checkbox ref={savedBox} id={savedId} checked={saved} onCheckedChange={(value) => setSaved(value)} />
         {t('twoFactorSetup.confirmSaved')}
       </label>
       <Button
@@ -266,6 +267,9 @@ function CodesStep({ codes, onFinish }: { codes: string[]; onFinish: () => Promi
       <ConfirmDialog
         open={blocker.status === 'blocked'}
         onClose={() => blocker.reset?.()}
+        // Opened by the browser's back button, not a button on the page: staying gives the focus to
+        // the step's next action.
+        finalFocus={savedBox}
         title={t('twoFactorSetup.leaveCodes.title')}
         body={t('twoFactorSetup.leaveCodes.body')}
         action={t('twoFactorSetup.leaveCodes.leave')}

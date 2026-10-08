@@ -70,7 +70,7 @@ import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '../../components/confirm-dialog';
 import { FormAlert } from '../../components/form-alert';
 import { isMissing, LoadError } from '../../components/load-error';
-import { can, canAll, useMe } from '../../lib/auth';
+import { canAll, useMe } from '../../lib/auth';
 import { errorMessage } from '../../lib/errors';
 import { formatNumber } from '../../lib/format';
 import { useShownWhileClosing } from '../../lib/use-shown-while-closing';
@@ -83,7 +83,7 @@ import { ClientInvoicesTab } from '../invoices/client-invoices-tab';
 import { ConvertedFromLead } from '../leads/converted-from-lead';
 import { ClientProjectsTab } from '../projects/client-projects-tab';
 import { hasMoneyAccess, hasReportAccess } from '../projects/project-access';
-import { ClientQuotesTab } from '../quotes/client-quotes-tab';
+import { ClientQuotesTab, hasQuoteAccess } from '../quotes/client-quotes-tab';
 import { ClientRetainersTab, EndedClientWorkCallout } from '../retainers/client-retainers-tab';
 import { ClientTasksTab } from '../tasks/client-tasks-tab';
 import { BrandKitTab } from './brand-kit-tab';
@@ -183,8 +183,8 @@ function Profile({
   const me = useMe();
   const navigate = useNavigate({ from: '/clients/$clientId/' });
   const scopeAll = canAll(me, 'clients.manage');
-  // Quotes are confidential to quote readers (F04 screen 7).
-  const quoteReader = can(me, 'quotes.read');
+  // Quotes are confidential to quote readers covering the client (F04 screen 7).
+  const quoteReader = hasQuoteAccess(me, client.accountManager.id);
   // Invoices, balances and statements need `invoices.read` covering the client (F13 screen 5).
   const invoiceReader = hasMoneyAccess(me, client.accountManager.id);
   // The ad wallet and campaigns need `campaigns.read` covering the client (F12 screen 4).

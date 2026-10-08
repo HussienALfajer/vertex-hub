@@ -45,7 +45,7 @@ import {
   SproutIcon,
   UserRoundCheckIcon,
 } from 'lucide-react';
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LoadError } from '../../components/load-error';
 import { canAll, useMe } from '../../lib/auth';
@@ -332,6 +332,7 @@ function Filters({
   const managers = useQuery(userListQuery({ pageSize: 100 }));
   const departments = useQuery(departmentListQuery);
   const [text, setText] = useSearchText(search.search, onChange);
+  const searchField = useRef<HTMLInputElement>(null);
   const mine = search.projectManagerId === me.user.id;
 
   const clientItems = [
@@ -363,6 +364,7 @@ function Filters({
           />
           <Input
             type="search"
+            ref={searchField}
             value={text}
             onChange={(event) => setText(event.target.value)}
             placeholder={t('projects.search')}
@@ -449,7 +451,7 @@ function Filters({
             <Button
               variant="ghost"
               size="sm"
-              onClick={() =>
+              onClick={() => {
                 onChange({
                   search: undefined,
                   status: undefined,
@@ -457,8 +459,10 @@ function Filters({
                   projectManagerId: undefined,
                   department: undefined,
                   overdue: undefined,
-                })
-              }
+                });
+                // The button leaves with the filters: the focus goes to the search field.
+                searchField.current?.focus();
+              }}
             >
               <FilterXIcon />
               {t('projects.filters.clear')}

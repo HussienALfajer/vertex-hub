@@ -287,6 +287,7 @@ function Filters({
   // Owners come from the lead managers' list; readers without it pick All or Mine.
   const owners = useQuery({ ...leadOwnersQuery, enabled: can(me, 'leads.manage') });
   const [text, setText] = useSearchText(search.search, onChange);
+  const searchField = useRef<HTMLInputElement>(null);
   const isAccountManager = me.roles.includes('account_manager') && !scopeAll;
 
   const ownerItems = [
@@ -316,6 +317,7 @@ function Filters({
         />
         <Input
           type="search"
+          ref={searchField}
           value={text}
           onChange={(event) => setText(event.target.value)}
           placeholder={t('leads.search')}
@@ -389,15 +391,17 @@ function Filters({
             <Button
               variant="ghost"
               size="sm"
-              onClick={() =>
+              onClick={() => {
                 onChange({
                   search: undefined,
                   owner: undefined,
                   source: undefined,
                   followUp: undefined,
                   stage: undefined,
-                })
-              }
+                });
+                // The button leaves with the filters: the focus goes to the search field.
+                searchField.current?.focus();
+              }}
             >
               <FilterXIcon />
               {t('leads.filters.clear')}

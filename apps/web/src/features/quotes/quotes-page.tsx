@@ -32,7 +32,7 @@ import {
   StampIcon,
   UserRoundCheckIcon,
 } from 'lucide-react';
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LoadError } from '../../components/load-error';
 import { can, canAll, useMe } from '../../lib/auth';
@@ -231,7 +231,10 @@ function Filters({
   );
   const managers = useQuery({ ...userListQuery({ pageSize: 100 }), enabled: scopeAll });
   const [text, setText] = useSearchText(search.search, onChange);
+  const searchField = useRef<HTMLInputElement>(null);
   const mine = search.accountManagerId === me.user.id;
+  // The "My clients" toggle is for account managers (spec screen 3).
+  const accountManager = me.roles.includes('account_manager');
 
   const clientItems: Choice[] = [
     { value: ALL, label: t('quotes.filters.allClients') },
@@ -255,6 +258,7 @@ function Filters({
           />
           <Input
             type="search"
+            ref={searchField}
             value={text}
             onChange={(event) => setText(event.target.value)}
             placeholder={t('quotes.search')}
@@ -313,15 +317,17 @@ function Filters({
               {t('quotes.filters.awaiting')}
             </Button>
           )}
-          <Button
-            variant={mine ? 'secondary' : 'outline'}
-            size="sm"
-            aria-pressed={mine}
-            onClick={() => onChange({ accountManagerId: mine ? undefined : me.user.id })}
-          >
-            <UserRoundCheckIcon />
-            {t('quotes.filters.mine')}
-          </Button>
+          {accountManager && (
+            <Button
+              variant={mine ? 'secondary' : 'outline'}
+              size="sm"
+              aria-pressed={mine}
+              onClick={() => onChange({ accountManagerId: mine ? undefined : me.user.id })}
+            >
+              <UserRoundCheckIcon />
+              {t('quotes.filters.mine')}
+            </Button>
+          )}
           {scopeAll && (
             <Button
               variant={archived ? 'secondary' : 'outline'}
@@ -337,15 +343,17 @@ function Filters({
             <Button
               variant="ghost"
               size="sm"
-              onClick={() =>
+              onClick={() => {
                 onChange({
                   search: undefined,
                   status: undefined,
                   clientId: undefined,
                   accountManagerId: undefined,
                   awaiting: undefined,
-                })
-              }
+                });
+                // The button leaves with the filters: the focus goes to the search field.
+                searchField.current?.focus();
+              }}
             >
               <FilterXIcon />
               {t('quotes.filters.clear')}

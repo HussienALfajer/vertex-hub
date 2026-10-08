@@ -49,6 +49,7 @@ import {
   passwordFailure,
   SCREEN_ERROR,
 } from '../../lib/errors';
+import { useReturnFocus } from '../../lib/use-return-focus';
 import { DepartmentChips } from '../users/user-badges';
 import { SkillsInput } from '../users/user-form';
 import { skillsQuery, userQuery, useUpdateOwnProfile } from '../users/users.queries';
@@ -295,6 +296,13 @@ function TwoFactorCard() {
   const me = useMe();
   const { enabled, required } = me.twoFactor;
   const [dialog, setDialog] = useState<'disable' | 'regenerate' | null>(null);
+  // Back to the button that opened the dialog; after turning 2FA off, to "Turn on" instead.
+  const enableLink = useRef<HTMLAnchorElement>(null);
+  const returnFocus = useReturnFocus(enableLink);
+  const open = (mode: 'disable' | 'regenerate') => (event: React.MouseEvent<HTMLElement>) => {
+    returnFocus.from(event.currentTarget);
+    setDialog(mode);
+  };
 
   return (
     <Card className="lg:sticky lg:top-24">
@@ -322,20 +330,26 @@ function TwoFactorCard() {
       <div className="flex flex-col gap-2">
         {enabled ? (
           <>
-            <Button variant="outline" onClick={() => setDialog('regenerate')}>
+            <Button variant="outline" onClick={open('regenerate')}>
               {t('account.twoFactor.regenerate')}
             </Button>
             {!required && (
-              <Button variant="ghost" onClick={() => setDialog('disable')}>
+              <Button variant="ghost" onClick={open('disable')}>
                 {t('account.twoFactor.disableAction')}
               </Button>
             )}
           </>
         ) : (
-          <Button render={<Link to="/setup-two-factor" />}>{t('account.twoFactor.enable')}</Button>
+          <Button ref={enableLink} render={<Link to="/setup-two-factor" />}>
+            {t('account.twoFactor.enable')}
+          </Button>
         )}
       </div>
-      <PasswordDialog mode={dialog} onClose={() => setDialog(null)} />
+      <PasswordDialog
+        mode={dialog}
+        onClose={() => setDialog(null)}
+        finalFocus={returnFocus.target}
+      />
     </Card>
   );
 }
@@ -344,9 +358,11 @@ function TwoFactorCard() {
 function PasswordDialog({
   mode,
   onClose,
+  finalFocus,
 }: {
   mode: 'disable' | 'regenerate' | null;
   onClose: () => void;
+  finalFocus: () => HTMLElement | null;
 }) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
@@ -403,7 +419,7 @@ function PasswordDialog({
       }}
       onOpenChangeComplete={(open) => !open && reset()}
     >
-      <DialogContent closeLabel={codes ? undefined : t('common.close')}>
+      <DialogContent closeLabel={codes ? undefined : t('common.close')} finalFocus={finalFocus}>
         <DialogHeader>
           <DialogTitle>
             {shown === 'disable'

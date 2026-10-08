@@ -37,7 +37,7 @@ import {
   SettingsIcon,
   UserRoundCheckIcon,
 } from 'lucide-react';
-import { type ReactNode, useCallback, useState } from 'react';
+import { type ReactNode, useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LoadError } from '../../components/load-error';
 import { can, canAll, useMe } from '../../lib/auth';
@@ -294,6 +294,7 @@ function Filters({
   );
   const managers = useQuery({ ...userListQuery({ pageSize: 100 }), enabled: scopeAll });
   const [text, setText] = useSearchText(search.search, onChange);
+  const searchField = useRef<HTMLInputElement>(null);
   const mine = search.accountManagerId === me.user.id;
   const accountManager = me.roles.includes('account_manager');
 
@@ -323,6 +324,7 @@ function Filters({
           />
           <Input
             type="search"
+            ref={searchField}
             value={text}
             onChange={(event) => setText(event.target.value)}
             placeholder={t('invoices.search')}
@@ -391,7 +393,7 @@ function Filters({
             <Button
               variant="ghost"
               size="sm"
-              onClick={() =>
+              onClick={() => {
                 onChange({
                   search: undefined,
                   clientId: undefined,
@@ -399,8 +401,10 @@ function Filters({
                   accountManagerId: undefined,
                   dueFrom: undefined,
                   dueTo: undefined,
-                })
-              }
+                });
+                // The button leaves with the filters: the focus goes to the search field.
+                searchField.current?.focus();
+              }}
             >
               <FilterXIcon />
               {t('invoices.filters.clear')}

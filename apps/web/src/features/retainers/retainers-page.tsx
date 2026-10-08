@@ -44,7 +44,7 @@ import {
   TrendingDownIcon,
   UserRoundCheckIcon,
 } from 'lucide-react';
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LoadError } from '../../components/load-error';
 import { can, canAll, scopesOf, useMe } from '../../lib/auth';
@@ -351,6 +351,7 @@ function Filters({
   const managers = useQuery(userListQuery({ pageSize: 100 }));
   const departments = useQuery(departmentListQuery);
   const [text, setText] = useSearchText(search.search, onChange);
+  const searchField = useRef<HTMLInputElement>(null);
   // "My clients" is for account managers: the retainers of the clients they manage.
   const accountManager = scopesOf(me, 'projects.manage').includes('own_clients');
   const mine = search.accountManagerId === me.user.id;
@@ -384,6 +385,7 @@ function Filters({
           />
           <Input
             type="search"
+            ref={searchField}
             value={text}
             onChange={(event) => setText(event.target.value)}
             placeholder={t('retainers.search')}
@@ -492,7 +494,7 @@ function Filters({
             <Button
               variant="ghost"
               size="sm"
-              onClick={() =>
+              onClick={() => {
                 onChange({
                   search: undefined,
                   status: undefined,
@@ -502,8 +504,10 @@ function Filters({
                   behind: undefined,
                   renewalDue: undefined,
                   pendingApproval: undefined,
-                })
-              }
+                });
+                // The button leaves with the filters: the focus goes to the search field.
+                searchField.current?.focus();
+              }}
             >
               <FilterXIcon />
               {t('projects.filters.clear')}
