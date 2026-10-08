@@ -20729,6 +20729,20 @@ export interface operations {
                 };
                 content?: never;
             };
+            /** @description `INVALID_DATES`: to before from, or over 366 days */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description A department outside your `reports.read` scope */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     ReportsController_revenue: {
@@ -20775,6 +20789,13 @@ export interface operations {
         responses: {
             /** @description The revenue report as an Excel file with three sheets (rule 15) */
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `INVALID_DATES`: to before from, or over 366 days */
+            400: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -20884,6 +20905,20 @@ export interface operations {
                 };
                 content?: never;
             };
+            /** @description `INVALID_MONTH`: a month after the current one */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such client in your `reports.read` scope */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     ClientReportController_saveSummary: {
@@ -20976,6 +21011,20 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["QuotePdfRender"];
                 };
+            };
+            /** @description `INVALID_MONTH`: a month after the current one */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such client in your `reports.read` scope */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

@@ -14013,6 +14013,12 @@
         "responses": {
           "200": {
             "description": "The productivity report as an Excel file (rule 24)"
+          },
+          "400": {
+            "description": "`INVALID_DATES`: to before from, or over 366 days"
+          },
+          "403": {
+            "description": "A department outside your `reports.read` scope"
           }
         },
         "tags": [
@@ -14093,6 +14099,9 @@
         "responses": {
           "200": {
             "description": "The revenue report as an Excel file with three sheets (rule 15)"
+          },
+          "400": {
+            "description": "`INVALID_DATES`: to before from, or over 366 days"
           }
         },
         "tags": [
@@ -14251,6 +14260,12 @@
         "responses": {
           "200": {
             "description": "The report as an Excel file (rule 24)"
+          },
+          "400": {
+            "description": "`INVALID_MONTH`: a month after the current one"
+          },
+          "404": {
+            "description": "No such client in your `reports.read` scope"
           }
         },
         "tags": [
@@ -14336,6 +14351,12 @@
                 }
               }
             }
+          },
+          "400": {
+            "description": "`INVALID_MONTH`: a month after the current one"
+          },
+          "404": {
+            "description": "No such client in your `reports.read` scope"
           }
         },
         "tags": [
