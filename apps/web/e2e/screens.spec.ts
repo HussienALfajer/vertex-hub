@@ -848,6 +848,17 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await screenshot(page, testInfo, `quote-new-dialog-${colorScheme}`);
     });
 
+    test('quote list (Finance: no "My clients")', async ({ page }, testInfo) => {
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await mockApi(page, { signedIn: true, me: financeMe });
+      await page.goto('/quotes');
+      await expect(page.getByRole('link', { name: /هوية وسوشال الياسمين/ })).toBeVisible();
+      await expect(
+        page.getByRole('button', { name: ar.quotes.filters.mine, exact: true }),
+      ).toHaveCount(0);
+      await screenshot(page, testInfo, `quotes-list-finance-${colorScheme}`);
+    });
+
     test('quote builder', async ({ page }, testInfo) => {
       await page.setViewportSize({ width: 1440, height: 1600 });
       await mockApi(page, { signedIn: true });

@@ -235,3 +235,15 @@ test('the rename dialog starts from the saved name and gives the focus back', as
   await rename.click();
   await expect(page.getByRole('dialog').getByLabel(ar.departments.detail.name)).toHaveValue(saved);
 });
+
+test('the account’s 2FA dialog gives the focus back to its button', async ({ page }) => {
+  await mockApi(page, { signedIn: true, me: manager });
+  await page.goto('/account');
+  const regenerate = page.getByRole('button', { name: ar.account.twoFactor.regenerate });
+  await regenerate.click();
+  const dialog = page.getByRole('dialog', { name: ar.account.twoFactor.regenerateTitle });
+  await expect(dialog).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+  await expect(regenerate).toBeFocused();
+});
