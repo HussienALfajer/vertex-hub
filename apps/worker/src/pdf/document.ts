@@ -47,8 +47,11 @@ export function textBlock(title: string, text: string | null): string {
 
 const ARABIC_LETTER = /\p{Script=Arabic}/u;
 
-/** A phone, an amount or a date inside an Arabic line: digits split by spaces or dashes. */
-const NUMBER_GROUP = /\+?\d[\d\s\-/.]*\d/g;
+/**
+ * A phone, an amount or a date inside an Arabic line: digits split by spaces or dashes. Captured,
+ * so splitting a line on it keeps the groups at the odd positions.
+ */
+const NUMBER_GROUP = /(\+?\d[\d\s\-/.]*\d)/;
 
 /**
  * Text typed on several lines (company details, terms, payment details), each line isolated with
@@ -61,11 +64,23 @@ export function textLines(text: string): string {
     .split('\n')
     .map((line) =>
       ARABIC_LETTER.test(line)
-        ? `<bdi dir="rtl">${escapeHtml(line).replace(NUMBER_GROUP, (group) => `<bdi dir="ltr">${group}</bdi>`)}</bdi>`
+        ? `<bdi dir="rtl">${isolateNumbers(line)}</bdi>`
         : `<bdi dir="ltr">${escapeHtml(line)}</bdi>`,
     )
     .join('<br>');
 }
+
+/**
+ * An Arabic line, escaped, with its numbers isolated left to right. They are found before
+ * escaping, so the digits of an entity (`&#39;`) are never taken for a number.
+ */
+const isolateNumbers = (line: string) =>
+  line
+    .split(NUMBER_GROUP)
+    .map((part, index) =>
+      index % 2 === 1 ? `<bdi dir="ltr">${escapeHtml(part)}</bdi>` : escapeHtml(part),
+    )
+    .join('');
 
 /**
  * A `dl.meta` entry; `num` for dates and numbers, which read left to right. Other values (a billing

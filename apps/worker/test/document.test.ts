@@ -16,6 +16,10 @@ describe('PDF text helpers', () => {
     );
     // A lone digit is no group; text is escaped.
     expect(textLines('بند 5 <b>')).toBe('<bdi dir="rtl">بند 5 &lt;b&gt;</bdi>');
+    // An escaped apostrophe stays an entity: its digits are no number.
+    expect(textLines("شعار McDonald's 2026")).toBe(
+      '<bdi dir="rtl">شعار McDonald&#39;s <bdi dir="ltr">2026</bdi></bdi>',
+    );
   });
 
   it('prints a billing address with a phone line by line', () => {
