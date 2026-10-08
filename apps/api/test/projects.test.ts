@@ -362,6 +362,23 @@ describe('projects', () => {
       expect(entry?.before).toMatchObject({ departments: ['design'], dueDate: '2099-12-31' });
     });
 
+    it('takes the same departments in another order as no change (no audit entry)', async () => {
+      const { id: clientId } = await cast.createClient();
+      const project = await cast.createProject(clientId, {
+        departments: ['design', 'development'],
+      });
+      const response = await patch(project.id, cast.employee.cookie, {
+        departments: ['development', 'design'],
+      });
+      expect(response.status).toBe(200);
+      expect(projectDetailSchema.parse(await response.json()).departments).toEqual([
+        'design',
+        'development',
+      ]);
+      const updates = (await auditOf(project.id)).filter((e) => e.action === 'project.updated');
+      expect(updates).toEqual([]);
+    });
+
     it('moves the assigned scope with the project manager (rule 3, edge case 10)', async () => {
       const { id: clientId } = await cast.createClient();
       const project = await cast.createProject(clientId);

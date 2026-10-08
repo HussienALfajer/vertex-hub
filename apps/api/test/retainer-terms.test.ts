@@ -691,5 +691,26 @@ describe('retainer terms (F05B T1–T12, E1–E3)', () => {
       expect((await client.post(status, cast.gm.cookie, { status: 'active' })).status).toBe(200);
       expect((await detail(created.id)).term).toBeNull();
     });
+
+    it('counts the live month’s additions and credits in the current total, not a cancelled month’s (T6)', async () => {
+      const created = await retainer({ term: term(3, [10000, 10000, 10000]) });
+      await db.insert(retainerCharges).values([
+        { retainerId: created.id, month: thisMonth, kind: 'addition', amountMinor: 3000 },
+        { retainerId: created.id, month: thisMonth, kind: 'credit', amountMinor: -2000 },
+        { retainerId: created.id, month: nextMonth, kind: 'addition', amountMinor: 4000 },
+      ]);
+      await ok(
+        await client.post(`/api/retainers/${created.id}/status`, cast.am.cookie, {
+          status: 'ended',
+          termination: { feeMinor: 500, reason: 'إنهاء مبكر' },
+        }),
+        (body) => retainerDetailSchema.parse(body),
+      );
+      const [ended] = await listTerms(created.id);
+      expect(ended?.status).toBe('cancelled');
+      expect(ended?.schedule.map((month) => month.money?.totalMinor)).toEqual([11000, 0, 0]);
+      // The termination fee is not a month's charge: it stays out of the term's total.
+      expect(ended?.money).toEqual({ agreedTotalMinor: 30000, currentTotalMinor: 11000 });
+    });
   });
 });

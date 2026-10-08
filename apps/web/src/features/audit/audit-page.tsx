@@ -34,8 +34,8 @@ import { ChevronDownIcon, CpuIcon, FilterXIcon, HistoryIcon } from 'lucide-react
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LoadError } from '../../components/load-error';
-import i18n from '../../i18n';
 import { SystemStatus } from '../../components/system-status';
+import i18n from '../../i18n';
 import { canAll, useMe } from '../../lib/auth';
 import { everyPage } from '../../lib/every-page';
 import {
@@ -54,6 +54,7 @@ import { projectListQuery } from '../projects/projects.queries';
 import { retainerListQuery } from '../retainers/retainers.queries';
 import { userListQuery } from '../users/users.queries';
 import { auditListQuery } from './audit.queries';
+import { shownFields } from './audit-fields';
 import { type AuditNames, AuditValue } from './audit-value';
 
 export interface AuditSearch {
@@ -283,8 +284,7 @@ function useEntityNames(): EntityNames {
   const archivedServices = useQuery(
     all(
       'archived-services',
-      (page) =>
-        queryClient.fetchQuery(serviceListQuery({ archived: 'true', page, pageSize: 100 })),
+      (page) => queryClient.fetchQuery(serviceListQuery({ archived: 'true', page, pageSize: 100 })),
       canAll(me, 'catalog.manage'),
     ),
   ).data;
@@ -482,55 +482,10 @@ const actionTone = (action: AuditAction) => {
   return 'neutral';
 };
 
-const LINK_FIELDS = new Set([
-  'clientId',
-  'projectId',
-  'retainerId',
-  'lineId',
-  'fromQuoteId',
-  'byQuoteId',
-  'ownerType',
-  'ownerId',
-  'role',
-  'shotId',
-  'taskId',
-  'leadId',
-  'campaignId',
-  'templateId',
-]);
-
-/**
- * Ids of other records the log has no name for (contacts, tasks, posts, cycle lines): an id
- * means nothing to a reader, and the record's own page shows what it points to.
- */
-const REFERENCE_FIELDS = new Set([
-  'contactId',
-  'contactIds',
-  'requestedByContactId',
-  'itemId',
-  'taskIds',
-  'postId',
-  'shootId',
-  'quoteId',
-  'amendmentId',
-  'milestoneId',
-  'retainerCycleId',
-  'cycleLineId',
-  'extraWorkItemId',
-  'revisionId',
-  'templateRunId',
-  'editingTaskId',
-  'fromPostId',
-  'interests',
-]);
-
 function AuditRow({ entry, names }: { entry: AuditEntry; names: EntityNames }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
-  // The parent's id on a child record's entry is where its link points, not a change.
-  const fields = [
-    ...new Set([...Object.keys(entry.before ?? {}), ...Object.keys(entry.after ?? {})]),
-  ].filter((field) => !LINK_FIELDS.has(field) && !REFERENCE_FIELDS.has(field));
+  const fields = shownFields(entry);
   const detailsId = `audit-${entry.id}`;
 
   return (
@@ -589,7 +544,9 @@ function AuditRow({ entry, names }: { entry: AuditEntry; names: EntityNames }) {
             <tbody>
               {fields.map((field) => (
                 <tr key={field} className="align-top">
-                  <td className="py-1.5 pe-4 font-medium">{fieldLabel(t, entry.entityType, field)}</td>
+                  <td className="py-1.5 pe-4 font-medium">
+                    {fieldLabel(t, entry.entityType, field)}
+                  </td>
                   <td className="py-1.5 pe-4 text-muted-foreground">
                     <AuditValue
                       entityType={entry.entityType}
@@ -615,8 +572,6 @@ function AuditRow({ entry, names }: { entry: AuditEntry; names: EntityNames }) {
     </li>
   );
 }
-
-
 
 function fieldLabel(t: TFunction, entityType: AuditEntityType, field: string): string {
   // A file's source is how its final version was chosen; a lead's, where it came from.
@@ -868,7 +823,11 @@ function ownPageLink(t: TFunction, entry: AuditEntry, names: EntityNames) {
   switch (entry.entityType) {
     case 'invoice':
       return (
-        <Link to="/invoices/$invoiceId" params={{ invoiceId: entry.entityId }} className={linkClass}>
+        <Link
+          to="/invoices/$invoiceId"
+          params={{ invoiceId: entry.entityId }}
+          className={linkClass}
+        >
           {textOf(entry, 'number') ?? t('audit.openInvoice')}
         </Link>
       );

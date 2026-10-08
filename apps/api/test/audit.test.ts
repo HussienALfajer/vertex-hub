@@ -98,7 +98,14 @@ describe('audit log', () => {
   });
 
   it('rejects invalid filters', async () => {
-    for (const query of ['action=user.deleted', 'pageSize=101', 'entityId=not-a-uuid']) {
+    for (const query of [
+      'action=user.deleted',
+      'pageSize=101',
+      'entityId=not-a-uuid',
+      // Years outside CALENDAR_YEARS, which the time zone conversions cannot handle.
+      'from=0000-01-01T00:00:00Z',
+      'to=9999-12-31T23:59:59Z',
+    ]) {
       expect((await client.get(`/api/audit?${query}`, manager.cookie)).status, query).toBe(400);
     }
   });

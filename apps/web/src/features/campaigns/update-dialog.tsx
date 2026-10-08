@@ -23,11 +23,12 @@ import { MoneyInput } from '../../components/money-input';
 import { errorMessage } from '../../lib/errors';
 import { useFocusFirstError } from '../../lib/focus-first-invalid';
 import { isolateLtr } from '../../lib/format';
-import { formatMoney, rateInput } from '../../lib/money';
+import { formatMoney } from '../../lib/money';
 import { Money } from '../quotes/quote-badges';
 import { FormDialog } from '../quotes/quote-dialogs';
 import { CostPerResult } from './campaign-badges';
 import { useAddCampaignUpdate, useEditCampaignUpdate } from './campaigns.queries';
+import { count } from './update-count';
 import { defaultPeriod } from './update-period';
 
 interface UpdateValues {
@@ -39,15 +40,6 @@ interface UpdateValues {
   results: string;
   note: string;
 }
-
-/**
- * A typed count: digits only, Arabic-Indic ones read as Latin. A count is whole, so a thousands
- * separator (`15,000`, `١٥٬٠٠٠`) cannot be mistaken for a decimal mark and is dropped.
- */
-const count = (text: string) => {
-  const digits = rateInput(text).replace(/[,٬\s]/g, '');
-  return /^\d+$/.test(digits) ? Number(digits) : Number.NaN;
-};
 
 /**
  * Spec screen 3, "Add update": a period with its spend and results. Before saving it shows the

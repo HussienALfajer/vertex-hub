@@ -423,7 +423,7 @@ function EndActionSelect({ retainerId, term }: { retainerId: string; term: Retai
  * The first month a term may start in (T2): this month or later, not before the retainer's start
  * date, and after every other term that is not cancelled.
  */
-function earliestStart(retainer: RetainerDetail, others: RetainerTerm[]): CalendarDate {
+export function earliestStart(retainer: RetainerDetail, others: RetainerTerm[]): CalendarDate {
   let month = firstOfMonth(businessDate());
   const start = firstOfMonth(retainer.startDate);
   if (start > month) month = start;

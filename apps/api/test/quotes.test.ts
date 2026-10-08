@@ -359,6 +359,17 @@ describe('quotes', () => {
   });
 
   describe('drafts', () => {
+    it('takes a save that changes nothing as no change: same updatedAt, no audit entry', async () => {
+      const quote = await save(await builtQuote(), { clientNotes: 'يدفع نقدًا' });
+      const entries = await auditOf(quote.id);
+      const unchanged = await save(quote, {
+        title: `  ${quote.title} `,
+        clientNotes: ' يدفع نقدًا ',
+      });
+      expect(unchanged.updatedAt).toBe(quote.updatedAt);
+      expect(await auditOf(quote.id)).toHaveLength(entries.length);
+    });
+
     it('copy catalog lines and compute the totals (rules 4, 5)', async () => {
       const quote = await builtQuote(68000);
       const [oneOff, monthly] = quote.lines;
@@ -692,6 +703,14 @@ describe('quotes', () => {
 
       const latest = await client.get(`/api/quotes?search=${v1.displayNumber}`, cast.am.cookie);
       expect(quotePageSchema.parse(await latest.json()).items.map((q) => q.id)).toEqual([v2.id]);
+      // The number as the screens show it, with a version: the list shows the latest one.
+      const withVersion = await client.get(
+        `/api/quotes?search=${encodeURIComponent(`${v1.displayNumber} v1`)}`,
+        cast.am.cookie,
+      );
+      expect(quotePageSchema.parse(await withVersion.json()).items.map((q) => q.id)).toEqual([
+        v2.id,
+      ]);
 
       const sentV2 = await sent(v2, cast.gm.cookie);
       expect(sentV2.versions.map((v) => v.status)).toEqual(['superseded', 'sent']);

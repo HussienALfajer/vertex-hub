@@ -70,9 +70,9 @@ import {
   formatNumber,
 } from '../../lib/format';
 import { formatAmount, rateText } from '../../lib/money';
-import { splitMentions } from '../tasks/mentions';
 import { useDepartmentNames } from '../projects/project-badges';
 import { lineName } from '../retainers/retainer-badges';
+import { splitMentions } from '../tasks/mentions';
 
 type Item = Record<string, unknown>;
 
@@ -389,7 +389,14 @@ export function AuditValue({
   if (isItem(value) && text(value, 'name')) return <span>{text(value, 'name')}</span>;
   // An approval link's email (F14): its recipients.
   if (field === 'email' && isItem(value) && Array.isArray(value.to)) {
-    return <span>{value.to.filter(isItem).map((to) => text(to, 'name') ?? text(to, 'email')).join('، ')}</span>;
+    return (
+      <span>
+        {value.to
+          .filter(isItem)
+          .map((to) => text(to, 'name') ?? text(to, 'email'))
+          .join('، ')}
+      </span>
+    );
   }
   if (typeof value === 'boolean') {
     if (field === 'twoFactorEnabled') {
