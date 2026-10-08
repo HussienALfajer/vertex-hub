@@ -363,7 +363,9 @@ export function AssigneeField({
         )}
       />
       <FieldDescription>{hint}</FieldDescription>
-      <FieldError match={!!error} role={errorRole(error)}>{fieldError(error, t('tasks.form.errors.assignee'))}</FieldError>
+      <FieldError match={!!error} role={errorRole(error)}>
+        {fieldError(error, t('tasks.form.errors.assignee'))}
+      </FieldError>
     </Field>
   );
 }
@@ -449,7 +451,9 @@ export function ClientField({ form, clients }: { form: TaskFormMethods; clients:
         )}
       />
       <FieldDescription>{t('tasks.form.clientHint')}</FieldDescription>
-      <FieldError match={!!error} role={errorRole(error)}>{fieldError(error, t('tasks.form.errors.client'))}</FieldError>
+      <FieldError match={!!error} role={errorRole(error)}>
+        {fieldError(error, t('tasks.form.errors.client'))}
+      </FieldError>
     </Field>
   );
 }
@@ -773,7 +777,10 @@ export function ClientRequestFields({
               </Select>
             )}
           />
-          <FieldError match={!!errors.requestedByContactId} role={errorRole(errors.requestedByContactId)}>
+          <FieldError
+            match={!!errors.requestedByContactId}
+            role={errorRole(errors.requestedByContactId)}
+          >
             {fieldError(errors.requestedByContactId, t('errors.UNKNOWN_CONTACT'))}
           </FieldError>
         </Field>
@@ -1031,35 +1038,35 @@ export function LinksField({ form }: { form: TaskFormMethods }) {
         <Optional />
       </p>
       <div ref={list} className="contents">
-      {links.fields.map((link, index) => (
-        <div key={link.id} className="grid gap-2 sm:grid-cols-[1fr_12rem_auto] sm:items-start">
-          <Field invalid={!!errors?.[index]?.url}>
-            <FieldLabel className="sr-only">{t('tasks.links.url')}</FieldLabel>
-            <Input
-              type="url"
-              dir="ltr"
-              placeholder="https://"
-              {...form.register(`links.${index}.url`)}
-            />
-            <FieldError match={!!errors?.[index]?.url}>{t('tasks.links.errors.url')}</FieldError>
-          </Field>
-          <Field>
-            <FieldLabel className="sr-only">{t('tasks.links.label')}</FieldLabel>
-            <Input
-              placeholder={t('tasks.links.labelPlaceholder')}
-              {...form.register(`links.${index}.label`)}
-            />
-          </Field>
-          <IconButton
-            data-focus="remove"
-            size="icon"
-            label={t('tasks.links.removeAt', { position: formatNumber(index + 1) })}
-            onClick={() => remove(index)}
-          >
-            <XIcon />
-          </IconButton>
-        </div>
-      ))}
+        {links.fields.map((link, index) => (
+          <div key={link.id} className="grid gap-2 sm:grid-cols-[1fr_12rem_auto] sm:items-start">
+            <Field invalid={!!errors?.[index]?.url}>
+              <FieldLabel className="sr-only">{t('tasks.links.url')}</FieldLabel>
+              <Input
+                type="url"
+                dir="ltr"
+                placeholder="https://"
+                {...form.register(`links.${index}.url`)}
+              />
+              <FieldError match={!!errors?.[index]?.url}>{t('tasks.links.errors.url')}</FieldError>
+            </Field>
+            <Field>
+              <FieldLabel className="sr-only">{t('tasks.links.label')}</FieldLabel>
+              <Input
+                placeholder={t('tasks.links.labelPlaceholder')}
+                {...form.register(`links.${index}.label`)}
+              />
+            </Field>
+            <IconButton
+              data-focus="remove"
+              size="icon"
+              label={t('tasks.links.removeAt', { position: formatNumber(index + 1) })}
+              onClick={() => remove(index)}
+            >
+              <XIcon />
+            </IconButton>
+          </div>
+        ))}
       </div>
       <Button
         ref={addButton}

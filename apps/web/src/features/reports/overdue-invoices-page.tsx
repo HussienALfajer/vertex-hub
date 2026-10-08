@@ -197,11 +197,7 @@ function OverdueTable({ report }: { report: OverdueInvoicesReport }) {
             {/* The USD balance only beside a SYP one: for USD it is the same amount. */}
             <TableCell className="text-end">
               <span className="flex flex-col items-end">
-                <Money
-                  minor={row.balanceMinor}
-                  currency={row.currency}
-                  className="font-medium"
-                />
+                <Money minor={row.balanceMinor} currency={row.currency} className="font-medium" />
                 {row.currency !== 'USD' && (
                   <Money
                     minor={row.balanceUsdMinor}

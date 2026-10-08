@@ -287,353 +287,333 @@ function StepForm({
 
   return (
     <form
-          className="grid gap-5"
-          // The dialog renders in a portal inside the page form: its submit must not reach that form.
-          onSubmit={(event) => {
-            event.stopPropagation();
-            submit(event);
-          }}
-          noValidate
-        >
-          <DialogHeader>
-            <DialogTitle>
-              {isNew ? t('templates.step.addTitle') : t('templates.step.editTitle')}
-            </DialogTitle>
-            <DialogDescription>{t('templates.step.hint')}</DialogDescription>
-          </DialogHeader>
+      className="grid gap-5"
+      // The dialog renders in a portal inside the page form: its submit must not reach that form.
+      onSubmit={(event) => {
+        event.stopPropagation();
+        submit(event);
+      }}
+      noValidate
+    >
+      <DialogHeader>
+        <DialogTitle>
+          {isNew ? t('templates.step.addTitle') : t('templates.step.editTitle')}
+        </DialogTitle>
+        <DialogDescription>{t('templates.step.hint')}</DialogDescription>
+      </DialogHeader>
 
-          <Field invalid={!!errors.title}>
-            <FieldLabel htmlFor={ids.title}>{t('templates.step.title')}</FieldLabel>
-            <Input
-              id={ids.title}
-              autoComplete="off"
-              placeholder={t('templates.step.titlePlaceholder')}
-              {...form.register('title')}
-            />
-            {kind === 'retainer_cycle' && repeated && (
-              <FieldDescription>{t('templates.step.titleRepeatedHint')}</FieldDescription>
-            )}
-            <FieldError match={!!errors.title}>{t('templates.step.errors.title')}</FieldError>
-          </Field>
+      <Field invalid={!!errors.title}>
+        <FieldLabel htmlFor={ids.title}>{t('templates.step.title')}</FieldLabel>
+        <Input
+          id={ids.title}
+          autoComplete="off"
+          placeholder={t('templates.step.titlePlaceholder')}
+          {...form.register('title')}
+        />
+        {kind === 'retainer_cycle' && repeated && (
+          <FieldDescription>{t('templates.step.titleRepeatedHint')}</FieldDescription>
+        )}
+        <FieldError match={!!errors.title}>{t('templates.step.errors.title')}</FieldError>
+      </Field>
 
-          <div className="grid gap-5 sm:grid-cols-2">
-            <Field invalid={!!errors.department}>
-              <FieldLabel htmlFor={ids.department}>{t('templates.step.department')}</FieldLabel>
-              <Controller
-                control={form.control}
-                name="department"
-                render={({ field }) => (
-                  <Select
-                    items={departmentItems}
-                    value={field.value || null}
-                    onValueChange={(value) => field.onChange(value ?? '')}
-                  >
-                    <SelectTrigger id={ids.department} onBlur={field.onBlur} ref={field.ref}>
-                      <SelectValue placeholder={t('templates.step.departmentPlaceholder')} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {departmentItems.map((item) => (
-                        <SelectItem key={item.value} value={item.value}>
-                          {item.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-              />
-              <FieldDescription>{t('templates.step.departmentHint')}</FieldDescription>
-              <FieldError match={!!errors.department}>
-                {t('templates.step.errors.department')}
-              </FieldError>
-            </Field>
-            {kind === 'project' && (
-              <Field>
-                <FieldLabel htmlFor={ids.stage}>{t('templates.step.stage')}</FieldLabel>
-                <Controller
-                  control={form.control}
-                  name="stageKey"
-                  render={({ field }) => (
-                    <Select
-                      items={stageItems}
-                      value={field.value}
-                      onValueChange={(value) => field.onChange(value ?? NO_STAGE)}
-                    >
-                      <SelectTrigger id={ids.stage} onBlur={field.onBlur} ref={field.ref}>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {stageItems.map((item) => (
-                          <SelectItem key={item.value} value={item.value}>
-                            {item.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-                />
-                <FieldDescription>{t('templates.step.stageHint')}</FieldDescription>
-              </Field>
-            )}
-          </div>
-
-          {kind === 'retainer_cycle' && (
-            <Field>
-              <FieldLabel id={ids.kind} render={<span />}>
-                {t('templates.step.timing')}
-              </FieldLabel>
-              <Controller
-                control={form.control}
-                name="repeated"
-                render={({ field }) => (
-                  <ToggleGroup
-                    aria-labelledby={ids.kind}
-                    value={[field.value ? 'repeated' : 'fixed']}
-                    onValueChange={(next: string[]) => {
-                      if (next[0]) field.onChange(next[0] === 'repeated');
-                    }}
-                  >
-                    <ToggleGroupItem value="fixed">{t('templates.step.fixed')}</ToggleGroupItem>
-                    <ToggleGroupItem value="repeated">
-                      {t('templates.step.repeated')}
-                    </ToggleGroupItem>
-                  </ToggleGroup>
-                )}
-              />
-              <FieldDescription>
-                {repeated ? t('templates.step.repeatedHint') : t('templates.step.fixedHint')}
-              </FieldDescription>
-            </Field>
-          )}
-
-          {kind === 'retainer_cycle' && repeated ? (
-            <div className="grid gap-5 sm:grid-cols-2">
-              <Field invalid={!!errors.repeatKind}>
-                <FieldLabel htmlFor={ids.repeatKind}>{t('templates.step.repeatKind')}</FieldLabel>
-                <Controller
-                  control={form.control}
-                  name="repeatKind"
-                  render={({ field }) => (
-                    <Select
-                      items={kindItems}
-                      value={field.value || null}
-                      onValueChange={(value) => field.onChange(value ?? '')}
-                    >
-                      <SelectTrigger id={ids.repeatKind} onBlur={field.onBlur} ref={field.ref}>
-                        <SelectValue placeholder={t('templates.step.repeatKindPlaceholder')} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {kindItems.map((item) => (
-                          <SelectItem key={item.value} value={item.value}>
-                            {item.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-                />
-                <FieldError match={!!errors.repeatKind}>
-                  {t('templates.step.errors.repeatKind')}
-                </FieldError>
-              </Field>
-              <Field invalid={!!errors.spreadFromDay}>
-                <FieldLabel htmlFor={ids.spread}>{t('templates.step.spreadFromDay')}</FieldLabel>
-                <Input
-                  id={ids.spread}
-                  type="number"
-                  inputMode="numeric"
-                  min={1}
-                  max={TEMPLATE_LIMITS.cycleDueDay}
-                  placeholder="1"
-                  className="w-28"
-                  {...form.register('spreadFromDay', { valueAsNumber: true })}
-                />
-                <FieldDescription>{t('templates.step.spreadFromDayHint')}</FieldDescription>
-                <FieldError match={!!errors.spreadFromDay}>
-                  {t('templates.step.errors.day', {
-                    max: formatNumber(TEMPLATE_LIMITS.cycleDueDay),
-                  })}
-                </FieldError>
-              </Field>
-              {repeatKind === 'other' && (
-                <Field invalid={!!errors.repeatLabel}>
-                  <FieldLabel htmlFor={ids.repeatLabel}>
-                    {t('templates.step.repeatLabel')}
-                  </FieldLabel>
-                  <Input
-                    id={ids.repeatLabel}
-                    autoComplete="off"
-                    {...form.register('repeatLabel')}
-                  />
-                  <FieldDescription>{t('templates.step.repeatLabelHint')}</FieldDescription>
-                  <FieldError match={!!errors.repeatLabel}>
-                    {t('templates.step.errors.repeatLabel')}
-                  </FieldError>
-                </Field>
-              )}
-            </div>
-          ) : (
-            <Field invalid={!!errors.dueDay}>
-              <FieldLabel htmlFor={ids.dueDay}>{t('templates.step.dueDay')}</FieldLabel>
-              <Input
-                id={ids.dueDay}
-                type="number"
-                inputMode="numeric"
-                min={1}
-                max={maxDay}
-                className="w-28"
-                {...form.register('dueDay', { valueAsNumber: true })}
-              />
-              <FieldDescription>
-                {kind === 'project'
-                  ? t('templates.step.dueDayHint')
-                  : t('templates.step.dueDayCycleHint')}
-              </FieldDescription>
-              <FieldError match={!!errors.dueDay}>
-                {t('templates.step.errors.day', { max: formatNumber(maxDay) })}
-              </FieldError>
-            </Field>
-          )}
-
-          <Field>
-            <FieldLabel id={ids.priority} render={<span />}>
-              {t('templates.step.priority')}
-            </FieldLabel>
-            <Controller
-              control={form.control}
-              name="priority"
-              render={({ field }) => (
-                <ToggleGroup
-                  aria-labelledby={ids.priority}
-                  value={[field.value]}
-                  onValueChange={(next: TaskPriority[]) => {
-                    if (next[0]) field.onChange(next[0]);
-                  }}
-                >
-                  {TASK_PRIORITIES.map((priority) => (
-                    <ToggleGroupItem key={priority} value={priority}>
-                      {t(`tasks.priorities.${priority}`)}
-                    </ToggleGroupItem>
-                  ))}
-                </ToggleGroup>
-              )}
-            />
-          </Field>
-
-          <div className="grid gap-5 sm:grid-cols-2">
-            <Field>
-              {/* The switch stays beside its own label, away from the next column's field. */}
-              <label htmlFor={ids.approval} className="flex items-center gap-3">
-                <span className="text-sm font-medium">{t('tasks.form.needsClientApproval')}</span>
-                <Controller
-                  control={form.control}
-                  name="needsClientApproval"
-                  render={({ field }) => (
-                    <Switch
-                      id={ids.approval}
-                      checked={field.value}
-                      onCheckedChange={field.onChange}
-                    />
-                  )}
-                />
-              </label>
-              <FieldDescription>{t('tasks.form.needsClientApprovalHint')}</FieldDescription>
-            </Field>
-            <Field invalid={!!errors.revisionLimit}>
-              <FieldLabel htmlFor={ids.limit}>{t('tasks.form.revisionLimit')}</FieldLabel>
-              <Input
-                id={ids.limit}
-                type="number"
-                inputMode="numeric"
-                min={0}
-                max={TASK_LIMITS.revisionLimit}
-                className="w-28"
-                {...form.register('revisionLimit', { valueAsNumber: true })}
-              />
-              <FieldDescription>{t('tasks.form.revisionLimitHint')}</FieldDescription>
-              <FieldError match={!!errors.revisionLimit}>
-                {t('tasks.form.errors.revisionLimit', {
-                  max: formatNumber(TASK_LIMITS.revisionLimit),
-                })}
-              </FieldError>
-            </Field>
-          </div>
-
-          <Field invalid={!!errors.dependsOn}>
-            <FieldLabel htmlFor={ids.dependsOn}>
-              {t('templates.step.dependsOn')}
-              <span className="ms-1 font-normal text-muted-foreground">
-                ({t('common.optional')})
-              </span>
-            </FieldLabel>
-            <Controller
-              control={form.control}
-              name="dependsOn"
-              render={({ field }) => (
-                <MultiCombobox
-                  id={ids.dependsOn}
-                  items={options}
-                  value={field.value.flatMap(
-                    (key) => options.find((option) => option.key === key) ?? [],
-                  )}
-                  onValueChange={(next) =>
-                    field.onChange(
-                      next.slice(0, TEMPLATE_LIMITS.dependencies).map((option) => option.key),
-                    )
-                  }
-                  itemToLabel={(option) => option.title}
-                  itemToKey={(option) => option.key}
-                  placeholder={
-                    options.length > 0
-                      ? t('templates.step.dependsOnPlaceholder')
-                      : t('templates.step.noEarlierSteps')
-                  }
-                  emptyLabel={t('common.noMatches')}
-                  removeLabel={(label) => t('common.remove', { label })}
-                  invalid={!!errors.dependsOn}
-                />
-              )}
-            />
-            <FieldDescription>
-              {kind === 'retainer_cycle'
-                ? t('templates.step.dependsOnCycleHint')
-                : t('templates.step.dependsOnHint')}
-            </FieldDescription>
-            <FieldError match={!!errors.dependsOn}>
-              {t('templates.step.errors.dependsOn')}
-            </FieldError>
-          </Field>
-
+      <div className="grid gap-5 sm:grid-cols-2">
+        <Field invalid={!!errors.department}>
+          <FieldLabel htmlFor={ids.department}>{t('templates.step.department')}</FieldLabel>
           <Controller
             control={form.control}
-            name="checklist"
+            name="department"
             render={({ field }) => (
-              <ChecklistEditor
-                items={field.value}
-                onChange={field.onChange}
-                invalid={!!errors.checklist}
-              />
+              <Select
+                items={departmentItems}
+                value={field.value || null}
+                onValueChange={(value) => field.onChange(value ?? '')}
+              >
+                <SelectTrigger id={ids.department} onBlur={field.onBlur} ref={field.ref}>
+                  <SelectValue placeholder={t('templates.step.departmentPlaceholder')} />
+                </SelectTrigger>
+                <SelectContent>
+                  {departmentItems.map((item) => (
+                    <SelectItem key={item.value} value={item.value}>
+                      {item.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             )}
           />
-
-          <Field invalid={!!errors.brief}>
-            <FieldLabel htmlFor={ids.brief}>
-              {t('templates.step.brief')}
-              <span className="ms-1 font-normal text-muted-foreground">
-                ({t('common.optional')})
-              </span>
-            </FieldLabel>
-            <Textarea id={ids.brief} rows={3} {...form.register('brief')} />
-            <FieldError match={!!errors.brief}>{t('templates.step.errors.brief')}</FieldError>
+          <FieldDescription>{t('templates.step.departmentHint')}</FieldDescription>
+          <FieldError match={!!errors.department}>
+            {t('templates.step.errors.department')}
+          </FieldError>
+        </Field>
+        {kind === 'project' && (
+          <Field>
+            <FieldLabel htmlFor={ids.stage}>{t('templates.step.stage')}</FieldLabel>
+            <Controller
+              control={form.control}
+              name="stageKey"
+              render={({ field }) => (
+                <Select
+                  items={stageItems}
+                  value={field.value}
+                  onValueChange={(value) => field.onChange(value ?? NO_STAGE)}
+                >
+                  <SelectTrigger id={ids.stage} onBlur={field.onBlur} ref={field.ref}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {stageItems.map((item) => (
+                      <SelectItem key={item.value} value={item.value}>
+                        {item.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            />
+            <FieldDescription>{t('templates.step.stageHint')}</FieldDescription>
           </Field>
+        )}
+      </div>
 
-          <DialogFooter>
-            <DialogClose render={<Button variant="outline" type="button" />}>
-              {t('common.cancel')}
-            </DialogClose>
-            <Button type="submit">
-              {isNew ? t('templates.step.add') : t('templates.step.apply')}
-            </Button>
-          </DialogFooter>
+      {kind === 'retainer_cycle' && (
+        <Field>
+          <FieldLabel id={ids.kind} render={<span />}>
+            {t('templates.step.timing')}
+          </FieldLabel>
+          <Controller
+            control={form.control}
+            name="repeated"
+            render={({ field }) => (
+              <ToggleGroup
+                aria-labelledby={ids.kind}
+                value={[field.value ? 'repeated' : 'fixed']}
+                onValueChange={(next: string[]) => {
+                  if (next[0]) field.onChange(next[0] === 'repeated');
+                }}
+              >
+                <ToggleGroupItem value="fixed">{t('templates.step.fixed')}</ToggleGroupItem>
+                <ToggleGroupItem value="repeated">{t('templates.step.repeated')}</ToggleGroupItem>
+              </ToggleGroup>
+            )}
+          />
+          <FieldDescription>
+            {repeated ? t('templates.step.repeatedHint') : t('templates.step.fixedHint')}
+          </FieldDescription>
+        </Field>
+      )}
+
+      {kind === 'retainer_cycle' && repeated ? (
+        <div className="grid gap-5 sm:grid-cols-2">
+          <Field invalid={!!errors.repeatKind}>
+            <FieldLabel htmlFor={ids.repeatKind}>{t('templates.step.repeatKind')}</FieldLabel>
+            <Controller
+              control={form.control}
+              name="repeatKind"
+              render={({ field }) => (
+                <Select
+                  items={kindItems}
+                  value={field.value || null}
+                  onValueChange={(value) => field.onChange(value ?? '')}
+                >
+                  <SelectTrigger id={ids.repeatKind} onBlur={field.onBlur} ref={field.ref}>
+                    <SelectValue placeholder={t('templates.step.repeatKindPlaceholder')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {kindItems.map((item) => (
+                      <SelectItem key={item.value} value={item.value}>
+                        {item.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            />
+            <FieldError match={!!errors.repeatKind}>
+              {t('templates.step.errors.repeatKind')}
+            </FieldError>
+          </Field>
+          <Field invalid={!!errors.spreadFromDay}>
+            <FieldLabel htmlFor={ids.spread}>{t('templates.step.spreadFromDay')}</FieldLabel>
+            <Input
+              id={ids.spread}
+              type="number"
+              inputMode="numeric"
+              min={1}
+              max={TEMPLATE_LIMITS.cycleDueDay}
+              placeholder="1"
+              className="w-28"
+              {...form.register('spreadFromDay', { valueAsNumber: true })}
+            />
+            <FieldDescription>{t('templates.step.spreadFromDayHint')}</FieldDescription>
+            <FieldError match={!!errors.spreadFromDay}>
+              {t('templates.step.errors.day', {
+                max: formatNumber(TEMPLATE_LIMITS.cycleDueDay),
+              })}
+            </FieldError>
+          </Field>
+          {repeatKind === 'other' && (
+            <Field invalid={!!errors.repeatLabel}>
+              <FieldLabel htmlFor={ids.repeatLabel}>{t('templates.step.repeatLabel')}</FieldLabel>
+              <Input id={ids.repeatLabel} autoComplete="off" {...form.register('repeatLabel')} />
+              <FieldDescription>{t('templates.step.repeatLabelHint')}</FieldDescription>
+              <FieldError match={!!errors.repeatLabel}>
+                {t('templates.step.errors.repeatLabel')}
+              </FieldError>
+            </Field>
+          )}
+        </div>
+      ) : (
+        <Field invalid={!!errors.dueDay}>
+          <FieldLabel htmlFor={ids.dueDay}>{t('templates.step.dueDay')}</FieldLabel>
+          <Input
+            id={ids.dueDay}
+            type="number"
+            inputMode="numeric"
+            min={1}
+            max={maxDay}
+            className="w-28"
+            {...form.register('dueDay', { valueAsNumber: true })}
+          />
+          <FieldDescription>
+            {kind === 'project'
+              ? t('templates.step.dueDayHint')
+              : t('templates.step.dueDayCycleHint')}
+          </FieldDescription>
+          <FieldError match={!!errors.dueDay}>
+            {t('templates.step.errors.day', { max: formatNumber(maxDay) })}
+          </FieldError>
+        </Field>
+      )}
+
+      <Field>
+        <FieldLabel id={ids.priority} render={<span />}>
+          {t('templates.step.priority')}
+        </FieldLabel>
+        <Controller
+          control={form.control}
+          name="priority"
+          render={({ field }) => (
+            <ToggleGroup
+              aria-labelledby={ids.priority}
+              value={[field.value]}
+              onValueChange={(next: TaskPriority[]) => {
+                if (next[0]) field.onChange(next[0]);
+              }}
+            >
+              {TASK_PRIORITIES.map((priority) => (
+                <ToggleGroupItem key={priority} value={priority}>
+                  {t(`tasks.priorities.${priority}`)}
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
+          )}
+        />
+      </Field>
+
+      <div className="grid gap-5 sm:grid-cols-2">
+        <Field>
+          {/* The switch stays beside its own label, away from the next column's field. */}
+          <label htmlFor={ids.approval} className="flex items-center gap-3">
+            <span className="text-sm font-medium">{t('tasks.form.needsClientApproval')}</span>
+            <Controller
+              control={form.control}
+              name="needsClientApproval"
+              render={({ field }) => (
+                <Switch id={ids.approval} checked={field.value} onCheckedChange={field.onChange} />
+              )}
+            />
+          </label>
+          <FieldDescription>{t('tasks.form.needsClientApprovalHint')}</FieldDescription>
+        </Field>
+        <Field invalid={!!errors.revisionLimit}>
+          <FieldLabel htmlFor={ids.limit}>{t('tasks.form.revisionLimit')}</FieldLabel>
+          <Input
+            id={ids.limit}
+            type="number"
+            inputMode="numeric"
+            min={0}
+            max={TASK_LIMITS.revisionLimit}
+            className="w-28"
+            {...form.register('revisionLimit', { valueAsNumber: true })}
+          />
+          <FieldDescription>{t('tasks.form.revisionLimitHint')}</FieldDescription>
+          <FieldError match={!!errors.revisionLimit}>
+            {t('tasks.form.errors.revisionLimit', {
+              max: formatNumber(TASK_LIMITS.revisionLimit),
+            })}
+          </FieldError>
+        </Field>
+      </div>
+
+      <Field invalid={!!errors.dependsOn}>
+        <FieldLabel htmlFor={ids.dependsOn}>
+          {t('templates.step.dependsOn')}
+          <span className="ms-1 font-normal text-muted-foreground">({t('common.optional')})</span>
+        </FieldLabel>
+        <Controller
+          control={form.control}
+          name="dependsOn"
+          render={({ field }) => (
+            <MultiCombobox
+              id={ids.dependsOn}
+              items={options}
+              value={field.value.flatMap(
+                (key) => options.find((option) => option.key === key) ?? [],
+              )}
+              onValueChange={(next) =>
+                field.onChange(
+                  next.slice(0, TEMPLATE_LIMITS.dependencies).map((option) => option.key),
+                )
+              }
+              itemToLabel={(option) => option.title}
+              itemToKey={(option) => option.key}
+              placeholder={
+                options.length > 0
+                  ? t('templates.step.dependsOnPlaceholder')
+                  : t('templates.step.noEarlierSteps')
+              }
+              emptyLabel={t('common.noMatches')}
+              removeLabel={(label) => t('common.remove', { label })}
+              invalid={!!errors.dependsOn}
+            />
+          )}
+        />
+        <FieldDescription>
+          {kind === 'retainer_cycle'
+            ? t('templates.step.dependsOnCycleHint')
+            : t('templates.step.dependsOnHint')}
+        </FieldDescription>
+        <FieldError match={!!errors.dependsOn}>{t('templates.step.errors.dependsOn')}</FieldError>
+      </Field>
+
+      <Controller
+        control={form.control}
+        name="checklist"
+        render={({ field }) => (
+          <ChecklistEditor
+            items={field.value}
+            onChange={field.onChange}
+            invalid={!!errors.checklist}
+          />
+        )}
+      />
+
+      <Field invalid={!!errors.brief}>
+        <FieldLabel htmlFor={ids.brief}>
+          {t('templates.step.brief')}
+          <span className="ms-1 font-normal text-muted-foreground">({t('common.optional')})</span>
+        </FieldLabel>
+        <Textarea id={ids.brief} rows={3} {...form.register('brief')} />
+        <FieldError match={!!errors.brief}>{t('templates.step.errors.brief')}</FieldError>
+      </Field>
+
+      <DialogFooter>
+        <DialogClose render={<Button variant="outline" type="button" />}>
+          {t('common.cancel')}
+        </DialogClose>
+        <Button type="submit">{isNew ? t('templates.step.add') : t('templates.step.apply')}</Button>
+      </DialogFooter>
     </form>
   );
 }

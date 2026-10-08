@@ -465,6 +465,8 @@ function ScheduleSection({ post }: { post: PostDetail }) {
 function PublishingSection({ post }: { post: PostDetail }) {
   const { t } = useTranslation();
   const [editing, setEditing] = useState(false);
+  // The dialog opens without a trigger: the focus goes back to "Edit" when it closes.
+  const editRef = useRef<HTMLButtonElement>(null);
   if (!post.scheduledAt && !post.publishedAt) return null;
   const published = post.status === 'published';
   return (
@@ -473,7 +475,7 @@ function PublishingSection({ post }: { post: PostDetail }) {
       action={
         published &&
         post.permissions.canEdit && (
-          <Button variant="ghost" size="sm" onClick={() => setEditing(true)}>
+          <Button ref={editRef} variant="ghost" size="sm" onClick={() => setEditing(true)}>
             <PencilIcon />
             {t('common.edit')}
           </Button>
@@ -523,7 +525,12 @@ function PublishingSection({ post }: { post: PostDetail }) {
             {t('content.publishing.noLinks')}
           </p>
         ))}
-      <PublishedDialog post={post} open={editing} onClose={() => setEditing(false)} />
+      <PublishedDialog
+        post={post}
+        open={editing}
+        onClose={() => setEditing(false)}
+        finalFocus={editRef}
+      />
     </TaskSection>
   );
 }

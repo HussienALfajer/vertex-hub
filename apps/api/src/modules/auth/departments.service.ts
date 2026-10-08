@@ -106,10 +106,7 @@ export class DepartmentsService {
           .select({ id: departments.id })
           .from(departments)
           .where(
-            and(
-              sql`lower(${departments.name}) = lower(${input.name})`,
-              ne(departments.id, id),
-            ),
+            and(sql`lower(${departments.name}) = lower(${input.name})`, ne(departments.id, id)),
           );
         if (taken) {
           throw new CodedException(

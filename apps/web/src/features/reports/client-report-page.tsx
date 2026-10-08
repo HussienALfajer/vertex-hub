@@ -752,12 +752,16 @@ function ClientReportPdf({
   const [asked, setAsked] = useState(false);
   const [emailing, setEmailing] = useState(false);
   const ready = useQuery({ ...clientReportPdfReadyQuery(clientId, month), enabled: asked });
-  const state = !asked ? 'idle' : ready.isSuccess ? 'ready' : ready.isError ? 'failed' : 'preparing';
+  const state = !asked
+    ? 'idle'
+    : ready.isSuccess
+      ? 'ready'
+      : ready.isError
+        ? 'failed'
+        : 'preparing';
   const prepareRef = useRef<HTMLButtonElement>(null);
   const downloadRef = useRef<HTMLAnchorElement>(null);
-  useFocusAfterChange(state, () =>
-    state === 'ready' ? downloadRef.current : prepareRef.current,
-  );
+  useFocusAfterChange(state, () => (state === 'ready' ? downloadRef.current : prepareRef.current));
 
   async function ask() {
     try {
@@ -774,8 +778,14 @@ function ClientReportPdf({
     return (
       <>
         <Button
-          ref={downloadRef}
-          render={<a href={clientReportPdfUrl(clientId, month)} target="_blank" rel="noopener" />}
+          render={
+            <a
+              ref={downloadRef}
+              href={clientReportPdfUrl(clientId, month)}
+              target="_blank"
+              rel="noopener"
+            />
+          }
         >
           <DownloadIcon />
           {t('reports.client.downloadPdf')}
@@ -808,7 +818,10 @@ function ClientReportPdf({
         onClick={ask}
       >
         {preparing ? (
-          <LoaderCircleIcon aria-hidden="true" className="animate-spin motion-reduce:animate-none" />
+          <LoaderCircleIcon
+            aria-hidden="true"
+            className="animate-spin motion-reduce:animate-none"
+          />
         ) : (
           <FileTextIcon />
         )}

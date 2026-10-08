@@ -130,10 +130,7 @@ function RetainerView({ retainer, tab }: { retainer: RetainerDetail; tab: Retain
   const menu = useRef<HTMLButtonElement>(null);
   const reactivate = useRef<HTMLButtonElement>(null);
   const restore = useRef<HTMLButtonElement>(null);
-  const focus = useMemo<RetainerFocus>(
-    () => ({ heading, resume, menu, reactivate, restore }),
-    [],
-  );
+  const focus = useMemo<RetainerFocus>(() => ({ heading, resume, menu, reactivate, restore }), []);
   // A status change or an archive swaps the header's controls (archive → restore → actions menu,
   // pause → resume); a menu item or a dialog may give the focus back to one just before it leaves.
   useFocusAfterChange(`${retainer.status}:${retainer.archivedAt ?? ''}`, () => {
@@ -155,11 +152,7 @@ function RetainerView({ retainer, tab }: { retainer: RetainerDetail; tab: Retain
 
   return (
     <>
-      <RetainerHero
-        retainer={retainer}
-        focus={focus}
-        onArchive={() => setConfirming('archive')}
-      />
+      <RetainerHero retainer={retainer} focus={focus} onArchive={() => setConfirming('archive')} />
       {archived ? (
         <ArchivedCallout
           retainer={retainer}

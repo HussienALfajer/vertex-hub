@@ -99,7 +99,9 @@ type FinalFocus = ComponentProps<typeof DialogContent>['finalFocus'];
  * goes back to the button that opened it. Sending takes the items out of what is ready, which
  * often disables that button: the focus then goes to `fallback`, else the selected tab.
  */
-export function useRequestDialog(fallback: (draft: RequestDraft) => HTMLElement | null = () => null) {
+export function useRequestDialog(
+  fallback: (draft: RequestDraft) => HTMLElement | null = () => null,
+) {
   const [draft, setDraft] = useState<RequestDraft | null>(null);
   const shown = useShownWhileClosing(draft);
   const opener = useRef<HTMLElement | null>(null);
@@ -114,7 +116,8 @@ export function useRequestDialog(fallback: (draft: RequestDraft) => HTMLElement 
   };
   return {
     open(next: RequestDraft) {
-      opener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      opener.current =
+        document.activeElement instanceof HTMLElement ? document.activeElement : null;
       setDraft(next);
     },
     dialog: { draft: shown, open: draft !== null, onClose: () => setDraft(null), finalFocus },

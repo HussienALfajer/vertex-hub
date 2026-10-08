@@ -76,10 +76,7 @@ function TaskView({ task }: { task: TaskDetail }) {
   const actions = useRef<HTMLDivElement>(null);
   const menu = useRef<HTMLButtonElement>(null);
   const restoreButton = useRef<HTMLButtonElement>(null);
-  const focus = useMemo<TaskFocus>(
-    () => ({ heading, actions, menu, restore: restoreButton }),
-    [],
-  );
+  const focus = useMemo<TaskFocus>(() => ({ heading, actions, menu, restore: restoreButton }), []);
   // A move, an archive or a restore swaps the header's controls (archive → restore → the moves
   // and the menu): a focus left on the page body goes to the control that replaced them.
   useFocusAfterChange(
@@ -98,11 +95,7 @@ function TaskView({ task }: { task: TaskDetail }) {
   return (
     <>
       <TaskHero task={task} focus={focus} onArchive={() => setConfirming('archive')} />
-      <Banners
-        task={task}
-        restoreRef={restoreButton}
-        onRestore={() => setConfirming('restore')}
-      />
+      <Banners task={task} restoreRef={restoreButton} onRestore={() => setConfirming('restore')} />
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
         <div className="flex min-w-0 flex-col gap-6">
           <BriefSection task={task} />

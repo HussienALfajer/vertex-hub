@@ -99,7 +99,12 @@ export function StatementSection({
         </Field>
         <Field invalid={!validDates}>
           <FieldLabel>{t('invoices.statement.from')}</FieldLabel>
-          <Input type="date" dir="ltr" value={from} onChange={(event) => setFrom(event.target.value)} />
+          <Input
+            type="date"
+            dir="ltr"
+            value={from}
+            onChange={(event) => setFrom(event.target.value)}
+          />
         </Field>
         <Field invalid={!validDates}>
           <FieldLabel>{t('invoices.statement.to')}</FieldLabel>
@@ -248,12 +253,16 @@ function StatementPdf({
   const render = useRenderStatement(clientId);
   const [asked, setAsked] = useState(false);
   const ready = useQuery({ ...statementPdfReadyQuery(clientId, query), enabled: asked });
-  const state = !asked ? 'idle' : ready.isSuccess ? 'ready' : ready.isError ? 'failed' : 'preparing';
+  const state = !asked
+    ? 'idle'
+    : ready.isSuccess
+      ? 'ready'
+      : ready.isError
+        ? 'failed'
+        : 'preparing';
   const prepareRef = useRef<HTMLButtonElement>(null);
   const downloadRef = useRef<HTMLAnchorElement>(null);
-  useFocusAfterChange(state, () =>
-    state === 'ready' ? downloadRef.current : prepareRef.current,
-  );
+  useFocusAfterChange(state, () => (state === 'ready' ? downloadRef.current : prepareRef.current));
 
   async function ask() {
     try {
@@ -270,10 +279,16 @@ function StatementPdf({
     return (
       <span className="flex flex-wrap items-center gap-2">
         <Button
-          ref={downloadRef}
           variant="outline"
           size="sm"
-          render={<a href={statementPdfUrl(clientId, query)} target="_blank" rel="noopener" />}
+          render={
+            <a
+              ref={downloadRef}
+              href={statementPdfUrl(clientId, query)}
+              target="_blank"
+              rel="noopener"
+            />
+          }
         >
           <DownloadIcon />
           {t('invoices.statement.download')}
@@ -296,7 +311,10 @@ function StatementPdf({
         onClick={ask}
       >
         {preparing ? (
-          <LoaderCircleIcon aria-hidden="true" className="animate-spin motion-reduce:animate-none" />
+          <LoaderCircleIcon
+            aria-hidden="true"
+            className="animate-spin motion-reduce:animate-none"
+          />
         ) : (
           <FileTextIcon />
         )}

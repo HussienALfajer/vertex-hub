@@ -349,10 +349,7 @@ function CycleLineRow({
             <DropdownMenu>
               <DropdownMenuTrigger
                 render={
-                  <IconButton
-                    ref={menuButton}
-                    label={t('retainers.cycle.lineActions', { name })}
-                  />
+                  <IconButton ref={menuButton} label={t('retainers.cycle.lineActions', { name })} />
                 }
               >
                 <EllipsisIcon />

@@ -250,7 +250,12 @@ function CodesStep({ codes, onFinish }: { codes: string[]; onFinish: () => Promi
         htmlFor={savedId}
         className="flex cursor-pointer items-center gap-3 text-sm font-medium"
       >
-        <Checkbox ref={savedBox} id={savedId} checked={saved} onCheckedChange={(value) => setSaved(value)} />
+        <Checkbox
+          ref={savedBox}
+          id={savedId}
+          checked={saved}
+          onCheckedChange={(value) => setSaved(value)}
+        />
         {t('twoFactorSetup.confirmSaved')}
       </label>
       <Button

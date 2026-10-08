@@ -333,7 +333,9 @@ export function ChecklistSection({ task }: { task: TaskDetail }) {
     const to = index + by;
     if (to === 0 || to === items.length - 1) {
       list.current
-        ?.querySelector<HTMLElement>(`[data-row="${moved}"] [data-focus="${by < 0 ? 'down' : 'up'}"]`)
+        ?.querySelector<HTMLElement>(
+          `[data-row="${moved}"] [data-focus="${by < 0 ? 'down' : 'up'}"]`,
+        )
         ?.focus();
     }
   }

@@ -143,7 +143,12 @@ function WeekPicker({
           to: formatCalendarDate(addDays(from, 6)),
         })}
       </p>
-      <IconButton variant="outline" size="icon" label={t('tasks.workload.nextWeek')} onClick={onNext}>
+      <IconButton
+        variant="outline"
+        size="icon"
+        label={t('tasks.workload.nextWeek')}
+        onClick={onNext}
+      >
         <ChevronLeftIcon className="ltr:-scale-x-100" />
       </IconButton>
       {!current && (

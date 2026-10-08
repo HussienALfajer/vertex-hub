@@ -139,62 +139,59 @@ function ClientReportCard() {
       </div>
       <p className="text-sm text-muted-foreground">{t('reports.client.about')}</p>
       {clients.isError ? (
-        <LoadError
-          message={t('reports.client.clientsError')}
-          onRetry={() => clients.refetch()}
-        />
+        <LoadError message={t('reports.client.clientsError')} onRetry={() => clients.refetch()} />
       ) : (
-      <form
-        ref={formRef}
-        className="flex flex-col gap-3 md:flex-row md:items-start"
-        noValidate
-        onSubmit={(event) => {
-          event.preventDefault();
-          if (!clientId) {
-            flushSync(() => setMissingClient(true));
-            focusFirstInvalid(formRef.current);
-            return;
-          }
-          void navigate({
-            to: '/clients/$clientId/report',
-            params: { clientId },
-            search: { month },
-          });
-        }}
-      >
-        <Field className="md:w-72" invalid={missingClient}>
-          <FieldLabel id={ids.client} render={<span />}>
-            {t('reports.client.client')}
-          </FieldLabel>
-          <ChoiceSelect
-            labelledBy={ids.client}
-            placeholder={t('reports.client.pickClient')}
-            items={(clients.data?.items ?? []).map((client) => ({
-              value: client.id,
-              label: client.tradeName,
-            }))}
-            value={clientId}
-            onChange={(next) => {
-              setClientId(next);
-              setMissingClient(false);
-            }}
-          />
-          {clients.isSuccess && clients.data.items.length === 0 && (
-            <FieldDescription>{t('reports.client.noClients')}</FieldDescription>
-          )}
-          <FieldError match={missingClient}>{t('reports.client.clientRequired')}</FieldError>
-        </Field>
-        <Field className="md:w-48">
-          <FieldLabel id={ids.month} render={<span />}>
-            {t('reports.client.month')}
-          </FieldLabel>
-          <MonthSelect labelledBy={ids.month} value={month} onChange={setMonth} />
-        </Field>
-        {/* Lined up with the fields, below their labels. */}
-        <Button type="submit" className="md:mt-7">
-          {t('reports.client.open')}
-        </Button>
-      </form>
+        <form
+          ref={formRef}
+          className="flex flex-col gap-3 md:flex-row md:items-start"
+          noValidate
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (!clientId) {
+              flushSync(() => setMissingClient(true));
+              focusFirstInvalid(formRef.current);
+              return;
+            }
+            void navigate({
+              to: '/clients/$clientId/report',
+              params: { clientId },
+              search: { month },
+            });
+          }}
+        >
+          <Field className="md:w-72" invalid={missingClient}>
+            <FieldLabel id={ids.client} render={<span />}>
+              {t('reports.client.client')}
+            </FieldLabel>
+            <ChoiceSelect
+              labelledBy={ids.client}
+              placeholder={t('reports.client.pickClient')}
+              items={(clients.data?.items ?? []).map((client) => ({
+                value: client.id,
+                label: client.tradeName,
+              }))}
+              value={clientId}
+              onChange={(next) => {
+                setClientId(next);
+                setMissingClient(false);
+              }}
+            />
+            {clients.isSuccess && clients.data.items.length === 0 && (
+              <FieldDescription>{t('reports.client.noClients')}</FieldDescription>
+            )}
+            <FieldError match={missingClient}>{t('reports.client.clientRequired')}</FieldError>
+          </Field>
+          <Field className="md:w-48">
+            <FieldLabel id={ids.month} render={<span />}>
+              {t('reports.client.month')}
+            </FieldLabel>
+            <MonthSelect labelledBy={ids.month} value={month} onChange={setMonth} />
+          </Field>
+          {/* Lined up with the fields, below their labels. */}
+          <Button type="submit" className="md:mt-7">
+            {t('reports.client.open')}
+          </Button>
+        </form>
       )}
     </Card>
   );

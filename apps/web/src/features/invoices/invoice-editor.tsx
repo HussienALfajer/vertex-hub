@@ -212,7 +212,8 @@ function Editor({
     if (!checked.success) {
       // Each refused value shows under its field; the engagement rule has none.
       for (const issue of checked.error.issues) {
-        if (issue.path.length > 0) form.setError(issue.path.join('.') as 'notes', { type: 'schema' });
+        if (issue.path.length > 0)
+          form.setError(issue.path.join('.') as 'notes', { type: 'schema' });
         else setFailure(t('invoices.editor.errors.invalid'));
       }
       return;
@@ -258,12 +259,7 @@ function Editor({
       )}
 
       {!invoice.archivedAt && (
-        <DraftActions
-          invoice={invoice}
-          settings={settings}
-          dirty={dirty}
-          issueRef={issueButton}
-        />
+        <DraftActions invoice={invoice} settings={settings} dirty={dirty} issueRef={issueButton} />
       )}
       {!invoice.archivedAt && invoice.permissions.canEdit && (
         <DraftPreview invoice={invoice} saved={!dirty} />

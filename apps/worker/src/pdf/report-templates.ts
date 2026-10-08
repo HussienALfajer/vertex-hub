@@ -1,8 +1,8 @@
 import {
   type ClientReportSnapshot,
   CLIENT_REPORT_LABELS as L,
-  REPORT_VALUE_LABELS as VALUES,
   responseTimeText,
+  REPORT_VALUE_LABELS as VALUES,
 } from '@vertex-hub/contracts';
 import {
   documentHtml,

@@ -101,7 +101,9 @@ export function ServicesDialog({
     event?.preventDefault();
     setFailure(null);
     // Nothing changed: close without a request or a "saved" toast.
-    if (invoice.lines.every((line) => (values.get(line.id) ?? null) === (line.service?.id ?? null))) {
+    if (
+      invoice.lines.every((line) => (values.get(line.id) ?? null) === (line.service?.id ?? null))
+    ) {
       onClose();
       return;
     }

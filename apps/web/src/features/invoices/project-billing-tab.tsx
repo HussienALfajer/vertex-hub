@@ -354,11 +354,7 @@ export function BillingSection({
   return (
     <section className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2
-          ref={headingRef}
-          tabIndex={headingRef ? -1 : undefined}
-          className="text-lg font-bold"
-        >
+        <h2 ref={headingRef} tabIndex={headingRef ? -1 : undefined} className="text-lg font-bold">
           {title}
         </h2>
         {action}

@@ -280,13 +280,11 @@ function IssuedInvoice({
         open={open === 'payment'}
         onClose={() => setOpen(null)}
         // A payment that settles the invoice takes its button away.
-        finalFocus={() => (recordButton.current?.isConnected ? recordButton.current : heading.current)}
+        finalFocus={() =>
+          recordButton.current?.isConnected ? recordButton.current : heading.current
+        }
       />
-      <DueDateDialog
-        invoice={invoice}
-        open={open === 'dueDate'}
-        onClose={() => setOpen(null)}
-      />
+      <DueDateDialog invoice={invoice} open={open === 'dueDate'} onClose={() => setOpen(null)} />
       {permissions.canEditServices && (
         <ServicesDialog
           invoice={invoice}

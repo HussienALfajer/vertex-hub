@@ -84,16 +84,19 @@ type RateContext = { storedRate: string | null };
  * The rate is sent only when it changed: saving it again would date it today. Blank is allowed
  * only while no rate is set; once set, a rate is replaced, never removed.
  */
+const settingsResolver = standardSchemaResolver(updateInvoiceSettingsSchema);
+
 const resolver: Resolver<SettingsValues, RateContext, UpdateInvoiceSettings> = (
   values,
   context,
   options,
 ) => {
   const rate = rateInput(values.sypPerUsd);
-  return standardSchemaResolver(updateInvoiceSettingsSchema)(
+  return settingsResolver(
     { ...values, sypPerUsd: rate === rateText(context?.storedRate ?? null) ? undefined : rate },
     context,
-    options,
+    // The same fields: only the values differ, the rate being left out when it did not change.
+    options as Parameters<typeof settingsResolver>[2],
   ) as ReturnType<Resolver<SettingsValues, RateContext, UpdateInvoiceSettings>>;
 };
 

@@ -6,8 +6,8 @@ import {
   type ProductivityMeasures,
   type ProductivityReport,
   type RevenueReport,
-  REPORT_VALUE_LABELS as VALUES,
   responseTimeText,
+  REPORT_VALUE_LABELS as VALUES,
 } from '@vertex-hub/contracts';
 import ExcelJS from 'exceljs';
 

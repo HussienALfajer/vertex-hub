@@ -340,7 +340,7 @@ function TwoFactorCard() {
             )}
           </>
         ) : (
-          <Button ref={enableLink} render={<Link to="/setup-two-factor" />}>
+          <Button render={<Link ref={enableLink} to="/setup-two-factor" />}>
             {t('account.twoFactor.enable')}
           </Button>
         )}
