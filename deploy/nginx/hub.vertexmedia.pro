@@ -36,7 +36,7 @@ server {
     server_tokens off;
 
     limit_conn perip 100;
-    limit_req zone=general burst=50 nodelay;
+    limit_req zone=vhgeneral burst=50 nodelay;
 
     include snippets/vertexhub-headers.conf;
 
