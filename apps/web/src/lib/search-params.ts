@@ -11,9 +11,14 @@ export const ALL = 'all';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-/** Trimmed text, cut to `max` characters. */
-export const textParam = (value: unknown, max: number): string | undefined =>
-  typeof value === 'string' && value.trim() ? value.trim().slice(0, max) : undefined;
+/**
+ * Trimmed text, cut to `max` characters. A typed link's `?search=3` reaches it as the number the
+ * router parsed, and is read back as text.
+ */
+export function textParam(value: unknown, max: number): string | undefined {
+  const text = typeof value === 'number' ? String(value) : value;
+  return typeof text === 'string' && text.trim() ? text.trim().slice(0, max) : undefined;
+}
 
 /** A record id. */
 export const idParam = (value: unknown): string | undefined =>

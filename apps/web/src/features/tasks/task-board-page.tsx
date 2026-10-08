@@ -21,17 +21,23 @@ import {
   EmptyState,
   Field,
   FieldLabel,
+  IconButton,
   MultiCombobox,
   PageHeader,
   Skeleton,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
   toast,
 } from '@vertex-hub/ui';
 import { ArrowLeftIcon, BanIcon, KanbanIcon, MoveIcon, UserRoundIcon } from 'lucide-react';
-import { type DragEvent, useId, useState } from 'react';
+import { type DragEvent, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LoadError } from '../../components/load-error';
 import { errorMessage } from '../../lib/errors';
 import { formatNumber } from '../../lib/format';
+import { useFocusAfterChange } from '../../lib/use-focus-after-change';
+import { useShownWhileClosing } from '../../lib/use-shown-while-closing';
 import { idParam, listParam } from '../../lib/search-params';
 import { clientListQuery } from '../clients/clients.queries';
 import { departmentListQuery } from '../departments/departments.queries';
@@ -205,6 +211,20 @@ function Board({ board, search }: { board: TaskBoard; search: TaskBoardSearch })
   const [dragged, setDragged] = useState<Dragged | null>(null);
   const [over, setOver] = useState<TaskStatus | null>(null);
   const [dialog, setDialog] = useState<{ task: TaskDetail; target: Target } | null>(null);
+  const shownDialog = useShownWhileClosing(dialog);
+  const boardRef = useRef<HTMLOListElement>(null);
+  // The card a keyboard move started from: it remounts in its new column (or leaves the board).
+  const moved = useRef<string | null>(null);
+  const cardTarget = (): HTMLElement | null => {
+    const button = (selector: string) =>
+      boardRef.current?.querySelector<HTMLElement>(`${selector} [data-focus="move"]`) ?? null;
+    return (moved.current && button(`[data-task="${moved.current}"]`)) || button('[data-task]');
+  };
+  // The card follows its task into another column: the focus follows it there.
+  useFocusAfterChange(
+    board.columns.map((column) => column.items.map((task) => task.id).join()).join('|'),
+    cardTarget,
+  );
 
   // Cards carry list fields only: the moves come with the task's detail, loaded on drag start.
   const detailOf = (id: string) => queryClient.fetchQuery({ ...taskQuery(id), staleTime: 10_000 });
@@ -214,6 +234,7 @@ function Board({ board, search }: { board: TaskBoard; search: TaskBoardSearch })
       : undefined;
 
   async function run(task: TaskDetail, target: Target) {
+    moved.current = task.id;
     if (needsDialog(task, target)) {
       setDialog({ task, target });
       return;
@@ -265,7 +286,11 @@ function Board({ board, search }: { board: TaskBoard; search: TaskBoardSearch })
       <p className="sr-only">{t('tasks.board.keyboardHint')}</p>
       {/* Relative: the cards' screen-reader text stays inside the scroll area. */}
       <div className="relative -mx-4 overflow-x-auto px-4 pb-2 md:mx-0 md:px-0">
-        <ol aria-label={t('tasks.board.title')} className="flex min-w-max items-start gap-3">
+        <ol
+          ref={boardRef}
+          aria-label={t('tasks.board.title')}
+          className="flex min-w-max items-start gap-3"
+        >
           {board.columns.map((column) => {
             const status = column.status;
             const source = dragged?.task.status === status;
@@ -349,8 +374,15 @@ function Board({ board, search }: { board: TaskBoard; search: TaskBoardSearch })
           })}
         </ol>
       </div>
-      {dialog && (
-        <MoveDialog task={dialog.task} target={dialog.target} onClose={() => setDialog(null)} />
+      {shownDialog && (
+        <MoveDialog
+          key={`${shownDialog.task.id}:${shownDialog.target.move}`}
+          task={shownDialog.task}
+          target={shownDialog.target}
+          open={dialog !== null}
+          onClose={() => setDialog(null)}
+          finalFocus={() => cardTarget() ?? true}
+        />
       )}
     </>
   );
@@ -408,24 +440,28 @@ function BoardCard({
           {formatDue(task)}
           {task.overdue && <TaskOverdueBadge />}
         </span>
-        {task.assignee ? (
-          <span title={task.assignee.name} className="flex">
-            <Avatar
-              name={task.assignee.name}
-              size="sm"
-              tone={task.assignee.archived ? 'muted' : 'brand'}
-            />
-            <span className="sr-only">{task.assignee.name}</span>
-          </span>
-        ) : (
-          <span
-            title={t('tasks.unassigned')}
-            className="flex size-7 items-center justify-center rounded-full border border-dashed border-border text-muted-foreground"
-          >
-            <UserRoundIcon aria-hidden="true" className="size-3.5" />
-            <span className="sr-only">{t('tasks.unassigned')}</span>
-          </span>
-        )}
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              task.assignee ? (
+                <span className="flex">
+                  <Avatar
+                    name={task.assignee.name}
+                    size="sm"
+                    tone={task.assignee.archived ? 'muted' : 'brand'}
+                  />
+                  <span className="sr-only">{task.assignee.name}</span>
+                </span>
+              ) : (
+                <span className="flex size-7 items-center justify-center rounded-full border border-dashed border-border text-muted-foreground">
+                  <UserRoundIcon aria-hidden="true" className="size-3.5" />
+                  <span className="sr-only">{t('tasks.unassigned')}</span>
+                </span>
+              )
+            }
+          />
+          <TooltipContent>{task.assignee?.name ?? t('tasks.unassigned')}</TooltipContent>
+        </Tooltip>
       </div>
     </li>
   );
@@ -451,12 +487,7 @@ function MoveMenu({
     <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger
         render={
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            aria-label={t('tasks.board.moveTo', { title: task.title })}
-            title={t('tasks.board.moveTo', { title: task.title })}
-          />
+          <IconButton data-focus="move" label={t('tasks.board.moveTo', { title: task.title })} />
         }
       >
         <MoveIcon />

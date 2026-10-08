@@ -4,6 +4,10 @@ import {
   businessDate,
   businessInstant,
   businessTimeOfDay,
+  CALENDAR_YEARS,
+  calendarDateSchema,
+  calendarMonthSchema,
+  instantSchema,
   isWorkDay,
   nextWorkDay,
   nthWorkDay,
@@ -122,5 +126,23 @@ describe('add months (F04 A5, A7)', () => {
   it('clamps to the last day of a shorter month', () => {
     expect(addMonths('2026-01-31', 1)).toBe('2026-02-28');
     expect(addMonths('2027-12-31', 2)).toBe('2028-02-29');
+  });
+});
+
+describe('calendar date and month ranges', () => {
+  it('refuses years the database or the time zone cannot handle', () => {
+    expect(CALENDAR_YEARS).toEqual({ min: 1900, max: 2999 });
+    for (const date of ['0000-01-01', '0001-01-01', '1899-12-31', '3000-01-01', '9999-12-31']) {
+      expect(calendarDateSchema.safeParse(date).success).toBe(false);
+    }
+    expect(calendarDateSchema.safeParse('1900-01-01').success).toBe(true);
+    expect(calendarDateSchema.safeParse('2999-12-31').success).toBe(true);
+    expect(calendarDateSchema.safeParse('2026-02-30').success).toBe(false);
+    expect(calendarMonthSchema.safeParse('0000-01').success).toBe(false);
+    expect(calendarMonthSchema.safeParse('2026-13').success).toBe(false);
+    expect(calendarMonthSchema.safeParse('2026-10').success).toBe(true);
+    expect(instantSchema.safeParse('0000-01-01T00:00:00Z').success).toBe(false);
+    expect(instantSchema.safeParse('9999-12-31T00:00:00Z').success).toBe(false);
+    expect(instantSchema.safeParse('2026-10-08T00:00:00+03:00').success).toBe(true);
   });
 });

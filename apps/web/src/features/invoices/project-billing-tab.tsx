@@ -15,7 +15,7 @@ import {
   TableRow,
 } from '@vertex-hub/ui';
 import { ArchiveIcon, PencilIcon, PlusIcon, ReceiptTextIcon, WalletIcon } from 'lucide-react';
-import { type ReactNode, useRef, useState } from 'react';
+import { type ReactNode, type RefObject, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '../../components/confirm-dialog';
 import { LoadError } from '../../components/load-error';
@@ -342,16 +342,25 @@ function ExpensesSection({ billing }: { billing: ProjectBilling }) {
 export function BillingSection({
   title,
   action,
+  headingRef,
   children,
 }: {
   title: string;
   action?: ReactNode;
+  /** Makes the heading focusable, for an action that takes its own button away. */
+  headingRef?: RefObject<HTMLHeadingElement | null>;
   children: ReactNode;
 }) {
   return (
     <section className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-lg font-bold">{title}</h2>
+        <h2
+          ref={headingRef}
+          tabIndex={headingRef ? -1 : undefined}
+          className="text-lg font-bold"
+        >
+          {title}
+        </h2>
         {action}
       </div>
       {children}

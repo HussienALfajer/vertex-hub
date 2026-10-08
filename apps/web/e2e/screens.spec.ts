@@ -1241,7 +1241,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await page.keyboard.press('Escape');
 
       await page.setViewportSize({ width: 1440, height: 1100 });
-      await page.getByRole('button', { name: ar.content.calendar.views.week }).click();
+      await page.getByRole('button', { name: ar.calendar.views.week }).click();
       await expect(page).toHaveURL(/view=week/);
       await expect(page.getByRole('link', { name: /ريل كواليس المطبخ/ })).toBeVisible();
       await screenshot(page, testInfo, `content-week-${colorScheme}`);

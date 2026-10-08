@@ -14,46 +14,23 @@ import {
   Button,
   CalendarDay,
   CalendarGrid,
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
   EmptyState,
   Field,
   FieldLabel,
   MultiCombobox,
   Skeleton,
-  ToggleGroup,
-  ToggleGroupItem,
 } from '@vertex-hub/ui';
-import {
-  CalendarDaysIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon,
-  FilterXIcon,
-  UserRoundIcon,
-} from 'lucide-react';
-import { type ReactNode, useId, useState } from 'react';
+import { CalendarDaysIcon, FilterXIcon, UserRoundIcon } from 'lucide-react';
+import { type ReactNode, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LoadError } from '../../components/load-error';
-import {
-  formatCalendarDate,
-  formatMonth,
-  formatNumber,
-  formatWeekday,
-  formatWeekdayDate,
-} from '../../lib/format';
+import { formatNumber, formatWeekday, formatWeekdayDate } from '../../lib/format';
 import { ALL, dayParam, flagParam, idParam, listParam, oneOfParam } from '../../lib/search-params';
 import { clientListQuery } from '../clients/clients.queries';
 import { FilterSelect } from '../tasks/task-list-page';
+import { CalendarToolbar, DayDialog, MoreOnDay } from './calendar-toolbar';
 import { contentCalendarQuery } from './content.queries';
-import {
-  type CalendarView,
-  calendarRange,
-  daysBetween,
-  sameMonth,
-  shiftCalendar,
-} from './content-dates';
+import { type CalendarView, calendarRange, daysBetween, sameMonth } from './content-dates';
 import { PostCard, PostRows } from './post-parts';
 
 /** What the calendar shows: kept in the URL on the Content page (spec F08, screen 1). */
@@ -127,48 +104,7 @@ export function ContentCalendar({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="flex items-center gap-1">
-          <Button
-            variant="outline"
-            size="icon"
-            aria-label={t(`content.calendar.previous.${view}`)}
-            onClick={() => onChange({ date: shiftCalendar(view, date, -1) })}
-          >
-            <ChevronRightIcon className="ltr:-scale-x-100" />
-          </Button>
-          <Button
-            variant="outline"
-            size="icon"
-            aria-label={t(`content.calendar.next.${view}`)}
-            onClick={() => onChange({ date: shiftCalendar(view, date, 1) })}
-          >
-            <ChevronLeftIcon className="ltr:-scale-x-100" />
-          </Button>
-          <Button variant="outline" onClick={() => onChange({ date: undefined })}>
-            {t('content.calendar.today')}
-          </Button>
-        </div>
-        <h2 className="text-lg font-bold tabular-nums" aria-live="polite">
-          {view === 'month'
-            ? formatMonth(date)
-            : t('content.calendar.weekRange', {
-                from: formatCalendarDate(range.from),
-                to: formatCalendarDate(range.to),
-              })}
-        </h2>
-        <ToggleGroup
-          aria-label={t('content.calendar.view')}
-          className="ms-auto"
-          value={[view]}
-          onValueChange={(next: CalendarView[]) => {
-            if (next[0]) onChange({ view: next[0] === 'week' ? 'week' : undefined });
-          }}
-        >
-          <ToggleGroupItem value="month">{t('content.calendar.views.month')}</ToggleGroupItem>
-          <ToggleGroupItem value="week">{t('content.calendar.views.week')}</ToggleGroupItem>
-        </ToggleGroup>
-      </div>
+      <CalendarToolbar view={view} date={date} onChange={onChange} />
 
       <Filters state={state} onChange={onChange} withClient={!clientId} />
 
@@ -206,20 +142,7 @@ export function ContentCalendar({
                   {shown.map((post) => (
                     <PostCard key={post.id} post={post} showClient={showClient} />
                   ))}
-                  {more > 0 && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 justify-start px-1.5 text-xs"
-                      aria-label={t('content.calendar.moreOn', {
-                        n: formatNumber(more),
-                        date: formatWeekdayDate(day),
-                      })}
-                      onClick={() => setOpenDay(day)}
-                    >
-                      <span dir="ltr">{t('content.calendar.more', { n: formatNumber(more) })}</span>
-                    </Button>
-                  )}
+                  {more > 0 && <MoreOnDay day={day} count={more} onOpen={() => setOpenDay(day)} />}
                 </CalendarDay>
               );
             })}
@@ -233,16 +156,9 @@ export function ContentCalendar({
         </>
       )}
 
-      {openDay && (
-        <Dialog open onOpenChange={(open) => !open && setOpenDay(null)}>
-          <DialogContent closeLabel={t('common.close')} className="max-w-2xl p-0">
-            <DialogHeader className="px-6 pt-6">
-              <DialogTitle>{formatWeekdayDate(openDay)}</DialogTitle>
-            </DialogHeader>
-            <PostRows posts={postsOf(openDay)} showClient={showClient} showDate={false} />
-          </DialogContent>
-        </Dialog>
-      )}
+      <DayDialog day={openDay} onClose={() => setOpenDay(null)}>
+        {(day) => <PostRows posts={postsOf(day)} showClient={showClient} showDate={false} />}
+      </DayDialog>
     </div>
   );
 }
@@ -268,7 +184,7 @@ function Agenda({
             {formatWeekdayDate(day)}
             {day === today && (
               <span className="rounded-sm bg-primary px-1.5 text-xs text-primary-foreground">
-                {t('content.calendar.today')}
+                {t('calendar.today')}
               </span>
             )}
           </h3>
@@ -290,6 +206,7 @@ function Filters({
 }) {
   const { t } = useTranslation();
   const statusId = useId();
+  const panel = useRef<HTMLDivElement>(null);
   const clients = useQuery({
     ...clientListQuery({ status: ['active', 'paused', 'ended'], pageSize: 100 }),
     enabled: withClient,
@@ -324,7 +241,7 @@ function Filters({
     !!state.mine;
 
   return (
-    <div className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-3">
+    <div ref={panel} className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-3">
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {withClient && (
           <FilterSelect
@@ -381,15 +298,17 @@ function Filters({
           <Button
             variant="ghost"
             size="sm"
-            onClick={() =>
+            onClick={() => {
               onChange({
                 clientId: undefined,
                 status: undefined,
                 platform: undefined,
                 type: undefined,
                 mine: undefined,
-              })
-            }
+              });
+              // The button leaves with the filters: the focus goes to the first one.
+              panel.current?.querySelector<HTMLElement>('button, input')?.focus();
+            }}
           >
             <FilterXIcon />
             {t('content.filters.clear')}

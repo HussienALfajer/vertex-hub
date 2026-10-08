@@ -15,7 +15,7 @@ import {
   TriangleAlertIcon,
   UndoIcon,
 } from 'lucide-react';
-import { type ReactNode, useState } from 'react';
+import { type ReactNode, type RefObject, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '../../components/confirm-dialog';
 import { isMissing, LoadError } from '../../components/load-error';
@@ -27,11 +27,14 @@ import {
   formatNumber,
   formatTimeOfDay,
 } from '../../lib/format';
+import { useFocusAfterChange } from '../../lib/use-focus-after-change';
+import { useShownWhileClosing } from '../../lib/use-shown-while-closing';
 import { PostApprovalSection } from '../approvals/task-approval-panel';
 import { PersonName } from '../projects/project-badges';
 import { lineName } from '../retainers/retainer-badges';
+import { focusTarget, type TaskFocus } from '../tasks/task-actions';
 import { TaskSection } from '../tasks/task-parts';
-import { postQuery, useRestorePost } from './content.queries';
+import { postQuery, useArchivePost, useRestorePost } from './content.queries';
 import { ContentDialog, DetailsDialog, PostActions, PublishedDialog } from './post-actions';
 import { PostMediaSection } from './post-media';
 import { PostOverdueBadge, PostPlatforms, PostStatusBadge, PostTypeIcon } from './post-parts';
@@ -66,10 +69,31 @@ export function PostPage({ postId }: { postId: string }) {
 }
 
 function PostView({ post }: { post: PostDetail }) {
+  const { t } = useTranslation();
+  const heading = useRef<HTMLHeadingElement>(null);
+  const actions = useRef<HTMLDivElement>(null);
+  const menu = useRef<HTMLButtonElement>(null);
+  const restoreButton = useRef<HTMLButtonElement>(null);
+  const focus = useMemo<TaskFocus>(() => ({ heading, actions, menu, restore: restoreButton }), []);
+  // A move, an archive or a restore swaps the header's controls (archive → restore → the moves
+  // and the menu): a focus left on the page body goes to the control that replaced them.
+  useFocusAfterChange(
+    `${post.status}:${post.reviewStage ?? ''}:${post.archivedAt ?? ''}:${post.allowedTransitions.join()}`,
+    () => {
+      const target = focusTarget(focus);
+      return target === true ? null : target;
+    },
+  );
+  // The archive and restore confirmation lives here: the menu and the notice that open it leave
+  // the page with the change.
+  const [confirming, setConfirming] = useState<'archive' | 'restore' | null>(null);
+  const shownConfirm = useShownWhileClosing(confirming) ?? 'archive';
+  const archive = useArchivePost(post.id);
+  const restore = useRestorePost(post.id);
   return (
     <>
-      <PostHero post={post} />
-      <Banners post={post} />
+      <PostHero post={post} focus={focus} onArchive={() => setConfirming('archive')} />
+      <Banners post={post} restoreRef={restoreButton} onRestore={() => setConfirming('restore')} />
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
         <div className="flex min-w-0 flex-col gap-6">
           <ContentSection post={post} />
@@ -84,12 +108,36 @@ function PostView({ post }: { post: PostDetail }) {
           <PublishingSection post={post} />
         </div>
       </div>
+      <ConfirmDialog
+        open={confirming !== null}
+        onClose={() => setConfirming(null)}
+        title={t(`content.${shownConfirm}.title`, { title: post.title })}
+        body={t(`content.${shownConfirm}.body`)}
+        action={t(`content.actions.${shownConfirm}`)}
+        destructive={shownConfirm === 'archive'}
+        pending={archive.isPending || restore.isPending}
+        // Archived: "restore" in the notice; restored: the moves or the menu.
+        finalFocus={() => focusTarget(focus, 'menu')}
+        onConfirm={async () => {
+          if (shownConfirm === 'archive') await archive.mutateAsync(undefined);
+          else await restore.mutateAsync(undefined);
+          toast.add({ title: t(`content.${shownConfirm}.done`), type: 'success' });
+        }}
+      />
     </>
   );
 }
 
 /** What goes out, for whom and when, with the moves the caller may make now. */
-function PostHero({ post }: { post: PostDetail }) {
+function PostHero({
+  post,
+  focus,
+  onArchive,
+}: {
+  post: PostDetail;
+  focus: TaskFocus;
+  onArchive: () => void;
+}) {
   const { t } = useTranslation();
   return (
     <section className="flex flex-col gap-5 rounded-lg border border-border bg-surface p-6">
@@ -110,7 +158,9 @@ function PostHero({ post }: { post: PostDetail }) {
               {t(`content.types.${post.type}`)}
             </span>
           </p>
-          <h1 className="text-2xl font-bold">{post.title}</h1>
+          <h1 ref={focus.heading} tabIndex={-1} data-focus="heading" className="text-2xl font-bold">
+            {post.title}
+          </h1>
           <div className="flex flex-wrap items-center gap-2">
             <PostStatusBadge status={post.status} stage={post.reviewStage} />
             {post.overdue && <PostOverdueBadge />}
@@ -122,7 +172,7 @@ function PostHero({ post }: { post: PostDetail }) {
             )}
           </div>
         </div>
-        <PostActions post={post} />
+        <PostActions post={post} focus={focus} onArchive={onArchive} />
       </div>
       <dl className="grid gap-4 border-t border-border pt-5 text-sm sm:grid-cols-2 lg:grid-cols-4">
         <Fact label={t('content.page.publish')}>
@@ -148,12 +198,17 @@ function PostHero({ post }: { post: PostDetail }) {
               <PersonName name={post.responsible.name} archived={post.responsible.archived} />
             </Link>
             {!post.responsible.inScope && (
-              <Badge tone="warning" title={t('content.page.outOfScopeHint')}>
+              <Badge tone="warning">
                 <TriangleAlertIcon aria-hidden="true" />
                 {t('content.page.outOfScope')}
               </Badge>
             )}
           </span>
+          {!post.responsible.inScope && (
+            <span className="mt-1 block text-xs text-muted-foreground">
+              {t('content.page.outOfScopeHint')}
+            </span>
+          )}
         </Fact>
         <Fact label={t('content.page.createdBy')}>
           <span>
@@ -193,10 +248,34 @@ function latestReturn(post: PostDetail): { note: string | null; by: string; at: 
 }
 
 /** Archived, read-only, medical-stage, cancelled and returned posts say so above everything. */
-function Banners({ post }: { post: PostDetail }) {
+function Banners({
+  post,
+  restoreRef,
+  onRestore,
+}: {
+  post: PostDetail;
+  restoreRef: RefObject<HTMLButtonElement | null>;
+  onRestore: () => void;
+}) {
   const { t } = useTranslation();
   const me = useMe();
-  if (post.archivedAt) return <ArchivedCallout post={post} />;
+  if (post.archivedAt) {
+    return (
+      <Callout
+        icon={<ArchiveIcon />}
+        title={t('content.page.archivedTitle')}
+        description={t('content.page.archivedBody')}
+        action={
+          post.permissions.canArchive && (
+            <Button ref={restoreRef} variant="outline" size="sm" onClick={onRestore}>
+              <ArchiveRestoreIcon />
+              {t('content.actions.restore')}
+            </Button>
+          )
+        }
+      />
+    );
+  }
   if (post.readOnly) {
     return (
       <Callout
@@ -248,41 +327,6 @@ function Banners({ post }: { post: PostDetail }) {
       })}
       description={returned.note ?? t('content.page.returnedBody')}
     />
-  );
-}
-
-function ArchivedCallout({ post }: { post: PostDetail }) {
-  const { t } = useTranslation();
-  const restore = useRestorePost(post.id);
-  const [confirming, setConfirming] = useState(false);
-  return (
-    <>
-      <Callout
-        icon={<ArchiveIcon />}
-        title={t('content.page.archivedTitle')}
-        description={t('content.page.archivedBody')}
-        action={
-          post.permissions.canArchive && (
-            <Button variant="outline" size="sm" onClick={() => setConfirming(true)}>
-              <ArchiveRestoreIcon />
-              {t('content.actions.restore')}
-            </Button>
-          )
-        }
-      />
-      <ConfirmDialog
-        open={confirming}
-        onClose={() => setConfirming(false)}
-        title={t('content.restore.title', { title: post.title })}
-        body={t('content.restore.body')}
-        action={t('content.actions.restore')}
-        pending={restore.isPending}
-        onConfirm={async () => {
-          await restore.mutateAsync(undefined);
-          toast.add({ title: t('content.restore.done'), type: 'success' });
-        }}
-      />
-    </>
   );
 }
 
@@ -339,7 +383,7 @@ function ContentSection({ post }: { post: PostDetail }) {
           {t('content.page.contentLocked')}
         </p>
       )}
-      {editing && <ContentDialog post={post} onClose={() => setEditing(false)} />}
+      <ContentDialog post={post} open={editing} onClose={() => setEditing(false)} />
     </TaskSection>
   );
 }
@@ -412,7 +456,7 @@ function ScheduleSection({ post }: { post: PostDetail }) {
           </Button>
         </div>
       )}
-      {editing && <DetailsDialog post={post} onClose={() => setEditing(false)} />}
+      <DetailsDialog post={post} open={editing} onClose={() => setEditing(false)} />
     </TaskSection>
   );
 }
@@ -479,7 +523,7 @@ function PublishingSection({ post }: { post: PostDetail }) {
             {t('content.publishing.noLinks')}
           </p>
         ))}
-      {editing && <PublishedDialog post={post} onClose={() => setEditing(false)} />}
+      <PublishedDialog post={post} open={editing} onClose={() => setEditing(false)} />
     </TaskSection>
   );
 }

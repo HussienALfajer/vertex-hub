@@ -24,6 +24,7 @@ import {
   DialogTitle,
   EmptyState,
   Field,
+  FieldDescription,
   FieldError,
   FieldLabel,
   Select,
@@ -42,11 +43,13 @@ import {
   toast,
 } from '@vertex-hub/ui';
 import { CalendarRangeIcon, PencilIcon, PlusIcon, RepeatIcon, XIcon } from 'lucide-react';
-import { useId, useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FormAlert } from '../../components/form-alert';
 import { LoadError } from '../../components/load-error';
+import { ApiError } from '../../lib/api/client';
 import { errorMessage } from '../../lib/errors';
+import { focusFirstInvalid } from '../../lib/focus-first-invalid';
 import { formatMonth, formatNumber } from '../../lib/format';
 import { formatMoney } from '../../lib/money';
 import { retainerBillingQuery } from '../invoices/invoices.queries';
@@ -85,6 +88,14 @@ export function ContractTab({ retainer }: { retainer: RetainerDetail }) {
   const { canSeeMoney, canEditMoney } = retainer.permissions;
   const terms = useQuery(retainerTermsQuery(retainer.id));
   const billing = useQuery({ ...retainerBillingQuery(retainer.id), enabled: canSeeMoney });
+  const container = useRef<HTMLDivElement>(null);
+  // When the button that opened a term dialog is gone, an open term's heading takes the focus:
+  // the newest after adding one (the empty state or "add" leaves), else the first.
+  const termHeading = (newest = false) => {
+    const headings = container.current?.querySelectorAll<HTMLElement>('[data-open-term] h2') ?? [];
+    return newest ? headings[headings.length - 1] : headings[0];
+  };
+  const firstHeading = () => termHeading();
 
   if (terms.isPending) {
     return (
@@ -114,10 +125,16 @@ export function ContractTab({ retainer }: { retainer: RetainerDetail }) {
     (billing.data?.charges ?? []).map((charge) => [charge.id, charge.invoice] as const),
   );
   const currency = retainer.money?.currency ?? 'USD';
-  const add = canAdd && <TermDialog retainer={retainer} />;
+  const add = canAdd && (
+    <TermDialog
+      retainer={retainer}
+      earliest={earliestStart(retainer, items)}
+      fallback={() => termHeading(true)}
+    />
+  );
 
   return (
-    <div className="flex flex-col gap-6">
+    <div ref={container} className="flex flex-col gap-6">
       {open.length === 0 ? (
         <EmptyState
           icon={<CalendarRangeIcon />}
@@ -140,8 +157,10 @@ export function ContractTab({ retainer }: { retainer: RetainerDetail }) {
               key={term.id}
               retainer={retainer}
               term={term}
+              others={items.filter((other) => other.id !== term.id)}
               invoices={invoices}
               editable={canEditMoney}
+              fallback={firstHeading}
             />
           ))}
           {add && <div>{add}</div>}
@@ -158,6 +177,7 @@ export function ContractTab({ retainer }: { retainer: RetainerDetail }) {
               term={term}
               invoices={invoices}
               editable={false}
+              fallback={firstHeading}
             />
           ))}
         </section>
@@ -166,18 +186,27 @@ export function ContractTab({ retainer }: { retainer: RetainerDetail }) {
   );
 }
 
+/** Where a term dialog sends the focus when its button is gone. */
+type Fallback = () => HTMLElement | null | undefined;
+
 function TermCard({
   retainer,
   term,
+  others = [],
   invoices,
   editable,
+  fallback,
 }: {
   retainer: RetainerDetail;
   term: RetainerTerm;
+  /** The retainer's other terms: a scheduled term's new start comes after them (T2). */
+  others?: RetainerTerm[];
   invoices: Map<string, SourceInvoice | null>;
   editable: boolean;
+  fallback: Fallback;
 }) {
   const { t } = useTranslation();
+  const heading = useRef<HTMLHeadingElement>(null);
   const currency = retainer.money?.currency ?? 'USD';
   const open = term.status === 'active' || term.status === 'scheduled';
   const money = term.money;
@@ -186,12 +215,13 @@ function TermCard({
   return (
     <section
       aria-label={t('retainers.terms.name', { number: formatNumber(term.number) })}
+      data-open-term={open || undefined}
       className="flex flex-col gap-4 rounded-lg border border-border bg-surface p-5"
     >
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex min-w-0 flex-col gap-1">
           <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-lg font-bold">
+            <h2 ref={heading} tabIndex={-1} className="text-lg font-bold">
               {t('retainers.terms.name', { number: formatNumber(term.number) })}
             </h2>
             <Badge tone={STATUS_TONES[term.status]}>
@@ -227,11 +257,17 @@ function TermCard({
               term={term}
               currency={currency}
               invoices={invoices}
+              fallback={heading}
             />
             {term.status === 'scheduled' && (
               <>
-                <TermDialog retainer={retainer} term={term} />
-                <CancelTermDialog retainerId={retainer.id} term={term} />
+                <TermDialog
+                  retainer={retainer}
+                  term={term}
+                  earliest={earliestStart(retainer, others)}
+                  fallback={() => heading.current}
+                />
+                <CancelTermDialog retainerId={retainer.id} term={term} fallback={fallback} />
               </>
             )}
           </div>
@@ -355,12 +391,12 @@ function EndActionSelect({ retainerId, term }: { retainerId: string; term: Retai
     label: t(`retainers.terms.endActions.${action}`),
   }));
   return (
+    // Not disabled while saving: a disabled trigger would drop the focus to the page body.
     <Select
       items={items}
       value={term.endAction}
-      disabled={update.isPending}
       onValueChange={async (next: TermEndAction | null) => {
-        if (!next || next === term.endAction) return;
+        if (!next || next === term.endAction || update.isPending) return;
         try {
           await update.mutateAsync({ termId: term.id, endAction: next });
           toast.add({ title: t('retainers.terms.endActionSaved'), type: 'success' });
@@ -383,29 +419,58 @@ function EndActionSelect({ retainerId, term }: { retainerId: string; term: Retai
   );
 }
 
-/** The months a term may start in: this month and the next two years. */
-function startMonths(today: CalendarDate): CalendarDate[] {
-  const first = firstOfMonth(today);
-  return Array.from({ length: 25 }, (_, index) => addMonths(first, index));
+/**
+ * The first month a term may start in (T2): this month or later, not before the retainer's start
+ * date, and after every other term that is not cancelled.
+ */
+function earliestStart(retainer: RetainerDetail, others: RetainerTerm[]): CalendarDate {
+  let month = firstOfMonth(businessDate());
+  const start = firstOfMonth(retainer.startDate);
+  if (start > month) month = start;
+  for (const other of others) {
+    if (other.status !== 'cancelled' && other.endMonth >= month) {
+      month = addMonths(other.endMonth, 1);
+    }
+  }
+  return month;
 }
 
+/** The refusals that concern the start month, shown on that field. */
+const START_CODES = new Set(['TERM_OVERLAP', 'MONTH_ALREADY_CHARGED', 'INVALID_DATES']);
+
 /** "Add term" (T2–T4), or "Edit" a scheduled term (T5). */
-function TermDialog({ retainer, term }: { retainer: RetainerDetail; term?: RetainerTerm }) {
+function TermDialog({
+  retainer,
+  term,
+  earliest,
+  fallback,
+}: {
+  retainer: RetainerDetail;
+  term?: RetainerTerm;
+  /** The first month offered: the months before it would overlap or be in the past. */
+  earliest: CalendarDate;
+  fallback: Fallback;
+}) {
   const { t } = useTranslation();
   const ids = { start: useId() };
+  const openButton = useRef<HTMLButtonElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
   const create = useCreateTerm(retainer.id);
   const update = useUpdateTerm(retainer.id);
   const [open, setOpen] = useState(false);
   const [startMonth, setStartMonth] = useState<CalendarDate | null>(null);
   const [draft, setDraft] = useState<TermDraft>(EMPTY_TERM);
-  const [problems, setProblems] = useState<TermProblems & { start?: true }>({});
+  // `start` is true when none was chosen, or the API's reason when it refused the month.
+  const [problems, setProblems] = useState<TermProblems & { start?: true | string }>({});
   const [failure, setFailure] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
-  const months = startMonths(businessDate());
-  const items = months.map((month) => ({ value: month, label: formatMonth(month) }));
+  // This month and the next two years, from the first month a term may start in.
+  const items = Array.from({ length: 25 }, (_, index) => addMonths(earliest, index)).map(
+    (month) => ({ value: month, label: formatMonth(month) }),
+  );
 
   function openDialog() {
-    setStartMonth(term?.startMonth ?? null);
+    setStartMonth(term?.startMonth ?? earliest);
     setDraft(term ? draftOf(term) : EMPTY_TERM);
     setProblems({});
     setFailure(null);
@@ -421,7 +486,20 @@ function TermDialog({ retainer, term }: { retainer: RetainerDetail; term?: Retai
       ...(!startMonth && { start: true as const }),
     };
     setProblems(next);
-    if (isTermProblems(parsed) || !startMonth) return;
+    if (isTermProblems(parsed) || !startMonth) {
+      // After the render marks the fields: the first one to fix takes the focus.
+      setTimeout(() => focusFirstInvalid(formRef.current));
+      return;
+    }
+    // Editing without a change: close without a request or a "saved" toast.
+    if (
+      term &&
+      startMonth === term.startMonth &&
+      JSON.stringify(parsed) === JSON.stringify(parseTerm(draftOf(term)))
+    ) {
+      setOpen(false);
+      return;
+    }
     setPending(true);
     try {
       if (term) {
@@ -433,7 +511,12 @@ function TermDialog({ retainer, term }: { retainer: RetainerDetail; term?: Retai
       }
       setOpen(false);
     } catch (error) {
-      setFailure(errorMessage(t, error));
+      if (error instanceof ApiError && START_CODES.has(error.code ?? '')) {
+        setProblems({ start: errorMessage(t, error) });
+        setTimeout(() => focusFirstInvalid(formRef.current));
+      } else {
+        setFailure(errorMessage(t, error));
+      }
     } finally {
       setPending(false);
     }
@@ -442,19 +525,25 @@ function TermDialog({ retainer, term }: { retainer: RetainerDetail; term?: Retai
   return (
     <>
       {term ? (
-        <Button variant="outline" size="sm" onClick={openDialog}>
+        <Button ref={openButton} variant="outline" size="sm" onClick={openDialog}>
           <PencilIcon />
           {t('retainers.terms.edit')}
         </Button>
       ) : (
-        <Button onClick={openDialog}>
+        <Button ref={openButton} onClick={openDialog}>
           <PlusIcon />
           {t('retainers.terms.add')}
         </Button>
       )}
       <Dialog open={open} onOpenChange={(next) => !next && setOpen(false)}>
-        <DialogContent closeLabel={t('common.close')} className="max-w-2xl">
-          <form className="grid gap-5" onSubmit={submit} noValidate>
+        <DialogContent
+          closeLabel={t('common.close')}
+          className="max-w-2xl"
+          finalFocus={() =>
+            openButton.current?.isConnected ? openButton.current : (fallback() ?? true)
+          }
+        >
+          <form ref={formRef} className="grid gap-5" onSubmit={submit} noValidate>
             <DialogHeader>
               <DialogTitle>
                 {term
@@ -470,7 +559,10 @@ function TermDialog({ retainer, term }: { retainer: RetainerDetail; term?: Retai
               <Select
                 items={items}
                 value={startMonth}
-                onValueChange={(value: CalendarDate | null) => setStartMonth(value)}
+                onValueChange={(value: CalendarDate | null) => {
+                  setStartMonth(value);
+                  setProblems(({ start: _, ...rest }) => rest);
+                }}
               >
                 <SelectTrigger id={ids.start}>
                   <SelectValue placeholder={t('retainers.terms.startMonth')} />
@@ -483,9 +575,15 @@ function TermDialog({ retainer, term }: { retainer: RetainerDetail; term?: Retai
                   ))}
                 </SelectContent>
               </Select>
-              <FieldError match={!!problems.start}>
-                {t('retainers.terms.errors.startMonth')}
+              <FieldError
+                match={!!problems.start}
+                role={typeof problems.start === 'string' ? 'alert' : undefined}
+              >
+                {typeof problems.start === 'string'
+                  ? problems.start
+                  : t('retainers.terms.errors.startMonth')}
               </FieldError>
+              <FieldDescription>{t('retainers.terms.startHint')}</FieldDescription>
             </Field>
             <TermPlanEditor
               value={draft}
@@ -515,10 +613,21 @@ function TermDialog({ retainer, term }: { retainer: RetainerDetail; term?: Retai
 }
 
 /** T5: a scheduled term is cancelled with a reason. */
-function CancelTermDialog({ retainerId, term }: { retainerId: string; term: RetainerTerm }) {
+function CancelTermDialog({
+  retainerId,
+  term,
+  fallback,
+}: {
+  retainerId: string;
+  term: RetainerTerm;
+  /** The cancelled term's card leaves the open terms: the first term left takes the focus. */
+  fallback: Fallback;
+}) {
   const { t } = useTranslation();
   const id = useId();
   const cancel = useCancelTerm(retainerId);
+  const openButton = useRef<HTMLButtonElement>(null);
+  const reasonRef = useRef<HTMLTextAreaElement>(null);
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState('');
   const [missing, setMissing] = useState(false);
@@ -529,6 +638,7 @@ function CancelTermDialog({ retainerId, term }: { retainerId: string; term: Reta
     setFailure(null);
     if (!reason.trim()) {
       setMissing(true);
+      reasonRef.current?.focus();
       return;
     }
     try {
@@ -543,6 +653,7 @@ function CancelTermDialog({ retainerId, term }: { retainerId: string; term: Reta
   return (
     <>
       <Button
+        ref={openButton}
         variant="outline"
         size="sm"
         onClick={() => {
@@ -556,7 +667,12 @@ function CancelTermDialog({ retainerId, term }: { retainerId: string; term: Reta
         {t('retainers.terms.cancel')}
       </Button>
       <Dialog open={open} onOpenChange={(next) => !next && setOpen(false)}>
-        <DialogContent closeLabel={t('common.close')}>
+        <DialogContent
+          closeLabel={t('common.close')}
+          finalFocus={() =>
+            openButton.current?.isConnected ? openButton.current : (fallback() ?? true)
+          }
+        >
           <form className="grid gap-5" onSubmit={submit} noValidate>
             <DialogHeader>
               <DialogTitle>
@@ -567,6 +683,7 @@ function CancelTermDialog({ retainerId, term }: { retainerId: string; term: Reta
             <Field invalid={missing}>
               <FieldLabel htmlFor={id}>{t('retainers.terms.cancelReason')}</FieldLabel>
               <Textarea
+                ref={reasonRef}
                 id={id}
                 rows={2}
                 maxLength={500}

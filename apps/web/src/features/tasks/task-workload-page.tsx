@@ -15,6 +15,7 @@ import {
   EmptyState,
   Field,
   FieldLabel,
+  IconButton,
   Meter,
   MultiCombobox,
   PageHeader,
@@ -27,7 +28,7 @@ import {
   TableRow,
 } from '@vertex-hub/ui';
 import { ChevronLeftIcon, ChevronRightIcon, InboxIcon, UsersIcon } from 'lucide-react';
-import { useId } from 'react';
+import { useId, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LoadError } from '../../components/load-error';
 import { formatCalendarDate, formatNumber } from '../../lib/format';
@@ -124,32 +125,37 @@ function WeekPicker({
   onThisWeek: () => void;
 }) {
   const { t } = useTranslation();
+  const previous = useRef<HTMLButtonElement>(null);
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <Button
+      <IconButton
+        ref={previous}
         variant="outline"
         size="icon"
-        aria-label={t('tasks.workload.previousWeek')}
+        label={t('tasks.workload.previousWeek')}
         onClick={onPrevious}
       >
         <ChevronRightIcon className="ltr:-scale-x-100" />
-      </Button>
+      </IconButton>
       <p className="min-w-52 text-center text-sm font-medium tabular-nums" aria-live="polite">
         {t('tasks.workload.week', {
           from: formatCalendarDate(from),
           to: formatCalendarDate(addDays(from, 6)),
         })}
       </p>
-      <Button
-        variant="outline"
-        size="icon"
-        aria-label={t('tasks.workload.nextWeek')}
-        onClick={onNext}
-      >
+      <IconButton variant="outline" size="icon" label={t('tasks.workload.nextWeek')} onClick={onNext}>
         <ChevronLeftIcon className="ltr:-scale-x-100" />
-      </Button>
+      </IconButton>
       {!current && (
-        <Button variant="ghost" size="sm" onClick={onThisWeek}>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => {
+            onThisWeek();
+            // The button leaves with the change: the focus stays in the week picker.
+            previous.current?.focus();
+          }}
+        >
           {t('tasks.workload.thisWeek')}
         </Button>
       )}
@@ -194,10 +200,11 @@ function DepartmentFilter({
 function UnassignedTiles({ workload }: { workload: TaskWorkload }) {
   const { t } = useTranslation();
   const departmentName = useDepartmentNames();
+  const headingId = useId();
   if (workload.unassigned.length === 0) return null;
   return (
-    <section aria-labelledby="workload-unassigned" className="flex flex-col gap-2">
-      <h2 id="workload-unassigned" className="text-sm font-medium text-muted-foreground">
+    <section aria-labelledby={headingId} className="flex flex-col gap-2">
+      <h2 id={headingId} className="text-sm font-medium text-muted-foreground">
         {t('tasks.workload.unassigned')}
       </h2>
       <ul className="flex flex-wrap gap-2">

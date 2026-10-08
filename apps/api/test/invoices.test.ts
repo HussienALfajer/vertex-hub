@@ -489,6 +489,22 @@ describe('invoices', () => {
         before: { totalMinor: 0, lineCount: 0, retainerId: null },
         after: { totalMinor: 5500, lineCount: 2, retainerId: retainer.id },
       });
+      // The same draft sent again, its texts with spaces: no change, no entry, same `updatedAt`.
+      const unchanged = await ok(
+        await put(
+          `/api/invoices/${draft.id}`,
+          finance.cookie,
+          draftOf(saved, {
+            notes: '  يدفع نقدًا  ',
+            lines: draftOf(saved).lines.map((item) => ({
+              ...item,
+              description: ` ${item.description} `,
+            })),
+          }),
+        ),
+      );
+      expect(unchanged.updatedAt).toBe(saved.updatedAt);
+      expect(await auditOf(draft.id)).toHaveLength(entries.length);
     });
   });
 
@@ -659,11 +675,21 @@ describe('invoices', () => {
       expect(moved).toMatchObject({ status: 'sent', dueOn: addDays(today, 10), daysOverdue: null });
       const [row] = await db.select().from(invoices).where(eq(invoices.id, issued.id));
       expect(invoiceSnapshotSchema.parse(row?.snapshot).dueOn).toBe(addDays(today, 10));
-      expect((await auditOf(issued.id)).at(-1)).toMatchObject({
+      const entries = await auditOf(issued.id);
+      expect(entries.at(-1)).toMatchObject({
         action: 'invoice.due_date_changed',
         before: { dueOn: addDays(today, -5), status: 'overdue' },
         after: { dueOn: addDays(today, 10), status: 'sent', reason: 'طلب العميل مهلة' },
       });
+      // The current date again is no change: no entry and no new version of the PDF.
+      const same = await ok(
+        await client.post(`/api/invoices/${issued.id}/due-date`, finance.cookie, {
+          dueOn: addDays(today, 10),
+          reason: 'نفس التاريخ',
+        }),
+      );
+      expect(same.updatedAt).toBe(moved.updatedAt);
+      expect(await auditOf(issued.id)).toHaveLength(entries.length);
       await expectError(
         await client.post(`/api/invoices/${issued.id}/due-date`, finance.cookie, {
           dueOn: addDays(today, -1),

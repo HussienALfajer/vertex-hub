@@ -232,6 +232,8 @@ export function InvoicesPage({ search }: { search: InvoicesSearch }) {
 /** Outstanding and overdue per currency and in USD, over every invoice the filters match. */
 function Totals({ totals }: { totals: InvoicePage['totals'] }) {
   const { t } = useTranslation();
+  // With USD balances only, the total in USD would repeat the USD card.
+  const usdOnly = totals.byCurrency.length === 1 && totals.byCurrency[0]?.currency === 'USD';
   return (
     <section aria-label={t('invoices.totals.label')} className="grid gap-3 sm:grid-cols-3">
       {totals.byCurrency.map((row) => (
@@ -247,15 +249,17 @@ function Totals({ totals }: { totals: InvoicePage['totals'] }) {
           </TotalLine>
         </Card>
       ))}
-      <Card className="gap-2 p-4">
-        <h2 className="text-sm text-muted-foreground">{t('invoices.totals.usd')}</h2>
-        <TotalLine label={t('invoices.totals.outstanding')}>
-          <Money minor={totals.usd.outstandingMinor} currency="USD" className="font-bold" />
-        </TotalLine>
-        <TotalLine label={t('invoices.totals.overdue')}>
-          <Money minor={totals.usd.overdueMinor} currency="USD" />
-        </TotalLine>
-      </Card>
+      {!usdOnly && (
+        <Card className="gap-2 p-4">
+          <h2 className="text-sm text-muted-foreground">{t('invoices.totals.usd')}</h2>
+          <TotalLine label={t('invoices.totals.outstanding')}>
+            <Money minor={totals.usd.outstandingMinor} currency="USD" className="font-bold" />
+          </TotalLine>
+          <TotalLine label={t('invoices.totals.overdue')}>
+            <Money minor={totals.usd.overdueMinor} currency="USD" />
+          </TotalLine>
+        </Card>
+      )}
     </section>
   );
 }
@@ -357,6 +361,7 @@ function Filters({
           <FieldLabel>{t('invoices.filters.dueFrom')}</FieldLabel>
           <Input
             type="date"
+            dir="ltr"
             value={search.dueFrom ?? ''}
             onChange={(event) => onChange({ dueFrom: event.target.value || undefined })}
           />
@@ -365,6 +370,7 @@ function Filters({
           <FieldLabel>{t('invoices.filters.dueTo')}</FieldLabel>
           <Input
             type="date"
+            dir="ltr"
             value={search.dueTo ?? ''}
             onChange={(event) => onChange({ dueTo: event.target.value || undefined })}
           />

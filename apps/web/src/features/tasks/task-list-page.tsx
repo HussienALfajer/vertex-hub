@@ -17,6 +17,7 @@ import {
 } from '@vertex-hub/contracts';
 import {
   Avatar,
+  Badge,
   Button,
   cn,
   EmptyState,
@@ -55,7 +56,7 @@ import {
   SendIcon,
   StethoscopeIcon,
 } from 'lucide-react';
-import { useCallback, useId } from 'react';
+import { useCallback, useId, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LoadError } from '../../components/load-error';
 import { canAll, useMe } from '../../lib/auth';
@@ -336,6 +337,7 @@ function Filters({
     enabled: !!clientId,
   });
   const [text, setText] = useSearchText(search.search, onChange);
+  const searchInput = useRef<HTMLInputElement>(null);
 
   const clientItems = [
     { value: ALL, label: t('tasks.filters.allClients') },
@@ -390,6 +392,7 @@ function Filters({
             className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
           />
           <Input
+            ref={searchInput}
             type="search"
             value={text}
             onChange={(event) => setText(event.target.value)}
@@ -505,6 +508,7 @@ function Filters({
             <Input
               id={ids.from}
               type="date"
+              dir="ltr"
               value={search.dueFrom ?? ''}
               onChange={(event) => onChange({ dueFrom: event.target.value || undefined })}
             />
@@ -516,6 +520,7 @@ function Filters({
             <Input
               id={ids.to}
               type="date"
+              dir="ltr"
               value={search.dueTo ?? ''}
               min={search.dueFrom}
               onChange={(event) => onChange({ dueTo: event.target.value || undefined })}
@@ -581,15 +586,17 @@ function Filters({
             variant="ghost"
             size="sm"
             className="ms-auto"
-            onClick={() =>
+            onClick={() => {
               onChange(
                 Object.fromEntries(
                   Object.keys(search)
                     .filter((key) => !['archived', 'sort', 'order'].includes(key))
                     .map((key) => [key, undefined]),
                 ),
-              )
-            }
+              );
+              // The button leaves with the filters: the focus goes to the search, the first one.
+              searchInput.current?.focus();
+            }}
           >
             <FilterXIcon />
             {t('tasks.filters.clear')}
@@ -657,7 +664,6 @@ function TasksTable({
             {t('tasks.columns.dueDate')}
           </TableSortHead>
           <TableHead>{t('tasks.columns.progress')}</TableHead>
-          <TableHead>{t('tasks.columns.type')}</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -682,6 +688,12 @@ function TasksTable({
                       .filter(Boolean)
                       .join(' · ')}
                   </span>
+                  {/* The type shows only when it is not plain work: a column made the table too wide. */}
+                  {task.type === 'client_request' && (
+                    <Badge tone="gold" className="mt-1 w-fit">
+                      {t('tasks.types.client_request')}
+                    </Badge>
+                  )}
                 </span>
               </TableCell>
               <TableCell>
@@ -731,9 +743,6 @@ function TasksTable({
                     </span>
                   )}
                 </span>
-              </TableCell>
-              <TableCell className="text-xs text-muted-foreground">
-                {t(`tasks.types.${task.type}`)}
               </TableCell>
             </TableRow>
           );

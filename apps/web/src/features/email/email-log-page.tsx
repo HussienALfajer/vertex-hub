@@ -34,7 +34,7 @@ import {
   toast,
 } from '@vertex-hub/ui';
 import { FilterXIcon, MailIcon, SearchIcon, SendIcon } from 'lucide-react';
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LoadError } from '../../components/load-error';
 import { can, useMe } from '../../lib/auth';
@@ -131,7 +131,12 @@ export function EmailLogPage({ search }: { search: EmailLogSearch }) {
         description={t('email.log.subtitle')}
         actions={
           can(me, 'users.manage') && (
-            <Button variant="outline" disabled={sendTest.isPending} onClick={test}>
+            <Button
+              variant="outline"
+              disabled={sendTest.isPending}
+              focusableWhenDisabled
+              onClick={test}
+            >
               <SendIcon />
               {t('email.log.test')}
             </Button>
@@ -185,6 +190,7 @@ function Filters({
 }) {
   const { t } = useTranslation();
   const [text, setText] = useSearchText(search.search, onChange);
+  const searchRef = useRef<HTMLInputElement>(null);
   const audienceItems = [
     { value: ALL, label: t('email.log.allAudiences') },
     ...EMAIL_AUDIENCES.map((audience) => ({
@@ -206,6 +212,7 @@ function Filters({
             className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
           />
           <Input
+            ref={searchRef}
             type="search"
             value={text}
             onChange={(event) => setText(event.target.value)}
@@ -229,7 +236,7 @@ function Filters({
           ))}
         </ToggleGroup>
       </div>
-      <div className="flex flex-col gap-3 md:flex-row md:items-end">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-[repeat(4,minmax(0,1fr))_auto] xl:items-end">
         <FilterSelect
           label={t('email.log.audience')}
           items={audienceItems}
@@ -267,7 +274,8 @@ function Filters({
         <Button
           variant="ghost"
           disabled={!filtered}
-          onClick={() =>
+          focusableWhenDisabled
+          onClick={() => {
             onChange({
               status: undefined,
               audience: undefined,
@@ -275,8 +283,10 @@ function Filters({
               from: undefined,
               to: undefined,
               search: undefined,
-            })
-          }
+            });
+            // The button turns off: the search field is where filtering starts again.
+            searchRef.current?.focus();
+          }}
         >
           <FilterXIcon />
           {t('email.log.clear')}
@@ -298,18 +308,21 @@ function FilterSelect({
   onChange: (value: string) => void;
 }) {
   return (
-    <Select items={items} value={value} onValueChange={(next) => onChange(next ?? ALL)}>
-      <SelectTrigger aria-label={label} className="md:w-52">
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent>
-        {items.map((item) => (
-          <SelectItem key={item.value} value={item.value}>
-            {item.label}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+    <Field>
+      <FieldLabel>{label}</FieldLabel>
+      <Select items={items} value={value} onValueChange={(next) => onChange(next ?? ALL)}>
+        <SelectTrigger className="min-w-0">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {items.map((item) => (
+            <SelectItem key={item.value} value={item.value}>
+              {item.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </Field>
   );
 }
 
@@ -322,14 +335,16 @@ function EmailTable({ emails }: { emails: EmailLogItem[] }) {
           <TableHead>{t('email.log.columns.time')}</TableHead>
           <TableHead>{t('email.log.columns.kind')}</TableHead>
           <TableHead>{t('email.log.columns.recipients')}</TableHead>
-          <TableHead>{t('email.log.columns.subject')}</TableHead>
+          <TableHead className="hidden xl:table-cell">{t('email.log.columns.subject')}</TableHead>
           <TableHead>{t('email.log.columns.status')}</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {emails.map((email) => (
           <TableRow key={email.id}>
-            <TableCell>{formatDateTime(email.createdAt)}</TableCell>
+            <TableCell className="min-w-36 whitespace-normal">
+              {formatDateTime(email.createdAt)}
+            </TableCell>
             <TableCell>
               <span className="flex flex-col items-start">
                 {t(`email.kinds.${email.kind}`)}
@@ -344,13 +359,21 @@ function EmailTable({ emails }: { emails: EmailLogItem[] }) {
                 <bdi dir="ltr" className="text-end text-xs text-muted-foreground">
                   {email.to.map((address) => address.email).join(', ')}
                 </bdi>
+                {/* Below `xl` the subject has no column of its own, so the status keeps its room. */}
+                <span className="mt-1 max-w-64 truncate text-xs xl:hidden" dir="auto">
+                  {email.subject}
+                </span>
               </span>
             </TableCell>
-            <TableCell className="max-w-56 truncate" dir="auto" title={email.subject}>
+            <TableCell
+              className="hidden max-w-56 truncate xl:table-cell"
+              dir="auto"
+              title={email.subject}
+            >
               {email.subject}
             </TableCell>
             <TableCell className="whitespace-normal">
-              <span className="flex max-w-56 flex-col items-start gap-1">
+              <span className="flex max-w-56 min-w-24 flex-col items-start gap-1">
                 <EmailStatusBadge status={email.status} />
                 <span className="text-xs text-muted-foreground">
                   {t('email.log.attempts', { n: formatNumber(email.attempts) })}

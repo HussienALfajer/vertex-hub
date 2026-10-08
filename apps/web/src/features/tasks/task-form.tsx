@@ -21,6 +21,7 @@ import {
   FieldDescription,
   FieldError,
   FieldLabel,
+  IconButton,
   Input,
   MultiCombobox,
   Select,
@@ -35,7 +36,8 @@ import {
 } from '@vertex-hub/ui';
 import type { TFunction } from 'i18next';
 import { LinkIcon, PlusIcon, ReceiptTextIcon, XIcon } from 'lucide-react';
-import { useId, useState } from 'react';
+import { useId, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import {
   Controller,
   type FieldPath,
@@ -46,7 +48,8 @@ import {
 import { useTranslation } from 'react-i18next';
 import { ApiError } from '../../lib/api/client';
 import { useMe } from '../../lib/auth';
-import { errorMessage, fieldError, SCREEN_ERROR } from '../../lib/errors';
+import { errorMessage, errorRole, fieldError, SCREEN_ERROR } from '../../lib/errors';
+import { focusAfterRemoval } from '../../lib/focus-after-removal';
 import { formatMonth, formatNumber } from '../../lib/format';
 import { useDebouncedValue } from '../../lib/use-search-text';
 import { ClientStatusBadge } from '../clients/client-badges';
@@ -91,7 +94,7 @@ export function taskFormFailure(form: TaskFormMethods, t: TFunction, error: unkn
   if (field) {
     // The shared text of `INVALID_DATES` speaks of a start date, which tasks do not have.
     const message = field === 'dueDate' ? t('tasks.form.errors.duePast') : errorMessage(t, error);
-    form.setError(field, { type: SCREEN_ERROR, message });
+    form.setError(field, { type: SCREEN_ERROR, message }, { shouldFocus: true });
     return null;
   }
   return errorMessage(t, error);
@@ -100,7 +103,11 @@ export function taskFormFailure(form: TaskFormMethods, t: TFunction, error: unkn
 /** Rule 12 before the round trip: a new task is not due in the past. */
 export function checkDueDate(form: TaskFormMethods, t: TFunction, dueDate: string) {
   if (dueDate >= businessDate()) return true;
-  form.setError('dueDate', { type: SCREEN_ERROR, message: t('tasks.form.errors.duePast') });
+  form.setError(
+    'dueDate',
+    { type: SCREEN_ERROR, message: t('tasks.form.errors.duePast') },
+    { shouldFocus: true },
+  );
   return false;
 }
 
@@ -185,10 +192,11 @@ export function DueFields({ form, allowPast }: { form: TaskFormMethods; allowPas
         <FieldLabel>{t('tasks.form.dueDate')}</FieldLabel>
         <Input
           type="date"
+          dir="ltr"
           min={allowPast ? undefined : businessDate()}
           {...form.register('dueDate')}
         />
-        <FieldError match={!!dateError}>
+        <FieldError match={!!dateError} role={errorRole(dateError)}>
           {fieldError(dateError, t('tasks.form.errors.dueDate'))}
         </FieldError>
       </Field>
@@ -203,6 +211,7 @@ export function DueFields({ form, allowPast }: { form: TaskFormMethods; allowPas
           render={({ field }) => (
             <Input
               type="time"
+              dir="ltr"
               value={field.value ?? ''}
               onChange={(event) => field.onChange(event.target.value || null)}
               onBlur={field.onBlur}
@@ -273,11 +282,6 @@ export interface AssigneeOption {
   note: string | null;
 }
 
-/**
- * Who the user may assign in the department (rule 6): every member with assign scope for it,
- * else themselves when they belong to it. Invited members qualify but only user managers may list
- * them, so they are not offered here.
- */
 /** The members of a department (invited ones only for user managers, so they are left out). */
 export function useDepartmentMembers(
   department: DepartmentCode | undefined,
@@ -359,7 +363,7 @@ export function AssigneeField({
         )}
       />
       <FieldDescription>{hint}</FieldDescription>
-      <FieldError match={!!error}>{fieldError(error, t('tasks.form.errors.assignee'))}</FieldError>
+      <FieldError match={!!error} role={errorRole(error)}>{fieldError(error, t('tasks.form.errors.assignee'))}</FieldError>
     </Field>
   );
 }
@@ -445,7 +449,7 @@ export function ClientField({ form, clients }: { form: TaskFormMethods; clients:
         )}
       />
       <FieldDescription>{t('tasks.form.clientHint')}</FieldDescription>
-      <FieldError match={!!error}>{fieldError(error, t('tasks.form.errors.client'))}</FieldError>
+      <FieldError match={!!error} role={errorRole(error)}>{fieldError(error, t('tasks.form.errors.client'))}</FieldError>
     </Field>
   );
 }
@@ -566,35 +570,40 @@ export function EngagementFields({
           {t('tasks.form.engagement')}
           <Optional />
         </FieldLabel>
-        <Select
-          items={engagementItems}
-          value={value}
-          onValueChange={(next) => {
-            const [kind, id] = (next ?? 'none').split(':');
-            form.setValue('projectId', kind === 'project' ? (id ?? null) : null, {
-              shouldDirty: true,
-            });
-            form.setValue('retainerCycleId', kind === 'cycle' ? (id ?? null) : null, {
-              shouldDirty: true,
-            });
-            form.setValue('milestoneId', null, { shouldDirty: true });
-            form.setValue('cycleLineId', null, { shouldDirty: true });
-            form.clearErrors(['projectId', 'retainerCycleId']);
-          }}
-        >
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {engagementItems.map((item) => (
-              <SelectItem key={item.value} value={item.value}>
-                {item.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {/* One select for two fields; refusals on either go to `projectId`, which holds the focus. */}
+        <Controller
+          control={form.control}
+          name="projectId"
+          render={({ field }) => (
+            <Select
+              items={engagementItems}
+              value={value}
+              onValueChange={(next) => {
+                const [kind, id] = (next ?? 'none').split(':');
+                field.onChange(kind === 'project' ? (id ?? null) : null);
+                form.setValue('retainerCycleId', kind === 'cycle' ? (id ?? null) : null, {
+                  shouldDirty: true,
+                });
+                form.setValue('milestoneId', null, { shouldDirty: true });
+                form.setValue('cycleLineId', null, { shouldDirty: true });
+                form.clearErrors(['projectId', 'retainerCycleId']);
+              }}
+            >
+              <SelectTrigger onBlur={field.onBlur} ref={field.ref}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {engagementItems.map((item) => (
+                  <SelectItem key={item.value} value={item.value}>
+                    {item.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        />
         <FieldDescription>{t('tasks.form.engagementHint')}</FieldDescription>
-        <FieldError match={!!error}>
+        <FieldError match={!!error} role={errorRole(error)}>
           {fieldError(error, t('tasks.form.errors.engagement'))}
         </FieldError>
       </Field>
@@ -626,7 +635,7 @@ export function EngagementFields({
               </Select>
             )}
           />
-          <FieldError match={!!milestoneError}>
+          <FieldError match={!!milestoneError} role={errorRole(milestoneError)}>
             {fieldError(milestoneError, t('tasks.form.errors.engagement'))}
           </FieldError>
         </Field>
@@ -676,7 +685,8 @@ export function ApprovalFields({ form }: { form: TaskFormMethods }) {
   return (
     <div className="grid gap-5 sm:grid-cols-2">
       <Field>
-        <label htmlFor={ids.approval} className="flex items-center justify-between gap-3">
+        {/* The switch stays beside its own label, away from the next column's field. */}
+        <label htmlFor={ids.approval} className="flex items-center gap-3">
           <span className="text-sm font-medium">{t('tasks.form.needsClientApproval')}</span>
           <Controller
             control={form.control}
@@ -763,13 +773,13 @@ export function ClientRequestFields({
               </Select>
             )}
           />
-          <FieldError match={!!errors.requestedByContactId}>
+          <FieldError match={!!errors.requestedByContactId} role={errorRole(errors.requestedByContactId)}>
             {fieldError(errors.requestedByContactId, t('errors.UNKNOWN_CONTACT'))}
           </FieldError>
         </Field>
         <Field invalid={!!errors.requestedOn}>
           <FieldLabel>{t('tasks.form.requestedOn')}</FieldLabel>
-          <Input type="date" max={businessDate()} {...form.register('requestedOn')} />
+          <Input type="date" dir="ltr" max={businessDate()} {...form.register('requestedOn')} />
           <FieldError match={!!errors.requestedOn}>{t('tasks.form.errors.requestedOn')}</FieldError>
         </Field>
       </div>
@@ -797,7 +807,7 @@ export function ClientRequestFields({
             </ToggleGroup>
           )}
         />
-        <FieldError match={!!errors.requestScope}>
+        <FieldError match={!!errors.requestScope} role={errorRole(errors.requestScope)}>
           {fieldError(errors.requestScope, t('errors.EXTRA_WORK_BILLED'))}
         </FieldError>
       </Field>
@@ -906,7 +916,7 @@ export function DependenciesField({ form }: { form: TaskFormMethods }) {
         )}
       />
       <FieldDescription>{t('tasks.form.dependenciesHint')}</FieldDescription>
-      <FieldError match={!!error}>
+      <FieldError match={!!error} role={errorRole(error)}>
         {fieldError(error as never, t('errors.INVALID_DEPENDENCY'))}
       </FieldError>
     </Field>
@@ -918,6 +928,8 @@ export function ChecklistField({ form }: { form: TaskFormMethods }) {
   const { t } = useTranslation();
   const id = useId();
   const [draft, setDraft] = useState('');
+  const list = useRef<HTMLOListElement>(null);
+  const input = useRef<HTMLInputElement>(null);
   return (
     <Controller
       control={form.control}
@@ -930,6 +942,13 @@ export function ChecklistField({ form }: { form: TaskFormMethods }) {
           if (!text || full) return;
           field.onChange([...items, text.slice(0, 200)]);
           setDraft('');
+          // "Add" turns off with the empty field: the focus goes back to typing the next one.
+          input.current?.focus();
+        };
+        /** The next row's remove button takes the focus, the previous one's, or the field. */
+        const remove = (index: number) => {
+          flushSync(() => field.onChange(items.filter((_, other) => other !== index)));
+          focusAfterRemoval(list.current, index, input.current);
         };
         return (
           <Field>
@@ -938,7 +957,7 @@ export function ChecklistField({ form }: { form: TaskFormMethods }) {
               <Optional />
             </FieldLabel>
             {items.length > 0 && (
-              <ol className="flex flex-col gap-1.5">
+              <ol ref={list} className="flex flex-col gap-1.5">
                 {items.map((item, index) => (
                   <li
                     // biome-ignore lint/suspicious/noArrayIndexKey: items are plain strings that may repeat
@@ -949,21 +968,20 @@ export function ChecklistField({ form }: { form: TaskFormMethods }) {
                       {formatNumber(index + 1)}.
                     </span>
                     <span className="flex-1">{item}</span>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon-sm"
-                      aria-label={t('common.remove', { label: item })}
-                      onClick={() => field.onChange(items.filter((_, other) => other !== index))}
+                    <IconButton
+                      data-focus="remove"
+                      label={t('common.remove', { label: item })}
+                      onClick={() => remove(index)}
                     >
                       <XIcon />
-                    </Button>
+                    </IconButton>
                   </li>
                 ))}
               </ol>
             )}
             <div className="flex items-center gap-2">
               <Input
+                ref={input}
                 id={id}
                 value={draft}
                 maxLength={200}
@@ -999,12 +1017,20 @@ export function LinksField({ form }: { form: TaskFormMethods }) {
   const { t } = useTranslation();
   const links = useFieldArray({ control: form.control, name: 'links' });
   const errors = form.formState.errors.links;
+  const list = useRef<HTMLDivElement>(null);
+  const addButton = useRef<HTMLButtonElement>(null);
+  /** The next row's remove button takes the focus, the previous one's, or "add". */
+  function remove(index: number) {
+    flushSync(() => links.remove(index));
+    focusAfterRemoval(list.current, index, addButton.current);
+  }
   return (
     <div className="flex flex-col gap-3">
       <p className="text-sm font-medium">
         {t('tasks.form.links')}
         <Optional />
       </p>
+      <div ref={list} className="contents">
       {links.fields.map((link, index) => (
         <div key={link.id} className="grid gap-2 sm:grid-cols-[1fr_12rem_auto] sm:items-start">
           <Field invalid={!!errors?.[index]?.url}>
@@ -1024,18 +1050,19 @@ export function LinksField({ form }: { form: TaskFormMethods }) {
               {...form.register(`links.${index}.label`)}
             />
           </Field>
-          <Button
-            type="button"
-            variant="ghost"
+          <IconButton
+            data-focus="remove"
             size="icon"
-            aria-label={t('tasks.links.remove')}
-            onClick={() => links.remove(index)}
+            label={t('tasks.links.removeAt', { position: formatNumber(index + 1) })}
+            onClick={() => remove(index)}
           >
             <XIcon />
-          </Button>
+          </IconButton>
         </div>
       ))}
+      </div>
       <Button
+        ref={addButton}
         type="button"
         variant="outline"
         size="sm"

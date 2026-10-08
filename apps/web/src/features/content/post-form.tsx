@@ -172,13 +172,15 @@ export function PlatformsField({ form }: { form: PostFormMethods }) {
           const chosen: PostPlatform[] = field.value ?? [];
           return (
             <ul className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              {ordered.map((platform) => (
+              {ordered.map((platform, index) => (
                 <li key={platform}>
                   <label
                     htmlFor={`${id}-${platform}`}
-                    className="flex cursor-pointer items-center gap-2 rounded-md border border-border px-2 py-1.5 text-sm"
+                    className="flex h-full cursor-pointer items-center gap-2 rounded-md border border-border px-2 py-1.5 text-sm"
                   >
                     <Checkbox
+                      // The first box takes the focus when no platform is chosen.
+                      ref={index === 0 ? field.ref : undefined}
                       id={`${id}-${platform}`}
                       checked={chosen.includes(platform)}
                       onCheckedChange={(checked) =>
@@ -191,7 +193,9 @@ export function PlatformsField({ form }: { form: PostFormMethods }) {
                       }
                     />
                     <PlatformMark platform={platform} size="xs" />
-                    <span className="truncate">{t(`clients.platforms.names.${platform}`)}</span>
+                    <span className="min-w-0 leading-tight">
+                      {t(`clients.platforms.names.${platform}`)}
+                    </span>
                   </label>
                 </li>
               ))}
@@ -218,6 +222,7 @@ export function PublishFields({ form, allowPast }: { form: PostFormMethods; allo
         <FieldLabel>{t('content.form.publishDate')}</FieldLabel>
         <Input
           type="date"
+          dir="ltr"
           min={allowPast ? undefined : businessDate()}
           {...form.register('publishDate')}
         />
@@ -236,6 +241,7 @@ export function PublishFields({ form, allowPast }: { form: PostFormMethods; allo
           render={({ field }) => (
             <Input
               type="time"
+              dir="ltr"
               value={field.value ?? ''}
               onChange={(event) => field.onChange(event.target.value || null)}
               onBlur={field.onBlur}
@@ -549,15 +555,26 @@ function ClientField({ form }: { form: PostFormMethods }) {
  * The new-post dialog (screen 3). From a client's Content tab the client is fixed; on the Content
  * page it is chosen among the clients the user may edit.
  */
-export function NewPostDialog({
-  client,
-  defaultDate,
-  onClose,
-}: {
+export function NewPostDialog({ open, onClose, ...props }: NewPostProps & { open: boolean }) {
+  const { t } = useTranslation();
+  // The form mounts with the dialog's content: each opening starts empty, and the fields stay
+  // while the dialog fades out.
+  return (
+    <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
+      <DialogContent closeLabel={t('common.close')} className="max-w-2xl">
+        <NewPostForm {...props} onClose={onClose} />
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+interface NewPostProps {
   client?: { id: string; name: string };
   defaultDate?: string;
   onClose: () => void;
-}) {
+}
+
+function NewPostForm({ client, defaultDate, onClose }: NewPostProps) {
   const { t } = useTranslation();
   const me = useMe();
   const create = useCreatePost();
@@ -591,35 +608,31 @@ export function NewPostDialog({
     }
   });
   return (
-    <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent closeLabel={t('common.close')} className="max-w-2xl">
-        <form className="grid gap-5" onSubmit={submit} noValidate>
-          <DialogHeader>
-            <DialogTitle>{t('content.new.title')}</DialogTitle>
-            <DialogDescription>
-              {client ? t('content.new.forClient', { client: client.name }) : t('content.new.body')}
-            </DialogDescription>
-          </DialogHeader>
-          {!client && <ClientField form={form} />}
-          <TitleField form={form} />
-          <TypeField form={form} />
-          <PlatformsField form={form} />
-          <PublishFields form={form} />
-          <CaptionFields form={form} />
-          <NotesField form={form} />
-          <ResponsibleField form={form} />
-          <ApprovalField form={form} />
-          {failure && <FormAlert>{failure}</FormAlert>}
-          <DialogFooter>
-            <DialogClose render={<Button variant="outline" type="button" />}>
-              {t('common.cancel')}
-            </DialogClose>
-            <Button type="submit" disabled={form.formState.isSubmitting}>
-              {form.formState.isSubmitting ? t('common.saving') : t('content.new.submit')}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+    <form className="grid gap-5" onSubmit={submit} noValidate>
+      <DialogHeader>
+        <DialogTitle>{t('content.new.title')}</DialogTitle>
+        <DialogDescription>
+          {client ? t('content.new.forClient', { client: client.name }) : t('content.new.body')}
+        </DialogDescription>
+      </DialogHeader>
+      {!client && <ClientField form={form} />}
+      <TitleField form={form} />
+      <TypeField form={form} />
+      <PlatformsField form={form} />
+      <PublishFields form={form} />
+      <CaptionFields form={form} />
+      <NotesField form={form} />
+      <ResponsibleField form={form} />
+      <ApprovalField form={form} />
+      {failure && <FormAlert>{failure}</FormAlert>}
+      <DialogFooter>
+        <DialogClose render={<Button variant="outline" type="button" />}>
+          {t('common.cancel')}
+        </DialogClose>
+        <Button type="submit" disabled={form.formState.isSubmitting}>
+          {form.formState.isSubmitting ? t('common.saving') : t('content.new.submit')}
+        </Button>
+      </DialogFooter>
+    </form>
   );
 }

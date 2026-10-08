@@ -24,8 +24,9 @@ export interface PeriodSearch {
 export function parsePeriodSearch(search: Record<string, unknown>): PeriodSearch {
   const from = dayParam(search.from);
   const to = dayParam(search.to);
-  // Half a period is no period: both ends or neither.
-  return from && to ? { from, to } : {};
+  // Half a period is no period: both ends or neither. Both keys are always set: the router keeps
+  // a raw URL value that the parsed search leaves out.
+  return from && to ? { from, to } : { from: undefined, to: undefined };
 }
 
 /**
@@ -95,6 +96,7 @@ export function PeriodPicker({
             <FieldLabel>{t('reports.period.from')}</FieldLabel>
             <Input
               type="date"
+              dir="ltr"
               value={search.from ?? period.from}
               onChange={(event) =>
                 event.target.value && onChange({ from: event.target.value, to: period.to })
@@ -105,6 +107,7 @@ export function PeriodPicker({
             <FieldLabel>{t('reports.period.to')}</FieldLabel>
             <Input
               type="date"
+              dir="ltr"
               value={search.to ?? period.to}
               onChange={(event) =>
                 event.target.value && onChange({ from: period.from, to: event.target.value })

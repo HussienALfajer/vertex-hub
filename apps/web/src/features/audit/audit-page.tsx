@@ -18,6 +18,7 @@ import {
   EmptyState,
   Field,
   FieldLabel,
+  IconButton,
   Input,
   PageHeader,
   Pagination,
@@ -30,9 +31,10 @@ import {
 } from '@vertex-hub/ui';
 import type { TFunction } from 'i18next';
 import { ChevronDownIcon, CpuIcon, FilterXIcon, HistoryIcon } from 'lucide-react';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LoadError } from '../../components/load-error';
+import i18n from '../../i18n';
 import { SystemStatus } from '../../components/system-status';
 import { canAll, useMe } from '../../lib/auth';
 import { everyPage } from '../../lib/every-page';
@@ -45,13 +47,14 @@ import {
 } from '../../lib/format';
 import { ALL, dayParam, idParam, oneOfParam, pageParam } from '../../lib/search-params';
 import { usePageInRange } from '../../lib/use-page-in-range';
+import { serviceListQuery } from '../catalog/catalog.queries';
 import { clientListQuery } from '../clients/clients.queries';
 import { departmentListQuery } from '../departments/departments.queries';
 import { projectListQuery } from '../projects/projects.queries';
 import { retainerListQuery } from '../retainers/retainers.queries';
 import { userListQuery } from '../users/users.queries';
 import { auditListQuery } from './audit.queries';
-import { AuditValue } from './audit-value';
+import { type AuditNames, AuditValue } from './audit-value';
 
 export interface AuditSearch {
   entityType?: AuditEntityType;
@@ -82,6 +85,7 @@ export function AuditPage({ search }: { search: AuditSearch }) {
   const navigate = useNavigate({ from: '/audit' });
   const page = search.page ?? 1;
   const names = useEntityNames();
+  const headingRef = useRef<HTMLHeadingElement>(null);
 
   const entries = useQuery(
     auditListQuery({
@@ -113,11 +117,28 @@ export function AuditPage({ search }: { search: AuditSearch }) {
   return (
     <>
       <PageHeader
+        headingRef={headingRef}
         title={t('audit.title')}
         description={t('audit.subtitle')}
         actions={<SystemStatus />}
       />
       <Filters search={search} actors={names.users} onChange={setFilter} filtered={filtered} />
+      {search.entityId && (
+        // Opened from a record's history: the filters above do not show it.
+        <p className="flex flex-wrap items-center gap-x-2 text-sm text-muted-foreground">
+          {t('audit.oneRecord')}
+          <Button
+            variant="link"
+            size="sm"
+            onClick={() => {
+              setFilter({ entityId: undefined });
+              headingRef.current?.focus();
+            }}
+          >
+            {t('audit.allRecords')}
+          </Button>
+        </p>
+      )}
       {entries.isPending ? (
         <div className="flex flex-col gap-2">
           {['a', 'b', 'c', 'd', 'e', 'f'].map((row) => (
@@ -159,10 +180,8 @@ export function AuditPage({ search }: { search: AuditSearch }) {
   );
 }
 
-interface EntityNames {
+interface EntityNames extends AuditNames {
   users: { id: string; name: string }[];
-  user: (id: string) => string | undefined;
-  department: (id: string) => string | undefined;
   client: (id: string) => string | undefined;
   project: (id: string) => string | undefined;
   retainer: (id: string) => string | undefined;
@@ -170,7 +189,8 @@ interface EntityNames {
 
 /**
  * Names for the entities and actors in the log: every user (any status), department, client,
- * project and retainer, however many (archived ones only for those who may see them).
+ * project, retainer and catalog service, however many (archived ones only for those who may see
+ * them).
  */
 function useEntityNames(): EntityNames {
   const me = useMe();
@@ -257,6 +277,17 @@ function useEntityNames(): EntityNames {
       canAll(me, 'projects.manage'),
     ),
   ).data;
+  const services = useQuery(
+    all('services', (page) => queryClient.fetchQuery(serviceListQuery({ page, pageSize: 100 }))),
+  ).data;
+  const archivedServices = useQuery(
+    all(
+      'archived-services',
+      (page) =>
+        queryClient.fetchQuery(serviceListQuery({ archived: 'true', page, pageSize: 100 })),
+      canAll(me, 'catalog.manage'),
+    ),
+  ).data;
   return useMemo(() => {
     const people = (users ?? [])
       .map(({ id, name }) => ({ id, name }))
@@ -283,10 +314,17 @@ function useEntityNames(): EntityNames {
         retainer.name,
       ]),
     );
+    const serviceNames = new Map(
+      [...(services ?? []), ...(archivedServices ?? [])].map((service) => [
+        service.id,
+        service.name,
+      ]),
+    );
     return {
       users: people,
       user: (id) => userNames.get(id),
       department: (id) => departmentNames.get(id),
+      service: (id) => serviceNames.get(id),
       client: (id) => clientNames.get(id),
       project: (id) => projectNames.get(id),
       retainer: (id) => retainerNames.get(id),
@@ -300,6 +338,8 @@ function useEntityNames(): EntityNames {
     archivedProjects,
     retainers,
     archivedRetainers,
+    services,
+    archivedServices,
   ]);
 }
 
@@ -380,6 +420,7 @@ function Filters({
       <Button
         variant="ghost"
         disabled={!filtered}
+        focusableWhenDisabled
         onClick={() =>
           onChange({
             entityType: undefined,
@@ -452,6 +493,35 @@ const LINK_FIELDS = new Set([
   'ownerId',
   'role',
   'shotId',
+  'taskId',
+  'leadId',
+  'campaignId',
+  'templateId',
+]);
+
+/**
+ * Ids of other records the log has no name for (contacts, tasks, posts, cycle lines): an id
+ * means nothing to a reader, and the record's own page shows what it points to.
+ */
+const REFERENCE_FIELDS = new Set([
+  'contactId',
+  'contactIds',
+  'requestedByContactId',
+  'itemId',
+  'taskIds',
+  'postId',
+  'shootId',
+  'quoteId',
+  'amendmentId',
+  'milestoneId',
+  'retainerCycleId',
+  'cycleLineId',
+  'extraWorkItemId',
+  'revisionId',
+  'templateRunId',
+  'editingTaskId',
+  'fromPostId',
+  'interests',
 ]);
 
 function AuditRow({ entry, names }: { entry: AuditEntry; names: EntityNames }) {
@@ -460,7 +530,7 @@ function AuditRow({ entry, names }: { entry: AuditEntry; names: EntityNames }) {
   // The parent's id on a child record's entry is where its link points, not a change.
   const fields = [
     ...new Set([...Object.keys(entry.before ?? {}), ...Object.keys(entry.after ?? {})]),
-  ].filter((field) => !LINK_FIELDS.has(field));
+  ].filter((field) => !LINK_FIELDS.has(field) && !REFERENCE_FIELDS.has(field));
   const detailsId = `audit-${entry.id}`;
 
   return (
@@ -477,7 +547,7 @@ function AuditRow({ entry, names }: { entry: AuditEntry; names: EntityNames }) {
             <Avatar name={entry.actorName} size="sm" />
           ) : (
             <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
-              <CpuIcon className="size-4" />
+              <CpuIcon className="size-4" aria-hidden="true" />
             </span>
           )}
           <span className="truncate text-sm font-medium">
@@ -492,18 +562,16 @@ function AuditRow({ entry, names }: { entry: AuditEntry; names: EntityNames }) {
           <EntityLink entry={entry} names={names} />
         </span>
         {fields.length > 0 ? (
-          <Button
-            variant="ghost"
-            size="icon-sm"
+          <IconButton
+            label={open ? t('audit.hideDetails') : t('audit.showDetails')}
             aria-expanded={open}
             aria-controls={detailsId}
-            aria-label={open ? t('audit.hideDetails') : t('audit.showDetails')}
             onClick={() => setOpen((value) => !value)}
           >
             <ChevronDownIcon
               className={open ? 'rotate-180 transition-transform' : 'transition-transform'}
             />
-          </Button>
+          </IconButton>
         ) : (
           <span className="size-8" />
         )}
@@ -521,13 +589,13 @@ function AuditRow({ entry, names }: { entry: AuditEntry; names: EntityNames }) {
             <tbody>
               {fields.map((field) => (
                 <tr key={field} className="align-top">
-                  <td className="py-1.5 pe-4 font-medium">{fieldLabel(t, field)}</td>
+                  <td className="py-1.5 pe-4 font-medium">{fieldLabel(t, entry.entityType, field)}</td>
                   <td className="py-1.5 pe-4 text-muted-foreground">
                     <AuditValue
                       entityType={entry.entityType}
                       field={field}
                       value={entry.before?.[field]}
-                      userName={names.user}
+                      names={names}
                     />
                   </td>
                   <td className="py-1.5">
@@ -535,7 +603,7 @@ function AuditRow({ entry, names }: { entry: AuditEntry; names: EntityNames }) {
                       entityType={entry.entityType}
                       field={field}
                       value={entry.after?.[field]}
-                      userName={names.user}
+                      names={names}
                     />
                   </td>
                 </tr>
@@ -548,214 +616,16 @@ function AuditRow({ entry, names }: { entry: AuditEntry; names: EntityNames }) {
   );
 }
 
-const KNOWN_FIELDS = [
-  'name',
-  'email',
-  'title',
-  'phone',
-  'skills',
-  'roles',
-  'primaryDepartment',
-  'secondaryDepartments',
-  'manager',
-  'status',
-  'twoFactorEnabled',
-  'kind',
-  'tradeName',
-  'sector',
-  'accountManager',
-  'isHealthcare',
-  'archived',
-  'colors',
-  'fonts',
-  'toneOfVoice',
-  'forbiddenWords',
-  'files',
-  'references',
-  'jobTitle',
-  'hasFinalApproval',
-  'notes',
-  'platform',
-  'label',
-  'url',
-  'agencyAccess',
-  'adminNote',
-  'occurredAt',
-  'channel',
-  'contactId',
-  'summary',
-  'description',
-  'departments',
-  'startDate',
-  'dueDate',
-  'currency',
-  'projectManager',
-  'client',
-  'milestones',
-  'reason',
-  'position',
-  'installmentMinor',
-  'projectId',
-  'openTasks',
-  'renewalDate',
-  'monthlyFeeMinor',
-  'deliverables',
-  'month',
-  'periodStart',
-  'periodEnd',
-  'lines',
-  'lineId',
-  'committed',
-  'delivered',
-  'delta',
-  'retainerId',
-  'requestedOn',
-  'requestedByContactId',
-  'estimateMinor',
-  'billingStatus',
-  'billingNote',
-  'brief',
-  'type',
-  'department',
-  'assigneeId',
-  'assignee',
-  'priority',
-  'dueTime',
-  'clientId',
-  'milestoneId',
-  'retainerCycleId',
-  'cycleLineId',
-  'needsClientApproval',
-  'revisionLimit',
-  'requestScope',
-  'extraWorkItemId',
-  'dependsOn',
-  'checklist',
-  'links',
-  'note',
-  'revisionSource',
-  'revisionNumber',
-  'overLimit',
-  'overrideReason',
-  'revisionId',
-  'decision',
-  'taskId',
-  'text',
-  'done',
-  'site',
-  'body',
-  'mentionedUserIds',
-  'stages',
-  'steps',
-  'stagesAdded',
-  'stagesChanged',
-  'stagesRemoved',
-  'stepsAdded',
-  'stepsChanged',
-  'stepsRemoved',
-  'user',
-  'template',
-  'templateId',
-  'templateRunId',
-  'trigger',
-  'taskCount',
-  'milestonesCreated',
-  'brandKind',
-  'confidential',
-  'number',
-  'sizeBytes',
-  'host',
-  'source',
-  'previousFinal',
-  'stage',
-  'reviewStage',
-  'outcome',
-  'versions',
-  'hasText',
-  'length',
-  'via',
-  'itemId',
-  'taskIds',
-  'expiresAt',
-  'revoked',
-  'platforms',
-  'publishDate',
-  'publishTime',
-  'responsibleId',
-  'captionLength',
-  'hashtagsLength',
-  'hasCaption',
-  'publishedAt',
-  'publishedLinks',
-  'fromPostId',
-  'startsAt',
-  'endsAt',
-  'location',
-  'mapUrl',
-  'crew',
-  'externalCrew',
-  'shots',
-  'acceptedConflicts',
-  'closeNote',
-  'rawFilesSite',
-  'editingTaskId',
-  'untickedShots',
-  'cancelReason',
-  'taskCancelled',
-  'onlineUrl',
-  'agenda',
-  'organizerId',
-  'attendeeIds',
-  'contactIds',
-  'billing',
-  'priceUsdMinor',
-  'priceSypMinor',
-  'revisionRounds',
-  'deliverableKind',
-  'deliverableLabel',
-  'items',
-  'displayNumber',
-  'validityDays',
-  'validUntil',
-  'oneOffNetMinor',
-  'monthlyNetMinor',
-  'oneOffDiscountMinor',
-  'monthlyDiscountMinor',
-  'oneOffEffectiveDiscount',
-  'monthlyEffectiveDiscount',
-  'monthlyTermMonths',
-  'lineCount',
-  'installments',
-  'discountApproval',
-  'respondedOn',
-  'project',
-  'retainer',
-  'proofFile',
-  'clientNotes',
-  'terms',
-  'companyDetails',
-  'defaultTerms',
-  'defaultValidityDays',
-  'discountThresholdPercent',
-  'paidOn',
-  'amountMinor',
-  'appliedMinor',
-  'method',
-  'spentOn',
-  'effectiveMonth',
-  'scope',
-  'amountDeltaMinor',
-  'moneyDeltaMinor',
-  'effects',
-  'decisionNote',
-  'cause',
-  'settleNote',
-  'remainderMinor',
-] as const;
 
-function fieldLabel(t: TFunction, field: string): string {
-  const known = KNOWN_FIELDS.find((name) => name === field);
-  return known ? t(`audit.fields.${known}`) : field;
+
+function fieldLabel(t: TFunction, entityType: AuditEntityType, field: string): string {
+  // A file's source is how its final version was chosen; a lead's, where it came from.
+  if (field === 'source' && entityType === 'lead') return t('audit.fields.leadSource');
+  if (field === 'source' && entityType === 'post') return t('audit.fields.reviewSource');
+  // A file's number is its version; elsewhere it is the record's number (invoice, amendment).
+  if (field === 'number' && entityType !== 'file_item') return t('audit.fields.recordNumber');
+  const key = `audit.fields.${field}`;
+  return i18n.exists(key) ? t(key as 'audit.fields.name') : field;
 }
 
 /** The client a client, contact, platform account or note entry belongs to. */
@@ -766,9 +636,14 @@ function clientIdOf(entry: AuditEntry): string | undefined {
   return typeof clientId === 'string' ? clientId : undefined;
 }
 
-const CLIENT_TAB: Partial<Record<AuditEntityType, 'platforms' | 'communication'>> = {
+const CLIENT_TAB: Partial<
+  Record<AuditEntityType, 'platforms' | 'communication' | 'invoices' | 'ads'>
+> = {
   client_platform_account: 'platforms',
   client_note: 'communication',
+  payment: 'invoices',
+  ad_wallet: 'ads',
+  ad_wallet_entry: 'ads',
 };
 
 /** The client tab an entry's change shows on: brand files and documents have their own. */
@@ -832,20 +707,28 @@ function postIdOf(entry: AuditEntry): string | undefined {
   return undefined;
 }
 
-/** The project a project, milestone or extra work entry belongs to. */
+const PROJECT_PARTS: AuditEntityType[] = ['project_milestone', 'extra_work', 'project_expense'];
+
+/** The project a project, milestone, extra work or expense entry belongs to. */
 function projectIdOf(entry: AuditEntry): string | undefined {
   if (entry.entityType === 'project') return entry.entityId;
   if (entry.entityType === 'file_item') return fileOwnerOf(entry, 'project');
-  if (entry.entityType !== 'project_milestone' && entry.entityType !== 'extra_work') return;
-  const projectId = entry.after?.projectId ?? entry.before?.projectId;
-  return typeof projectId === 'string' ? projectId : undefined;
+  if (!PROJECT_PARTS.includes(entry.entityType)) return;
+  return textOf(entry, 'projectId');
 }
 
 /** The project tab an entry's change shows on. */
-function projectTabOf(entry: AuditEntry): 'extra-work' | 'documents' | undefined {
+function projectTabOf(entry: AuditEntry): 'extra-work' | 'billing' | 'documents' | undefined {
   if (entry.entityType === 'extra_work') return 'extra-work';
+  if (entry.entityType === 'project_expense') return 'billing';
   if (entry.entityType === 'file_item') return 'documents';
   return undefined;
+}
+
+/** A text field of the entry, after the change or else before it. */
+function textOf(entry: AuditEntry, field: string): string | undefined {
+  const value = entry.after?.[field] ?? entry.before?.[field];
+  return typeof value === 'string' ? value : undefined;
 }
 
 /** A file entry names its file when the entry carries the name, next to its owner. */
@@ -912,10 +795,13 @@ function EntityLink({ entry, names }: { entry: AuditEntry; names: EntityNames })
       </Link>
     );
   }
+  const own = ownPageLink(t, entry, names);
+  if (own) return own;
   const projectId = projectIdOf(entry);
   if (projectId) {
     const projectName = names.project(projectId) ?? t('audit.openProject');
     const milestoneName = entry.after?.name ?? entry.before?.name;
+    const expense = textOf(entry, 'description');
     return (
       <Link
         to="/projects/$projectId"
@@ -925,7 +811,9 @@ function EntityLink({ entry, names }: { entry: AuditEntry; names: EntityNames })
       >
         {entry.entityType === 'project_milestone' && typeof milestoneName === 'string'
           ? t('audit.milestoneOfProject', { milestone: milestoneName, project: projectName })
-          : withFileName(t, entry, projectName)}
+          : entry.entityType === 'project_expense' && expense
+            ? t('audit.expenseOfProject', { expense, project: projectName })
+            : withFileName(t, entry, projectName)}
       </Link>
     );
   }
@@ -951,6 +839,11 @@ function EntityLink({ entry, names }: { entry: AuditEntry; names: EntityNames })
   // A contact is named by the entry itself; the rest by their client.
   const contactName = entry.after?.name ?? entry.before?.name;
   const clientName = names.client(clientId) ?? t('audit.openClient');
+  // Payments and ad wallet entries show on the client's tabs, by their receipt number.
+  const receipt =
+    entry.entityType === 'payment' || entry.entityType === 'ad_wallet_entry'
+      ? (textOf(entry, 'number') ?? textOf(entry, 'receiptNumber'))
+      : undefined;
   return (
     <Link
       to="/clients/$clientId"
@@ -960,7 +853,143 @@ function EntityLink({ entry, names }: { entry: AuditEntry; names: EntityNames })
     >
       {entry.entityType === 'client_contact' && typeof contactName === 'string'
         ? t('audit.contactOfClient', { contact: contactName, client: clientName })
-        : withFileName(t, entry, clientName)}
+        : receipt
+          ? t('audit.receiptOfClient', { receipt, client: clientName })
+          : withFileName(t, entry, clientName)}
     </Link>
   );
+}
+
+/**
+ * Records with a page of their own (or their parent's, for lead notes, campaign updates and
+ * template runs), named by the entry when it carries the name.
+ */
+function ownPageLink(t: TFunction, entry: AuditEntry, names: EntityNames) {
+  switch (entry.entityType) {
+    case 'invoice':
+      return (
+        <Link to="/invoices/$invoiceId" params={{ invoiceId: entry.entityId }} className={linkClass}>
+          {textOf(entry, 'number') ?? t('audit.openInvoice')}
+        </Link>
+      );
+    case 'quote':
+      return (
+        <Link to="/quotes/$quoteId" params={{ quoteId: entry.entityId }} className={linkClass}>
+          {textOf(entry, 'displayNumber') ?? t('audit.openQuote')}
+        </Link>
+      );
+    case 'lead':
+    case 'lead_note': {
+      const leadId = entry.entityType === 'lead' ? entry.entityId : textOf(entry, 'leadId');
+      if (!leadId) return null;
+      return (
+        <Link to="/leads/$leadId" params={{ leadId }} className={linkClass}>
+          {textOf(entry, 'name') ?? t('audit.openLead')}
+        </Link>
+      );
+    }
+    case 'ad_campaign':
+    case 'ad_campaign_update': {
+      const own = entry.entityType === 'ad_campaign';
+      const campaignId = own ? entry.entityId : textOf(entry, 'campaignId');
+      if (!campaignId) return null;
+      return (
+        <Link to="/campaigns/$campaignId" params={{ campaignId }} className={linkClass}>
+          {(own && textOf(entry, 'name')) || t('audit.openCampaign')}
+        </Link>
+      );
+    }
+    case 'template':
+    case 'template_run': {
+      const own = entry.entityType === 'template';
+      const templateId = own ? entry.entityId : textOf(entry, 'templateId');
+      if (!templateId) return null;
+      return (
+        <Link to="/templates/$templateId" params={{ templateId }} className={linkClass}>
+          {textOf(entry, own ? 'name' : 'template') ?? t('audit.openTemplate')}
+        </Link>
+      );
+    }
+    case 'catalog_service':
+    case 'catalog_package':
+      return (
+        <Link to="/catalog" className={linkClass}>
+          {textOf(entry, 'name') ?? t('audit.openCatalog')}
+        </Link>
+      );
+    case 'quote_settings':
+      return (
+        <Link to="/catalog/settings" className={linkClass}>
+          {t('audit.openSettings')}
+        </Link>
+      );
+    case 'invoice_settings':
+      return (
+        <Link to="/invoices/settings" className={linkClass}>
+          {t('audit.openSettings')}
+        </Link>
+      );
+    case 'approval_request':
+      return (
+        <Link
+          to="/approvals/requests/$requestId"
+          params={{ requestId: entry.entityId }}
+          className={linkClass}
+        >
+          {t('audit.openApprovalRequest')}
+        </Link>
+      );
+    case 'file_item': {
+      // Task, post, project, retainer and client files link through their owners below.
+      const quoteId = fileOwnerOf(entry, 'quote');
+      if (quoteId) {
+        return (
+          <Link to="/quotes/$quoteId" params={{ quoteId }} className={linkClass}>
+            {textOf(entry, 'name')
+              ? withFileName(t, entry, t('audit.quoteNoun'))
+              : t('audit.openQuote')}
+          </Link>
+        );
+      }
+      const invoiceId = fileOwnerOf(entry, 'invoice');
+      if (invoiceId) {
+        return (
+          <Link to="/invoices/$invoiceId" params={{ invoiceId }} className={linkClass}>
+            {textOf(entry, 'name')
+              ? withFileName(t, entry, t('audit.invoiceNoun'))
+              : t('audit.openInvoice')}
+          </Link>
+        );
+      }
+      const clientId = fileOwnerOf(entry, 'ad_wallet_entry') && textOf(entry, 'clientId');
+      if (!clientId) return null;
+      return (
+        <Link
+          to="/clients/$clientId"
+          params={{ clientId }}
+          search={{ tab: 'ads' }}
+          className={linkClass}
+        >
+          {withFileName(t, entry, names.client(clientId) ?? t('audit.openClient'))}
+        </Link>
+      );
+    }
+    case 'client_report': {
+      // The entry's id is the client's; the month is on the entry.
+      const month = textOf(entry, 'month');
+      const client = names.client(entry.entityId) ?? t('audit.openClient');
+      return (
+        <Link
+          to="/clients/$clientId/report"
+          params={{ clientId: entry.entityId }}
+          search={{ month }}
+          className={linkClass}
+        >
+          {month ? t('audit.reportOfClient', { month: formatMonth(month), client }) : client}
+        </Link>
+      );
+    }
+    default:
+      return null;
+  }
 }

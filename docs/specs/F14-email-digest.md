@@ -236,7 +236,7 @@ The emails themselves (rendered in the worker): RTL Arabic layout, logo header, 
 Settled in implementation (PR 4):
 - The web app starts every client email from the shared `SendEmailDialog` and shows histories with `EmailHistory` (`apps/web/src/features/email/`); the prefilled subject and message come from `clientEmailDraft` in `packages/messages`, so the dialog and the API use one template.
 - The dialog shows the attachment's file name only: no record exposes its PDF's size to the web app yet. A failed email's error is shown under its status badge (in the history and the log), not in a tooltip: there is no tooltip component, and the text stays readable on touch screens.
-- The email log puts the record link under the kind and the attempts under the status, so the table fits beside the menu at 1280 px.
+- The email log puts the record link under the kind and the attempts under the status, so the table fits beside the menu at 1280 px. Below `xl` the subject sits under the recipients instead of in its own column, so the table also fits at 1024 px.
 - "Send reminder by email" on the request page follows the WhatsApp reminder's condition (open, items pending, after the 48-hour notice) with the contact's email instead of a phone. The reissue confirmation carries the "Also send by email" checkbox.
 - The receipt and deposit receipt "Send by email" buttons are icons with an accessible name, in the documents column of their tables.
 

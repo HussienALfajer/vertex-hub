@@ -97,15 +97,14 @@ export function ServicesDialog({
   const [values, setValues] = useState(stored);
   const [failure, setFailure] = useState<string | null>(null);
 
-  function close() {
-    setValues(stored());
-    setFailure(null);
-    onClose();
-  }
-
   async function submit(event?: { preventDefault: () => void }) {
     event?.preventDefault();
     setFailure(null);
+    // Nothing changed: close without a request or a "saved" toast.
+    if (invoice.lines.every((line) => (values.get(line.id) ?? null) === (line.service?.id ?? null))) {
+      onClose();
+      return;
+    }
     try {
       await save.mutateAsync({
         lines: invoice.lines.map((line) => ({
@@ -123,7 +122,12 @@ export function ServicesDialog({
   return (
     <FormDialog
       open={open}
-      onClose={close}
+      onClose={onClose}
+      // Back to the stored services once it has faded out (after a save, the new ones).
+      onClosed={() => {
+        setValues(stored());
+        setFailure(null);
+      }}
       submitting={save.isPending}
       title={t('invoices.services.title', { number: invoice.displayNumber ?? '' })}
       description={t('invoices.services.hint')}

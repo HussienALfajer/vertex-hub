@@ -1,4 +1,10 @@
 import {
+  AD_CAMPAIGN_STATUSES,
+  AD_FUNDINGS,
+  AD_OBJECTIVES,
+  AD_PLATFORMS,
+  AD_WALLET_ENTRY_KINDS,
+  AMENDMENT_KINDS,
   AMENDMENT_SCOPES,
   AMENDMENT_STATUSES,
   APPROVAL_WITHDRAWN_REASONS,
@@ -17,10 +23,18 @@ import {
   EXTRA_WORK_BILLING,
   FILE_FINAL_SOURCES,
   FILE_VERSION_KINDS,
+  INVOICE_ORIGINS,
+  INVOICE_STATUSES,
+  LEAD_LOSS_REASONS,
+  LEAD_SOURCES,
+  LEAD_STAGES,
   MEETING_STATUSES,
   MILESTONE_STATUSES,
   NOTE_CHANNELS,
+  PAYMENT_METHODS,
   PLATFORM_ACCESS_STATES,
+  POST_STATUSES,
+  POST_TYPES,
   PROJECT_STATUSES,
   QUOTE_REJECTION_REASONS,
   QUOTE_STATUSES,
@@ -40,6 +54,7 @@ import {
   TASK_STATUSES,
   TASK_TYPES,
   TEMPLATE_KINDS,
+  TEMPLATE_RUN_TRIGGERS,
   TERM_END_ACTIONS,
   TERM_STATUSES,
   USER_STATUSES,
@@ -47,12 +62,26 @@ import {
 import { Badge, ColorSwatch } from '@vertex-hub/ui';
 import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
-import { formatDateTime, formatFileSize, formatMonth, formatNumber } from '../../lib/format';
-import { formatAmount } from '../../lib/money';
+import {
+  formatDate,
+  formatDateTime,
+  formatFileSize,
+  formatMonth,
+  formatNumber,
+} from '../../lib/format';
+import { formatAmount, rateText } from '../../lib/money';
+import { splitMentions } from '../tasks/mentions';
 import { useDepartmentNames } from '../projects/project-badges';
 import { lineName } from '../retainers/retainer-badges';
 
 type Item = Record<string, unknown>;
+
+/** Names the log shows instead of the ids an entry records. */
+export interface AuditNames {
+  user: (id: string) => string | undefined;
+  department: (id: string) => string | undefined;
+  service: (id: string) => string | undefined;
+}
 
 const isItem = (value: unknown): value is Item => typeof value === 'object' && value !== null;
 
@@ -72,13 +101,54 @@ const LTR_FIELDS = new Set([
 ]);
 
 /** Fields that hold an instant. */
-const DATE_TIME_FIELDS = new Set(['occurredAt', 'expiresAt', 'startsAt', 'endsAt']);
+const DATE_TIME_FIELDS = new Set([
+  'occurredAt',
+  'expiresAt',
+  'startsAt',
+  'endsAt',
+  'publishedAt',
+  'closedAt',
+]);
+
+/** Fields that hold the first day of a month (F05B terms and amendments). */
+const MONTH_FIELDS = new Set(['month', 'startMonth', 'endMonth', 'effectiveMonth']);
+
+/** Fields that hold a user's id. */
+const USER_ID_FIELDS = new Set([
+  'assigneeId',
+  'responsibleId',
+  'ownerId',
+  'organizerId',
+  'attendeeIds',
+  'mentionedUserIds',
+]);
+
+const CALENDAR_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** A user, department or catalog service named from its id, or undefined. */
+function namedId(field: string, value: unknown, names: AuditNames): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  if (USER_ID_FIELDS.has(field)) return names.user(value);
+  if (field === 'primaryDepartmentId') return names.department(value);
+  if (field === 'serviceId') return names.service(value);
+  return undefined;
+}
 
 /** Money fields hold minor units (ADR 0006); the currency is a field of its own. */
 const isMoneyField = (field: string) => field.endsWith('Minor');
 
 /** Why a healthcare flag change moved a task between the medical stage and the client (F09). */
 const HEALTHCARE_REASONS = ['healthcare_on', 'healthcare_off'] as const;
+
+/** Why the system changed a record on its own: closed a shoot's task, ended a retainer's terms. */
+const SYSTEM_REASONS = [
+  'shoot_closed',
+  'post_return',
+  'task_linked',
+  'retainer_ended',
+  'end_action_changed',
+  'quote_renewal',
+] as const;
 
 /** Translates a value from one of the contract's fixed lists, or returns undefined. */
 function enumLabel(
@@ -114,6 +184,64 @@ function enumLabel(
     const user = find(USER_STATUSES);
     if (user) return t(`users.statuses.${user}`);
   }
+  if (field === 'status' && (entityType === 'invoice' || entityType === 'payment')) {
+    const invoice = find(INVOICE_STATUSES);
+    if (invoice) return t(`invoices.statuses.${invoice}`);
+  }
+  if (entityType === 'invoice' && field === 'origin') {
+    const origin = find(INVOICE_ORIGINS);
+    if (origin) return t(`invoices.origins.${origin}`);
+  }
+  if (field === 'method') {
+    const method = find(PAYMENT_METHODS);
+    if (method) return t(`invoices.methods.${method}`);
+  }
+  if (entityType === 'ad_campaign') {
+    const status = field === 'status' ? find(AD_CAMPAIGN_STATUSES) : undefined;
+    if (status) return t(`campaigns.statuses.${status}`);
+    const platform = field === 'platform' ? find(AD_PLATFORMS) : undefined;
+    if (platform) return t(`campaigns.platforms.${platform}`);
+    const objective = field === 'objective' ? find(AD_OBJECTIVES) : undefined;
+    if (objective) return t(`campaigns.objectives.${objective}`);
+    const funding = field === 'funding' ? find(AD_FUNDINGS) : undefined;
+    if (funding) return t(`campaigns.funding.${funding}`);
+  }
+  if (entityType === 'ad_wallet_entry' && field === 'kind') {
+    const kind = find(AD_WALLET_ENTRY_KINDS);
+    if (kind) return t(`campaigns.ledger.kinds.${kind}`);
+  }
+  if (entityType === 'lead') {
+    const stage = field === 'stage' ? find(LEAD_STAGES) : undefined;
+    if (stage) return t(`leads.stages.${stage}`);
+    const source = field === 'source' ? find(LEAD_SOURCES) : undefined;
+    if (source) return t(`leads.sources.${source}`);
+    const lost = field === 'lostReason' ? find(LEAD_LOSS_REASONS) : undefined;
+    if (lost) return t(`leads.lossReasons.${lost}`);
+    if (field === 'mode' && (value === 'new' || value === 'existing')) {
+      return t(`leads.convert.modes.${value}`);
+    }
+  }
+  if (entityType === 'post') {
+    const source = field === 'source' ? find(REVISION_SOURCES) : undefined;
+    if (source) return t(`tasks.revisionSources.${source}`);
+    const status = field === 'status' ? find(POST_STATUSES) : undefined;
+    if (status) return t(`content.statuses.${status}`);
+    const type = field === 'type' ? find(POST_TYPES) : undefined;
+    if (type) return t(`content.types.${type}`);
+  }
+  if (entityType === 'retainer_amendment' && field === 'kind') {
+    const kind = find(AMENDMENT_KINDS);
+    if (kind) return t(`audit.amendmentKinds.${kind}`);
+  }
+  if (entityType === 'template_run' && field === 'trigger') {
+    const trigger = find(TEMPLATE_RUN_TRIGGERS);
+    if (trigger) return t(`audit.triggers.${trigger}`);
+  }
+  // Why the system changed a record (tasks, posts, F05B terms and amendments).
+  if (field === 'reason' || field === 'cause') {
+    const reason = find(SYSTEM_REASONS);
+    if (reason) return t(`audit.reasons.${reason}`);
+  }
   if (entityType === 'shoot' && field === 'type') {
     const type = find(SHOOT_TYPES);
     if (type) return t(`calendar.shootTypes.${type}`);
@@ -135,7 +263,11 @@ function enumLabel(
     const reason = field === 'reason' ? find(HEALTHCARE_REASONS) : undefined;
     if (reason) return t(`audit.reasons.${reason}`);
   }
-  if (entityType === 'task' || entityType === 'approval_request') {
+  if (entityType === 'post' || entityType === 'approval_request') {
+    const channel = field === 'channel' || field === 'via' ? find(RESPONSE_CHANNELS) : undefined;
+    if (channel) return t(`tasks.responses.channels.${channel}`);
+  }
+  if (entityType === 'task' || entityType === 'approval_request' || entityType === 'post') {
     const stage = field === 'stage' || field === 'reviewStage' ? find(REVIEW_STAGES) : undefined;
     if (stage) return t(`tasks.reviews.stages.${stage}`);
     const outcome = field === 'outcome' ? find(REVIEW_OUTCOMES) : undefined;
@@ -156,7 +288,7 @@ function enumLabel(
     const role = find(ROLES);
     if (role) return t(`roles.${role}`);
   }
-  if (field === 'platform') {
+  if (field === 'platform' || field === 'platforms') {
     const platform = find(CLIENT_PLATFORMS);
     if (platform) return t(`clients.platforms.names.${platform}`);
   }
@@ -226,13 +358,12 @@ export function AuditValue({
   entityType,
   field,
   value,
-  userName,
+  names,
 }: {
   entityType: AuditEntityType;
   field: string;
   value: unknown;
-  /** Names the users a list refers to by id (a shoot's crew). */
-  userName?: (id: string) => string | undefined;
+  names: AuditNames;
 }) {
   const { t } = useTranslation();
   const none = <span className="text-muted-foreground">{t('common.none')}</span>;
@@ -242,19 +373,24 @@ export function AuditValue({
     if (value.length === 0) return none;
     return (
       <span className="flex flex-wrap gap-1">
-        {value.map((item) => (
+        {value.map((item, index) => (
           <ListItem
-            key={typeof item === 'string' ? item : JSON.stringify(item)}
+            // biome-ignore lint/suspicious/noArrayIndexKey: an entry's list never reorders, and may repeat a value (a term's monthly amounts)
+            key={index}
             entityType={entityType}
             field={field}
             item={item}
-            userName={userName}
+            names={names}
           />
         ))}
       </span>
     );
   }
   if (isItem(value) && text(value, 'name')) return <span>{text(value, 'name')}</span>;
+  // An approval link's email (F14): its recipients.
+  if (field === 'email' && isItem(value) && Array.isArray(value.to)) {
+    return <span>{value.to.filter(isItem).map((to) => text(to, 'name') ?? text(to, 'email')).join('، ')}</span>;
+  }
   if (typeof value === 'boolean') {
     if (field === 'twoFactorEnabled') {
       return <span>{value ? t('account.twoFactor.on') : t('account.twoFactor.off')}</span>;
@@ -266,9 +402,25 @@ export function AuditValue({
   }
   const label = enumLabel(t, entityType, field, value);
   if (label) return <span>{label}</span>;
-  // A meeting's organizer (F11) is recorded by id.
-  const organizer = field === 'organizerId' && typeof value === 'string' && userName?.(value);
-  if (organizer) return <span>{organizer}</span>;
+  const named = namedId(field, value, names);
+  if (named) return <span>{named}</span>;
+  // A comment's mentions are `@{id}` tokens (F06): shown by name.
+  if (field === 'body' && typeof value === 'string') {
+    return (
+      <span className="whitespace-pre-line">
+        {splitMentions(value)
+          .map((part) => ('text' in part ? part.text : `@${names.user(part.mention) ?? '…'}`))
+          .join('')}
+      </span>
+    );
+  }
+  if (field === 'sypPerUsd' && typeof value === 'string') {
+    return (
+      <span dir="ltr" className="tabular-nums">
+        {rateText(value)}
+      </span>
+    );
+  }
   if (isMoneyField(field) && typeof value === 'number') {
     return (
       <span dir="ltr" className="tabular-nums">
@@ -276,7 +428,7 @@ export function AuditValue({
       </span>
     );
   }
-  if (field === 'month' && typeof value === 'string') {
+  if (MONTH_FIELDS.has(field) && typeof value === 'string') {
     return <span>{formatMonth(value)}</span>;
   }
   if (DATE_TIME_FIELDS.has(field) && typeof value === 'string') {
@@ -291,6 +443,16 @@ export function AuditValue({
       );
     }
     if (field === 'sizeBytes') return <span>{formatFileSize(value)}</span>;
+  }
+  if (typeof value === 'string' && CALENDAR_DATE.test(value)) {
+    return <span>{formatDate(value)}</span>;
+  }
+  if (typeof value === 'number') {
+    return (
+      <span dir="ltr" className="tabular-nums">
+        {formatNumber(value)}
+      </span>
+    );
   }
   const shown = String(value);
   return LTR_FIELDS.has(field) ? (
@@ -307,23 +469,54 @@ function ListItem({
   entityType,
   field,
   item,
-  userName,
+  names,
 }: {
   entityType: AuditEntityType;
   field: string;
   item: unknown;
-  userName?: (id: string) => string | undefined;
+  names: AuditNames;
 }) {
   const { t } = useTranslation();
   if (field === 'departments' && DEPARTMENT_CODES.some((code) => code === item)) {
     return <DepartmentItem code={item as DepartmentCode} />;
   }
+  if (typeof item === 'number') {
+    // A term's monthly amounts (F05B) are minor units.
+    return (
+      <Badge tone="outline" dir="ltr" className="tabular-nums">
+        {field === 'schedule' ? formatAmount(item) : formatNumber(item)}
+      </Badge>
+    );
+  }
   if (!isItem(item)) {
-    // A meeting's attendees (F11) are recorded by id.
-    const attendee = field === 'attendeeIds' ? userName?.(String(item)) : undefined;
     return (
       <Badge tone="outline">
-        {attendee ?? enumLabel(t, entityType, field, item) ?? String(item)}
+        {namedId(field, item, names) ?? enumLabel(t, entityType, field, item) ?? String(item)}
+      </Badge>
+    );
+  }
+  // An invoice line's service (F15): the service's name, or unclassified.
+  if ('serviceId' in item && 'lineId' in item) {
+    const serviceId = text(item, 'serviceId');
+    return (
+      <Badge tone="outline" dir="auto">
+        {(serviceId && names.service(serviceId)) ?? t('reports.revenue.unclassified')}
+      </Badge>
+    );
+  }
+  // A month of an amendment's schedule or effects (F05B): the month and its amounts.
+  const month = text(item, 'month');
+  if (month && (typeof item.amountMinor === 'number' || typeof item.afterMinor === 'number')) {
+    const amounts =
+      typeof item.amountMinor === 'number'
+        ? formatAmount(item.amountMinor)
+        : `${typeof item.beforeMinor === 'number' ? formatAmount(item.beforeMinor) : '—'} → ${formatAmount(item.afterMinor as number)}`;
+    return (
+      <Badge tone="outline">
+        {formatMonth(month)}:{' '}
+        <span dir="ltr" className="tabular-nums">
+          {amounts}
+        </span>
       </Badge>
     );
   }
@@ -351,7 +544,7 @@ function ListItem({
   const role = CREW_ROLES.find((known) => known === item.role);
   if (role) {
     const userId = text(item, 'userId');
-    const who = text(item, 'name') ?? (userId ? userName?.(userId) : undefined);
+    const who = text(item, 'name') ?? (userId ? names.user(userId) : undefined);
     return (
       <Badge tone="outline" dir="auto">
         {[who, t(`calendar.crewRoles.${role}`), item.isLead === true && t('calendar.form.lead')]
@@ -391,7 +584,7 @@ function ListItem({
   }
   return (
     <Badge tone="outline" dir="auto">
-      {text(item, 'name') ?? text(item, 'label') ?? text(item, 'url')}
+      {text(item, 'name') ?? text(item, 'title') ?? text(item, 'label') ?? text(item, 'url')}
     </Badge>
   );
 }

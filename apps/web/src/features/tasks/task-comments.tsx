@@ -14,11 +14,15 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  Field,
+  FieldError,
+  FieldLabel,
+  IconButton,
   Skeleton,
   Textarea,
 } from '@vertex-hub/ui';
 import { AtSignIcon, PencilIcon, SendIcon, Trash2Icon } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { type RefObject, useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '../../components/confirm-dialog';
 import { FormAlert } from '../../components/form-alert';
@@ -51,8 +55,10 @@ export function CommentsSection({ task }: { task: TaskDetail }) {
   const items = comments.data?.pages.flatMap((page) => page.items) ?? [];
   const add = useAddComment(task.id);
   const closed = task.archivedAt !== null || task.readOnly;
+  const heading = useRef<HTMLHeadingElement>(null);
+  const composer = useRef<HTMLTextAreaElement>(null);
   return (
-    <TaskSection title={t('tasks.comments.title')}>
+    <TaskSection title={t('tasks.comments.title')} headingRef={heading}>
       {comments.isPending ? (
         <div className="flex flex-col gap-3">
           <Skeleton className="h-16" />
@@ -76,13 +82,19 @@ export function CommentsSection({ task }: { task: TaskDetail }) {
           )}
           <ol className="flex flex-col gap-4">
             {items.map((comment) => (
-              <CommentItem key={comment.id} task={task} comment={comment} />
+              <CommentItem
+                key={comment.id}
+                task={task}
+                comment={comment}
+                fallback={closed ? heading : composer}
+              />
             ))}
           </ol>
         </>
       )}
       {!closed && (
         <Composer
+          inputRef={composer}
           submitLabel={t('tasks.comments.send')}
           onSubmit={async (input) => {
             await add.mutateAsync(input);
@@ -93,12 +105,37 @@ export function CommentsSection({ task }: { task: TaskDetail }) {
   );
 }
 
-function CommentItem({ task, comment }: { task: TaskDetail; comment: TaskComment }) {
+function CommentItem({
+  task,
+  comment,
+  fallback,
+}: {
+  task: TaskDetail;
+  comment: TaskComment;
+  /** Takes the focus once a removed comment's buttons leave with it. */
+  fallback: RefObject<HTMLElement | null>;
+}) {
   const { t } = useTranslation();
   const edit = useEditComment(task.id);
   const remove = useRemoveComment(task.id);
   const [editing, setEditing] = useState(false);
   const [removing, setRemoving] = useState(false);
+  const editButton = useRef<HTMLButtonElement>(null);
+  const editor = useRef<HTMLTextAreaElement>(null);
+  // Editing swaps the text for a form and back: the focus follows into it and back to "edit".
+  const opened = useRef(false);
+  useEffect(() => {
+    if (editing) editor.current?.focus();
+    else if (opened.current && document.activeElement === document.body) {
+      editButton.current?.focus();
+    }
+    opened.current = editing;
+  }, [editing]);
+  // The comment is named by its author and time: a conversation repeats the same buttons.
+  const named = {
+    name: comment.author.name,
+    time: formatDateTime(comment.createdAt),
+  };
   return (
     <li className="flex gap-3">
       <Avatar name={comment.author.name} tone={comment.author.archived ? 'muted' : 'brand'} />
@@ -112,24 +149,21 @@ function CommentItem({ task, comment }: { task: TaskDetail; comment: TaskComment
           {!editing && (comment.canEdit || comment.canRemove) && !comment.removed && (
             <span className="ms-auto flex items-center">
               {comment.canEdit && (
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label={t('tasks.comments.edit')}
+                <IconButton
+                  ref={editButton}
+                  label={t('tasks.comments.editOf', named)}
                   onClick={() => setEditing(true)}
                 >
                   <PencilIcon />
-                </Button>
+                </IconButton>
               )}
               {comment.canRemove && (
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label={t('tasks.comments.remove')}
+                <IconButton
+                  label={t('tasks.comments.removeOf', named)}
                   onClick={() => setRemoving(true)}
                 >
                   <Trash2Icon />
-                </Button>
+                </IconButton>
               )}
             </span>
           )}
@@ -138,6 +172,7 @@ function CommentItem({ task, comment }: { task: TaskDetail; comment: TaskComment
           <p className="text-sm text-muted-foreground">{t('tasks.comments.removed')}</p>
         ) : editing ? (
           <Composer
+            inputRef={editor}
             initial={toDraft(comment.body, comment.mentions)}
             submitLabel={t('common.save')}
             onCancel={() => setEditing(false)}
@@ -158,6 +193,8 @@ function CommentItem({ task, comment }: { task: TaskDetail; comment: TaskComment
         action={t('tasks.comments.remove')}
         destructive
         pending={remove.isPending}
+        // Removed, the comment loses its buttons: the focus goes to the composer.
+        finalFocus={() => fallback.current ?? true}
         onConfirm={async () => {
           await remove.mutateAsync(comment.id);
         }}
@@ -194,11 +231,13 @@ function CommentBody({ body, mentions }: { body: string; mentions: TaskComment['
  * tokens; typing a name without picking it leaves it as text.
  */
 function Composer({
+  inputRef,
   initial = EMPTY_DRAFT,
   submitLabel,
   onSubmit,
   onCancel,
 }: {
+  inputRef: RefObject<HTMLTextAreaElement | null>;
   initial?: MentionDraft;
   submitLabel: string;
   onSubmit: (input: TaskCommentInput) => Promise<void>;
@@ -213,8 +252,10 @@ function Composer({
       everyPage((page) => queryClient.fetchQuery(userListQuery({ page, pageSize: 100 }))),
     staleTime: 60_000,
   });
-  const input = useRef<HTMLTextAreaElement>(null);
+  const id = useId();
+  const input = inputRef;
   const [draft, setDraft] = useState<MentionDraft>(initial);
+  const [invalid, setInvalid] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
@@ -234,7 +275,8 @@ function Composer({
     setFailure(null);
     const parsed = taskCommentInputSchema.safeParse({ body: toBody(draft) });
     if (!parsed.success) {
-      setFailure(t('tasks.comments.errors.body'));
+      setInvalid(true);
+      input.current?.focus();
       return;
     }
     setPending(true);
@@ -250,20 +292,29 @@ function Composer({
 
   return (
     <div className="flex flex-col gap-2">
-      <Textarea
-        ref={input}
-        rows={3}
-        value={draft.text}
-        aria-label={t('tasks.comments.label')}
-        placeholder={t('tasks.comments.placeholder')}
-        onChange={(event) => setDraft((current) => editDraft(current, event.target.value))}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
-            event.preventDefault();
-            void submit();
-          }
-        }}
-      />
+      <Field invalid={invalid}>
+        <FieldLabel htmlFor={id} className="sr-only">
+          {t('tasks.comments.label')}
+        </FieldLabel>
+        <Textarea
+          ref={input}
+          id={id}
+          rows={3}
+          value={draft.text}
+          placeholder={t('tasks.comments.placeholder')}
+          onChange={(event) => {
+            setInvalid(false);
+            setDraft((current) => editDraft(current, event.target.value));
+          }}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
+              event.preventDefault();
+              void submit();
+            }
+          }}
+        />
+        <FieldError match={invalid}>{t('tasks.comments.errors.body')}</FieldError>
+      </Field>
       {failure && <FormAlert>{failure}</FormAlert>}
       <div className="flex flex-wrap items-center gap-2">
         <DropdownMenu>
@@ -289,7 +340,14 @@ function Composer({
               {t('common.cancel')}
             </Button>
           )}
-          <Button size="sm" type="button" disabled={pending || !draft.text.trim()} onClick={submit}>
+          {/* It turns off once the comment is sent: focusable, so the focus stays here. */}
+          <Button
+            size="sm"
+            type="button"
+            disabled={pending || !draft.text.trim()}
+            focusableWhenDisabled
+            onClick={submit}
+          >
             <SendIcon className="rtl:-scale-x-100" />
             {submitLabel}
           </Button>

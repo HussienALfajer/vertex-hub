@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { instantSchema } from './dates.js';
 import { pageQuerySchema, pageSchema } from './lists.js';
 
 /** Every audited change, as `<entity>.<verb>`. Features add theirs with their spec. */
@@ -300,8 +301,8 @@ export const auditListQuerySchema = pageQuerySchema.extend({
   entityId: z.uuid().optional(),
   actorId: z.uuid().optional(),
   action: auditActionSchema.optional(),
-  from: z.iso.datetime({ offset: true }).optional(),
-  to: z.iso.datetime({ offset: true }).optional(),
+  from: instantSchema.optional(),
+  to: instantSchema.optional(),
 });
 
 export type AuditListQuery = z.infer<typeof auditListQuerySchema>;

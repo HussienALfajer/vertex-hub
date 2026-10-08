@@ -62,7 +62,12 @@ export function HomePage() {
             <span className="text-sm text-muted-foreground" aria-live="polite">
               {t('dashboard.loadedAt', { time: formatTime(loadedAt) })}
             </span>
-            <Button variant="outline" onClick={refresh} disabled={refreshing}>
+            <Button
+              variant="outline"
+              onClick={refresh}
+              disabled={refreshing}
+              focusableWhenDisabled
+            >
               <RefreshCwIcon
                 className={refreshing ? 'animate-spin motion-reduce:animate-none' : ''}
               />

@@ -236,9 +236,7 @@ function DueTiles({ summary }: { summary: MyTaskSummary }) {
             </span>
             <span className="flex min-w-0 flex-col">
               <span className="text-2xl font-bold tabular-nums">{formatNumber(count)}</span>
-              <span className="truncate text-sm text-muted-foreground">
-                {t(`tasks.my.sections.${key}`)}
-              </span>
+              <span className="text-sm text-muted-foreground">{t(`tasks.my.sections.${key}`)}</span>
             </span>
           </>
         );

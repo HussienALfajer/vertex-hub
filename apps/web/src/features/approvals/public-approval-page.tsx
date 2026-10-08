@@ -42,7 +42,7 @@ import {
   MessageSquareReplyIcon,
   Undo2Icon,
 } from 'lucide-react';
-import { type ReactNode, useId, useState } from 'react';
+import { type ReactNode, useId, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { FormAlert } from '../../components/form-alert';
@@ -50,6 +50,7 @@ import { LoadError } from '../../components/load-error';
 import { ApiError } from '../../lib/api/client';
 import { errorMessage, SCREEN_ERROR } from '../../lib/errors';
 import { formatDateTime, formatFileSize, formatNumber } from '../../lib/format';
+import { useFocusAfterChange } from '../../lib/use-focus-after-change';
 import { formatPublish, POST_TYPE_ICONS, PostPlatforms } from '../content/post-parts';
 import { FileTypeIcon } from '../files/file-parts';
 import {
@@ -89,7 +90,7 @@ export function PublicApprovalPage({ token }: { token: string }) {
             <LinkMessage
               icon={<ClockAlertIcon />}
               title={t('approvals.public.expiredTitle')}
-              body={t('errors.APPROVAL_LINK_EXPIRED')}
+              body={t('approvals.public.expiredBody')}
             />
           ) : status === 404 || status === 400 ? (
             // Rule 20: never which case of "not valid" applies.
@@ -123,6 +124,13 @@ function ApprovalView({ token, approval }: { token: string; approval: PublicAppr
   const tasks = approval.items.filter((item) => item.kind === 'task');
   const posts = approval.items.filter((item) => item.kind === 'post');
   const pendingPosts = posts.filter((item) => item.status === 'pending');
+  const planHeading = useRef<HTMLHeadingElement>(null);
+  // A decision takes its buttons away: the focus goes to the heading of what was decided.
+  const decided = useRef<HTMLElement | null>(null);
+  useFocusAfterChange(approval.items.map((item) => item.status).join(), () => decided.current);
+  const setDecided = (heading: HTMLElement | null) => {
+    decided.current = heading;
+  };
   return (
     <>
       <section className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-5">
@@ -146,18 +154,24 @@ function ApprovalView({ token, approval }: { token: string; approval: PublicAppr
       {tasks.length > 0 && (
         <ol className="flex flex-col gap-4">
           {tasks.map((item) => (
-            <ItemCard key={item.id} token={token} item={item} />
+            <ItemCard key={item.id} token={token} item={item} onDecide={setDecided} />
           ))}
         </ol>
       )}
       {posts.length > 0 && (
         <section aria-labelledby={planId} className="flex flex-col gap-4">
           <div className="flex flex-wrap items-center gap-3 pt-2">
-            <h2 id={planId} className="text-lg font-bold">
+            <h2 id={planId} ref={planHeading} tabIndex={-1} className="text-lg font-bold">
               {t('approvals.public.contentPlan')}
             </h2>
             {pendingPosts.length > 1 && (
-              <Button className="ms-auto" onClick={() => setApprovingAll(true)}>
+              <Button
+                className="ms-auto"
+                onClick={() => {
+                  decided.current = planHeading.current;
+                  setApprovingAll(true);
+                }}
+              >
                 <CheckCheckIcon />
                 {t('approvals.public.approveAll', { n: formatNumber(pendingPosts.length) })}
               </Button>
@@ -165,7 +179,7 @@ function ApprovalView({ token, approval }: { token: string; approval: PublicAppr
           </div>
           <ol className="flex flex-col gap-4">
             {posts.map((item) => (
-              <ItemCard key={item.id} token={token} item={item} />
+              <ItemCard key={item.id} token={token} item={item} onDecide={setDecided} />
             ))}
           </ol>
         </section>
@@ -185,10 +199,24 @@ function ApprovalView({ token, approval }: { token: string; approval: PublicAppr
  * One task or post. A post shows its date and time, type and platforms first, its media as a
  * strip to swipe through, then the caption and hashtags (F08 rule 27).
  */
-function ItemCard({ token, item }: { token: string; item: PublicApprovalItem }) {
+function ItemCard({
+  token,
+  item,
+  onDecide,
+}: {
+  token: string;
+  item: PublicApprovalItem;
+  /** Opening a decision names the heading that takes the focus once it is sent. */
+  onDecide: (heading: HTMLElement | null) => void;
+}) {
   const { t } = useTranslation();
+  const heading = useRef<HTMLHeadingElement>(null);
   const [deciding, setDeciding] = useState<ClientDecision | null>(null);
   const [previewing, setPreviewing] = useState<PublicApprovalFile | null>(null);
+  const decide = (decision: ClientDecision) => {
+    onDecide(heading.current);
+    setDeciding(decision);
+  };
   const { post } = item;
   // The files of a post carry no name (rule 27): they are numbered instead.
   const files = item.files.map((file, index) =>
@@ -213,7 +241,7 @@ function ItemCard({ token, item }: { token: string; item: PublicApprovalItem }) 
             <PostPlatforms platforms={post.platforms} size="sm" />
           </div>
         )}
-        <Heading className="text-lg font-bold" dir="auto">
+        <Heading ref={heading} tabIndex={-1} className="text-lg font-bold" dir="auto">
           {item.title}
         </Heading>
       </div>
@@ -257,7 +285,7 @@ function ItemCard({ token, item }: { token: string; item: PublicApprovalItem }) 
       )}
       {item.status === 'pending' ? (
         <div className="flex flex-col gap-2 border-t border-border pt-4 sm:flex-row">
-          <Button size="lg" className="sm:flex-1" onClick={() => setDeciding('approved')}>
+          <Button size="lg" className="sm:flex-1" onClick={() => decide('approved')}>
             <CircleCheckBigIcon />
             {t('approvals.public.approve')}
           </Button>
@@ -265,7 +293,7 @@ function ItemCard({ token, item }: { token: string; item: PublicApprovalItem }) 
             size="lg"
             variant="outline"
             className="sm:flex-1"
-            onClick={() => setDeciding('changes_requested')}
+            onClick={() => decide('changes_requested')}
           >
             <MessageSquareReplyIcon />
             {t('approvals.public.requestChanges')}

@@ -10,10 +10,11 @@ import {
 } from '@vertex-hub/contracts';
 import { Badge, Button, cn, Skeleton } from '@vertex-hub/ui';
 import { LockIcon, PlusIcon } from 'lucide-react';
-import { type ReactNode, useState } from 'react';
+import { type ReactNode, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LoadError } from '../../components/load-error';
 import { formatNumber } from '../../lib/format';
+import { useFocusAfterChange } from '../../lib/use-focus-after-change';
 import { AddFilesDialog, useFileItemActions } from '../files/file-dialogs';
 import { FileItemCard } from '../files/file-item-card';
 import { FileThumbnail, VersionBadge } from '../files/file-parts';
@@ -32,7 +33,15 @@ export function PostMediaSection({ post }: { post: PostDetail }) {
   const owner: FileOwnerRef = { type: 'post', id: post.id };
   const files = useQuery(fileItemsQuery({ ownerType: 'post', ownerId: post.id }));
   const [adding, setAdding] = useState(false);
-  const { actions, dialogs } = useFileItemActions(owner, { allowLink: true });
+  // A removed file leaves with the menu that removed it: the focus goes to the section heading.
+  const heading = useRef<HTMLHeadingElement>(null);
+  const addButton = useRef<HTMLButtonElement>(null);
+  const { actions, dialogs } = useFileItemActions(owner, {
+    allowLink: true,
+    afterItemRemoved: heading,
+  });
+  // The list refreshes after a dialog gave the focus back to a control the change replaced.
+  useFocusAfterChange(files.data?.items.length ?? 0, () => heading.current);
   const snapshot = postSnapshot(post);
   const sent = new Set(snapshot?.review.versions.map((version) => version.id));
   const mark = (versionId: string) =>
@@ -53,10 +62,11 @@ export function PostMediaSection({ post }: { post: PostDetail }) {
   return (
     <TaskSection
       title={t('content.media.title')}
+      headingRef={heading}
       count={post.media.length > 0 ? formatNumber(post.media.length) : undefined}
       action={
         canAdd && (
-          <Button variant="ghost" size="sm" onClick={() => setAdding(true)}>
+          <Button ref={addButton} variant="ghost" size="sm" onClick={() => setAdding(true)}>
             <PlusIcon />
             {t('content.media.add')}
           </Button>
@@ -103,6 +113,10 @@ export function PostMediaSection({ post }: { post: PostDetail }) {
           withNote
           allowLink
           onClose={() => setAdding(false)}
+          // The tenth file hides "add files": the heading takes the focus then.
+          finalFocus={() =>
+            (addButton.current?.isConnected ? addButton.current : heading.current) ?? true
+          }
         />
       )}
       {dialogs}

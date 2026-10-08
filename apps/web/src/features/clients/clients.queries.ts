@@ -3,19 +3,21 @@ import {
   keepPreviousData,
   queryOptions,
   useMutation,
+  useQuery,
   useQueryClient,
 } from '@tanstack/react-query';
-import type {
-  CreateClient,
-  CreateContact,
-  CreateNote,
-  CreatePlatformAccount,
-  NoteListQuery,
-  UpdateBrandKit,
-  UpdateClient,
-  UpdateContact,
-  UpdateNote,
-  UpdatePlatformAccount,
+import {
+  CLIENT_STATUSES,
+  type CreateClient,
+  type CreateContact,
+  type CreateNote,
+  type CreatePlatformAccount,
+  type NoteListQuery,
+  type UpdateBrandKit,
+  type UpdateClient,
+  type UpdateContact,
+  type UpdateNote,
+  type UpdatePlatformAccount,
 } from '@vertex-hub/contracts';
 import { api, call } from '../../lib/api/client';
 import type { paths } from '../../lib/api/schema.gen';
@@ -40,6 +42,23 @@ export const clientListQuery = (filters: ClientListFilters) =>
     queryFn: () => call(api.GET('/api/clients', { params: { query: filters } })),
     placeholderData: keepPreviousData,
   });
+
+/**
+ * The account managers of every client the user can list, by name. The users list filters by
+ * role for user managers only, so filters for other readers take their choices from here.
+ */
+export function useClientAccountManagers(): { id: string; name: string }[] {
+  const everyClient = useQuery(clientListQuery({ status: [...CLIENT_STATUSES], pageSize: 100 }));
+  const managers = new Map(
+    (everyClient.data?.items ?? []).map(({ accountManager }) => [
+      accountManager.id,
+      accountManager.name,
+    ]),
+  );
+  return [...managers]
+    .map(([id, name]) => ({ id, name }))
+    .sort((a, b) => a.name.localeCompare(b.name, 'ar'));
+}
 
 export const clientQuery = (id: string) =>
   queryOptions({

@@ -12,19 +12,21 @@ import {
   ReceiptTextIcon,
   StethoscopeIcon,
 } from 'lucide-react';
-import { type ReactNode, useState } from 'react';
+import { type ReactNode, type RefObject, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '../../components/confirm-dialog';
 import { isMissing, LoadError } from '../../components/load-error';
 import { can, useMe } from '../../lib/auth';
 import { formatCalendarDate, formatDateTime, formatNumber } from '../../lib/format';
+import { useFocusAfterChange } from '../../lib/use-focus-after-change';
+import { useShownWhileClosing } from '../../lib/use-shown-while-closing';
 import { ClientApprovalSection } from '../approvals/task-approval-panel';
 import { TaskShootSection } from '../calendar/task-shoot-section';
 import { TaskPostSection } from '../content/task-post-section';
 import { PersonName, useDepartmentNames } from '../projects/project-badges';
 import { lineName } from '../retainers/retainer-badges';
 import { TaskTemplateOrigin } from '../templates/template-runs';
-import { TaskActions } from './task-actions';
+import { focusTarget, TaskActions, type TaskFocus } from './task-actions';
 import {
   BlockedBadge,
   formatDue,
@@ -40,7 +42,7 @@ import { TaskFilesSection } from './task-files';
 import { ChecklistSection, DependenciesSection, LinksSection, TaskSection } from './task-parts';
 import { ClientResponsesSection, ClientTextSection, ReviewHistorySection } from './task-review';
 import { RevisionsSection } from './task-revisions';
-import { taskQuery, useRestoreTask } from './tasks.queries';
+import { taskQuery, useArchiveTask, useRestoreTask } from './tasks.queries';
 
 export function TaskPage({ taskId }: { taskId: string }) {
   const { t } = useTranslation();
@@ -69,10 +71,38 @@ export function TaskPage({ taskId }: { taskId: string }) {
 }
 
 function TaskView({ task }: { task: TaskDetail }) {
+  const { t } = useTranslation();
+  const heading = useRef<HTMLHeadingElement>(null);
+  const actions = useRef<HTMLDivElement>(null);
+  const menu = useRef<HTMLButtonElement>(null);
+  const restoreButton = useRef<HTMLButtonElement>(null);
+  const focus = useMemo<TaskFocus>(
+    () => ({ heading, actions, menu, restore: restoreButton }),
+    [],
+  );
+  // A move, an archive or a restore swaps the header's controls (archive → restore → the moves
+  // and the menu): a focus left on the page body goes to the control that replaced them.
+  useFocusAfterChange(
+    `${task.status}:${task.reviewStage ?? ''}:${task.archivedAt ?? ''}:${task.allowedTransitions.join()}`,
+    () => {
+      const target = focusTarget(focus);
+      return target === true ? null : target;
+    },
+  );
+  // The archive and restore confirmation lives here: the menu and the notice that open it leave
+  // the page with the change.
+  const [confirming, setConfirming] = useState<'archive' | 'restore' | null>(null);
+  const shownConfirm = useShownWhileClosing(confirming) ?? 'archive';
+  const archive = useArchiveTask(task.id);
+  const restore = useRestoreTask(task.id);
   return (
     <>
-      <TaskHero task={task} />
-      <Banners task={task} />
+      <TaskHero task={task} focus={focus} onArchive={() => setConfirming('archive')} />
+      <Banners
+        task={task}
+        restoreRef={restoreButton}
+        onRestore={() => setConfirming('restore')}
+      />
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
         <div className="flex min-w-0 flex-col gap-6">
           <BriefSection task={task} />
@@ -93,12 +123,36 @@ function TaskView({ task }: { task: TaskDetail }) {
           <LinksSection task={task} />
         </div>
       </div>
+      <ConfirmDialog
+        open={confirming !== null}
+        onClose={() => setConfirming(null)}
+        title={t(`tasks.${shownConfirm}.title`, { title: task.title })}
+        body={t(`tasks.${shownConfirm}.body`)}
+        action={t(`tasks.actions.${shownConfirm}`)}
+        destructive={shownConfirm === 'archive'}
+        pending={archive.isPending || restore.isPending}
+        // Archived: "restore" in the notice; restored: the moves or the menu.
+        finalFocus={() => focusTarget(focus, 'menu')}
+        onConfirm={async () => {
+          if (shownConfirm === 'archive') await archive.mutateAsync(undefined);
+          else await restore.mutateAsync(undefined);
+          toast.add({ title: t(`tasks.${shownConfirm}.done`), type: 'success' });
+        }}
+      />
     </>
   );
 }
 
 /** Who does what by when, with the moves the caller may make now. */
-function TaskHero({ task }: { task: TaskDetail }) {
+function TaskHero({
+  task,
+  focus,
+  onArchive,
+}: {
+  task: TaskDetail;
+  focus: TaskFocus;
+  onArchive: () => void;
+}) {
   const { t } = useTranslation();
   const departmentName = useDepartmentNames();
   const archived = task.archivedAt !== null;
@@ -148,7 +202,9 @@ function TaskHero({ task }: { task: TaskDetail }) {
             )}
           </p>
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-2xl font-bold">{task.title}</h1>
+            <h1 ref={focus.heading} tabIndex={-1} className="text-2xl font-bold">
+              {task.title}
+            </h1>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <TaskStatusBadge status={task.status} stage={task.reviewStage} />
@@ -162,7 +218,7 @@ function TaskHero({ task }: { task: TaskDetail }) {
             {archived && <TaskArchivedBadge />}
           </div>
         </div>
-        <TaskActions task={task} />
+        <TaskActions task={task} focus={focus} onArchive={onArchive} />
       </div>
       <dl className="grid gap-4 border-t border-border pt-5 text-sm sm:grid-cols-2 lg:grid-cols-4">
         <Fact label={t('tasks.page.assignee')}>
@@ -208,10 +264,34 @@ function Fact({ label, children }: { label: string; children: ReactNode }) {
 }
 
 /** Cancelled, archived, read-only and medical-stage tasks say so above everything else. */
-function Banners({ task }: { task: TaskDetail }) {
+function Banners({
+  task,
+  restoreRef,
+  onRestore,
+}: {
+  task: TaskDetail;
+  restoreRef: RefObject<HTMLButtonElement | null>;
+  onRestore: () => void;
+}) {
   const { t } = useTranslation();
   const me = useMe();
-  if (task.archivedAt) return <ArchivedCallout task={task} />;
+  if (task.archivedAt) {
+    return (
+      <Callout
+        icon={<ArchiveIcon />}
+        title={t('tasks.page.archivedTitle')}
+        description={t('tasks.page.archivedBody')}
+        action={
+          task.permissions.canArchive && (
+            <Button ref={restoreRef} variant="outline" size="sm" onClick={onRestore}>
+              <ArchiveRestoreIcon />
+              {t('tasks.actions.restore')}
+            </Button>
+          )
+        }
+      />
+    );
+  }
   if (task.readOnly) {
     return (
       <Callout
@@ -249,41 +329,6 @@ function Banners({ task }: { task: TaskDetail }) {
           : t('tasks.page.cancelledBody')
       }
     />
-  );
-}
-
-function ArchivedCallout({ task }: { task: TaskDetail }) {
-  const { t } = useTranslation();
-  const restore = useRestoreTask(task.id);
-  const [confirming, setConfirming] = useState(false);
-  return (
-    <>
-      <Callout
-        icon={<ArchiveIcon />}
-        title={t('tasks.page.archivedTitle')}
-        description={t('tasks.page.archivedBody')}
-        action={
-          task.permissions.canArchive && (
-            <Button variant="outline" size="sm" onClick={() => setConfirming(true)}>
-              <ArchiveRestoreIcon />
-              {t('tasks.actions.restore')}
-            </Button>
-          )
-        }
-      />
-      <ConfirmDialog
-        open={confirming}
-        onClose={() => setConfirming(false)}
-        title={t('tasks.restore.title', { title: task.title })}
-        body={t('tasks.restore.body')}
-        action={t('tasks.actions.restore')}
-        pending={restore.isPending}
-        onConfirm={async () => {
-          await restore.mutateAsync(undefined);
-          toast.add({ title: t('tasks.restore.done'), type: 'success' });
-        }}
-      />
-    </>
   );
 }
 

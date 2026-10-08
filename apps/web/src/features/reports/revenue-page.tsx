@@ -131,43 +131,41 @@ function ByClient({ report }: { report: RevenueReport }) {
   const { t } = useTranslation();
   if (report.byClient.length === 0) return <Empty />;
   return (
-    <div className="overflow-hidden rounded-lg border border-border bg-surface">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>{t('reports.revenue.client')}</TableHead>
-            <TableHead>{t('reports.revenue.accountManager')}</TableHead>
-            <TableHead className="text-end">{t('reports.revenue.invoiced')}</TableHead>
-            <TableHead className="text-end">{t('reports.revenue.collected')}</TableHead>
-            <TableHead className="text-end">{t('reports.revenue.outstanding')}</TableHead>
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>{t('reports.revenue.client')}</TableHead>
+          <TableHead>{t('reports.revenue.accountManager')}</TableHead>
+          <TableHead className="text-end">{t('reports.revenue.invoiced')}</TableHead>
+          <TableHead className="text-end">{t('reports.revenue.collected')}</TableHead>
+          <TableHead className="text-end">{t('reports.revenue.outstanding')}</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {report.byClient.map((row) => (
+          <TableRow key={row.client.id}>
+            <TableCell>
+              <Link
+                to="/clients/$clientId"
+                params={{ clientId: row.client.id }}
+                search={{ tab: 'invoices' }}
+                className="font-medium hover:underline"
+              >
+                {row.client.name}
+              </Link>
+            </TableCell>
+            <TableCell>
+              {row.accountManager?.name ?? (
+                <span className="text-muted-foreground">{t('common.none')}</span>
+              )}
+            </TableCell>
+            <UsdCell minor={row.invoicedUsdMinor} />
+            <UsdCell minor={row.collectedUsdMinor} />
+            <UsdCell minor={row.outstandingUsdMinor} />
           </TableRow>
-        </TableHeader>
-        <TableBody>
-          {report.byClient.map((row) => (
-            <TableRow key={row.client.id}>
-              <TableCell>
-                <Link
-                  to="/clients/$clientId"
-                  params={{ clientId: row.client.id }}
-                  search={{ tab: 'invoices' }}
-                  className="font-medium hover:underline"
-                >
-                  {row.client.name}
-                </Link>
-              </TableCell>
-              <TableCell>
-                {row.accountManager?.name ?? (
-                  <span className="text-muted-foreground">{t('common.none')}</span>
-                )}
-              </TableCell>
-              <UsdCell minor={row.invoicedUsdMinor} />
-              <UsdCell minor={row.collectedUsdMinor} />
-              <UsdCell minor={row.outstandingUsdMinor} />
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
+        ))}
+      </TableBody>
+    </Table>
   );
 }
 
@@ -176,38 +174,36 @@ function ByService({ report }: { report: RevenueReport }) {
   const { t } = useTranslation();
   if (report.byService.length === 0) return <Empty />;
   return (
-    <div className="overflow-hidden rounded-lg border border-border bg-surface">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>{t('reports.revenue.service')}</TableHead>
-            <TableHead className="text-end">{t('reports.revenue.invoiced')}</TableHead>
-            <TableHead className="text-end">{t('reports.revenue.collected')}</TableHead>
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>{t('reports.revenue.service')}</TableHead>
+          <TableHead className="text-end">{t('reports.revenue.invoiced')}</TableHead>
+          <TableHead className="text-end">{t('reports.revenue.collected')}</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {report.byService.map((row) => (
+          <TableRow key={row.id ?? 'unclassified'}>
+            <TableCell>
+              {row.kind === 'unclassified' ? (
+                <span className="text-muted-foreground">{t('reports.revenue.unclassified')}</span>
+              ) : (
+                <span className="flex flex-wrap items-center gap-2">
+                  <span className="font-medium">{row.name}</span>
+                  {row.kind === 'package' && (
+                    <Badge tone="info">{t('reports.revenue.package')}</Badge>
+                  )}
+                  {row.archived && <Badge tone="neutral">{t('reports.revenue.archived')}</Badge>}
+                </span>
+              )}
+            </TableCell>
+            <UsdCell minor={row.invoicedUsdMinor} />
+            <UsdCell minor={row.collectedUsdMinor} />
           </TableRow>
-        </TableHeader>
-        <TableBody>
-          {report.byService.map((row) => (
-            <TableRow key={row.id ?? 'unclassified'}>
-              <TableCell>
-                {row.kind === 'unclassified' ? (
-                  <span className="text-muted-foreground">{t('reports.revenue.unclassified')}</span>
-                ) : (
-                  <span className="flex flex-wrap items-center gap-2">
-                    <span className="font-medium">{row.name}</span>
-                    {row.kind === 'package' && (
-                      <Badge tone="info">{t('reports.revenue.package')}</Badge>
-                    )}
-                    {row.archived && <Badge tone="neutral">{t('reports.revenue.archived')}</Badge>}
-                  </span>
-                )}
-              </TableCell>
-              <UsdCell minor={row.invoicedUsdMinor} />
-              <UsdCell minor={row.collectedUsdMinor} />
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
+        ))}
+      </TableBody>
+    </Table>
   );
 }
 

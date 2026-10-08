@@ -3,15 +3,14 @@ import { Link } from '@tanstack/react-router';
 import type { ApprovalItemKind, PostDetail, TaskDetail } from '@vertex-hub/contracts';
 import { Button, Callout } from '@vertex-hub/ui';
 import { ArrowLeftIcon, LinkIcon, ShieldAlertIcon } from 'lucide-react';
-import { type ReactNode, useState } from 'react';
+import { type ReactNode, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LoadError } from '../../components/load-error';
 import { formatDateTime } from '../../lib/format';
 import { TaskSection } from '../tasks/task-parts';
 import { RequestStateBadge } from './approval-parts';
 import { approvalReadyQuery, approvalRequestQuery } from './approvals.queries';
-import type { RequestDraft } from './ready-tab';
-import { RequestDialog } from './request-dialog';
+import { RequestDialog, type RequestDraft, useRequestDialog } from './request-dialog';
 
 /**
  * The Client approval panel of the task page (spec F09, screen 5): the link the task waits in,
@@ -59,30 +58,28 @@ function ApprovalPanel({
   canSend: boolean;
 }) {
   const { t } = useTranslation();
-  // Kept while the dialog is open: the item stops being ready once its link exists.
-  const [draft, setDraft] = useState<RequestDraft | null>(null);
+  const panel = useRef<HTMLDivElement>(null);
+  // Once sent, "Create approval link" gives way to the pending link and "Open request".
+  const request = useRequestDialog(
+    () => panel.current?.querySelector<HTMLElement>('a, button') ?? null,
+  );
   const sends = canSend && clientId !== null;
-  if (!pending && !sends && !draft) return null;
+  if (!pending && !sends && !request.dialog.draft) return null;
   return (
     <TaskSection title={t('tasks.approval.title')}>
-      {pending && <PendingLink kind={kind} pending={pending} />}
-      {sends && clientId && (
-        <SendAction
-          kind={kind}
-          itemId={itemId}
-          clientId={clientId}
-          resend={pending !== null}
-          onCreate={setDraft}
-        />
-      )}
-      {draft && (
-        <RequestDialog
-          client={draft.client}
-          tasks={draft.tasks}
-          posts={draft.posts}
-          onClose={() => setDraft(null)}
-        />
-      )}
+      <div ref={panel} className="contents">
+        {pending && <PendingLink kind={kind} pending={pending} />}
+        {sends && clientId && (
+          <SendAction
+            kind={kind}
+            itemId={itemId}
+            clientId={clientId}
+            resend={pending !== null}
+            onCreate={request.open}
+          />
+        )}
+      </div>
+      <RequestDialog {...request.dialog} />
     </TaskSection>
   );
 }

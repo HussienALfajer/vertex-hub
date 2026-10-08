@@ -89,7 +89,7 @@ export function invoiceHtml(
   const rows = snapshot.lines
     .map(
       (line) => `<tr>
-        <td><div class="description">${escapeHtml(line.description)}</div></td>
+        <td><div class="description">${textLines(line.description)}</div></td>
         <td class="num">${line.quantity}</td>
         <td class="num">${formatMoney(line.unitPriceMinor, currency)}</td>
         <td class="num">${formatMoney(line.totalMinor, currency)}</td>

@@ -97,7 +97,7 @@ export function ContentPage({ search }: { search: ContentSearch }) {
           <MyPosts />
         </TabsContent>
       </Tabs>
-      {creating && <NewPostDialog defaultDate={state.date} onClose={() => setCreating(false)} />}
+      <NewPostDialog open={creating} defaultDate={state.date} onClose={() => setCreating(false)} />
     </>
   );
 }

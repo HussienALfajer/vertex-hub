@@ -29,12 +29,13 @@ import {
   toast,
 } from '@vertex-hub/ui';
 import { GavelIcon, MessageSquareWarningIcon } from 'lucide-react';
-import { useId, useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import { Controller, useForm, useWatch } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { FormAlert } from '../../components/form-alert';
 import { errorMessage, fieldError, SCREEN_ERROR } from '../../lib/errors';
 import { formatDateTime, formatNumber } from '../../lib/format';
+import { useShownWhileClosing } from '../../lib/use-shown-while-closing';
 import { TaskSection } from './task-parts';
 import { useDecideRevision } from './tasks.queries';
 
@@ -47,11 +48,15 @@ const REVISION_TONES = { client: 'warning', internal: 'neutral', medical: 'info'
 export function RevisionsSection({ task }: { task: TaskDetail }) {
   const { t } = useTranslation();
   const [deciding, setDeciding] = useState<TaskRevision | null>(null);
+  // The revision stays while the dialog fades out; its "decide" button leaves with the decision.
+  const shownDeciding = useShownWhileClosing(deciding);
+  const heading = useRef<HTMLHeadingElement>(null);
   const history = [...task.revisionHistory].reverse();
   const canDecide = task.permissions.canDecideRevision && !task.readOnly;
   return (
     <TaskSection
       title={t('tasks.revisions.title')}
+      headingRef={heading}
       count={
         task.client
           ? t('tasks.revisionsCount', {
@@ -115,8 +120,14 @@ export function RevisionsSection({ task }: { task: TaskDetail }) {
           ))}
         </ol>
       )}
-      {deciding && (
-        <DecisionDialog task={task} revision={deciding} onClose={() => setDeciding(null)} />
+      {canDecide && shownDeciding && (
+        <DecisionDialog
+          task={task}
+          revision={shownDeciding}
+          open={deciding !== null}
+          onClose={() => setDeciding(null)}
+          finalFocus={() => heading.current ?? true}
+        />
       )}
     </TaskSection>
   );
@@ -151,23 +162,32 @@ function Decision({ revision }: { revision: TaskRevision }) {
 function DecisionDialog({
   task,
   revision,
+  open,
   onClose,
+  finalFocus,
 }: {
   task: TaskDetail;
   revision: TaskRevision;
+  open: boolean;
   onClose: () => void;
+  finalFocus: () => HTMLElement | true;
 }) {
   const { t } = useTranslation();
   const ids = { decision: useId(), note: useId() };
   const decide = useDecideRevision(task.id);
   const [failure, setFailure] = useState<string | null>(null);
+  const engagement = task.project ?? task.retainer;
+  // Extra work needs a project or retainer to be logged on (rule 10).
+  const defaults: RevisionDecisionInput = {
+    decision: engagement ? 'extra_work' : 'free',
+    note: '',
+  };
   const form = useForm<RevisionDecisionInput>({
     resolver: standardSchemaResolver(revisionDecisionInputSchema),
-    defaultValues: { decision: 'extra_work', note: '' },
+    defaultValues: defaults,
   });
   const decision = useWatch({ control: form.control, name: 'decision' });
   const noteError = form.formState.errors.note;
-  const engagement = task.project ?? task.retainer;
 
   const submit = form.handleSubmit(async (values) => {
     setFailure(null);
@@ -189,8 +209,17 @@ function DecisionDialog({
   });
 
   return (
-    <Dialog open onOpenChange={(next) => !next && onClose()}>
-      <DialogContent closeLabel={t('common.close')}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => !next && onClose()}
+      // After the exit animation, so the reason does not empty while the dialog fades.
+      onOpenChangeComplete={(next) => {
+        if (next) return;
+        form.reset(defaults);
+        setFailure(null);
+      }}
+    >
+      <DialogContent closeLabel={t('common.close')} finalFocus={finalFocus}>
         <form className="grid gap-5" onSubmit={submit} noValidate>
           <DialogHeader>
             <DialogTitle>

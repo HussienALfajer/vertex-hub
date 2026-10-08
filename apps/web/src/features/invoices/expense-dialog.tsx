@@ -13,6 +13,7 @@ import { Controller, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { MoneyInput } from '../../components/money-input';
 import { errorMessage } from '../../lib/errors';
+import { rateInput, rateText } from '../../lib/money';
 import { ChoiceSelect } from '../quotes/choice-select';
 import { FormDialog } from '../quotes/quote-dialogs';
 import { RateHint, validRate } from './invoice-dialogs';
@@ -62,7 +63,7 @@ export function ExpenseDialog({
         description: expense.description,
         amountMinor: expense.amountMinor,
         currency: expense.currency,
-        sypPerUsd: expense.sypPerUsd,
+        sypPerUsd: rateText(expense.sypPerUsd),
         note: expense.note ?? '',
       }
     : {
@@ -70,7 +71,7 @@ export function ExpenseDialog({
         description: '',
         amountMinor: null,
         currency: projectCurrency,
-        sypPerUsd: settings.data?.sypPerUsd ?? '',
+        sypPerUsd: rateText(settings.data?.sypPerUsd ?? null),
         note: '',
       };
   const form = useForm<ExpenseValues>({ values: defaults });
@@ -102,7 +103,8 @@ export function ExpenseDialog({
       description: values.description,
       amountMinor: values.amountMinor ?? 0,
       currency: values.currency,
-      sypPerUsd: values.sypPerUsd.trim(),
+      // Arabic-Indic digits and the Arabic decimal mark are read as typed on an Arabic keyboard.
+      sypPerUsd: rateInput(values.sypPerUsd),
       note: values.note.trim() || null,
     };
     try {
@@ -207,7 +209,7 @@ export function ExpenseDialog({
             inputMode="decimal"
             autoComplete="off"
             className="tabular-nums"
-            {...form.register('sypPerUsd', { validate: (value) => validRate(value.trim()) })}
+            {...form.register('sypPerUsd', { validate: (value) => validRate(rateInput(value)) })}
           />
           {!expense && <RateHint settings={settings.data} />}
           <FieldError match={!!errors.sypPerUsd}>{t('invoices.rate.invalid')}</FieldError>

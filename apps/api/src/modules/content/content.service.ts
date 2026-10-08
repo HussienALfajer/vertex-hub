@@ -349,7 +349,7 @@ export class ContentService {
         throw new CodedException(
           409,
           'POST_LOCKED',
-          `These fields do not change on a ${post.status} post`,
+          `These fields do not change on a post in ${post.status}`,
         );
       }
       if (
@@ -407,6 +407,11 @@ export class ContentService {
     const copyId = await this.db.transaction(async (tx) => {
       const source = await readablePost(tx, this.clients, actor, id);
       const client = await this.activeClient(tx, actor, source.clientId);
+      // A copy is a new post: never in the past, as on create.
+      const publishDate = input.publishDate ?? source.publishDate;
+      if (publishDate < businessDate()) {
+        throw new CodedException(400, 'INVALID_DATES', 'The publish date is in the past');
+      }
       const [copy] = await tx
         .insert(contentPosts)
         .values({
@@ -417,7 +422,7 @@ export class ContentService {
           caption: source.caption,
           hashtags: source.hashtags,
           notes: source.notes,
-          publishDate: input.publishDate ?? source.publishDate,
+          publishDate,
           publishTime: source.publishTime,
           needsClientApproval: source.needsClientApproval,
           responsibleId: actor.id,

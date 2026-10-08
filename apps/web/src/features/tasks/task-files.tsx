@@ -1,12 +1,13 @@
 import { useQuery } from '@tanstack/react-query';
 import type { FileItem, FileVersion, TaskDetail } from '@vertex-hub/contracts';
-import { Badge, Button, cn, Skeleton, Switch, toast } from '@vertex-hub/ui';
+import { Badge, Button, cn, IconButton, Skeleton, Switch, toast } from '@vertex-hub/ui';
 import { ArchiveRestoreIcon, LockIcon, PlusIcon, XIcon } from 'lucide-react';
-import { type ReactNode, useId, useState } from 'react';
+import { type ReactNode, type RefObject, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LoadError } from '../../components/load-error';
 import { errorMessage } from '../../lib/errors';
 import { businessDay, formatCalendarDate, formatNumber } from '../../lib/format';
+import { useFocusAfterChange } from '../../lib/use-focus-after-change';
 import { AddFilesDialog, useFileItemActions } from '../files/file-dialogs';
 import { type FileItemActions, FileItemCard, OpenButton } from '../files/file-item-card';
 import { FileThumbnail, latestVersion, RemovedBadge } from '../files/file-parts';
@@ -37,12 +38,25 @@ export function TaskFilesSection({ task }: { task: TaskDetail }) {
     }),
   );
   const [adding, setAdding] = useState<'deliverable' | 'reference' | null>(null);
-  const { actions, dialogs } = useFileItemActions(owner, { allowLink: true });
+  // A removed file leaves with the menu that removed it: the focus goes to the section heading.
+  const heading = useRef<HTMLHeadingElement>(null);
+  const addButtons = {
+    deliverable: useRef<HTMLButtonElement>(null),
+    reference: useRef<HTMLButtonElement>(null),
+  };
+  const { actions, dialogs } = useFileItemActions(owner, {
+    allowLink: true,
+    afterItemRemoved: heading,
+  });
 
   const total = task.fileCounts.deliverables + task.fileCounts.references;
   const rights = files.data?.rights;
   const deliverables = files.data?.items.filter((item) => item.role === 'deliverable') ?? [];
   const references = files.data?.items.filter((item) => item.role === 'reference') ?? [];
+  // The list refreshes after a dialog gave the focus back to a control the change replaced (a
+  // restore swaps its button for "remove").
+  const removedCount = files.data?.items.filter((item) => item.archivedAt !== null).length ?? 0;
+  useFocusAfterChange(`${files.data?.items.length ?? 0}:${removedCount}`, () => heading.current);
   // Rule 10: the final marker is set by hand on an approved or delivered task.
   const finalMarkable = task.status === 'approved' || task.status === 'delivered';
   const snapshot = reviewSnapshot(task);
@@ -66,6 +80,7 @@ export function TaskFilesSection({ task }: { task: TaskDetail }) {
   return (
     <TaskSection
       title={t('tasks.files.title')}
+      headingRef={heading}
       count={total > 0 ? formatNumber(total) : undefined}
       action={
         rights?.canSeeRemoved && (
@@ -96,7 +111,12 @@ export function TaskFilesSection({ task }: { task: TaskDetail }) {
             count={deliverables.length}
             action={
               rights?.canAddDeliverable && (
-                <Button variant="ghost" size="sm" onClick={() => setAdding('deliverable')}>
+                <Button
+                  ref={addButtons.deliverable}
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setAdding('deliverable')}
+                >
                   <PlusIcon />
                   {t('tasks.files.addDeliverable')}
                 </Button>
@@ -124,7 +144,12 @@ export function TaskFilesSection({ task }: { task: TaskDetail }) {
             count={references.length}
             action={
               rights?.canAddReference && (
-                <Button variant="ghost" size="sm" onClick={() => setAdding('reference')}>
+                <Button
+                  ref={addButtons.reference}
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setAdding('reference')}
+                >
                   <PlusIcon />
                   {t('tasks.files.addReferences')}
                 </Button>
@@ -149,6 +174,7 @@ export function TaskFilesSection({ task }: { task: TaskDetail }) {
           withNote
           allowLink
           onClose={() => setAdding(null)}
+          finalFocus={() => focusOr(addButtons.deliverable, heading)}
         />
       )}
       {adding === 'reference' && (
@@ -158,12 +184,19 @@ export function TaskFilesSection({ task }: { task: TaskDetail }) {
           title={t('tasks.files.addReferencesTitle')}
           description={t('tasks.files.addReferencesBody')}
           onClose={() => setAdding(null)}
+          finalFocus={() => focusOr(addButtons.reference, heading)}
         />
       )}
       {dialogs}
     </TaskSection>
   );
 }
+
+/** The button that opened a dialog, or the heading when the change took it off the page. */
+const focusOr = (
+  button: RefObject<HTMLElement | null>,
+  heading: RefObject<HTMLElement | null>,
+): HTMLElement | true => (button.current?.isConnected ? button.current : heading.current) ?? true;
 
 function Group({
   title,
@@ -242,22 +275,18 @@ function ReferenceGrid({ items, actions }: { items: FileItem[]; actions: FileIte
               <div className="ms-auto flex items-center">
                 <OpenButton version={version} name={item.name} />
                 {!removed && item.permissions.canRemove && (
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    aria-label={t('common.remove', { label: item.name })}
+                  <IconButton
+                    label={t('common.remove', { label: item.name })}
                     onClick={() =>
                       actions.onRemove({ kind: 'item', id: item.id, label: item.name })
                     }
                   >
                     <XIcon />
-                  </Button>
+                  </IconButton>
                 )}
                 {removed && item.permissions.canRestore && (
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    aria-label={t('files.restoreNamed', { name: item.name })}
+                  <IconButton
+                    label={t('files.restoreNamed', { name: item.name })}
                     disabled={restore.isPending}
                     onClick={() =>
                       restore
@@ -269,7 +298,7 @@ function ReferenceGrid({ items, actions }: { items: FileItem[]; actions: FileIte
                     }
                   >
                     <ArchiveRestoreIcon />
-                  </Button>
+                  </IconButton>
                 )}
               </div>
             </div>

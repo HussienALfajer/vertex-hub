@@ -67,9 +67,13 @@ export function textLines(text: string): string {
     .join('<br>');
 }
 
-/** A `dl.meta` entry; `num` for dates and numbers, which read left to right. */
+/**
+ * A `dl.meta` entry; `num` for dates and numbers, which read left to right. Other values (a billing
+ * address with a phone, a payment reference of digits) print line by line as `textLines` does.
+ */
 export function metaItem(label: string, value: string, options: { num?: boolean } = {}): string {
-  return `<div><dt>${label}</dt><dd${options.num ? ' class="num"' : ''}>${escapeHtml(value)}</dd></div>`;
+  const shown = options.num ? escapeHtml(value) : textLines(value);
+  return `<div><dt>${label}</dt><dd${options.num ? ' class="num"' : ''}>${shown}</dd></div>`;
 }
 
 const STYLES = `

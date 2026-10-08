@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { BRAND_FILE_KINDS } from './clients.js';
+import { calendarMonthSchema } from './dates.js';
 import { pageQuerySchema, pageSchema, queryBooleanSchema } from './lists.js';
 import { httpUrlSchema, optionalText } from './text.js';
 
@@ -429,7 +430,7 @@ export const fileItemPageSchema = pageSchema(fileDocumentSchema).meta({
 
 export type FileItemPage = z.infer<typeof fileItemPageSchema>;
 
-export const fileMonthSchema = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/);
+export const fileMonthSchema = calendarMonthSchema;
 
 export const fileLibraryQuerySchema = pageQuerySchema.extend({
   clientId: z.uuid(),

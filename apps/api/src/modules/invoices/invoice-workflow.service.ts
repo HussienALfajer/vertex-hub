@@ -140,6 +140,10 @@ export class InvoiceWorkflowService {
       if (input.dueOn < today || (invoice.issuedOn && input.dueOn < invoice.issuedOn)) {
         throw new CodedException(400, 'INVALID_DATES', 'The due date is in the past');
       }
+      // The same date is no change: no audit entry and no new version of the PDF.
+      if (input.dueOn === invoice.dueOn) {
+        return { detail: await this.invoices.toDetail(actor, invoice, client, tx), row: null };
+      }
       const status = invoiceStatus({ ...invoice, dueOn: input.dueOn, today });
       const snapshot = invoice.snapshot
         ? { ...(invoice.snapshot as InvoiceSnapshot), dueOn: input.dueOn }
@@ -160,7 +164,7 @@ export class InvoiceWorkflowService {
       });
       return { detail: await this.invoices.toDetail(actor, updated, client, tx), row: updated };
     });
-    await this.afterRender(row, null);
+    if (row) await this.afterRender(row, null);
     return detail;
   }
 

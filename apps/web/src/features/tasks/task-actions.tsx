@@ -36,6 +36,7 @@ import {
   FieldDescription,
   FieldError,
   FieldLabel,
+  IconButton,
   Select,
   SelectContent,
   SelectItem,
@@ -64,12 +65,12 @@ import {
   UndoIcon,
   UserRoundCogIcon,
 } from 'lucide-react';
-import { useId, useState } from 'react';
+import { type ComponentProps, type RefObject, useId, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
-import { ConfirmDialog } from '../../components/confirm-dialog';
 import { FormAlert } from '../../components/form-alert';
 import { errorMessage, fieldError, SCREEN_ERROR } from '../../lib/errors';
+import { useShownWhileClosing } from '../../lib/use-shown-while-closing';
 import { clientQuery } from '../clients/clients.queries';
 import { TaskStatusBadge } from './task-badges';
 import {
@@ -87,7 +88,7 @@ import {
   useDepartments,
 } from './task-form';
 import { type MedicalDecision, MedicalReviewDialog } from './task-review';
-import { useArchiveTask, useChangeTaskStatus, useUpdateTask } from './tasks.queries';
+import { useChangeTaskStatus, useUpdateTask } from './tasks.queries';
 
 /** Icons that point along the reading direction, so they mirror in RTL (brand §6). */
 export const MIRRORED_ICONS: ReadonlySet<LucideIcon> = new Set([
@@ -181,17 +182,79 @@ export function targetsOf(task: TaskDetail): Target[] {
   });
 }
 
+type FinalFocus = ComponentProps<typeof DialogContent>['finalFocus'];
+
+/**
+ * The task page's controls that take the focus when an action removes the one that held it: a
+ * move swaps the header's buttons, an archive swaps them for the notice's "restore".
+ */
+export interface TaskFocus {
+  heading: RefObject<HTMLHeadingElement | null>;
+  /** The header's buttons; the first move (`data-move`) takes the focus after another move. */
+  actions: RefObject<HTMLDivElement | null>;
+  menu: RefObject<HTMLButtonElement | null>;
+  restore: RefObject<HTMLButtonElement | null>;
+}
+
+/**
+ * The first of these controls still on the page: "restore" on an archived task, then the first
+ * move and the menu (the menu first after a menu action), else the heading.
+ */
+export function focusTarget(focus: TaskFocus, first: 'move' | 'menu' = 'move'): HTMLElement | true {
+  const move = focus.actions.current?.querySelector<HTMLElement>('[data-move]') ?? null;
+  const order = first === 'menu' ? [focus.menu.current, move] : [move, focus.menu.current];
+  for (const element of [focus.restore.current, ...order]) {
+    if (element?.isConnected) return element;
+  }
+  return focus.heading.current ?? true;
+}
+
+type ActionDialog = Target | 'edit' | 'reassign';
+
 /**
  * The header's actions: the workflow moves the caller may make now (`allowedTransitions`), then
  * edit, reassign, cancel and archive in a menu. The API enforces every rule; a move that became
- * stale answers `INVALID_TRANSITION` and the page reloads (edge case 1).
+ * stale answers `INVALID_TRANSITION` and the page reloads (edge case 1). Every dialog stays
+ * mounted, so it fades out and gives the focus back: to the button that opened it, or the control
+ * that replaced it.
  */
-export function TaskActions({ task }: { task: TaskDetail }) {
+export function TaskActions({
+  task,
+  focus,
+  onArchive,
+}: {
+  task: TaskDetail;
+  focus: TaskFocus;
+  /** The confirmation lives on the page: the menu leaves with the archive. */
+  onArchive: () => void;
+}) {
   const { t } = useTranslation();
   const change = useChangeTaskStatus(task.id);
-  const [dialog, setDialog] = useState<Target | 'edit' | 'reassign' | 'archive' | null>(null);
+  const [dialog, setDialog] = useState<ActionDialog | null>(null);
   const [medical, setMedical] = useState<MedicalDecision | null>(null);
+  // The dialog's content stays while it fades out after closing.
+  const shownDialog = useShownWhileClosing(dialog);
+  const shownMedical = useShownWhileClosing(medical);
+  // The button that opened a dialog; a menu item is gone once its menu closes.
+  const opener = useRef<{ element: HTMLElement | null; fromMenu: boolean }>({
+    element: null,
+    fromMenu: false,
+  });
   if (task.readOnly) return null;
+
+  function open(next: ActionDialog, fromMenu = false) {
+    opener.current = { element: document.activeElement as HTMLElement | null, fromMenu };
+    setDialog(next);
+  }
+  function openMedical(decision: MedicalDecision) {
+    opener.current = { element: document.activeElement as HTMLElement | null, fromMenu: false };
+    setMedical(decision);
+  }
+  const finalFocus: FinalFocus = () => {
+    const { element, fromMenu } = opener.current;
+    if (!fromMenu && element?.isConnected && element !== document.body) return element;
+    return focusTarget(focus, fromMenu ? 'menu' : 'move');
+  };
 
   const targets = targetsOf(task);
   const moves = targets.filter((target) => target.move !== 'cancel');
@@ -201,7 +264,7 @@ export function TaskActions({ task }: { task: TaskDetail }) {
 
   async function run(target: Target) {
     if (needsDialog(task, target)) {
-      setDialog(target);
+      open(target);
       return;
     }
     try {
@@ -213,14 +276,14 @@ export function TaskActions({ task }: { task: TaskDetail }) {
   }
 
   return (
-    <div className="flex shrink-0 flex-wrap items-center gap-2">
+    <div ref={focus.actions} className="flex shrink-0 flex-wrap items-center gap-2">
       {canMedicalReview && (
         <>
-          <Button onClick={() => setMedical('approve')}>
+          <Button data-move onClick={() => openMedical('approve')}>
             <StethoscopeIcon />
             {t('tasks.medical.approve')}
           </Button>
-          <Button variant="outline" onClick={() => setMedical('return')}>
+          <Button data-move variant="outline" onClick={() => openMedical('return')}>
             <UndoIcon className="rtl:-scale-x-100" />
             {t('tasks.medical.return')}
           </Button>
@@ -231,8 +294,11 @@ export function TaskActions({ task }: { task: TaskDetail }) {
         return (
           <Button
             key={target.to}
+            data-move
             variant={BACKWARD.includes(target.move) ? 'outline' : 'primary'}
             disabled={change.isPending}
+            // It may leave with the move: focusable, so the focus is not dropped meanwhile.
+            focusableWhenDisabled
             onClick={() => run(target)}
           >
             <Icon className={MIRRORED_ICONS.has(Icon) ? 'rtl:-scale-x-100' : undefined} />
@@ -243,25 +309,32 @@ export function TaskActions({ task }: { task: TaskDetail }) {
       {menu && (
         <DropdownMenu>
           <DropdownMenuTrigger
-            render={<Button variant="outline" size="icon" aria-label={t('tasks.actions.more')} />}
+            render={
+              <IconButton
+                ref={focus.menu}
+                variant="outline"
+                size="icon"
+                label={t('tasks.actions.more')}
+              />
+            }
           >
             <EllipsisIcon />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             {canEdit && (
-              <DropdownMenuItem onClick={() => setDialog('edit')}>
+              <DropdownMenuItem onClick={() => open('edit', true)}>
                 <PencilIcon />
                 {t('tasks.actions.edit')}
               </DropdownMenuItem>
             )}
             {canAssign && (
-              <DropdownMenuItem onClick={() => setDialog('reassign')}>
+              <DropdownMenuItem onClick={() => open('reassign', true)}>
                 <UserRoundCogIcon />
                 {t('tasks.actions.reassign')}
               </DropdownMenuItem>
             )}
             {cancel && (
-              <DropdownMenuItem variant="destructive" onClick={() => setDialog(cancel)}>
+              <DropdownMenuItem variant="destructive" onClick={() => open(cancel, true)}>
                 <BanIcon />
                 {t('tasks.moves.cancel')}
               </DropdownMenuItem>
@@ -269,7 +342,7 @@ export function TaskActions({ task }: { task: TaskDetail }) {
             {canArchive && (
               <>
                 {(canEdit || canAssign || cancel) && <DropdownMenuSeparator />}
-                <DropdownMenuItem variant="destructive" onClick={() => setDialog('archive')}>
+                <DropdownMenuItem variant="destructive" onClick={onArchive}>
                   <ArchiveIcon />
                   {t('tasks.actions.archive')}
                 </DropdownMenuItem>
@@ -278,15 +351,42 @@ export function TaskActions({ task }: { task: TaskDetail }) {
           </DropdownMenuContent>
         </DropdownMenu>
       )}
-      {typeof dialog === 'object' && dialog !== null && (
-        <MoveDialog task={task} target={dialog} onClose={() => setDialog(null)} />
+      {typeof shownDialog === 'object' && shownDialog !== null && (
+        <MoveDialog
+          key={shownDialog.move}
+          task={task}
+          target={shownDialog}
+          open={dialog === shownDialog}
+          onClose={() => setDialog(null)}
+          finalFocus={finalFocus}
+        />
       )}
-      {medical && (
-        <MedicalReviewDialog task={task} decision={medical} onClose={() => setMedical(null)} />
+      {shownMedical && (
+        <MedicalReviewDialog
+          key={shownMedical}
+          task={task}
+          decision={shownMedical}
+          open={medical !== null}
+          onClose={() => setMedical(null)}
+          finalFocus={finalFocus}
+        />
       )}
-      {dialog === 'edit' && <EditTaskDialog task={task} onClose={() => setDialog(null)} />}
-      {dialog === 'reassign' && <ReassignDialog task={task} onClose={() => setDialog(null)} />}
-      <ArchiveDialog task={task} open={dialog === 'archive'} onClose={() => setDialog(null)} />
+      {shownDialog === 'edit' && (
+        <EditTaskDialog
+          task={task}
+          open={dialog === 'edit'}
+          onClose={() => setDialog(null)}
+          finalFocus={finalFocus}
+        />
+      )}
+      {shownDialog === 'reassign' && (
+        <ReassignDialog
+          task={task}
+          open={dialog === 'reassign'}
+          onClose={() => setDialog(null)}
+          finalFocus={finalFocus}
+        />
+      )}
     </div>
   );
 }
@@ -298,14 +398,19 @@ export function TaskActions({ task }: { task: TaskDetail }) {
 export function MoveDialog({
   task,
   target,
+  open,
   onClose,
+  finalFocus,
 }: {
   task: TaskDetail;
   target: Target;
+  open: boolean;
   onClose: () => void;
+  finalFocus: FinalFocus;
 }) {
   const { t } = useTranslation();
   const ids = { note: useId(), reason: useId(), contact: useId() };
+  const contactTrigger = useRef<HTMLButtonElement>(null);
   const change = useChangeTaskStatus(task.id);
   const [failure, setFailure] = useState<string | null>(null);
   const { move } = target;
@@ -357,14 +462,18 @@ export function MoveDialog({
 
   const submit = form.handleSubmit(async (values) => {
     setFailure(null);
-    if (needsNote && !values.note) {
+    // Every missing field says so; the first one in the dialog takes the focus.
+    const missingNote = needsNote && !values.note;
+    const missingContact = needsContact && !values.contactId;
+    if (missingNote) {
       form.setError('note', { type: SCREEN_ERROR, message: t(`tasks.move.errors.${noteKind}`) });
-      return;
     }
-    if (needsContact && !values.contactId) {
+    if (missingContact) {
       form.setError('contactId', { type: SCREEN_ERROR, message: t('tasks.move.errors.contact') });
-      return;
     }
+    if (missingNote) form.setFocus('note');
+    else if (missingContact) contactTrigger.current?.focus();
+    if (missingNote || missingContact) return;
     try {
       const moved = await change.mutateAsync({
         ...values,
@@ -380,8 +489,17 @@ export function MoveDialog({
   });
 
   return (
-    <Dialog open onOpenChange={(next) => !next && onClose()}>
-      <DialogContent closeLabel={t('common.close')}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => !next && onClose()}
+      // After the exit animation, so the note does not empty while the dialog fades.
+      onOpenChangeComplete={(next) => {
+        if (next) return;
+        form.reset();
+        setFailure(null);
+      }}
+    >
+      <DialogContent closeLabel={t('common.close')} finalFocus={finalFocus}>
         <form className="grid gap-5" onSubmit={submit} noValidate>
           <DialogHeader>
             <DialogTitle>{t(`tasks.move.${move}.title`, { title: task.title })}</DialogTitle>
@@ -434,7 +552,7 @@ export function MoveDialog({
                   form.clearErrors('contactId');
                 }}
               >
-                <SelectTrigger aria-labelledby={ids.contact}>
+                <SelectTrigger ref={contactTrigger} aria-labelledby={ids.contact}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -477,11 +595,48 @@ export function MoveDialog({
   );
 }
 
+/** The edit form's values for the task as saved. */
+function editValues(task: TaskDetail): CreateTaskInput {
+  const request = task.clientRequest;
+  return {
+    type: task.type,
+    title: task.title,
+    brief: task.brief ?? '',
+    department: task.department,
+    assigneeId: task.assignee?.id ?? null,
+    priority: task.priority,
+    dueDate: task.dueDate,
+    dueTime: task.dueTime,
+    clientId: task.client?.id ?? null,
+    projectId: task.project?.id ?? null,
+    milestoneId: task.milestone?.id ?? null,
+    retainerCycleId: task.cycle?.id ?? null,
+    cycleLineId: task.cycleLine?.id ?? null,
+    needsClientApproval: task.needsClientApproval,
+    revisionLimit: task.revisions.limit,
+    ...(request && {
+      requestedByContactId: request.contact?.id ?? null,
+      requestedOn: request.requestedOn,
+      requestScope: request.scope,
+    }),
+  };
+}
+
 /**
  * The task's own fields as one form: what, when, for which client and engagement. Only changed
  * fields are sent; the assignee and department have their own dialog.
  */
-function EditTaskDialog({ task, onClose }: { task: TaskDetail; onClose: () => void }) {
+function EditTaskDialog({
+  task,
+  open,
+  onClose,
+  finalFocus,
+}: {
+  task: TaskDetail;
+  open: boolean;
+  onClose: () => void;
+  finalFocus: FinalFocus;
+}) {
   const { t } = useTranslation();
   const update = useUpdateTask(task.id);
   const [failure, setFailure] = useState<string | null>(null);
@@ -494,28 +649,9 @@ function EditTaskDialog({ task, onClose }: { task: TaskDetail; onClose: () => vo
   const request = task.clientRequest;
   const form = useForm<CreateTaskInput, unknown, CreateTask>({
     resolver: standardSchemaResolver(createTaskSchema),
-    defaultValues: {
-      type: task.type,
-      title: task.title,
-      brief: task.brief ?? '',
-      department: task.department,
-      assigneeId: task.assignee?.id ?? null,
-      priority: task.priority,
-      dueDate: task.dueDate,
-      dueTime: task.dueTime,
-      clientId: task.client?.id ?? null,
-      projectId: task.project?.id ?? null,
-      milestoneId: task.milestone?.id ?? null,
-      retainerCycleId: task.cycle?.id ?? null,
-      cycleLineId: task.cycleLine?.id ?? null,
-      needsClientApproval: task.needsClientApproval,
-      revisionLimit: task.revisions.limit,
-      ...(request && {
-        requestedByContactId: request.contact?.id ?? null,
-        requestedOn: request.requestedOn,
-        requestScope: request.scope,
-      }),
-    },
+    // Another person's save shows here; what the user typed is kept while the dialog is open.
+    values: editValues(task),
+    resetOptions: { keepDirtyValues: true },
   });
   const submit = form.handleSubmit(async (values) => {
     setFailure(null);
@@ -539,8 +675,13 @@ function EditTaskDialog({ task, onClose }: { task: TaskDetail; onClose: () => vo
       ...(dirty.requestedOn && values.requestedOn && { requestedOn: values.requestedOn }),
       ...(dirty.requestScope && values.requestScope && { requestScope: values.requestScope }),
     };
+    // Nothing changed: nothing to send, and nothing to announce.
+    if (Object.keys(changes).length === 0) {
+      onClose();
+      return;
+    }
     try {
-      if (Object.keys(changes).length > 0) await update.mutateAsync(changes);
+      await update.mutateAsync(changes);
       toast.add({ title: t('tasks.edit.saved'), type: 'success' });
       onClose();
     } catch (error) {
@@ -549,8 +690,17 @@ function EditTaskDialog({ task, onClose }: { task: TaskDetail; onClose: () => vo
   });
 
   return (
-    <Dialog open onOpenChange={(next) => !next && onClose()}>
-      <DialogContent closeLabel={t('common.close')} className="max-w-2xl">
+    <Dialog
+      open={open}
+      onOpenChange={(next) => !next && onClose()}
+      // After the exit animation: unsaved edits are dropped (`keepDirtyValues` is not applied).
+      onOpenChangeComplete={(next) => {
+        if (next) return;
+        form.reset(editValues(task), { keepDirtyValues: false });
+        setFailure(null);
+      }}
+    >
+      <DialogContent closeLabel={t('common.close')} className="max-w-2xl" finalFocus={finalFocus}>
         <form className="grid gap-5" onSubmit={submit} noValidate>
           <DialogHeader>
             <DialogTitle>{t('tasks.edit.title')}</DialogTitle>
@@ -598,7 +748,17 @@ const UNASSIGNED = 'unassigned';
  * Assign scope moves the task to someone else or another department (rule 6): leaving it
  * unassigned puts it in the department's queue.
  */
-function ReassignDialog({ task, onClose }: { task: TaskDetail; onClose: () => void }) {
+function ReassignDialog({
+  task,
+  open,
+  onClose,
+  finalFocus,
+}: {
+  task: TaskDetail;
+  open: boolean;
+  onClose: () => void;
+  finalFocus: FinalFocus;
+}) {
   const { t } = useTranslation();
   const ids = { department: useId(), assignee: useId() };
   const update = useUpdateTask(task.id);
@@ -624,8 +784,13 @@ function ReassignDialog({ task, onClose }: { task: TaskDetail; onClose: () => vo
       setFailure(t('errors.generic'));
       return;
     }
+    // Nothing changed: nothing to send.
+    if (Object.keys(parsed.data).length === 0) {
+      onClose();
+      return;
+    }
     try {
-      if (Object.keys(parsed.data).length > 0) await update.mutateAsync(parsed.data);
+      await update.mutateAsync(parsed.data);
       toast.add({ title: t('tasks.reassign.done'), type: 'success' });
       onClose();
     } catch (error) {
@@ -634,8 +799,18 @@ function ReassignDialog({ task, onClose }: { task: TaskDetail; onClose: () => vo
   }
 
   return (
-    <Dialog open onOpenChange={(next) => !next && onClose()}>
-      <DialogContent closeLabel={t('common.close')}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => !next && onClose()}
+      // After the exit animation, back to the task's current department and assignee.
+      onOpenChangeComplete={(next) => {
+        if (next) return;
+        setDepartment(task.department);
+        setAssigneeId(task.assignee?.id ?? UNASSIGNED);
+        setFailure(null);
+      }}
+    >
+      <DialogContent closeLabel={t('common.close')} finalFocus={finalFocus}>
         <div className="grid gap-5">
           <DialogHeader>
             <DialogTitle>{t('tasks.reassign.title')}</DialogTitle>
@@ -706,33 +881,5 @@ function ReassignDialog({ task, onClose }: { task: TaskDetail; onClose: () => vo
         </div>
       </DialogContent>
     </Dialog>
-  );
-}
-
-function ArchiveDialog({
-  task,
-  open,
-  onClose,
-}: {
-  task: TaskDetail;
-  open: boolean;
-  onClose: () => void;
-}) {
-  const { t } = useTranslation();
-  const archive = useArchiveTask(task.id);
-  return (
-    <ConfirmDialog
-      open={open}
-      onClose={onClose}
-      title={t('tasks.archive.title', { title: task.title })}
-      body={t('tasks.archive.body')}
-      action={t('tasks.actions.archive')}
-      destructive
-      pending={archive.isPending}
-      onConfirm={async () => {
-        await archive.mutateAsync(undefined);
-        toast.add({ title: t('tasks.archive.done'), type: 'success' });
-      }}
-    />
   );
 }

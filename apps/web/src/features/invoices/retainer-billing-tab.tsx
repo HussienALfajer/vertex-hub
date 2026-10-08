@@ -23,7 +23,7 @@ import {
   toast,
 } from '@vertex-hub/ui';
 import { HandCoinsIcon, ReceiptTextIcon, SparklesIcon } from 'lucide-react';
-import { useId, useState } from 'react';
+import { type RefObject, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FormAlert } from '../../components/form-alert';
 import { LoadError } from '../../components/load-error';
@@ -70,6 +70,16 @@ function RetainerBillingView({
   const canInvoice = can(me, 'invoices.manage') && !billing.retainer.archived;
   const { currency } = billing.retainer;
   const none = <span className="text-muted-foreground">{t('common.none')}</span>;
+  const chargesHeading = useRef<HTMLHeadingElement>(null);
+  // C5: a later month's draft takes a pending credit; without one it is owed to the client (C9).
+  const laterMonthTakes = (credit: RetainerCharge) =>
+    billing.charges.some(
+      (charge) =>
+        charge.kind === 'monthly' &&
+        charge.status === 'pending' &&
+        !charge.invoice &&
+        charge.month > credit.month,
+    );
 
   return (
     <div className="flex flex-col gap-6">
@@ -82,7 +92,7 @@ function RetainerBillingView({
         )}
       </p>
 
-      <BillingSection title={t('invoices.billing.charges')}>
+      <BillingSection title={t('invoices.billing.charges')} headingRef={chargesHeading}>
         {billing.charges.length === 0 ? (
           <EmptyState
             icon={<ReceiptTextIcon />}
@@ -147,7 +157,9 @@ function RetainerBillingView({
                       </span>
                     ) : charge.kind === 'credit' && charge.due && !charge.invoice ? (
                       <span className="font-medium text-status-gold-foreground">
-                        {t('invoices.billing.creditOwed')}
+                        {laterMonthTakes(charge)
+                          ? t('invoices.billing.creditNextMonth')
+                          : t('invoices.billing.creditOwed')}
                       </span>
                     ) : !charge.due ? (
                       <span className="text-muted-foreground">{t('invoices.billing.notDue')}</span>
@@ -169,7 +181,11 @@ function RetainerBillingView({
                             />
                           )}
                           {charge.kind === 'credit' && billing.canSettleCredits && (
-                            <SettleDialog retainerId={billing.retainer.id} charge={charge} />
+                            <SettleDialog
+                              retainerId={billing.retainer.id}
+                              charge={charge}
+                              fallback={chargesHeading}
+                            />
                           )}
                         </span>
                       )}
@@ -239,10 +255,21 @@ function RetainerBillingView({
 }
 
 /** F05B C9: a pending credit refunded or settled outside the system, with a note. */
-function SettleDialog({ retainerId, charge }: { retainerId: string; charge: RetainerCharge }) {
+function SettleDialog({
+  retainerId,
+  charge,
+  fallback,
+}: {
+  retainerId: string;
+  charge: RetainerCharge;
+  /** The settled credit's button leaves: the charges' heading takes the focus. */
+  fallback: RefObject<HTMLElement | null>;
+}) {
   const { t } = useTranslation();
   const id = useId();
   const settle = useSettleCharge(retainerId);
+  const openButton = useRef<HTMLButtonElement>(null);
+  const noteRef = useRef<HTMLTextAreaElement>(null);
   const [open, setOpen] = useState(false);
   const [note, setNote] = useState('');
   const [missing, setMissing] = useState(false);
@@ -253,6 +280,7 @@ function SettleDialog({ retainerId, charge }: { retainerId: string; charge: Reta
     setFailure(null);
     if (!note.trim()) {
       setMissing(true);
+      noteRef.current?.focus();
       return;
     }
     try {
@@ -267,6 +295,7 @@ function SettleDialog({ retainerId, charge }: { retainerId: string; charge: Reta
   return (
     <>
       <Button
+        ref={openButton}
         variant="outline"
         size="sm"
         onClick={() => {
@@ -280,7 +309,12 @@ function SettleDialog({ retainerId, charge }: { retainerId: string; charge: Reta
         {t('invoices.billing.settle')}
       </Button>
       <Dialog open={open} onOpenChange={(next) => !next && setOpen(false)}>
-        <DialogContent closeLabel={t('common.close')}>
+        <DialogContent
+          closeLabel={t('common.close')}
+          finalFocus={() =>
+            openButton.current?.isConnected ? openButton.current : (fallback.current ?? true)
+          }
+        >
           <form className="grid gap-5" onSubmit={submit} noValidate>
             <DialogHeader>
               <DialogTitle>{t('invoices.billing.settleTitle')}</DialogTitle>
@@ -289,6 +323,7 @@ function SettleDialog({ retainerId, charge }: { retainerId: string; charge: Reta
             <Field invalid={missing}>
               <FieldLabel htmlFor={id}>{t('invoices.billing.settleNote')}</FieldLabel>
               <Textarea
+                ref={noteRef}
                 id={id}
                 rows={2}
                 maxLength={300}

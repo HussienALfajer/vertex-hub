@@ -31,7 +31,7 @@ import {
   toast,
 } from '@vertex-hub/ui';
 import { FileTextIcon, HourglassIcon } from 'lucide-react';
-import { useId, useState } from 'react';
+import { type ComponentProps, useId, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { FormAlert } from '../../components/form-alert';
@@ -64,6 +64,8 @@ interface SendEmailDialogProps {
   draft: ClientEmailDraft;
   /** Null for the emails without one (ad budget notice). */
   attachment: EmailAttachment | null;
+  /** The button that opened it: a dialog without a trigger gives the focus back only so. */
+  finalFocus?: ComponentProps<typeof DialogContent>['finalFocus'];
 }
 
 /**
@@ -71,12 +73,18 @@ interface SendEmailDialogProps {
  * with an email, with copies to the account manager and the sender, and a subject and message
  * prefilled from the kind's template.
  */
-export function SendEmailDialog({ open, onClose, clientId, ...props }: SendEmailDialogProps) {
+export function SendEmailDialog({
+  open,
+  onClose,
+  clientId,
+  finalFocus,
+  ...props
+}: SendEmailDialogProps) {
   const { t } = useTranslation();
   const client = useQuery({ ...clientQuery(clientId), enabled: open });
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
-      <DialogContent closeLabel={t('common.close')} className="max-w-2xl">
+      <DialogContent closeLabel={t('common.close')} finalFocus={finalFocus} className="max-w-2xl">
         {client.isPending ? (
           <div className="flex flex-col gap-4">
             <Skeleton className="h-6 w-56" />
@@ -105,7 +113,7 @@ function EmailForm({
   attachment,
   onReload,
   onClose,
-}: Omit<SendEmailDialogProps, 'open' | 'clientId'> & {
+}: Omit<SendEmailDialogProps, 'open' | 'clientId' | 'finalFocus'> & {
   client: ClientDetailResponse;
   onReload: () => void;
 }) {

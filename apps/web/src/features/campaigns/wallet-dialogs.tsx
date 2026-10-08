@@ -30,14 +30,16 @@ import {
   RefreshCwIcon,
   TriangleAlertIcon,
 } from 'lucide-react';
-import { useId, useState } from 'react';
+import { type ComponentProps, useId, useRef, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { MoneyInput } from '../../components/money-input';
 import { can, useMe } from '../../lib/auth';
 import { errorMessage } from '../../lib/errors';
+import { useFocusFirstError } from '../../lib/focus-first-invalid';
 import { isolateLtr } from '../../lib/format';
-import { formatMoney } from '../../lib/money';
+import { formatMoney, rateInput, rateText } from '../../lib/money';
+import { useShownWhileClosing } from '../../lib/use-shown-while-closing';
 import { latestVersion } from '../files/file-parts';
 import { fileContentUrl, fileItemsQuery } from '../files/files.queries';
 import { type Proof, ProofField } from '../files/proof-field';
@@ -53,6 +55,8 @@ import {
   useUpdateWalletThreshold,
   useVoidWalletEntry,
 } from './campaigns.queries';
+
+type FinalFocus = ComponentProps<typeof FormDialog>['finalFocus'];
 
 interface EntryValues {
   occurredOn: string;
@@ -70,36 +74,44 @@ interface EntryValues {
  */
 export function WalletEntryDialog({
   wallet,
+  open,
   kind,
   onClose,
+  finalFocus,
 }: {
   wallet: AdWallet;
-  /** The entry to record; null keeps the dialog closed. */
-  kind: AdWalletEntryKind | null;
+  open: boolean;
+  /** The entry to record, kept while the dialog fades out. */
+  kind: AdWalletEntryKind;
   onClose: () => void;
+  /** The button that opened it. */
+  finalFocus: FinalFocus;
 }) {
   const { t } = useTranslation();
   const me = useMe();
   const ids = { amount: useId(), currency: useId(), method: useId() };
   const record = useRecordWalletEntry(wallet.client.id);
-  const open = kind !== null;
   const settings = useQuery({ ...invoiceSettingsQuery, enabled: open && can(me, 'invoices.read') });
   const today = businessDate();
   const defaults: EntryValues = {
     occurredOn: today,
     amountMinor: null,
     currency: 'USD',
-    sypPerUsd: settings.data?.sypPerUsd ?? '',
+    sypPerUsd: rateText(settings.data?.sypPerUsd ?? null),
     method: null,
     reference: '',
     note: '',
   };
-  const form = useForm<EntryValues>({ values: defaults });
+  // The first invalid field takes the focus, selects included (they register no element).
+  const form = useForm<EntryValues>({ values: defaults, shouldFocusError: false });
+  const fields = useRef<HTMLDivElement>(null);
+  useFocusFirstError(form.formState.submitCount, fields);
   const [proof, setProof] = useState<Proof | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
   const { errors } = form.formState;
   const [currency, amount, rawRate] = form.watch(['currency', 'amountMinor', 'sypPerUsd']);
-  const rate = rawRate.trim();
+  // Arabic-Indic digits and the Arabic decimal mark are read as typed on an Arabic keyboard.
+  const rate = rateInput(rawRate);
   // In SYP the rate converts the amount; without a current rate the API has none to fall back on
   // (`RATE_REQUIRED`, edge case 6).
   const showRate = currency === 'SYP' || !settings.data?.sypPerUsd;
@@ -111,17 +123,9 @@ export function WalletEntryDialog({
   const balanceAfter = usd === null ? null : wallet.balanceMinor + (refund ? -usd : usd);
   const exceeds = refund && usd !== null && usd > wallet.balanceMinor;
 
-  function close() {
-    setFailure(null);
-    proof?.controller?.abort();
-    setProof(null);
-    form.reset(defaults);
-    onClose();
-  }
-
   const submit = form.handleSubmit(async (values) => {
     setFailure(null);
-    if (!kind || exceeds) return;
+    if (exceeds) return;
     if (proof && !proof.uploadId) {
       setFailure(t('campaigns.entry.proofWaiting'));
       return;
@@ -149,7 +153,7 @@ export function WalletEntryDialog({
         title: refund ? t('campaigns.entry.refunded') : t('campaigns.entry.deposited'),
         type: 'success',
       });
-      close();
+      onClose();
     } catch (error) {
       setFailure(errorMessage(t, error));
     }
@@ -167,7 +171,15 @@ export function WalletEntryDialog({
   return (
     <FormDialog
       open={open}
-      onClose={close}
+      onClose={onClose}
+      // Reset once it has faded out, so nothing typed is kept for the next opening.
+      onClosed={() => {
+        setFailure(null);
+        proof?.controller?.abort();
+        setProof(null);
+        form.reset(defaults);
+      }}
+      finalFocus={finalFocus}
       submitting={form.formState.isSubmitting}
       title={refund ? t('campaigns.entry.refundTitle') : t('campaigns.entry.depositTitle')}
       description={t(refund ? 'campaigns.entry.refundHint' : 'campaigns.entry.depositHint', {
@@ -177,146 +189,153 @@ export function WalletEntryDialog({
       failure={failure}
       onSubmit={submit}
     >
-      <div className="grid gap-5 sm:grid-cols-2">
-        <Field invalid={!!errors.occurredOn}>
-          <FieldLabel>{t('campaigns.entry.occurredOn')}</FieldLabel>
-          <Input
-            type="date"
-            max={today}
-            {...form.register('occurredOn', { validate: (day) => !!day && day <= today })}
-          />
-          <FieldError match={!!errors.occurredOn}>
-            {t('campaigns.entry.errors.occurredOn')}
-          </FieldError>
-        </Field>
-        <Controller
-          control={form.control}
-          name="currency"
-          render={({ field }) => (
-            <Field>
-              <FieldLabel id={ids.currency} render={<span />}>
-                {t('campaigns.entry.currency')}
-              </FieldLabel>
-              <ChoiceSelect
-                labelledBy={ids.currency}
-                items={currencyItems}
-                value={field.value}
-                onChange={(next) => {
-                  field.onChange(next);
-                  form.setValue('amountMinor', null);
-                }}
-              />
-            </Field>
-          )}
-        />
-        <Controller
-          control={form.control}
-          name="amountMinor"
-          rules={{ validate: (minor) => !!minor && minor > 0 }}
-          render={({ field }) => (
-            <Field invalid={!!errors.amountMinor}>
-              <FieldLabel htmlFor={ids.amount}>{t('campaigns.entry.amount')}</FieldLabel>
-              <MoneyInput
-                id={ids.amount}
-                currency={currency}
-                value={field.value}
-                onValueChange={field.onChange}
-              />
-              <FieldError match={!!errors.amountMinor}>
-                {t('campaigns.entry.errors.amount')}
-              </FieldError>
-            </Field>
-          )}
-        />
-        {showRate && (
-          <Field invalid={!!errors.sypPerUsd}>
-            <FieldLabel>{t('invoices.rate.label')}</FieldLabel>
+      <div ref={fields} className="contents">
+        <div className="grid gap-5 sm:grid-cols-2">
+          <Field invalid={!!errors.occurredOn}>
+            <FieldLabel>{t('campaigns.entry.occurredOn')}</FieldLabel>
             <Input
+              type="date"
               dir="ltr"
-              inputMode="decimal"
-              autoComplete="off"
-              className="tabular-nums"
-              {...form.register('sypPerUsd', { validate: (value) => validRate(value) })}
+              max={today}
+              {...form.register('occurredOn', { validate: (day) => !!day && day <= today })}
             />
-            <RateHint settings={settings.data} />
-            <FieldError match={!!errors.sypPerUsd}>{t('invoices.rate.invalid')}</FieldError>
+            <FieldError match={!!errors.occurredOn}>
+              {t('campaigns.entry.errors.occurredOn')}
+            </FieldError>
           </Field>
-        )}
-      </div>
-      {showRate && <StaleRate settings={settings.data} />}
-      {usd !== null && (
-        <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 rounded-lg border border-border p-3 text-sm">
-          {currency !== 'USD' && (
-            <>
-              <dt className="text-muted-foreground">{t('campaigns.entry.usd')}</dt>
-              <dd>
-                <Money minor={usd} currency="USD" />
-              </dd>
-            </>
-          )}
-          {balanceAfter !== null && (
-            <>
-              <dt className="text-muted-foreground">{t('campaigns.entry.balanceAfter')}</dt>
-              <dd className="font-bold">
-                <Money
-                  minor={balanceAfter}
-                  currency="USD"
-                  className={balanceAfter < 0 ? 'text-destructive-text' : undefined}
+          <Controller
+            control={form.control}
+            name="currency"
+            render={({ field }) => (
+              <Field>
+                <FieldLabel id={ids.currency} render={<span />}>
+                  {t('campaigns.entry.currency')}
+                </FieldLabel>
+                <ChoiceSelect
+                  labelledBy={ids.currency}
+                  items={currencyItems}
+                  value={field.value}
+                  onChange={(next) => {
+                    field.onChange(next);
+                    form.setValue('amountMinor', null);
+                  }}
                 />
-              </dd>
-            </>
-          )}
-        </dl>
-      )}
-      {exceeds && (
-        <Callout
-          tone="danger"
-          icon={<TriangleAlertIcon />}
-          title={t('campaigns.entry.exceedsTitle')}
-          description={t('errors.REFUND_EXCEEDS_BALANCE')}
-        />
-      )}
-      <div className="grid gap-5 sm:grid-cols-2">
-        <Controller
-          control={form.control}
-          name="method"
-          rules={{ validate: (method) => method !== null }}
-          render={({ field }) => (
-            <Field invalid={!!errors.method}>
-              <FieldLabel id={ids.method} render={<span />}>
-                {t('campaigns.entry.method')}
-              </FieldLabel>
-              <ChoiceSelect
-                labelledBy={ids.method}
-                items={methodItems}
-                value={field.value}
-                placeholder={t('campaigns.entry.pickMethod')}
-                onChange={field.onChange}
+              </Field>
+            )}
+          />
+          <Controller
+            control={form.control}
+            name="amountMinor"
+            rules={{ validate: (minor) => !!minor && minor > 0 }}
+            render={({ field }) => (
+              <Field invalid={!!errors.amountMinor}>
+                <FieldLabel htmlFor={ids.amount}>{t('campaigns.entry.amount')}</FieldLabel>
+                <MoneyInput
+                  id={ids.amount}
+                  currency={currency}
+                  value={field.value}
+                  onValueChange={field.onChange}
+                />
+                <FieldError match={!!errors.amountMinor}>
+                  {t('campaigns.entry.errors.amount')}
+                </FieldError>
+              </Field>
+            )}
+          />
+          {showRate && (
+            <Field invalid={!!errors.sypPerUsd}>
+              <FieldLabel>{t('invoices.rate.label')}</FieldLabel>
+              <Input
+                dir="ltr"
+                inputMode="decimal"
+                autoComplete="off"
+                className="tabular-nums"
+                {...form.register('sypPerUsd', {
+                  validate: (value) => validRate(rateInput(value)),
+                })}
               />
-              <FieldError match={!!errors.method}>{t('campaigns.entry.errors.method')}</FieldError>
+              <RateHint settings={settings.data} />
+              <FieldError match={!!errors.sypPerUsd}>{t('invoices.rate.invalid')}</FieldError>
             </Field>
           )}
-        />
-        <Field invalid={!!errors.reference}>
-          <FieldLabel>{t('campaigns.entry.reference')}</FieldLabel>
-          <Input autoComplete="off" {...form.register('reference')} />
-          <FieldDescription>{t('invoices.payments.referenceHint')}</FieldDescription>
-          <FieldError match={!!errors.reference}>
-            {t('invoices.payments.errors.reference')}
-          </FieldError>
+        </div>
+        {showRate && <StaleRate settings={settings.data} />}
+        {usd !== null && (
+          <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 rounded-lg border border-border p-3 text-sm">
+            {currency !== 'USD' && (
+              <>
+                <dt className="text-muted-foreground">{t('campaigns.entry.usd')}</dt>
+                <dd>
+                  <Money minor={usd} currency="USD" />
+                </dd>
+              </>
+            )}
+            {balanceAfter !== null && (
+              <>
+                <dt className="text-muted-foreground">{t('campaigns.entry.balanceAfter')}</dt>
+                <dd className="font-bold">
+                  <Money
+                    minor={balanceAfter}
+                    currency="USD"
+                    className={balanceAfter < 0 ? 'text-destructive-text' : undefined}
+                  />
+                </dd>
+              </>
+            )}
+          </dl>
+        )}
+        {exceeds && (
+          <Callout
+            tone="danger"
+            icon={<TriangleAlertIcon />}
+            title={t('campaigns.entry.exceedsTitle')}
+            description={t('errors.REFUND_EXCEEDS_BALANCE')}
+          />
+        )}
+        <div className="grid gap-5 sm:grid-cols-2">
+          <Controller
+            control={form.control}
+            name="method"
+            rules={{ validate: (method) => method !== null }}
+            render={({ field }) => (
+              <Field invalid={!!errors.method}>
+                <FieldLabel id={ids.method} render={<span />}>
+                  {t('campaigns.entry.method')}
+                </FieldLabel>
+                <ChoiceSelect
+                  labelledBy={ids.method}
+                  items={methodItems}
+                  value={field.value}
+                  placeholder={t('campaigns.entry.pickMethod')}
+                  onChange={field.onChange}
+                />
+                <FieldError match={!!errors.method}>
+                  {t('campaigns.entry.errors.method')}
+                </FieldError>
+              </Field>
+            )}
+          />
+          <Field invalid={!!errors.reference}>
+            <FieldLabel>{t('campaigns.entry.reference')}</FieldLabel>
+            <Input autoComplete="off" {...form.register('reference')} />
+            <FieldDescription>{t('invoices.payments.referenceHint')}</FieldDescription>
+            <FieldError match={!!errors.reference}>
+              {t('invoices.payments.errors.reference')}
+            </FieldError>
+          </Field>
+        </div>
+        <Field invalid={!!errors.note}>
+          <FieldLabel>{t('campaigns.entry.note')}</FieldLabel>
+          <Textarea rows={2} {...form.register('note')} />
+          <FieldError match={!!errors.note}>{t('invoices.payments.errors.note')}</FieldError>
         </Field>
+        <ProofField
+          proof={proof}
+          onProof={setProof}
+          label={t('campaigns.entry.proof')}
+          hint={t('campaigns.entry.proofHint')}
+        />
       </div>
-      <Field invalid={!!errors.note}>
-        <FieldLabel>{t('campaigns.entry.note')}</FieldLabel>
-        <Textarea rows={2} {...form.register('note')} />
-        <FieldError match={!!errors.note}>{t('invoices.payments.errors.note')}</FieldError>
-      </Field>
-      <ProofField
-        proof={proof}
-        onProof={setProof}
-        label={t('campaigns.entry.proof')}
-        hint={t('campaigns.entry.proofHint')}
-      />
     </FormDialog>
   );
 }
@@ -326,27 +345,34 @@ export function ThresholdDialog({
   wallet,
   open,
   onClose,
+  finalFocus,
 }: {
   wallet: AdWallet;
   open: boolean;
   onClose: () => void;
+  /** The button that opened it. */
+  finalFocus: FinalFocus;
 }) {
   const { t } = useTranslation();
   const id = useId();
   const save = useUpdateWalletThreshold(wallet.client.id);
   const [value, setValue] = useState<number | null>(wallet.lowBalanceThresholdMinor);
   const [failure, setFailure] = useState<string | null>(null);
-
-  function close() {
-    setFailure(null);
-    setValue(wallet.lowBalanceThresholdMinor);
-    onClose();
+  // Each opening starts from the threshold as it is now (another manager may have changed it).
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (open) {
+      setValue(wallet.lowBalanceThresholdMinor);
+      setFailure(null);
+    }
   }
 
   return (
     <FormDialog
       open={open}
-      onClose={close}
+      onClose={onClose}
+      finalFocus={finalFocus}
       submitting={save.isPending}
       title={t('campaigns.threshold.title')}
       description={t('campaigns.threshold.hint')}
@@ -376,19 +402,26 @@ export function ThresholdDialog({
 /** Rule 18: a void deposit keeps its receipt number; its receipt is archived. */
 export function VoidEntryDialog({
   clientId,
-  entry,
+  entry: open,
   onClose,
+  finalFocus,
 }: {
   clientId: string;
+  /** The entry to void; null keeps the dialog closed. */
   entry: WalletEntry | null;
   onClose: () => void;
+  /** Where the focus goes: the entry's "void" button leaves with it. */
+  finalFocus: FinalFocus;
 }) {
   const { t } = useTranslation();
   const voiding = useVoidWalletEntry(clientId);
+  // The entry stays while the dialog fades out, so its title does not change.
+  const entry = useShownWhileClosing(open);
   return (
     <ReasonDialog
-      open={entry !== null}
+      open={open !== null}
       onClose={onClose}
+      finalFocus={finalFocus}
       title={
         entry?.receiptNumber
           ? t('campaigns.void.depositTitle', { number: entry.receiptNumber })

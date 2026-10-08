@@ -314,7 +314,7 @@ function Pulse({
                 <span className="text-2xl font-bold tabular-nums">
                   {total === undefined ? t('common.none') : formatNumber(total)}
                 </span>
-                <span className="truncate text-sm text-muted-foreground">
+                <span className="text-sm text-muted-foreground">
                   {t(`retainers.pulse.${tile.key}`)}
                 </span>
               </span>
@@ -559,7 +559,7 @@ function RetainersTable({ retainers, archived }: { retainers: Retainer[]; archiv
       <TableBody>
         {retainers.map((retainer) => (
           <TableRow key={retainer.id}>
-            <TableCell className="whitespace-normal">
+            <TableCell className="min-w-56 whitespace-normal">
               <Link
                 to="/retainers/$retainerId"
                 params={{ retainerId: retainer.id }}

@@ -126,10 +126,17 @@ export const useMedicalReviewPost = (id: string) =>
     WITH_WORK,
   );
 
-export const useDuplicatePost = (id: string) =>
-  useContentMutation((input: DuplicatePost) =>
-    call(api.POST('/api/content/posts/{id}/duplicate', { ...path(id), body: input })),
-  );
+/** The copy goes into the cache, so its page shows at once after the move to it. */
+export const useDuplicatePost = (id: string) => {
+  const queryClient = useQueryClient();
+  return useContentMutation(async (input: DuplicatePost) => {
+    const copy = await call(
+      api.POST('/api/content/posts/{id}/duplicate', { ...path(id), body: input }),
+    );
+    queryClient.setQueryData(contentKeys.detail(copy.id), copy);
+    return copy;
+  });
+};
 
 export const useArchivePost = (id: string) =>
   useContentMutation(() => call(api.POST('/api/content/posts/{id}/archive', path(id))), WITH_WORK);

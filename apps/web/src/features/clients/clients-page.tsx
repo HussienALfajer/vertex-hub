@@ -41,7 +41,7 @@ import { ALL, flagParam, idParam, listParam, pageParam, textParam } from '../../
 import { usePageInRange } from '../../lib/use-page-in-range';
 import { useSearchText } from '../../lib/use-search-text';
 import { ClientStatusBadge, HealthcareBadge, NoApprovalContactBadge } from './client-badges';
-import { clientListQuery, sectorsQuery } from './clients.queries';
+import { clientListQuery, sectorsQuery, useClientAccountManagers } from './clients.queries';
 
 export interface ClientsSearch {
   search?: string;
@@ -184,9 +184,7 @@ function Filters({
 }) {
   const { t } = useTranslation();
   const me = useMe();
-  // The users list filters by role for user managers only, so the choices come from the clients
-  // every reader can list: the account managers they actually have.
-  const everyClient = useQuery(clientListQuery({ status: [...CLIENT_STATUSES], pageSize: 100 }));
+  const managers = useClientAccountManagers();
   const sectors = useQuery(sectorsQuery);
   const [text, setText] = useSearchText(search.search, onChange);
   const isAccountManager = me.roles.includes('account_manager');
@@ -194,16 +192,7 @@ function Filters({
 
   const managerItems = [
     { value: ALL, label: t('clients.filters.allManagers') },
-    ...[
-      ...new Map(
-        (everyClient.data?.items ?? []).map(({ accountManager }) => [
-          accountManager.id,
-          accountManager.name,
-        ]),
-      ),
-    ]
-      .sort(([, a], [, b]) => a.localeCompare(b, 'ar'))
-      .map(([value, label]) => ({ value, label })),
+    ...managers.map(({ id, name }) => ({ value: id, label: name })),
   ];
   const sectorItems = [
     { value: ALL, label: t('clients.filters.allSectors') },

@@ -30,6 +30,7 @@ import {
   FieldDescription,
   FieldError,
   FieldLabel,
+  IconButton,
   Input,
   Select,
   SelectContent,
@@ -43,11 +44,15 @@ import {
   toast,
 } from '@vertex-hub/ui';
 import { FilePenLineIcon, MinusIcon, PlusIcon, ShieldAlertIcon, XIcon } from 'lucide-react';
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { FormAlert } from '../../components/form-alert';
 import { MoneyInput } from '../../components/money-input';
+import { ApiError } from '../../lib/api/client';
 import { errorMessage } from '../../lib/errors';
+import { focusAfterRemoval } from '../../lib/focus-after-removal';
+import { focusFirstInvalid } from '../../lib/focus-first-invalid';
 import { formatMonth, formatNumber, isolateLtr } from '../../lib/format';
 import { formatMoney } from '../../lib/money';
 import { DeliverableIcon, lineName } from './retainer-badges';
@@ -63,6 +68,23 @@ interface LineDraft {
 }
 
 type Direction = 'increase' | 'decrease';
+
+/** What the form shows on a field rather than above the buttons. */
+interface Problems {
+  empty?: true;
+  reason?: true;
+  /** A new line without a quantity, or "other" without a name. */
+  lines?: true;
+  /** The API refused the month or the amount (`INVALID_EFFECTIVE_MONTH`, `NEGATIVE_AMOUNT`). */
+  month?: string;
+  amount?: string;
+}
+
+/** The refusals that belong to a field: the month or the amount. */
+const FIELD_OF_CODE: Record<string, 'month' | 'amount'> = {
+  INVALID_EFFECTIVE_MONTH: 'month',
+  NEGATIVE_AMOUNT: 'amount',
+};
 
 const PREVIEW_DELAY_MS = 400;
 
@@ -82,6 +104,10 @@ export function AmendmentDialog({ retainer }: { retainer: RetainerDetail }) {
   const currency = retainer.money?.currency ?? 'USD';
   const create = useCreateAmendment(retainer.id);
   const preview = usePreviewAmendment(retainer.id);
+  const openButton = useRef<HTMLButtonElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
+  // Only the latest preview is shown: an earlier answer may arrive after a later one.
+  const previewRequest = useRef(0);
   const [open, setOpen] = useState(false);
   const [scope, setScope] = useState<AmendmentScope>('month');
   const [month, setMonth] = useState<CalendarDate>(firstOfMonth(businessDate()));
@@ -89,7 +115,7 @@ export function AmendmentDialog({ retainer }: { retainer: RetainerDetail }) {
   const [direction, setDirection] = useState<Direction>('increase');
   const [amount, setAmount] = useState<number | null>(null);
   const [reason, setReason] = useState('');
-  const [problems, setProblems] = useState<{ empty?: true; reason?: true }>({});
+  const [problems, setProblems] = useState<Problems>({});
   const [failure, setFailure] = useState<string | null>(null);
   const [shown, setShown] = useState<AmendmentPreview | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
@@ -99,7 +125,7 @@ export function AmendmentDialog({ retainer }: { retainer: RetainerDetail }) {
     scope,
     effectiveMonth: month,
     lines: lines
-      .filter((line) => line.delta !== 0)
+      .filter((line) => line.added || line.delta !== 0)
       .map((line) => ({
         kind: line.kind,
         label: line.label.trim() || null,
@@ -109,12 +135,17 @@ export function AmendmentDialog({ retainer }: { retainer: RetainerDetail }) {
     reason: reason.trim(),
   };
   const empty = body.lines.length === 0 && body.amountDeltaMinor === 0;
+  // A new line needs a quantity, and a name when its kind is "other" (A2).
+  const linesInvalid = lines.some(
+    (line) => line.added && (line.delta < 1 || (line.kind === 'other' && !line.label.trim())),
+  );
   const request = JSON.stringify({ ...body, reason: undefined });
 
   // The preview follows the form, a moment after the last change; nothing is saved.
   // biome-ignore lint/correctness/useExhaustiveDependencies: `request` stands for the body
   useEffect(() => {
-    if (!open || empty) {
+    const current = ++previewRequest.current;
+    if (!open || empty || linesInvalid) {
       setShown(null);
       setPreviewError(null);
       return;
@@ -124,10 +155,12 @@ export function AmendmentDialog({ retainer }: { retainer: RetainerDetail }) {
         { ...body, reason: body.reason || '—' },
         {
           onSuccess: (result) => {
+            if (current !== previewRequest.current) return;
             setShown(result);
             setPreviewError(null);
           },
           onError: (error) => {
+            if (current !== previewRequest.current) return;
             setShown(null);
             setPreviewError(errorMessage(t, error));
           },
@@ -164,21 +197,30 @@ export function AmendmentDialog({ retainer }: { retainer: RetainerDetail }) {
     });
   }
 
+  /** Shows the problems, then focuses the first control to fix (after the render marks it). */
+  function showProblems(next: Problems) {
+    setProblems(next);
+    setTimeout(() => focusFirstInvalid(formRef.current));
+  }
+
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     setFailure(null);
-    const next = {
+    const next: Problems = {
       ...(empty && { empty: true as const }),
+      ...(linesInvalid && { lines: true as const }),
       ...(!body.reason && { reason: true as const }),
     };
-    setProblems(next);
-    if (next.empty || next.reason) return;
+    if (Object.keys(next).length > 0) return showProblems(next);
+    setProblems({});
     try {
       const saved = await create.mutateAsync(body);
       toast.add({ title: t(`retainers.amendments.saved.${saved.status}`), type: 'success' });
       setOpen(false);
     } catch (error) {
-      setFailure(errorMessage(t, error));
+      const field = error instanceof ApiError ? FIELD_OF_CODE[error.code ?? ''] : undefined;
+      if (field) showProblems({ [field]: errorMessage(t, error) });
+      else setFailure(errorMessage(t, error));
     }
   }
 
@@ -186,13 +228,13 @@ export function AmendmentDialog({ retainer }: { retainer: RetainerDetail }) {
 
   return (
     <>
-      <Button onClick={openDialog}>
+      <Button ref={openButton} onClick={openDialog}>
         <FilePenLineIcon />
         {t('retainers.amendments.new')}
       </Button>
       <Dialog open={open} onOpenChange={(next) => !next && setOpen(false)}>
-        <DialogContent closeLabel={t('common.close')} className="max-w-2xl">
-          <form className="grid gap-5" onSubmit={submit} noValidate>
+        <DialogContent closeLabel={t('common.close')} className="max-w-2xl" finalFocus={openButton}>
+          <form ref={formRef} className="grid gap-5" onSubmit={submit} noValidate>
             <DialogHeader>
               <DialogTitle>{t('retainers.amendments.newTitle')}</DialogTitle>
               <DialogDescription>{t('retainers.amendments.newHint')}</DialogDescription>
@@ -206,7 +248,11 @@ export function AmendmentDialog({ retainer }: { retainer: RetainerDetail }) {
                 <ToggleGroup
                   aria-labelledby={ids.scope}
                   value={[scope]}
-                  onValueChange={(next: AmendmentScope[]) => next[0] && setScope(next[0])}
+                  onValueChange={(next: AmendmentScope[]) => {
+                    if (!next[0]) return;
+                    setScope(next[0]);
+                    setProblems(({ month: _, ...rest }) => rest);
+                  }}
                 >
                   {(['month', 'onward'] as const).map((value) => (
                     <ToggleGroupItem key={value} value={value}>
@@ -215,7 +261,7 @@ export function AmendmentDialog({ retainer }: { retainer: RetainerDetail }) {
                   ))}
                 </ToggleGroup>
               </Field>
-              <Field>
+              <Field invalid={!!problems.month}>
                 <FieldLabel htmlFor={ids.month}>
                   {scope === 'month'
                     ? t('retainers.amendments.month')
@@ -224,7 +270,11 @@ export function AmendmentDialog({ retainer }: { retainer: RetainerDetail }) {
                 <Select
                   items={months}
                   value={month}
-                  onValueChange={(value: CalendarDate | null) => value && setMonth(value)}
+                  onValueChange={(value: CalendarDate | null) => {
+                    if (!value) return;
+                    setMonth(value);
+                    setProblems(({ month: _, ...rest }) => rest);
+                  }}
                 >
                   <SelectTrigger id={ids.month}>
                     <SelectValue />
@@ -237,6 +287,9 @@ export function AmendmentDialog({ retainer }: { retainer: RetainerDetail }) {
                     ))}
                   </SelectContent>
                 </Select>
+                <FieldError match={!!problems.month} role="alert">
+                  {problems.month}
+                </FieldError>
               </Field>
             </div>
 
@@ -250,19 +303,21 @@ export function AmendmentDialog({ retainer }: { retainer: RetainerDetail }) {
                   { kind: 'design', label: '', delta: 1, added: true },
                 ])
               }
-              onChangeAdded={(index, patch) =>
+              onChangeAdded={(index, patch) => {
                 setLines((current) => {
                   const target = added[index];
                   return current.map((item) => (item === target ? { ...item, ...patch } : item));
-                })
-              }
+                });
+                setProblems(({ lines: _, ...rest }) => rest);
+              }}
               onRemoveAdded={(index) =>
                 setLines((current) => current.filter((item) => item !== added[index]))
               }
               canAdd={lines.length < RETAINER_LIMITS.amendmentLines}
+              invalid={!!problems.lines}
             />
 
-            <Field>
+            <Field invalid={!!problems.amount}>
               <FieldLabel htmlFor={ids.amount}>{t('retainers.amendments.amount')}</FieldLabel>
               <div className="grid gap-3 sm:grid-cols-[auto_minmax(0,1fr)]">
                 <ToggleGroup
@@ -280,7 +335,11 @@ export function AmendmentDialog({ retainer }: { retainer: RetainerDetail }) {
                   id={ids.amount}
                   currency={currency}
                   value={amount}
-                  onValueChange={setAmount}
+                  aria-invalid={!!problems.amount || undefined}
+                  onValueChange={(minor) => {
+                    setAmount(minor);
+                    setProblems(({ amount: _, ...rest }) => rest);
+                  }}
                 />
               </div>
               <FieldDescription>
@@ -288,6 +347,9 @@ export function AmendmentDialog({ retainer }: { retainer: RetainerDetail }) {
                   ? t('retainers.amendments.amountHintMonth')
                   : t('retainers.amendments.amountHintOnward')}
               </FieldDescription>
+              <FieldError match={!!problems.amount} role="alert">
+                {problems.amount}
+              </FieldError>
             </Field>
 
             <Field invalid={!!problems.reason}>
@@ -299,7 +361,7 @@ export function AmendmentDialog({ retainer }: { retainer: RetainerDetail }) {
                 value={reason}
                 onChange={(event) => {
                   setReason(event.target.value);
-                  setProblems((current) => ({ ...current, reason: undefined }));
+                  setProblems(({ reason: _, ...rest }) => rest);
                 }}
               />
               <FieldError match={!!problems.reason}>
@@ -344,6 +406,7 @@ function LinesEditor({
   onChangeAdded,
   onRemoveAdded,
   canAdd,
+  invalid,
 }: {
   standing: DeliverableLine[];
   lines: LineDraft[];
@@ -352,9 +415,20 @@ function LinesEditor({
   onChangeAdded: (index: number, patch: Partial<LineDraft>) => void;
   onRemoveAdded: (index: number) => void;
   canAdd: boolean;
+  /** A new line misses its quantity, or its name for "other". */
+  invalid: boolean;
 }) {
   const { t } = useTranslation();
   const id = useId();
+  const errorId = useId();
+  const list = useRef<HTMLUListElement>(null);
+  const addButton = useRef<HTMLButtonElement>(null);
+
+  /** A new line removed: the focus goes to the next new line's remove button, or "add a line". */
+  function removeAdded(index: number) {
+    flushSync(() => onRemoveAdded(index));
+    focusAfterRemoval(list.current, index, addButton.current);
+  }
   const kinds = DELIVERABLE_KINDS.map((kind) => ({
     value: kind,
     label: t(`retainers.kinds.${kind}`),
@@ -369,6 +443,7 @@ function LinesEditor({
         {t('retainers.amendments.lines')}
       </span>
       <ul
+        ref={list}
         aria-labelledby={id}
         className="flex flex-col divide-y divide-border rounded-lg border border-border"
       >
@@ -385,28 +460,26 @@ function LinesEditor({
                 </span>
               </span>
               <span className="flex items-center gap-2">
-                <Button
+                <IconButton
                   variant="outline"
-                  size="icon-sm"
-                  aria-label={t('retainers.amendments.decrease', { line: name })}
+                  label={t('retainers.amendments.decrease', { line: name })}
                   onClick={() => onStep(line, -1)}
                 >
                   <MinusIcon />
-                </Button>
+                </IconButton>
                 <span
                   className="w-10 text-center text-sm font-bold tabular-nums"
                   aria-live="polite"
                 >
                   {isolateLtr(delta > 0 ? `+${formatNumber(delta)}` : formatNumber(delta))}
                 </span>
-                <Button
+                <IconButton
                   variant="outline"
-                  size="icon-sm"
-                  aria-label={t('retainers.amendments.increase', { line: name })}
+                  label={t('retainers.amendments.increase', { line: name })}
                   onClick={() => onStep(line, 1)}
                 >
                   <PlusIcon />
-                </Button>
+                </IconButton>
               </span>
             </li>
           );
@@ -437,36 +510,50 @@ function LinesEditor({
             </Select>
             <Input
               aria-label={t('retainers.amendments.newLineLabel')}
-              placeholder={t('retainers.amendments.newLineLabel')}
+              aria-invalid={(invalid && line.kind === 'other' && !line.label.trim()) || undefined}
+              aria-describedby={invalid ? errorId : undefined}
+              placeholder={
+                line.kind === 'other'
+                  ? t('retainers.lines.labelRequired')
+                  : t('retainers.amendments.newLineLabel')
+              }
               maxLength={60}
               value={line.label}
               onChange={(event) => onChangeAdded(index, { label: event.target.value })}
             />
             <Input
               aria-label={t('retainers.amendments.newLineQuantity')}
+              aria-invalid={(invalid && line.delta < 1) || undefined}
+              aria-describedby={invalid ? errorId : undefined}
               type="number"
+              inputMode="numeric"
               min={1}
               max={999}
-              value={line.delta}
+              className="text-end tabular-nums"
+              value={line.delta || ''}
               onChange={(event) =>
                 onChangeAdded(index, {
-                  delta: Math.max(0, Math.trunc(Number(event.target.value) || 0)),
+                  delta: Math.min(999, Math.max(0, Math.trunc(Number(event.target.value) || 0))),
                 })
               }
             />
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              aria-label={t('retainers.amendments.removeLine')}
-              onClick={() => onRemoveAdded(index)}
+            <IconButton
+              data-focus="remove"
+              label={t('retainers.amendments.removeLine', { position: formatNumber(index + 1) })}
+              onClick={() => removeAdded(index)}
             >
               <XIcon />
-            </Button>
+            </IconButton>
           </li>
         ))}
       </ul>
+      {invalid && (
+        <p id={errorId} role="alert" className="text-sm text-destructive-text">
+          {t('retainers.amendments.errors.newLine')}
+        </p>
+      )}
       <div>
-        <Button variant="outline" size="sm" onClick={onAdd} disabled={!canAdd}>
+        <Button ref={addButton} variant="outline" size="sm" onClick={onAdd} disabled={!canAdd}>
           <PlusIcon />
           {t('retainers.amendments.addLine')}
         </Button>

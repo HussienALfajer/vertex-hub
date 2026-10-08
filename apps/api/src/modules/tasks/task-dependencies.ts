@@ -26,13 +26,16 @@ export async function lockDependencyGraph(tx: Transaction): Promise<void> {
   await tx.execute(sql`select pg_advisory_xact_lock(${7_140_016})`);
 }
 
-/** SQL over a row of `tasks`: it waits on a live dependency that is not finished (rule 3). */
-export const blockedSql = sql<boolean>`exists (
+/**
+ * SQL over a row of `tasks`: it is open and waits on a live dependency that is not finished
+ * (rule 3). A delivered or cancelled task waits on nothing, whatever its dependencies.
+ */
+export const blockedSql = sql<boolean>`("tasks"."status" not in ('delivered', 'cancelled') and exists (
   select 1 from ${taskDependencies} as d
   inner join ${tasks} as dependency on dependency.id = d.depends_on_id
   where d.task_id = "tasks"."id"
     and dependency.archived_at is null
-    and dependency.status not in ('approved', 'delivered', 'cancelled'))`;
+    and dependency.status not in ('approved', 'delivered', 'cancelled')))`;
 
 /** The ids among `taskIds` that are blocked. */
 export async function blockedIds(taskIds: string[], executor: Executor): Promise<Set<string>> {

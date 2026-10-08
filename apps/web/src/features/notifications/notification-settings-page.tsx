@@ -122,8 +122,7 @@ function SettingsForm({ settings }: { settings: NotificationSettings }) {
               .filter((item) => item.category === category)
               .map((item) => {
                 const name = t(`notifications.types.${item.type}`);
-                // A type muted in the app creates nothing to email (rule 2).
-                const emailLocked = item.mutable && muted.has(item.type);
+                const inApp = !(item.mutable && muted.has(item.type));
                 return (
                   <li key={item.type} className="flex items-center justify-between gap-4 py-3">
                     <div className="flex flex-col gap-0.5">
@@ -134,7 +133,7 @@ function SettingsForm({ settings }: { settings: NotificationSettings }) {
                           {t('notifications.settings.locked')}
                         </span>
                       )}
-                      {emailLocked && (
+                      {!inApp && (
                         <span className="text-xs text-muted-foreground">
                           {t('notifications.settings.emailLocked')}
                         </span>
@@ -143,7 +142,7 @@ function SettingsForm({ settings }: { settings: NotificationSettings }) {
                     <div className="flex gap-4">
                       <Switch
                         aria-label={t('notifications.settings.appLabel', { name })}
-                        checked={!emailLocked}
+                        checked={inApp}
                         disabled={!item.mutable || update.isPending}
                         onCheckedChange={(checked) =>
                           save({ mutedTypes: toggled(muted, item.type, !checked) })
@@ -151,8 +150,9 @@ function SettingsForm({ settings }: { settings: NotificationSettings }) {
                       />
                       <Switch
                         aria-label={t('notifications.settings.emailLabel', { name })}
-                        checked={!emailLocked && emailed.has(item.type)}
-                        disabled={emailLocked || update.isPending}
+                        // A type muted in the app creates nothing to email (rule 2).
+                        checked={inApp && emailed.has(item.type)}
+                        disabled={!inApp || update.isPending}
                         onCheckedChange={(checked) =>
                           save({
                             mutedTypes: [...muted],

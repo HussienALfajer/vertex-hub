@@ -192,12 +192,12 @@ test('the calendar filters, moves between months and keeps its state in the URL'
   await expect(page.getByRole('link', { name: /كاروسيل أطباق الخريف/ })).toHaveCount(0);
   await page.getByRole('button', { name: ar.content.filters.clear }).click();
 
-  await page.getByRole('button', { name: ar.content.calendar.next.month }).click();
+  await page.getByRole('button', { name: ar.calendar.next.month }).click();
   await expect(page).toHaveURL(/date=2026-11-01/);
   await expect(page.getByRole('link', { name: /حملة تشرين الثاني/ })).toBeVisible();
-  await page.getByRole('button', { name: ar.content.calendar.next.month }).click();
+  await page.getByRole('button', { name: ar.calendar.next.month }).click();
   await expect(page.getByText(ar.content.calendar.emptyTitle)).toBeVisible();
-  await page.getByRole('button', { name: ar.content.calendar.today }).click();
+  await page.getByRole('button', { name: ar.calendar.today }).click();
   await expect(page.getByRole('link', { name: /كاروسيل أطباق الخريف/ })).toBeVisible();
 
   // My posts: nothing waits for a user who is responsible for no post.
