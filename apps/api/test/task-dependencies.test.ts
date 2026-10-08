@@ -195,6 +195,43 @@ describe('task dependencies (rules 3, 4, 5)', () => {
     expect((await cast.detail(waiting.id, cast.gm.cookie)).blocked).toBe(true);
   });
 
+  it('never shows a delivered or cancelled task as blocked', async () => {
+    const { id: clientId } = await cast.createClient();
+    const dependency = await cast.taskAt('delivered', { clientId });
+    const delivered = await cast.taskAt('delivered', { clientId, dependsOn: [dependency.id] });
+    await cast.moveOk(dependency.id, cast.designManager.cookie, {
+      status: 'in_progress',
+      note: 'One more change',
+    });
+    const cancelled = await cast.createTask(cast.am.cookie, {
+      clientId,
+      dependsOn: [dependency.id],
+    });
+    expect(cancelled.blocked).toBe(true);
+    await cast.moveOk(cancelled.id, cast.designManager.cookie, {
+      status: 'cancelled',
+      note: 'Dropped',
+    });
+
+    for (const id of [delivered.id, cancelled.id]) {
+      expect((await cast.detail(id, cast.gm.cookie)).blocked, id).toBe(false);
+    }
+    const finished = `/api/tasks?clientId=${clientId}&status=delivered&status=cancelled`;
+    const list = async (query: string) =>
+      taskPageSchema.parse(await (await client.get(`${finished}${query}`, cast.gm.cookie)).json())
+        .items;
+    expect((await list('')).map((t) => [t.id, t.blocked])).toEqual(
+      expect.arrayContaining([
+        [delivered.id, false],
+        [cancelled.id, false],
+      ]),
+    );
+    expect((await list('&blocked=true')).map((t) => t.id)).toEqual([]);
+    expect((await list('&blocked=false')).map((t) => t.id)).toEqual(
+      expect.arrayContaining([delivered.id, cancelled.id]),
+    );
+  });
+
   it('never lets two concurrent edits close a cycle between them (rule 4, edge case 2)', async () => {
     const { id: clientId } = await cast.createClient();
     const [a, b, c, d] = await Promise.all(

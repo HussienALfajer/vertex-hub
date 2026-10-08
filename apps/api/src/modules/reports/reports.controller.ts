@@ -56,6 +56,8 @@ export class ReportsController {
   @RequirePermissions('reports.read')
   @ApiProduces(XLSX_MIME_TYPE)
   @ApiOkResponse({ description: 'The productivity report as an Excel file (rule 24)' })
+  @ApiBadRequestResponse({ description: '`INVALID_DATES`: to before from, or over 366 days' })
+  @ApiForbiddenResponse({ description: 'A department outside your `reports.read` scope' })
   async productivityExport(
     @CurrentUser() actor: CurrentUserInfo,
     @Query({ schema: productivityQuerySchema }) query: ProductivityQuery,
@@ -85,6 +87,7 @@ export class ReportsController {
   @RequirePermissions('reports.finance')
   @ApiProduces(XLSX_MIME_TYPE)
   @ApiOkResponse({ description: 'The revenue report as an Excel file with three sheets (rule 15)' })
+  @ApiBadRequestResponse({ description: '`INVALID_DATES`: to before from, or over 366 days' })
   async revenueExport(
     @Query({ schema: revenueQuerySchema }) query: RevenueQuery,
     @Res() response: ServerResponse,

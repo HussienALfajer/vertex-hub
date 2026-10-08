@@ -28,7 +28,8 @@ export function SourceInvoiceCell({ invoice }: { invoice: SourceInvoice | null }
           t('invoices.draftNumber')
         )}
       </Link>
-      <InvoiceStatusBadge status={invoice.status} />
+      {/* A draft has no number yet: its link already says "draft". */}
+      {invoice.displayNumber && <InvoiceStatusBadge status={invoice.status} />}
     </span>
   );
 }

@@ -6,7 +6,7 @@ import {
   type InvoiceDetail,
   type Payment,
 } from '@vertex-hub/contracts';
-import { Button } from '@vertex-hub/ui';
+import { Button, IconButton } from '@vertex-hub/ui';
 import { BellRingIcon, MailIcon } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -84,14 +84,12 @@ export function ReceiptEmailButton({
   if (!invoice.displayNumber) return null;
   return (
     <>
-      <Button
-        variant="ghost"
-        size="icon-sm"
-        aria-label={t('invoices.email.receiptOf', { number: payment.receiptNumber })}
+      <IconButton
+        label={t('invoices.email.receiptOf', { number: payment.receiptNumber })}
         onClick={() => setOpen(true)}
       >
         <MailIcon />
-      </Button>
+      </IconButton>
       <SendEmailDialog
         open={open}
         onClose={() => setOpen(false)}

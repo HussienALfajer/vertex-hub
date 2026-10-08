@@ -1,6 +1,7 @@
 import type { ComponentProps, ReactNode } from 'react';
 import { AscentLines } from '../brand/ascent-lines';
 import { cn } from '../lib/cn';
+import { IconTile } from './icon-tile';
 
 interface EmptyStateProps extends Omit<ComponentProps<'div'>, 'title'> {
   icon?: ReactNode;
@@ -23,9 +24,9 @@ function EmptyState({ icon, title, description, action, className, ...props }: E
       <AscentLines className="absolute inset-y-0 end-0 hidden h-full w-16 text-border sm:block" />
       <AscentLines className="absolute inset-y-0 start-0 hidden h-full w-16 text-border sm:block" />
       {icon && (
-        <div className="relative flex size-12 items-center justify-center rounded-lg bg-muted text-muted-foreground [&_svg]:size-6">
+        <IconTile size="lg" className="relative">
           {icon}
-        </div>
+        </IconTile>
       )}
       <p className="relative max-w-sm text-lg font-bold">{title}</p>
       {description && (

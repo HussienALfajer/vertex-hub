@@ -291,6 +291,24 @@ describe('acceptQuoteSchema', () => {
     ).toMatchObject({ departments: ['design'] });
   });
 
+  it('takes an optional term on a new or renewed retainer (F05B Q1, Q2)', () => {
+    const renew = { mode: 'renew', retainerId: pkg, templateId: null };
+    expect(
+      acceptQuoteSchema.parse({ respondedOn: '2026-10-02', retainer: renew }).retainer,
+    ).toMatchObject({ term: null });
+    const term = { months: 3, agreedTotalMinor: 100000, schedule: [33333, 33333, 33334] };
+    expect(
+      acceptQuoteSchema.parse({ respondedOn: '2026-10-02', retainer: { ...renew, term } }).retainer
+        ?.term,
+    ).toEqual({ ...term, endAction: 'renew' });
+    expect(
+      acceptQuoteSchema.safeParse({
+        respondedOn: '2026-10-02',
+        retainer: { ...renew, term: { ...term, months: 37 } },
+      }).success,
+    ).toBe(false);
+  });
+
   it('refuses a template twice and a retainer without its mode fields', () => {
     expect(
       acceptQuoteSchema.safeParse({

@@ -12,6 +12,9 @@ React 19 + Vite SPA, Arabic RTL first. Read `brand/identity.md` before visual wo
 ## Rules
 - UI comes from `@vertex-hub/ui` only. No ad-hoc colors, fonts, spacing or raw hex values. Missing component: add it to `packages/ui`, not here.
 - Logical CSS only (`ms-*`, `ps-*`, `start-*`, `text-start`). `packages/ui/src/conventions.test.ts` checks this file tree too.
+- Fields for left-to-right values (email, phone, URL, date, rate, password) set `dir="ltr"` and keep the default alignment, so the text starts at the left edge and grows to the right; no `text-end` on them. Passwords use `PasswordInput`. LTR text shown inside Arabic content (a phone in a list) keeps `text-end` to line up with it.
+- Icon-only buttons get an `aria-label` and a `Tooltip` with the same text, never a `title` attribute.
+- Where an error shows: about one field (invalid value, wrong code, wrong password in a confirmation) it is that field's `FieldError` (`role="alert"` when it comes from the server), the field turns red and gets the focus back; about the whole action (wrong email and password together, too many attempts, network) it is a `FormAlert` above the submit button. `passwordFailure()` in `src/lib/errors.ts` tells the two apart for password confirmations.
 - No hard-coded user-facing text: `t('<feature>.<key>')`, shared strings under `common`. Arabic copy follows `brand/identity.md` §9. Notification texts and links come from `@vertex-hub/messages`, which the emails share (ADR 0028).
 - Numbers and dates only through `src/lib/format.ts` (`ar-u-nu-latn`, `Asia/Damascus`).
 - Server state in TanStack Query. Query keys start with the module name. API calls go through `api` and `call()` in `src/lib/api/client.ts`, typed from the OpenAPI document (`schema.gen.ts`, generated: never edit). After an API change: `pnpm --filter @vertex-hub/api openapi:export`, then `pnpm --filter @vertex-hub/web api:generate`. Better Auth calls use `authClient`.

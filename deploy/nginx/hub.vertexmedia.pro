@@ -64,6 +64,15 @@ server {
         include snippets/vertexhub-proxy.conf;
     }
 
+    # The activation page checks its link on opening; anonymous, so the same tight limit, answered
+    # with 429 so the page can offer a retry.
+    location = /api/password-links/check {
+        limit_req zone=vhsignin burst=5 nodelay;
+        limit_req_status 429;
+        proxy_pass http://127.0.0.1:3050;
+        include snippets/vertexhub-proxy.conf;
+    }
+
     # "Forgot password" (F14 email rule 13) is anonymous and sends email: the same tight limit,
     # answered with 429 so the page can say to try later.
     location = /api/password-links/request {

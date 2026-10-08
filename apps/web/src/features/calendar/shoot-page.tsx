@@ -14,17 +14,19 @@ import {
   StarIcon,
   TriangleAlertIcon,
 } from 'lucide-react';
-import { type ReactNode, useState } from 'react';
+import { type ReactNode, type RefObject, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '../../components/confirm-dialog';
 import { isMissing, LoadError } from '../../components/load-error';
 import { can, useMe } from '../../lib/auth';
 import { errorMessage } from '../../lib/errors';
 import { formatDateTime, formatLinkHost, formatNumber, formatWeekdayDate } from '../../lib/format';
+import { useFocusAfterChange } from '../../lib/use-focus-after-change';
+import { useShownWhileClosing } from '../../lib/use-shown-while-closing';
 import { PersonName } from '../projects/project-badges';
 import { TaskStatusBadge } from '../tasks/task-badges';
 import { TaskSection } from '../tasks/task-parts';
-import { shootQuery, useRestoreShoot, useTickShot } from './calendar.queries';
+import { shootQuery, useArchiveShoot, useRestoreShoot, useTickShot } from './calendar.queries';
 import {
   ConflictBadge,
   ConflictList,
@@ -34,7 +36,7 @@ import {
   ShootTypeIcon,
   useClientLabel,
 } from './calendar-parts';
-import { ShootActions } from './shoot-actions';
+import { ShootActions, type ShootFocus, shootFocusTarget } from './shoot-actions';
 
 /** A shoot (spec F11, screen 3): what, when, where, who, and the shot list the crew ticks. */
 export function ShootPage({ shootId }: { shootId: string }) {
@@ -67,10 +69,43 @@ export function ShootPage({ shootId }: { shootId: string }) {
 
 function ShootView({ shoot }: { shoot: ShootDetail }) {
   const { t } = useTranslation();
+  const heading = useRef<HTMLHeadingElement>(null);
+  const actions = useRef<HTMLDivElement>(null);
+  const restoreButton = useRef<HTMLButtonElement>(null);
+  const focus = useMemo<ShootFocus>(() => ({ heading, actions, restore: restoreButton }), []);
+  // Closing, cancelling, reopening, archiving and restoring swap the header's controls: a focus
+  // left on the page body goes to the control that replaced them.
+  useFocusAfterChange(`${shoot.status}:${shoot.archivedAt ?? ''}`, () => shootFocusTarget(focus));
+  // The archive and restore confirmation lives here: the menu and the notice that open it leave
+  // the page with the change.
+  const [confirming, setConfirming] = useState<'archive' | 'restore' | null>(null);
+  const shownConfirm = useShownWhileClosing(confirming) ?? 'archive';
+  const archive = useArchiveShoot(shoot.id);
+  const restore = useRestoreShoot(shoot.id);
   return (
     <>
-      <ShootHero shoot={shoot} />
-      <Banners shoot={shoot} />
+      <ShootHero shoot={shoot} focus={focus} onArchive={() => setConfirming('archive')} />
+      <Banners
+        shoot={shoot}
+        restoreRef={restoreButton}
+        onRestore={() => setConfirming('restore')}
+      />
+      <ConfirmDialog
+        open={confirming !== null}
+        onClose={() => setConfirming(null)}
+        title={t(`calendar.${shownConfirm}.title`, { title: shoot.title })}
+        body={t(`calendar.${shownConfirm}.body`)}
+        action={t(`calendar.actions.${shownConfirm}`)}
+        destructive={shownConfirm === 'archive'}
+        pending={archive.isPending || restore.isPending}
+        // Archived: "restore" in the notice; restored: the header's actions.
+        finalFocus={() => shootFocusTarget(focus) ?? true}
+        onConfirm={async () => {
+          if (shownConfirm === 'archive') await archive.mutateAsync(undefined);
+          else await restore.mutateAsync(undefined);
+          toast.add({ title: t(`calendar.${shownConfirm}.done`), type: 'success' });
+        }}
+      />
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
         <div className="flex min-w-0 flex-col gap-6">
           <ShotsSection shoot={shoot} />
@@ -92,7 +127,15 @@ function ShootView({ shoot }: { shoot: ShootDetail }) {
   );
 }
 
-function ShootHero({ shoot }: { shoot: ShootDetail }) {
+function ShootHero({
+  shoot,
+  focus,
+  onArchive,
+}: {
+  shoot: ShootDetail;
+  focus: ShootFocus;
+  onArchive: () => void;
+}) {
   const { t } = useTranslation();
   const clientLabel = useClientLabel();
   return (
@@ -112,7 +155,9 @@ function ShootHero({ shoot }: { shoot: ShootDetail }) {
               t('calendar.internal')
             )}
           </p>
-          <h1 className="text-2xl font-bold">{shoot.title}</h1>
+          <h1 ref={focus.heading} tabIndex={-1} className="text-2xl font-bold outline-none">
+            {shoot.title}
+          </h1>
           <div className="flex flex-wrap items-center gap-2">
             <ShootStatusBadge status={shoot.status} />
             <Badge tone="outline">
@@ -123,7 +168,7 @@ function ShootHero({ shoot }: { shoot: ShootDetail }) {
             {shoot.archivedAt && <ShootArchivedBadge />}
           </div>
         </div>
-        <ShootActions shoot={shoot} />
+        <ShootActions shoot={shoot} focus={focus} onArchive={onArchive} />
       </div>
       <dl className="grid gap-4 border-t border-border pt-5 text-sm sm:grid-cols-2 lg:grid-cols-4">
         <Fact label={t('calendar.shoot.time')}>
@@ -180,9 +225,33 @@ function Fact({ label, children }: { label: string; children: ReactNode }) {
 }
 
 /** Archived, cancelled and double-booked shoots say so above everything else. */
-function Banners({ shoot }: { shoot: ShootDetail }) {
+function Banners({
+  shoot,
+  restoreRef,
+  onRestore,
+}: {
+  shoot: ShootDetail;
+  restoreRef: RefObject<HTMLButtonElement | null>;
+  onRestore: () => void;
+}) {
   const { t } = useTranslation();
-  if (shoot.archivedAt) return <ArchivedCallout shoot={shoot} />;
+  if (shoot.archivedAt) {
+    return (
+      <Callout
+        icon={<ArchiveIcon />}
+        title={t('calendar.shoot.archivedTitle')}
+        description={t('calendar.shoot.archivedBody')}
+        action={
+          shoot.permissions.canArchive && (
+            <Button ref={restoreRef} variant="outline" size="sm" onClick={onRestore}>
+              <ArchiveRestoreIcon />
+              {t('calendar.actions.restore')}
+            </Button>
+          )
+        }
+      />
+    );
+  }
   if (shoot.status === 'cancelled') {
     return (
       <Callout
@@ -214,41 +283,6 @@ function Banners({ shoot }: { shoot: ShootDetail }) {
   );
 }
 
-function ArchivedCallout({ shoot }: { shoot: ShootDetail }) {
-  const { t } = useTranslation();
-  const restore = useRestoreShoot(shoot.id);
-  const [confirming, setConfirming] = useState(false);
-  return (
-    <>
-      <Callout
-        icon={<ArchiveIcon />}
-        title={t('calendar.shoot.archivedTitle')}
-        description={t('calendar.shoot.archivedBody')}
-        action={
-          shoot.permissions.canArchive && (
-            <Button variant="outline" size="sm" onClick={() => setConfirming(true)}>
-              <ArchiveRestoreIcon />
-              {t('calendar.actions.restore')}
-            </Button>
-          )
-        }
-      />
-      <ConfirmDialog
-        open={confirming}
-        onClose={() => setConfirming(false)}
-        title={t('calendar.restore.title', { title: shoot.title })}
-        body={t('calendar.restore.body')}
-        action={t('calendar.actions.restore')}
-        pending={restore.isPending}
-        onConfirm={async () => {
-          await restore.mutateAsync(undefined);
-          toast.add({ title: t('calendar.restore.done'), type: 'success' });
-        }}
-      />
-    </>
-  );
-}
-
 /**
  * Rule 7: the shot list, ticked by the crew on the day. Rows are tall enough to hit with a thumb;
  * the list is read-only once the shoot is closed or cancelled.
@@ -260,6 +294,8 @@ function ShotsSection({ shoot }: { shoot: ShootDetail }) {
   const done = shoot.shots.filter((shot) => shot.doneAt !== null).length;
 
   async function set(shotId: string, checked: boolean) {
+    // The box stays enabled while it saves, so it keeps the focus; changes wait for the save.
+    if (tick.isPending) return;
     try {
       await tick.mutateAsync({ shotId, done: checked });
     } catch (error) {
@@ -298,7 +334,7 @@ function ShotsSection({ shoot }: { shoot: ShootDetail }) {
                     id={`shot-${shot.id}`}
                     className="size-7 [&_svg]:size-5"
                     checked={ticked}
-                    disabled={!canTick || tick.isPending}
+                    disabled={!canTick}
                     onCheckedChange={(checked) => set(shot.id, checked)}
                   />
                   <span className="flex min-w-0 flex-col gap-0.5">
@@ -367,15 +403,16 @@ function CrewSection({ shoot }: { shoot: ShootDetail }) {
     <TaskSection title={t('calendar.shoot.crew')}>
       <ul className="flex flex-col gap-3 text-sm">
         {shoot.crew.map((member) => (
-          <li key={member.user.id} className="flex items-center justify-between gap-3">
+          // The role goes under the name: beside it, it cut the name short in this column.
+          <li key={member.user.id} className="flex flex-col gap-1">
             <Link
               to="/team/$userId"
               params={{ userId: member.user.id }}
-              className="min-w-0 font-medium hover:underline"
+              className="min-w-0 self-start font-medium hover:underline"
             >
               <PersonName name={member.user.name} archived={member.user.archived} />
             </Link>
-            <span className="flex shrink-0 items-center gap-2 text-muted-foreground">
+            <span className="flex flex-wrap items-center gap-2 ps-8 text-muted-foreground">
               {t(`calendar.crewRoles.${member.role}`)}
               {member.isLead && (
                 <Badge tone="gold">

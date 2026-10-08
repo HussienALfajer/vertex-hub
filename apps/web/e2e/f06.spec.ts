@@ -297,3 +297,26 @@ test('project, retainer and client pages lead to their tasks', async ({ page }) 
   await expect(rows.first()).toContainText('بوستات أسبوع الافتتاح');
   await expect(rows.first()).toContainText(ar.tasks.overLimitPending);
 });
+
+test('removing a checklist row of the new task form gives the focus to the next row', async ({
+  page,
+}) => {
+  await mockApi(page, { signedIn: true, me: accountManagerMe });
+  await page.goto('/tasks/new');
+  const field = page.getByPlaceholder(ar.tasks.form.checklistPlaceholder);
+  for (const item of ['أولى', 'ثانية', 'ثالثة']) {
+    await field.fill(item);
+    await field.press('Enter');
+  }
+  const remove = (label: string) =>
+    page.getByRole('button', { name: ar.common.remove.replace('{{label}}', label) });
+  // The middle row: the next one takes its place.
+  await remove('ثانية').click();
+  await expect(remove('ثالثة')).toBeFocused();
+  // The last row: the previous one.
+  await remove('ثالثة').click();
+  await expect(remove('أولى')).toBeFocused();
+  // None left: back to typing.
+  await remove('أولى').click();
+  await expect(field).toBeFocused();
+});

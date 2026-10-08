@@ -1,5 +1,12 @@
 import { z } from 'zod';
-import { addDays, type CalendarDate, calendarDateSchema, daysInclusive } from './dates.js';
+import {
+  addDays,
+  addMonths,
+  type CalendarDate,
+  calendarDateSchema,
+  daysInclusive,
+  firstOfMonth,
+} from './dates.js';
 import { departmentCodeSchema } from './departments.js';
 import {
   pageQuerySchema,
@@ -8,7 +15,7 @@ import {
   queryListSchema,
   sortOrderSchema,
 } from './lists.js';
-import { currencySchema, minorAmountSchema } from './money.js';
+import { currencySchema, minorAmountSchema, signedMinorAmountSchema } from './money.js';
 import { engagementDepartmentsSchema, projectNameSchema, taskCountsSchema } from './projects.js';
 
 export const RETAINER_STATUSES = ['active', 'paused', 'ended'] as const;
@@ -37,6 +44,225 @@ export const cycleStatusSchema = z.enum(CYCLE_STATUSES).meta({ id: 'CycleStatus'
 
 export type CycleStatus = z.infer<typeof cycleStatusSchema>;
 
+/**
+ * What a retainer charge bills (spec F05B, ADR 0029): a month's amount, an amendment's addition
+ * or credit, or an early termination fee. Invoices bill charges, not cycles.
+ */
+export const RETAINER_CHARGE_KINDS = ['monthly', 'addition', 'credit', 'termination_fee'] as const;
+
+export const retainerChargeKindSchema = z
+  .enum(RETAINER_CHARGE_KINDS)
+  .meta({ id: 'RetainerChargeKind' });
+
+export type RetainerChargeKind = z.infer<typeof retainerChargeKindSchema>;
+
+/** Being invoiced is read from invoice lines, as for other sources; this is the charge's own state. */
+export const RETAINER_CHARGE_STATUSES = ['pending', 'cancelled', 'settled_outside'] as const;
+
+export const retainerChargeStatusSchema = z
+  .enum(RETAINER_CHARGE_STATUSES)
+  .meta({ id: 'RetainerChargeStatus' });
+
+export type RetainerChargeStatus = z.infer<typeof retainerChargeStatusSchema>;
+
+// Terms (spec F05B T1–T12)
+
+/** What happens when a term's last month ends (T7–T9). */
+export const TERM_END_ACTIONS = ['renew', 'end', 'continue'] as const;
+
+export const termEndActionSchema = z.enum(TERM_END_ACTIONS).meta({ id: 'TermEndAction' });
+
+export type TermEndAction = z.infer<typeof termEndActionSchema>;
+
+export const TERM_STATUSES = ['scheduled', 'active', 'completed', 'cancelled'] as const;
+
+export const termStatusSchema = z.enum(TERM_STATUSES).meta({ id: 'TermStatus' });
+
+export type TermStatus = z.infer<typeof termStatusSchema>;
+
+export const TERM_LIMITS = { minMonths: 1, maxMonths: 36 } as const;
+
+/** T7: the renewal term is created this many days before the current term ends. */
+export const TERM_RENEWAL_DAYS = 30;
+
+/**
+ * T3: the default schedule, an even split of the total with the remainder on the last month
+ * (100000 over 3 months is 33333 / 33333 / 33334).
+ */
+export function splitEvenly(totalMinor: number, months: number): number[] {
+  if (months < 1) return [];
+  const each = Math.floor(totalMinor / months);
+  return Array.from({ length: months }, (_, index) =>
+    index === months - 1 ? totalMinor - each * (months - 1) : each,
+  );
+}
+
+/** The months of a term, first days, from its start month. */
+export function termMonths(startMonth: CalendarDate, months: number): CalendarDate[] {
+  return Array.from({ length: months }, (_, index) => addMonths(startMonth, index));
+}
+
+/** The position (1…months) of `month` in a term starting in `startMonth`. */
+export function termPosition(startMonth: CalendarDate, month: CalendarDate): number {
+  const [startYear, start] = startMonth.split('-').map(Number) as [number, number];
+  const [year, current] = month.split('-').map(Number) as [number, number];
+  return (year - startYear) * 12 + current - start + 1;
+}
+
+/** The last month of a term (its first day). */
+export function termEndMonth(startMonth: CalendarDate, months: number): CalendarDate {
+  return addMonths(startMonth, months - 1);
+}
+
+/** T11: the renewal date of a retainer whose last term ends in `endMonth`: the day after. */
+export function dayAfterTerm(endMonth: CalendarDate): CalendarDate {
+  return addMonths(endMonth, 1);
+}
+
+/** T3: one amount per month, summing to the agreed total (`SCHEDULE_TOTAL_MISMATCH`). */
+export function scheduleMatches(term: {
+  months: number;
+  agreedTotalMinor: number;
+  schedule: readonly number[];
+}): boolean {
+  return (
+    term.schedule.length === term.months &&
+    term.schedule.reduce((sum, amount) => sum + amount, 0) === term.agreedTotalMinor
+  );
+}
+
+const monthSchema = calendarDateSchema.refine(
+  (date) => firstOfMonth(date) === date,
+  'Expected the first day of a month',
+);
+
+const termMonthCountSchema = z.number().int().min(TERM_LIMITS.minMonths).max(TERM_LIMITS.maxMonths);
+
+/**
+ * A term without its start month: the new retainer form (it starts in the start date's month)
+ * and quote acceptance (F04, Q1). The sum and length of the schedule are checked by the API.
+ */
+export const retainerTermInputSchema = z
+  .object({
+    months: termMonthCountSchema,
+    /** Money field. */
+    agreedTotalMinor: minorAmountSchema,
+    /** One amount per month, in order (T3); money field. */
+    schedule: z.array(minorAmountSchema).min(1).max(TERM_LIMITS.maxMonths),
+    endAction: termEndActionSchema.default('renew'),
+  })
+  .meta({ id: 'RetainerTermInput' });
+
+export type RetainerTermInput = z.infer<typeof retainerTermInputSchema>;
+
+export const createRetainerTermSchema = retainerTermInputSchema
+  .extend({ startMonth: monthSchema })
+  .meta({ id: 'CreateRetainerTerm' });
+
+export type CreateRetainerTerm = z.infer<typeof createRetainerTermSchema>;
+
+export type CreateRetainerTermInput = z.input<typeof createRetainerTermSchema>;
+
+/** T5: every field of a scheduled term; an active term takes `endAction` only (`TERM_STARTED`). */
+export const updateRetainerTermSchema = createRetainerTermSchema
+  .partial()
+  .extend({ endAction: termEndActionSchema.optional() })
+  .meta({ id: 'UpdateRetainerTerm' });
+
+export type UpdateRetainerTerm = z.infer<typeof updateRetainerTermSchema>;
+
+export const cancelRetainerTermSchema = z
+  .object({ reason: z.string().trim().min(1).max(500) })
+  .meta({ id: 'CancelRetainerTerm' });
+
+export type CancelRetainerTerm = z.infer<typeof cancelRetainerTermSchema>;
+
+/** The active term of a retainer, else its scheduled one (header chip, list renewal column). */
+export const retainerTermSummarySchema = z
+  .object({
+    id: z.uuid(),
+    number: z.number().int().min(1),
+    status: termStatusSchema,
+    startMonth: calendarDateSchema,
+    endMonth: calendarDateSchema,
+    months: z.number().int().min(1),
+    endAction: termEndActionSchema,
+    /** Detail only, for callers with money access (G3). */
+    money: z
+      .object({
+        agreedTotalMinor: z.number().int().min(0),
+        /** T6: Σ of its months' non-cancelled monthly, addition and credit charges. */
+        currentTotalMinor: z.number().int(),
+      })
+      .optional(),
+  })
+  .meta({ id: 'RetainerTermSummary' });
+
+export type RetainerTermSummary = z.infer<typeof retainerTermSummarySchema>;
+
+/**
+ * A month of a term: its `monthly` charge (C1). The invoice that bills it is on the retainer's
+ * billing (`RetainerCharge`, money access), by `chargeId`.
+ */
+export const retainerTermMonthSchema = z
+  .object({
+    month: calendarDateSchema,
+    /** 1…months. */
+    position: z.number().int().min(1),
+    /** Null when the month has no charge (a cancelled term's month that never had one). */
+    chargeId: z.uuid().nullable(),
+    status: retainerChargeStatusSchema.nullable(),
+    /** The month began and its charge became due (C3). */
+    due: z.boolean(),
+    /** Present only for callers with money access (G3). */
+    money: z
+      .object({
+        /** The month's `monthly` charge. */
+        amountMinor: z.number().int().min(0),
+        /** The schedule amount plus onward amendments (what a renewal copies, T7). */
+        baseAmountMinor: z.number().int().min(0),
+        /** Σ of the month's non-cancelled monthly, addition and credit charges (T6). */
+        totalMinor: z.number().int(),
+      })
+      .optional(),
+  })
+  .meta({ id: 'RetainerTermMonth' });
+
+export type RetainerTermMonth = z.infer<typeof retainerTermMonthSchema>;
+
+export const retainerTermSchema = retainerTermSummarySchema
+  .omit({ money: true })
+  .extend({
+    /** The term this one renews automatically (T7). */
+    renewedFrom: z.object({ id: z.uuid(), number: z.number().int().min(1) }).nullable(),
+    cancelledAt: z.iso.datetime().nullable(),
+    cancelReason: z.string().nullable(),
+    createdAt: z.iso.datetime(),
+    money: retainerTermSummarySchema.shape.money,
+    /** Its months in order, each with its `monthly` charge (T3). */
+    schedule: z.array(retainerTermMonthSchema),
+  })
+  .meta({ id: 'RetainerTerm' });
+
+export type RetainerTerm = z.infer<typeof retainerTermSchema>;
+
+export const retainerTermListSchema = z
+  .object({ items: z.array(retainerTermSchema) })
+  .meta({ id: 'RetainerTermList', description: 'Terms, newest first' });
+
+export type RetainerTermList = z.infer<typeof retainerTermListSchema>;
+
+/** E2: an optional early termination fee when a retainer ends (money access). */
+export const retainerTerminationSchema = z
+  .object({
+    /** Money field. */
+    feeMinor: minorAmountSchema.min(1),
+    reason: z.string().trim().min(1).max(500),
+  })
+  .meta({ id: 'RetainerTermination' });
+
+export type RetainerTermination = z.infer<typeof retainerTerminationSchema>;
+
 /** `post` covers single posts and carousels; `other` needs a label. */
 export const DELIVERABLE_KINDS = [
   'design',
@@ -61,6 +287,9 @@ export const RETAINER_LIMITS = {
   adjustmentsPerLine: 100,
   /** A line's revision limit; the same bound as `TASK_LIMITS.revisionLimit` (no import: cycle). */
   revisionLimit: 20,
+  /** F05B A7. */
+  amendments: 300,
+  amendmentLines: 20,
 } as const;
 
 // Deliverable lines
@@ -344,6 +573,343 @@ export const createCycleAdjustmentSchema = z
 
 export type CreateCycleAdjustment = z.infer<typeof createCycleAdjustmentSchema>;
 
+// Amendments (spec F05B A1–A9, C5, C6)
+
+export const AMENDMENT_KINDS = ['change', 'reschedule', 'quote_renewal'] as const;
+
+export const amendmentKindSchema = z.enum(AMENDMENT_KINDS).meta({ id: 'AmendmentKind' });
+
+export type AmendmentKind = z.infer<typeof amendmentKindSchema>;
+
+/** A1: one month, or every month from the effective month on. */
+export const AMENDMENT_SCOPES = ['month', 'onward'] as const;
+
+export const amendmentScopeSchema = z.enum(AMENDMENT_SCOPES).meta({ id: 'AmendmentScope' });
+
+export type AmendmentScope = z.infer<typeof amendmentScopeSchema>;
+
+export const AMENDMENT_STATUSES = [
+  'pending_approval',
+  'scheduled',
+  'applied',
+  'rejected',
+  'withdrawn',
+  'cancelled',
+] as const;
+
+export const amendmentStatusSchema = z.enum(AMENDMENT_STATUSES).meta({ id: 'AmendmentStatus' });
+
+export type AmendmentStatus = z.infer<typeof amendmentStatusSchema>;
+
+/**
+ * What an amendment does to a month (C6, A3): an amount not yet invoiced changes, a draft is
+ * synced, an issued month gets an addition or a credit; an open-ended fee changes; a month without
+ * a cycle takes no line change.
+ */
+export const AMENDMENT_EFFECTS = [
+  'charge_changed',
+  'draft_synced',
+  'addition',
+  'credit',
+  'fee_changed',
+  'no_cycle',
+] as const;
+
+export const amendmentEffectKindSchema = z
+  .enum(AMENDMENT_EFFECTS)
+  .meta({ id: 'AmendmentEffectKind' });
+
+export type AmendmentEffectKind = z.infer<typeof amendmentEffectKindSchema>;
+
+/** A month's `monthly` charge as the planner reads it (C6). */
+export interface MonthChargeState {
+  month: CalendarDate;
+  /** The month's `monthly` charge; for a month without one, the amount it would be created at. */
+  amountMinor: number;
+  /** The live invoice that bills the charge. */
+  invoice: { id: string; displayNumber: string | null; issued: boolean } | null;
+  /** Σ of the month's other non-cancelled charges (additions, credits). */
+  extrasMinor: number;
+}
+
+/** One month's outcome of an amount change; `before` and `after` are the month's totals. */
+export interface MonthEffect {
+  month: CalendarDate;
+  effect: Extract<AmendmentEffectKind, 'charge_changed' | 'draft_synced' | 'addition' | 'credit'>;
+  beforeMinor: number;
+  afterMinor: number;
+  invoice: { id: string; displayNumber: string | null } | null;
+}
+
+/**
+ * C6 and A3, the month-effect planner used by the preview and the apply: an amount change on a
+ * month. A charge no live invoice bills changes; one on a draft changes and syncs the draft; one
+ * on an issued invoice keeps its amount and the difference becomes an addition or a credit.
+ * Returns null for no change and `'negative'` when the month's total, or a changed charge, would
+ * go below 0 (`NEGATIVE_AMOUNT`).
+ */
+export function planMonthChange(
+  state: MonthChargeState,
+  deltaMinor: number,
+): MonthEffect | 'negative' | null {
+  if (deltaMinor === 0) return null;
+  const beforeMinor = state.amountMinor + state.extrasMinor;
+  const afterMinor = beforeMinor + deltaMinor;
+  if (afterMinor < 0) return 'negative';
+  const invoice = state.invoice
+    ? { id: state.invoice.id, displayNumber: state.invoice.displayNumber }
+    : null;
+  if (state.invoice?.issued) {
+    return {
+      month: state.month,
+      effect: deltaMinor > 0 ? 'addition' : 'credit',
+      beforeMinor,
+      afterMinor,
+      invoice,
+    };
+  }
+  if (state.amountMinor + deltaMinor < 0) return 'negative';
+  return {
+    month: state.month,
+    effect: state.invoice ? 'draft_synced' : 'charge_changed',
+    beforeMinor,
+    afterMinor,
+    invoice,
+  };
+}
+
+/**
+ * A4: Σ of the change over the months it affects; an open-ended fee change counts the delta
+ * itself once.
+ */
+export function amendmentMoneyDelta(change: {
+  amountDeltaMinor: number;
+  months: number;
+  changesFee: boolean;
+}): number {
+  return change.amountDeltaMinor * (change.months + (change.changesFee ? 1 : 0));
+}
+
+/** A4: a reduction waits for the General Manager unless its creator may approve it. */
+export function amendmentNeedsApproval(moneyDeltaMinor: number, canApprove: boolean): boolean {
+  return moneyDeltaMinor < 0 && !canApprove;
+}
+
+export interface CreditTaking {
+  /** The credits on the draft with the part each gives (negative). */
+  taken: { id: string; amountMinor: number }[];
+  /** A credit larger than what was left: `appliedMinor` stays on it, the remainder is new. */
+  split: { id: string; appliedMinor: number; remainderMinor: number } | null;
+}
+
+/**
+ * C5: pending credits (negative, oldest first) taken off a month's draft of `totalMinor` while the
+ * total stays ≥ 0; a credit larger than what is left is split.
+ */
+export function takeCredits(
+  totalMinor: number,
+  credits: readonly { id: string; amountMinor: number }[],
+): CreditTaking {
+  const taken: CreditTaking['taken'] = [];
+  let left = totalMinor;
+  for (const credit of credits) {
+    if (left <= 0) break;
+    if (left + credit.amountMinor >= 0) {
+      taken.push({ id: credit.id, amountMinor: credit.amountMinor });
+      left += credit.amountMinor;
+      continue;
+    }
+    taken.push({ id: credit.id, amountMinor: -left });
+    return {
+      taken,
+      split: { id: credit.id, appliedMinor: -left, remainderMinor: credit.amountMinor + left },
+    };
+  }
+  return { taken, split: null };
+}
+
+const amendmentReasonSchema = z.string().trim().min(1).max(500);
+
+/** A2: a line change; a line not on the retainer needs a delta > 0 (`INVALID_QUANTITY`). */
+export const amendmentLineInputSchema = z
+  .object({
+    kind: deliverableKindSchema,
+    label: deliverableLabelSchema.optional(),
+    quantityDelta: z
+      .number()
+      .int()
+      .min(-999)
+      .max(999)
+      .refine((delta) => delta !== 0, 'The change cannot be zero'),
+    /** For a new line only. */
+    revisionLimit: revisionLimitSchema.optional(),
+  })
+  .refine(labelRequiredForOther, labelRule)
+  .meta({ id: 'AmendmentLineInput' });
+
+export type AmendmentLineInput = z.infer<typeof amendmentLineInputSchema>;
+
+/**
+ * A1–A3: the effective month is the current month or later, placed against the terms by the API
+ * (`INVALID_EFFECTIVE_MONTH`); at least one line or a non-zero amount (`EMPTY_AMENDMENT`).
+ */
+export const createAmendmentSchema = z
+  .object({
+    scope: amendmentScopeSchema,
+    effectiveMonth: monthSchema,
+    lines: z.array(amendmentLineInputSchema).max(RETAINER_LIMITS.amendmentLines).default([]),
+    /** The change to each affected month; money field. */
+    amountDeltaMinor: signedMinorAmountSchema.default(0),
+    reason: amendmentReasonSchema,
+  })
+  .meta({ id: 'CreateAmendment' });
+
+export type CreateAmendment = z.infer<typeof createAmendmentSchema>;
+
+export type CreateAmendmentInput = z.input<typeof createAmendmentSchema>;
+
+/** A6: new amounts for months of a term that no issued invoice bills, with the same sum. */
+export const rescheduleTermSchema = z
+  .object({
+    schedule: z
+      .array(z.object({ month: monthSchema, amountMinor: minorAmountSchema }))
+      .min(1)
+      .max(TERM_LIMITS.maxMonths),
+    reason: amendmentReasonSchema,
+  })
+  .meta({ id: 'RescheduleTerm' });
+
+export type RescheduleTerm = z.infer<typeof rescheduleTermSchema>;
+
+export const approveAmendmentSchema = z
+  .object({ note: z.string().trim().max(500).optional() })
+  .meta({ id: 'ApproveAmendment' });
+
+export type ApproveAmendment = z.infer<typeof approveAmendmentSchema>;
+
+/** A4: rejecting needs a note. */
+export const rejectAmendmentSchema = z
+  .object({ note: z.string().trim().min(1).max(500) })
+  .meta({ id: 'RejectAmendment' });
+
+export type RejectAmendment = z.infer<typeof rejectAmendmentSchema>;
+
+export const amendmentLineSchema = z
+  .object({
+    kind: deliverableKindSchema,
+    label: z.string().nullable(),
+    /** `change`: the change to the line. */
+    quantityDelta: z.number().int().nullable(),
+    /** `quote_renewal`: the line's new monthly quantity. */
+    quantity: z.number().int().nullable(),
+    revisionLimit: z.number().int().min(0).nullable(),
+    position: z.number().int().min(1),
+  })
+  .meta({ id: 'AmendmentLine' });
+
+export type AmendmentLine = z.infer<typeof amendmentLineSchema>;
+
+export const amendmentEffectSchema = z
+  .object({
+    month: calendarDateSchema,
+    effect: amendmentEffectKindSchema,
+    /** The invoice that billed the month: the synced draft, or the issued one. */
+    invoice: z.object({ id: z.uuid(), displayNumber: z.string().nullable() }).nullable(),
+    /** The month's total (or the fee) before and after; money access only (G3). */
+    money: z.object({ beforeMinor: z.number().int(), afterMinor: z.number().int() }).optional(),
+  })
+  .meta({ id: 'AmendmentEffect' });
+
+export type AmendmentEffect = z.infer<typeof amendmentEffectSchema>;
+
+const amendmentPersonSchema = z.object({ id: z.uuid(), name: z.string() });
+
+export const amendmentSchema = z
+  .object({
+    id: z.uuid(),
+    retainerId: z.uuid(),
+    number: z.number().int().min(1),
+    kind: amendmentKindSchema,
+    /** Null for a reschedule. */
+    scope: amendmentScopeSchema.nullable(),
+    effectiveMonth: calendarDateSchema,
+    status: amendmentStatusSchema,
+    reason: z.string(),
+    lines: z.array(amendmentLineSchema),
+    /** Null for a system amendment (quote renewal). */
+    createdBy: amendmentPersonSchema.nullable(),
+    createdAt: z.iso.datetime(),
+    decision: z
+      .object({
+        approved: z.boolean(),
+        by: amendmentPersonSchema,
+        at: z.iso.datetime(),
+        note: z.string().nullable(),
+      })
+      .nullable(),
+    appliedAt: z.iso.datetime().nullable(),
+    /** What it did when applied; while pending or scheduled, what it would do (its preview). */
+    effects: z.array(amendmentEffectSchema),
+    /** Present only for callers with money access (G3). */
+    money: z
+      .object({
+        amountDeltaMinor: z.number().int(),
+        /** A4: Σ of the change over the months it affects, when created. */
+        moneyDeltaMinor: z.number().int(),
+        /** `reschedule`: the new amounts. */
+        schedule: z
+          .array(z.object({ month: calendarDateSchema, amountMinor: z.number().int() }))
+          .nullable(),
+      })
+      .optional(),
+  })
+  .meta({ id: 'Amendment' });
+
+export type Amendment = z.infer<typeof amendmentSchema>;
+
+/** `POST /amendments/preview`: what saving would do; nothing is saved. */
+export const amendmentPreviewSchema = z
+  .object({
+    months: z.array(amendmentEffectSchema),
+    moneyDeltaMinor: z.number().int(),
+    needsApproval: z.boolean(),
+  })
+  .meta({ id: 'AmendmentPreview' });
+
+export type AmendmentPreview = z.infer<typeof amendmentPreviewSchema>;
+
+export const amendmentListQuerySchema = pageQuerySchema.extend({
+  status: queryListSchema(amendmentStatusSchema).optional(),
+});
+
+export type AmendmentListQuery = z.infer<typeof amendmentListQuerySchema>;
+
+/** Newest first. */
+export const amendmentPageSchema = pageSchema(amendmentSchema).meta({ id: 'AmendmentPage' });
+
+export type AmendmentPage = z.infer<typeof amendmentPageSchema>;
+
+/** `GET /api/retainer-amendments`: amendments waiting for the General Manager, oldest first. */
+export const pendingAmendmentListQuerySchema = pageQuerySchema.extend({
+  status: z.literal('pending_approval').default('pending_approval'),
+});
+
+export type PendingAmendmentListQuery = z.infer<typeof pendingAmendmentListQuerySchema>;
+
+export const retainerAmendmentSchema = amendmentSchema
+  .extend({
+    retainer: amendmentPersonSchema.extend({ currency: currencySchema }),
+    client: amendmentPersonSchema,
+  })
+  .meta({ id: 'RetainerAmendment' });
+
+export type RetainerAmendment = z.infer<typeof retainerAmendmentSchema>;
+
+export const retainerAmendmentPageSchema = pageSchema(retainerAmendmentSchema).meta({
+  id: 'RetainerAmendmentPage',
+});
+
+export type RetainerAmendmentPage = z.infer<typeof retainerAmendmentPageSchema>;
 // Retainers
 
 const retainerFieldsSchema = z.object({
@@ -358,12 +924,17 @@ const retainerFieldsSchema = z.object({
   monthlyFeeMinor: minorAmountSchema.nullable(),
 });
 
-/** `renewalDate` > `startDate` is checked by the API (`INVALID_DATES`). */
+/**
+ * `renewalDate` > `startDate` is checked by the API (`INVALID_DATES`). A `term` starts in the
+ * start date's month and sets the renewal date (F05B T11: `RENEWAL_DATE_FROM_TERM` with both).
+ */
 export const createRetainerSchema = retainerFieldsSchema
   .extend({
     clientId: z.uuid(),
     /** At most `RETAINER_LIMITS.deliverables`; the API answers `LIMIT_REACHED`. */
     deliverables: z.array(newDeliverableLineSchema).default([]),
+    /** Money field (F05B). */
+    term: retainerTermInputSchema.optional(),
   })
   .partial({ renewalDate: true, currency: true, monthlyFeeMinor: true })
   .meta({ id: 'CreateRetainer' });
@@ -380,7 +951,11 @@ export type UpdateRetainer = z.infer<typeof updateRetainerSchema>;
 export type UpdateRetainerInput = z.input<typeof updateRetainerSchema>;
 
 export const retainerStatusChangeSchema = z
-  .object({ status: retainerStatusSchema })
+  .object({
+    status: retainerStatusSchema,
+    /** `ended` only (F05B E2); money field. */
+    termination: retainerTerminationSchema.optional(),
+  })
   .meta({ id: 'RetainerStatusChange' });
 
 export type RetainerStatusChange = z.infer<typeof retainerStatusChangeSchema>;
@@ -394,8 +969,13 @@ export const retainerSchema = z
     accountManager: z.object({ id: z.uuid(), name: z.string() }),
     departments: z.array(departmentCodeSchema),
     status: retainerStatusSchema,
+    /** With an active or scheduled term, the day after its last term (F05B T11). */
     renewalDate: calendarDateSchema.nullable(),
     renewal: renewalStateSchema.nullable(),
+    /** The active term, else the scheduled one (F05B). */
+    term: retainerTermSummarySchema.nullable(),
+    /** Amendments waiting for the General Manager (F05B A4). */
+    pendingAmendments: z.number().int().min(0),
     /** The newest open cycle, or null (paused across a month, ended, not started). */
     currentCycle: cycleSchema.nullable(),
   })
@@ -426,7 +1006,12 @@ export const retainerDetailSchema = retainerSchema
     archivedAt: z.iso.datetime().nullable(),
     /** Present only for callers with money access. */
     money: z
-      .object({ currency: currencySchema, monthlyFeeMinor: z.number().int().min(0).nullable() })
+      .object({
+        currency: currencySchema,
+        monthlyFeeMinor: z.number().int().min(0).nullable(),
+        /** F05B C9: pending credits owed to the client, as a positive amount. */
+        creditPendingMinor: z.number().int().min(0),
+      })
       .optional(),
     permissions: retainerPermissionsSchema,
   })
@@ -447,6 +1032,8 @@ export const retainerListQuerySchema = pageQuerySchema.extend({
   behind: queryBooleanSchema.optional(),
   /** `true`: renewal due or overdue (R6). */
   renewalDue: queryBooleanSchema.optional(),
+  /** `true`: with amendments waiting for the General Manager (F05B A4). */
+  pendingApproval: queryBooleanSchema.optional(),
   /** `true` lists archived retainers only; needs `projects.manage` with scope all. */
   archived: queryBooleanSchema.default(false),
   sort: z.enum(RETAINER_SORTS).default('clientName'),

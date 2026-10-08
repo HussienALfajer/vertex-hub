@@ -8,7 +8,7 @@ import {
   AlertDialogTitle,
   Button,
 } from '@vertex-hub/ui';
-import { type ReactNode, useState } from 'react';
+import { type ComponentProps, type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { errorMessage } from '../lib/errors';
 import { FormAlert } from './form-alert';
@@ -27,6 +27,8 @@ interface ConfirmDialogProps {
   describeFailure?: (error: unknown) => string | undefined;
   /** Options of the action, under the body. */
   children?: ReactNode;
+  /** Where the focus goes when it closes, when the element that opened it is gone (a menu item). */
+  finalFocus?: ComponentProps<typeof AlertDialogContent>['finalFocus'];
 }
 
 /** Asks before an action that changes a record, and shows why it failed. */
@@ -41,20 +43,18 @@ export function ConfirmDialog({
   onConfirm,
   describeFailure,
   children,
+  finalFocus,
 }: ConfirmDialogProps) {
   const { t } = useTranslation();
   const [failure, setFailure] = useState<string | null>(null);
   return (
     <AlertDialog
       open={open}
-      onOpenChange={(next) => {
-        if (!next) {
-          setFailure(null);
-          onClose();
-        }
-      }}
+      onOpenChange={(next) => !next && onClose()}
+      // After the exit animation, so the failure does not vanish while the dialog fades.
+      onOpenChangeComplete={(next) => !next && setFailure(null)}
     >
-      <AlertDialogContent>
+      <AlertDialogContent finalFocus={finalFocus}>
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>
           <AlertDialogDescription>{body}</AlertDialogDescription>

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { responseTimeText } from './report-labels.js';
 import {
   agingBucket,
   averageOf,
@@ -185,5 +186,19 @@ describe('responseTime (F15 rule 18.7)', () => {
     expect(responseTime(47.9)).toEqual({ unit: 'hours', value: 47.9 });
     expect(responseTime(48)).toEqual({ unit: 'days', value: 2 });
     expect(responseTime(90)).toEqual({ unit: 'days', value: 3.8 });
+  });
+});
+
+describe('responseTimeText (F15 rule 18.7, report files)', () => {
+  it('prints Arabic plurals, and under an hour when it rounds to none', () => {
+    expect(responseTimeText(0.01)).toBe('أقل من ساعة');
+    expect(responseTimeText(1)).toBe('ساعة واحدة');
+    expect(responseTimeText(2)).toBe('ساعتان');
+    expect(responseTimeText(3)).toBe('3 ساعات');
+    expect(responseTimeText(11)).toBe('11 ساعة');
+    expect(responseTimeText(5.4)).toBe('5.4 ساعة');
+    expect(responseTimeText(48)).toBe('يومان');
+    expect(responseTimeText(72)).toBe('3 أيام');
+    expect(responseTimeText(90)).toBe('3.8 يوم');
   });
 });

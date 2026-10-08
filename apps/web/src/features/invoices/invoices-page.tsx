@@ -37,7 +37,7 @@ import {
   SettingsIcon,
   UserRoundCheckIcon,
 } from 'lucide-react';
-import { type ReactNode, useCallback, useState } from 'react';
+import { type ReactNode, useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LoadError } from '../../components/load-error';
 import { can, canAll, useMe } from '../../lib/auth';
@@ -232,6 +232,8 @@ export function InvoicesPage({ search }: { search: InvoicesSearch }) {
 /** Outstanding and overdue per currency and in USD, over every invoice the filters match. */
 function Totals({ totals }: { totals: InvoicePage['totals'] }) {
   const { t } = useTranslation();
+  // With USD balances only, the total in USD would repeat the USD card.
+  const usdOnly = totals.byCurrency.length === 1 && totals.byCurrency[0]?.currency === 'USD';
   return (
     <section aria-label={t('invoices.totals.label')} className="grid gap-3 sm:grid-cols-3">
       {totals.byCurrency.map((row) => (
@@ -247,15 +249,17 @@ function Totals({ totals }: { totals: InvoicePage['totals'] }) {
           </TotalLine>
         </Card>
       ))}
-      <Card className="gap-2 p-4">
-        <h2 className="text-sm text-muted-foreground">{t('invoices.totals.usd')}</h2>
-        <TotalLine label={t('invoices.totals.outstanding')}>
-          <Money minor={totals.usd.outstandingMinor} currency="USD" className="font-bold" />
-        </TotalLine>
-        <TotalLine label={t('invoices.totals.overdue')}>
-          <Money minor={totals.usd.overdueMinor} currency="USD" />
-        </TotalLine>
-      </Card>
+      {!usdOnly && (
+        <Card className="gap-2 p-4">
+          <h2 className="text-sm text-muted-foreground">{t('invoices.totals.usd')}</h2>
+          <TotalLine label={t('invoices.totals.outstanding')}>
+            <Money minor={totals.usd.outstandingMinor} currency="USD" className="font-bold" />
+          </TotalLine>
+          <TotalLine label={t('invoices.totals.overdue')}>
+            <Money minor={totals.usd.overdueMinor} currency="USD" />
+          </TotalLine>
+        </Card>
+      )}
     </section>
   );
 }
@@ -290,6 +294,7 @@ function Filters({
   );
   const managers = useQuery({ ...userListQuery({ pageSize: 100 }), enabled: scopeAll });
   const [text, setText] = useSearchText(search.search, onChange);
+  const searchField = useRef<HTMLInputElement>(null);
   const mine = search.accountManagerId === me.user.id;
   const accountManager = me.roles.includes('account_manager');
 
@@ -319,6 +324,7 @@ function Filters({
           />
           <Input
             type="search"
+            ref={searchField}
             value={text}
             onChange={(event) => setText(event.target.value)}
             placeholder={t('invoices.search')}
@@ -357,6 +363,7 @@ function Filters({
           <FieldLabel>{t('invoices.filters.dueFrom')}</FieldLabel>
           <Input
             type="date"
+            dir="ltr"
             value={search.dueFrom ?? ''}
             onChange={(event) => onChange({ dueFrom: event.target.value || undefined })}
           />
@@ -365,6 +372,7 @@ function Filters({
           <FieldLabel>{t('invoices.filters.dueTo')}</FieldLabel>
           <Input
             type="date"
+            dir="ltr"
             value={search.dueTo ?? ''}
             onChange={(event) => onChange({ dueTo: event.target.value || undefined })}
           />
@@ -385,7 +393,7 @@ function Filters({
             <Button
               variant="ghost"
               size="sm"
-              onClick={() =>
+              onClick={() => {
                 onChange({
                   search: undefined,
                   clientId: undefined,
@@ -393,8 +401,10 @@ function Filters({
                   accountManagerId: undefined,
                   dueFrom: undefined,
                   dueTo: undefined,
-                })
-              }
+                });
+                // The button leaves with the filters: the focus goes to the search field.
+                searchField.current?.focus();
+              }}
             >
               <FilterXIcon />
               {t('invoices.filters.clear')}

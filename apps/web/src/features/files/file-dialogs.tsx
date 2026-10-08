@@ -31,7 +31,7 @@ import {
   Textarea,
   toast,
 } from '@vertex-hub/ui';
-import { useCallback, useId, useState } from 'react';
+import { type ComponentProps, type RefObject, useCallback, useId, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '../../components/confirm-dialog';
@@ -50,17 +50,31 @@ import {
 import { UploadControl } from './upload-control';
 
 /** "What changed", sent with every file added from the dialog. */
-function NoteField({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+/** A version's note: what changed, or for a new file what it is (`first`). */
+function NoteField({
+  value,
+  onChange,
+  first,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  first?: boolean;
+}) {
   const { t } = useTranslation();
   const id = useId();
   return (
     <Field>
-      <FieldLabel htmlFor={id}>{t('files.note')}</FieldLabel>
+      <FieldLabel htmlFor={id}>
+        {first ? t('files.firstNote') : t('files.note')}
+        {first && (
+          <span className="ms-1 font-normal text-muted-foreground">({t('common.optional')})</span>
+        )}
+      </FieldLabel>
       <Textarea
         id={id}
         rows={2}
         maxLength={FILE_NOTE_MAX}
-        placeholder={t('files.notePlaceholder')}
+        placeholder={first ? t('files.firstNotePlaceholder') : t('files.notePlaceholder')}
         value={value}
         onChange={(event) => onChange(event.target.value)}
       />
@@ -119,6 +133,7 @@ export function AddFilesDialog({
   allowLink,
   withConfidential,
   onClose,
+  finalFocus,
 }: {
   owner: FileOwnerRef;
   fileRole: FileRole;
@@ -128,6 +143,8 @@ export function AddFilesDialog({
   allowLink?: boolean;
   withConfidential?: boolean;
   onClose: () => void;
+  /** Where the focus goes when it closes, when the button that opened it may be gone. */
+  finalFocus?: ComponentProps<typeof DialogContent>['finalFocus'];
 }) {
   const { t } = useTranslation();
   const confidentialId = useId();
@@ -150,13 +167,13 @@ export function AddFilesDialog({
   }, [t, onClose]);
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent closeLabel={t('common.close')}>
+      <DialogContent closeLabel={t('common.close')} finalFocus={finalFocus}>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
         {fileRole === 'brand' && <BrandKindField value={brandKind} onChange={setBrandKind} />}
-        {withNote && <NoteField value={note} onChange={setNote} />}
+        {withNote && <NoteField value={note} onChange={setNote} first />}
         {withConfidential && (
           <label
             htmlFor={confidentialId}
@@ -277,7 +294,17 @@ type Preview = { entries: PreviewEntry[]; index: number } | null;
  * The dialogs behind a list of file items (new version, rename, remove, preview) and the
  * actions its cards call. `allowLink`: new versions may be links.
  */
-export function useFileItemActions(owner: FileOwnerRef, { allowLink }: { allowLink: boolean }) {
+export function useFileItemActions(
+  owner: FileOwnerRef,
+  {
+    allowLink,
+    afterItemRemoved,
+  }: {
+    allowLink: boolean;
+    /** Takes the focus once a removed item leaves the list with the menu that removed it. */
+    afterItemRemoved?: RefObject<HTMLElement | null>;
+  },
+) {
   const { t } = useTranslation();
   const [versioning, setVersioning] = useState<FileItem | null>(null);
   const [renaming, setRenaming] = useState<FileItem | null>(null);
@@ -338,6 +365,11 @@ export function useFileItemActions(owner: FileOwnerRef, { allowLink }: { allowLi
         action={t('files.removeAction')}
         destructive
         pending={archiveItem.isPending || archiveVersion.isPending}
+        finalFocus={() =>
+          (removing?.kind === 'item' && afterItemRemoved?.current?.isConnected
+            ? afterItemRemoved.current
+            : null) ?? true
+        }
         onConfirm={async () => {
           if (removing?.kind === 'item') await archiveItem.mutateAsync(removing.id);
           if (removing?.kind === 'version') await archiveVersion.mutateAsync(removing.id);

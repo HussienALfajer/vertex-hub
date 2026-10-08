@@ -733,6 +733,47 @@
         ]
       }
     },
+    "/api/password-links/check": {
+      "post": {
+        "operationId": "PasswordLinksController_check",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CheckLink"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The link works",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LinkInfo"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "LINK_INVALID: unknown, used, expired or replaced link",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
     "/api/password-links/redeem": {
       "post": {
         "operationId": "PasswordLinksController_redeem",
@@ -1856,9 +1897,7 @@
             "required": false,
             "in": "query",
             "schema": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 100
+              "type": "string"
             }
           },
           {
@@ -3332,6 +3371,18 @@
             }
           },
           {
+            "name": "pendingApproval",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ]
+            }
+          },
+          {
             "name": "archived",
             "required": false,
             "in": "query",
@@ -3865,6 +3916,556 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/CycleLine"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "retainers"
+        ]
+      }
+    },
+    "/api/retainers/{retainerId}/terms": {
+      "get": {
+        "operationId": "RetainerTermsController_list",
+        "parameters": [
+          {
+            "name": "retainerId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The retainer’s terms, newest first; amounts only with money access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RetainerTermList"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "retainers"
+        ]
+      },
+      "post": {
+        "operationId": "RetainerTermsController_create",
+        "parameters": [
+          {
+            "name": "retainerId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRetainerTerm"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The new term with its schedule (client scope and money access). A term starting this month is active at once and drafts the month’s invoice",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RetainerTerm"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "retainers"
+        ]
+      }
+    },
+    "/api/retainers/{retainerId}/terms/{termId}": {
+      "patch": {
+        "operationId": "RetainerTermsController_update",
+        "parameters": [
+          {
+            "name": "retainerId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "termId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateRetainerTerm"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "A scheduled term changes every field; an active term its end action only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RetainerTerm"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "retainers"
+        ]
+      }
+    },
+    "/api/retainers/{retainerId}/terms/{termId}/cancel": {
+      "post": {
+        "operationId": "RetainerTermsController_cancel",
+        "parameters": [
+          {
+            "name": "retainerId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "termId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CancelRetainerTerm"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The cancelled term (scheduled terms only) with its charges cancelled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RetainerTerm"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "retainers"
+        ]
+      }
+    },
+    "/api/retainers/{retainerId}/amendments": {
+      "get": {
+        "operationId": "RetainerAmendmentsController_list",
+        "parameters": [
+          {
+            "name": "retainerId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 1,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 50,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/AmendmentStatus"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AmendmentStatus"
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The retainer’s amendments, newest first; amounts only with money access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AmendmentPage"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "retainers"
+        ]
+      },
+      "post": {
+        "operationId": "RetainerAmendmentsController_create",
+        "parameters": [
+          {
+            "name": "retainerId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAmendment"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The new amendment: applied at once in the current month, scheduled for a later one, or pending approval when it reduces agreed amounts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Amendment"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "retainers"
+        ]
+      }
+    },
+    "/api/retainers/{retainerId}/amendments/preview": {
+      "post": {
+        "operationId": "RetainerAmendmentsController_preview",
+        "parameters": [
+          {
+            "name": "retainerId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAmendment"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "What saving the amendment would do, per month; nothing is saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AmendmentPreview"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "retainers"
+        ]
+      }
+    },
+    "/api/retainers/{retainerId}/amendments/{amendmentId}/approve": {
+      "post": {
+        "operationId": "RetainerAmendmentsController_approve",
+        "parameters": [
+          {
+            "name": "retainerId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "amendmentId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApproveAmendment"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The approved amendment, checked again and applied or scheduled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Amendment"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "retainers"
+        ]
+      }
+    },
+    "/api/retainers/{retainerId}/amendments/{amendmentId}/reject": {
+      "post": {
+        "operationId": "RetainerAmendmentsController_reject",
+        "parameters": [
+          {
+            "name": "retainerId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "amendmentId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RejectAmendment"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The rejected amendment",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Amendment"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "retainers"
+        ]
+      }
+    },
+    "/api/retainers/{retainerId}/amendments/{amendmentId}/withdraw": {
+      "post": {
+        "operationId": "RetainerAmendmentsController_withdraw",
+        "parameters": [
+          {
+            "name": "retainerId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "amendmentId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The withdrawn amendment (its creator or a manager of the retainer)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Amendment"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "retainers"
+        ]
+      }
+    },
+    "/api/retainers/{retainerId}/terms/{termId}/reschedule": {
+      "post": {
+        "operationId": "RetainerAmendmentsController_reschedule",
+        "parameters": [
+          {
+            "name": "retainerId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "termId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RescheduleTerm"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The reschedule, applied at once: unbilled months of the term, same total",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Amendment"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "retainers"
+        ]
+      }
+    },
+    "/api/retainer-amendments": {
+      "get": {
+        "operationId": "PendingAmendmentsController_list",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 1,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 50,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "pending_approval",
+              "type": "string",
+              "enum": [
+                "pending_approval"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Amendments pending approval with their retainer and client, oldest first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RetainerAmendmentPage"
                 }
               }
             }
@@ -8500,11 +9101,150 @@
         ],
         "responses": {
           "200": {
-            "description": "Cycles and extra work with their invoices, and invoices (money access)",
+            "description": "Charges and extra work with their invoices, and invoices (money access)",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/RetainerBilling"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "invoices"
+        ]
+      }
+    },
+    "/api/retainers/{id}/charges": {
+      "get": {
+        "operationId": "InvoiceBillingController_retainerCharges",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 1,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 50,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/RetainerChargeStatus"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RetainerChargeStatus"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "name": "kind",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/RetainerChargeKind"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RetainerChargeKind"
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The retainer's charges with their invoices, newest month first (money access)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RetainerChargePage"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such retainer, or outside read access"
+          }
+        },
+        "tags": [
+          "invoices"
+        ]
+      }
+    },
+    "/api/retainers/{id}/charges/{chargeId}/settle": {
+      "post": {
+        "operationId": "InvoiceBillingController_settleCharge",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "chargeId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SettleRetainerCharge"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "A pending credit no live invoice bills, settled outside the system (F05B C9)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RetainerCharge"
                 }
               }
             }
@@ -13273,6 +14013,12 @@
         "responses": {
           "200": {
             "description": "The productivity report as an Excel file (rule 24)"
+          },
+          "400": {
+            "description": "`INVALID_DATES`: to before from, or over 366 days"
+          },
+          "403": {
+            "description": "A department outside your `reports.read` scope"
           }
         },
         "tags": [
@@ -13353,6 +14099,9 @@
         "responses": {
           "200": {
             "description": "The revenue report as an Excel file with three sheets (rule 15)"
+          },
+          "400": {
+            "description": "`INVALID_DATES`: to before from, or over 366 days"
           }
         },
         "tags": [
@@ -13511,6 +14260,12 @@
         "responses": {
           "200": {
             "description": "The report as an Excel file (rule 24)"
+          },
+          "400": {
+            "description": "`INVALID_MONTH`: a month after the current one"
+          },
+          "404": {
+            "description": "No such client in your `reports.read` scope"
           }
         },
         "tags": [
@@ -13596,6 +14351,12 @@
                 }
               }
             }
+          },
+          "400": {
+            "description": "`INVALID_MONTH`: a month after the current one"
+          },
+          "404": {
+            "description": "No such client in your `reports.read` scope"
           }
         },
         "tags": [
@@ -13779,6 +14540,9 @@
           "project_milestone",
           "retainer",
           "retainer_cycle",
+          "retainer_charge",
+          "retainer_term",
+          "retainer_amendment",
           "extra_work",
           "task",
           "task_checklist_item",
@@ -13823,6 +14587,7 @@
           "user.two_factor_enabled",
           "user.two_factor_disabled",
           "user.two_factor_reset",
+          "user.backup_codes_regenerated",
           "user.profile_updated",
           "department.updated",
           "client.created",
@@ -13868,6 +14633,24 @@
           "retainer_cycle.line_updated",
           "retainer_cycle.line_added",
           "retainer_cycle.adjusted",
+          "retainer_charge.created",
+          "retainer_charge.amount_changed",
+          "retainer_charge.cancelled",
+          "retainer_charge.split",
+          "retainer_charge.settled_outside",
+          "retainer_term.created",
+          "retainer_term.updated",
+          "retainer_term.end_action_changed",
+          "retainer_term.cancelled",
+          "retainer_term.started",
+          "retainer_term.completed",
+          "retainer_term.renewed",
+          "retainer_amendment.created",
+          "retainer_amendment.approved",
+          "retainer_amendment.rejected",
+          "retainer_amendment.withdrawn",
+          "retainer_amendment.applied",
+          "retainer_amendment.cancelled",
           "extra_work.created",
           "extra_work.updated",
           "extra_work.billing_changed",
@@ -14581,6 +15364,7 @@
           "quotes.approve_discount",
           "projects.read",
           "projects.manage",
+          "retainers.approve_reduction",
           "tasks.read",
           "tasks.request",
           "tasks.work",
@@ -14773,9 +15557,7 @@
             "maxLength": 100
           },
           "email": {
-            "type": "string",
-            "format": "email",
-            "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+            "type": "string"
           },
           "primaryDepartmentId": {
             "type": "string",
@@ -14872,9 +15654,7 @@
             "maxLength": 100
           },
           "email": {
-            "type": "string",
-            "format": "email",
-            "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+            "type": "string"
           },
           "primaryDepartmentId": {
             "type": "string",
@@ -15080,24 +15860,46 @@
           }
         }
       },
-      "RedeemLink": {
+      "CheckLink": {
         "type": "object",
         "properties": {
           "token": {
             "type": "string",
             "minLength": 1,
             "maxLength": 200
-          },
-          "password": {
-            "type": "string",
-            "minLength": 12,
-            "maxLength": 128
           }
         },
         "required": [
-          "token",
-          "password"
+          "token"
         ]
+      },
+      "LinkInfo": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "activation",
+              "reset"
+            ]
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+          }
+        },
+        "required": [
+          "kind",
+          "expiresAt",
+          "email"
+        ],
+        "additionalProperties": false
       },
       "ErrorResponse": {
         "type": "object",
@@ -15120,6 +15922,25 @@
         ],
         "additionalProperties": false,
         "description": "An error; `code` tells errors apart"
+      },
+      "RedeemLink": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "password": {
+            "type": "string",
+            "minLength": 12,
+            "maxLength": 128
+          }
+        },
+        "required": [
+          "token",
+          "password"
+        ]
       },
       "RequestPasswordLink": {
         "type": "object",
@@ -20545,6 +21366,14 @@
                     "type": "integer",
                     "minimum": 0,
                     "maximum": 9007199254740991
+                  },
+                  "endAction": {
+                    "nullable": true,
+                    "allOf": [
+                      {
+                        "$ref": "#/components/schemas/TermEndAction"
+                      }
+                    ]
                   }
                 },
                 "required": [
@@ -20708,6 +21537,352 @@
                   "daysLeft",
                   "final",
                   "lines"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "id",
+              "actor",
+              "subject",
+              "count",
+              "read",
+              "createdAt",
+              "updatedAt",
+              "type",
+              "data"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "actor": {
+                "nullable": true,
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "name"
+                ],
+                "additionalProperties": false
+              },
+              "subject": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "$ref": "#/components/schemas/NotificationSubjectType"
+                  },
+                  "id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  }
+                },
+                "required": [
+                  "type",
+                  "id"
+                ],
+                "additionalProperties": false
+              },
+              "count": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "read": {
+                "type": "boolean"
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+              },
+              "updatedAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "retainer_term_renewed"
+                ]
+              },
+              "data": {
+                "type": "object",
+                "properties": {
+                  "retainer": {
+                    "type": "string"
+                  },
+                  "client": {
+                    "type": "string"
+                  },
+                  "termNumber": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  },
+                  "startMonth": {
+                    "type": "string",
+                    "format": "date",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                  },
+                  "endMonth": {
+                    "type": "string",
+                    "format": "date",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                  }
+                },
+                "required": [
+                  "retainer",
+                  "client",
+                  "termNumber",
+                  "startMonth",
+                  "endMonth"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "id",
+              "actor",
+              "subject",
+              "count",
+              "read",
+              "createdAt",
+              "updatedAt",
+              "type",
+              "data"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "actor": {
+                "nullable": true,
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "name"
+                ],
+                "additionalProperties": false
+              },
+              "subject": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "$ref": "#/components/schemas/NotificationSubjectType"
+                  },
+                  "id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  }
+                },
+                "required": [
+                  "type",
+                  "id"
+                ],
+                "additionalProperties": false
+              },
+              "count": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "read": {
+                "type": "boolean"
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+              },
+              "updatedAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "retainer_amendment_pending"
+                ]
+              },
+              "data": {
+                "type": "object",
+                "properties": {
+                  "retainer": {
+                    "type": "string"
+                  },
+                  "client": {
+                    "type": "string"
+                  },
+                  "number": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  },
+                  "moneyDeltaMinor": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "currency": {
+                    "$ref": "#/components/schemas/Currency"
+                  },
+                  "creator": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "retainer",
+                  "client",
+                  "number",
+                  "moneyDeltaMinor",
+                  "currency",
+                  "creator"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "id",
+              "actor",
+              "subject",
+              "count",
+              "read",
+              "createdAt",
+              "updatedAt",
+              "type",
+              "data"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "actor": {
+                "nullable": true,
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "name"
+                ],
+                "additionalProperties": false
+              },
+              "subject": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "$ref": "#/components/schemas/NotificationSubjectType"
+                  },
+                  "id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  }
+                },
+                "required": [
+                  "type",
+                  "id"
+                ],
+                "additionalProperties": false
+              },
+              "count": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "read": {
+                "type": "boolean"
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+              },
+              "updatedAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "retainer_amendment_decided"
+                ]
+              },
+              "data": {
+                "type": "object",
+                "properties": {
+                  "retainer": {
+                    "type": "string"
+                  },
+                  "number": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  },
+                  "approved": {
+                    "type": "boolean"
+                  },
+                  "note": {
+                    "nullable": true,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "retainer",
+                  "number",
+                  "approved",
+                  "note"
                 ],
                 "additionalProperties": false
               }
@@ -21944,6 +23119,14 @@
           "lead"
         ]
       },
+      "TermEndAction": {
+        "type": "string",
+        "enum": [
+          "renew",
+          "end",
+          "continue"
+        ]
+      },
       "DeliverableKind": {
         "type": "string",
         "enum": [
@@ -21956,6 +23139,13 @@
           "ad_campaign",
           "monthly_report",
           "other"
+        ]
+      },
+      "Currency": {
+        "type": "string",
+        "enum": [
+          "USD",
+          "SYP"
         ]
       },
       "ClientEmailKind": {
@@ -22098,6 +23288,9 @@
           "project_manager_assigned",
           "retainer_renewal_due",
           "retainer_behind",
+          "retainer_term_renewed",
+          "retainer_amendment_pending",
+          "retainer_amendment_decided",
           "quote_approval_requested",
           "quote_approval_decided",
           "quote_accepted",
@@ -22115,14 +23308,14 @@
         "type": "object",
         "properties": {
           "mutedTypes": {
-            "maxItems": 56,
+            "maxItems": 59,
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/NotificationType"
             }
           },
           "emailTypes": {
-            "maxItems": 56,
+            "maxItems": 59,
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/NotificationType"
@@ -23404,9 +24597,7 @@
         "type": "object",
         "properties": {
           "tradeName": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 120
+            "type": "string"
           },
           "sector": {
             "nullable": true,
@@ -23440,9 +24631,7 @@
         "type": "object",
         "properties": {
           "tradeName": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 120
+            "type": "string"
           },
           "sector": {
             "nullable": true,
@@ -23522,7 +24711,6 @@
             }
           },
           "files": {
-            "default": [],
             "maxItems": 30,
             "type": "array",
             "items": {
@@ -24364,13 +25552,6 @@
         ],
         "additionalProperties": false
       },
-      "Currency": {
-        "type": "string",
-        "enum": [
-          "USD",
-          "SYP"
-        ]
-      },
       "ProjectPermissions": {
         "type": "object",
         "properties": {
@@ -24758,6 +25939,19 @@
               }
             ]
           },
+          "term": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RetainerTermSummary"
+              }
+            ]
+          },
+          "pendingAmendments": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
           "currentCycle": {
             "nullable": true,
             "allOf": [
@@ -24776,6 +25970,8 @@
           "status",
           "renewalDate",
           "renewal",
+          "term",
+          "pendingAmendments",
           "currentCycle"
         ],
         "additionalProperties": false
@@ -24785,6 +25981,81 @@
         "enum": [
           "due",
           "overdue"
+        ]
+      },
+      "RetainerTermSummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "number": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "status": {
+            "$ref": "#/components/schemas/TermStatus"
+          },
+          "startMonth": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+          },
+          "endMonth": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+          },
+          "months": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "endAction": {
+            "$ref": "#/components/schemas/TermEndAction"
+          },
+          "money": {
+            "type": "object",
+            "properties": {
+              "agreedTotalMinor": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "currentTotalMinor": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "agreedTotalMinor",
+              "currentTotalMinor"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "status",
+          "startMonth",
+          "endMonth",
+          "months",
+          "endAction"
+        ],
+        "additionalProperties": false
+      },
+      "TermStatus": {
+        "type": "string",
+        "enum": [
+          "scheduled",
+          "active",
+          "completed",
+          "cancelled"
         ]
       },
       "Cycle": {
@@ -25006,6 +26277,19 @@
               }
             ]
           },
+          "term": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RetainerTermSummary"
+              }
+            ]
+          },
+          "pendingAmendments": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
           "currentCycle": {
             "nullable": true,
             "allOf": [
@@ -25048,11 +26332,17 @@
                 "type": "integer",
                 "minimum": 0,
                 "maximum": 9007199254740991
+              },
+              "creditPendingMinor": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
               }
             },
             "required": [
               "currency",
-              "monthlyFeeMinor"
+              "monthlyFeeMinor",
+              "creditPendingMinor"
             ],
             "additionalProperties": false
           },
@@ -25069,6 +26359,8 @@
           "status",
           "renewalDate",
           "renewal",
+          "term",
+          "pendingAmendments",
           "currentCycle",
           "startDate",
           "endedOn",
@@ -25201,6 +26493,13 @@
             "items": {
               "$ref": "#/components/schemas/NewDeliverableLine"
             }
+          },
+          "term": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RetainerTermInput"
+              }
+            ]
           }
         },
         "required": [
@@ -25236,6 +26535,44 @@
         "required": [
           "kind",
           "monthlyQuantity"
+        ]
+      },
+      "RetainerTermInput": {
+        "type": "object",
+        "properties": {
+          "months": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 36
+          },
+          "agreedTotalMinor": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "schedule": {
+            "minItems": 1,
+            "maxItems": 36,
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "endAction": {
+            "default": "renew",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TermEndAction"
+              }
+            ]
+          }
+        },
+        "required": [
+          "months",
+          "agreedTotalMinor",
+          "schedule"
         ]
       },
       "UpdateRetainer": {
@@ -25346,10 +26683,36 @@
         "properties": {
           "status": {
             "$ref": "#/components/schemas/RetainerStatus"
+          },
+          "termination": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RetainerTermination"
+              }
+            ]
           }
         },
         "required": [
           "status"
+        ]
+      },
+      "RetainerTermination": {
+        "type": "object",
+        "properties": {
+          "feeMinor": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "feeMinor",
+          "reason"
         ]
       },
       "CyclePage": {
@@ -25650,6 +27013,1078 @@
           "delta",
           "reason"
         ]
+      },
+      "RetainerTermList": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RetainerTerm"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "additionalProperties": false,
+        "description": "Terms, newest first"
+      },
+      "RetainerTerm": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "number": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "status": {
+            "$ref": "#/components/schemas/TermStatus"
+          },
+          "startMonth": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+          },
+          "endMonth": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+          },
+          "months": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "endAction": {
+            "$ref": "#/components/schemas/TermEndAction"
+          },
+          "renewedFrom": {
+            "nullable": true,
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "number": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "id",
+              "number"
+            ],
+            "additionalProperties": false
+          },
+          "cancelledAt": {
+            "nullable": true,
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "cancelReason": {
+            "nullable": true,
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "money": {
+            "type": "object",
+            "properties": {
+              "agreedTotalMinor": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "currentTotalMinor": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "agreedTotalMinor",
+              "currentTotalMinor"
+            ],
+            "additionalProperties": false
+          },
+          "schedule": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RetainerTermMonth"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "status",
+          "startMonth",
+          "endMonth",
+          "months",
+          "endAction",
+          "renewedFrom",
+          "cancelledAt",
+          "cancelReason",
+          "createdAt",
+          "schedule"
+        ],
+        "additionalProperties": false
+      },
+      "RetainerTermMonth": {
+        "type": "object",
+        "properties": {
+          "month": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+          },
+          "position": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "chargeId": {
+            "nullable": true,
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "status": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RetainerChargeStatus"
+              }
+            ]
+          },
+          "due": {
+            "type": "boolean"
+          },
+          "money": {
+            "type": "object",
+            "properties": {
+              "amountMinor": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "baseAmountMinor": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "totalMinor": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "amountMinor",
+              "baseAmountMinor",
+              "totalMinor"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "month",
+          "position",
+          "chargeId",
+          "status",
+          "due"
+        ],
+        "additionalProperties": false
+      },
+      "RetainerChargeStatus": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "cancelled",
+          "settled_outside"
+        ]
+      },
+      "CreateRetainerTerm": {
+        "type": "object",
+        "properties": {
+          "months": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 36
+          },
+          "agreedTotalMinor": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "schedule": {
+            "minItems": 1,
+            "maxItems": 36,
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "endAction": {
+            "default": "renew",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TermEndAction"
+              }
+            ]
+          },
+          "startMonth": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+          }
+        },
+        "required": [
+          "months",
+          "agreedTotalMinor",
+          "schedule",
+          "startMonth"
+        ]
+      },
+      "UpdateRetainerTerm": {
+        "type": "object",
+        "properties": {
+          "months": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 36
+          },
+          "agreedTotalMinor": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "schedule": {
+            "minItems": 1,
+            "maxItems": 36,
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "endAction": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TermEndAction"
+              }
+            ]
+          },
+          "startMonth": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+          }
+        }
+      },
+      "CancelRetainerTerm": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "reason"
+        ]
+      },
+      "AmendmentStatus": {
+        "type": "string",
+        "enum": [
+          "pending_approval",
+          "scheduled",
+          "applied",
+          "rejected",
+          "withdrawn",
+          "cancelled"
+        ]
+      },
+      "AmendmentPage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Amendment"
+            }
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "page",
+          "pageSize"
+        ],
+        "additionalProperties": false
+      },
+      "Amendment": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "retainerId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "number": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "kind": {
+            "$ref": "#/components/schemas/AmendmentKind"
+          },
+          "scope": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AmendmentScope"
+              }
+            ]
+          },
+          "effectiveMonth": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+          },
+          "status": {
+            "$ref": "#/components/schemas/AmendmentStatus"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AmendmentLine"
+            }
+          },
+          "createdBy": {
+            "nullable": true,
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ],
+            "additionalProperties": false
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "decision": {
+            "nullable": true,
+            "type": "object",
+            "properties": {
+              "approved": {
+                "type": "boolean"
+              },
+              "by": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "name"
+                ],
+                "additionalProperties": false
+              },
+              "at": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+              },
+              "note": {
+                "nullable": true,
+                "type": "string"
+              }
+            },
+            "required": [
+              "approved",
+              "by",
+              "at",
+              "note"
+            ],
+            "additionalProperties": false
+          },
+          "appliedAt": {
+            "nullable": true,
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "effects": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AmendmentEffect"
+            }
+          },
+          "money": {
+            "type": "object",
+            "properties": {
+              "amountDeltaMinor": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "moneyDeltaMinor": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "schedule": {
+                "nullable": true,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "month": {
+                      "type": "string",
+                      "format": "date",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                    },
+                    "amountMinor": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": [
+                    "month",
+                    "amountMinor"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "amountDeltaMinor",
+              "moneyDeltaMinor",
+              "schedule"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "id",
+          "retainerId",
+          "number",
+          "kind",
+          "scope",
+          "effectiveMonth",
+          "status",
+          "reason",
+          "lines",
+          "createdBy",
+          "createdAt",
+          "decision",
+          "appliedAt",
+          "effects"
+        ],
+        "additionalProperties": false
+      },
+      "AmendmentKind": {
+        "type": "string",
+        "enum": [
+          "change",
+          "reschedule",
+          "quote_renewal"
+        ]
+      },
+      "AmendmentScope": {
+        "type": "string",
+        "enum": [
+          "month",
+          "onward"
+        ]
+      },
+      "AmendmentLine": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/DeliverableKind"
+          },
+          "label": {
+            "nullable": true,
+            "type": "string"
+          },
+          "quantityDelta": {
+            "nullable": true,
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "quantity": {
+            "nullable": true,
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "revisionLimit": {
+            "nullable": true,
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "position": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "kind",
+          "label",
+          "quantityDelta",
+          "quantity",
+          "revisionLimit",
+          "position"
+        ],
+        "additionalProperties": false
+      },
+      "AmendmentEffect": {
+        "type": "object",
+        "properties": {
+          "month": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+          },
+          "effect": {
+            "$ref": "#/components/schemas/AmendmentEffectKind"
+          },
+          "invoice": {
+            "nullable": true,
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "displayNumber": {
+                "nullable": true,
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "displayNumber"
+            ],
+            "additionalProperties": false
+          },
+          "money": {
+            "type": "object",
+            "properties": {
+              "beforeMinor": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "afterMinor": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "beforeMinor",
+              "afterMinor"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "month",
+          "effect",
+          "invoice"
+        ],
+        "additionalProperties": false
+      },
+      "AmendmentEffectKind": {
+        "type": "string",
+        "enum": [
+          "charge_changed",
+          "draft_synced",
+          "addition",
+          "credit",
+          "fee_changed",
+          "no_cycle"
+        ]
+      },
+      "CreateAmendment": {
+        "type": "object",
+        "properties": {
+          "scope": {
+            "$ref": "#/components/schemas/AmendmentScope"
+          },
+          "effectiveMonth": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+          },
+          "lines": {
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AmendmentLineInput"
+            }
+          },
+          "amountDeltaMinor": {
+            "default": 0,
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "scope",
+          "effectiveMonth",
+          "reason"
+        ]
+      },
+      "AmendmentLineInput": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/DeliverableKind"
+          },
+          "label": {
+            "nullable": true,
+            "type": "string",
+            "maxLength": 60
+          },
+          "quantityDelta": {
+            "type": "integer",
+            "minimum": -999,
+            "maximum": 999
+          },
+          "revisionLimit": {
+            "nullable": true,
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 20
+          }
+        },
+        "required": [
+          "kind",
+          "quantityDelta"
+        ]
+      },
+      "AmendmentPreview": {
+        "type": "object",
+        "properties": {
+          "months": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AmendmentEffect"
+            }
+          },
+          "moneyDeltaMinor": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "needsApproval": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "months",
+          "moneyDeltaMinor",
+          "needsApproval"
+        ],
+        "additionalProperties": false
+      },
+      "ApproveAmendment": {
+        "type": "object",
+        "properties": {
+          "note": {
+            "type": "string",
+            "maxLength": 500
+          }
+        }
+      },
+      "RejectAmendment": {
+        "type": "object",
+        "properties": {
+          "note": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "note"
+        ]
+      },
+      "RescheduleTerm": {
+        "type": "object",
+        "properties": {
+          "schedule": {
+            "minItems": 1,
+            "maxItems": 36,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "month": {
+                  "type": "string",
+                  "format": "date",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                },
+                "amountMinor": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "month",
+                "amountMinor"
+              ]
+            }
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "schedule",
+          "reason"
+        ]
+      },
+      "RetainerAmendmentPage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RetainerAmendment"
+            }
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "page",
+          "pageSize"
+        ],
+        "additionalProperties": false
+      },
+      "RetainerAmendment": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "retainerId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "number": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "kind": {
+            "$ref": "#/components/schemas/AmendmentKind"
+          },
+          "scope": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AmendmentScope"
+              }
+            ]
+          },
+          "effectiveMonth": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+          },
+          "status": {
+            "$ref": "#/components/schemas/AmendmentStatus"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AmendmentLine"
+            }
+          },
+          "createdBy": {
+            "nullable": true,
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ],
+            "additionalProperties": false
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "decision": {
+            "nullable": true,
+            "type": "object",
+            "properties": {
+              "approved": {
+                "type": "boolean"
+              },
+              "by": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "name"
+                ],
+                "additionalProperties": false
+              },
+              "at": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+              },
+              "note": {
+                "nullable": true,
+                "type": "string"
+              }
+            },
+            "required": [
+              "approved",
+              "by",
+              "at",
+              "note"
+            ],
+            "additionalProperties": false
+          },
+          "appliedAt": {
+            "nullable": true,
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "effects": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AmendmentEffect"
+            }
+          },
+          "money": {
+            "type": "object",
+            "properties": {
+              "amountDeltaMinor": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "moneyDeltaMinor": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "schedule": {
+                "nullable": true,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "month": {
+                      "type": "string",
+                      "format": "date",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                    },
+                    "amountMinor": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": [
+                    "month",
+                    "amountMinor"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "amountDeltaMinor",
+              "moneyDeltaMinor",
+              "schedule"
+            ],
+            "additionalProperties": false
+          },
+          "retainer": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "name": {
+                "type": "string"
+              },
+              "currency": {
+                "$ref": "#/components/schemas/Currency"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "currency"
+            ],
+            "additionalProperties": false
+          },
+          "client": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "id",
+          "retainerId",
+          "number",
+          "kind",
+          "scope",
+          "effectiveMonth",
+          "status",
+          "reason",
+          "lines",
+          "createdBy",
+          "createdAt",
+          "decision",
+          "appliedAt",
+          "effects",
+          "retainer",
+          "client"
+        ],
+        "additionalProperties": false
       },
       "ExtraWorkBilling": {
         "type": "string",
@@ -31527,7 +33962,9 @@
           "quote_accepted",
           "milestone_done",
           "cycle_opened",
-          "manual"
+          "manual",
+          "retainer_amendment",
+          "retainer_termination"
         ]
       },
       "InvoicePage": {
@@ -31833,7 +34270,7 @@
               "additionalProperties": false
             }
           },
-          "cycles": {
+          "charges": {
             "type": "array",
             "items": {
               "type": "object",
@@ -31866,10 +34303,12 @@
                   "format": "date",
                   "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
                 },
-                "feeMinor": {
-                  "nullable": true,
+                "kind": {
+                  "$ref": "#/components/schemas/RetainerChargeKind"
+                },
+                "amountMinor": {
                   "type": "integer",
-                  "minimum": 0,
+                  "minimum": -9007199254740991,
                   "maximum": 9007199254740991
                 }
               },
@@ -31877,7 +34316,8 @@
                 "id",
                 "retainer",
                 "month",
-                "feeMinor"
+                "kind",
+                "amountMinor"
               ],
               "additionalProperties": false
             }
@@ -31953,10 +34393,19 @@
         },
         "required": [
           "milestones",
-          "cycles",
+          "charges",
           "extraWork"
         ],
         "additionalProperties": false
+      },
+      "RetainerChargeKind": {
+        "type": "string",
+        "enum": [
+          "monthly",
+          "addition",
+          "credit",
+          "termination_fee"
+        ]
       },
       "InvoiceDetail": {
         "type": "object",
@@ -32339,12 +34788,12 @@
           },
           "unitPriceMinor": {
             "type": "integer",
-            "minimum": 0,
+            "minimum": -9007199254740991,
             "maximum": 9007199254740991
           },
           "totalMinor": {
             "type": "integer",
-            "minimum": 0,
+            "minimum": -9007199254740991,
             "maximum": 9007199254740991
           },
           "source": {
@@ -32449,7 +34898,7 @@
         "type": "string",
         "enum": [
           "milestone",
-          "retainer_cycle",
+          "retainer_charge",
           "extra_work"
         ]
       },
@@ -32778,7 +35227,7 @@
                 },
                 "unitPriceMinor": {
                   "type": "integer",
-                  "minimum": 0,
+                  "minimum": -9007199254740991,
                   "maximum": 9007199254740991
                 },
                 "source": {
@@ -33582,40 +36031,10 @@
             ],
             "additionalProperties": false
           },
-          "cycles": {
+          "charges": {
             "type": "array",
             "items": {
-              "type": "object",
-              "properties": {
-                "id": {
-                  "type": "string",
-                  "format": "uuid",
-                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                },
-                "month": {
-                  "type": "string",
-                  "format": "date",
-                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
-                },
-                "status": {
-                  "$ref": "#/components/schemas/CycleStatus"
-                },
-                "invoice": {
-                  "nullable": true,
-                  "allOf": [
-                    {
-                      "$ref": "#/components/schemas/SourceInvoice"
-                    }
-                  ]
-                }
-              },
-              "required": [
-                "id",
-                "month",
-                "status",
-                "invoice"
-              ],
-              "additionalProperties": false
+              "$ref": "#/components/schemas/RetainerCharge"
             }
           },
           "extraWork": {
@@ -33664,15 +36083,167 @@
             "items": {
               "$ref": "#/components/schemas/Invoice"
             }
+          },
+          "canSettleCredits": {
+            "type": "boolean"
           }
         },
         "required": [
           "retainer",
-          "cycles",
+          "charges",
           "extraWork",
-          "invoices"
+          "invoices",
+          "canSettleCredits"
         ],
         "additionalProperties": false
+      },
+      "RetainerCharge": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "month": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/RetainerChargeKind"
+          },
+          "amountMinor": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "status": {
+            "$ref": "#/components/schemas/RetainerChargeStatus"
+          },
+          "term": {
+            "nullable": true,
+            "type": "object",
+            "properties": {
+              "number": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "position": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "months": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "number",
+              "position",
+              "months"
+            ],
+            "additionalProperties": false
+          },
+          "amendment": {
+            "nullable": true,
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "number": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "id",
+              "number"
+            ],
+            "additionalProperties": false
+          },
+          "settleNote": {
+            "nullable": true,
+            "type": "string"
+          },
+          "due": {
+            "type": "boolean"
+          },
+          "invoice": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SourceInvoice"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "month",
+          "kind",
+          "amountMinor",
+          "status",
+          "term",
+          "amendment",
+          "settleNote",
+          "due",
+          "invoice"
+        ],
+        "additionalProperties": false
+      },
+      "RetainerChargePage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RetainerCharge"
+            }
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "page",
+          "pageSize"
+        ],
+        "additionalProperties": false
+      },
+      "SettleRetainerCharge": {
+        "type": "object",
+        "properties": {
+          "note": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300
+          }
+        },
+        "required": [
+          "note"
+        ]
       },
       "InvoiceEmail": {
         "type": "object",
@@ -37597,6 +40168,9 @@
                   "additionalProperties": false
                 }
               },
+              "term": {
+                "$ref": "#/components/schemas/AcceptTermPlan"
+              },
               "renewable": {
                 "type": "array",
                 "items": {
@@ -37612,12 +40186,22 @@
                     },
                     "status": {
                       "$ref": "#/components/schemas/RetainerStatus"
+                    },
+                    "renewsFrom": {
+                      "type": "string",
+                      "format": "date",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                    },
+                    "afterTerm": {
+                      "type": "boolean"
                     }
                   },
                   "required": [
                     "id",
                     "name",
-                    "status"
+                    "status",
+                    "renewsFrom",
+                    "afterTerm"
                   ],
                   "additionalProperties": false
                 }
@@ -37632,6 +40216,7 @@
               "currency",
               "monthlyFeeMinor",
               "lines",
+              "term",
               "renewable"
             ],
             "additionalProperties": false
@@ -37672,6 +40257,42 @@
           "retainer",
           "archivedTemplates",
           "conversion"
+        ],
+        "additionalProperties": false
+      },
+      "AcceptTermPlan": {
+        "nullable": true,
+        "type": "object",
+        "properties": {
+          "months": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 36
+          },
+          "agreedTotalMinor": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "schedule": {
+            "minItems": 1,
+            "maxItems": 36,
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "endAction": {
+            "$ref": "#/components/schemas/TermEndAction"
+          }
+        },
+        "required": [
+          "months",
+          "agreedTotalMinor",
+          "schedule",
+          "endAction"
         ],
         "additionalProperties": false
       },
@@ -37987,6 +40608,15 @@
                     "type": "string",
                     "format": "uuid",
                     "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "term": {
+                    "default": null,
+                    "nullable": true,
+                    "allOf": [
+                      {
+                        "$ref": "#/components/schemas/RetainerTermInput"
+                      }
+                    ]
                   }
                 },
                 "required": [
@@ -38017,6 +40647,15 @@
                     "type": "string",
                     "format": "uuid",
                     "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "term": {
+                    "default": null,
+                    "nullable": true,
+                    "allOf": [
+                      {
+                        "$ref": "#/components/schemas/RetainerTermInput"
+                      }
+                    ]
                   }
                 },
                 "required": [
@@ -38055,9 +40694,7 @@
                 "type": "object",
                 "properties": {
                   "tradeName": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 120
+                    "type": "string"
                   },
                   "sector": {
                     "nullable": true,

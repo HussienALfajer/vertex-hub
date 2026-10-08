@@ -192,16 +192,32 @@ test('the calendar filters, moves between months and keeps its state in the URL'
   await expect(page.getByRole('link', { name: /كاروسيل أطباق الخريف/ })).toHaveCount(0);
   await page.getByRole('button', { name: ar.content.filters.clear }).click();
 
-  await page.getByRole('button', { name: ar.content.calendar.next.month }).click();
+  await page.getByRole('button', { name: ar.calendar.next.month }).click();
   await expect(page).toHaveURL(/date=2026-11-01/);
   await expect(page.getByRole('link', { name: /حملة تشرين الثاني/ })).toBeVisible();
-  await page.getByRole('button', { name: ar.content.calendar.next.month }).click();
+  await page.getByRole('button', { name: ar.calendar.next.month }).click();
   await expect(page.getByText(ar.content.calendar.emptyTitle)).toBeVisible();
-  await page.getByRole('button', { name: ar.content.calendar.today }).click();
+  await page.getByRole('button', { name: ar.calendar.today }).click();
   await expect(page.getByRole('link', { name: /كاروسيل أطباق الخريف/ })).toBeVisible();
 
   // My posts: nothing waits for a user who is responsible for no post.
   await page.getByRole('tab', { name: ar.content.tabs.mine }).click();
   await expect(page).toHaveURL(/tab=mine/);
   await expect(page.getByText(ar.content.my.emptyTitle)).toBeVisible();
+});
+
+test('recording the client’s changes by hand names every missing field at once', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 1800 });
+  await onToday(page);
+  await mockApi(page, { signedIn: true, me: accountManagerMe, content: true });
+  await page.goto(`/content/posts/${seedIds.coffeeReel}`);
+  await move(page, ar.content.moves.client_changes);
+  const dialog = page.getByRole('dialog');
+  await dialog.getByRole('button', { name: ar.content.moves.client_changes }).click();
+  await expect(dialog.getByText(ar.tasks.move.errors.contact)).toBeVisible();
+  await expect(dialog.getByText(ar.tasks.move.errors.changes)).toBeVisible();
+  // The first one in the dialog takes the focus: the contact.
+  await expect(dialog.getByRole('combobox')).toBeFocused();
 });

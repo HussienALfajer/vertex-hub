@@ -6,7 +6,7 @@ import {
   type CreateClientInput,
   createClientSchema,
 } from '@vertex-hub/contracts';
-import { AscentLines, Avatar, Button, PageHeader, toast } from '@vertex-hub/ui';
+import { AscentLines, Avatar, Button, cn, PageHeader, toast } from '@vertex-hub/ui';
 import { ArrowRightIcon } from 'lucide-react';
 import { useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
@@ -70,7 +70,7 @@ export function NewClientPage() {
       >
         <div className="flex min-w-0 flex-col gap-6">
           <FormSection title={t('clients.form.identity')} hint={t('clients.form.identityHint')}>
-            <TradeNameField form={form} />
+            <TradeNameField form={form} autoFocus />
             <SectorField form={form} />
           </FormSection>
           <FormSection
@@ -106,7 +106,8 @@ function Preview({ form }: { form: ClientFormMethods }) {
   const manager = [...(active.data?.items ?? []), ...(invited.data?.items ?? [])].find(
     (user) => user.id === values.accountManagerId,
   );
-  const name = values.tradeName?.trim() || t('clients.form.tradeNamePlaceholder');
+  // Until a name is typed, the preview names the field rather than showing the example as a name.
+  const name = values.tradeName?.trim();
 
   return (
     <aside
@@ -118,9 +119,16 @@ function Preview({ form }: { form: ClientFormMethods }) {
         {t('clients.new.preview')}
       </p>
       <div className="relative flex items-center gap-3">
-        <Avatar name={name} shape="square" size="lg" />
+        <Avatar
+          name={name || t('clients.form.tradeName')}
+          shape="square"
+          size="lg"
+          tone={name ? 'brand' : 'muted'}
+        />
         <div className="flex min-w-0 flex-col gap-1">
-          <p className="truncate text-lg font-bold">{name}</p>
+          <p className={cn('truncate text-lg font-bold', !name && 'text-muted-foreground')}>
+            {name || t('clients.form.tradeName')}
+          </p>
           <p className="truncate text-sm text-muted-foreground">
             {values.sector?.trim() || t('clients.profile.noSector')}
           </p>

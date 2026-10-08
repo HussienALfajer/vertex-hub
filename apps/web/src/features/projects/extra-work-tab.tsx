@@ -34,6 +34,7 @@ import {
   FieldDescription,
   FieldError,
   FieldLabel,
+  IconButton,
   Input,
   Select,
   SelectContent,
@@ -57,7 +58,7 @@ import {
   UserRoundIcon,
   UserRoundPenIcon,
 } from 'lucide-react';
-import { useId, useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '../../components/confirm-dialog';
@@ -66,9 +67,11 @@ import { LoadError } from '../../components/load-error';
 import { MoneyInput } from '../../components/money-input';
 import { TabHeader } from '../../components/tab-header';
 import { ApiError } from '../../lib/api/client';
-import { errorMessage, fieldError, SCREEN_ERROR } from '../../lib/errors';
+import { errorMessage, errorRole, fieldError, SCREEN_ERROR } from '../../lib/errors';
 import { formatCalendarDate, formatNumber } from '../../lib/format';
 import { formatMoney } from '../../lib/money';
+import { useReturnFocus } from '../../lib/use-return-focus';
+import { useShownWhileClosing } from '../../lib/use-shown-while-closing';
 import { clientQuery } from '../clients/clients.queries';
 import {
   type ExtraWorkParent,
@@ -111,24 +114,49 @@ export function BillingBadge({ status }: { status: ExtraWorkBilling }) {
 export function ExtraWorkTab({ owner }: { owner: ExtraWorkOwner }) {
   const { t } = useTranslation();
   const items = useInfiniteQuery(extraWorkQuery(owner));
+  const archive = useArchiveExtraWork(owner);
   const [logging, setLogging] = useState(false);
+  const [archiving, setArchiving] = useState<{ item: ExtraWork; index: number } | null>(null);
+  // The archived item stays named while the confirmation fades out.
+  const shownArchiving = useShownWhileClosing(archiving);
   const { canLog, canBill, currency } = owner;
+  // Only one "log" button shows at a time (header or empty state): the focus falls back to it
+  // when the button that opened a dialog left with the change.
+  const logButton = useRef<HTMLButtonElement>(null);
+  const heading = useRef<HTMLHeadingElement>(null);
+  const list = useRef<HTMLUListElement>(null);
+  const returnFocus = useReturnFocus(logButton);
 
   const all = items.data?.pages.flatMap((page) => page.items) ?? [];
+
+  /** After an archive: the menu of the item now in its place, the one before, or "log". */
+  function afterArchive() {
+    const menus = list.current?.querySelectorAll<HTMLElement>('[data-focus="menu"]') ?? [];
+    const index = shownArchiving?.index ?? 0;
+    return menus[Math.min(index, menus.length - 1)] ?? returnFocus.target() ?? heading.current;
+  }
+
+  const logAction = canLog && (
+    <Button
+      ref={logButton}
+      size={all.length > 0 ? 'sm' : undefined}
+      onClick={(event) => {
+        returnFocus.from(event.currentTarget);
+        setLogging(true);
+      }}
+    >
+      <PlusIcon />
+      {t('projects.extraWork.log')}
+    </Button>
+  );
 
   return (
     <>
       <TabHeader
         title={t('projects.extraWork.title')}
         description={t('projects.extraWork.hint')}
-        action={
-          canLog && (
-            <Button size="sm" onClick={() => setLogging(true)}>
-              <PlusIcon />
-              {t('projects.extraWork.log')}
-            </Button>
-          )
-        }
+        action={all.length > 0 && logAction}
+        headingRef={heading}
       />
       {items.isPending ? (
         <div className="flex flex-col gap-3">
@@ -142,26 +170,20 @@ export function ExtraWorkTab({ owner }: { owner: ExtraWorkOwner }) {
           icon={<ReceiptTextIcon />}
           title={t('projects.extraWork.emptyTitle')}
           description={canLog ? t('projects.extraWork.emptyHint') : undefined}
-          action={
-            canLog && (
-              <Button onClick={() => setLogging(true)}>
-                <PlusIcon />
-                {t('projects.extraWork.log')}
-              </Button>
-            )
-          }
+          action={logAction}
         />
       ) : (
         <>
           {currency && !items.hasNextPage && <Ledger items={all} currency={currency} />}
-          <ul className="flex flex-col gap-3">
-            {all.map((item) => (
+          <ul ref={list} className="flex flex-col gap-3">
+            {all.map((item, index) => (
               <ExtraWorkItem
                 key={item.id}
                 owner={owner}
                 item={item}
                 canEdit={canLog}
                 canBill={canBill}
+                onArchive={() => setArchiving({ item, index })}
               />
             ))}
           </ul>
@@ -178,7 +200,30 @@ export function ExtraWorkTab({ owner }: { owner: ExtraWorkOwner }) {
           )}
         </>
       )}
-      <ExtraWorkDialog owner={owner} open={logging} onClose={() => setLogging(false)} />
+      {canLog && (
+        <ExtraWorkDialog
+          owner={owner}
+          open={logging}
+          onClose={() => setLogging(false)}
+          finalFocus={() => returnFocus.target() ?? heading.current ?? true}
+        />
+      )}
+      <ConfirmDialog
+        open={archiving !== null}
+        onClose={() => setArchiving(null)}
+        title={t('projects.extraWork.archiveTitle', { title: shownArchiving?.item.title ?? '' })}
+        body={t('projects.extraWork.archiveBody')}
+        action={t('projects.extraWork.archive')}
+        destructive
+        pending={archive.isPending}
+        // Back to the menu that opened it, or the next item's once it is gone.
+        finalFocus={() => afterArchive() ?? true}
+        onConfirm={async () => {
+          if (!archiving) return;
+          await archive.mutateAsync(archiving.item.id);
+          toast.add({ title: t('projects.extraWork.archived'), type: 'success' });
+        }}
+      />
     </>
   );
 }
@@ -218,15 +263,18 @@ function ExtraWorkItem({
   item,
   canEdit,
   canBill,
+  onArchive,
 }: {
   owner: ExtraWorkOwner;
   item: ExtraWork;
   canEdit: boolean;
   canBill: boolean;
+  /** The confirmation lives in the tab: the item leaves with the archive. */
+  onArchive: () => void;
 }) {
   const { t } = useTranslation();
-  const archive = useArchiveExtraWork(owner);
-  const [dialog, setDialog] = useState<'edit' | 'billing' | 'archive' | null>(null);
+  const [dialog, setDialog] = useState<'edit' | 'billing' | null>(null);
+  const menuButton = useRef<HTMLButtonElement>(null);
   const estimate = item.money?.estimateMinor ?? null;
   // Billed work follows its invoice (F13 rule 25): void the invoice to change it.
   const canChangeBilling = canBill && item.billingStatus !== 'billed';
@@ -282,10 +330,10 @@ function ExtraWorkItem({
           <DropdownMenu>
             <DropdownMenuTrigger
               render={
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label={t('projects.extraWork.actions', { title: item.title })}
+                <IconButton
+                  ref={menuButton}
+                  data-focus="menu"
+                  label={t('projects.extraWork.actions', { title: item.title })}
                 />
               }
             >
@@ -307,7 +355,7 @@ function ExtraWorkItem({
               {canEdit && (
                 <>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem variant="destructive" onClick={() => setDialog('archive')}>
+                  <DropdownMenuItem variant="destructive" onClick={onArchive}>
                     <ArchiveIcon />
                     {t('projects.extraWork.archive')}
                   </DropdownMenuItem>
@@ -318,31 +366,24 @@ function ExtraWorkItem({
         )}
       </div>
 
-      <ExtraWorkDialog
-        owner={owner}
-        item={item}
-        open={dialog === 'edit'}
-        onClose={() => setDialog(null)}
-      />
-      <BillingDialog
-        owner={owner}
-        item={item}
-        open={dialog === 'billing'}
-        onClose={() => setDialog(null)}
-      />
-      <ConfirmDialog
-        open={dialog === 'archive'}
-        onClose={() => setDialog(null)}
-        title={t('projects.extraWork.archiveTitle', { title: item.title })}
-        body={t('projects.extraWork.archiveBody')}
-        action={t('projects.extraWork.archive')}
-        destructive
-        pending={archive.isPending}
-        onConfirm={async () => {
-          await archive.mutateAsync(item.id);
-          toast.add({ title: t('projects.extraWork.archived'), type: 'success' });
-        }}
-      />
+      {canEdit && (
+        <ExtraWorkDialog
+          owner={owner}
+          item={item}
+          open={dialog === 'edit'}
+          onClose={() => setDialog(null)}
+          finalFocus={() => menuButton.current ?? true}
+        />
+      )}
+      {canChangeBilling && (
+        <BillingDialog
+          owner={owner}
+          item={item}
+          open={dialog === 'billing'}
+          onClose={() => setDialog(null)}
+          finalFocus={() => menuButton.current ?? true}
+        />
+      )}
     </li>
   );
 }
@@ -355,11 +396,14 @@ function ExtraWorkDialog({
   item,
   open,
   onClose,
+  finalFocus,
 }: {
   owner: ExtraWorkOwner;
   item?: ExtraWork;
   open: boolean;
   onClose: () => void;
+  /** Where the focus goes when it closes: the button that opened it, or a fallback. */
+  finalFocus: () => HTMLElement | true;
 }) {
   const { t } = useTranslation();
   const ids = {
@@ -399,21 +443,23 @@ function ExtraWorkDialog({
     contactItems.push({ value: item.contact.id, label: item.contact.name });
   }
 
-  function close() {
+  // After the exit animation, so the next opening starts afresh. A plain `reset()` would apply
+  // `keepDirtyValues` and keep what was typed.
+  function closed() {
     setFailure(null);
-    form.reset();
-    onClose();
+    form.reset(undefined, { keepDirtyValues: false });
   }
+
+  const futureDate = () =>
+    form.setError(
+      'requestedOn',
+      { type: SCREEN_ERROR, message: t('projects.extraWork.errors.futureDate') },
+      { shouldFocus: true },
+    );
 
   const submit = form.handleSubmit(async (values) => {
     setFailure(null);
-    if (values.requestedOn && values.requestedOn > today) {
-      form.setError('requestedOn', {
-        type: SCREEN_ERROR,
-        message: t('projects.extraWork.errors.futureDate'),
-      });
-      return;
-    }
+    if (values.requestedOn && values.requestedOn > today) return futureDate();
     const dirty = form.formState.dirtyFields;
     try {
       if (item) {
@@ -426,25 +472,24 @@ function ExtraWorkDialog({
           }),
           ...(money && dirty.estimateMinor && { estimateMinor: values.estimateMinor ?? null }),
         };
-        if (Object.keys(changes).length > 0)
-          await update.mutateAsync({ itemId: item.id, ...changes });
+        // Nothing changed: close without a request or a "saved" toast.
+        if (Object.keys(changes).length === 0) return onClose();
+        await update.mutateAsync({ itemId: item.id, ...changes });
         toast.add({ title: t('projects.extraWork.saved'), type: 'success' });
       } else {
         await create.mutateAsync(money ? values : { ...values, estimateMinor: undefined });
         toast.add({ title: t('projects.extraWork.logged'), type: 'success' });
       }
-      close();
+      onClose();
     } catch (error) {
       if (error instanceof ApiError && error.code === 'INVALID_DATES') {
-        form.setError('requestedOn', {
-          type: SCREEN_ERROR,
-          message: t('projects.extraWork.errors.futureDate'),
-        });
+        futureDate();
       } else if (error instanceof ApiError && error.code === 'UNKNOWN_CONTACT') {
-        form.setError('requestedByContactId', {
-          type: SCREEN_ERROR,
-          message: errorMessage(t, error),
-        });
+        form.setError(
+          'requestedByContactId',
+          { type: SCREEN_ERROR, message: errorMessage(t, error) },
+          { shouldFocus: true },
+        );
       } else {
         setFailure(errorMessage(t, error));
       }
@@ -452,8 +497,12 @@ function ExtraWorkDialog({
   });
 
   return (
-    <Dialog open={open} onOpenChange={(next) => !next && close()}>
-      <DialogContent closeLabel={t('common.close')}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => !next && onClose()}
+      onOpenChangeComplete={(next) => !next && closed()}
+    >
+      <DialogContent closeLabel={t('common.close')} finalFocus={finalFocus}>
         <form className="grid gap-5" onSubmit={submit} noValidate>
           <DialogHeader>
             <DialogTitle>
@@ -488,8 +537,14 @@ function ExtraWorkDialog({
               <FieldLabel htmlFor={ids.date}>
                 {t('projects.extraWork.fields.requestedOn')}
               </FieldLabel>
-              <Input id={ids.date} type="date" max={today} {...form.register('requestedOn')} />
-              <FieldError match={!!errors.requestedOn}>
+              <Input
+                id={ids.date}
+                type="date"
+                dir="ltr"
+                max={today}
+                {...form.register('requestedOn')}
+              />
+              <FieldError match={!!errors.requestedOn} role={errorRole(errors.requestedOn)}>
                 {fieldError(errors.requestedOn, t('projects.form.errors.date'))}
               </FieldError>
             </Field>
@@ -508,7 +563,11 @@ function ExtraWorkDialog({
                       field.onChange(!value || value === NO_CONTACT ? null : value)
                     }
                   >
-                    <SelectTrigger aria-labelledby={ids.contact} onBlur={field.onBlur}>
+                    <SelectTrigger
+                      aria-labelledby={ids.contact}
+                      onBlur={field.onBlur}
+                      ref={field.ref}
+                    >
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -521,7 +580,10 @@ function ExtraWorkDialog({
                   </Select>
                 )}
               />
-              <FieldError match={!!errors.requestedByContactId}>
+              <FieldError
+                match={!!errors.requestedByContactId}
+                role={errorRole(errors.requestedByContactId)}
+              >
                 {fieldError(errors.requestedByContactId, t('errors.UNKNOWN_CONTACT'))}
               </FieldError>
             </Field>
@@ -574,11 +636,13 @@ function BillingDialog({
   item,
   open,
   onClose,
+  finalFocus,
 }: {
   owner: ExtraWorkOwner;
   item: ExtraWork;
   open: boolean;
   onClose: () => void;
+  finalFocus: () => HTMLElement | true;
 }) {
   const { t } = useTranslation();
   const ids = { status: useId(), note: useId() };
@@ -591,33 +655,39 @@ function BillingDialog({
     values: { billingStatus: item.billingStatus, billingNote: item.billingNote ?? '' },
   });
   const status = form.watch('billingStatus');
-  const noteError = form.formState.errors.billingNote;
+  const { errors, isDirty } = form.formState;
+  const noteError = errors.billingNote;
 
-  function close() {
+  // After the exit animation, so the next opening starts from the saved status. A plain
+  // `reset()` would apply `keepDirtyValues` and keep what was typed.
+  function closed() {
     setFailure(null);
-    form.reset();
-    onClose();
+    form.reset(undefined, { keepDirtyValues: false });
   }
 
   const submit = form.handleSubmit(async (values) => {
     setFailure(null);
     if (billingNeedsNote(values.billingStatus) && !values.billingNote) {
-      form.setError('billingNote', {
-        type: SCREEN_ERROR,
-        message: t('errors.BILLING_NOTE_REQUIRED'),
-      });
+      form.setError(
+        'billingNote',
+        { type: SCREEN_ERROR, message: t('errors.BILLING_NOTE_REQUIRED') },
+        { shouldFocus: true },
+      );
       return;
     }
+    // Nothing changed: close without a request or a "saved" toast.
+    if (!isDirty) return onClose();
     try {
       await change.mutateAsync({ itemId: item.id, ...values });
       toast.add({ title: t('projects.extraWork.billingSaved'), type: 'success' });
-      close();
+      onClose();
     } catch (error) {
       if (error instanceof ApiError && error.code === 'BILLING_NOTE_REQUIRED') {
-        form.setError('billingNote', {
-          type: SCREEN_ERROR,
-          message: errorMessage(t, error),
-        });
+        form.setError(
+          'billingNote',
+          { type: SCREEN_ERROR, message: errorMessage(t, error) },
+          { shouldFocus: true },
+        );
       } else {
         setFailure(errorMessage(t, error));
       }
@@ -625,8 +695,12 @@ function BillingDialog({
   });
 
   return (
-    <Dialog open={open} onOpenChange={(next) => !next && close()}>
-      <DialogContent closeLabel={t('common.close')}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => !next && onClose()}
+      onOpenChangeComplete={(next) => !next && closed()}
+    >
+      <DialogContent closeLabel={t('common.close')} finalFocus={finalFocus}>
         <form className="grid gap-5" onSubmit={submit} noValidate>
           <DialogHeader>
             <DialogTitle>{t('projects.extraWork.billingTitle', { title: item.title })}</DialogTitle>
@@ -664,7 +738,7 @@ function BillingDialog({
             </FieldLabel>
             <Textarea id={ids.note} rows={2} {...form.register('billingNote')} />
             <FieldDescription>{t(`projects.extraWork.noteHint.${status}`)}</FieldDescription>
-            <FieldError match={!!noteError}>
+            <FieldError match={!!noteError} role={errorRole(noteError)}>
               {fieldError(noteError, t('projects.extraWork.errors.billingNote'))}
             </FieldError>
           </Field>

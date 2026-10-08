@@ -6,7 +6,7 @@ import { ArrowRightIcon, MailCheckIcon } from 'lucide-react';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
-import { AuthHeading, AuthLayout } from '../../components/auth-layout';
+import { AuthHeading, AuthLayout, AuthOutcome } from '../../components/auth-layout';
 import { FormAlert } from '../../components/form-alert';
 import { api, call } from '../../lib/api/client';
 import { errorMessage } from '../../lib/errors';
@@ -17,7 +17,7 @@ import { errorMessage } from '../../lib/errors';
  */
 export function ForgotPasswordPage() {
   const { t } = useTranslation();
-  const [sent, setSent] = useState(false);
+  const [sentTo, setSentTo] = useState<string | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
   const {
     register,
@@ -32,7 +32,7 @@ export function ForgotPasswordPage() {
     setFailure(null);
     try {
       await call(api.POST('/api/password-links/request', { body }));
-      setSent(true);
+      setSentTo(body.email);
     } catch (error) {
       // nginx answers 429 past the sign-in limit (rule 13): "try again later".
       setFailure(errorMessage(t, error));
@@ -41,19 +41,24 @@ export function ForgotPasswordPage() {
 
   return (
     <AuthLayout>
-      {sent ? (
-        <div role="status" className="flex flex-col gap-6">
-          <span className="flex size-12 items-center justify-center rounded-lg bg-status-success text-status-success-foreground">
-            <MailCheckIcon className="size-6" />
-          </span>
-          <AuthHeading
-            title={t('forgotPassword.sentTitle')}
-            subtitle={t('forgotPassword.sentBody')}
-          />
-          <Button size="lg" className="w-full" render={<Link to="/login" />}>
-            {t('forgotPassword.back')}
-          </Button>
-        </div>
+      {sentTo ? (
+        <AuthOutcome
+          icon={<MailCheckIcon />}
+          tone="success"
+          title={t('forgotPassword.sentTitle')}
+          body={t('forgotPassword.sentBody', { email: sentTo })}
+        >
+          <p className="text-sm text-muted-foreground">{t('forgotPassword.sentHint')}</p>
+          <div className="flex flex-col gap-3">
+            <Button size="lg" className="w-full" render={<Link to="/login" />}>
+              {t('forgotPassword.back')}
+            </Button>
+            {/* The form comes back with the address kept, its field focused, ready to correct. */}
+            <Button variant="ghost" className="w-full" onClick={() => setSentTo(null)}>
+              {t('forgotPassword.otherAddress')}
+            </Button>
+          </div>
+        </AuthOutcome>
       ) : (
         <>
           <AuthHeading title={t('forgotPassword.title')} subtitle={t('forgotPassword.subtitle')} />
@@ -63,7 +68,6 @@ export function ForgotPasswordPage() {
               <Input
                 type="email"
                 dir="ltr"
-                className="text-end"
                 autoComplete="username"
                 autoFocus
                 {...register('email')}

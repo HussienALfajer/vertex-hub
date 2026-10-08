@@ -9,7 +9,7 @@ import {
 } from '@vertex-hub/contracts';
 import { Button, EmptyState, Skeleton } from '@vertex-hub/ui';
 import { ArrowLeftIcon, LayersIcon, ListTodoIcon, MilestoneIcon, PlusIcon } from 'lucide-react';
-import { type ReactNode, useState } from 'react';
+import { type ReactNode, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LoadError } from '../../components/load-error';
 import { TabHeader } from '../../components/tab-header';
@@ -42,6 +42,9 @@ export function ProjectTasksTab({
 }) {
   const { t } = useTranslation();
   const [generating, setGenerating] = useState(false);
+  // Opened after creating the project, the dialog has no button to give the focus back to.
+  const generateButton = useRef<HTMLButtonElement>(null);
+  const heading = useRef<HTMLHeadingElement>(null);
   const tasks = useQuery(
     taskListQuery({ projectId: project.id, status: [...TASK_STATUSES], pageSize: TAB_SIZE }),
   );
@@ -65,7 +68,7 @@ export function ProjectTasksTab({
     </Button>
   );
   const generate = canGenerate && (
-    <Button size="sm" variant="outline" onClick={() => setGenerating(true)}>
+    <Button ref={generateButton} size="sm" variant="outline" onClick={() => setGenerating(true)}>
       <LayersIcon />
       {t('templates.generate.fromTemplate')}
     </Button>
@@ -75,6 +78,7 @@ export function ProjectTasksTab({
       target={{ type: 'project', project }}
       initialTemplateId={generateTemplateId}
       open={generating || (!!generateTemplateId && canGenerate)}
+      finalFocus={() => generateButton.current ?? heading.current ?? true}
       onClose={() => {
         setGenerating(false);
         onGenerateClosed();
@@ -133,6 +137,7 @@ export function ProjectTasksTab({
       <TabHeader
         title={t('tasks.projectTab.title')}
         description={t('tasks.projectTab.hint')}
+        headingRef={heading}
         action={
           items.length > 0 && (
             <div className="flex flex-wrap gap-2">
@@ -248,7 +253,7 @@ function TaskGroup({
         )}
         <span className="ms-auto">{newTask}</span>
       </div>
-      <TaskRows tasks={tasks} showAssignee />
+      <TaskRows tasks={tasks} showAssignee inEngagement />
     </section>
   );
 }

@@ -4,8 +4,13 @@ import { calendarDateSchema, timeOfDaySchema } from './dates.js';
 import { departmentCodeSchema } from './departments.js';
 import { clientEmailKindSchema } from './email-basics.js';
 import { pageQuerySchema, pageSchema, queryBooleanSchema } from './lists.js';
-import { minorAmountSchema, signedMinorAmountSchema } from './money.js';
-import { BEHIND_ALERT_DAYS, deliverableKindSchema, RETAINER_LIMITS } from './retainers.js';
+import { currencySchema, minorAmountSchema, signedMinorAmountSchema } from './money.js';
+import {
+  BEHIND_ALERT_DAYS,
+  deliverableKindSchema,
+  RETAINER_LIMITS,
+  termEndActionSchema,
+} from './retainers.js';
 
 /*
  * In-app notifications (spec F14, ADR 0018): a fixed catalog of types, each rendered by the web
@@ -62,6 +67,9 @@ export const NOTIFICATION_TYPES = [
   'project_manager_assigned',
   'retainer_renewal_due',
   'retainer_behind',
+  'retainer_term_renewed',
+  'retainer_amendment_pending',
+  'retainer_amendment_decided',
   'quote_approval_requested',
   'quote_approval_decided',
   'quote_accepted',
@@ -182,6 +190,17 @@ const CATALOG: Record<
   project_manager_assigned: { category: 'clients_projects', subject: 'project', mutable: false },
   retainer_renewal_due: { category: 'reminders', subject: 'retainer', mutable: true },
   retainer_behind: { category: 'reminders', subject: 'retainer', mutable: false },
+  retainer_term_renewed: { category: 'reminders', subject: 'retainer', mutable: true },
+  retainer_amendment_pending: {
+    category: 'clients_projects',
+    subject: 'retainer',
+    mutable: false,
+  },
+  retainer_amendment_decided: {
+    category: 'clients_projects',
+    subject: 'retainer',
+    mutable: false,
+  },
   quote_approval_requested: { category: 'clients_projects', subject: 'quote', mutable: false },
   quote_approval_decided: { category: 'clients_projects', subject: 'quote', mutable: false },
   quote_accepted: { category: 'clients_projects', subject: 'quote', mutable: true },
@@ -399,6 +418,33 @@ export const NOTIFICATION_DATA_SCHEMAS = {
     renewalDate: calendarDateSchema,
     /** 0 once the renewal date is reached. */
     daysLeft: z.number().int().min(0),
+    /** The end action of the retainer's last term; null without a term (F05B T11). */
+    endAction: termEndActionSchema.nullable().optional(),
+  }),
+  /** F05B T7: the job scheduled the next term of a term that renews. */
+  retainer_term_renewed: z.object({
+    retainer: nameSchema,
+    client: nameSchema,
+    termNumber: z.number().int().min(1),
+    startMonth: calendarDateSchema,
+    endMonth: calendarDateSchema,
+  }),
+  /** F05B A4: an amendment that reduces agreed amounts waits for the General Manager. */
+  retainer_amendment_pending: z.object({
+    retainer: nameSchema,
+    client: nameSchema,
+    number: z.number().int().min(1),
+    /** Negative: the reduction over the months it affects. */
+    moneyDeltaMinor: signedMinorAmountSchema,
+    currency: currencySchema,
+    creator: nameSchema,
+  }),
+  /** F05B A4: the General Manager approved or rejected the creator's amendment. */
+  retainer_amendment_decided: z.object({
+    retainer: nameSchema,
+    number: z.number().int().min(1),
+    approved: z.boolean(),
+    note: z.string().nullable(),
   }),
   /** P2A rule 6: the lines of an open cycle that are behind, by position. */
   retainer_behind: z.object({

@@ -173,6 +173,19 @@ describe('shoots (F11 rules 1–9)', () => {
       );
     });
 
+    it('refuses a new shoot task on a past day: it would be due in the past', async () => {
+      await expectError(
+        await cast.book(cast.gm.cookie, {
+          newTask: {},
+          clientId,
+          startsAt: cast.at(-1, '10:00'),
+          endsAt: cast.at(-1, '13:00'),
+        }),
+        400,
+        'INVALID_DATES',
+      );
+    });
+
     it('refuses tasks that are not bookable (rule 2, edge case 1)', async () => {
       const design = await cast.createTask(cast.gm.cookie, { clientId });
       await expectError(

@@ -1,5 +1,8 @@
 import { z } from 'zod';
 
+/** Runs of whitespace inside a text become one space, as a name is typed or pasted. */
+export const singleSpaced = (text: string) => text.replace(/\s+/g, ' ');
+
 /** Optional text: blank input is stored as null. */
 export const optionalText = (max: number) =>
   z

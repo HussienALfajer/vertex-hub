@@ -12,11 +12,12 @@ import {
   Skeleton,
 } from '@vertex-hub/ui';
 import { ChevronLeftIcon, HistoryIcon, PackageCheckIcon } from 'lucide-react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LoadError } from '../../components/load-error';
 import { TabHeader } from '../../components/tab-header';
 import { formatCalendarDate, formatDateTime, formatMonth, formatNumber } from '../../lib/format';
+import { useShownWhileClosing } from '../../lib/use-shown-while-closing';
 import { AdjustmentsList } from './cycle-tab';
 import { DeliverableIcon, DeliveryRate, lineName } from './retainer-badges';
 import { retainerCycleQuery, retainerCyclesQuery } from './retainers.queries';
@@ -29,6 +30,9 @@ export function HistoryTab({ retainer }: { retainer: RetainerDetail }) {
   const { t } = useTranslation();
   const cycles = useInfiniteQuery(retainerCyclesQuery(retainer.id));
   const [openId, setOpenId] = useState<string | null>(null);
+  // The dialog stays mounted, with its last cycle, so it fades out and gives the focus back.
+  const shownId = useShownWhileClosing(openId);
+  const opener = useRef<HTMLElement | null>(null);
   const closed = (cycles.data?.pages.flatMap((page) => page.items) ?? []).filter(
     (cycle) => cycle.status === 'closed',
   );
@@ -53,7 +57,14 @@ export function HistoryTab({ retainer }: { retainer: RetainerDetail }) {
         <>
           <ul aria-label={t('retainers.history.title')} className="flex flex-col gap-3">
             {closed.map((cycle) => (
-              <ClosedCycleRow key={cycle.id} cycle={cycle} onOpen={() => setOpenId(cycle.id)} />
+              <ClosedCycleRow
+                key={cycle.id}
+                cycle={cycle}
+                onOpen={(button) => {
+                  opener.current = button;
+                  setOpenId(cycle.id);
+                }}
+              />
             ))}
           </ul>
           {cycles.hasNextPage && (
@@ -69,14 +80,27 @@ export function HistoryTab({ retainer }: { retainer: RetainerDetail }) {
           )}
         </>
       )}
-      {openId && (
-        <CycleDialog retainerId={retainer.id} cycleId={openId} onClose={() => setOpenId(null)} />
+      {shownId && (
+        <CycleDialog
+          retainerId={retainer.id}
+          cycleId={shownId}
+          open={openId !== null}
+          onClose={() => setOpenId(null)}
+          finalFocus={() => opener.current ?? true}
+        />
       )}
     </>
   );
 }
 
-function ClosedCycleRow({ cycle, onOpen }: { cycle: Cycle; onOpen: () => void }) {
+function ClosedCycleRow({
+  cycle,
+  onOpen,
+}: {
+  cycle: Cycle;
+  /** Receives the row's button, which takes the focus back when the dialog closes. */
+  onOpen: (button: HTMLButtonElement) => void;
+}) {
   const { t } = useTranslation();
   const month = formatMonth(cycle.month);
   const after = cycle.lines.reduce((sum, line) => sum + line.deliveredAfterClose, 0);
@@ -84,7 +108,7 @@ function ClosedCycleRow({ cycle, onOpen }: { cycle: Cycle; onOpen: () => void })
     <li>
       <button
         type="button"
-        onClick={onOpen}
+        onClick={(event) => onOpen(event.currentTarget)}
         aria-label={t('retainers.history.open', { month })}
         className="group flex w-full flex-col gap-3 rounded-lg border border-border bg-surface p-4 text-start transition-colors duration-150 ease-out outline-offset-4 hover:border-primary md:flex-row md:items-center"
       >
@@ -139,18 +163,22 @@ function ClosedCycleRow({ cycle, onOpen }: { cycle: Cycle; onOpen: () => void })
 function CycleDialog({
   retainerId,
   cycleId,
+  open,
   onClose,
+  finalFocus,
 }: {
   retainerId: string;
   cycleId: string;
+  open: boolean;
   onClose: () => void;
+  finalFocus: () => HTMLElement | true;
 }) {
   const { t } = useTranslation();
   const cycle = useQuery(retainerCycleQuery(retainerId, cycleId));
 
   return (
-    <Dialog open onOpenChange={(next) => !next && onClose()}>
-      <DialogContent closeLabel={t('common.close')} className="max-w-2xl">
+    <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
+      <DialogContent closeLabel={t('common.close')} className="max-w-2xl" finalFocus={finalFocus}>
         {cycle.isPending ? (
           <div className="flex flex-col gap-3">
             <Skeleton className="h-7 w-48" />

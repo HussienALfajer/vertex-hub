@@ -34,7 +34,8 @@ const rolesSchema = z.array(assignableRoleSchema).transform((roles) => [...new S
 
 const userFieldsSchema = z.object({
   name: z.string().trim().min(1).max(100),
-  email: z.email().toLowerCase(),
+  /** Trimmed (a pasted address often carries a space) and stored lower-case. */
+  email: z.string().trim().toLowerCase().pipe(z.email()),
   primaryDepartmentId: z.uuid(),
   secondaryDepartmentIds: z.array(z.uuid()).transform((ids) => [...new Set(ids)]),
   title: optionalText(80),
@@ -152,6 +153,19 @@ export const redeemLinkSchema = z
   .meta({ id: 'RedeemLink' });
 
 export type RedeemLink = z.infer<typeof redeemLinkSchema>;
+
+/** Checks a link before the password is typed; it does not use the link up. */
+export const checkLinkSchema = redeemLinkSchema.pick({ token: true }).meta({ id: 'CheckLink' });
+
+export type CheckLink = z.infer<typeof checkLinkSchema>;
+
+/** What the activation page shows for a valid link: the account's email and the link's kind. */
+export const linkInfoResponseSchema = userLinkSchema
+  .pick({ kind: true, expiresAt: true })
+  .extend({ email: z.email() })
+  .meta({ id: 'LinkInfo' });
+
+export type LinkInfoResponse = z.infer<typeof linkInfoResponseSchema>;
 
 /** F14 email rule 13, "forgot password": the address is trimmed and compared case-insensitively. */
 export const requestPasswordLinkSchema = z

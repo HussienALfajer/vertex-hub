@@ -26,7 +26,7 @@ import {
   toast,
 } from '@vertex-hub/ui';
 import { PencilIcon, PlusIcon } from 'lucide-react';
-import { useId, useState } from 'react';
+import { type ComponentProps, useId, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { FormAlert } from '../../components/form-alert';
@@ -99,6 +99,7 @@ function SnapshotContent({
 export function ClientTextSection({ task }: { task: TaskDetail }) {
   const { t } = useTranslation();
   const [editing, setEditing] = useState(false);
+  const editButton = useRef<HTMLButtonElement>(null);
   const canEdit = task.permissions.canEditClientText && !task.readOnly;
   const snapshot = reviewSnapshot(task);
   const reviewed = snapshot?.review.clientText ?? null;
@@ -108,7 +109,7 @@ export function ClientTextSection({ task }: { task: TaskDetail }) {
       title={t('tasks.clientText.title')}
       action={
         canEdit && (
-          <Button variant="ghost" size="sm" onClick={() => setEditing(true)}>
+          <Button ref={editButton} variant="ghost" size="sm" onClick={() => setEditing(true)}>
             {task.clientText ? <PencilIcon /> : <PlusIcon />}
             {task.clientText ? t('tasks.clientText.edit') : t('tasks.clientText.add')}
           </Button>
@@ -139,23 +140,48 @@ export function ClientTextSection({ task }: { task: TaskDetail }) {
           )}
         </div>
       )}
-      {editing && <ClientTextDialog task={task} onClose={() => setEditing(false)} />}
+      {canEdit && (
+        <ClientTextDialog
+          task={task}
+          open={editing}
+          onClose={() => setEditing(false)}
+          finalFocus={() => editButton.current ?? true}
+        />
+      )}
     </TaskSection>
   );
 }
 
-function ClientTextDialog({ task, onClose }: { task: TaskDetail; onClose: () => void }) {
+/** Kept mounted, so it fades out and gives the focus back; each opening starts from the saved text. */
+function ClientTextDialog({
+  task,
+  open,
+  onClose,
+  finalFocus,
+}: {
+  task: TaskDetail;
+  open: boolean;
+  onClose: () => void;
+  finalFocus: () => HTMLElement | true;
+}) {
   const { t } = useTranslation();
   const id = useId();
   const save = useSetClientText(task.id);
   const [failure, setFailure] = useState<string | null>(null);
   const form = useForm<TaskClientTextInput>({
     resolver: standardSchemaResolver(taskClientTextInputSchema),
-    defaultValues: { clientText: task.clientText ?? '' },
+    // Another person's save shows here while the dialog is closed; typed text is kept while open.
+    values: { clientText: task.clientText ?? '' },
+    resetOptions: { keepDirtyValues: true },
   });
   const textError = form.formState.errors.clientText;
   const submit = form.handleSubmit(async (values) => {
     setFailure(null);
+    // Nothing changed: nothing to send.
+    if ((values.clientText ?? null) === (task.clientText ?? null)) {
+      onClose();
+      return;
+    }
     try {
       await save.mutateAsync(values);
       toast.add({ title: t('tasks.clientText.saved'), type: 'success' });
@@ -165,8 +191,17 @@ function ClientTextDialog({ task, onClose }: { task: TaskDetail; onClose: () => 
     }
   });
   return (
-    <Dialog open onOpenChange={(next) => !next && onClose()}>
-      <DialogContent closeLabel={t('common.close')} className="max-w-2xl">
+    <Dialog
+      open={open}
+      onOpenChange={(next) => !next && onClose()}
+      // After the exit animation: unsaved text is dropped (`keepDirtyValues` is not applied).
+      onOpenChangeComplete={(next) => {
+        if (next) return;
+        form.reset({ clientText: task.clientText ?? '' }, { keepDirtyValues: false });
+        setFailure(null);
+      }}
+    >
+      <DialogContent closeLabel={t('common.close')} className="max-w-2xl" finalFocus={finalFocus}>
         <form className="grid gap-5" onSubmit={submit} noValidate>
           <DialogHeader>
             <DialogTitle>{t('tasks.clientText.dialogTitle')}</DialogTitle>
@@ -207,11 +242,15 @@ export type MedicalDecision = MedicalReview['decision'];
 export function MedicalReviewDialog({
   task,
   decision,
+  open,
   onClose,
+  finalFocus,
 }: {
   task: TaskDetail;
   decision: MedicalDecision;
+  open: boolean;
   onClose: () => void;
+  finalFocus: ComponentProps<typeof DialogContent>['finalFocus'];
 }) {
   const { t } = useTranslation();
   const id = useId();
@@ -242,8 +281,17 @@ export function MedicalReviewDialog({
     }
   });
   return (
-    <Dialog open onOpenChange={(next) => !next && onClose()}>
-      <DialogContent closeLabel={t('common.close')}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => !next && onClose()}
+      // After the exit animation, so the note does not empty while the dialog fades.
+      onOpenChangeComplete={(next) => {
+        if (next) return;
+        form.reset();
+        setFailure(null);
+      }}
+    >
+      <DialogContent closeLabel={t('common.close')} finalFocus={finalFocus}>
         <form className="grid gap-5" onSubmit={submit} noValidate>
           <DialogHeader>
             <DialogTitle>

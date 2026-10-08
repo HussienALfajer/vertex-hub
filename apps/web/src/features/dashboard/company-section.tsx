@@ -277,7 +277,8 @@ function RetainersBehind({ data }: { data: CompanyDashboard }) {
         <ul className="flex flex-col divide-y divide-border">
           {data.retainersBehind.map((row) => (
             <li key={row.cycleId} className="flex flex-wrap items-center gap-x-4 gap-y-1 py-2">
-              <span className="flex min-w-0 flex-1 flex-col">
+              {/* A base width: on a phone the badge and the rate wrap under the name. */}
+              <span className="flex min-w-0 flex-1 basis-48 flex-col">
                 <Link
                   to="/retainers/$retainerId"
                   params={{ retainerId: row.retainer.id }}

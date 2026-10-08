@@ -41,7 +41,12 @@ function FieldDescription({ className, ...props }: FieldPrimitive.Description.Pr
 }
 
 /** Pass `match` to show it: `true` for errors computed outside the browser's validity API. */
+/**
+ * With a boolean `match`, the form decides alone. Base UI would also show the error while the
+ * input's own validity fails (a date past `max`), and keep it after the value is fixed.
+ */
 function FieldError({ className, ...props }: FieldPrimitive.Error.Props) {
+  if (props.match === false) return null;
   return (
     <FieldPrimitive.Error
       data-slot="field-error"

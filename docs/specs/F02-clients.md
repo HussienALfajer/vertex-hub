@@ -56,7 +56,7 @@ Module ownership: the `clients` module owns `clients`, `client_contacts`, `clien
 | Field | Type | Rules |
 |---|---|---|
 | `id` | uuid | `id()` |
-| `trade_name` | text | required, trimmed, 1–120 chars; unique case-insensitively among non-archived clients (unique index on `lower(trade_name)` where `archived_at is null`) |
+| `trade_name` | text | required, trimmed, runs of inner spaces collapsed to one (migration 0053), 1–120 chars; unique case-insensitively among non-archived clients (unique index on `lower(trade_name)` where `archived_at is null`) |
 | `sector` | text | optional, trimmed, 1–60 chars; indexed for the filter; suggestions come from the distinct values in use |
 | `account_manager_id` | uuid → `users.id` | required, indexed; the primary account manager |
 | `status` | enum `client_status` (`active`, `paused`, `ended`) | required, default `active`, indexed |
@@ -67,12 +67,12 @@ Module ownership: the `clients` module owns `clients`, `client_contacts`, `clien
 `brandKitSchema` (in `packages/contracts/src/clients.ts`); the kit is read and replaced as a whole:
 | Field | Type | Rules |
 |---|---|---|
-| `colors` | `{ name?: string; hex: string }[]` | ≤ 20; `hex` is `#RRGGBB`, stored upper-case; `name` 1–40 chars |
+| `colors` | `{ name?: string; hex: string }[]` | ≤ 20; `hex` is `#RRGGBB`, stored upper-case, a repeated `hex` kept once; `name` 1–40 chars |
 | `fonts` | string[] | ≤ 10; each 1–60 chars, trimmed, unique case-insensitively |
 | `toneOfVoice` | string | optional, ≤ 2000 chars |
 | `forbiddenWords` | string[] | ≤ 100; each 1–60 chars, trimmed, unique case-insensitively |
-| `files` | `{ kind: 'logo' \| 'font' \| 'guidelines' \| 'other'; label: string; url: string }[]` | ≤ 30; `label` 1–80 chars; `url` http(s), ≤ 2048 chars |
-| `references` | `{ kind: 'liked' \| 'disliked'; url: string; note?: string }[]` | ≤ 50; `url` http(s), ≤ 2048 chars; `note` ≤ 300 chars |
+| `files` | `{ kind: 'logo' \| 'font' \| 'guidelines' \| 'other'; label: string; url: string }[]` | ≤ 30; `label` 1–80 chars; `url` http(s), ≤ 2048 chars, a repeated `url` kept once |
+| `references` | `{ kind: 'liked' \| 'disliked'; url: string; note?: string }[]` | ≤ 50; `url` http(s), ≤ 2048 chars, a repeated `url` kept once; `note` ≤ 300 chars |
 
 Brand files are links in V1; F10 adds uploaded files to the kit.
 
@@ -132,7 +132,7 @@ Status is the business state. Archiving is separate and only for records entered
 3. Moving a client from `ended` to `active` or `paused`, or restoring a client that is `active` or `paused`, also requires a valid account manager (rule 2) (`INVALID_ACCOUNT_MANAGER`). Other edits of an ended client whose account manager has since been archived or lost the role are allowed.
 4. An Account Manager's `own_clients` scope covers the non-archived clients whose `account_manager_id` is them. A change of account manager applies to the old and new manager on their next request.
 5. Only scope-all holders create clients, change the account manager, change the healthcare flag, archive and restore (403 for everyone else, including the client's own account manager).
-6. Trade names are unique case-insensitively among non-archived clients (`CLIENT_NAME_TAKEN`), checked on create, rename and restore.
+6. Trade names are unique case-insensitively among non-archived clients (`CLIENT_NAME_TAKEN`), checked on create, rename and restore. Spaces inside a name count once: "Cafe   One" is stored as "Cafe One", and searches collapse them the same way.
 7. An archived client cannot be edited, and nothing can be added to it (contacts, platform accounts, notes, brand kit) (`CLIENT_ARCHIVED`). Restoring is the only change.
 8. A user who is primary account manager of an `active` or `paused` non-archived client cannot be archived or lose the Account Manager role until each such client gets another account manager (`USER_HAS_RESPONSIBILITIES`, listing the clients). This extends F01 rule 9 ("an active client" there means `active` or `paused`). Ended clients do not block.
 9. Any number of contacts may have final-approval authority, including none. A non-archived client without such a contact shows a warning on its profile and in the list. F09 refuses to send an approval link for a client without one.

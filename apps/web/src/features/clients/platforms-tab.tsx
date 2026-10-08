@@ -28,6 +28,7 @@ import {
   FieldDescription,
   FieldError,
   FieldLabel,
+  IconButton,
   Input,
   PlatformMark,
   Select,
@@ -51,7 +52,7 @@ import {
   ShareIcon,
   Trash2Icon,
 } from 'lucide-react';
-import { useId, useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import { Controller, useForm, useWatch } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '../../components/confirm-dialog';
@@ -59,6 +60,8 @@ import { FormAlert } from '../../components/form-alert';
 import { TabHeader } from '../../components/tab-header';
 import { errorMessage } from '../../lib/errors';
 import { formatLink, formatNumber } from '../../lib/format';
+import { useReturnFocus } from '../../lib/use-return-focus';
+import { useShownWhileClosing } from '../../lib/use-shown-while-closing';
 import { PlatformAccessBadge } from './client-badges';
 import {
   useArchivePlatformAccount,
@@ -83,12 +86,24 @@ export function PlatformsTab({
   const { t } = useTranslation();
   const [editing, setEditing] = useState<Editing>(null);
   const [removing, setRemoving] = useState<PlatformAccount | null>(null);
+  // The removed account stays named while the confirmation fades out.
+  const shownRemoving = useShownWhileClosing(removing);
   const archive = useArchivePlatformAccount(client.id);
+  // Only one "add" button shows at a time (header or empty state): the focus falls back to it
+  // when the button that opened a dialog left with the change (a removed card).
+  const addButton = useRef<HTMLButtonElement>(null);
+  const returnFocus = useReturnFocus(addButton);
   const accounts = client.platformAccounts;
   const granted = accounts.filter((account) => account.agencyAccess === 'granted').length;
 
-  const addButton = editable && (
-    <Button onClick={() => setEditing('new')}>
+  const addAction = editable && (
+    <Button
+      ref={addButton}
+      onClick={(event) => {
+        returnFocus.from(event.currentTarget);
+        setEditing('new');
+      }}
+    >
       <PlusIcon />
       {t('clients.platforms.add')}
     </Button>
@@ -106,14 +121,16 @@ export function PlatformsTab({
               })
             : t('clients.platforms.description')
         }
-        action={accounts.length > 0 && addButton}
+        action={accounts.length > 0 && addAction}
       />
       {accounts.length === 0 ? (
         <EmptyState
           icon={<ShareIcon />}
           title={t('clients.platforms.emptyTitle')}
-          description={t('clients.platforms.emptyHint')}
-          action={addButton}
+          description={
+            editable ? t('clients.platforms.emptyHint') : t('clients.platforms.emptyReadOnlyHint')
+          }
+          action={addAction}
         />
       ) : (
         <ul className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -122,8 +139,14 @@ export function PlatformsTab({
               <AccountCard
                 account={account}
                 editable={editable}
-                onEdit={() => setEditing(account)}
-                onRemove={() => setRemoving(account)}
+                onEdit={(opener) => {
+                  returnFocus.from(opener);
+                  setEditing(account);
+                }}
+                onRemove={(opener) => {
+                  returnFocus.from(opener);
+                  setRemoving(account);
+                }}
               />
             </li>
           ))}
@@ -131,18 +154,24 @@ export function PlatformsTab({
       )}
 
       {editable && (
-        <AccountDialog clientId={client.id} editing={editing} onClose={() => setEditing(null)} />
+        <AccountDialog
+          clientId={client.id}
+          editing={editing}
+          onClose={() => setEditing(null)}
+          finalFocus={returnFocus.target}
+        />
       )}
       <ConfirmDialog
         open={removing !== null}
         onClose={() => setRemoving(null)}
         title={t('clients.platforms.removeTitle', {
-          name: removing ? accountName(t, removing) : '',
+          name: shownRemoving ? accountName(t, shownRemoving) : '',
         })}
         body={t('clients.platforms.removeBody')}
         action={t('clients.platforms.remove')}
         destructive
         pending={archive.isPending}
+        finalFocus={() => returnFocus.target() ?? true}
         onConfirm={async () => {
           if (!removing) return;
           await archive.mutateAsync(removing.id);
@@ -161,10 +190,12 @@ function AccountCard({
 }: {
   account: PlatformAccount;
   editable: boolean;
-  onEdit: () => void;
-  onRemove: () => void;
+  /** Each gets the menu's button, where the focus returns. */
+  onEdit: (opener: HTMLElement | null) => void;
+  onRemove: (opener: HTMLElement | null) => void;
 }) {
   const { t } = useTranslation();
+  const menuButton = useRef<HTMLButtonElement>(null);
   const name = accountName(t, account);
   return (
     <Card className="h-full gap-4 p-5">
@@ -182,22 +213,18 @@ function AccountCard({
           <DropdownMenu>
             <DropdownMenuTrigger
               render={
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label={t('clients.platforms.actions', { name })}
-                />
+                <IconButton ref={menuButton} label={t('clients.platforms.actions', { name })} />
               }
             >
               <EllipsisIcon />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={onEdit}>
+              <DropdownMenuItem onClick={() => onEdit(menuButton.current)}>
                 <PencilIcon />
                 {t('clients.platforms.edit')}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem variant="destructive" onClick={onRemove}>
+              <DropdownMenuItem variant="destructive" onClick={() => onRemove(menuButton.current)}>
                 <Trash2Icon />
                 {t('clients.platforms.remove')}
               </DropdownMenuItem>
@@ -245,50 +272,62 @@ const emptyAccount: CreatePlatformAccountInput = {
   adminNote: '',
 };
 
+const accountValues = (account: PlatformAccount | null): CreatePlatformAccountInput =>
+  account
+    ? {
+        platform: account.platform,
+        label: account.label ?? '',
+        url: account.url,
+        agencyAccess: account.agencyAccess,
+        adminNote: account.adminNote ?? '',
+      }
+    : emptyAccount;
+
 function AccountDialog({
   clientId,
   editing,
   onClose,
+  finalFocus,
 }: {
   clientId: string;
   editing: Editing;
   onClose: () => void;
+  /** Where the focus goes when it closes: the button that opened it, or a fallback. */
+  finalFocus: () => HTMLElement | null;
 }) {
   const { t } = useTranslation();
   const ids = { platform: useId(), access: useId() };
   const create = useCreatePlatformAccount(clientId);
   const update = useUpdatePlatformAccount(clientId);
   const [failure, setFailure] = useState<string | null>(null);
-  const account = editing === 'new' ? null : editing;
+  // The title and fields stay while the dialog fades out.
+  const shown = useShownWhileClosing(editing);
+  const account = shown === 'new' ? null : shown;
   const form = useForm<CreatePlatformAccountInput, unknown, CreatePlatformAccount>({
     resolver: standardSchemaResolver(createPlatformAccountSchema),
     // A refetch keeps what the user already changed.
     resetOptions: { keepDirtyValues: true },
-    values: account
-      ? {
-          platform: account.platform,
-          label: account.label ?? '',
-          url: account.url,
-          agencyAccess: account.agencyAccess,
-          adminNote: account.adminNote ?? '',
-        }
-      : emptyAccount,
+    values: accountValues(account),
   });
-  const { errors } = form.formState;
+  // Read while rendering: React Hook Form updates only the state a component reads.
+  const { errors, isDirty } = form.formState;
   const platform = useWatch({ control: form.control, name: 'platform' });
   const platformItems = CLIENT_PLATFORMS.map((value) => ({
     value,
     label: t(`clients.platforms.names.${value}`),
   }));
 
-  function close() {
+  // After the exit animation, so the next opening starts afresh. A plain `reset()` would apply
+  // `keepDirtyValues` and keep what was typed.
+  function closed() {
     setFailure(null);
-    form.reset(emptyAccount);
-    onClose();
+    form.reset(accountValues(account), { keepDirtyValues: false });
   }
 
   const submit = form.handleSubmit(async (values) => {
     setFailure(null);
+    // Nothing changed: close without a request or a "saved" toast.
+    if (account && !isDirty) return onClose();
     try {
       if (account) {
         await update.mutateAsync({ accountId: account.id, ...values });
@@ -297,15 +336,23 @@ function AccountDialog({
         await create.mutateAsync(values);
         toast.add({ title: t('clients.platforms.added'), type: 'success' });
       }
-      close();
+      onClose();
     } catch (error) {
       setFailure(errorMessage(t, error));
     }
   });
 
   return (
-    <Dialog open={editing !== null} onOpenChange={(open) => !open && close()}>
-      <DialogContent closeLabel={t('common.close')} className="max-w-xl">
+    <Dialog
+      open={editing !== null}
+      onOpenChange={(open) => !open && onClose()}
+      onOpenChangeComplete={(open) => !open && closed()}
+    >
+      <DialogContent
+        closeLabel={t('common.close')}
+        className="max-w-xl"
+        finalFocus={() => finalFocus() ?? true}
+      >
         <form className="grid gap-5" onSubmit={submit} noValidate>
           <DialogHeader>
             <DialogTitle>
@@ -360,7 +407,6 @@ function AccountDialog({
             <Input
               type="url"
               dir="ltr"
-              className="text-end"
               placeholder={t('clients.brandKit.form.urlPlaceholder')}
               autoComplete="off"
               {...form.register('url')}

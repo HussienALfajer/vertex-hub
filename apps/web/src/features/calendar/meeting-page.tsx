@@ -28,6 +28,9 @@ import {
   FieldLabel,
   Skeleton,
   Textarea,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
   toast,
 } from '@vertex-hub/ui';
 import {
@@ -42,7 +45,7 @@ import {
   TriangleAlertIcon,
   VideoIcon,
 } from 'lucide-react';
-import { type ReactNode, useState } from 'react';
+import { type ReactNode, type RefObject, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '../../components/confirm-dialog';
 import { FormAlert } from '../../components/form-alert';
@@ -50,6 +53,7 @@ import { isMissing, LoadError } from '../../components/load-error';
 import { can, useMe } from '../../lib/auth';
 import { errorMessage } from '../../lib/errors';
 import { formatDateTime, formatLinkHost, formatNumber, formatWeekdayDate } from '../../lib/format';
+import { type ReturnFocus, useReturnFocus } from '../../lib/use-return-focus';
 import { PersonName } from '../projects/project-badges';
 import { TaskSection } from '../tasks/task-parts';
 import {
@@ -112,10 +116,13 @@ export function MeetingStatusBadge({ status }: { status: MeetingStatus }) {
 function MeetingView({ meeting }: { meeting: MeetingDetail }) {
   const { t } = useTranslation();
   const me = useMe();
+  // Cancelling, archiving and restoring take their own button off the page.
+  const heading = useRef<HTMLHeadingElement>(null);
+  const returnFocus = useReturnFocus(heading);
   return (
     <>
-      <MeetingHero meeting={meeting} />
-      <Banners meeting={meeting} />
+      <MeetingHero meeting={meeting} heading={heading} returnFocus={returnFocus} />
+      <Banners meeting={meeting} returnFocus={returnFocus} />
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
         <div className="flex min-w-0 flex-col gap-6">
           <TaskSection
@@ -149,12 +156,20 @@ function MeetingView({ meeting }: { meeting: MeetingDetail }) {
   );
 }
 
-function MeetingHero({ meeting }: { meeting: MeetingDetail }) {
+function MeetingHero({
+  meeting,
+  heading,
+  returnFocus,
+}: {
+  meeting: MeetingDetail;
+  heading: RefObject<HTMLHeadingElement | null>;
+  returnFocus: ReturnFocus;
+}) {
   const { t } = useTranslation();
   const clientLabel = useClientLabel();
   return (
     <section className="flex flex-col gap-5 rounded-lg border border-border bg-surface p-6">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-start">
         <div className="flex min-w-0 flex-1 flex-col gap-3">
           <p className="text-sm text-muted-foreground">
             {meeting.client ? (
@@ -169,7 +184,9 @@ function MeetingHero({ meeting }: { meeting: MeetingDetail }) {
               t('calendar.internal')
             )}
           </p>
-          <h1 className="text-2xl font-bold">{meeting.title}</h1>
+          <h1 ref={heading} tabIndex={-1} className="text-2xl font-bold wrap-anywhere">
+            {meeting.title}
+          </h1>
           <div className="flex flex-wrap items-center gap-2">
             <MeetingStatusBadge status={meeting.status} />
             {meeting.conflict && <ConflictBadge />}
@@ -181,7 +198,7 @@ function MeetingHero({ meeting }: { meeting: MeetingDetail }) {
             )}
           </div>
         </div>
-        <MeetingActions meeting={meeting} />
+        <MeetingActions meeting={meeting} returnFocus={returnFocus} />
       </div>
       <dl className="grid gap-4 border-t border-border pt-5 text-sm sm:grid-cols-2 lg:grid-cols-4">
         <Fact label={t('calendar.shoot.time')}>
@@ -233,63 +250,110 @@ function Fact({ label, children }: { label: string; children: ReactNode }) {
 type Open = 'edit' | 'cancel' | 'archive' | null;
 
 /** The online link for everyone, then what the caller may do, from the server's answer. */
-function MeetingActions({ meeting }: { meeting: MeetingDetail }) {
+function MeetingActions({
+  meeting,
+  returnFocus,
+}: {
+  meeting: MeetingDetail;
+  returnFocus: ReturnFocus;
+}) {
   const { t } = useTranslation();
-  const [open, setOpen] = useState<Open>(null);
+  const [open, setOpenState] = useState<Open>(null);
+  const menuButton = useRef<HTMLButtonElement>(null);
+  const setOpen = (next: Exclude<Open, null>, opener: HTMLElement | null) => {
+    returnFocus.from(opener);
+    setOpenState(next);
+  };
+  const close = () => setOpenState(null);
   const archive = useArchiveMeeting(meeting.id);
   const { canEdit, canCancel, canArchive } = meeting.permissions;
   const archived = meeting.archivedAt !== null;
   const menu = canCancel || (canArchive && !archived);
   const joinable = meeting.onlineUrl && meeting.status === 'scheduled' && !archived;
-  if (!joinable && !canEdit && !menu) return null;
+  // The dialogs outlive the buttons: a cancelled meeting has none left, and its dialog still
+  // fades out and gives the focus to the heading.
+  const buttons = joinable || canEdit || menu;
 
   return (
-    <div className="flex shrink-0 flex-wrap items-center gap-2">
-      {meeting.onlineUrl && joinable && (
-        <Button render={<a href={meeting.onlineUrl} target="_blank" rel="noreferrer" />}>
-          <VideoIcon />
-          {t('calendar.meetings.join', { host: formatLinkHost(meeting.onlineUrl) })}
-        </Button>
+    <>
+      {buttons && (
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          {meeting.onlineUrl && joinable && (
+            <Button render={<a href={meeting.onlineUrl} target="_blank" rel="noreferrer" />}>
+              <VideoIcon />
+              {t('calendar.meetings.join', { host: formatLinkHost(meeting.onlineUrl) })}
+            </Button>
+          )}
+          {canEdit && (
+            <Button variant="outline" onClick={(event) => setOpen('edit', event.currentTarget)}>
+              <PencilIcon />
+              {t('calendar.meetings.actions.edit')}
+            </Button>
+          )}
+          {menu && (
+            <DropdownMenu>
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <DropdownMenuTrigger
+                      render={
+                        <Button
+                          ref={menuButton}
+                          variant="outline"
+                          size="icon"
+                          aria-label={t('calendar.actions.more')}
+                        />
+                      }
+                    />
+                  }
+                >
+                  <EllipsisIcon />
+                </TooltipTrigger>
+                <TooltipContent>{t('calendar.actions.more')}</TooltipContent>
+              </Tooltip>
+              <DropdownMenuContent align="end">
+                {canCancel && (
+                  <DropdownMenuItem
+                    variant="destructive"
+                    onClick={() => setOpen('cancel', menuButton.current)}
+                  >
+                    <BanIcon />
+                    {t('calendar.meetings.actions.cancel')}
+                  </DropdownMenuItem>
+                )}
+                {canArchive && !archived && (
+                  <>
+                    {canCancel && <DropdownMenuSeparator />}
+                    <DropdownMenuItem
+                      variant="destructive"
+                      onClick={() => setOpen('archive', menuButton.current)}
+                    >
+                      <ArchiveIcon />
+                      {t('calendar.meetings.actions.archive')}
+                    </DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+        </div>
       )}
-      {canEdit && (
-        <Button variant="outline" onClick={() => setOpen('edit')}>
-          <PencilIcon />
-          {t('calendar.meetings.actions.edit')}
-        </Button>
-      )}
-      {menu && (
-        <DropdownMenu>
-          <DropdownMenuTrigger
-            render={
-              <Button variant="outline" size="icon" aria-label={t('calendar.actions.more')} />
-            }
-          >
-            <EllipsisIcon />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            {canCancel && (
-              <DropdownMenuItem variant="destructive" onClick={() => setOpen('cancel')}>
-                <BanIcon />
-                {t('calendar.meetings.actions.cancel')}
-              </DropdownMenuItem>
-            )}
-            {canArchive && !archived && (
-              <>
-                {canCancel && <DropdownMenuSeparator />}
-                <DropdownMenuItem variant="destructive" onClick={() => setOpen('archive')}>
-                  <ArchiveIcon />
-                  {t('calendar.meetings.actions.archive')}
-                </DropdownMenuItem>
-              </>
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      )}
-      {open === 'edit' && <MeetingDialog meeting={meeting} onClose={() => setOpen(null)} />}
-      {open === 'cancel' && <CancelDialog meeting={meeting} onClose={() => setOpen(null)} />}
+      <MeetingDialog
+        meeting={meeting}
+        open={open === 'edit'}
+        onClose={close}
+        finalFocus={returnFocus.target}
+      />
+      <CancelDialog
+        meeting={meeting}
+        open={open === 'cancel'}
+        onClose={close}
+        finalFocus={returnFocus.target}
+      />
       <ConfirmDialog
         open={open === 'archive'}
-        onClose={() => setOpen(null)}
+        onClose={close}
+        finalFocus={returnFocus.target}
         title={t('calendar.meetings.archive.title', { title: meeting.title })}
         body={t('calendar.meetings.archive.body')}
         action={t('calendar.meetings.actions.archive')}
@@ -300,12 +364,34 @@ function MeetingActions({ meeting }: { meeting: MeetingDetail }) {
           toast.add({ title: t('calendar.meetings.archive.done'), type: 'success' });
         }}
       />
-    </div>
+    </>
   );
 }
 
 /** Rule 14: cancelling is final; the reason is optional. */
-function CancelDialog({ meeting, onClose }: { meeting: MeetingDetail; onClose: () => void }) {
+function CancelDialog({
+  meeting,
+  open,
+  onClose,
+  finalFocus,
+}: {
+  meeting: MeetingDetail;
+  open: boolean;
+  onClose: () => void;
+  finalFocus: () => HTMLElement | null;
+}) {
+  const { t } = useTranslation();
+  return (
+    <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
+      <DialogContent closeLabel={t('common.close')} finalFocus={finalFocus}>
+        {/* Unmounted once the dialog has faded out. */}
+        <CancelForm meeting={meeting} onClose={onClose} />
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function CancelForm({ meeting, onClose }: { meeting: MeetingDetail; onClose: () => void }) {
   const { t } = useTranslation();
   const cancel = useCancelMeeting(meeting.id);
   const [reason, setReason] = useState('');
@@ -330,54 +416,46 @@ function CancelDialog({ meeting, onClose }: { meeting: MeetingDetail; onClose: (
   }
 
   return (
-    <Dialog open onOpenChange={(next) => !next && onClose()}>
-      <DialogContent closeLabel={t('common.close')}>
-        <form
-          className="grid gap-5"
-          noValidate
-          onSubmit={(event) => {
-            event.preventDefault();
-            void submit();
-          }}
-        >
-          <DialogHeader>
-            <DialogTitle>
-              {t('calendar.meetings.cancel.title', { title: meeting.title })}
-            </DialogTitle>
-            <DialogDescription>{t('calendar.meetings.cancel.body')}</DialogDescription>
-          </DialogHeader>
-          <Field invalid={!!problem}>
-            <FieldLabel>
-              {t('calendar.cancel.reason')}
-              <span className="ms-1 font-normal text-muted-foreground">
-                ({t('common.optional')})
-              </span>
-            </FieldLabel>
-            <Textarea
-              rows={3}
-              maxLength={CALENDAR_LIMITS.cancelReason}
-              value={reason}
-              onChange={(event) => setReason(event.target.value)}
-            />
-            <FieldError match={!!problem}>{problem}</FieldError>
-          </Field>
-          {failure && <FormAlert>{failure}</FormAlert>}
-          <DialogFooter>
-            <DialogClose render={<Button variant="outline" />}>{t('common.cancel')}</DialogClose>
-            <Button type="submit" variant="destructive" disabled={cancel.isPending}>
-              {t('calendar.meetings.actions.cancel')}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+    <form
+      className="grid gap-5"
+      noValidate
+      onSubmit={(event) => {
+        event.preventDefault();
+        void submit();
+      }}
+    >
+      <DialogHeader>
+        <DialogTitle>{t('calendar.meetings.cancel.title', { title: meeting.title })}</DialogTitle>
+        <DialogDescription>{t('calendar.meetings.cancel.body')}</DialogDescription>
+      </DialogHeader>
+      <Field invalid={!!problem}>
+        <FieldLabel>
+          {t('calendar.cancel.reason')}
+          <span className="ms-1 font-normal text-muted-foreground">({t('common.optional')})</span>
+        </FieldLabel>
+        <Textarea
+          rows={3}
+          maxLength={CALENDAR_LIMITS.cancelReason}
+          value={reason}
+          onChange={(event) => setReason(event.target.value)}
+        />
+        <FieldError match={!!problem}>{problem}</FieldError>
+      </Field>
+      {failure && <FormAlert>{failure}</FormAlert>}
+      <DialogFooter>
+        <DialogClose render={<Button variant="outline" />}>{t('common.cancel')}</DialogClose>
+        <Button type="submit" variant="destructive" disabled={cancel.isPending}>
+          {t('calendar.meetings.actions.cancel')}
+        </Button>
+      </DialogFooter>
+    </form>
   );
 }
 
 /** Archived, cancelled and double-booked meetings say so above everything else. */
-function Banners({ meeting }: { meeting: MeetingDetail }) {
+function Banners({ meeting, returnFocus }: { meeting: MeetingDetail; returnFocus: ReturnFocus }) {
   const { t } = useTranslation();
-  if (meeting.archivedAt) return <ArchivedCallout meeting={meeting} />;
+  if (meeting.archivedAt) return <ArchivedCallout meeting={meeting} returnFocus={returnFocus} />;
   if (meeting.status === 'cancelled') {
     return (
       <Callout
@@ -409,7 +487,13 @@ function Banners({ meeting }: { meeting: MeetingDetail }) {
   );
 }
 
-function ArchivedCallout({ meeting }: { meeting: MeetingDetail }) {
+function ArchivedCallout({
+  meeting,
+  returnFocus,
+}: {
+  meeting: MeetingDetail;
+  returnFocus: ReturnFocus;
+}) {
   const { t } = useTranslation();
   const restore = useRestoreMeeting(meeting.id);
   const [confirming, setConfirming] = useState(false);
@@ -421,7 +505,14 @@ function ArchivedCallout({ meeting }: { meeting: MeetingDetail }) {
         description={t('calendar.meetings.archivedBody')}
         action={
           meeting.permissions.canArchive && (
-            <Button variant="outline" size="sm" onClick={() => setConfirming(true)}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={(event) => {
+                returnFocus.from(event.currentTarget);
+                setConfirming(true);
+              }}
+            >
               <ArchiveRestoreIcon />
               {t('calendar.meetings.actions.restore')}
             </Button>
@@ -431,6 +522,7 @@ function ArchivedCallout({ meeting }: { meeting: MeetingDetail }) {
       <ConfirmDialog
         open={confirming}
         onClose={() => setConfirming(false)}
+        finalFocus={returnFocus.target}
         title={t('calendar.meetings.restore.title', { title: meeting.title })}
         body={t('calendar.meetings.restore.body')}
         action={t('calendar.meetings.actions.restore')}

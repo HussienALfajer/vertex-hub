@@ -4,10 +4,14 @@ import {
   type AcceptPlan,
   type AcceptQuoteInput,
   acceptQuoteSchema,
+  addMonths,
   businessDate,
+  type CalendarDate,
   type Currency,
   type DepartmentCode,
+  firstOfMonth,
   type QuoteDetail,
+  type RetainerTermInput,
 } from '@vertex-hub/contracts';
 import {
   Badge,
@@ -29,20 +33,30 @@ import {
   Input,
   MultiCombobox,
   Skeleton,
+  Switch,
   Textarea,
   ToggleGroup,
   ToggleGroupItem,
   toast,
 } from '@vertex-hub/ui';
 import { TriangleAlertIcon } from 'lucide-react';
-import { type ReactNode, useEffect, useId, useRef, useState } from 'react';
+import {
+  type ComponentProps,
+  type ReactNode,
+  type RefObject,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+} from 'react';
 import { Controller, type FieldPath, type UseFormReturn, useForm, useWatch } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { FormAlert } from '../../components/form-alert';
 import { LoadError } from '../../components/load-error';
 import { ApiError } from '../../lib/api/client';
 import { errorMessage, fieldError, SCREEN_ERROR } from '../../lib/errors';
-import { formatCalendarDate, formatNumber } from '../../lib/format';
+import { focusFirstInvalid } from '../../lib/focus-first-invalid';
+import { formatCalendarDate, formatMonth, formatNumber } from '../../lib/format';
 import { clientQuery } from '../clients/clients.queries';
 import { departmentListQuery } from '../departments/departments.queries';
 import { type Proof, ProofField } from '../files/proof-field';
@@ -59,6 +73,14 @@ import { conversionRefusal } from '../leads/lead-dialogs';
 import { DepartmentChips } from '../projects/project-badges';
 import { useProjectManagerOptions } from '../projects/project-form';
 import { DeliverableIcon, lineName, RetainerStatusBadge } from '../retainers/retainer-badges';
+import {
+  EMPTY_TERM,
+  isTermProblems,
+  parseTerm,
+  type TermDraft,
+  TermPlanEditor,
+  type TermProblems,
+} from '../retainers/term-fields';
 import { templateListQuery } from '../templates/templates.queries';
 import { ChoiceSelect } from './choice-select';
 import { Money } from './quote-badges';
@@ -125,10 +147,35 @@ function defaultsOf(plan: AcceptPlan, today: string): AcceptValues {
       name: plan.retainer?.name ?? '',
       departments: plan.retainer?.departments ?? [],
       startDate: plan.retainer?.startDate ?? today,
-      renewalDate: plan.retainer?.renewalDate ?? '',
+      // A term sets the renewal date (F05B T11): empty while the quote's term is on.
+      renewalDate: plan.retainer?.term ? '' : (plan.retainer?.renewalDate ?? ''),
       templateId: plan.retainer?.template?.id ?? null,
     },
   };
+}
+
+/** The term the dialog sends: null without one, or while it does not add up yet. */
+function termInput(term: TermDraft | null): RetainerTermInput | null {
+  const parsed = term ? parseTerm(term) : null;
+  return parsed && !isTermProblems(parsed) ? parsed : null;
+}
+
+/** F05B Q1: the start date's month, or the current month when that is later (owner decision). */
+function newTermStart(startDate: string): CalendarDate {
+  const current = firstOfMonth(businessDate());
+  const month = firstOfMonth(startDate);
+  return month > current ? month : current;
+}
+
+/** F05B Q1, Q2: the term's first month: the start date's, or the month the renewal takes effect. */
+function termStartOf(values: AcceptValues, plan: AcceptPlan): CalendarDate | null {
+  if (values.retainer.mode === 'new') {
+    return isDate(values.retainer.startDate) ? newTermStart(values.retainer.startDate) : null;
+  }
+  return (
+    plan.retainer?.renewable.find((item) => item.id === values.retainer.retainerId)?.renewsFrom ??
+    null
+  );
 }
 
 function toRequest(
@@ -136,6 +183,7 @@ function toRequest(
   plan: AcceptPlan,
   proof: Proof | null,
   conversion: ConversionValues | null,
+  term: TermDraft | null,
 ): AcceptQuoteInput {
   const { project, retainer } = values;
   return {
@@ -159,14 +207,21 @@ function toRequest(
     retainer:
       plan.retainer &&
       (retainer.mode === 'renew'
-        ? { mode: 'renew', retainerId: retainer.retainerId, templateId: retainer.templateId }
+        ? {
+            mode: 'renew',
+            retainerId: retainer.retainerId,
+            templateId: retainer.templateId,
+            term: termInput(term),
+          }
         : {
             mode: 'new',
             name: retainer.name,
             departments: retainer.departments,
             startDate: retainer.startDate,
-            renewalDate: retainer.renewalDate || null,
+            // A term sets the renewal date (F05B T11).
+            renewalDate: term ? null : retainer.renewalDate || null,
             templateId: retainer.templateId,
+            term: termInput(term),
           }),
   };
 }
@@ -176,21 +231,24 @@ export function AcceptDialog({
   quote,
   open,
   onClose,
+  finalFocus,
 }: {
   quote: QuoteDetail;
   open: boolean;
   onClose: () => void;
+  /** Where the focus goes when it closes: the button that opened it, or the page heading. */
+  finalFocus?: ComponentProps<typeof DialogContent>['finalFocus'];
 }) {
   const { t } = useTranslation();
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
-      <DialogContent closeLabel={t('common.close')} className="max-w-3xl">
+      <DialogContent closeLabel={t('common.close')} className="max-w-3xl" finalFocus={finalFocus}>
         <DialogHeader>
           <DialogTitle>{t('quotes.accept.title', { number: quote.displayNumber })}</DialogTitle>
           <DialogDescription>{t('quotes.accept.hint')}</DialogDescription>
         </DialogHeader>
-        {/* Mounted while open: closing starts the next acceptance afresh. */}
-        {open && <AcceptFlow quote={quote} onClose={onClose} />}
+        {/* Unmounted once the dialog has faded out: each acceptance starts afresh. */}
+        <AcceptFlow quote={quote} onClose={onClose} />
       </DialogContent>
     </Dialog>
   );
@@ -263,6 +321,10 @@ function AcceptSteps({
   const [failure, setFailure] = useState<string | null>(null);
   const [conversion, setConversion] = useConversionValues(plan.conversion);
   const [conversionIssues, setConversionIssues] = useState<ConversionProblems>({});
+  // F05B Q1: the quote's term, editable; kept beside the form while it is typed.
+  const [term, setTerm] = useState<TermDraft | null>(plan.retainer?.term ?? null);
+  const [termProblems, setTermProblems] = useState<TermProblems>({});
+  const termOn = useRef(term !== null);
   const steps: Step[] = [
     ...(plan.conversion ? (['client'] as const) : []),
     'response',
@@ -272,6 +334,24 @@ function AcceptSteps({
   ];
   const [step, setStep] = useState<Step>(plan.conversion ? 'client' : 'response');
   const index = steps.indexOf(step);
+
+  // After each move between steps the focus goes to the new step's label; after a failed check,
+  // to the first field to fix.
+  const container = useRef<HTMLDivElement>(null);
+  const stepLabel = useRef<HTMLParagraphElement>(null);
+  const focusOn = useRef<'step' | 'invalid' | null>(null);
+  const [moves, setMoves] = useState(0);
+  const moveFocus = (target: 'step' | 'invalid') => {
+    focusOn.current = target;
+    setMoves((count) => count + 1);
+  };
+  useEffect(() => {
+    if (moves === 0) return;
+    const target = focusOn.current;
+    focusOn.current = null;
+    if (target === 'step') stepLabel.current?.focus();
+    else if (target === 'invalid') focusFirstInvalid(container.current);
+  }, [moves]);
 
   // Dates the user typed stay; the rest follows the plan of the current choices (A2, A3, A5).
   const edited = useRef({
@@ -292,7 +372,7 @@ function AcceptSteps({
         plan.project.installments.map((installment) => installment.milestone),
       );
     }
-    if (plan.retainer && !edited.current.renewalDate) {
+    if (plan.retainer && !edited.current.renewalDate && !termOn.current) {
       form.setValue('retainer.renewalDate', plan.retainer.renewalDate ?? '');
     }
   }, [plan, form]);
@@ -326,7 +406,7 @@ function AcceptSteps({
     form.clearErrors();
     const values = form.getValues();
     const problems: [FieldPath<AcceptValues>, string | undefined][] = [];
-    const parsed = acceptQuoteSchema.safeParse(toRequest(values, plan, proof, conversion));
+    const parsed = acceptQuoteSchema.safeParse(toRequest(values, plan, proof, conversion, term));
     if (!parsed.success) {
       for (const issue of parsed.error.issues) {
         const [first, second] = issue.path;
@@ -354,11 +434,18 @@ function AcceptSteps({
         problems.push(['project.installmentMilestones', undefined]);
       }
     }
-    if (current === 'retainer' && values.retainer.mode === 'new') {
+    if (current === 'retainer' && values.retainer.mode === 'new' && !term) {
       const { startDate, renewalDate } = values.retainer;
       if (renewalDate && renewalDate <= startDate) {
         problems.push(['retainer.renewalDate', t('retainers.form.errors.renewalAfterStart')]);
       }
+    }
+    let termInvalid = false;
+    if (current === 'retainer') {
+      const parsedTerm = term ? parseTerm(term) : null;
+      const found = parsedTerm && isTermProblems(parsedTerm) ? parsedTerm : {};
+      setTermProblems(found);
+      termInvalid = Object.keys(found).length > 0;
     }
     let proofPending = false;
     for (const [path, message] of problems) {
@@ -369,11 +456,14 @@ function AcceptSteps({
       form.setError(path, { type: message ? SCREEN_ERROR : 'invalid', message: message ?? '' });
     }
     setFailure(proofPending ? t('quotes.accept.proof.waiting') : null);
-    return problems.length === 0;
+    return problems.length === 0 && !termInvalid;
   }
 
   function next() {
-    if (!check(step)) return;
+    if (!check(step)) {
+      moveFocus('invalid');
+      return;
+    }
     // A2: the project manager defaults to the account manager of the client step 0 creates or
     // links, until the user picks one.
     if (step === 'client' && conversion && !edited.current.projectManager) {
@@ -384,20 +474,22 @@ function AcceptSteps({
       if (manager) form.setValue('project.projectManagerId', manager);
     }
     setStep(steps[index + 1] ?? 'summary');
+    moveFocus('step');
   }
 
   function back() {
     form.clearErrors();
     setFailure(null);
     setStep(steps[index - 1] ?? steps[0] ?? 'response');
+    moveFocus('step');
   }
 
   async function submit() {
     setFailure(null);
     const parsed = acceptQuoteSchema.safeParse(
-      toRequest(form.getValues(), plan, proof, conversion),
+      toRequest(form.getValues(), plan, proof, conversion, term),
     );
-    if (!parsed.success) {
+    if (!parsed.success || (term && !termInput(term))) {
       setFailure(t('quotes.accept.errors.review'));
       return;
     }
@@ -419,6 +511,7 @@ function AcceptSteps({
       if (field) {
         setConversionIssues(field);
         setStep('client');
+        moveFocus('invalid');
         return;
       }
       setFailure(errorMessage(t, error));
@@ -426,8 +519,8 @@ function AcceptSteps({
   }
 
   return (
-    <div className="grid gap-5">
-      <Stepper steps={steps} current={step} />
+    <div ref={container} className="grid gap-5">
+      <Stepper steps={steps} current={step} label={stepLabel} />
       {step === 'client' && plan.conversion && conversion && (
         <ConversionFields
           plan={plan.conversion}
@@ -461,10 +554,23 @@ function AcceptSteps({
           onRenewalEdited={() => {
             edited.current.renewalDate = true;
           }}
+          term={term}
+          onTerm={(next) => {
+            if ((next !== null) !== termOn.current) {
+              termOn.current = next !== null;
+              form.setValue(
+                'retainer.renewalDate',
+                next || edited.current.renewalDate ? '' : (plan.retainer?.renewalDate ?? ''),
+              );
+            }
+            setTerm(next);
+            setTermProblems({});
+          }}
+          termProblems={termProblems}
         />
       )}
       {step === 'summary' && (
-        <Summary plan={plan} form={form} proof={proof} conversion={conversion} />
+        <Summary plan={plan} form={form} proof={proof} conversion={conversion} term={term} />
       )}
       {planning && step !== 'response' && (
         <p className="text-sm text-muted-foreground" aria-live="polite">
@@ -496,13 +602,21 @@ function AcceptSteps({
 }
 
 /** The steps drawn as rising bars, like the strokes of the mark (as in two-factor setup). */
-function Stepper({ steps, current }: { steps: Step[]; current: Step }) {
+function Stepper({
+  steps,
+  current,
+  label,
+}: {
+  steps: Step[];
+  current: Step;
+  label: RefObject<HTMLParagraphElement | null>;
+}) {
   const { t } = useTranslation();
   const index = steps.indexOf(current);
   const heights = ['h-1.5', 'h-2', 'h-2.5', 'h-3'];
   return (
     <div className="flex flex-col gap-2">
-      <p className="text-sm text-muted-foreground">
+      <p ref={label} tabIndex={-1} className="text-sm text-muted-foreground outline-none">
         {t('quotes.accept.stepOf', {
           step: formatNumber(index + 1),
           total: formatNumber(steps.length),
@@ -555,6 +669,7 @@ function ResponseStep({
           <Input
             id={ids.date}
             type="date"
+            dir="ltr"
             min={plan.sentOn}
             max={businessDate()}
             {...form.register('respondedOn')}
@@ -707,7 +822,7 @@ function ProjectStep({
         <div className="grid gap-5 sm:grid-cols-2">
           <Field invalid={!!errors?.startDate}>
             <FieldLabel htmlFor={ids.start}>{t('projects.form.startDate')}</FieldLabel>
-            <Input id={ids.start} type="date" {...form.register('project.startDate')} />
+            <Input id={ids.start} type="date" dir="ltr" {...form.register('project.startDate')} />
             <FieldError match={!!errors?.startDate}>{t('projects.form.errors.date')}</FieldError>
           </Field>
           <Field invalid={!!errors?.dueDate}>
@@ -715,6 +830,7 @@ function ProjectStep({
             <Input
               id={ids.due}
               type="date"
+              dir="ltr"
               {...form.register('project.dueDate', { onChange: () => onEdited('dueDate') })}
             />
             <FieldDescription>{t('quotes.accept.project.dueHint')}</FieldDescription>
@@ -873,10 +989,16 @@ function RetainerStep({
   retainer,
   form,
   onRenewalEdited,
+  term,
+  onTerm,
+  termProblems,
 }: {
   retainer: NonNullable<AcceptPlan['retainer']>;
   form: AcceptForm;
   onRenewalEdited: () => void;
+  term: TermDraft | null;
+  onTerm: (next: TermDraft | null) => void;
+  termProblems: TermProblems;
 }) {
   const { t } = useTranslation();
   const ids = {
@@ -886,9 +1008,20 @@ function RetainerStep({
     start: useId(),
     renewal: useId(),
     template: useId(),
+    term: useId(),
   };
   const errors = form.formState.errors.retainer;
-  const mode = useWatch({ control: form.control, name: 'retainer.mode' });
+  const [mode, retainerId, startDate] = useWatch({
+    control: form.control,
+    name: ['retainer.mode', 'retainer.retainerId', 'retainer.startDate'],
+  });
+  const renewed = retainer.renewable.find((item) => item.id === retainerId);
+  const termStart =
+    mode === 'renew'
+      ? (renewed?.renewsFrom ?? null)
+      : isDate(startDate)
+        ? newTermStart(startDate)
+        : null;
   const templates = useQuery(templateListQuery({ kind: 'retainer_cycle', pageSize: 100 }));
   const templateItems = [
     {
@@ -965,10 +1098,22 @@ function RetainerStep({
               </Field>
             )}
           />
-          <Callout
-            title={t('quotes.accept.retainer.renewTitle')}
-            description={t('quotes.accept.retainer.renewBody')}
-          />
+          {renewed && (
+            // F05B Q2: the lines, fee and term take effect after the active term, else next month.
+            <Callout
+              title={t('quotes.accept.retainer.renewFrom', {
+                month: formatMonth(renewed.renewsFrom),
+              })}
+              description={t(
+                renewed.afterTerm
+                  ? term
+                    ? 'quotes.accept.retainer.renewAfterTerm'
+                    : 'quotes.accept.retainer.renewContinue'
+                  : 'quotes.accept.retainer.renewBody',
+                { month: formatMonth(renewed.renewsFrom) },
+              )}
+            />
+          )}
         </section>
       ) : (
         <section className="grid gap-5">
@@ -991,7 +1136,12 @@ function RetainerStep({
           <div className="grid gap-5 sm:grid-cols-2">
             <Field invalid={!!errors?.startDate}>
               <FieldLabel htmlFor={ids.start}>{t('retainers.form.startDate')}</FieldLabel>
-              <Input id={ids.start} type="date" {...form.register('retainer.startDate')} />
+              <Input
+                id={ids.start}
+                type="date"
+                dir="ltr"
+                {...form.register('retainer.startDate')}
+              />
               <FieldDescription>{t('quotes.accept.retainer.startHint')}</FieldDescription>
               <FieldError match={!!errors?.startDate}>{t('projects.form.errors.date')}</FieldError>
             </Field>
@@ -1000,9 +1150,13 @@ function RetainerStep({
               <Input
                 id={ids.renewal}
                 type="date"
+                dir="ltr"
+                disabled={term !== null}
                 {...form.register('retainer.renewalDate', { onChange: onRenewalEdited })}
               />
-              <FieldDescription>{t('retainers.form.renewalHint')}</FieldDescription>
+              <FieldDescription>
+                {term ? t('retainers.terms.renewalFromTerm') : t('retainers.form.renewalHint')}
+              </FieldDescription>
               <FieldError match={!!errors?.renewalDate}>
                 {fieldError(errors?.renewalDate, t('projects.form.errors.date'))}
               </FieldError>
@@ -1010,6 +1164,36 @@ function RetainerStep({
           </div>
         </section>
       )}
+
+      <section className="grid gap-4 rounded-lg border border-border p-4">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex flex-col gap-0.5">
+            <label htmlFor={ids.term} className="text-sm font-medium">
+              {t('retainers.terms.enable')}
+            </label>
+            <p id={`${ids.term}-hint`} className="text-sm text-muted-foreground">
+              {term && termStart
+                ? t('quotes.accept.retainer.termStarts', { month: formatMonth(termStart) })
+                : t('retainers.terms.enableHint')}
+            </p>
+          </div>
+          <Switch
+            id={ids.term}
+            aria-describedby={`${ids.term}-hint`}
+            checked={term !== null}
+            onCheckedChange={(checked) => onTerm(checked ? (retainer.term ?? EMPTY_TERM) : null)}
+          />
+        </div>
+        {term && (
+          <TermPlanEditor
+            value={term}
+            onChange={onTerm}
+            startMonth={termStart}
+            currency={retainer.currency}
+            problems={termProblems}
+          />
+        )}
+      </section>
 
       <Controller
         control={form.control}
@@ -1094,14 +1278,18 @@ function Summary({
   form,
   proof,
   conversion,
+  term,
 }: {
   plan: AcceptPlan;
   form: AcceptForm;
   proof: Proof | null;
   conversion: ConversionValues | null;
+  term: TermDraft | null;
 }) {
   const { t } = useTranslation();
   const values = form.getValues();
+  const termStart = termStartOf(values, plan);
+  const accepted = termInput(term);
   const managers = useProjectManagerOptions();
   const managerName =
     managers.find((option) => option.id === values.project.projectManagerId)?.name ??
@@ -1133,8 +1321,10 @@ function Summary({
         <Fact label={t('quotes.response.respondedOn')}>
           {formatCalendarDate(values.respondedOn)}
         </Fact>
-        {values.note.trim() && <Fact label={t('quotes.response.note')}>{values.note.trim()}</Fact>}
-        {proof && <Fact label={t('quotes.accept.proof.label')}>{proof.file.name}</Fact>}
+        {values.note.trim() && (
+          <Fact label={t('quotes.accept.summary.note')}>{values.note.trim()}</Fact>
+        )}
+        {proof && <Fact label={t('quotes.accept.summary.proof')}>{proof.file.name}</Fact>}
       </SummaryBlock>
       {plan.project && (
         <SummaryBlock title={t('quotes.accept.summary.project', { name: values.project.name })}>
@@ -1175,12 +1365,31 @@ function Summary({
                 {formatCalendarDate(values.retainer.startDate)}
               </Fact>
               <Fact label={t('retainers.form.renewalDate')}>
-                {values.retainer.renewalDate
-                  ? formatCalendarDate(values.retainer.renewalDate)
-                  : t('common.none')}
+                {accepted && termStart
+                  ? formatCalendarDate(addMonths(termStart, accepted.months))
+                  : values.retainer.renewalDate
+                    ? formatCalendarDate(values.retainer.renewalDate)
+                    : t('common.none')}
               </Fact>
             </>
           )}
+          <Fact label={t('retainers.terms.sectionTitle')}>
+            {accepted && termStart ? (
+              <>
+                {t('quotes.accept.summary.term', {
+                  months: t('retainers.terms.monthsCount', {
+                    count: accepted.months,
+                    n: formatNumber(accepted.months),
+                  }),
+                  month: formatMonth(termStart),
+                  endAction: t(`retainers.terms.endActions.${accepted.endAction}`),
+                })}{' '}
+                <Money minor={accepted.agreedTotalMinor} currency={plan.retainer.currency} />
+              </>
+            ) : (
+              t('common.none')
+            )}
+          </Fact>
           <Fact label={t('retainers.form.monthlyFee')}>
             <Money minor={plan.retainer.monthlyFeeMinor} currency={plan.retainer.currency} />
           </Fact>

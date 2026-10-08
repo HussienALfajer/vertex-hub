@@ -3,6 +3,7 @@ import type { INestApplication } from '@nestjs/common';
 import {
   clientDetailResponseSchema,
   type ErrorResponse,
+  linkInfoResponseSchema,
   meResponseSchema,
   projectDetailSchema,
   userLinkSchema,
@@ -77,6 +78,7 @@ describe('users', () => {
     new URLSearchParams(new URL(url).hash.slice(1)).get('token') ?? '';
   const redeem = (token: string, password = PASSWORD) =>
     client.post('/api/password-links/redeem', undefined, { token, password });
+  const check = (token: string) => client.post('/api/password-links/check', undefined, { token });
 
   beforeAll(async () => {
     let url: string;
@@ -276,9 +278,14 @@ describe('users', () => {
       );
       seeded.push(created.user.id);
       const token = tokenOf(created.link.url);
+      const info = linkInfoResponseSchema.parse(await (await check(token)).json());
+      expect(info).toMatchObject({ kind: 'activation', email: created.user.email });
+      // Checking does not use the link up.
+      expect((await check(token)).status).toBe(200);
       expect((await redeem(token, 'short')).status).toBe(400);
       expect((await redeem(token)).status).toBe(204);
       await expectError(await redeem(token), 400, 'LINK_INVALID');
+      await expectError(await check(token), 400, 'LINK_INVALID');
       const cookie = await client.signIn(created.user.email ?? '');
       expect((await client.get('/api/users/skills', cookie)).status).toBe(200);
       const detail = userResponseSchema.parse(
@@ -301,6 +308,8 @@ describe('users', () => {
       );
       expect(second.kind).toBe('activation');
       await expectError(await redeem(tokenOf(first.url)), 400, 'LINK_INVALID');
+      await expectError(await check(tokenOf(first.url)), 400, 'LINK_INVALID');
+      await expectError(await check('made-up-token'), 400, 'LINK_INVALID');
       await db
         .update(verifications)
         .set({ expiresAt: new Date(Date.now() - 1000) })
@@ -308,6 +317,7 @@ describe('users', () => {
           and(like(verifications.identifier, 'user-link:%'), eq(verifications.value, user.id)),
         );
       await expectError(await redeem(tokenOf(second.url)), 400, 'LINK_INVALID');
+      await expectError(await check(tokenOf(second.url)), 400, 'LINK_INVALID');
     });
 
     it('resets an active user’s password and ends their sessions', async () => {
@@ -317,6 +327,8 @@ describe('users', () => {
         await (await client.post(`/api/users/${user.id}/link`, gm.cookie)).json(),
       );
       expect(link.kind).toBe('reset');
+      const info = linkInfoResponseSchema.parse(await (await check(tokenOf(link.url))).json());
+      expect(info).toMatchObject({ kind: 'reset', email: user.email });
       expect((await redeem(tokenOf(link.url), `${PASSWORD}-reset`)).status).toBe(204);
       expect((await client.get('/api/users/skills', cookie)).status).toBe(401);
       expect(

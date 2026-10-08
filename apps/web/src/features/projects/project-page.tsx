@@ -32,22 +32,26 @@ import {
   ListTodoIcon,
   MilestoneIcon,
   ReceiptTextIcon,
+  RotateCcwIcon,
   WalletIcon,
 } from 'lucide-react';
-import { type ReactNode, useState } from 'react';
+import { type ReactNode, type RefObject, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '../../components/confirm-dialog';
 import { isMissing, LoadError } from '../../components/load-error';
+import { canAll, useMe } from '../../lib/auth';
 import { formatCalendarDate, formatDateTime, formatNumber } from '../../lib/format';
 import { formatMoney } from '../../lib/money';
 import { idParam } from '../../lib/search-params';
+import { useFocusAfterChange } from '../../lib/use-focus-after-change';
+import { useShownWhileClosing } from '../../lib/use-shown-while-closing';
 import { OwnerDocumentsTab } from '../files/owner-documents-tab';
 import { ProjectBillingTab } from '../invoices/project-billing-tab';
 import { SourceQuotes } from '../quotes/source-quotes';
 import { ProjectTasksTab } from '../tasks/project-tasks-tab';
 import { ExtraWorkTab } from './extra-work-tab';
 import { MilestonesTab } from './milestones-tab';
-import { ProjectActions, ReopenButton } from './project-actions';
+import { focusTarget, ProjectActions, type ProjectFocus, ReopenDialog } from './project-actions';
 import {
   ArchivedBadge,
   DepartmentChips,
@@ -55,7 +59,7 @@ import {
   PersonName,
   ProjectStatusBadge,
 } from './project-badges';
-import { projectQuery, useRestoreProject } from './projects.queries';
+import { projectQuery, useArchiveProject, useRestoreProject } from './projects.queries';
 import { scheduleOf } from './schedule';
 
 const PROJECT_TABS = ['milestones', 'tasks', 'extra-work', 'billing', 'documents'] as const;
@@ -130,6 +134,33 @@ function ProjectView({
   // Completed, cancelled and archived projects are read-only (rule 7).
   const editable = project.permissions.canManage && !archived && !isProjectClosed(project.status);
 
+  const heading = useRef<HTMLHeadingElement>(null);
+  const next = useRef<HTMLButtonElement>(null);
+  const menu = useRef<HTMLButtonElement>(null);
+  const reopen = useRef<HTMLButtonElement>(null);
+  const restore = useRef<HTMLButtonElement>(null);
+  const milestonesTab = useRef<HTMLButtonElement>(null);
+  const focus = useMemo<ProjectFocus>(
+    () => ({ heading, next, menu, reopen, restore, milestones: milestonesTab }),
+    [],
+  );
+  // A status change or an archive swaps the header's controls (archive → restore → actions menu,
+  // cancel → reopen); a menu item or a dialog may give the focus back to one just before it leaves.
+  useFocusAfterChange(`${project.status}:${project.archivedAt ?? ''}`, () => {
+    const target = focusTarget(focus, 'restore', 'reopen', 'menu', 'next');
+    return target === true ? null : target;
+  });
+  // The archive confirmation and the reopen dialog live here: the menu and the notice that open
+  // them leave the page with the change.
+  const [confirming, setConfirming] = useState<'archive' | 'restore' | null>(null);
+  const shownConfirm = useShownWhileClosing(confirming) ?? 'archive';
+  const [reopening, setReopening] = useState(false);
+  // Mounted for everyone who may reopen (scope all), so it fades out and gives the focus back
+  // after the project it reopened no longer offers reopening.
+  const scopeAll = canAll(useMe(), 'projects.manage');
+  const archive = useArchiveProject(project.id);
+  const restoreProject = useRestoreProject(project.id);
+
   const openTab = (next: ProjectTab) =>
     navigate({
       search: (previous) => ({ ...previous, tab: next === 'milestones' ? undefined : next }),
@@ -138,11 +169,24 @@ function ProjectView({
 
   return (
     <>
-      <ProjectHero project={project} onShowMilestones={() => openTab('milestones')} />
-      {archived ? <ArchivedCallout project={project} /> : <ClosedCallout project={project} />}
+      <ProjectHero
+        project={project}
+        focus={focus}
+        onShowMilestones={() => openTab('milestones')}
+        onArchive={() => setConfirming('archive')}
+      />
+      {archived ? (
+        <ArchivedCallout
+          project={project}
+          restoreRef={restore}
+          onRestore={() => setConfirming('restore')}
+        />
+      ) : (
+        <ClosedCallout project={project} reopenRef={reopen} onReopen={() => setReopening(true)} />
+      )}
       <Tabs value={tab} onValueChange={(value: ProjectTab) => openTab(value)}>
         <TabsList aria-label={project.name}>
-          <TabsTrigger value="milestones">
+          <TabsTrigger ref={milestonesTab} value="milestones">
             <MilestoneIcon />
             {t('projects.page.tabs.milestones')}
             {project.milestones.length > 0 && (
@@ -214,6 +258,35 @@ function ProjectView({
           <OwnerDocumentsTab owner={{ type: 'project', id: project.id }} />
         </TabsContent>
       </Tabs>
+
+      <ConfirmDialog
+        open={confirming !== null}
+        onClose={() => setConfirming(null)}
+        title={t(`projects.${shownConfirm}.title`, { name: project.name })}
+        body={t(`projects.${shownConfirm}.body`)}
+        action={t(`projects.actions.${shownConfirm}`)}
+        destructive={shownConfirm === 'archive'}
+        pending={archive.isPending || restoreProject.isPending}
+        // The focus goes to the button that undoes the change, or back to the one that opened it.
+        finalFocus={() => focusTarget(focus, 'restore', 'menu', 'next')}
+        onConfirm={async () => {
+          if (confirming === 'restore') {
+            await restoreProject.mutateAsync(undefined);
+            toast.add({ title: t('projects.restore.done'), type: 'success' });
+          } else {
+            await archive.mutateAsync(undefined);
+            toast.add({ title: t('projects.archive.done'), type: 'success' });
+          }
+        }}
+      />
+      {scopeAll && (
+        <ReopenDialog
+          project={project}
+          open={reopening}
+          onClose={() => setReopening(false)}
+          finalFocus={() => focusTarget(focus, 'reopen', 'next', 'menu')}
+        />
+      )}
     </>
   );
 }
@@ -224,10 +297,14 @@ function ProjectView({
  */
 function ProjectHero({
   project,
+  focus,
   onShowMilestones,
+  onArchive,
 }: {
   project: ProjectDetail;
+  focus: ProjectFocus;
   onShowMilestones: () => void;
+  onArchive: () => void;
 }) {
   const { t } = useTranslation();
   const archived = project.archivedAt !== null;
@@ -237,7 +314,7 @@ function ProjectHero({
     <section className="relative overflow-hidden rounded-lg border border-border bg-surface">
       <AscentLines className="absolute inset-y-0 end-0 hidden h-full w-32 text-border md:block" />
       <div className="relative flex flex-col gap-6 p-6">
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-start">
+        <div className="flex flex-col gap-5 xl:flex-row xl:items-start">
           <Link
             to="/clients/$clientId"
             params={{ clientId: project.client.id }}
@@ -261,7 +338,9 @@ function ProjectHero({
                 {project.client.name}
               </Link>
               <div className="flex flex-wrap items-center gap-3">
-                <h1 className="text-2xl font-bold">{project.name}</h1>
+                <h1 ref={focus.heading} tabIndex={-1} className="text-2xl font-bold">
+                  {project.name}
+                </h1>
                 <ProjectStatusBadge status={project.status} />
                 {project.overdue && <OverdueBadge />}
                 {archived && <ArchivedBadge />}
@@ -297,7 +376,12 @@ function ProjectHero({
               <SourceQuotes projectId={project.id} />
             </dl>
           </div>
-          <ProjectActions project={project} onShowMilestones={onShowMilestones} />
+          <ProjectActions
+            project={project}
+            focus={focus}
+            onShowMilestones={onShowMilestones}
+            onArchive={onArchive}
+          />
         </div>
         <div className="grid gap-4 border-t border-border pt-5 sm:grid-cols-2 lg:grid-cols-[repeat(auto-fit,minmax(14rem,1fr))]">
           <ScheduleVital project={project} />
@@ -425,10 +509,23 @@ function MilestonesVital({ project }: { project: ProjectDetail }) {
 }
 
 /** A completed or cancelled project is read-only until someone with scope all reopens it. */
-function ClosedCallout({ project }: { project: ProjectDetail }) {
+function ClosedCallout({
+  project,
+  reopenRef,
+  onReopen,
+}: {
+  project: ProjectDetail;
+  reopenRef: RefObject<HTMLButtonElement | null>;
+  onReopen: () => void;
+}) {
   const { t } = useTranslation();
   if (!isProjectClosed(project.status)) return null;
-  const reopen = project.permissions.canReopen && <ReopenButton project={project} />;
+  const reopen = project.permissions.canReopen && (
+    <Button ref={reopenRef} variant="outline" size="sm" onClick={onReopen}>
+      <RotateCcwIcon />
+      {t('projects.actions.reopen')}
+    </Button>
+  );
   if (project.status === 'completed') {
     return (
       <Callout
@@ -458,38 +555,30 @@ function ClosedCallout({ project }: { project: ProjectDetail }) {
   );
 }
 
-function ArchivedCallout({ project }: { project: ProjectDetail }) {
+function ArchivedCallout({
+  project,
+  restoreRef,
+  onRestore,
+}: {
+  project: ProjectDetail;
+  restoreRef: RefObject<HTMLButtonElement | null>;
+  onRestore: () => void;
+}) {
   const { t } = useTranslation();
-  const restore = useRestoreProject(project.id);
-  const [confirming, setConfirming] = useState(false);
   return (
-    <>
-      <Callout
-        icon={<ArchiveIcon />}
-        title={t('projects.page.archivedTitle')}
-        description={t('projects.page.archivedBody')}
-        action={
-          project.permissions.canArchive && (
-            <Button variant="outline" size="sm" onClick={() => setConfirming(true)}>
-              <ArchiveRestoreIcon />
-              {t('projects.actions.restore')}
-            </Button>
-          )
-        }
-      />
-      <ConfirmDialog
-        open={confirming}
-        onClose={() => setConfirming(false)}
-        title={t('projects.restore.title', { name: project.name })}
-        body={t('projects.restore.body')}
-        action={t('projects.actions.restore')}
-        pending={restore.isPending}
-        onConfirm={async () => {
-          await restore.mutateAsync(undefined);
-          toast.add({ title: t('projects.restore.done'), type: 'success' });
-        }}
-      />
-    </>
+    <Callout
+      icon={<ArchiveIcon />}
+      title={t('projects.page.archivedTitle')}
+      description={t('projects.page.archivedBody')}
+      action={
+        project.permissions.canArchive && (
+          <Button ref={restoreRef} variant="outline" size="sm" onClick={onRestore}>
+            <ArchiveRestoreIcon />
+            {t('projects.actions.restore')}
+          </Button>
+        )
+      }
+    />
   );
 }
 

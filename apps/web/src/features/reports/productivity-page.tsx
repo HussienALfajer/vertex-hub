@@ -29,7 +29,6 @@ import { scopesOf, useMe } from '../../lib/auth';
 import { formatCalendarDate, formatNumber } from '../../lib/format';
 import { listParam } from '../../lib/search-params';
 import { departmentListQuery } from '../departments/departments.queries';
-import { useDepartmentNames } from '../projects/project-badges';
 import { managedDepartments } from '../tasks/task-access';
 import {
   BackToReports,
@@ -150,59 +149,56 @@ const MEASURES = [
 
 function ProductivityTable({ report }: { report: ProductivityReport }) {
   const { t } = useTranslation();
-  const departmentName = useDepartmentNames();
   return (
-    <div className="overflow-hidden rounded-lg border border-border bg-surface">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>{t('reports.productivity.name')}</TableHead>
-            {MEASURES.map((measure) => (
-              <TableHead key={measure} className="text-end">
-                {t(`reports.productivity.measures.${measure}`)}
-              </TableHead>
-            ))}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {report.departments.map((row) => (
-            <Fragment key={row.department}>
-              <TableRow className="bg-muted/50">
-                <TableCell>
-                  <span className="flex flex-col">
-                    <span className="font-bold">{departmentName(row.department)}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {row.unassigned.count === 0
-                        ? t('reports.productivity.noUnassigned')
-                        : t('reports.productivity.unassigned', {
-                            n: formatNumber(row.unassigned.count),
-                            date: row.unassigned.oldestOn
-                              ? formatCalendarDate(row.unassigned.oldestOn)
-                              : '',
-                          })}
-                    </span>
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>{t('reports.productivity.name')}</TableHead>
+          {MEASURES.map((measure) => (
+            <TableHead key={measure} className="min-w-20 text-end whitespace-normal">
+              {t(`reports.productivity.measures.${measure}`)}
+            </TableHead>
+          ))}
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {report.departments.map((row) => (
+          <Fragment key={row.department}>
+            <TableRow className="bg-muted/50">
+              <TableCell>
+                <span className="flex flex-col">
+                  <span className="font-bold">{row.name}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {row.unassigned.count === 0
+                      ? t('reports.productivity.noUnassigned')
+                      : t('reports.productivity.unassigned', {
+                          n: formatNumber(row.unassigned.count),
+                          date: row.unassigned.oldestOn
+                            ? formatCalendarDate(row.unassigned.oldestOn)
+                            : '',
+                        })}
+                  </span>
+                </span>
+              </TableCell>
+              <MeasureCells measures={row.measures} strong />
+            </TableRow>
+            {row.people.map(({ user, measures }) => (
+              <TableRow key={`${row.department}-${user.id}`}>
+                <TableCell className="ps-8">
+                  <span className="flex flex-wrap items-center gap-2">
+                    {user.name}
+                    {user.archived && (
+                      <Badge tone="neutral">{t('reports.productivity.archived')}</Badge>
+                    )}
                   </span>
                 </TableCell>
-                <MeasureCells measures={row.measures} strong />
+                <MeasureCells measures={measures} />
               </TableRow>
-              {row.people.map(({ user, measures }) => (
-                <TableRow key={`${row.department}-${user.id}`}>
-                  <TableCell className="ps-8">
-                    <span className="flex flex-wrap items-center gap-2">
-                      {user.name}
-                      {user.archived && (
-                        <Badge tone="neutral">{t('reports.productivity.archived')}</Badge>
-                      )}
-                    </span>
-                  </TableCell>
-                  <MeasureCells measures={measures} />
-                </TableRow>
-              ))}
-            </Fragment>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
+            ))}
+          </Fragment>
+        ))}
+      </TableBody>
+    </Table>
   );
 }
 

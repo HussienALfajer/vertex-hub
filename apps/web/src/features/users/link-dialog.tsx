@@ -9,10 +9,11 @@ import {
   DialogTitle,
   Field,
   FieldLabel,
+  IconTile,
   Input,
 } from '@vertex-hub/ui';
 import { CheckIcon, ClockIcon, CopyIcon, LinkIcon, MailCheckIcon } from 'lucide-react';
-import { type ReactNode, useRef } from 'react';
+import { type ComponentProps, type ReactNode, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useCopy } from '../../lib/clipboard';
 import { formatDateTime } from '../../lib/format';
@@ -25,25 +26,32 @@ interface LinkDialogProps {
   onClose: () => void;
   /** Buttons after "Copy", e.g. "Open profile". */
   actions?: ReactNode;
+  /** Where the focus goes when it closes, when the element that opened it is gone (a menu item). */
+  finalFocus?: ComponentProps<typeof DialogContent>['finalFocus'];
 }
 
 /**
  * Shows a one-time activation or reset link. It is emailed to the user and shown here once, so the
  * user manager can also copy it (F01, F14 email screen 7).
  */
-export function LinkDialog({ link, name, email, onClose, actions }: LinkDialogProps) {
+export function LinkDialog({ link, name, email, onClose, actions, finalFocus }: LinkDialogProps) {
   const { t } = useTranslation();
   const { copy, copied } = useCopy();
   const copyButton = useRef<HTMLButtonElement>(null);
   return (
     <Dialog open={link !== null} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent closeLabel={t('common.close')} className="max-w-xl" initialFocus={copyButton}>
+      <DialogContent
+        closeLabel={t('common.close')}
+        className="max-w-xl"
+        initialFocus={copyButton}
+        finalFocus={finalFocus}
+      >
         {link && (
           <>
             <DialogHeader>
-              <div className="mb-2 flex size-11 items-center justify-center rounded-lg bg-muted text-foreground">
-                <LinkIcon className="size-5" />
-              </div>
+              <IconTile className="mb-2">
+                <LinkIcon />
+              </IconTile>
               <DialogTitle>
                 {link.kind === 'activation'
                   ? t('users.link.activationTitle')

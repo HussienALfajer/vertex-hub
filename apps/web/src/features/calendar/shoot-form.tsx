@@ -33,6 +33,7 @@ import {
   FieldDescription,
   FieldError,
   FieldLabel,
+  IconButton,
   Input,
   Select,
   SelectContent,
@@ -52,14 +53,18 @@ import {
   TriangleAlertIcon,
   XIcon,
 } from 'lucide-react';
-import { type ReactNode, useId, useState } from 'react';
+import { type ReactNode, useEffect, useId, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { Controller, type UseFormReturn, useFieldArray, useForm, useWatch } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { FormAlert } from '../../components/form-alert';
 import { FormSection } from '../../components/form-section';
+import { UnsavedChangesGuard } from '../../components/unsaved-changes-guard';
 import { ApiError } from '../../lib/api/client';
 import { useMe } from '../../lib/auth';
 import { errorMessage } from '../../lib/errors';
+import { focusAfterRemoval } from '../../lib/focus-after-removal';
+import { focusFirstInvalid } from '../../lib/focus-first-invalid';
 import { formatMonth } from '../../lib/format';
 import { projectListQuery, projectQuery } from '../projects/projects.queries';
 import { lineName } from '../retainers/retainer-badges';
@@ -155,6 +160,7 @@ const PROBLEM_OF_CODE: Record<string, Problem> = {
   RETAINER_ARCHIVED: 'links',
   CYCLE_CLOSED: 'links',
   MILESTONE_DONE: 'links',
+  INVALID_DATES: 'time',
 };
 
 /**
@@ -215,6 +221,12 @@ export function ShootForm({ shoot, task }: { shoot?: ShootDetail; task?: TaskDet
   const form = useForm<ShootFormValues>({ defaultValues: defaultsOf(shoot, task, scopeAll) });
   const [problems, setProblems] = useState<Problems>({});
   const [failure, setFailure] = useState<string | null>(null);
+  const formRef = useRef<HTMLFormElement>(null);
+  useEffect(() => form.setFocus('title'), [form]);
+  // Every problem shows at once; the focus goes to the first one.
+  useEffect(() => {
+    if (Object.keys(problems).length > 0) focusFirstInvalid(formRef.current);
+  }, [problems]);
   /** The conflicts to accept before the save goes through (rule 5). */
   const [confirming, setConfirming] = useState<ScheduleConflict[] | null>(null);
   const fixed = !!shoot || !!task;
@@ -337,8 +349,12 @@ export function ShootForm({ shoot, task }: { shoot?: ShootDetail; task?: TaskDet
         return;
       }
       const problem = error instanceof ApiError ? PROBLEM_OF_CODE[error.code ?? ''] : undefined;
-      if (problem && onScreen(problem, values)) setProblems({ [problem]: errorMessage(t, error) });
-      else setFailure(errorMessage(t, error));
+      if (problem && onScreen(problem, values)) {
+        // A new shoot task is due on the shoot's day, which cannot be in the past (F06).
+        const message =
+          problem === 'time' ? t('calendar.form.errors.pastDay') : errorMessage(t, error);
+        setProblems({ [problem]: message });
+      } else setFailure(errorMessage(t, error));
     }
   }
 
@@ -347,6 +363,7 @@ export function ShootForm({ shoot, task }: { shoot?: ShootDetail; task?: TaskDet
   return (
     <>
       <form
+        ref={formRef}
         className="flex max-w-4xl flex-col gap-6"
         onSubmit={form.handleSubmit((values) => save(values, false))}
         noValidate
@@ -387,15 +404,15 @@ export function ShootForm({ shoot, task }: { shoot?: ShootDetail; task?: TaskDet
           <div className="grid gap-5 sm:grid-cols-3">
             <Field invalid={!!problems.time}>
               <FieldLabel>{t('calendar.form.date')}</FieldLabel>
-              <Input type="date" {...form.register('date')} />
+              <Input type="date" dir="ltr" {...form.register('date')} />
             </Field>
             <Field invalid={!!problems.time}>
               <FieldLabel>{t('calendar.form.startTime')}</FieldLabel>
-              <Input type="time" {...form.register('startTime')} />
+              <Input type="time" dir="ltr" {...form.register('startTime')} />
             </Field>
             <Field invalid={!!problems.time}>
               <FieldLabel>{t('calendar.form.endTime')}</FieldLabel>
-              <Input type="time" {...form.register('endTime')} />
+              <Input type="time" dir="ltr" {...form.register('endTime')} />
             </Field>
           </div>
           {problems.time ? (
@@ -468,6 +485,7 @@ export function ShootForm({ shoot, task }: { shoot?: ShootDetail; task?: TaskDet
           </Button>
         </div>
       </form>
+      <UnsavedChangesGuard dirty={form.formState.isDirty && !pending} />
 
       <AlertDialog open={confirming !== null} onOpenChange={(open) => !open && setConfirming(null)}>
         <AlertDialogContent>
@@ -913,6 +931,13 @@ function CrewField({
   const { t } = useTranslation();
   const rows = useFieldArray({ control: form.control, name: 'crew', keyName: 'key' });
   const crew = useWatch({ control: form.control, name: 'crew' });
+  const list = useRef<HTMLUListElement>(null);
+  const addButton = useRef<HTMLButtonElement>(null);
+  /** The next row's remove button takes the focus, the previous one's, or "add". */
+  function remove(index: number) {
+    flushSync(() => rows.remove(index));
+    focusAfterRemoval(list.current, index, addButton.current);
+  }
   const users = useQuery(userListQuery({ pageSize: 100 }));
   // A member archived after the booking stays listed (rule 6) and is not in the active list.
   const people = [
@@ -922,9 +947,10 @@ function CrewField({
 
   return (
     <RowGroup label={t('calendar.form.crew')} problem={problem}>
-      <ul className="flex flex-col gap-2">
+      <ul ref={list} className="flex flex-col gap-2">
         {rows.fields.map((row, index) => {
           const member = crew[index] ?? row;
+          const position = index + 1;
           const taken = crew.filter((_, other) => other !== index).map((other) => other.userId);
           const items = people
             .filter((person) => !taken.includes(person.id))
@@ -932,14 +958,17 @@ function CrewField({
           return (
             <li
               key={row.key}
-              className="grid items-center gap-2 rounded-md border border-border p-2 sm:grid-cols-[minmax(0,1fr)_10rem_auto_auto]"
+              className="grid items-center gap-2 rounded-md border border-border p-2 sm:grid-cols-[minmax(0,1fr)_10rem_auto]"
             >
               <Select
                 items={items}
                 value={member.userId || null}
                 onValueChange={(next) => next && form.setValue(`crew.${index}.userId`, next)}
               >
-                <SelectTrigger aria-label={t('calendar.form.crewMember')}>
+                <SelectTrigger
+                  aria-label={t('calendar.form.crewMember', { n: position })}
+                  aria-invalid={!!problem || undefined}
+                >
                   <SelectValue placeholder={t('calendar.form.crewMemberPlaceholder')} />
                 </SelectTrigger>
                 <SelectContent>
@@ -954,43 +983,44 @@ function CrewField({
                 </SelectContent>
               </Select>
               <RoleSelect
-                label={t('calendar.form.crewRole')}
+                label={t('calendar.form.crewRole', { n: position })}
                 value={member.role}
                 onChange={(role) => form.setValue(`crew.${index}.role`, role)}
               />
-              <Button
-                type="button"
-                variant={member.isLead ? 'secondary' : 'ghost'}
-                size="sm"
-                aria-pressed={member.isLead}
-                onClick={() =>
-                  form.setValue(
-                    'crew',
-                    crew.map((other, position) => ({ ...other, isLead: position === index })),
-                    { shouldDirty: true },
-                  )
-                }
-              >
-                <StarIcon />
-                {t('calendar.form.lead')}
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                className="justify-self-end"
-                aria-label={t('calendar.form.removeCrew')}
-                disabled={rows.fields.length === 1}
-                onClick={() => rows.remove(index)}
-              >
-                <XIcon />
-              </Button>
+              {/* On a phone the lead and remove buttons share the row's last line. */}
+              <span className="flex items-center justify-between gap-2">
+                <Button
+                  type="button"
+                  variant={member.isLead ? 'secondary' : 'ghost'}
+                  size="sm"
+                  aria-pressed={member.isLead}
+                  onClick={() =>
+                    form.setValue(
+                      'crew',
+                      crew.map((other, position) => ({ ...other, isLead: position === index })),
+                      { shouldDirty: true },
+                    )
+                  }
+                >
+                  <StarIcon />
+                  {t('calendar.form.lead')}
+                </Button>
+                <IconButton
+                  data-focus="remove"
+                  label={t('calendar.form.removeCrew', { n: position })}
+                  disabled={rows.fields.length === 1}
+                  onClick={() => remove(index)}
+                >
+                  <XIcon />
+                </IconButton>
+              </span>
             </li>
           );
         })}
       </ul>
       <div>
         <Button
+          ref={addButton}
           type="button"
           variant="outline"
           size="sm"
@@ -1009,6 +1039,13 @@ function CrewField({
 function ExternalCrewField({ form, problem }: { form: FormMethods; problem?: string }) {
   const { t } = useTranslation();
   const rows = useFieldArray({ control: form.control, name: 'externalCrew', keyName: 'key' });
+  const list = useRef<HTMLUListElement>(null);
+  const addButton = useRef<HTMLButtonElement>(null);
+  /** The next row's remove button takes the focus, the previous one's, or "add". */
+  function remove(index: number) {
+    flushSync(() => rows.remove(index));
+    focusAfterRemoval(list.current, index, addButton.current);
+  }
   return (
     <RowGroup
       label={
@@ -1021,14 +1058,15 @@ function ExternalCrewField({ form, problem }: { form: FormMethods; problem?: str
       problem={problem}
     >
       {rows.fields.length > 0 && (
-        <ul className="flex flex-col gap-2">
+        <ul ref={list} className="flex flex-col gap-2">
           {rows.fields.map((row, index) => (
             <li
               key={row.key}
               className="grid items-center gap-2 rounded-md border border-border p-2 sm:grid-cols-[minmax(0,1fr)_10rem_10rem_auto]"
             >
               <Input
-                aria-label={t('calendar.form.externalName')}
+                aria-label={t('calendar.form.externalNameOf', { n: index + 1 })}
+                aria-invalid={!!problem || undefined}
                 placeholder={t('calendar.form.externalName')}
                 maxLength={CALENDAR_LIMITS.externalCrewName}
                 {...form.register(`externalCrew.${index}.name`)}
@@ -1038,7 +1076,7 @@ function ExternalCrewField({ form, problem }: { form: FormMethods; problem?: str
                 name={`externalCrew.${index}.role`}
                 render={({ field }) => (
                   <RoleSelect
-                    label={t('calendar.form.crewRole')}
+                    label={t('calendar.form.externalRole', { n: index + 1 })}
                     value={field.value}
                     onChange={field.onChange}
                   />
@@ -1047,27 +1085,26 @@ function ExternalCrewField({ form, problem }: { form: FormMethods; problem?: str
               <Input
                 type="tel"
                 dir="ltr"
-                aria-label={t('calendar.form.externalPhone')}
+                aria-label={t('calendar.form.externalPhoneOf', { n: index + 1 })}
                 placeholder={t('calendar.form.externalPhone')}
                 className="placeholder:text-end"
                 {...form.register(`externalCrew.${index}.phone`)}
               />
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
+              <IconButton
+                data-focus="remove"
                 className="justify-self-end"
-                aria-label={t('calendar.form.removeExternal')}
-                onClick={() => rows.remove(index)}
+                label={t('calendar.form.removeExternal', { n: index + 1 })}
+                onClick={() => remove(index)}
               >
                 <XIcon />
-              </Button>
+              </IconButton>
             </li>
           ))}
         </ul>
       )}
       <div>
         <Button
+          ref={addButton}
           type="button"
           variant="outline"
           size="sm"
@@ -1086,10 +1123,30 @@ function ExternalCrewField({ form, problem }: { form: FormMethods; problem?: str
 function ShotsField({ form, problem }: { form: FormMethods; problem?: string }) {
   const { t } = useTranslation();
   const rows = useFieldArray({ control: form.control, name: 'shots', keyName: 'key' });
+  const list = useRef<HTMLOListElement>(null);
+  const addButton = useRef<HTMLButtonElement>(null);
+  /** The next row's remove button takes the focus, the previous one's, or "add". */
+  function remove(index: number) {
+    flushSync(() => rows.remove(index));
+    focusAfterRemoval(list.current, index, addButton.current);
+  }
+  /**
+   * Moving a row keeps the focus on the button that moved it, in its new place; at the top or the
+   * bottom that button turns off, so the other direction's takes the focus.
+   */
+  function move(from: number, to: number) {
+    flushSync(() => rows.move(from, to));
+    const row = list.current?.children[to];
+    const [same, other] = to < from ? ['up', 'down'] : ['down', 'up'];
+    const button = (name: string) =>
+      row?.querySelector<HTMLButtonElement>(`[data-focus="${name}"]`);
+    const target = button(same);
+    (target && !target.disabled ? target : button(other))?.focus();
+  }
   return (
     <RowGroup name={t('calendar.form.shots')} problem={problem}>
       {rows.fields.length > 0 && (
-        <ol className="flex flex-col gap-2">
+        <ol ref={list} className="flex flex-col gap-2">
           {rows.fields.map((row, index) => (
             <li
               key={row.key}
@@ -1097,6 +1154,7 @@ function ShotsField({ form, problem }: { form: FormMethods; problem?: string }) 
             >
               <Input
                 aria-label={t('calendar.form.shotText', { n: index + 1 })}
+                aria-invalid={!!problem || undefined}
                 placeholder={t('calendar.form.shotTextPlaceholder')}
                 maxLength={CALENDAR_LIMITS.shotText}
                 {...form.register(`shots.${index}.text`)}
@@ -1108,35 +1166,29 @@ function ShotsField({ form, problem }: { form: FormMethods; problem?: string }) 
                 {...form.register(`shots.${index}.note`)}
               />
               <span className="flex items-center justify-self-end">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label={t('calendar.form.moveShotUp', { n: index + 1 })}
+                <IconButton
+                  data-focus="up"
+                  label={t('calendar.form.moveShotUp', { n: index + 1 })}
                   disabled={index === 0}
-                  onClick={() => rows.move(index, index - 1)}
+                  onClick={() => move(index, index - 1)}
                 >
                   <ArrowUpIcon />
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label={t('calendar.form.moveShotDown', { n: index + 1 })}
+                </IconButton>
+                <IconButton
+                  data-focus="down"
+                  label={t('calendar.form.moveShotDown', { n: index + 1 })}
                   disabled={index === rows.fields.length - 1}
-                  onClick={() => rows.move(index, index + 1)}
+                  onClick={() => move(index, index + 1)}
                 >
                   <ArrowDownIcon />
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label={t('calendar.form.removeShot', { n: index + 1 })}
-                  onClick={() => rows.remove(index)}
+                </IconButton>
+                <IconButton
+                  data-focus="remove"
+                  label={t('calendar.form.removeShot', { n: index + 1 })}
+                  onClick={() => remove(index)}
                 >
                   <XIcon />
-                </Button>
+                </IconButton>
               </span>
             </li>
           ))}
@@ -1144,6 +1196,7 @@ function ShotsField({ form, problem }: { form: FormMethods; problem?: string }) 
       )}
       <div>
         <Button
+          ref={addButton}
           type="button"
           variant="outline"
           size="sm"

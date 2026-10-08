@@ -1,3 +1,4 @@
+import { randomInt } from 'node:crypto';
 import { Logger } from '@nestjs/common';
 import { type ErrorCode, MIN_PASSWORD_LENGTH } from '@vertex-hub/contracts';
 import {
@@ -68,6 +69,21 @@ export const SIGN_IN_LIMITS = {
   failuresPerAccount: 10,
   accountWindowMs: 15 * 60 * 1000,
 } as const;
+
+/**
+ * Backup codes are written down by hand, so they use lowercase letters and digits without the
+ * look-alikes (i, l, o, 0, 1): `xxxxx-xxxxx`, about 49 bits each, behind the sign-in limits.
+ */
+const BACKUP_CODE_ALPHABET = 'abcdefghjkmnpqrstuvwxyz23456789';
+
+function generateBackupCodes(amount = 10): string[] {
+  const part = () =>
+    Array.from(
+      { length: 5 },
+      () => BACKUP_CODE_ALPHABET[randomInt(BACKUP_CODE_ALPHABET.length)],
+    ).join('');
+  return Array.from({ length: amount }, () => `${part()}-${part()}`);
+}
 
 /** Failed sign-ins per email in a sliding window; memory is enough for one API process. */
 class AccountFailures {
@@ -155,13 +171,18 @@ export function createAuth(db: Database, env: Env, emails: AccountEmails) {
         '/sign-in/email': { window: 60, max: SIGN_IN_LIMITS.perIpPerMinute },
         '/two-factor/verify-totp': { window: 60, max: SIGN_IN_LIMITS.perIpPerMinute },
         '/two-factor/verify-backup-code': { window: 60, max: SIGN_IN_LIMITS.perIpPerMinute },
+        // These check the password again, so they are guessable like the sign-in.
+        '/two-factor/enable': { window: 60, max: SIGN_IN_LIMITS.perIpPerMinute },
+        '/two-factor/disable': { window: 60, max: SIGN_IN_LIMITS.perIpPerMinute },
+        '/two-factor/generate-backup-codes': { window: 60, max: SIGN_IN_LIMITS.perIpPerMinute },
+        '/change-password': { window: 60, max: SIGN_IN_LIMITS.perIpPerMinute },
       },
     },
     plugins: [
       twoFactor({
         issuer: 'Vertex Hub',
         skipVerificationOnEnable: false,
-        backupCodeOptions: { amount: 10 },
+        backupCodeOptions: { customBackupCodesGenerate: () => generateBackupCodes() },
       }),
     ],
     databaseHooks: {
@@ -249,10 +270,31 @@ export function createAuth(db: Database, env: Env, emails: AccountEmails) {
           }
           return;
         }
-        if (ctx.path !== '/change-password' && !TWO_FACTOR_SWITCHES.includes(ctx.path)) return;
+        if (
+          ctx.path !== '/change-password' &&
+          ctx.path !== '/two-factor/generate-backup-codes' &&
+          !TWO_FACTOR_SWITCHES.includes(ctx.path)
+        ) {
+          return;
+        }
         const session = ctx.context.session ?? (await getSessionFromCtx(ctx));
         if (!session) return;
         const actor = { id: session.user.id, name: session.user.name };
+
+        // New backup codes void the old ones: someone holding the session could lock the owner out.
+        if (ctx.path === '/two-factor/generate-backup-codes') {
+          if (ctx.context.returned instanceof APIError) return;
+          await db.transaction(async (tx) => {
+            await recordAudit(tx, {
+              actor,
+              action: 'user.backup_codes_regenerated',
+              entityType: 'user',
+              entityId: actor.id,
+            });
+            await emails.securityNotice(tx, actor.id, 'backup_codes_regenerated', null);
+          });
+          return;
+        }
 
         if (ctx.path === '/change-password') {
           if (ctx.context.returned instanceof APIError) return;

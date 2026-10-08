@@ -8,11 +8,12 @@ import {
   updateProjectExpenseSchema,
 } from '@vertex-hub/contracts';
 import { Field, FieldError, FieldLabel, Input, Textarea, toast } from '@vertex-hub/ui';
-import { useId, useState } from 'react';
+import { type ComponentProps, useId, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { MoneyInput } from '../../components/money-input';
 import { errorMessage } from '../../lib/errors';
+import { rateInput, rateText } from '../../lib/money';
 import { ChoiceSelect } from '../quotes/choice-select';
 import { FormDialog } from '../quotes/quote-dialogs';
 import { RateHint, validRate } from './invoice-dialogs';
@@ -39,6 +40,7 @@ export function ExpenseDialog({
   expense,
   open,
   onClose,
+  finalFocus,
 }: {
   projectId: string;
   projectCurrency: Currency;
@@ -46,6 +48,8 @@ export function ExpenseDialog({
   expense?: ProjectExpense;
   open: boolean;
   onClose: () => void;
+  /** Where the focus goes when it closes: the button that opened it, or a fallback. */
+  finalFocus: ComponentProps<typeof FormDialog>['finalFocus'];
 }) {
   const { t } = useTranslation();
   const ids = { amount: useId(), currency: useId() };
@@ -59,7 +63,7 @@ export function ExpenseDialog({
         description: expense.description,
         amountMinor: expense.amountMinor,
         currency: expense.currency,
-        sypPerUsd: expense.sypPerUsd,
+        sypPerUsd: rateText(expense.sypPerUsd),
         note: expense.note ?? '',
       }
     : {
@@ -67,18 +71,19 @@ export function ExpenseDialog({
         description: '',
         amountMinor: null,
         currency: projectCurrency,
-        sypPerUsd: settings.data?.sypPerUsd ?? '',
+        sypPerUsd: rateText(settings.data?.sypPerUsd ?? null),
         note: '',
       };
   const form = useForm<ExpenseValues>({ values: defaults });
   const [failure, setFailure] = useState<string | null>(null);
-  const { errors } = form.formState;
+  // `isDirty` read during render: the form tracks it only for a component that reads it.
+  const { errors, isDirty } = form.formState;
   const currency = form.watch('currency');
 
-  function close() {
+  // After the exit animation, so the fields do not change while the dialog fades.
+  function closed() {
     setFailure(null);
     form.reset(defaults);
-    onClose();
   }
 
   /** The values checked with the contract schema; the fields it refuses are marked. */
@@ -99,11 +104,14 @@ export function ExpenseDialog({
       description: values.description,
       amountMinor: values.amountMinor ?? 0,
       currency: values.currency,
-      sypPerUsd: values.sypPerUsd.trim(),
+      // Arabic-Indic digits and the Arabic decimal mark are read as typed on an Arabic keyboard.
+      sypPerUsd: rateInput(values.sypPerUsd),
       note: values.note.trim() || null,
     };
     try {
       if (expense) {
+        // Nothing changed: close without a request or a "saved" toast.
+        if (!isDirty) return onClose();
         const changes = checked(updateProjectExpenseSchema.safeParse(input));
         if (!changes) return;
         await update.mutateAsync({ expenseId: expense.id, ...changes });
@@ -114,7 +122,7 @@ export function ExpenseDialog({
         await create.mutateAsync(created);
         toast.add({ title: t('invoices.expenses.added'), type: 'success' });
       }
-      close();
+      onClose();
     } catch (error) {
       setFailure(errorMessage(t, error));
     }
@@ -128,7 +136,9 @@ export function ExpenseDialog({
   return (
     <FormDialog
       open={open}
-      onClose={close}
+      onClose={onClose}
+      onClosed={closed}
+      finalFocus={finalFocus}
       submitting={form.formState.isSubmitting}
       title={expense ? t('invoices.expenses.editTitle') : t('invoices.expenses.addTitle')}
       description={t('invoices.expenses.hint')}
@@ -151,6 +161,7 @@ export function ExpenseDialog({
           <FieldLabel>{t('invoices.expenses.spentOn')}</FieldLabel>
           <Input
             type="date"
+            dir="ltr"
             max={today}
             {...form.register('spentOn', { validate: (day) => !!day && day <= today })}
           />
@@ -198,8 +209,8 @@ export function ExpenseDialog({
             dir="ltr"
             inputMode="decimal"
             autoComplete="off"
-            className="text-end tabular-nums"
-            {...form.register('sypPerUsd', { validate: (value) => validRate(value.trim()) })}
+            className="tabular-nums"
+            {...form.register('sypPerUsd', { validate: (value) => validRate(rateInput(value)) })}
           />
           {!expense && <RateHint settings={settings.data} />}
           <FieldError match={!!errors.sypPerUsd}>{t('invoices.rate.invalid')}</FieldError>

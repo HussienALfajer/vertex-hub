@@ -13,7 +13,7 @@ import {
 } from 'drizzle-orm/pg-core';
 import { departmentCodeEnum } from './auth.js';
 import { archivedAt, id, timestamps } from './columns.js';
-import { deliverableKindEnum } from './retainers.js';
+import { deliverableKindEnum } from './deliverables.js';
 import { workTemplates } from './templates.js';
 
 /*

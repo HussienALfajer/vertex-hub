@@ -1,11 +1,14 @@
-import { DEPARTMENT_CAPABILITIES, type DepartmentCode } from '@vertex-hub/contracts';
+import type { DepartmentCode } from '@vertex-hub/contracts';
 
+/** The departments whose positions grant permissions: every key of `DEPARTMENT_CAPABILITIES`. */
 const described = [
   'internal_operations',
+  'content_management',
   'medical_consultation',
+  'photography',
   'general_communication',
   'marketing',
-] as const;
+] as const satisfies readonly DepartmentCode[];
 
 /**
  * The translation key explaining what a position in this department grants (ADR 0014), or null
@@ -13,7 +16,5 @@ const described = [
  */
 export function capabilityKey(code: DepartmentCode) {
   const match = described.find((department) => department === code);
-  return match && DEPARTMENT_CAPABILITIES[match]
-    ? (`departments.capabilities.${match}` as const)
-    : null;
+  return match ? (`departments.capabilities.${match}` as const) : null;
 }

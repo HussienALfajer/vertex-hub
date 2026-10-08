@@ -18,6 +18,7 @@ import {
   Avatar,
   Badge,
   Button,
+  Callout,
   Card,
   CardHeader,
   CardTitle,
@@ -26,8 +27,12 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  IconTile,
   PageHeader,
   Skeleton,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
   toast,
 } from '@vertex-hub/ui';
 import {
@@ -43,6 +48,7 @@ import {
   KeyRoundIcon,
   LinkIcon,
   ListTodoIcon,
+  type LucideIcon,
   MailIcon,
   PencilIcon,
   PhoneIcon,
@@ -53,7 +59,14 @@ import {
   UsersRoundIcon,
   UserXIcon,
 } from 'lucide-react';
-import { type ReactNode, useState } from 'react';
+import {
+  type ReactElement,
+  type ReactNode,
+  type RefObject,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '../../components/confirm-dialog';
 import { FormAlert } from '../../components/form-alert';
@@ -61,6 +74,7 @@ import { isMissing, LoadError } from '../../components/load-error';
 import { ApiError } from '../../lib/api/client';
 import { can, useMe } from '../../lib/auth';
 import { errorMessage } from '../../lib/errors';
+import { formatList } from '../../lib/format';
 import { LinkDialog } from './link-dialog';
 import { TwoFactorIndicator, UserStatusBadge } from './user-badges';
 import { UserForm } from './user-form';
@@ -107,22 +121,45 @@ export function UserProfilePage({ userId }: { userId: string }) {
 function Profile({ user }: { user: UserResponse }) {
   const me = useMe();
   const [editing, setEditing] = useState(false);
+  const editButton = useRef<HTMLButtonElement>(null);
+  const leftForm = useRef(false);
   const manager = can(me, 'users.manage');
   // Only a General Manager changes a General Manager (F01 rule 5).
   const canChange =
     manager && (!user.roles?.includes('general_manager') || me.roles.includes('general_manager'));
 
-  if (editing) return <EditUser user={user} onDone={() => setEditing(false)} />;
+  // The form replaces the profile, so leaving it would drop the focus on the page body.
+  useEffect(() => {
+    if (editing || !leftForm.current) return;
+    leftForm.current = false;
+    editButton.current?.focus();
+  }, [editing]);
+
+  if (editing) {
+    return (
+      <EditUser
+        user={user}
+        onDone={() => {
+          leftForm.current = true;
+          setEditing(false);
+        }}
+      />
+    );
+  }
 
   return (
     <>
       <ProfileHero
         user={user}
-        actions={canChange && <ProfileActions user={user} onEdit={() => setEditing(true)} />}
+        actions={
+          canChange && (
+            <ProfileActions user={user} editButton={editButton} onEdit={() => setEditing(true)} />
+          )
+        }
       />
       <Notices user={user} manager={manager} />
-      <div className="grid gap-6 lg:grid-cols-3">
-        <div className="flex flex-col gap-6 lg:col-span-2">
+      <div className="grid gap-6 xl:grid-cols-3">
+        <div className="flex flex-col gap-6 xl:col-span-2">
           <DepartmentsCard user={user} />
           <SkillsCard skills={user.skills} />
         </div>
@@ -164,35 +201,21 @@ function ProfileHero({ user, actions }: { user: UserResponse; actions: ReactNode
 
 function Notices({ user, manager }: { user: UserResponse; manager: boolean }) {
   const { t } = useTranslation();
-  const notices: { key: string; tone: 'warning' | 'info' | 'neutral'; text: string }[] = [];
   if (user.status === 'archived') {
-    notices.push({ key: 'archived', tone: 'neutral', text: t('users.profile.archivedNotice') });
-  } else {
-    if (manager && user.status === 'invited') {
-      notices.push({ key: 'invited', tone: 'info', text: t('users.profile.invitedNotice') });
-    }
-    if (manager && user.departments.length === 0) {
-      notices.push({ key: 'legacy', tone: 'warning', text: t('users.profile.legacy') });
-    }
+    return (
+      <Callout tone="neutral" icon={<ArchiveIcon />} title={t('users.profile.archivedNotice')} />
+    );
   }
-  if (notices.length === 0) return null;
-  const tones = {
-    warning: 'bg-status-warning text-status-warning-foreground',
-    info: 'bg-status-info text-status-info-foreground',
-    neutral: 'bg-status-neutral text-status-neutral-foreground',
-  };
+  if (!manager) return null;
   return (
-    <div className="flex flex-col gap-2">
-      {notices.map((notice) => (
-        <p
-          key={notice.key}
-          className={`flex items-center gap-2 rounded-md px-4 py-3 text-sm ${tones[notice.tone]}`}
-        >
-          <TriangleAlertIcon className="size-4 shrink-0" />
-          {notice.text}
-        </p>
-      ))}
-    </div>
+    <>
+      {user.status === 'invited' && (
+        <Callout tone="info" icon={<MailIcon />} title={t('users.profile.invitedNotice')} />
+      )}
+      {user.departments.length === 0 && (
+        <Callout tone="warning" icon={<TriangleAlertIcon />} title={t('users.profile.legacy')} />
+      )}
+    </>
   );
 }
 
@@ -349,9 +372,20 @@ function AccountCard({ user }: { user: UserResponse }) {
 
 type Confirming = 'archive' | 'restore' | 'resetTwoFactor' | null;
 
-function ProfileActions({ user, onEdit }: { user: UserResponse; onEdit: () => void }) {
+function ProfileActions({
+  user,
+  editButton,
+  onEdit,
+}: {
+  user: UserResponse;
+  editButton: RefObject<HTMLButtonElement | null>;
+  onEdit: () => void;
+}) {
   const { t } = useTranslation();
   const me = useMe();
+  // Every dialog here gives the focus back to the menu button, also the link dialog that the
+  // restore confirmation opens (else the focus goes back to the confirmation, which is gone).
+  const menuButton = useRef<HTMLButtonElement>(null);
   const issueLink = useIssueLink(user.id);
   const [link, setLink] = useState<UserLink | null>(null);
   const [confirming, setConfirming] = useState<Confirming>(null);
@@ -368,17 +402,31 @@ function ProfileActions({ user, onEdit }: { user: UserResponse; onEdit: () => vo
   return (
     <>
       {!archived && (
-        <Button variant="outline" onClick={onEdit}>
+        <Button ref={editButton} variant="outline" onClick={onEdit}>
           <PencilIcon />
           {t('users.profile.edit')}
         </Button>
       )}
       <DropdownMenu>
-        <DropdownMenuTrigger
-          render={<Button variant="outline" size="icon" aria-label={t('users.profile.actions')} />}
-        >
-          <EllipsisIcon />
-        </DropdownMenuTrigger>
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <DropdownMenuTrigger
+                render={
+                  <Button
+                    ref={menuButton}
+                    variant="outline"
+                    size="icon"
+                    aria-label={t('users.profile.actions')}
+                  />
+                }
+              />
+            }
+          >
+            <EllipsisIcon />
+          </TooltipTrigger>
+          <TooltipContent>{t('users.profile.actions')}</TooltipContent>
+        </Tooltip>
         <DropdownMenuContent align="end" className="min-w-64">
           {archived ? (
             <DropdownMenuItem onClick={() => setConfirming('restore')}>
@@ -413,22 +461,31 @@ function ProfileActions({ user, onEdit }: { user: UserResponse; onEdit: () => vo
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <LinkDialog link={link} name={user.name} email={user.email} onClose={() => setLink(null)} />
+      <LinkDialog
+        link={link}
+        name={user.name}
+        email={user.email}
+        onClose={() => setLink(null)}
+        finalFocus={menuButton}
+      />
       <ArchiveDialog
         user={user}
         open={confirming === 'archive'}
         onClose={() => setConfirming(null)}
+        finalFocus={menuButton}
       />
       <RestoreDialog
         user={user}
         open={confirming === 'restore'}
         onClose={() => setConfirming(null)}
         onRestored={setLink}
+        finalFocus={menuButton}
       />
       <ResetTwoFactorDialog
         user={user}
         open={confirming === 'resetTwoFactor'}
         onClose={() => setConfirming(null)}
+        finalFocus={menuButton}
       />
     </>
   );
@@ -436,25 +493,93 @@ function ProfileActions({ user, onEdit }: { user: UserResponse; onEdit: () => vo
 
 const responsibilitiesSchema = responsibilitySchema.array();
 
+/** How each responsibility that blocks archiving shows: its icon and the page to fix it on. */
+const responsibilityViews = {
+  manages_department: {
+    icon: Building2Icon,
+    open: 'users.responsibilities.open',
+    link: (id: string) => <Link to="/departments/$departmentId" params={{ departmentId: id }} />,
+  },
+  account_manager_of_client: {
+    icon: BriefcaseBusinessIcon,
+    open: 'users.responsibilities.openClient',
+    link: (id: string) => <Link to="/clients/$clientId" params={{ clientId: id }} />,
+  },
+  project_manager_of_project: {
+    icon: FolderKanbanIcon,
+    open: 'users.responsibilities.openProject',
+    link: (id: string) => <Link to="/projects/$projectId" params={{ projectId: id }} />,
+  },
+  assignee_of_open_tasks: {
+    icon: ListTodoIcon,
+    open: 'users.responsibilities.openTask',
+    link: (id: string) => <Link to="/tasks/$taskId" params={{ taskId: id }} />,
+  },
+  responsible_for_open_posts: {
+    icon: CalendarDaysIcon,
+    open: 'users.responsibilities.openPost',
+    link: (id: string) => <Link to="/content/posts/$postId" params={{ postId: id }} />,
+  },
+  lead_of_scheduled_shoots: {
+    icon: CameraIcon,
+    open: 'users.responsibilities.openShoot',
+    link: (id: string) => <Link to="/shoots/$shootId" params={{ shootId: id }} />,
+  },
+  organizer_of_upcoming_meetings: {
+    icon: UsersRoundIcon,
+    open: 'users.responsibilities.openMeeting',
+    link: (id: string) => <Link to="/meetings/$meetingId" params={{ meetingId: id }} />,
+  },
+  owner_of_open_leads: {
+    icon: TargetIcon,
+    open: 'users.responsibilities.openLead',
+    link: (id: string) => <Link to="/leads/$leadId" params={{ leadId: id }} />,
+  },
+} as const satisfies Record<
+  Responsibility['type'],
+  { icon: LucideIcon; open: string; link: (id: string) => ReactElement }
+>;
+
+/** The responsibilities a refusal lists (`USER_HAS_RESPONSIBILITIES` and similar), if any. */
+function blockersOf(error: unknown): Responsibility[] | null {
+  if (!(error instanceof ApiError)) return null;
+  if (error.code !== 'USER_HAS_RESPONSIBILITIES' && error.code !== 'MANAGER_MEMBERSHIP_REQUIRED') {
+    return null;
+  }
+  const parsed = responsibilitiesSchema.safeParse(error.details);
+  return parsed.success && parsed.data.length > 0 ? parsed.data : null;
+}
+
+/** The element a dialog gives the focus back to when it closes. */
+type FinalFocus = RefObject<HTMLElement | null>;
+
 function ArchiveDialog({
   user,
   open,
   onClose,
+  finalFocus,
 }: {
   user: UserResponse;
   open: boolean;
   onClose: () => void;
+  finalFocus: FinalFocus;
 }) {
   const { t } = useTranslation();
   const archive = useArchiveUser(user.id);
   const [blockers, setBlockers] = useState<Responsibility[] | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
+  const blockersTitle = useRef<HTMLHeadingElement>(null);
 
-  function close() {
+  // The archive button that had the focus is gone once the list shows: read the new title.
+  useEffect(() => {
+    if (blockers) blockersTitle.current?.focus();
+  }, [blockers]);
+
+  // After the exit animation, so the dialog does not flip back to the question while it fades.
+  function reset() {
     setBlockers(null);
     setFailure(null);
     archive.reset();
-    onClose();
   }
 
   async function confirm() {
@@ -462,124 +587,50 @@ function ArchiveDialog({
     try {
       await archive.mutateAsync();
       toast.add({ title: t('users.confirm.archived'), type: 'success' });
-      close();
+      onClose();
     } catch (error) {
-      const parsed =
-        error instanceof ApiError && error.code === 'USER_HAS_RESPONSIBILITIES'
-          ? responsibilitiesSchema.safeParse(error.details)
-          : null;
-      if (parsed?.success) setBlockers(parsed.data);
+      const found = blockersOf(error);
+      if (found) setBlockers(found);
       else setFailure(errorMessage(t, error));
     }
   }
 
   return (
-    <AlertDialog open={open} onOpenChange={(next) => !next && close()}>
-      <AlertDialogContent>
+    <AlertDialog
+      open={open}
+      onOpenChange={(next) => !next && onClose()}
+      onOpenChangeComplete={(next) => !next && reset()}
+    >
+      <AlertDialogContent finalFocus={finalFocus}>
         {blockers ? (
           <>
             <AlertDialogHeader>
-              <div className="mb-2 flex size-11 items-center justify-center rounded-lg bg-status-warning text-status-warning-foreground">
-                <UserXIcon className="size-5" />
-              </div>
-              <AlertDialogTitle>{t('users.responsibilities.title')}</AlertDialogTitle>
+              <IconTile tone="warning" className="mb-2">
+                <UserXIcon />
+              </IconTile>
+              <AlertDialogTitle ref={blockersTitle} tabIndex={-1} className="outline-none">
+                {t('users.responsibilities.title')}
+              </AlertDialogTitle>
               <AlertDialogDescription>{t('users.responsibilities.body')}</AlertDialogDescription>
             </AlertDialogHeader>
             <ul className="flex flex-col gap-2">
-              {blockers.map((item) => (
-                <li
-                  key={`${item.type}-${item.id}`}
-                  className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2"
-                >
-                  <span className="flex items-center gap-2 text-sm">
-                    {item.type === 'manages_department' ? (
-                      <Building2Icon className="size-4 text-muted-foreground" />
-                    ) : item.type === 'account_manager_of_client' ? (
-                      <BriefcaseBusinessIcon className="size-4 text-muted-foreground" />
-                    ) : item.type === 'assignee_of_open_tasks' ? (
-                      <ListTodoIcon className="size-4 text-muted-foreground" />
-                    ) : item.type === 'responsible_for_open_posts' ? (
-                      <CalendarDaysIcon className="size-4 text-muted-foreground" />
-                    ) : item.type === 'lead_of_scheduled_shoots' ? (
-                      <CameraIcon className="size-4 text-muted-foreground" />
-                    ) : item.type === 'organizer_of_upcoming_meetings' ? (
-                      <UsersRoundIcon className="size-4 text-muted-foreground" />
-                    ) : item.type === 'owner_of_open_leads' ? (
-                      <TargetIcon className="size-4 text-muted-foreground" />
-                    ) : (
-                      <FolderKanbanIcon className="size-4 text-muted-foreground" />
-                    )}
-                    {t(`users.responsibilities.${item.type}`, { name: item.name })}
-                  </span>
-                  {item.type === 'manages_department' ? (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      render={
-                        <Link to="/departments/$departmentId" params={{ departmentId: item.id }} />
-                      }
-                    >
-                      {t('users.responsibilities.open')}
+              {blockers.map((item) => {
+                const view = responsibilityViews[item.type];
+                return (
+                  <li
+                    key={`${item.type}-${item.id}`}
+                    className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2"
+                  >
+                    <span className="flex items-center gap-2 text-sm">
+                      <view.icon className="size-4 shrink-0 text-muted-foreground" />
+                      {t(`users.responsibilities.${item.type}`, { name: item.name })}
+                    </span>
+                    <Button size="sm" variant="outline" render={view.link(item.id)}>
+                      {t(view.open)}
                     </Button>
-                  ) : item.type === 'account_manager_of_client' ? (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      render={<Link to="/clients/$clientId" params={{ clientId: item.id }} />}
-                    >
-                      {t('users.responsibilities.openClient')}
-                    </Button>
-                  ) : item.type === 'project_manager_of_project' ? (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      render={<Link to="/projects/$projectId" params={{ projectId: item.id }} />}
-                    >
-                      {t('users.responsibilities.openProject')}
-                    </Button>
-                  ) : item.type === 'assignee_of_open_tasks' ? (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      render={<Link to="/tasks/$taskId" params={{ taskId: item.id }} />}
-                    >
-                      {t('users.responsibilities.openTask')}
-                    </Button>
-                  ) : item.type === 'responsible_for_open_posts' ? (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      render={<Link to="/content/posts/$postId" params={{ postId: item.id }} />}
-                    >
-                      {t('users.responsibilities.openPost')}
-                    </Button>
-                  ) : item.type === 'lead_of_scheduled_shoots' ? (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      render={<Link to="/shoots/$shootId" params={{ shootId: item.id }} />}
-                    >
-                      {t('users.responsibilities.openShoot')}
-                    </Button>
-                  ) : item.type === 'organizer_of_upcoming_meetings' ? (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      render={<Link to="/meetings/$meetingId" params={{ meetingId: item.id }} />}
-                    >
-                      {t('users.responsibilities.openMeeting')}
-                    </Button>
-                  ) : item.type === 'owner_of_open_leads' ? (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      render={<Link to="/leads/$leadId" params={{ leadId: item.id }} />}
-                    >
-                      {t('users.responsibilities.openLead')}
-                    </Button>
-                  ) : null}
-                </li>
-              ))}
+                  </li>
+                );
+              })}
             </ul>
             <AlertDialogFooter>
               <AlertDialogClose render={<Button variant="outline" />}>
@@ -616,14 +667,19 @@ function RestoreDialog({
   open,
   onClose,
   onRestored,
+  finalFocus,
 }: {
   user: UserResponse;
   open: boolean;
   onClose: () => void;
   onRestored: (link: UserLink) => void;
+  finalFocus: FinalFocus;
 }) {
   const { t } = useTranslation();
   const restore = useRestoreUser(user.id);
+  // After a restore the link dialog opens and takes the focus; this one closes after it and must
+  // not pull the focus back behind it.
+  const handedOver = useRef(false);
   return (
     <ConfirmDialog
       open={open}
@@ -632,7 +688,16 @@ function RestoreDialog({
       body={t('users.confirm.restoreBody')}
       action={t('users.confirm.restoreAction')}
       pending={restore.isPending}
-      onConfirm={async () => onRestored((await restore.mutateAsync()).link)}
+      finalFocus={() => {
+        const target = handedOver.current ? false : finalFocus.current;
+        handedOver.current = false;
+        return target;
+      }}
+      onConfirm={async () => {
+        const { link } = await restore.mutateAsync();
+        handedOver.current = true;
+        onRestored(link);
+      }}
     />
   );
 }
@@ -641,10 +706,12 @@ function ResetTwoFactorDialog({
   user,
   open,
   onClose,
+  finalFocus,
 }: {
   user: UserResponse;
   open: boolean;
   onClose: () => void;
+  finalFocus: FinalFocus;
 }) {
   const { t } = useTranslation();
   const reset = useResetTwoFactor(user.id);
@@ -657,6 +724,7 @@ function ResetTwoFactorDialog({
       action={t('users.confirm.resetAction')}
       destructive
       pending={reset.isPending}
+      finalFocus={finalFocus}
       onConfirm={async () => {
         await reset.mutateAsync();
         toast.add({ title: t('users.confirm.resetDone'), type: 'success' });
@@ -691,6 +759,16 @@ function EditUser({ user, onDone }: { user: UserResponse; onDone: () => void }) 
         ownAccount={user.id === me.user.id}
         submitLabel={t('users.form.save')}
         submittingLabel={t('common.saving')}
+        describeFailure={(error) => {
+          const blockers = blockersOf(error);
+          if (!blockers) return;
+          return t('users.form.blockedBy', {
+            message: errorMessage(t, error),
+            items: formatList(
+              blockers.map((item) => t(`users.responsibilities.${item.type}`, { name: item.name })),
+            ),
+          });
+        }}
         onSubmit={async (values) => {
           await update.mutateAsync(values);
           toast.add({ title: t('users.profile.updated'), type: 'success' });

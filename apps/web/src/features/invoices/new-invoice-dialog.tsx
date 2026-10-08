@@ -14,10 +14,12 @@ import {
   FieldError,
   FieldLabel,
 } from '@vertex-hub/ui';
-import { type FormEvent, useId, useState } from 'react';
+import { type FormEvent, useId, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { FormAlert } from '../../components/form-alert';
 import { errorMessage } from '../../lib/errors';
+import { focusFirstInvalid } from '../../lib/focus-first-invalid';
 import { clientListQuery } from '../clients/clients.queries';
 import { ChoiceSelect } from '../quotes/choice-select';
 import { useCreateInvoice } from './invoices.queries';
@@ -44,25 +46,27 @@ export function NewInvoiceDialog({
   const [currency, setCurrency] = useState<Currency>('USD');
   const [missingClient, setMissingClient] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
+  const formRef = useRef<HTMLFormElement>(null);
   // Ended and paused clients can be invoiced; archived ones cannot (rule 1).
   const clients = useQuery({
     ...clientListQuery({ status: ['active', 'paused', 'ended'], pageSize: 100 }),
     enabled: open && !fixedClientId,
   });
 
-  function close() {
+  // Once it has faded out, so the fields do not change while it fades.
+  function closed() {
     setFailure(null);
     setMissingClient(false);
     setClientId(fixedClientId ?? '');
     setCurrency('USD');
-    onClose();
   }
 
   async function submit(event: FormEvent) {
     event.preventDefault();
     setFailure(null);
     if (!clientId) {
-      setMissingClient(true);
+      flushSync(() => setMissingClient(true));
+      focusFirstInvalid(formRef.current);
       return;
     }
     try {
@@ -73,7 +77,7 @@ export function NewInvoiceDialog({
         retainerId: null,
         sources: [],
       });
-      close();
+      onClose();
       await navigate({ to: '/invoices/$invoiceId', params: { invoiceId: invoice.id } });
     } catch (error) {
       setFailure(errorMessage(t, error));
@@ -90,9 +94,13 @@ export function NewInvoiceDialog({
   }));
 
   return (
-    <Dialog open={open} onOpenChange={(next) => !next && close()}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => !next && onClose()}
+      onOpenChangeComplete={(next) => !next && closed()}
+    >
       <DialogContent closeLabel={t('common.close')}>
-        <form className="grid gap-5" onSubmit={submit} noValidate>
+        <form ref={formRef} className="grid gap-5" onSubmit={submit} noValidate>
           <DialogHeader>
             <DialogTitle>{t('invoices.new.title')}</DialogTitle>
             <DialogDescription>{t('invoices.new.hint')}</DialogDescription>

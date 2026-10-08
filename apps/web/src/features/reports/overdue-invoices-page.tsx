@@ -24,7 +24,7 @@ import { useTranslation } from 'react-i18next';
 import { LoadError } from '../../components/load-error';
 import { formatCalendarDate, formatNumber } from '../../lib/format';
 import { ALL, idParam, oneOfParam } from '../../lib/search-params';
-import { accountManagersQuery } from '../clients/clients.queries';
+import { useClientAccountManagers } from '../clients/clients.queries';
 import { ChoiceSelect } from '../quotes/choice-select';
 import { Money } from '../quotes/quote-badges';
 import { BackToReports, ExportButton } from './report-parts';
@@ -47,13 +47,13 @@ export function OverdueInvoicesPage({ search }: { search: OverdueInvoicesSearch 
   const { t } = useTranslation();
   const navigate = useNavigate({ from: '/reports/overdue-invoices' });
   const report = useQuery(overdueInvoicesReportQuery(search));
-  const managers = useQuery(accountManagersQuery);
+  const managers = useClientAccountManagers();
   const setSearch = (next: Partial<OverdueInvoicesSearch>) =>
     navigate({ search: (previous) => ({ ...previous, ...next }), replace: true });
 
   const managerItems = [
     { value: ALL, label: t('reports.overdue.allManagers') },
-    ...(managers.data?.items ?? []).map((user) => ({ value: user.id, label: user.name })),
+    ...managers.map((user) => ({ value: user.id, label: user.name })),
   ];
   const currencyItems = [
     { value: ALL, label: t('reports.overdue.allCurrencies') },
@@ -152,71 +152,78 @@ export function AgingBadge({ bucket }: { bucket: AgingBucket }) {
 function OverdueTable({ report }: { report: OverdueInvoicesReport }) {
   const { t } = useTranslation();
   return (
-    <div className="overflow-hidden rounded-lg border border-border bg-surface">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>{t('reports.overdue.number')}</TableHead>
-            <TableHead>{t('reports.overdue.client')}</TableHead>
-            <TableHead>{t('reports.overdue.accountManager')}</TableHead>
-            <TableHead className="text-end">{t('reports.overdue.total')}</TableHead>
-            <TableHead className="text-end">{t('reports.overdue.paid')}</TableHead>
-            <TableHead className="text-end">{t('reports.overdue.balance')}</TableHead>
-            <TableHead className="text-end">{t('reports.overdue.balanceUsd')}</TableHead>
-            <TableHead>{t('reports.overdue.dueOn')}</TableHead>
-            <TableHead>{t('reports.overdue.aging')}</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {report.invoices.map((row) => (
-            <TableRow key={row.id}>
-              <TableCell>
-                <Link
-                  to="/invoices/$invoiceId"
-                  params={{ invoiceId: row.id }}
-                  className="font-medium hover:underline"
-                >
-                  <span dir="ltr" className="tabular-nums">
-                    {row.number}
-                  </span>
-                </Link>
-              </TableCell>
-              <TableCell>{row.client.name}</TableCell>
-              <TableCell>
-                {row.accountManager?.name ?? (
-                  <span className="text-muted-foreground">{t('common.none')}</span>
-                )}
-              </TableCell>
-              <TableCell className="text-end">
-                <Money minor={row.totalMinor} currency={row.currency} />
-              </TableCell>
-              <TableCell className="text-end">
-                <Money minor={row.paidMinor} currency={row.currency} />
-              </TableCell>
-              <TableCell className="text-end font-medium">
-                <Money minor={row.balanceMinor} currency={row.currency} />
-              </TableCell>
-              <TableCell className="text-end">
-                <Money minor={row.balanceUsdMinor} currency="USD" />
-              </TableCell>
-              <TableCell>
-                <span className="flex flex-col">
-                  {formatCalendarDate(row.dueOn)}
-                  <span className="text-xs text-destructive-text">
-                    {t('invoices.daysOverdue', {
-                      count: row.daysOverdue,
-                      n: formatNumber(row.daysOverdue),
-                    })}
-                  </span>
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>{t('reports.overdue.number')}</TableHead>
+          <TableHead>{t('reports.overdue.client')}</TableHead>
+          <TableHead className="text-end">{t('reports.overdue.paid')}</TableHead>
+          <TableHead className="text-end">{t('reports.overdue.balance')}</TableHead>
+          <TableHead>{t('reports.overdue.dueOn')}</TableHead>
+          <TableHead>{t('reports.overdue.aging')}</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {report.invoices.map((row) => (
+          <TableRow key={row.id}>
+            <TableCell>
+              <Link
+                to="/invoices/$invoiceId"
+                params={{ invoiceId: row.id }}
+                className="font-medium hover:underline"
+              >
+                <span dir="ltr" className="tabular-nums">
+                  {row.number}
                 </span>
-              </TableCell>
-              <TableCell>
-                <AgingBadge bucket={row.bucket} />
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
+              </Link>
+            </TableCell>
+            <TableCell>
+              <span className="flex flex-col">
+                {row.client.name}
+                {row.accountManager && (
+                  <span className="text-xs text-muted-foreground">{row.accountManager.name}</span>
+                )}
+              </span>
+            </TableCell>
+            <TableCell className="text-end">
+              <span className="flex flex-col items-end">
+                <Money minor={row.paidMinor} currency={row.currency} />
+                <span className="text-xs text-muted-foreground">
+                  {t('reports.overdue.ofTotal')}{' '}
+                  <Money minor={row.totalMinor} currency={row.currency} />
+                </span>
+              </span>
+            </TableCell>
+            {/* The USD balance only beside a SYP one: for USD it is the same amount. */}
+            <TableCell className="text-end">
+              <span className="flex flex-col items-end">
+                <Money minor={row.balanceMinor} currency={row.currency} className="font-medium" />
+                {row.currency !== 'USD' && (
+                  <Money
+                    minor={row.balanceUsdMinor}
+                    currency="USD"
+                    className="text-xs text-muted-foreground"
+                  />
+                )}
+              </span>
+            </TableCell>
+            <TableCell>
+              <span className="flex flex-col">
+                {formatCalendarDate(row.dueOn)}
+                <span className="text-xs text-destructive-text">
+                  {t('invoices.daysOverdue', {
+                    count: row.daysOverdue,
+                    n: formatNumber(row.daysOverdue),
+                  })}
+                </span>
+              </span>
+            </TableCell>
+            <TableCell>
+              <AgingBadge bucket={row.bucket} />
+            </TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
   );
 }

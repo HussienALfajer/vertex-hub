@@ -1,4 +1,5 @@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@vertex-hub/ui';
+import type { Ref } from 'react';
 
 export interface Choice {
   value: string;
@@ -15,6 +16,7 @@ export function ChoiceSelect({
   placeholder,
   disabled,
   className,
+  ref,
 }: {
   items: Choice[];
   value: string | null;
@@ -24,6 +26,8 @@ export function ChoiceSelect({
   placeholder?: string;
   disabled?: boolean;
   className?: string;
+  /** The trigger, for the focus to come back to it on an error. */
+  ref?: Ref<HTMLButtonElement>;
 }) {
   return (
     <Select
@@ -32,7 +36,12 @@ export function ChoiceSelect({
       disabled={disabled}
       onValueChange={(next) => next !== null && onChange(next)}
     >
-      <SelectTrigger aria-labelledby={labelledBy} aria-label={label} className={className}>
+      <SelectTrigger
+        ref={ref}
+        aria-labelledby={labelledBy}
+        aria-label={label}
+        className={className}
+      >
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent>

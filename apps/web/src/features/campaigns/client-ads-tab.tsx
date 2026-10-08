@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { Link } from '@tanstack/react-router';
 import {
   AD_CAMPAIGN_STATUSES,
   type AdWallet,
@@ -12,6 +13,7 @@ import {
   Button,
   Card,
   EmptyState,
+  IconButton,
   Skeleton,
   Table,
   TableBody,
@@ -29,12 +31,13 @@ import {
   PlusIcon,
   WalletIcon,
 } from 'lucide-react';
-import { type ReactNode, useState } from 'react';
+import { type ReactNode, type RefObject, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LoadError } from '../../components/load-error';
 import { TabHeader } from '../../components/tab-header';
 import { scopesOf } from '../../lib/auth';
 import { formatCalendarDate } from '../../lib/format';
+import { useShownWhileClosing } from '../../lib/use-shown-while-closing';
 import { EmailHistory } from '../email/email-history';
 import { Money } from '../quotes/quote-badges';
 import { Balance, LowBalanceBadge } from './campaign-badges';
@@ -101,6 +104,13 @@ function WalletSection({ wallet }: { wallet: AdWallet }) {
   const [editingThreshold, setEditingThreshold] = useState(false);
   const [voiding, setVoiding] = useState<WalletEntry | null>(null);
   const { permissions } = wallet;
+  // Where each dialog gives the focus back: the button that opened it; a voided entry loses its
+  // "void" button, so the ledger's heading takes it.
+  const depositButton = useRef<HTMLButtonElement>(null);
+  const refundButton = useRef<HTMLButtonElement>(null);
+  const thresholdButton = useRef<HTMLButtonElement>(null);
+  const ledgerHeading = useRef<HTMLHeadingElement>(null);
+  const shownKind = useShownWhileClosing(recording);
 
   return (
     <section className="flex flex-col gap-4">
@@ -112,13 +122,18 @@ function WalletSection({ wallet }: { wallet: AdWallet }) {
             <div className="flex flex-wrap items-center gap-2">
               <BudgetLowEmailButton wallet={wallet} />
               {permissions.canFund && (
-                <Button size="sm" variant="outline" onClick={() => setRecording('refund')}>
+                <Button
+                  ref={refundButton}
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setRecording('refund')}
+                >
                   <BanknoteArrowUpIcon />
                   {t('campaigns.entry.refund')}
                 </Button>
               )}
               {permissions.canDeposit && (
-                <Button size="sm" onClick={() => setRecording('deposit')}>
+                <Button ref={depositButton} size="sm" onClick={() => setRecording('deposit')}>
                   <BanknoteArrowDownIcon />
                   {t('campaigns.entry.deposit')}
                 </Button>
@@ -149,14 +164,13 @@ function WalletSection({ wallet }: { wallet: AdWallet }) {
           label={t('campaigns.wallet.threshold')}
           badge={
             permissions.canEditThreshold && (
-              <Button
-                variant="ghost"
-                size="sm"
-                aria-label={t('campaigns.threshold.edit')}
+              <IconButton
+                ref={thresholdButton}
+                label={t('campaigns.threshold.edit')}
                 onClick={() => setEditingThreshold(true)}
               >
                 <PencilIcon />
-              </Button>
+              </IconButton>
             )
           }
         >
@@ -167,21 +181,33 @@ function WalletSection({ wallet }: { wallet: AdWallet }) {
           )}
         </Stat>
       </section>
-      <Ledger wallet={wallet} onVoid={permissions.canFund ? setVoiding : undefined} />
+      <Ledger
+        wallet={wallet}
+        headingRef={ledgerHeading}
+        onVoid={permissions.canFund ? setVoiding : undefined}
+      />
       <EmailHistory target={{ type: 'ad_wallet', clientId: wallet.client.id }} />
 
-      <WalletEntryDialog wallet={wallet} kind={recording} onClose={() => setRecording(null)} />
+      <WalletEntryDialog
+        wallet={wallet}
+        open={recording !== null}
+        kind={shownKind ?? 'deposit'}
+        onClose={() => setRecording(null)}
+        finalFocus={shownKind === 'refund' ? refundButton : depositButton}
+      />
       {permissions.canEditThreshold && (
         <ThresholdDialog
           wallet={wallet}
           open={editingThreshold}
           onClose={() => setEditingThreshold(false)}
+          finalFocus={thresholdButton}
         />
       )}
       <VoidEntryDialog
         clientId={wallet.client.id}
         entry={voiding}
         onClose={() => setVoiding(null)}
+        finalFocus={ledgerHeading}
       />
     </section>
   );
@@ -208,7 +234,15 @@ function Stat({
 }
 
 /** Rule 15: deposits, refunds and spend by date with the running balance; void entries struck. */
-function Ledger({ wallet, onVoid }: { wallet: AdWallet; onVoid?: (entry: WalletEntry) => void }) {
+function Ledger({
+  wallet,
+  headingRef,
+  onVoid,
+}: {
+  wallet: AdWallet;
+  headingRef: RefObject<HTMLHeadingElement | null>;
+  onVoid?: (entry: WalletEntry) => void;
+}) {
   const { t } = useTranslation();
   const entries = new Map(wallet.entries.map((entry) => [entry.id, entry]));
   if (wallet.ledger.length === 0) {
@@ -222,7 +256,9 @@ function Ledger({ wallet, onVoid }: { wallet: AdWallet; onVoid?: (entry: WalletE
   }
   return (
     <Card className="gap-4 p-6">
-      <h3 className="text-lg font-bold">{t('campaigns.ledger.heading')}</h3>
+      <h3 ref={headingRef} tabIndex={-1} className="text-lg font-bold outline-none">
+        {t('campaigns.ledger.heading')}
+      </h3>
       <Table>
         <TableHeader>
           <TableRow>
@@ -253,10 +289,17 @@ function Ledger({ wallet, onVoid }: { wallet: AdWallet; onVoid?: (entry: WalletE
                     {row.voided && <Badge tone="outline">{t('campaigns.ledger.voided')}</Badge>}
                   </span>
                 </TableCell>
-                <TableCell className="whitespace-normal">
+                {/* Wide enough for a campaign name and its period on two lines. */}
+                <TableCell className="min-w-56 whitespace-normal">
                   {row.spend ? (
                     <span className="flex flex-col">
-                      <span>{row.spend.campaign.name}</span>
+                      <Link
+                        to="/campaigns/$campaignId"
+                        params={{ campaignId: row.spend.campaign.id }}
+                        className="self-start hover:underline"
+                      >
+                        {row.spend.campaign.name}
+                      </Link>
                       <span className="text-xs text-muted-foreground">
                         {t('campaigns.dateRange', {
                           from: formatCalendarDate(row.spend.periodStart),
@@ -267,7 +310,7 @@ function Ledger({ wallet, onVoid }: { wallet: AdWallet; onVoid?: (entry: WalletE
                   ) : (
                     <span className="flex flex-col">
                       {row.entry?.receiptNumber && (
-                        <span dir="ltr" className="self-start tabular-nums">
+                        <span dir="ltr" className="self-start whitespace-nowrap tabular-nums">
                           {row.entry.receiptNumber}
                         </span>
                       )}
@@ -355,6 +398,7 @@ function CampaignsSection({
 }) {
   const { t } = useTranslation();
   const [creating, setCreating] = useState(false);
+  const newButton = useRef<HTMLButtonElement>(null);
   const campaigns = useQuery(
     campaignListQuery({ clientId: client.id, status: [...AD_CAMPAIGN_STATUSES], pageSize: 100 }),
   );
@@ -364,7 +408,7 @@ function CampaignsSection({
         title={t('campaigns.client.title')}
         action={
           canCreate && (
-            <Button size="sm" onClick={() => setCreating(true)}>
+            <Button ref={newButton} size="sm" onClick={() => setCreating(true)}>
               <PlusIcon />
               {t('campaigns.new.action')}
             </Button>
@@ -385,7 +429,12 @@ function CampaignsSection({
         <CampaignsTable campaigns={campaigns.data.items} showClient={false} />
       )}
       {canCreate && (
-        <CampaignDialog open={creating} onClose={() => setCreating(false)} clientId={client.id} />
+        <CampaignDialog
+          open={creating}
+          onClose={() => setCreating(false)}
+          clientId={client.id}
+          finalFocus={newButton}
+        />
       )}
     </section>
   );

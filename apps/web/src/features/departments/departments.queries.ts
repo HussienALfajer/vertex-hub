@@ -34,5 +34,7 @@ export function useUpdateDepartment(id: string) {
         queryClient.invalidateQueries({ queryKey: ['me'] }),
       ]);
     },
+    // A refusal can come from a stale page (the chosen manager left the department meanwhile).
+    onError: () => queryClient.invalidateQueries({ queryKey: departmentsKeys.detail(id) }),
   });
 }

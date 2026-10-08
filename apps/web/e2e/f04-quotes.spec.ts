@@ -1,5 +1,6 @@
+import { grantedPermissions, type MeResponse } from '@vertex-hub/contracts';
 import ar from '../src/i18n/locales/ar.json' with { type: 'json' };
-import { accountManagerMe, employeeMe, manager, mockApi, seedIds } from './fixtures';
+import { accountManagerMe, employeeMe, financeMe, manager, mockApi, seedIds } from './fixtures';
 import { expect, test } from './test';
 
 // F04 quote screens against the mocked API (the real rules are covered by apps/api/test).
@@ -202,4 +203,55 @@ test('account managers see their clients’ quotes only; employees see none', as
   await expect(
     page.getByRole('navigation', { name: ar.nav.label }).getByRole('link', { name: ar.nav.quotes }),
   ).toBeHidden();
+});
+
+test('"My clients" is for account managers; Finance and the General Manager see every quote', async ({
+  page,
+}) => {
+  const api = await mockApi(page, { signedIn: true, me: accountManagerMe });
+  await page.goto('/quotes');
+  const mine = page.getByRole('button', { name: ar.quotes.filters.mine, exact: true });
+  await expect(mine).toBeVisible();
+
+  // The seeded General Manager is an account manager too.
+  const generalManager: MeResponse = {
+    ...manager,
+    roles: ['general_manager', 'employee'],
+    permissions: grantedPermissions({ roles: ['general_manager', 'employee'], departments: [] }),
+  };
+  for (const me of [financeMe, generalManager]) {
+    api.signInAs(me);
+    await page.goto('/quotes');
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+    await expect(mine).toHaveCount(0);
+  }
+});
+
+test('"Clear filters" gives the focus to the search field', async ({ page }) => {
+  await mockApi(page, { signedIn: true, me: manager });
+  await page.goto('/quotes?search=Q-2026');
+  await page.getByRole('button', { name: ar.quotes.filters.clear }).click();
+  await expect(page.getByRole('button', { name: ar.quotes.filters.clear })).toHaveCount(0);
+  await expect(page.getByLabel(ar.quotes.search)).toBeFocused();
+});
+
+test('the client profile shows the Quotes tab to quote readers covering the client', async ({
+  page,
+}) => {
+  const api = await mockApi(page, { signedIn: true, me: accountManagerMe });
+  const quotesTab = page.getByRole('tab', { name: ar.clients.profile.tabs.quotes });
+  await page.goto(`/clients/${seedIds.jasmine}`);
+  await expect(quotesTab).toBeVisible();
+
+  // Another account manager's client: no tab, and a link to it opens the first tab.
+  await page.goto(`/clients/${seedIds.shifa}?tab=quotes`);
+  await expect(page.getByRole('tab', { name: ar.clients.profile.tabs.contacts })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
+  await expect(quotesTab).toHaveCount(0);
+
+  api.signInAs(financeMe);
+  await page.goto(`/clients/${seedIds.shifa}`);
+  await expect(quotesTab).toBeVisible();
 });

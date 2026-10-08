@@ -1,7 +1,7 @@
 import type { AdObjective, AdPlatform } from './campaigns.js';
 import type { PostPlatform } from './post-values.js';
 import type { ProjectStatus } from './projects.js';
-import type { AgingBucket } from './reports.js';
+import { type AgingBucket, responseTime } from './reports.js';
 import type { CycleStatus, DeliverableKind } from './retainers.js';
 
 /*
@@ -82,7 +82,7 @@ export const CLIENT_REPORT_LABELS = {
   preliminary: 'تقرير أولي: الشهر لم ينتهِ بعد',
   noActivity: 'لا نشاط مسجّل لهذا الشهر.',
   summary: 'ملخص الشهر',
-  retainers: 'الباقات الشهرية',
+  retainers: 'العقود الشهرية',
   kind: 'البند',
   committed: 'المتفق عليه',
   delivered: 'المسلَّم',
@@ -108,8 +108,6 @@ export const CLIENT_REPORT_LABELS = {
   approved: 'اعتُمد',
   changesRequested: 'طُلبت تعديلات',
   averageResponse: 'متوسط وقت الرد',
-  hours: 'ساعة',
-  days: 'يوم',
   campaigns: 'الحملات الإعلانية',
   platform: 'المنصة',
   campaign: 'الحملة',
@@ -130,3 +128,31 @@ export const CLIENT_REPORT_LABELS = {
   plannedPosts: 'منشورات مجدولة',
   bookedShoots: 'جلسات تصوير محجوزة',
 } as const;
+
+const pluralRules = new Intl.PluralRules('ar');
+
+/** Arabic forms by plural category; `{n}` is the number. Matches `reports.client.hours_*`. */
+const RESPONSE_TIME_FORMS: Record<'hours' | 'days', Record<Intl.LDMLPluralRule, string>> = {
+  hours: {
+    zero: 'أقل من ساعة',
+    one: 'ساعة واحدة',
+    two: 'ساعتان',
+    few: '{n} ساعات',
+    many: '{n} ساعة',
+    other: '{n} ساعة',
+  },
+  days: {
+    zero: '{n} يوم',
+    one: 'يوم واحد',
+    two: 'يومان',
+    few: '{n} أيام',
+    many: '{n} يومًا',
+    other: '{n} يوم',
+  },
+};
+
+/** Rule 18.7's average response time as the report files print it, with Arabic plurals. */
+export function responseTimeText(hours: number): string {
+  const { unit, value } = responseTime(hours);
+  return RESPONSE_TIME_FORMS[unit][pluralRules.select(value)].replace('{n}', String(value));
+}

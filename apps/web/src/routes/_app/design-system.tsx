@@ -50,12 +50,15 @@ import {
   Field,
   FieldDescription,
   FieldLabel,
+  IconButton,
+  IconTile,
   Input,
   Meter,
   MultiCombobox,
   OtpField,
   PageHeader,
   Pagination,
+  PasswordInput,
   PlatformMark,
   Popover,
   PopoverContent,
@@ -88,6 +91,7 @@ import {
 } from '@vertex-hub/ui';
 import {
   ArchiveIcon,
+  CheckIcon,
   CopyIcon,
   EllipsisIcon,
   ListTodoIcon,
@@ -195,6 +199,9 @@ function DesignSystemPage() {
           <Button variant="destructive">{t('designSystem.destructive')}</Button>
           <Button size="sm">{t('designSystem.primary')}</Button>
           <Button disabled>{t('designSystem.primary')}</Button>
+          <IconButton variant="outline" size="icon" label={t('designSystem.tooltip')}>
+            <CopyIcon />
+          </IconButton>
         </div>
       </Section>
 
@@ -219,6 +226,14 @@ function DesignSystemPage() {
                 ))}
               </SelectContent>
             </Select>
+          </Field>
+          <Field>
+            <FieldLabel>{t('login.password')}</FieldLabel>
+            <PasswordInput
+              showLabel={t('common.showPassword')}
+              hideLabel={t('common.hidePassword')}
+              defaultValue="VertexHub"
+            />
           </Field>
         </div>
       </Section>
@@ -525,6 +540,17 @@ function PeopleSection() {
               </Button>
             }
           />
+          <div className="flex items-center gap-3">
+            <IconTile>
+              <ListTodoIcon />
+            </IconTile>
+            <IconTile tone="success">
+              <CheckIcon />
+            </IconTile>
+            <IconTile tone="warning" size="lg">
+              <ArchiveIcon />
+            </IconTile>
+          </div>
           <div className="flex items-center gap-3">
             <Skeleton className="size-9 rounded-full" />
             <div className="flex flex-1 flex-col gap-2">

@@ -191,7 +191,7 @@ export class PostLinksService implements OnModuleInit {
       throw new CodedException(
         409,
         'POST_LOCKED',
-        `The linked tasks do not change on a ${post.status} post`,
+        `The linked tasks do not change on a post in ${post.status}`,
       );
     }
     return post;

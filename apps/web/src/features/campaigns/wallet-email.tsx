@@ -1,7 +1,7 @@
 import type { AdWallet, WalletEntry } from '@vertex-hub/contracts';
-import { Button } from '@vertex-hub/ui';
+import { Button, IconButton } from '@vertex-hub/ui';
 import { MailIcon, MailWarningIcon } from 'lucide-react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SendEmailDialog } from '../email/send-email-dialog';
 
@@ -13,21 +13,22 @@ const canEmail = (wallet: AdWallet) =>
 export function DepositEmailButton({ wallet, entry }: { wallet: AdWallet; entry: WalletEntry }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
+  const button = useRef<HTMLButtonElement>(null);
   const { receiptNumber, receiptPdf } = entry;
   if (!canEmail(wallet) || entry.kind !== 'deposit' || entry.voided) return null;
   if (!receiptNumber || !receiptPdf) return null;
   return (
     <>
-      <Button
-        variant="ghost"
-        size="icon-sm"
-        aria-label={t('campaigns.email.receiptOf', { number: receiptNumber })}
+      <IconButton
+        ref={button}
+        label={t('campaigns.email.receiptOf', { number: receiptNumber })}
         onClick={() => setOpen(true)}
       >
         <MailIcon />
-      </Button>
+      </IconButton>
       <SendEmailDialog
         open={open}
+        finalFocus={button}
         onClose={() => setOpen(false)}
         clientId={wallet.client.id}
         target={{ type: 'ad_receipt', id: entry.id }}
@@ -51,15 +52,17 @@ export function DepositEmailButton({ wallet, entry }: { wallet: AdWallet; entry:
 export function BudgetLowEmailButton({ wallet }: { wallet: AdWallet }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
+  const button = useRef<HTMLButtonElement>(null);
   if (!canEmail(wallet) || !wallet.low || wallet.lowBalanceThresholdMinor === null) return null;
   return (
     <>
-      <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
+      <Button ref={button} size="sm" variant="outline" onClick={() => setOpen(true)}>
         <MailWarningIcon />
         {t('campaigns.email.budgetLow')}
       </Button>
       <SendEmailDialog
         open={open}
+        finalFocus={button}
         onClose={() => setOpen(false)}
         clientId={wallet.client.id}
         target={{ type: 'ad_budget', clientId: wallet.client.id }}

@@ -52,10 +52,14 @@ test('book a shoot from a task with a conflict warning → tick → close create
   await page.getByLabel(ar.calendar.form.startTime).fill('11:00');
   await page.getByLabel(ar.calendar.form.endTime).fill('14:00');
   await page.getByLabel(ar.calendar.form.location, { exact: true }).fill('استوديو فيرتكس');
-  const members = page.getByRole('combobox', { name: ar.calendar.form.crewMember });
-  await pick(page, members.first(), 'كريم الزين');
+  const member = (n: number) =>
+    page.getByRole('combobox', {
+      name: ar.calendar.form.crewMember.replace('{{n}}', String(n)),
+      exact: true,
+    });
+  await pick(page, member(1), 'كريم الزين');
   await page.getByRole('button', { name: ar.calendar.form.addCrew }).click();
-  await pick(page, members.nth(1), 'ليان الأحمد');
+  await pick(page, member(2), 'ليان الأحمد');
   await page.getByRole('button', { name: ar.calendar.form.addShot }).click();
   await page.getByLabel('اللقطة 1', { exact: true }).fill('الطبق الرئيسي من الأعلى');
 
@@ -87,7 +91,7 @@ test('book a shoot from a task with a conflict warning → tick → close create
   await page.getByLabel(ar.calendar.form.startTime).fill('10:00');
   await page.getByLabel(ar.calendar.form.endTime).fill('11:00');
   await page.getByLabel(ar.calendar.form.location, { exact: true }).fill('استوديو فيرتكس');
-  await pick(page, members.first(), 'كريم الزين');
+  await pick(page, member(1), 'كريم الزين');
   await page.getByRole('button', { name: ar.calendar.form.book }).click();
   await expect(page.getByRole('alert').getByText(ar.errors.TASK_NOT_BOOKABLE)).toBeVisible();
 
@@ -287,6 +291,8 @@ test('create a meeting with a conflict warning → open it → edit → cancel',
   await expect(page.getByRole('button', { name: ar.calendar.meetings.actions.edit })).toHaveCount(
     0,
   );
+  // The menu stays for archiving, so the focus goes back to it.
+  await expect(page.getByRole('button', { name: ar.calendar.actions.more })).toBeFocused();
 });
 
 test('an employee creates meetings and edits only the ones they organize', async ({ page }) => {

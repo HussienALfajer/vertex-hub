@@ -46,13 +46,24 @@ import {
 } from '@vertex-hub/ui';
 import type { TFunction } from 'i18next';
 import { TriangleAlertIcon } from 'lucide-react';
-import { type FormEvent, type ReactNode, useId, useState } from 'react';
-import { Controller, useForm } from 'react-hook-form';
+import {
+  type ComponentProps,
+  type FormEvent,
+  type ReactNode,
+  type Ref,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+} from 'react';
+import { Controller, type Resolver, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { FormAlert } from '../../components/form-alert';
 import { LoadError } from '../../components/load-error';
 import { ApiError } from '../../lib/api/client';
-import { errorMessage, fieldError, SCREEN_ERROR } from '../../lib/errors';
+import { canAll, useMe } from '../../lib/auth';
+import { errorMessage, SCREEN_ERROR } from '../../lib/errors';
+import { focusFirstInvalid } from '../../lib/focus-first-invalid';
 import { formatList, fromBusinessDateTimeInput, toBusinessDateTimeInput } from '../../lib/format';
 import { channelIcon } from '../clients/communication-tab';
 import { ChoiceSelect } from '../quotes/choice-select';
@@ -101,16 +112,23 @@ export function conversionRefusal(t: TFunction, error: unknown): ConversionProbl
   };
 }
 
+/** What every lead dialog takes from its page. */
+export interface LeadDialogProps {
+  open: boolean;
+  onClose: () => void;
+  /** Where the focus goes when it closes, when the button that opened it may be gone. */
+  finalFocus?: ComponentProps<typeof DialogContent>['finalFocus'];
+}
+
 function DialogShell({
   open,
   onClose,
+  finalFocus,
   title,
   description,
   wide,
   children,
-}: {
-  open: boolean;
-  onClose: () => void;
+}: LeadDialogProps & {
   title: string;
   description?: string;
   wide?: boolean;
@@ -119,13 +137,17 @@ function DialogShell({
   const { t } = useTranslation();
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
-      <DialogContent closeLabel={t('common.close')} className={wide ? 'max-w-2xl' : 'max-w-xl'}>
+      <DialogContent
+        closeLabel={t('common.close')}
+        className={wide ? 'max-w-2xl' : 'max-w-xl'}
+        finalFocus={finalFocus}
+      >
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           {description && <DialogDescription>{description}</DialogDescription>}
         </DialogHeader>
-        {/* Mounted while open: each opening starts afresh. */}
-        {open && children}
+        {/* Unmounted once the dialog has faded out: each opening starts afresh. */}
+        {children}
       </DialogContent>
     </Dialog>
   );
@@ -151,12 +173,14 @@ function FollowUpField({
   onChange,
   invalid,
   error,
+  ref,
 }: {
   id: string;
   value: string;
   onChange: (value: string) => void;
   invalid: boolean;
   error?: string;
+  ref?: Ref<HTMLInputElement>;
 }) {
   const { t } = useTranslation();
   const today = businessDate();
@@ -164,14 +188,16 @@ function FollowUpField({
     <Field invalid={invalid}>
       <FieldLabel htmlFor={id}>{t('leads.form.nextFollowUpOn')}</FieldLabel>
       <Input
+        ref={ref}
         id={id}
         type="date"
+        dir="ltr"
         min={today}
         max={addDays(today, LEAD_LIMITS.followUpDays)}
         value={value}
         onChange={(event) => onChange(event.target.value)}
       />
-      <FieldError match={invalid}>
+      <FieldError match={invalid} role={error ? 'alert' : undefined}>
         {error ?? t('leads.form.errors.followUp', { n: LEAD_LIMITS.followUpDays })}
       </FieldError>
     </Field>
@@ -180,20 +206,12 @@ function FollowUpField({
 
 // Convert (screen 4)
 
-export function ConvertDialog({
-  lead,
-  open,
-  onClose,
-}: {
-  lead: LeadRef;
-  open: boolean;
-  onClose: () => void;
-}) {
+export function ConvertDialog({ lead, ...dialog }: LeadDialogProps & { lead: LeadRef }) {
   const { t } = useTranslation();
+  const { onClose } = dialog;
   return (
     <DialogShell
-      open={open}
-      onClose={onClose}
+      {...dialog}
       wide
       title={t('leads.convert.title', { name: lead.displayName })}
       description={t('leads.convert.hint')}
@@ -257,6 +275,11 @@ function ConvertForm({
   const [values, setValues] = useConversionValues(plan);
   const [problems, setProblems] = useState<ConversionProblems>({});
   const [failure, setFailure] = useState<string | null>(null);
+  const formRef = useRef<HTMLFormElement>(null);
+  // Every problem shows at once; the focus goes to the first one.
+  useEffect(() => {
+    if (Object.keys(problems).length > 0) focusFirstInvalid(formRef.current);
+  }, [problems]);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -279,7 +302,7 @@ function ConvertForm({
   }
 
   return (
-    <form className="grid gap-5" onSubmit={submit} noValidate>
+    <form ref={formRef} className="grid gap-5" onSubmit={submit} noValidate>
       <ConversionFields
         plan={plan}
         values={values}
@@ -305,20 +328,12 @@ function ConvertForm({
 
 // Lose and reopen (screen 5)
 
-export function LoseDialog({
-  lead,
-  open,
-  onClose,
-}: {
-  lead: LeadRef;
-  open: boolean;
-  onClose: () => void;
-}) {
+export function LoseDialog({ lead, ...dialog }: LeadDialogProps & { lead: LeadRef }) {
   const { t } = useTranslation();
+  const { onClose } = dialog;
   return (
     <DialogShell
-      open={open}
-      onClose={onClose}
+      {...dialog}
       title={t('leads.lose.title', { name: lead.displayName })}
       description={t('leads.lose.hint')}
     >
@@ -327,6 +342,17 @@ export function LoseDialog({
   );
 }
 
+/** The contract, then rule 8's note for the "other" reason (`NOTE_REQUIRED`). */
+const loseResolver: Resolver<LoseLeadInput, unknown, LoseLead> = async (
+  values,
+  context,
+  options,
+) => {
+  const result = await standardSchemaResolver(loseLeadSchema)(values, context, options);
+  if (values.reason !== 'other' || values.note?.trim() || result.errors.note) return result;
+  return { values: {}, errors: { ...result.errors, note: { type: 'required', message: '' } } };
+};
+
 function LoseForm({ lead, onClose }: { lead: LeadRef; onClose: () => void }) {
   const { t } = useTranslation();
   const id = useId();
@@ -334,7 +360,7 @@ function LoseForm({ lead, onClose }: { lead: LeadRef; onClose: () => void }) {
   const quotes = useQuery(leadQuotesQuery(lead.id));
   const [failure, setFailure] = useState<string | null>(null);
   const form = useForm<LoseLeadInput, unknown, LoseLead>({
-    resolver: standardSchemaResolver(loseLeadSchema),
+    resolver: loseResolver,
     defaultValues: { reason: 'price', note: '' },
   });
   const { errors } = form.formState;
@@ -350,10 +376,6 @@ function LoseForm({ lead, onClose }: { lead: LeadRef; onClose: () => void }) {
 
   const submit = form.handleSubmit(async (values) => {
     setFailure(null);
-    if (values.reason === 'other' && !values.note) {
-      form.setError('note', { type: SCREEN_ERROR, message: t('leads.lose.errors.noteRequired') });
-      return;
-    }
     try {
       const result = await lose.mutateAsync(values);
       toast.add({
@@ -394,7 +416,9 @@ function LoseForm({ lead, onClose }: { lead: LeadRef; onClose: () => void }) {
         </FieldLabel>
         <Textarea rows={3} {...form.register('note')} />
         <FieldError match={!!errors.note}>
-          {fieldError(errors.note, t('leads.lose.errors.note'))}
+          {errors.note?.type === 'required'
+            ? t('leads.lose.errors.noteRequired')
+            : t('leads.lose.errors.note')}
         </FieldError>
       </Field>
       {rejected.length > 0 && (
@@ -418,20 +442,12 @@ function LoseForm({ lead, onClose }: { lead: LeadRef; onClose: () => void }) {
   );
 }
 
-export function ReopenDialog({
-  lead,
-  open,
-  onClose,
-}: {
-  lead: LeadDetail;
-  open: boolean;
-  onClose: () => void;
-}) {
+export function ReopenDialog({ lead, ...dialog }: LeadDialogProps & { lead: LeadDetail }) {
   const { t } = useTranslation();
+  const { onClose } = dialog;
   return (
     <DialogShell
-      open={open}
-      onClose={onClose}
+      {...dialog}
       title={t('leads.reopen.title', { name: lead.displayName })}
       description={t('leads.reopen.hint')}
     >
@@ -453,12 +469,20 @@ function ReopenForm({ lead, onClose }: { lead: LeadDetail; onClose: () => void }
   const [problem, setProblem] = useState<'date' | 'owner' | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
   const chosenOwner = ownerId ?? (eligible ? lead.owner.id : null);
+  const dateField = useRef<HTMLInputElement>(null);
+  const ownerField = useRef<HTMLButtonElement>(null);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
     setFailure(null);
-    if (!followUpDateInRange(date, businessDate())) return setProblem('date');
-    if (!chosenOwner) return setProblem('owner');
+    if (!followUpDateInRange(date, businessDate())) {
+      setProblem('date');
+      return dateField.current?.focus();
+    }
+    if (!chosenOwner) {
+      setProblem('owner');
+      return ownerField.current?.focus();
+    }
     setProblem(null);
     try {
       await reopen.mutateAsync({
@@ -493,12 +517,19 @@ function ReopenForm({ lead, onClose }: { lead: LeadDetail; onClose: () => void }
           ))}
         </ToggleGroup>
       </Field>
-      <FollowUpField id={ids.date} value={date} onChange={setDate} invalid={problem === 'date'} />
+      <FollowUpField
+        ref={dateField}
+        id={ids.date}
+        value={date}
+        onChange={setDate}
+        invalid={problem === 'date'}
+      />
       <Field invalid={problem === 'owner'}>
         <FieldLabel id={ids.owner} render={<span />}>
           {t('leads.form.owner')}
         </FieldLabel>
         <ChoiceSelect
+          ref={ownerField}
           labelledBy={ids.owner}
           items={(owners.data?.items ?? []).map((owner) => ({
             value: owner.id,
@@ -523,20 +554,12 @@ function ReopenForm({ lead, onClose }: { lead: LeadDetail; onClose: () => void }
 
 // Owner and follow-up date
 
-export function OwnerDialog({
-  lead,
-  open,
-  onClose,
-}: {
-  lead: LeadDetail;
-  open: boolean;
-  onClose: () => void;
-}) {
+export function OwnerDialog({ lead, ...dialog }: LeadDialogProps & { lead: LeadDetail }) {
   const { t } = useTranslation();
+  const { onClose } = dialog;
   return (
     <DialogShell
-      open={open}
-      onClose={onClose}
+      {...dialog}
       title={t('leads.owner.title', { name: lead.displayName })}
       description={t('leads.owner.hint')}
     >
@@ -548,6 +571,7 @@ export function OwnerDialog({
 function OwnerForm({ lead, onClose }: { lead: LeadDetail; onClose: () => void }) {
   const { t } = useTranslation();
   const id = useId();
+  const me = useMe();
   const change = useChangeLeadOwner(lead.id);
   const owners = useQuery(leadOwnersQuery);
   const [ownerId, setOwnerId] = useState<string | null>(null);
@@ -581,7 +605,9 @@ function OwnerForm({ lead, onClose }: { lead: LeadDetail; onClose: () => void })
           value={ownerId ?? lead.owner.id}
           onChange={setOwnerId}
         />
-        <FieldDescription>{t('leads.owner.handOverHint')}</FieldDescription>
+        {!canAll(me, 'leads.manage') && (
+          <FieldDescription>{t('leads.owner.handOverHint')}</FieldDescription>
+        )}
       </Field>
       {failure && <FormAlert>{failure}</FormAlert>}
       <Footer pending={change.isPending} action={t('leads.owner.submit')} />
@@ -589,20 +615,12 @@ function OwnerForm({ lead, onClose }: { lead: LeadDetail; onClose: () => void })
   );
 }
 
-export function FollowUpDialog({
-  lead,
-  open,
-  onClose,
-}: {
-  lead: LeadDetail;
-  open: boolean;
-  onClose: () => void;
-}) {
+export function FollowUpDialog({ lead, ...dialog }: LeadDialogProps & { lead: LeadDetail }) {
   const { t } = useTranslation();
+  const { onClose } = dialog;
   return (
     <DialogShell
-      open={open}
-      onClose={onClose}
+      {...dialog}
       title={t('leads.followUp.setTitle')}
       description={t('leads.followUp.setHint')}
     >
@@ -618,11 +636,17 @@ function FollowUpForm({ lead, onClose }: { lead: LeadDetail; onClose: () => void
   const [date, setDate] = useState(lead.nextFollowUpOn ?? defaultFollowUpDate(businessDate()));
   const [invalid, setInvalid] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
+  const field = useRef<HTMLInputElement>(null);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
     setFailure(null);
-    if (!followUpDateInRange(date, businessDate())) return setInvalid(true);
+    // The same date: nothing to save, no request and no "saved" toast.
+    if (date === lead.nextFollowUpOn) return onClose();
+    if (!followUpDateInRange(date, businessDate())) {
+      setInvalid(true);
+      return field.current?.focus();
+    }
     setInvalid(false);
     try {
       await update.mutateAsync({ updatedAt: lead.updatedAt, nextFollowUpOn: date });
@@ -635,7 +659,7 @@ function FollowUpForm({ lead, onClose }: { lead: LeadDetail; onClose: () => void
 
   return (
     <form className="grid gap-5" onSubmit={submit} noValidate>
-      <FollowUpField id={id} value={date} onChange={setDate} invalid={invalid} />
+      <FollowUpField ref={field} id={id} value={date} onChange={setDate} invalid={invalid} />
       {failure && <FormAlert>{failure}</FormAlert>}
       <Footer pending={update.isPending} action={t('common.save')} />
     </form>
@@ -651,20 +675,17 @@ function FollowUpForm({ lead, onClose }: { lead: LeadDetail; onClose: () => void
 export function NoteDialog({
   lead,
   note,
-  open,
-  onClose,
-}: {
+  ...dialog
+}: LeadDialogProps & {
   lead: LeadDetail;
   /** The note to edit; a new activity otherwise. */
   note?: LeadNote;
-  open: boolean;
-  onClose: () => void;
 }) {
   const { t } = useTranslation();
+  const { onClose } = dialog;
   return (
     <DialogShell
-      open={open}
-      onClose={onClose}
+      {...dialog}
       wide
       title={note ? t('leads.activity.editTitle') : t('leads.activity.logTitle')}
       description={note ? undefined : t('leads.activity.logHint')}
@@ -689,8 +710,22 @@ function NoteForm({
   const update = useUpdateLeadNote(lead.id);
   const [failure, setFailure] = useState<string | null>(null);
   const today = businessDate();
+  // A new activity's follow-up date is checked with the schema (rule 4), so the focus goes to it.
+  const resolver: Resolver<CreateLeadNoteInput, unknown, CreateLeadNote> = async (
+    values,
+    context,
+    options,
+  ) => {
+    const result = await standardSchemaResolver(createLeadNoteSchema)(values, context, options);
+    if (note || result.errors.nextFollowUpOn) return result;
+    if (followUpDateInRange(values.nextFollowUpOn, today)) return result;
+    return {
+      values: {},
+      errors: { ...result.errors, nextFollowUpOn: { type: 'range', message: '' } },
+    };
+  };
   const form = useForm<CreateLeadNoteInput, unknown, CreateLeadNote>({
-    resolver: standardSchemaResolver(createLeadNoteSchema),
+    resolver,
     defaultValues: note
       ? {
           summary: note.summary,
@@ -706,10 +741,13 @@ function NoteForm({
           nextFollowUpOn: defaultFollowUpDate(today),
         },
   });
-  const { errors } = form.formState;
+  // Read while rendering: React Hook Form updates only the form state a component reads.
+  const { errors, isDirty, dirtyFields } = form.formState;
 
   const submit = form.handleSubmit(async (values) => {
     setFailure(null);
+    // An edit that changes nothing closes without a request or a "saved" toast.
+    if (note && !isDirty) return onClose();
     try {
       if (note) {
         await update.mutateAsync({
@@ -720,21 +758,21 @@ function NoteForm({
         });
         toast.add({ title: t('leads.activity.saved'), type: 'success' });
       } else {
-        if (!followUpDateInRange(values.nextFollowUpOn, today)) {
-          form.setError('nextFollowUpOn', { type: 'range' });
-          return;
-        }
         // An untouched time means "now": the API stamps the activity when it is logged.
         await add.mutateAsync({
           ...values,
-          occurredAt: form.formState.dirtyFields.occurredAt ? values.occurredAt : undefined,
+          occurredAt: dirtyFields.occurredAt ? values.occurredAt : undefined,
         });
         toast.add({ title: t('leads.activity.logged'), type: 'success' });
       }
       onClose();
     } catch (error) {
       if (error instanceof ApiError && error.code === 'INVALID_DATES') {
-        form.setError('nextFollowUpOn', { type: SCREEN_ERROR, message: errorMessage(t, error) });
+        form.setError(
+          'nextFollowUpOn',
+          { type: SCREEN_ERROR, message: errorMessage(t, error) },
+          { shouldFocus: true },
+        );
         return;
       }
       setFailure(errorMessage(t, error));
@@ -789,10 +827,11 @@ function NoteForm({
             name="occurredAt"
             render={({ field }) => (
               <Input
+                ref={field.ref}
                 id={ids.time}
                 type="datetime-local"
                 dir="ltr"
-                className="text-end tabular-nums"
+                className="tabular-nums"
                 max={toBusinessDateTimeInput(new Date())}
                 value={field.value ? toBusinessDateTimeInput(field.value) : ''}
                 onChange={(event) =>
@@ -814,6 +853,7 @@ function NoteForm({
             name="nextFollowUpOn"
             render={({ field }) => (
               <FollowUpField
+                ref={field.ref}
                 id={ids.date}
                 value={field.value}
                 onChange={field.onChange}

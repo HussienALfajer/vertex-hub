@@ -1,6 +1,12 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link, useNavigate } from '@tanstack/react-router';
-import { businessDate, daysInclusive, type RetainerDetail } from '@vertex-hub/contracts';
+import {
+  addDays,
+  businessDate,
+  daysInclusive,
+  type RetainerDetail,
+  type RetainerTerm,
+} from '@vertex-hub/contracts';
 import {
   AscentLines,
   Avatar,
@@ -19,30 +25,53 @@ import {
   ArrowRightIcon,
   CalendarDaysIcon,
   CircleStopIcon,
+  FileSignatureIcon,
   FileTextIcon,
   HistoryIcon,
   ReceiptTextIcon,
   TriangleAlertIcon,
   WalletIcon,
 } from 'lucide-react';
-import { type ReactNode, useState } from 'react';
+import { type ReactNode, type RefObject, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '../../components/confirm-dialog';
 import { isMissing, LoadError } from '../../components/load-error';
 import { formatCalendarDate, formatMonth, formatNumber } from '../../lib/format';
 import { formatMoney } from '../../lib/money';
+import { useFocusAfterChange } from '../../lib/use-focus-after-change';
+import { useShownWhileClosing } from '../../lib/use-shown-while-closing';
 import { OwnerDocumentsTab } from '../files/owner-documents-tab';
 import { RetainerBillingTab } from '../invoices/retainer-billing-tab';
 import { ExtraWorkTab } from '../projects/extra-work-tab';
 import { ArchivedBadge, DepartmentChips, PersonName } from '../projects/project-badges';
 import { SourceQuotes } from '../quotes/source-quotes';
+import { ContractTab } from './contract-tab';
 import { ThisMonthTab } from './cycle-tab';
 import { HistoryTab } from './history-tab';
-import { RetainerActions } from './retainer-actions';
-import { BehindBadge, DeliveryRate, RenewalBadge, RetainerStatusBadge } from './retainer-badges';
-import { retainerQuery, useRestoreRetainer } from './retainers.queries';
+import { focusTarget, RetainerActions, type RetainerFocus } from './retainer-actions';
+import {
+  BehindBadge,
+  DeliveryRate,
+  PendingApprovalBadge,
+  RenewalBadge,
+  RetainerStatusBadge,
+  TermChip,
+} from './retainer-badges';
+import {
+  retainerQuery,
+  retainerTermsQuery,
+  useArchiveRetainer,
+  useRestoreRetainer,
+} from './retainers.queries';
 
-const RETAINER_TABS = ['this-month', 'history', 'extra-work', 'billing', 'documents'] as const;
+const RETAINER_TABS = [
+  'this-month',
+  'contract',
+  'history',
+  'extra-work',
+  'billing',
+  'documents',
+] as const;
 
 type RetainerTab = (typeof RETAINER_TABS)[number];
 
@@ -96,6 +125,25 @@ function RetainerView({ retainer, tab }: { retainer: RetainerDetail; tab: Retain
   const archived = retainer.archivedAt !== null;
   const { permissions } = retainer;
 
+  const heading = useRef<HTMLHeadingElement>(null);
+  const resume = useRef<HTMLButtonElement>(null);
+  const menu = useRef<HTMLButtonElement>(null);
+  const reactivate = useRef<HTMLButtonElement>(null);
+  const restore = useRef<HTMLButtonElement>(null);
+  const focus = useMemo<RetainerFocus>(() => ({ heading, resume, menu, reactivate, restore }), []);
+  // A status change or an archive swaps the header's controls (archive → restore → actions menu,
+  // pause → resume); a menu item or a dialog may give the focus back to one just before it leaves.
+  useFocusAfterChange(`${retainer.status}:${retainer.archivedAt ?? ''}`, () => {
+    const target = focusTarget(focus, 'restore', 'reactivate', 'resume', 'menu');
+    return target === true ? null : target;
+  });
+  // The archive and restore confirmation lives here: the menu and the notice that open it leave
+  // the page with the change.
+  const [confirming, setConfirming] = useState<'archive' | 'restore' | null>(null);
+  const shownConfirm = useShownWhileClosing(confirming) ?? 'archive';
+  const archive = useArchiveRetainer(retainer.id);
+  const restoreRetainer = useRestoreRetainer(retainer.id);
+
   const openTab = (next: RetainerTab) =>
     navigate({
       search: (previous) => ({ ...previous, tab: next === 'this-month' ? undefined : next }),
@@ -104,13 +152,25 @@ function RetainerView({ retainer, tab }: { retainer: RetainerDetail; tab: Retain
 
   return (
     <>
-      <RetainerHero retainer={retainer} />
-      {archived ? <ArchivedCallout retainer={retainer} /> : <EndedCallout retainer={retainer} />}
+      <RetainerHero retainer={retainer} focus={focus} onArchive={() => setConfirming('archive')} />
+      {archived ? (
+        <ArchivedCallout
+          retainer={retainer}
+          restoreRef={restore}
+          onRestore={() => setConfirming('restore')}
+        />
+      ) : (
+        <EndedCallout retainer={retainer} />
+      )}
       <Tabs value={tab} onValueChange={(value: RetainerTab) => openTab(value)}>
         <TabsList aria-label={retainer.name}>
           <TabsTrigger value="this-month">
             <CalendarDaysIcon />
             {t('retainers.page.tabs.thisMonth')}
+          </TabsTrigger>
+          <TabsTrigger value="contract">
+            <FileSignatureIcon />
+            {t('retainers.page.tabs.contract')}
           </TabsTrigger>
           <TabsTrigger value="history">
             <HistoryIcon />
@@ -133,6 +193,9 @@ function RetainerView({ retainer, tab }: { retainer: RetainerDetail; tab: Retain
         </TabsList>
         <TabsContent value="this-month">
           <ThisMonthTab retainer={retainer} />
+        </TabsContent>
+        <TabsContent value="contract">
+          <ContractTab retainer={retainer} />
         </TabsContent>
         <TabsContent value="history">
           <HistoryTab retainer={retainer} />
@@ -160,6 +223,26 @@ function RetainerView({ retainer, tab }: { retainer: RetainerDetail; tab: Retain
           <OwnerDocumentsTab owner={{ type: 'retainer', id: retainer.id }} />
         </TabsContent>
       </Tabs>
+      <ConfirmDialog
+        open={confirming !== null}
+        onClose={() => setConfirming(null)}
+        title={t(`retainers.${shownConfirm}.title`, { name: retainer.name })}
+        body={t(`retainers.${shownConfirm}.body`)}
+        action={t(`retainers.actions.${shownConfirm}`)}
+        destructive={shownConfirm === 'archive'}
+        pending={archive.isPending || restoreRetainer.isPending}
+        // The focus goes to the button that undoes the change, or back to the one that opened it.
+        finalFocus={() => focusTarget(focus, 'restore', 'menu')}
+        onConfirm={async () => {
+          if (confirming === 'restore') {
+            await restoreRetainer.mutateAsync(undefined);
+            toast.add({ title: t('retainers.restore.done'), type: 'success' });
+          } else {
+            await archive.mutateAsync(undefined);
+            toast.add({ title: t('retainers.archive.done'), type: 'success' });
+          }
+        }}
+      />
     </>
   );
 }
@@ -168,7 +251,15 @@ function RetainerView({ retainer, tab }: { retainer: RetainerDetail; tab: Retain
  * The retainer at a glance: who it is for and who answers for it, then its vital signs — this
  * month's delivery, the renewal date and (with money access) the monthly fee.
  */
-function RetainerHero({ retainer }: { retainer: RetainerDetail }) {
+function RetainerHero({
+  retainer,
+  focus,
+  onArchive,
+}: {
+  retainer: RetainerDetail;
+  focus: RetainerFocus;
+  onArchive: () => void;
+}) {
   const { t } = useTranslation();
   const archived = retainer.archivedAt !== null;
   const muted = archived || retainer.status === 'ended';
@@ -201,12 +292,18 @@ function RetainerHero({ retainer }: { retainer: RetainerDetail }) {
                 {retainer.client.name}
               </Link>
               <div className="flex flex-wrap items-center gap-3">
-                <h1 className="text-2xl font-bold">{retainer.name}</h1>
+                <h1 ref={focus.heading} tabIndex={-1} className="text-2xl font-bold">
+                  {retainer.name}
+                </h1>
                 <RetainerStatusBadge status={retainer.status} />
                 {retainer.currentCycle?.behind && <BehindBadge />}
                 {retainer.renewal && <RenewalBadge state={retainer.renewal} />}
+                {retainer.pendingAmendments > 0 && (
+                  <PendingApprovalBadge count={retainer.pendingAmendments} />
+                )}
                 {archived && <ArchivedBadge />}
               </div>
+              {retainer.term && <TermChip term={retainer.term} />}
             </div>
             <dl className="flex flex-wrap items-center gap-x-6 gap-y-3 text-sm">
               <div className="flex items-center gap-2">
@@ -230,7 +327,7 @@ function RetainerHero({ retainer }: { retainer: RetainerDetail }) {
               <SourceQuotes retainerId={retainer.id} />
             </dl>
           </div>
-          <RetainerActions retainer={retainer} />
+          <RetainerActions retainer={retainer} focus={focus} onArchive={onArchive} />
         </div>
         <div className="grid gap-4 border-t border-border pt-5 sm:grid-cols-2 lg:grid-cols-[repeat(auto-fit,minmax(14rem,1fr))]">
           <Vital label={t('retainers.page.thisMonth')}>
@@ -244,26 +341,7 @@ function RetainerHero({ retainer }: { retainer: RetainerDetail }) {
             )}
           </Vital>
           <TermVital retainer={retainer} />
-          {retainer.money && (
-            <Vital label={t('retainers.form.monthlyFee')}>
-              {retainer.money.monthlyFeeMinor === null ? (
-                // M4: a retainer without a fee cannot be invoiced (F13).
-                <p className="flex items-center gap-2 text-xl font-bold text-status-warning-foreground">
-                  <TriangleAlertIcon aria-hidden="true" className="size-5" />
-                  {t('retainers.page.feeMissing')}
-                </p>
-              ) : (
-                <p className="text-xl font-bold tabular-nums">
-                  {formatMoney(retainer.money.monthlyFeeMinor, retainer.money.currency)}
-                </p>
-              )}
-              <p className="text-xs text-muted-foreground">
-                {retainer.money.monthlyFeeMinor === null
-                  ? t('retainers.page.feeMissingHint')
-                  : t('retainers.page.perMonth')}
-              </p>
-            </Vital>
-          )}
+          {retainer.money && <FeeVital retainer={retainer} money={retainer.money} />}
         </div>
       </div>
     </section>
@@ -279,11 +357,65 @@ function Vital({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-/** Since when the retainer runs, and how far its renewal date is (R6: a reminder only). */
+/**
+ * M4: the open-ended monthly fee. Without one, open-ended months cannot be invoiced (F13); the
+ * months of a term bill from its schedule (F05B T1), so the fee only matters outside the terms.
+ */
+function FeeVital({
+  retainer,
+  money,
+}: {
+  retainer: RetainerDetail;
+  money: NonNullable<RetainerDetail['money']>;
+}) {
+  const { t } = useTranslation();
+  const { term } = retainer;
+  // Without a fee, only a running retainer billed open-ended now or after its term needs one (T9).
+  const needsFee = retainer.status !== 'ended' && (!term || term.endAction === 'continue');
+  let hint: string | null = null;
+  if (term) hint = t('retainers.page.feeOutsideTerm');
+  else if (money.monthlyFeeMinor !== null) hint = t('retainers.page.perMonth');
+  else if (needsFee) hint = t('retainers.page.feeMissingHint');
+  return (
+    <Vital label={t('retainers.form.monthlyFee')}>
+      {money.monthlyFeeMinor !== null ? (
+        <p className="text-xl font-bold tabular-nums">
+          {formatMoney(money.monthlyFeeMinor, money.currency)}
+        </p>
+      ) : needsFee ? (
+        <p className="flex items-center gap-2 text-xl font-bold text-status-warning-foreground">
+          <TriangleAlertIcon aria-hidden="true" className="size-5" />
+          {t('retainers.page.feeMissing')}
+        </p>
+      ) : (
+        <p className="text-xl font-bold text-muted-foreground">{t('retainers.page.feeNotSet')}</p>
+      )}
+      {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
+    </Vital>
+  );
+}
+
+/**
+ * Since when the retainer runs, and how far its renewal date is (R6: a reminder only). With a
+ * term the date is the day after the last term (T11), and what happens then follows its end
+ * action: a renewal, the retainer's end, or open-ended months.
+ */
 function TermVital({ retainer }: { retainer: RetainerDetail }) {
   const { t } = useTranslation();
   const today = businessDate();
-  const { renewalDate } = retainer;
+  const { renewalDate, term } = retainer;
+  // The date follows the last term (T11), which may be a scheduled one after the active term.
+  const terms = useQuery({ ...retainerTermsQuery(retainer.id), enabled: term !== null });
+  const lastTerm = terms.data?.items
+    .filter((item) => item.status === 'active' || item.status === 'scheduled')
+    .reduce<RetainerTerm | null>(
+      (last, item) => (last === null || item.number > last.number ? item : last),
+      null,
+    );
+  const endAction = term ? (lastTerm ?? term).endAction : null;
+  // What the day after the last term brings: the retainer's end, open-ended months, or a renewal.
+  const upcoming =
+    endAction === 'end' ? 'endsIn' : endAction === 'continue' ? 'termEndsIn' : 'renewalIn';
   let headline: string;
   if (retainer.status === 'ended' && retainer.endedOn) {
     headline = t('retainers.page.endedOn', { date: formatCalendarDate(retainer.endedOn) });
@@ -294,18 +426,25 @@ function TermVital({ retainer }: { retainer: RetainerDetail }) {
     headline = t('retainers.page.renewalPast', { count: days, days: formatNumber(days) });
   } else {
     const days = daysInclusive(today, renewalDate) - 1;
-    headline = t('retainers.page.renewalIn', { count: days, days: formatNumber(days) });
+    headline = t(`retainers.page.${upcoming}`, { count: days, days: formatNumber(days) });
   }
   return (
     <Vital label={t('retainers.page.term')}>
       <p className="text-xl font-bold">{headline}</p>
       <p className="text-xs text-muted-foreground">
-        {renewalDate
-          ? t('retainers.startRenewal', {
-              start: formatCalendarDate(retainer.startDate),
-              renewal: formatCalendarDate(renewalDate),
+        {retainer.status === 'ended' || !renewalDate
+          ? t(retainer.startDate <= today ? 'retainers.startedOn' : 'retainers.startsOn', {
+              date: formatCalendarDate(retainer.startDate),
             })
-          : t('retainers.startsOn', { date: formatCalendarDate(retainer.startDate) })}
+          : term
+            ? t('retainers.startTermEnd', {
+                start: formatCalendarDate(retainer.startDate),
+                end: formatCalendarDate(addDays(renewalDate, -1)),
+              })
+            : t('retainers.startRenewal', {
+                start: formatCalendarDate(retainer.startDate),
+                renewal: formatCalendarDate(renewalDate),
+              })}
       </p>
     </Vital>
   );
@@ -328,38 +467,30 @@ function EndedCallout({ retainer }: { retainer: RetainerDetail }) {
   );
 }
 
-function ArchivedCallout({ retainer }: { retainer: RetainerDetail }) {
+function ArchivedCallout({
+  retainer,
+  restoreRef,
+  onRestore,
+}: {
+  retainer: RetainerDetail;
+  restoreRef: RefObject<HTMLButtonElement | null>;
+  onRestore: () => void;
+}) {
   const { t } = useTranslation();
-  const restore = useRestoreRetainer(retainer.id);
-  const [confirming, setConfirming] = useState(false);
   return (
-    <>
-      <Callout
-        icon={<ArchiveIcon />}
-        title={t('retainers.page.archivedTitle')}
-        description={t('projects.page.archivedBody')}
-        action={
-          retainer.permissions.canArchive && (
-            <Button variant="outline" size="sm" onClick={() => setConfirming(true)}>
-              <ArchiveRestoreIcon />
-              {t('retainers.actions.restore')}
-            </Button>
-          )
-        }
-      />
-      <ConfirmDialog
-        open={confirming}
-        onClose={() => setConfirming(false)}
-        title={t('retainers.restore.title', { name: retainer.name })}
-        body={t('retainers.restore.body')}
-        action={t('retainers.actions.restore')}
-        pending={restore.isPending}
-        onConfirm={async () => {
-          await restore.mutateAsync(undefined);
-          toast.add({ title: t('retainers.restore.done'), type: 'success' });
-        }}
-      />
-    </>
+    <Callout
+      icon={<ArchiveIcon />}
+      title={t('retainers.page.archivedTitle')}
+      description={t('projects.page.archivedBody')}
+      action={
+        retainer.permissions.canArchive && (
+          <Button ref={restoreRef} variant="outline" size="sm" onClick={onRestore}>
+            <ArchiveRestoreIcon />
+            {t('retainers.actions.restore')}
+          </Button>
+        )
+      }
+    />
   );
 }
 

@@ -16,17 +16,19 @@ import {
   toast,
 } from '@vertex-hub/ui';
 import { TriangleAlertIcon } from 'lucide-react';
-import { useId, useState } from 'react';
+import { type ComponentProps, useId, useRef, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { MoneyInput } from '../../components/money-input';
 import { errorMessage } from '../../lib/errors';
+import { useFocusFirstError } from '../../lib/focus-first-invalid';
 import { isolateLtr } from '../../lib/format';
 import { formatMoney } from '../../lib/money';
 import { Money } from '../quotes/quote-badges';
 import { FormDialog } from '../quotes/quote-dialogs';
 import { CostPerResult } from './campaign-badges';
 import { useAddCampaignUpdate, useEditCampaignUpdate } from './campaigns.queries';
+import { count } from './update-count';
 import { defaultPeriod } from './update-period';
 
 interface UpdateValues {
@@ -39,8 +41,6 @@ interface UpdateValues {
   note: string;
 }
 
-const count = (text: string) => (/^\d+$/.test(text.trim()) ? Number(text.trim()) : Number.NaN);
-
 /**
  * Spec screen 3, "Add update": a period with its spend and results. Before saving it shows the
  * cost per result and warns when the campaign goes over its budget or the wallet below zero; the
@@ -51,12 +51,15 @@ export function UpdateDialog({
   update,
   open,
   onClose,
+  finalFocus,
 }: {
   campaign: CampaignDetail;
   /** The update to edit; a new one otherwise. */
   update?: CampaignUpdate;
   open: boolean;
   onClose: () => void;
+  /** Where the focus goes when it closes: the button that opened it, or what replaced it. */
+  finalFocus: ComponentProps<typeof FormDialog>['finalFocus'];
 }) {
   const { t } = useTranslation();
   const spendId = useId();
@@ -81,7 +84,10 @@ export function UpdateDialog({
         results: '',
         note: '',
       };
-  const form = useForm<UpdateValues>({ values: defaults });
+  // The first invalid field takes the focus, the spend's money field included.
+  const form = useForm<UpdateValues>({ values: defaults, shouldFocusError: false });
+  const fields = useRef<HTMLDivElement>(null);
+  useFocusFirstError(form.formState.submitCount, fields);
   const [failure, setFailure] = useState<string | null>(null);
   const { errors } = form.formState;
   const [spend, results] = form.watch(['spendMinor', 'results']);
@@ -97,12 +103,6 @@ export function UpdateDialog({
   const cost =
     spend !== null && Number.isInteger(resultCount) ? costPerResult(spend, resultCount) : undefined;
   const resultsLabel = t(`campaigns.results.${campaign.objective}`);
-
-  function close() {
-    setFailure(null);
-    form.reset(defaults);
-    onClose();
-  }
 
   const submit = form.handleSubmit(async (values) => {
     setFailure(null);
@@ -133,7 +133,7 @@ export function UpdateDialog({
         await add.mutateAsync(checked.data);
         toast.add({ title: t('campaigns.updates.added'), type: 'success' });
       }
-      close();
+      onClose();
     } catch (error) {
       setFailure(errorMessage(t, error));
     }
@@ -146,7 +146,7 @@ export function UpdateDialog({
         dir="ltr"
         inputMode="numeric"
         autoComplete="off"
-        className="text-end tabular-nums"
+        className="tabular-nums"
         {...form.register(name)}
       />
       {hint && <FieldDescription>{hint}</FieldDescription>}
@@ -157,7 +157,13 @@ export function UpdateDialog({
   return (
     <FormDialog
       open={open}
-      onClose={close}
+      onClose={onClose}
+      // Reset once it has faded out, so nothing typed is kept for the next opening.
+      onClosed={() => {
+        setFailure(null);
+        form.reset(defaults);
+      }}
+      finalFocus={finalFocus}
       submitting={form.formState.isSubmitting}
       title={update ? t('campaigns.updates.editTitle') : t('campaigns.updates.addTitle')}
       description={t('campaigns.updates.hint')}
@@ -165,95 +171,105 @@ export function UpdateDialog({
       failure={failure}
       onSubmit={submit}
     >
-      <div className="grid gap-5 sm:grid-cols-2">
-        <Field invalid={!!errors.periodStart}>
-          <FieldLabel>{t('campaigns.updates.periodStart')}</FieldLabel>
-          <Input type="date" max={today} {...form.register('periodStart', { required: true })} />
-          <FieldError match={!!errors.periodStart}>
-            {t('campaigns.updates.errors.period')}
-          </FieldError>
-        </Field>
-        <Field invalid={!!errors.periodEnd}>
-          <FieldLabel>{t('campaigns.updates.periodEnd')}</FieldLabel>
-          <Input
-            type="date"
-            max={today}
-            {...form.register('periodEnd', { validate: (day) => !!day && day <= today })}
+      <div ref={fields} className="contents">
+        <div className="grid gap-5 sm:grid-cols-2">
+          <Field invalid={!!errors.periodStart}>
+            <FieldLabel>{t('campaigns.updates.periodStart')}</FieldLabel>
+            <Input
+              type="date"
+              dir="ltr"
+              max={today}
+              {...form.register('periodStart', { required: true })}
+            />
+            <FieldError match={!!errors.periodStart}>
+              {t('campaigns.updates.errors.period')}
+            </FieldError>
+          </Field>
+          <Field invalid={!!errors.periodEnd}>
+            <FieldLabel>{t('campaigns.updates.periodEnd')}</FieldLabel>
+            <Input
+              type="date"
+              dir="ltr"
+              max={today}
+              {...form.register('periodEnd', { validate: (day) => !!day && day <= today })}
+            />
+            <FieldError match={!!errors.periodEnd}>
+              {t('campaigns.updates.errors.period')}
+            </FieldError>
+          </Field>
+        </div>
+        <p className="-mt-3 text-sm text-muted-foreground">{t('campaigns.updates.periodHint')}</p>
+        <div className="grid gap-5 sm:grid-cols-2">
+          <Controller
+            control={form.control}
+            name="spendMinor"
+            rules={{ validate: (minor) => minor !== null }}
+            render={({ field }) => (
+              <Field invalid={!!errors.spendMinor}>
+                <FieldLabel htmlFor={spendId}>{t('campaigns.updates.spend')}</FieldLabel>
+                <MoneyInput
+                  id={spendId}
+                  currency="USD"
+                  value={field.value}
+                  onValueChange={field.onChange}
+                />
+                <FieldError match={!!errors.spendMinor}>
+                  {t('campaigns.updates.errors.spend')}
+                </FieldError>
+              </Field>
+            )}
           />
-          <FieldError match={!!errors.periodEnd}>{t('campaigns.updates.errors.period')}</FieldError>
+          {metric('results', resultsLabel, t('campaigns.updates.resultsHint'))}
+          {metric('reach', t('campaigns.updates.reach'), t('campaigns.updates.reachHint'))}
+          {metric('clicks', t('campaigns.updates.clicks'))}
+        </div>
+        <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 rounded-lg border border-border p-3 text-sm">
+          <dt className="text-muted-foreground">{t('campaigns.columns.costPerResult')}</dt>
+          <dd className="font-bold">
+            <CostPerResult minor={cost ?? null} />
+          </dd>
+          <dt className="text-muted-foreground">{t('campaigns.updates.spendAfter')}</dt>
+          <dd>
+            {t('campaigns.updates.ofBudget', {
+              spend: isolateLtr(formatMoney(spendAfter, 'USD')),
+              budget: isolateLtr(formatMoney(campaign.budgetMinor, 'USD')),
+            })}
+          </dd>
+          {walletAfter !== null && (
+            <>
+              <dt className="text-muted-foreground">{t('campaigns.updates.walletAfter')}</dt>
+              <dd>
+                <Money
+                  minor={walletAfter}
+                  currency="USD"
+                  className={walletAfter < 0 ? 'text-destructive-text' : undefined}
+                />
+              </dd>
+            </>
+          )}
+        </dl>
+        {overBudget && (
+          <Callout
+            tone="warning"
+            icon={<TriangleAlertIcon />}
+            title={t('campaigns.updates.overBudgetTitle')}
+            description={t('campaigns.updates.overBudgetBody')}
+          />
+        )}
+        {walletNegative && (
+          <Callout
+            tone="warning"
+            icon={<TriangleAlertIcon />}
+            title={t('campaigns.updates.walletNegativeTitle')}
+            description={t('campaigns.updates.walletNegativeBody')}
+          />
+        )}
+        <Field invalid={!!errors.note}>
+          <FieldLabel>{t('campaigns.updates.note')}</FieldLabel>
+          <Textarea rows={2} {...form.register('note')} />
+          <FieldError match={!!errors.note}>{t('campaigns.updates.errors.note')}</FieldError>
         </Field>
       </div>
-      <p className="-mt-3 text-sm text-muted-foreground">{t('campaigns.updates.periodHint')}</p>
-      <div className="grid gap-5 sm:grid-cols-2">
-        <Controller
-          control={form.control}
-          name="spendMinor"
-          rules={{ validate: (minor) => minor !== null }}
-          render={({ field }) => (
-            <Field invalid={!!errors.spendMinor}>
-              <FieldLabel htmlFor={spendId}>{t('campaigns.updates.spend')}</FieldLabel>
-              <MoneyInput
-                id={spendId}
-                currency="USD"
-                value={field.value}
-                onValueChange={field.onChange}
-              />
-              <FieldError match={!!errors.spendMinor}>
-                {t('campaigns.updates.errors.spend')}
-              </FieldError>
-            </Field>
-          )}
-        />
-        {metric('results', resultsLabel, t('campaigns.updates.resultsHint'))}
-        {metric('reach', t('campaigns.updates.reach'), t('campaigns.updates.reachHint'))}
-        {metric('clicks', t('campaigns.updates.clicks'))}
-      </div>
-      <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 rounded-lg border border-border p-3 text-sm">
-        <dt className="text-muted-foreground">{t('campaigns.columns.costPerResult')}</dt>
-        <dd className="font-bold">
-          <CostPerResult minor={cost ?? null} />
-        </dd>
-        <dt className="text-muted-foreground">{t('campaigns.updates.spendAfter')}</dt>
-        <dd>
-          {t('campaigns.updates.ofBudget', {
-            spend: isolateLtr(formatMoney(spendAfter, 'USD')),
-            budget: isolateLtr(formatMoney(campaign.budgetMinor, 'USD')),
-          })}
-        </dd>
-        {walletAfter !== null && (
-          <>
-            <dt className="text-muted-foreground">{t('campaigns.updates.walletAfter')}</dt>
-            <dd>
-              <Money
-                minor={walletAfter}
-                currency="USD"
-                className={walletAfter < 0 ? 'text-destructive-text' : undefined}
-              />
-            </dd>
-          </>
-        )}
-      </dl>
-      {overBudget && (
-        <Callout
-          tone="warning"
-          icon={<TriangleAlertIcon />}
-          title={t('campaigns.updates.overBudgetTitle')}
-          description={t('campaigns.updates.overBudgetBody')}
-        />
-      )}
-      {walletNegative && (
-        <Callout
-          tone="warning"
-          icon={<TriangleAlertIcon />}
-          title={t('campaigns.updates.walletNegativeTitle')}
-          description={t('campaigns.updates.walletNegativeBody')}
-        />
-      )}
-      <Field invalid={!!errors.note}>
-        <FieldLabel>{t('campaigns.updates.note')}</FieldLabel>
-        <Textarea rows={2} {...form.register('note')} />
-        <FieldError match={!!errors.note}>{t('campaigns.updates.errors.note')}</FieldError>
-      </Field>
     </FormDialog>
   );
 }

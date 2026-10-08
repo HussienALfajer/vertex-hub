@@ -234,6 +234,10 @@ const SECURITY_CHANGE_TEXT: Record<SecurityChange, { subject: string; what: stri
     subject: 'أُعيد ضبط التحقق بخطوتين',
     what: 'أُعيد ضبط التحقق بخطوتين لحسابك',
   },
+  backup_codes_regenerated: {
+    subject: 'أُنشئت رموز احتياطية جديدة',
+    what: 'أُنشئت رموز احتياطية جديدة لحسابك وأُلغيت السابقة',
+  },
   roles_changed: { subject: 'تغيّرت أدوارك', what: 'تغيّرت الأدوار المسندة إليك' },
   archived: { subject: 'أُرشف حسابك', what: 'أُرشف حسابك ولم يعد بإمكانك الدخول' },
 };

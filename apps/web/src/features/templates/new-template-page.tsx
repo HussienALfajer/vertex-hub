@@ -6,6 +6,7 @@ import { useWatch } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { FormAlert } from '../../components/form-alert';
 import { FormSection } from '../../components/form-section';
+import { UnsavedChangesGuard } from '../../components/unsaved-changes-guard';
 import {
   AssigneesEditor,
   BasicsFields,
@@ -80,6 +81,7 @@ export function NewTemplatePage() {
           </Button>
         </div>
       </form>
+      <UnsavedChangesGuard dirty={form.formState.isDirty && !form.formState.isSubmitting} />
     </>
   );
 }

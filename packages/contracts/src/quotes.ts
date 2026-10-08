@@ -17,6 +17,8 @@ import {
   deliverableKey,
   deliverableKindSchema,
   retainerStatusSchema,
+  retainerTermInputSchema,
+  termEndActionSchema,
 } from './retainers.js';
 import { TASK_LIMITS } from './tasks.js';
 import { optionalText } from './text.js';
@@ -574,7 +576,10 @@ export type QuoteDetail = z.infer<typeof quoteDetailSchema>;
 export const QUOTE_SORTS = ['updatedAt', 'number', 'validUntil'] as const;
 
 export const quoteListQuerySchema = pageQuerySchema.extend({
-  /** Matches the number (`Q-2026-0007` or `7`), the title, the client's or the lead's name. */
+  /**
+   * Matches the number (`Q-2026-0007`, `Q-2026-0007 v2` or `7`), the title, the client's or the
+   * lead's name.
+   */
   search: z.string().trim().min(1).max(100).optional(),
   status: queryListSchema(quoteStatusSchema).default([...OPEN_QUOTE_STATUSES]),
   clientId: z.uuid().optional(),
@@ -802,8 +807,27 @@ export const acceptPlanSchema = z
             revisionLimit: z.number().int().min(0),
           }),
         ),
+        /**
+         * F05B Q1: the term the quote's monthly term proposes: its months, the monthly net times
+         * the months, split evenly, renewing; null when the quote has no term.
+         */
+        term: retainerTermInputSchema
+          .extend({ endAction: termEndActionSchema })
+          .nullable()
+          .meta({ id: 'AcceptTermPlan' }),
         /** The client's active or paused retainers in the quote's currency (A5, edge case 9). */
-        renewable: z.array(acceptPersonSchema.extend({ status: retainerStatusSchema })),
+        renewable: z.array(
+          acceptPersonSchema.extend({
+            status: retainerStatusSchema,
+            /**
+             * F05B Q2: the month a renewal takes effect (its lines, fee and term): the month after
+             * the active term, else next month.
+             */
+            renewsFrom: calendarDateSchema,
+            /** Whether the retainer has an active term the renewal waits for. */
+            afterTerm: z.boolean(),
+          }),
+        ),
       })
       .nullable(),
     /** Templates of the quote archived since: skipped, with a warning (C3, edge case 8). */
@@ -815,20 +839,31 @@ export const acceptPlanSchema = z
 
 export type AcceptPlan = z.infer<typeof acceptPlanSchema>;
 
+/** F05B Q1, Q2: the term the acceptance creates; null for none. */
+const acceptTermSchema = retainerTermInputSchema.nullable().default(null);
+
 const acceptRetainerSchema = z.discriminatedUnion('mode', [
   z.object({
     mode: z.literal('new'),
     name: projectNameSchema,
     departments: engagementDepartmentsSchema,
     startDate: calendarDateSchema,
+    /** Null with a term: the term sets it (`RENEWAL_DATE_FROM_TERM`). */
     renewalDate: calendarDateSchema.nullable(),
     templateId: z.uuid().nullable(),
+    /** F05B Q1: starts in the start date's month. */
+    term: acceptTermSchema,
   }),
   z.object({
     mode: z.literal('renew'),
     retainerId: z.uuid(),
     /** Replaces the retainer's monthly template when set (A7). */
     templateId: z.uuid().nullable(),
+    /**
+     * F05B Q2: starts the month after the retainer's active term, else next month; without one, an
+     * active term continues monthly after it ends.
+     */
+    term: acceptTermSchema,
   }),
 ]);
 

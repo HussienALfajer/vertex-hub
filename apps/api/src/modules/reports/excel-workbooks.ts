@@ -6,7 +6,7 @@ import {
   type ProductivityMeasures,
   type ProductivityReport,
   type RevenueReport,
-  responseTime,
+  responseTimeText,
   REPORT_VALUE_LABELS as VALUES,
 } from '@vertex-hub/contracts';
 import ExcelJS from 'exceljs';
@@ -27,13 +27,13 @@ const LABELS = {
     new: 'جديدة',
     delivered: 'مسلّمة',
     onTime: 'في الموعد (%)',
-    clientRevisions: 'متوسط تعديلات العميل',
-    internalRevisions: 'متوسط المراجعات الداخلية',
-    cycleDays: 'متوسط مدة الإنجاز (يوم)',
+    clientRevisions: 'تعديلات العميل (متوسط)',
+    internalRevisions: 'تعديلات داخلية (متوسط)',
+    cycleDays: 'مدة الإنجاز بالأيام (متوسط)',
     openNow: 'مفتوحة الآن',
     overdueNow: 'متأخرة الآن',
-    unassigned: 'بلا مسؤول الآن',
-    oldestUnassigned: 'أقدم مهمة بلا مسؤول',
+    unassigned: 'غير مسندة الآن',
+    oldestUnassigned: 'أقدم مهمة غير مسندة',
   },
   revenue: {
     byClient: 'حسب العميل',
@@ -77,7 +77,7 @@ type Cell = string | number | Date | null;
 interface Column {
   header: string;
   width?: number;
-  format?: 'money' | 'date' | 'decimal';
+  format?: 'money' | 'date' | 'decimal' | 'count';
 }
 
 const money = (minor: number | null) => (minor === null ? null : minor / MINOR_PER_UNIT);
@@ -85,7 +85,12 @@ const money = (minor: number | null) => (minor === null ? null : minor / MINOR_P
 /** A calendar date as an Excel date (midnight UTC, so the day never shifts). */
 const day = (date: string | null) => (date ? new Date(`${date}T00:00:00Z`) : null);
 
-const FORMATS = { money: '#,##0.00', date: 'yyyy-mm-dd', decimal: '0.0' } as const;
+const FORMATS = {
+  money: '#,##0.00',
+  date: 'yyyy-mm-dd',
+  decimal: '0.0',
+  count: '#,##0',
+} as const;
 
 function addSheet(workbook: ExcelJS.Workbook, name: string, columns: Column[], rows: Cell[][]) {
   const sheet = workbook.addWorksheet(name, {
@@ -343,7 +348,7 @@ export async function clientReportWorkbook(report: ClientMonthlyReport): Promise
       report.projects.map((project) => [
         project.project.name,
         VALUES.projectStatuses[project.status],
-        `${project.deliveredTasks} / ${project.totalTasks}`,
+        project.totalTasks === 0 ? null : `${project.deliveredTasks} / ${project.totalTasks}`,
         project.milestonesDone.map((milestone) => milestone.name).join('، '),
       ]),
     );
@@ -392,8 +397,6 @@ export async function clientReportWorkbook(report: ClientMonthlyReport): Promise
   }
   const approvals = report.approvals;
   if (approvals.approved + approvals.changesRequested > 0) {
-    const time =
-      approvals.averageResponseHours === null ? null : responseTime(approvals.averageResponseHours);
     addSheet(
       workbook,
       CR.approvals,
@@ -406,7 +409,9 @@ export async function clientReportWorkbook(report: ClientMonthlyReport): Promise
         [CR.changesRequested, approvals.changesRequested],
         [
           CR.averageResponse,
-          time ? `${time.value} ${time.unit === 'hours' ? CR.hours : CR.days}` : null,
+          approvals.averageResponseHours === null
+            ? null
+            : responseTimeText(approvals.averageResponseHours),
         ],
       ],
     );
@@ -427,9 +432,9 @@ export async function clientReportWorkbook(report: ClientMonthlyReport): Promise
         { header: CR.campaign, width: 28 },
         { header: CR.objective, width: 18 },
         { header: CR.spend, format: 'money' },
-        { header: CR.reach, width: 12 },
-        { header: CR.clicks, width: 12 },
-        { header: CR.results, width: 12 },
+        { header: CR.reach, width: 12, format: 'count' },
+        { header: CR.clicks, width: 12, format: 'count' },
+        { header: CR.results, width: 12, format: 'count' },
         { header: CR.costPerResult, width: 20, format: 'money' },
       ],
       [

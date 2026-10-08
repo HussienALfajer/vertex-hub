@@ -23,6 +23,7 @@ import {
   invoiceSettings,
   invoices,
   projects,
+  retainerCharges,
   retainers,
 } from '@vertex-hub/db';
 import { testDatabaseUrl } from '@vertex-hub/db/testing';
@@ -246,7 +247,8 @@ describe('invoices', () => {
       expect(entry).toMatchObject({
         action: 'invoice_settings.updated',
         before: { sypPerUsd: '13000.0000', paymentDetails: '' },
-        after: { sypPerUsd: '13500.5', paymentDetails: 'بنك سوريا الدولي' },
+        // The rate as stored, so before and after read alike.
+        after: { sypPerUsd: '13500.5000', paymentDetails: 'بنك سوريا الدولي' },
       });
       // The same rate written another way is no change.
       const again = await patch('/api/invoice-settings', finance.cookie, { sypPerUsd: '13500.50' });
@@ -265,7 +267,7 @@ describe('invoices', () => {
 
   describe('drafting (rules 1, 4, 6–8)', () => {
     it('lists billable work of the client in the currency', async () => {
-      // The open cycle was drafted automatically (rule 4); once discarded it is billable again.
+      // The month's charge was drafted automatically (rule 4); once discarded it is billable again.
       const [automatic] = await db
         .select()
         .from(invoices)
@@ -281,10 +283,11 @@ describe('invoices', () => {
       expect(response.status).toBe(200);
       const items = billableItemsSchema.parse(await response.json());
       expect(items.milestones.map((item) => item.name)).toEqual(['الدفعة الأولى', 'التسليم']);
-      expect(items.cycles).toEqual([
+      expect(items.charges).toEqual([
         expect.objectContaining({
           retainer: { id: retainer.id, name: retainer.name },
-          feeMinor: 40000,
+          kind: 'monthly',
+          amountMinor: 40000,
         }),
       ]);
       expect(items.extraWork).toEqual([
@@ -298,7 +301,7 @@ describe('invoices', () => {
           )
         ).json(),
       );
-      expect(syp).toEqual({ milestones: [], cycles: [], extraWork: [] });
+      expect(syp).toEqual({ milestones: [], charges: [], extraWork: [] });
       expect(
         (
           await client.get(
@@ -374,20 +377,27 @@ describe('invoices', () => {
     });
 
     it('refuses mixed engagements, other currencies and archived records', async () => {
-      const cycleId = retainer.currentCycle?.id;
-      if (!cycleId) throw new Error('The retainer has no open cycle');
+      const [charge] = await db
+        .select({ id: retainerCharges.id })
+        .from(retainerCharges)
+        .where(eq(retainerCharges.retainerId, retainer.id));
+      const chargeId = charge?.id;
+      if (!chargeId) throw new Error('The retainer has no charge');
       await expectError(
         await create({
           sources: [
             { type: 'milestone', id: milestone(1).id },
-            { type: 'retainer_cycle', id: cycleId },
+            { type: 'retainer_charge', id: chargeId },
           ],
         }),
         409,
         'MIXED_ENGAGEMENTS',
       );
       await expectError(
-        await create({ projectId: project.id, sources: [{ type: 'retainer_cycle', id: cycleId }] }),
+        await create({
+          projectId: project.id,
+          sources: [{ type: 'retainer_charge', id: chargeId }],
+        }),
         409,
         'MIXED_ENGAGEMENTS',
       );
@@ -479,6 +489,22 @@ describe('invoices', () => {
         before: { totalMinor: 0, lineCount: 0, retainerId: null },
         after: { totalMinor: 5500, lineCount: 2, retainerId: retainer.id },
       });
+      // The same draft sent again, its texts with spaces: no change, no entry, same `updatedAt`.
+      const unchanged = await ok(
+        await put(
+          `/api/invoices/${draft.id}`,
+          finance.cookie,
+          draftOf(saved, {
+            notes: '  يدفع نقدًا  ',
+            lines: draftOf(saved).lines.map((item) => ({
+              ...item,
+              description: ` ${item.description} `,
+            })),
+          }),
+        ),
+      );
+      expect(unchanged.updatedAt).toBe(saved.updatedAt);
+      expect(await auditOf(draft.id)).toHaveLength(entries.length);
     });
   });
 
@@ -649,11 +675,21 @@ describe('invoices', () => {
       expect(moved).toMatchObject({ status: 'sent', dueOn: addDays(today, 10), daysOverdue: null });
       const [row] = await db.select().from(invoices).where(eq(invoices.id, issued.id));
       expect(invoiceSnapshotSchema.parse(row?.snapshot).dueOn).toBe(addDays(today, 10));
-      expect((await auditOf(issued.id)).at(-1)).toMatchObject({
+      const entries = await auditOf(issued.id);
+      expect(entries.at(-1)).toMatchObject({
         action: 'invoice.due_date_changed',
         before: { dueOn: addDays(today, -5), status: 'overdue' },
         after: { dueOn: addDays(today, 10), status: 'sent', reason: 'طلب العميل مهلة' },
       });
+      // The current date again is no change: no entry and no new version of the PDF.
+      const same = await ok(
+        await client.post(`/api/invoices/${issued.id}/due-date`, finance.cookie, {
+          dueOn: addDays(today, 10),
+          reason: 'نفس التاريخ',
+        }),
+      );
+      expect(same.updatedAt).toBe(moved.updatedAt);
+      expect(await auditOf(issued.id)).toHaveLength(entries.length);
       await expectError(
         await client.post(`/api/invoices/${issued.id}/due-date`, finance.cookie, {
           dueOn: addDays(today, -1),

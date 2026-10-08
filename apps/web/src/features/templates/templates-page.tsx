@@ -165,8 +165,9 @@ function Filters({
   ];
 
   return (
-    <div className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-3 md:flex-row md:items-center">
-      <div className="relative flex-1">
+    <div className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-3 md:flex-row md:flex-wrap md:items-center">
+      {/* Keeps room to type; the selects wrap under it when the row is narrow. */}
+      <div className="relative flex-1 md:min-w-64">
         <SearchIcon
           aria-hidden="true"
           className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"

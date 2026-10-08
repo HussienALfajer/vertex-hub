@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { instantSchema } from './dates.js';
 import { pageQuerySchema, pageSchema } from './lists.js';
 
 /** Every audited change, as `<entity>.<verb>`. Features add theirs with their spec. */
@@ -15,6 +16,7 @@ export const AUDIT_ACTIONS = [
   'user.two_factor_enabled',
   'user.two_factor_disabled',
   'user.two_factor_reset',
+  'user.backup_codes_regenerated',
   'user.profile_updated',
   'department.updated',
   'client.created',
@@ -60,6 +62,24 @@ export const AUDIT_ACTIONS = [
   'retainer_cycle.line_updated',
   'retainer_cycle.line_added',
   'retainer_cycle.adjusted',
+  'retainer_charge.created',
+  'retainer_charge.amount_changed',
+  'retainer_charge.cancelled',
+  'retainer_charge.split',
+  'retainer_charge.settled_outside',
+  'retainer_term.created',
+  'retainer_term.updated',
+  'retainer_term.end_action_changed',
+  'retainer_term.cancelled',
+  'retainer_term.started',
+  'retainer_term.completed',
+  'retainer_term.renewed',
+  'retainer_amendment.created',
+  'retainer_amendment.approved',
+  'retainer_amendment.rejected',
+  'retainer_amendment.withdrawn',
+  'retainer_amendment.applied',
+  'retainer_amendment.cancelled',
   'extra_work.created',
   'extra_work.updated',
   'extra_work.billing_changed',
@@ -221,6 +241,9 @@ export const AUDIT_ENTITY_TYPES = [
   'project_milestone',
   'retainer',
   'retainer_cycle',
+  'retainer_charge',
+  'retainer_term',
+  'retainer_amendment',
   'extra_work',
   'task',
   'task_checklist_item',
@@ -278,8 +301,8 @@ export const auditListQuerySchema = pageQuerySchema.extend({
   entityId: z.uuid().optional(),
   actorId: z.uuid().optional(),
   action: auditActionSchema.optional(),
-  from: z.iso.datetime({ offset: true }).optional(),
-  to: z.iso.datetime({ offset: true }).optional(),
+  from: instantSchema.optional(),
+  to: instantSchema.optional(),
 });
 
 export type AuditListQuery = z.infer<typeof auditListQuerySchema>;

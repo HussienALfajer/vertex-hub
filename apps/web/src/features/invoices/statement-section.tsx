@@ -25,11 +25,12 @@ import {
   toast,
 } from '@vertex-hub/ui';
 import { DownloadIcon, FileTextIcon, LoaderCircleIcon, ScrollTextIcon } from 'lucide-react';
-import { useId, useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LoadError } from '../../components/load-error';
 import { errorMessage } from '../../lib/errors';
 import { formatCalendarDate } from '../../lib/format';
+import { useFocusAfterChange } from '../../lib/use-focus-after-change';
 import { ChoiceSelect } from '../quotes/choice-select';
 import { Money } from '../quotes/quote-badges';
 import { StatementEmailButton } from './invoice-email';
@@ -98,11 +99,16 @@ export function StatementSection({
         </Field>
         <Field invalid={!validDates}>
           <FieldLabel>{t('invoices.statement.from')}</FieldLabel>
-          <Input type="date" value={from} onChange={(event) => setFrom(event.target.value)} />
+          <Input
+            type="date"
+            dir="ltr"
+            value={from}
+            onChange={(event) => setFrom(event.target.value)}
+          />
         </Field>
         <Field invalid={!validDates}>
           <FieldLabel>{t('invoices.statement.to')}</FieldLabel>
-          <Input type="date" value={to} onChange={(event) => setTo(event.target.value)} />
+          <Input type="date" dir="ltr" value={to} onChange={(event) => setTo(event.target.value)} />
           <FieldError match={!validDates}>{t('invoices.statement.errors.dates')}</FieldError>
         </Field>
       </div>
@@ -247,6 +253,16 @@ function StatementPdf({
   const render = useRenderStatement(clientId);
   const [asked, setAsked] = useState(false);
   const ready = useQuery({ ...statementPdfReadyQuery(clientId, query), enabled: asked });
+  const state = !asked
+    ? 'idle'
+    : ready.isSuccess
+      ? 'ready'
+      : ready.isError
+        ? 'failed'
+        : 'preparing';
+  const prepareRef = useRef<HTMLButtonElement>(null);
+  const downloadRef = useRef<HTMLAnchorElement>(null);
+  useFocusAfterChange(state, () => (state === 'ready' ? downloadRef.current : prepareRef.current));
 
   async function ask() {
     try {
@@ -259,13 +275,20 @@ function StatementPdf({
     }
   }
 
-  if (asked && ready.isSuccess) {
+  if (state === 'ready') {
     return (
       <span className="flex flex-wrap items-center gap-2">
         <Button
           variant="outline"
           size="sm"
-          render={<a href={statementPdfUrl(clientId, query)} target="_blank" rel="noopener" />}
+          render={
+            <a
+              ref={downloadRef}
+              href={statementPdfUrl(clientId, query)}
+              target="_blank"
+              rel="noopener"
+            />
+          }
         >
           <DownloadIcon />
           {t('invoices.statement.download')}
@@ -274,25 +297,36 @@ function StatementPdf({
       </span>
     );
   }
-  const gaveUp = asked && ready.isError;
-  if (asked && !gaveUp) {
-    return (
-      <span role="status" className="flex items-center gap-2 text-sm text-muted-foreground">
-        <LoaderCircleIcon
-          aria-hidden="true"
-          className="size-4 animate-spin motion-reduce:animate-none"
-        />
-        {t('invoices.statement.preparing')}
-      </span>
-    );
-  }
+  // One button while it is asked for and prepared, so the focus stays on it.
+  const preparing = state === 'preparing';
   return (
     <span className="flex flex-wrap items-center gap-2">
-      {gaveUp && <Badge tone="danger">{t('invoices.pdf.failed')}</Badge>}
-      <Button variant="outline" size="sm" disabled={render.isPending} onClick={ask}>
-        <FileTextIcon />
-        {gaveUp ? t('invoices.pdf.renderAgain') : t('invoices.statement.preparePdf')}
+      {state === 'failed' && <Badge tone="danger">{t('invoices.pdf.failed')}</Badge>}
+      <Button
+        ref={prepareRef}
+        variant="outline"
+        size="sm"
+        disabled={preparing || render.isPending}
+        focusableWhenDisabled
+        onClick={ask}
+      >
+        {preparing ? (
+          <LoaderCircleIcon
+            aria-hidden="true"
+            className="animate-spin motion-reduce:animate-none"
+          />
+        ) : (
+          <FileTextIcon />
+        )}
+        {preparing
+          ? t('invoices.statement.preparing')
+          : state === 'failed'
+            ? t('invoices.pdf.renderAgain')
+            : t('invoices.statement.preparePdf')}
       </Button>
+      <span role="status" className="sr-only">
+        {preparing ? t('invoices.statement.preparing') : ''}
+      </span>
     </span>
   );
 }

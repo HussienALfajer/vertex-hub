@@ -50,12 +50,16 @@ import {
   quoteLineItems,
   quoteLines,
   quotes,
+  retainerAmendmentLines,
+  retainerAmendments,
+  retainerCharges,
   retainerCycleAdjustments,
   retainerCycleLines,
   retainerCycles,
   retainerDeliverables,
   retainers,
   retainerTemplates,
+  retainerTerms,
   shootCrew,
   shootShots,
   shoots,
@@ -653,8 +657,8 @@ export async function removeProjects(db: Database, ids: string[]): Promise<void>
 }
 
 /**
- * Removes seeded retainers, their lines, cycles, template link and runs, extra work and audit
- * entries (test cleanup only).
+ * Removes seeded retainers, their lines, cycles, charges, template link and runs, extra work and
+ * audit entries (test cleanup only; their invoices go first, with `removeInvoices`).
  */
 export async function removeRetainers(db: Database, ids: string[]): Promise<void> {
   if (ids.length === 0) return;
@@ -692,9 +696,53 @@ export async function removeRetainers(db: Database, ids: string[]): Promise<void
       .from(extraWorkItems)
       .where(inArray(extraWorkItems.retainerId, ids))
   ).map((row) => row.id);
+  const charges = (
+    await db
+      .select({ id: retainerCharges.id })
+      .from(retainerCharges)
+      .where(inArray(retainerCharges.retainerId, ids))
+  ).map((row) => row.id);
+  const terms = (
+    await db
+      .select({ id: retainerTerms.id })
+      .from(retainerTerms)
+      .where(inArray(retainerTerms.retainerId, ids))
+  ).map((row) => row.id);
+  const amendments = (
+    await db
+      .select({ id: retainerAmendments.id })
+      .from(retainerAmendments)
+      .where(inArray(retainerAmendments.retainerId, ids))
+  ).map((row) => row.id);
   await db
     .delete(auditEntries)
-    .where(inArray(auditEntries.entityId, [...ids, ...cycles, ...extraWork]));
+    .where(
+      inArray(auditEntries.entityId, [
+        ...ids,
+        ...cycles,
+        ...extraWork,
+        ...charges,
+        ...terms,
+        ...amendments,
+      ]),
+    );
+  // Credit remainders point to the credit they were split from.
+  await db
+    .update(retainerCharges)
+    .set({ splitFromId: null })
+    .where(inArray(retainerCharges.retainerId, ids));
+  await db.delete(retainerCharges).where(inArray(retainerCharges.retainerId, ids));
+  // Renewal terms point to the term they renew.
+  await db
+    .update(retainerTerms)
+    .set({ renewedFromId: null })
+    .where(inArray(retainerTerms.retainerId, ids));
+  await db.delete(retainerTerms).where(inArray(retainerTerms.retainerId, ids));
+  if (amendments.length) {
+    await db
+      .delete(retainerAmendmentLines)
+      .where(inArray(retainerAmendmentLines.amendmentId, amendments));
+  }
   if (lines.length) {
     await db
       .delete(retainerCycleAdjustments)
@@ -702,6 +750,7 @@ export async function removeRetainers(db: Database, ids: string[]): Promise<void
     await db.delete(retainerCycleLines).where(inArray(retainerCycleLines.id, lines));
   }
   if (cycles.length) await db.delete(retainerCycles).where(inArray(retainerCycles.id, cycles));
+  await db.delete(retainerAmendments).where(inArray(retainerAmendments.retainerId, ids));
   await db.delete(extraWorkItems).where(inArray(extraWorkItems.retainerId, ids));
   await db.delete(retainerDeliverables).where(inArray(retainerDeliverables.retainerId, ids));
   await db.delete(retainers).where(inArray(retainers.id, ids));
@@ -842,6 +891,20 @@ async function removeQuoteRows(db: Database, where: SQL): Promise<void> {
   ).map((row) => row.id);
   await db.delete(auditEntries).where(inArray(auditEntries.entityId, ids));
   await db.delete(notifications).where(inArray(notifications.subjectId, ids));
+  // Terms and quote renewals an accepted quote made (F05B Q1, Q2) point at it.
+  await db.update(retainerTerms).set({ quoteId: null }).where(inArray(retainerTerms.quoteId, ids));
+  const renewalIds = (
+    await db
+      .select({ id: retainerAmendments.id })
+      .from(retainerAmendments)
+      .where(inArray(retainerAmendments.quoteId, ids))
+  ).map((row) => row.id);
+  if (renewalIds.length) {
+    await db
+      .delete(retainerAmendmentLines)
+      .where(inArray(retainerAmendmentLines.amendmentId, renewalIds));
+    await db.delete(retainerAmendments).where(inArray(retainerAmendments.id, renewalIds));
+  }
   if (lineIds.length)
     await db.delete(quoteLineItems).where(inArray(quoteLineItems.lineId, lineIds));
   await db.delete(quoteLines).where(inArray(quoteLines.quoteId, ids));

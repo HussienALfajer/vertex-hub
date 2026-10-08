@@ -115,11 +115,14 @@ export function DraftPreview({ invoice, saved }: { invoice: InvoiceDetail; saved
   );
 }
 
-/** Rule 20: a payment's receipt, with "render again" after a failure. */
+/**
+ * Rule 20: a payment's receipt, with "render again" after a failure. A void payment's receipt is
+ * archived (rule 22) and no longer downloads.
+ */
 export function ReceiptPdf({ invoice, payment }: { invoice: InvoiceDetail; payment: Payment }) {
   const { t } = useTranslation();
   const render = useRenderReceipt(invoice.id);
-  if (!payment.receiptPdf) return null;
+  if (!payment.receiptPdf || payment.voided) return null;
   if (payment.receiptPdf.state === 'ready') {
     return (
       <Button

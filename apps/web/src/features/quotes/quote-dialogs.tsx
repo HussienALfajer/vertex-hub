@@ -29,16 +29,71 @@ import {
   Textarea,
   toast,
 } from '@vertex-hub/ui';
-import { type BaseSyntheticEvent, type ReactNode, useId, useState } from 'react';
-import { Controller, useForm } from 'react-hook-form';
+import {
+  type BaseSyntheticEvent,
+  type ComponentProps,
+  type ReactNode,
+  useId,
+  useState,
+} from 'react';
+import {
+  Controller,
+  type FieldErrors,
+  type FieldValues,
+  get,
+  type Path,
+  type Resolver,
+  useForm,
+} from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
+import { ConfirmDialog } from '../../components/confirm-dialog';
 import { FormAlert } from '../../components/form-alert';
-import { errorMessage } from '../../lib/errors';
+import { ApiError } from '../../lib/api/client';
+import { errorMessage, errorRole, SCREEN_ERROR } from '../../lib/errors';
+import { formatCalendarDate } from '../../lib/format';
 import { clientQuery } from '../clients/clients.queries';
 import { ChoiceSelect } from './choice-select';
-import { useDecideApproval, useExtendQuote, useRejectQuote } from './quotes.queries';
+import { useDecideApproval, useExtendQuote, useRejectQuote, useSendQuote } from './quotes.queries';
 
 const NONE = 'none';
+
+/** The contract, then the range of days the API checks (`INVALID_DATES`), shown on the field. */
+function withDateRange<T extends FieldValues, O>(
+  schema: Resolver<T, unknown, O>,
+  field: Path<T>,
+  earliest: string,
+  latest: string,
+): Resolver<T, unknown, O> {
+  return async (values, context, options) => {
+    const result = await schema(values, context, options);
+    const day: string = get(values, field);
+    if (get(result.errors, field) || (day >= earliest && day <= latest)) return result;
+    const errors = { ...result.errors, [field]: { type: 'range', message: '' } };
+    return { values: {}, errors: errors as FieldErrors<T> };
+  };
+}
+
+/** Rule 11: the response date from the sent day to today, and a note for "other". */
+function rejectResolver(
+  sentOn: string,
+  today: string,
+): Resolver<RejectQuoteInput, unknown, RejectQuote> {
+  const dated = withDateRange(
+    standardSchemaResolver(rejectQuoteSchema),
+    'respondedOn',
+    sentOn,
+    today,
+  );
+  return async (values, context, options) => {
+    const result = await dated(values, context, options);
+    if (values.reason !== 'other' || values.note?.trim() || result.errors.note) return result;
+    return { values: {}, errors: { ...result.errors, note: { type: 'required', message: '' } } };
+  };
+}
+
+/** The API refused the date: the day changed while the dialog was open. */
+const refusedDate = (error: unknown) =>
+  error instanceof ApiError && error.knownCode === 'INVALID_DATES';
 
 /** A dialog around one small form: its title, fields, error and submit button. */
 export function FormDialog({
@@ -51,6 +106,8 @@ export function FormDialog({
   failure,
   onSubmit,
   children,
+  finalFocus,
+  onClosed,
 }: {
   open: boolean;
   onClose: () => void;
@@ -61,11 +118,19 @@ export function FormDialog({
   failure: string | null;
   onSubmit: (event?: BaseSyntheticEvent) => Promise<void>;
   children: ReactNode;
+  /** Where the focus goes when it closes, when the button that opened it may be gone. */
+  finalFocus?: ComponentProps<typeof DialogContent>['finalFocus'];
+  /** Runs once the dialog has faded out: the place to reset its form. */
+  onClosed?: () => void;
 }) {
   const { t } = useTranslation();
   return (
-    <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
-      <DialogContent closeLabel={t('common.close')}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => !next && onClose()}
+      onOpenChangeComplete={(next) => !next && onClosed?.()}
+    >
+      <DialogContent closeLabel={t('common.close')} finalFocus={finalFocus}>
         <form className="grid gap-5" onSubmit={onSubmit} noValidate>
           <DialogHeader>
             <DialogTitle>{title}</DialogTitle>
@@ -87,34 +152,29 @@ export function FormDialog({
   );
 }
 
-/** Rule 7: the General Manager returns a discount with a note for the requester. */
-export function ReturnApprovalDialog({
-  quote,
-  open,
-  onClose,
-}: {
+/** What each quote dialog takes from its page. */
+interface QuoteDialogProps {
   quote: QuoteDetail;
   open: boolean;
   onClose: () => void;
-}) {
+  /** Where the focus goes when it closes: the button that opened it, or the page heading. */
+  finalFocus?: ComponentProps<typeof DialogContent>['finalFocus'];
+}
+
+/** Rule 7: the General Manager returns a discount with a note for the requester. */
+export function ReturnApprovalDialog({ quote, open, onClose, finalFocus }: QuoteDialogProps) {
   const { t } = useTranslation();
   const decide = useDecideApproval(quote.id);
   const [failure, setFailure] = useState<string | null>(null);
   const form = useForm<{ note: string }>({ defaultValues: { note: '' } });
   const { errors } = form.formState;
 
-  function close() {
-    setFailure(null);
-    form.reset();
-    onClose();
-  }
-
   const submit = form.handleSubmit(async ({ note }) => {
     setFailure(null);
     try {
-      await decide.mutateAsync({ decision: 'return', note });
+      await decide.mutateAsync({ decision: 'return', note: note.trim() });
       toast.add({ title: t('quotes.approval.returnedToast'), type: 'success' });
-      close();
+      onClose();
     } catch (error) {
       setFailure(errorMessage(t, error));
     }
@@ -123,7 +183,12 @@ export function ReturnApprovalDialog({
   return (
     <FormDialog
       open={open}
-      onClose={close}
+      onClose={onClose}
+      onClosed={() => {
+        setFailure(null);
+        form.reset();
+      }}
+      finalFocus={finalFocus}
       submitting={form.formState.isSubmitting}
       title={t('quotes.approval.returnTitle')}
       description={t('quotes.approval.returnHint')}
@@ -146,47 +211,41 @@ export function ReturnApprovalDialog({
 }
 
 /** Rule 10: an expired quote is sent again until a new last day; prices and PDF stay. */
-export function ExtendDialog({
-  quote,
-  open,
-  onClose,
-}: {
-  quote: QuoteDetail;
-  open: boolean;
-  onClose: () => void;
-}) {
+export function ExtendDialog({ quote, open, onClose, finalFocus }: QuoteDialogProps) {
   const { t } = useTranslation();
   const extend = useExtendQuote(quote.id);
   const [failure, setFailure] = useState<string | null>(null);
   const today = businessDate();
   const latest = addDays(today, QUOTE_LIMITS.validityDays);
   const form = useForm<ExtendQuote>({
-    resolver: standardSchemaResolver(extendQuoteSchema),
+    resolver: withDateRange(standardSchemaResolver(extendQuoteSchema), 'validUntil', today, latest),
     defaultValues: { validUntil: addDays(today, quote.validityDays) },
   });
   const { errors } = form.formState;
-
-  function close() {
-    setFailure(null);
-    form.reset();
-    onClose();
-  }
 
   const submit = form.handleSubmit(async ({ validUntil }) => {
     setFailure(null);
     try {
       await extend.mutateAsync(validUntil);
       toast.add({ title: t('quotes.extend.done'), type: 'success' });
-      close();
+      onClose();
     } catch (error) {
-      setFailure(errorMessage(t, error));
+      // The day changed while the dialog was open: the field says so.
+      if (refusedDate(error)) {
+        form.setError('validUntil', { type: SCREEN_ERROR, message: '' }, { shouldFocus: true });
+      } else setFailure(errorMessage(t, error));
     }
   });
 
   return (
     <FormDialog
       open={open}
-      onClose={close}
+      onClose={onClose}
+      onClosed={() => {
+        setFailure(null);
+        form.reset();
+      }}
+      finalFocus={finalFocus}
       submitting={form.formState.isSubmitting}
       title={t('quotes.extend.title')}
       description={t('quotes.extend.hint')}
@@ -196,24 +255,18 @@ export function ExtendDialog({
     >
       <Field invalid={!!errors.validUntil}>
         <FieldLabel>{t('quotes.extend.validUntil')}</FieldLabel>
-        <Input type="date" min={today} max={latest} {...form.register('validUntil')} />
+        <Input type="date" dir="ltr" min={today} max={latest} {...form.register('validUntil')} />
         <FieldDescription>{t('quotes.extend.validUntilHint')}</FieldDescription>
-        <FieldError match={!!errors.validUntil}>{t('quotes.extend.errors.validUntil')}</FieldError>
+        <FieldError match={!!errors.validUntil} role={errorRole(errors.validUntil)}>
+          {t('quotes.extend.errors.validUntil')}
+        </FieldError>
       </Field>
     </FormDialog>
   );
 }
 
 /** Rule 11: the client's no, with a reason; final. */
-export function RejectDialog({
-  quote,
-  open,
-  onClose,
-}: {
-  quote: QuoteDetail;
-  open: boolean;
-  onClose: () => void;
-}) {
+export function RejectDialog({ quote, open, onClose, finalFocus }: QuoteDialogProps) {
   const { t } = useTranslation();
   const ids = { contact: useId(), reason: useId() };
   const reject = useRejectQuote(quote.id);
@@ -224,31 +277,24 @@ export function RejectDialog({
   });
   const [failure, setFailure] = useState<string | null>(null);
   const today = businessDate();
+  const sentOn = quote.sentAt ? businessDate(new Date(quote.sentAt)) : today;
   const form = useForm<RejectQuoteInput, unknown, RejectQuote>({
-    resolver: standardSchemaResolver(rejectQuoteSchema),
+    resolver: rejectResolver(sentOn, today),
     defaultValues: { respondedOn: today, contactId: null, reason: 'price', note: '' },
   });
   const { errors } = form.formState;
   const reason = form.watch('reason');
 
-  function close() {
-    setFailure(null);
-    form.reset();
-    onClose();
-  }
-
   const submit = form.handleSubmit(async (values) => {
     setFailure(null);
-    if (values.reason === 'other' && !values.note) {
-      form.setError('note', { type: 'required' });
-      return;
-    }
     try {
       await reject.mutateAsync(values);
       toast.add({ title: t('quotes.reject.done'), type: 'success' });
-      close();
+      onClose();
     } catch (error) {
-      setFailure(errorMessage(t, error));
+      if (refusedDate(error)) {
+        form.setError('respondedOn', { type: SCREEN_ERROR, message: '' }, { shouldFocus: true });
+      } else setFailure(errorMessage(t, error));
     }
   });
 
@@ -264,7 +310,12 @@ export function RejectDialog({
   return (
     <FormDialog
       open={open}
-      onClose={close}
+      onClose={onClose}
+      onClosed={() => {
+        setFailure(null);
+        form.reset();
+      }}
+      finalFocus={finalFocus}
       submitting={form.formState.isSubmitting}
       title={t('quotes.reject.title', { number: quote.displayNumber })}
       description={t('quotes.reject.hint')}
@@ -275,13 +326,8 @@ export function RejectDialog({
       <div className="grid gap-5 sm:grid-cols-2">
         <Field invalid={!!errors.respondedOn}>
           <FieldLabel>{t('quotes.response.respondedOn')}</FieldLabel>
-          <Input
-            type="date"
-            min={quote.sentAt ? businessDate(new Date(quote.sentAt)) : undefined}
-            max={today}
-            {...form.register('respondedOn')}
-          />
-          <FieldError match={!!errors.respondedOn}>
+          <Input type="date" dir="ltr" min={sentOn} max={today} {...form.register('respondedOn')} />
+          <FieldError match={!!errors.respondedOn} role={errorRole(errors.respondedOn)}>
             {t('quotes.response.errors.respondedOn')}
           </FieldError>
         </Field>
@@ -328,5 +374,31 @@ export function RejectDialog({
         <FieldError match={!!errors.note}>{t('quotes.reject.errors.note')}</FieldError>
       </Field>
     </FormDialog>
+  );
+}
+
+/** Rule 6: sending locks the draft, queues its PDF and dates its validity from today. */
+export function SendDialog({ quote, open, onClose, finalFocus }: QuoteDialogProps) {
+  const { t } = useTranslation();
+  const send = useSendQuote(quote.id);
+  const zeroPriced = quote.lines.some((line) => line.unitPriceMinor === 0);
+  const validUntil = addDays(businessDate(), quote.validityDays);
+  return (
+    <ConfirmDialog
+      open={open}
+      onClose={onClose}
+      finalFocus={finalFocus}
+      title={t('quotes.send.title', { number: quote.displayNumber })}
+      body={[
+        t('quotes.send.body', { date: formatCalendarDate(validUntil) }),
+        ...(zeroPriced ? [t('quotes.send.zeroPrice')] : []),
+      ].join(' ')}
+      action={t('quotes.send.confirm')}
+      pending={send.isPending}
+      onConfirm={async () => {
+        await send.mutateAsync(zeroPriced);
+        toast.add({ title: t('quotes.send.done'), type: 'success' });
+      }}
+    />
   );
 }

@@ -59,6 +59,8 @@ test('ready tasks go to the client in one link; the client approves one and asks
 
   // The link is shown once, to copy or to send on WhatsApp to the contact's phone.
   await expect(dialog.getByText(ar.approvals.request.issuedTitle)).toBeVisible();
+  // The form left with its step: the focus goes to the link.
+  await expect(dialog.getByLabel(ar.approvals.link.label)).toBeFocused();
   const link = await dialog.getByLabel(ar.approvals.link.label).inputValue();
   expect(link).toMatch(/\/a\/link-token-\d+$/);
   await expect(dialog.getByRole('link', { name: ar.approvals.link.whatsApp })).toHaveAttribute(
@@ -97,6 +99,8 @@ test('ready tasks go to the client in one link; the client approves one and asks
   await expect(approving.getByText(ar.approvals.public.approveBody)).toBeVisible();
   await approving.getByRole('button', { name: ar.approvals.public.confirmApprove }).click();
   await expect(banner.getByText(ar.approvals.public.decided.approved)).toBeVisible();
+  // The decision took its buttons away: the focus goes to the heading of what was decided.
+  await expect(banner.getByRole('heading', { level: 2 })).toBeFocused();
 
   // Asking for changes needs a note.
   await story.getByRole('button', { name: ar.approvals.public.requestChanges }).click();
@@ -106,6 +110,7 @@ test('ready tasks go to the client in one link; the client approves one and asks
   await changing.getByLabel(ar.approvals.public.changes).fill('غيّروا الموعد إلى السبت.');
   await changing.getByRole('button', { name: ar.approvals.public.sendChanges }).click();
   await expect(story.getByText(ar.approvals.public.decided.changes_requested)).toBeVisible();
+  await expect(story.getByRole('heading', { level: 2 })).toBeFocused();
 
   // The decisions are final: after a reload nothing is left to decide.
   await page.reload();
@@ -272,4 +277,24 @@ test('everyone reads requests; only client scope acts, and a notification opens 
   await dialog.getByRole('button', { name: ar.approvals.request.done }).click();
   await expect(panel.getByText(ar.approvals.states.open)).toBeVisible();
   await expect(panel.getByRole('button', { name: ar.tasks.approval.create })).toHaveCount(0);
+});
+
+test('closing the issued link gives the focus to the selected tab once nothing is left to send', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 1400 });
+  await onTasksToday(page);
+  await mockApi(page, { signedIn: true, me: accountManagerMe, approvals: true });
+  await page.goto('/approvals');
+  const jasmine = page.getByRole('region', { name: 'مطعم الياسمين' });
+  await jasmine.getByRole('button', { name: ar.approvals.ready.selectAll }).click();
+  await jasmine.getByRole('button', { name: /^أنشئ رابط اعتماد \(2\)$/ }).click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByRole('button', { name: ar.approvals.request.create }).click();
+  await expect(dialog.getByText(ar.approvals.request.issuedTitle)).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+  // The client's card left with its ready tasks, and its button with it.
+  await expect(jasmine).toHaveCount(0);
+  await expect(page.getByRole('tab', { selected: true })).toBeFocused();
 });

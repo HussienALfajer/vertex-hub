@@ -1,4 +1,5 @@
 import type { Currency, QuoteSnapshot } from '@vertex-hub/contracts';
+import { fill, plural } from '@vertex-hub/messages';
 import {
   documentHtml,
   escapeHtml,
@@ -31,8 +32,22 @@ const LABELS = {
   discount: 'الخصم',
   net: 'الصافي',
   monthlyNet: 'الصافي الشهري',
-  perMonth: 'شهرياً',
-  term: (months: number) => `مدة الاشتراك: ${months} شهراً`,
+  perMonth: 'شهريًا',
+  term: (months: number) =>
+    `مدة الاشتراك: ${fill(
+      plural(
+        {
+          zero: '{{n}} شهر',
+          one: 'شهر واحد',
+          two: 'شهران',
+          few: '{{n}} أشهر',
+          many: '{{n}} شهرًا',
+          other: '{{n}} شهر',
+        },
+        months,
+      ),
+      { n: months },
+    )}`,
   termTotal: 'إجمالي المدة',
   installments: 'الدفعات',
   installment: 'الدفعة',

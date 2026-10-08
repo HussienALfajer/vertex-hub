@@ -25,12 +25,13 @@ import {
   ToggleGroup,
   ToggleGroupItem,
 } from '@vertex-hub/ui';
-import { useId, useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { FormAlert } from '../../components/form-alert';
 import { can, canAll, useMe } from '../../lib/auth';
 import { errorMessage } from '../../lib/errors';
+import { useFocusFirstError } from '../../lib/focus-first-invalid';
 import { clientListQuery, clientQuery } from '../clients/clients.queries';
 import { leadListQuery } from '../leads/leads.queries';
 import { ChoiceSelect } from './choice-select';
@@ -45,19 +46,28 @@ type Recipient = 'client' | 'lead';
  * 14), opened in the builder once created. From a client's Quotes tab or a lead's page the
  * recipient is fixed.
  */
-export function NewQuoteDialog({
-  open,
-  onClose,
-  clientId,
-  leadId,
-}: {
+export function NewQuoteDialog({ open, onClose, clientId, leadId }: NewQuoteProps) {
+  const { t } = useTranslation();
+  return (
+    <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
+      <DialogContent closeLabel={t('common.close')}>
+        {/* Unmounted once the dialog has faded out: each opening starts afresh. */}
+        <NewQuoteForm onClose={onClose} clientId={clientId} leadId={leadId} />
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+interface NewQuoteProps {
   open: boolean;
   onClose: () => void;
   /** The client the quote is for, when the dialog opens from its profile. */
   clientId?: string;
   /** The lead the quote is for, when the dialog opens from its page (F03 screen 3). */
   leadId?: string;
-}) {
+}
+
+function NewQuoteForm({ onClose, clientId, leadId }: Omit<NewQuoteProps, 'open'>) {
   const { t } = useTranslation();
   const me = useMe();
   const navigate = useNavigate();
@@ -80,11 +90,13 @@ export function NewQuoteDialog({
     contactId: null,
   });
   const [recipient, setRecipient] = useState<Recipient>(leadId ? 'lead' : 'client');
-  const empty = emptyFor(leadId ? 'lead' : 'client');
   const form = useForm<CreateQuoteInput, unknown, CreateQuote>({
     resolver: standardSchemaResolver(createQuoteSchema),
-    defaultValues: empty,
+    defaultValues: emptyFor(recipient),
+    shouldFocusError: false,
   });
+  const formRef = useRef<HTMLFormElement>(null);
+  useFocusFirstError(form.formState.submitCount, formRef);
   const { errors } = form.formState;
   const chosenClient = form.watch('clientId');
   // Account managers quote their own clients only; the API refuses the others.
@@ -94,9 +106,9 @@ export function NewQuoteDialog({
       accountManagerId: canAll(me, 'quotes.manage') ? undefined : me.user.id,
       pageSize: 100,
     }),
-    enabled: open && !clientId,
+    enabled: !clientId,
   });
-  const client = useQuery({ ...clientQuery(chosenClient ?? ''), enabled: open && !!chosenClient });
+  const client = useQuery({ ...clientQuery(chosenClient ?? ''), enabled: !!chosenClient });
   // Account managers quote the leads they own only (F03 "Quote scope on lead quotes").
   const leads = useQuery({
     ...leadListQuery({
@@ -104,15 +116,8 @@ export function NewQuoteDialog({
       ownerId: canAll(me, 'quotes.manage') ? undefined : me.user.id,
       pageSize: 100,
     }),
-    enabled: open && offersLeads && recipient === 'lead',
+    enabled: offersLeads && recipient === 'lead',
   });
-
-  function close() {
-    setFailure(null);
-    setRecipient(leadId ? 'lead' : 'client');
-    form.reset(empty);
-    onClose();
-  }
 
   function pickRecipient(next: Recipient) {
     setRecipient(next);
@@ -123,7 +128,7 @@ export function NewQuoteDialog({
     setFailure(null);
     try {
       const quote = await create.mutateAsync(values);
-      close();
+      onClose();
       await navigate({ to: '/quotes/$quoteId', params: { quoteId: quote.id } });
     } catch (error) {
       setFailure(errorMessage(t, error));
@@ -151,136 +156,132 @@ export function NewQuoteDialog({
   ];
 
   return (
-    <Dialog open={open} onOpenChange={(next) => !next && close()}>
-      <DialogContent closeLabel={t('common.close')}>
-        <form className="grid gap-5" onSubmit={submit} noValidate>
-          <DialogHeader>
-            <DialogTitle>{t('quotes.new.title')}</DialogTitle>
-            <DialogDescription>{t('quotes.new.hint')}</DialogDescription>
-          </DialogHeader>
-          {offersLeads && (
-            <Field>
-              <FieldLabel id={ids.recipient} render={<span />}>
-                {t('quotes.form.for')}
+    <form ref={formRef} className="grid gap-5" onSubmit={submit} noValidate>
+      <DialogHeader>
+        <DialogTitle>{t('quotes.new.title')}</DialogTitle>
+        <DialogDescription>{t('quotes.new.hint')}</DialogDescription>
+      </DialogHeader>
+      {offersLeads && (
+        <Field>
+          <FieldLabel id={ids.recipient} render={<span />}>
+            {t('quotes.form.for')}
+          </FieldLabel>
+          <ToggleGroup
+            aria-labelledby={ids.recipient}
+            value={[recipient]}
+            onValueChange={(next: Recipient[]) => {
+              if (next[0]) pickRecipient(next[0]);
+            }}
+          >
+            <ToggleGroupItem value="client">{t('quotes.form.forClient')}</ToggleGroupItem>
+            <ToggleGroupItem value="lead">{t('quotes.form.forLead')}</ToggleGroupItem>
+          </ToggleGroup>
+        </Field>
+      )}
+      {!fixed && recipient === 'lead' && (
+        <Controller
+          control={form.control}
+          name="leadId"
+          render={({ field }) => (
+            <Field invalid={!!errors.leadId || !!errors.clientId}>
+              <FieldLabel id={ids.lead} render={<span />}>
+                {t('quotes.form.lead')}
               </FieldLabel>
-              <ToggleGroup
-                aria-labelledby={ids.recipient}
-                value={[recipient]}
-                onValueChange={(next: Recipient[]) => {
-                  if (next[0]) pickRecipient(next[0]);
-                }}
-              >
-                <ToggleGroupItem value="client">{t('quotes.form.forClient')}</ToggleGroupItem>
-                <ToggleGroupItem value="lead">{t('quotes.form.forLead')}</ToggleGroupItem>
-              </ToggleGroup>
+              <ChoiceSelect
+                ref={field.ref}
+                labelledBy={ids.lead}
+                items={leadItems}
+                value={field.value || null}
+                placeholder={t('quotes.form.pickLead')}
+                onChange={field.onChange}
+              />
+              <FieldDescription>{t('quotes.form.leadHint')}</FieldDescription>
+              <FieldError match={!!errors.leadId || !!errors.clientId}>
+                {t('quotes.form.errors.lead')}
+              </FieldError>
             </Field>
           )}
-          {!fixed && recipient === 'lead' && (
-            <Controller
-              control={form.control}
-              name="leadId"
-              render={({ field }) => (
-                <Field invalid={!!errors.leadId || !!errors.clientId}>
-                  <FieldLabel id={ids.lead} render={<span />}>
-                    {t('quotes.form.lead')}
-                  </FieldLabel>
-                  <ChoiceSelect
-                    labelledBy={ids.lead}
-                    items={leadItems}
-                    value={field.value || null}
-                    placeholder={t('quotes.form.pickLead')}
-                    onChange={field.onChange}
-                  />
-                  <FieldDescription>{t('quotes.form.leadHint')}</FieldDescription>
-                  <FieldError match={!!errors.leadId || !!errors.clientId}>
-                    {t('quotes.form.errors.lead')}
-                  </FieldError>
-                </Field>
-              )}
-            />
-          )}
-          {!fixed && recipient === 'client' && (
-            <Controller
-              control={form.control}
-              name="clientId"
-              render={({ field }) => (
-                <Field invalid={!!errors.clientId}>
-                  <FieldLabel id={ids.client} render={<span />}>
-                    {t('quotes.form.client')}
-                  </FieldLabel>
-                  <ChoiceSelect
-                    labelledBy={ids.client}
-                    items={clientItems}
-                    value={field.value || null}
-                    placeholder={t('quotes.form.pickClient')}
-                    onChange={(next) => {
-                      field.onChange(next);
-                      form.setValue('contactId', null);
-                    }}
-                  />
-                  <FieldError match={!!errors.clientId}>
-                    {t('quotes.form.errors.client')}
-                  </FieldError>
-                </Field>
-              )}
-            />
-          )}
-          <Field invalid={!!errors.title}>
-            <FieldLabel>{t('quotes.form.title')}</FieldLabel>
-            <Input autoComplete="off" {...form.register('title')} />
-            <FieldDescription>{t('quotes.form.titleHint')}</FieldDescription>
-            <FieldError match={!!errors.title}>{t('quotes.form.errors.title')}</FieldError>
-          </Field>
-          <div className="grid gap-5 sm:grid-cols-2">
-            <Controller
-              control={form.control}
-              name="currency"
-              render={({ field }) => (
-                <Field>
-                  <FieldLabel id={ids.currency} render={<span />}>
-                    {t('quotes.form.currency')}
-                  </FieldLabel>
-                  <ChoiceSelect
-                    labelledBy={ids.currency}
-                    items={currencyItems}
-                    value={field.value ?? 'USD'}
-                    onChange={field.onChange}
-                  />
-                </Field>
-              )}
-            />
-            {recipient === 'client' && (
-              <Controller
-                control={form.control}
-                name="contactId"
-                render={({ field }) => (
-                  <Field>
-                    <FieldLabel id={ids.contact} render={<span />}>
-                      {t('quotes.form.addressee')}
-                    </FieldLabel>
-                    <ChoiceSelect
-                      labelledBy={ids.contact}
-                      items={contactItems}
-                      value={field.value ?? NONE}
-                      disabled={!chosenClient}
-                      onChange={(next) => field.onChange(next === NONE ? null : next)}
-                    />
-                  </Field>
-                )}
+        />
+      )}
+      {!fixed && recipient === 'client' && (
+        <Controller
+          control={form.control}
+          name="clientId"
+          render={({ field }) => (
+            <Field invalid={!!errors.clientId}>
+              <FieldLabel id={ids.client} render={<span />}>
+                {t('quotes.form.client')}
+              </FieldLabel>
+              <ChoiceSelect
+                ref={field.ref}
+                labelledBy={ids.client}
+                items={clientItems}
+                value={field.value || null}
+                placeholder={t('quotes.form.pickClient')}
+                onChange={(next) => {
+                  field.onChange(next);
+                  form.setValue('contactId', null);
+                }}
               />
+              <FieldError match={!!errors.clientId}>{t('quotes.form.errors.client')}</FieldError>
+            </Field>
+          )}
+        />
+      )}
+      <Field invalid={!!errors.title}>
+        <FieldLabel>{t('quotes.form.title')}</FieldLabel>
+        <Input autoComplete="off" {...form.register('title')} />
+        <FieldDescription>{t('quotes.form.titleHint')}</FieldDescription>
+        <FieldError match={!!errors.title}>{t('quotes.form.errors.title')}</FieldError>
+      </Field>
+      <div className="grid gap-5 sm:grid-cols-2">
+        <Controller
+          control={form.control}
+          name="currency"
+          render={({ field }) => (
+            <Field>
+              <FieldLabel id={ids.currency} render={<span />}>
+                {t('quotes.form.currency')}
+              </FieldLabel>
+              <ChoiceSelect
+                labelledBy={ids.currency}
+                items={currencyItems}
+                value={field.value ?? 'USD'}
+                onChange={field.onChange}
+              />
+            </Field>
+          )}
+        />
+        {recipient === 'client' && (
+          <Controller
+            control={form.control}
+            name="contactId"
+            render={({ field }) => (
+              <Field>
+                <FieldLabel id={ids.contact} render={<span />}>
+                  {t('quotes.form.addressee')}
+                </FieldLabel>
+                <ChoiceSelect
+                  labelledBy={ids.contact}
+                  items={contactItems}
+                  value={field.value ?? NONE}
+                  disabled={!chosenClient}
+                  onChange={(next) => field.onChange(next === NONE ? null : next)}
+                />
+              </Field>
             )}
-          </div>
-          {failure && <FormAlert>{failure}</FormAlert>}
-          <DialogFooter>
-            <DialogClose render={<Button variant="outline" type="button" />}>
-              {t('common.cancel')}
-            </DialogClose>
-            <Button type="submit" disabled={form.formState.isSubmitting}>
-              {form.formState.isSubmitting ? t('common.saving') : t('quotes.new.create')}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+          />
+        )}
+      </div>
+      {failure && <FormAlert>{failure}</FormAlert>}
+      <DialogFooter>
+        <DialogClose render={<Button variant="outline" type="button" />}>
+          {t('common.cancel')}
+        </DialogClose>
+        <Button type="submit" disabled={form.formState.isSubmitting}>
+          {form.formState.isSubmitting ? t('common.saving') : t('quotes.new.create')}
+        </Button>
+      </DialogFooter>
+    </form>
   );
 }

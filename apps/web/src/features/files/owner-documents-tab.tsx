@@ -1,10 +1,11 @@
 import { useQuery } from '@tanstack/react-query';
 import { Button, EmptyState, Skeleton, Switch } from '@vertex-hub/ui';
 import { FileTextIcon, UploadIcon } from 'lucide-react';
-import { useId, useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LoadError } from '../../components/load-error';
 import { TabHeader } from '../../components/tab-header';
+import { useFocusAfterChange } from '../../lib/use-focus-after-change';
 import { AddFilesDialog, useFileItemActions } from './file-dialogs';
 import { FileItemCard } from './file-item-card';
 import { type FileOwnerRef, fileItemsQuery } from './files.queries';
@@ -30,12 +31,22 @@ export function OwnerDocumentsTab({
       ...(showRemoved && { includeArchived: 'true' }),
     }),
   );
-  const { actions, dialogs } = useFileItemActions(owner, { allowLink: true });
+  // Only one upload button shows at a time (header or empty state): the focus goes to it after an
+  // upload or a removal changed which one shows, or the heading when none does.
+  const uploadButton = useRef<HTMLButtonElement>(null);
+  const heading = useRef<HTMLHeadingElement>(null);
+  const { actions, dialogs } = useFileItemActions(owner, {
+    allowLink: true,
+    afterItemRemoved: uploadButton,
+  });
   const rights = files.data?.rights;
   const items = files.data?.items ?? [];
+  // The list refreshes after the dialog gave the focus back (to a button an upload or a removal
+  // then replaced): once it shows, a focus left on the page body goes to the upload button.
+  useFocusAfterChange(items.length, () => uploadButton.current ?? heading.current);
 
   const upload = rights?.canManageDocuments && (
-    <Button size="sm" onClick={() => setAdding(true)}>
+    <Button ref={uploadButton} size="sm" onClick={() => setAdding(true)}>
       <UploadIcon />
       {t('files.documents.upload')}
     </Button>
@@ -46,6 +57,7 @@ export function OwnerDocumentsTab({
       <TabHeader
         title={t('files.documents.title')}
         description={t(`files.documents.hint.${owner.type}`)}
+        headingRef={heading}
         action={
           <div className="flex flex-wrap items-center gap-3">
             {rights?.canSeeRemoved && (
@@ -89,6 +101,7 @@ export function OwnerDocumentsTab({
           allowLink
           withConfidential={rights?.canSetConfidential}
           onClose={() => setAdding(false)}
+          finalFocus={() => uploadButton.current ?? heading.current ?? true}
         />
       )}
       {dialogs}

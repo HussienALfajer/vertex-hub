@@ -1,7 +1,15 @@
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { addMonths, businessDate, CLIENT_STATUSES, type MeResponse } from '@vertex-hub/contracts';
-import { Button, Card, Field, FieldLabel, PageHeader } from '@vertex-hub/ui';
+import {
+  Button,
+  Card,
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldLabel,
+  PageHeader,
+} from '@vertex-hub/ui';
 import {
   ChartNoAxesColumnIcon,
   ClockAlertIcon,
@@ -9,9 +17,12 @@ import {
   type LucideIcon,
   UsersIcon,
 } from 'lucide-react';
-import { useId, useState } from 'react';
+import { useId, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { useTranslation } from 'react-i18next';
+import { LoadError } from '../../components/load-error';
 import { can, scopesOf, useMe } from '../../lib/auth';
+import { focusFirstInvalid } from '../../lib/focus-first-invalid';
 import { clientListQuery } from '../clients/clients.queries';
 import { SeeLink } from '../dashboard/dashboard-parts';
 import { ChoiceSelect } from '../quotes/choice-select';
@@ -39,7 +50,7 @@ export function ReportsPage() {
   return (
     <>
       <PageHeader title={t('reports.title')} description={t('reports.subtitle')} />
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {open.clientReport && <ClientReportCard />}
         {open.productivity && (
           <ReportCard
@@ -114,10 +125,12 @@ function ClientReportCard() {
     }),
   );
   const [clientId, setClientId] = useState<string | null>(null);
+  const [missingClient, setMissingClient] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
   const [month, setMonth] = useState(addMonths(businessDate(), -1).slice(0, 7));
 
   return (
-    <Card className="gap-3 md:col-span-2">
+    <Card className="gap-3 md:col-span-2 xl:col-span-3">
       <div className="flex items-center gap-3">
         <span className="flex size-10 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground [&_svg]:size-5">
           <FileChartColumnIcon aria-hidden="true" />
@@ -125,43 +138,61 @@ function ClientReportCard() {
         <h2 className="text-lg font-bold">{t('reports.client.title')}</h2>
       </div>
       <p className="text-sm text-muted-foreground">{t('reports.client.about')}</p>
-      <form
-        className="flex flex-col gap-3 md:flex-row md:items-end"
-        onSubmit={(event) => {
-          event.preventDefault();
-          if (!clientId) return;
-          void navigate({
-            to: '/clients/$clientId/report',
-            params: { clientId },
-            search: { month },
-          });
-        }}
-      >
-        <Field className="md:w-72">
-          <FieldLabel id={ids.client} render={<span />}>
-            {t('reports.client.client')}
-          </FieldLabel>
-          <ChoiceSelect
-            labelledBy={ids.client}
-            placeholder={t('reports.client.pickClient')}
-            items={(clients.data?.items ?? []).map((client) => ({
-              value: client.id,
-              label: client.tradeName,
-            }))}
-            value={clientId}
-            onChange={setClientId}
-          />
-        </Field>
-        <Field className="md:w-48">
-          <FieldLabel id={ids.month} render={<span />}>
-            {t('reports.client.month')}
-          </FieldLabel>
-          <MonthSelect labelledBy={ids.month} value={month} onChange={setMonth} />
-        </Field>
-        <Button type="submit" disabled={!clientId}>
-          {t('reports.client.open')}
-        </Button>
-      </form>
+      {clients.isError ? (
+        <LoadError message={t('reports.client.clientsError')} onRetry={() => clients.refetch()} />
+      ) : (
+        <form
+          ref={formRef}
+          className="flex flex-col gap-3 md:flex-row md:items-start"
+          noValidate
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (!clientId) {
+              flushSync(() => setMissingClient(true));
+              focusFirstInvalid(formRef.current);
+              return;
+            }
+            void navigate({
+              to: '/clients/$clientId/report',
+              params: { clientId },
+              search: { month },
+            });
+          }}
+        >
+          <Field className="md:w-72" invalid={missingClient}>
+            <FieldLabel id={ids.client} render={<span />}>
+              {t('reports.client.client')}
+            </FieldLabel>
+            <ChoiceSelect
+              labelledBy={ids.client}
+              placeholder={t('reports.client.pickClient')}
+              items={(clients.data?.items ?? []).map((client) => ({
+                value: client.id,
+                label: client.tradeName,
+              }))}
+              value={clientId}
+              onChange={(next) => {
+                setClientId(next);
+                setMissingClient(false);
+              }}
+            />
+            {clients.isSuccess && clients.data.items.length === 0 && (
+              <FieldDescription>{t('reports.client.noClients')}</FieldDescription>
+            )}
+            <FieldError match={missingClient}>{t('reports.client.clientRequired')}</FieldError>
+          </Field>
+          <Field className="md:w-48">
+            <FieldLabel id={ids.month} render={<span />}>
+              {t('reports.client.month')}
+            </FieldLabel>
+            <MonthSelect labelledBy={ids.month} value={month} onChange={setMonth} />
+          </Field>
+          {/* Lined up with the fields, below their labels. */}
+          <Button type="submit" className="md:mt-7">
+            {t('reports.client.open')}
+          </Button>
+        </form>
+      )}
     </Card>
   );
 }

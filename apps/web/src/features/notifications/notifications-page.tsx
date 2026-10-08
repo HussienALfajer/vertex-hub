@@ -8,6 +8,7 @@ import {
 import {
   Button,
   EmptyState,
+  IconButton,
   PageHeader,
   Pagination,
   Select,
@@ -20,11 +21,12 @@ import {
   ToggleGroupItem,
 } from '@vertex-hub/ui';
 import { BellIcon, CheckCheckIcon, MailIcon, MailOpenIcon, SettingsIcon } from 'lucide-react';
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LoadError } from '../../components/load-error';
 import { formatNumber } from '../../lib/format';
 import { ALL, flagParam, oneOfParam, pageParam } from '../../lib/search-params';
+import { useFocusAfterChange } from '../../lib/use-focus-after-change';
 import { usePageInRange } from '../../lib/use-page-in-range';
 import { NotificationItem } from './notification-item';
 import {
@@ -77,6 +79,15 @@ export function NotificationsPage({ search }: { search: NotificationsSearch }) {
   );
   const unread = useQuery(unreadCountQuery);
   const markAll = useMarkAllRead();
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const listRef = useRef<HTMLUListElement>(null);
+  // A row that leaves the Unread filter takes its button with it: the focus goes to the button
+  // now at its position, else to the heading.
+  const toggled = useRef(0);
+  useFocusAfterChange(list.data?.items.map((item) => item.id).join() ?? '', () => {
+    const buttons = listRef.current?.querySelectorAll<HTMLElement>('[data-focus="read"]') ?? [];
+    return buttons[Math.min(toggled.current, buttons.length - 1)] ?? headingRef.current;
+  });
 
   const setFilter = (next: Partial<NotificationsSearch>) =>
     navigate({ search: (previous) => ({ ...previous, ...next, page: undefined }), replace: true });
@@ -92,6 +103,7 @@ export function NotificationsPage({ search }: { search: NotificationsSearch }) {
   return (
     <>
       <PageHeader
+        headingRef={headingRef}
         title={t('notifications.title')}
         description={t('notifications.subtitle')}
         actions={
@@ -102,6 +114,7 @@ export function NotificationsPage({ search }: { search: NotificationsSearch }) {
             </Button>
             <Button
               disabled={!unread.data?.count || markAll.isPending}
+              focusableWhenDisabled
               onClick={() => markAll.mutate()}
             >
               <CheckCheckIcon />
@@ -166,12 +179,22 @@ export function NotificationsPage({ search }: { search: NotificationsSearch }) {
         />
       ) : (
         <div className="flex flex-col gap-4">
-          <ul className="divide-y divide-border overflow-hidden rounded-lg border border-border bg-surface">
-            {list.data.items.map((notification) => (
+          <ul
+            ref={listRef}
+            className="divide-y divide-border overflow-hidden rounded-lg border border-border bg-surface"
+          >
+            {list.data.items.map((notification, index) => (
               <li key={notification.id}>
                 <NotificationItem
                   notification={notification}
-                  actions={<ReadToggle notification={notification} />}
+                  actions={
+                    <ReadToggle
+                      notification={notification}
+                      onToggle={() => {
+                        toggled.current = index;
+                      }}
+                    />
+                  }
                 />
               </li>
             ))}
@@ -196,24 +219,30 @@ export function NotificationsPage({ search }: { search: NotificationsSearch }) {
   );
 }
 
-function ReadToggle({ notification }: { notification: Notification }) {
+function ReadToggle({
+  notification,
+  onToggle,
+}: {
+  notification: Notification;
+  onToggle: () => void;
+}) {
   const { t } = useTranslation();
   const markRead = useMarkRead();
   const markUnread = useMarkUnread();
-  const label = notification.read ? t('notifications.markUnread') : t('notifications.markRead');
   return (
-    <Button
-      variant="ghost"
-      size="icon-sm"
-      aria-label={label}
-      title={label}
-      disabled={markRead.isPending || markUnread.isPending}
-      onClick={() =>
-        notification.read ? markUnread.mutate(notification.id) : markRead.mutate(notification.id)
-      }
+    <IconButton
+      data-focus="read"
+      label={notification.read ? t('notifications.markUnread') : t('notifications.markRead')}
+      // Stays enabled while it saves, so it keeps the focus; a second click waits.
+      onClick={() => {
+        if (markRead.isPending || markUnread.isPending) return;
+        onToggle();
+        if (notification.read) markUnread.mutate(notification.id);
+        else markRead.mutate(notification.id);
+      }}
     >
       {notification.read ? <MailIcon /> : <MailOpenIcon />}
-    </Button>
+    </IconButton>
   );
 }
 

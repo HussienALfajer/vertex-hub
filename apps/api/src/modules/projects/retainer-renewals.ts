@@ -11,6 +11,7 @@ import { DATABASE } from '../../core/database/database.module.js';
 import { runEach } from '../../core/jobs/index.js';
 import { ClientDirectory } from '../clients/index.js';
 import { DailyReminders } from '../notifications/index.js';
+import { RetainerTermsService } from './retainer-terms.service.js';
 
 /**
  * The retainer renewal reminder (F05 R6, F14 rule 12), registered as a source of the
@@ -25,6 +26,7 @@ export class RetainerRenewals implements OnModuleInit {
     @Inject(DATABASE) private readonly db: Database,
     private readonly clients: ClientDirectory,
     private readonly reminders: DailyReminders,
+    private readonly terms: RetainerTermsService,
   ) {}
 
   onModuleInit(): void {
@@ -68,6 +70,7 @@ export class RetainerRenewals implements OnModuleInit {
           const client = await this.clients.summary(retainer.clientId, tx);
           if (!client || client.archived) return false;
           const reached = renewalDate <= today;
+          const endAction = await this.terms.lastEndAction(tx, retainer.id);
           return this.reminders.remindOnce(
             tx,
             {
@@ -86,6 +89,7 @@ export class RetainerRenewals implements OnModuleInit {
                 client: client.name,
                 renewalDate,
                 daysLeft: reached ? 0 : daysInclusive(today, renewalDate) - 1,
+                endAction,
               },
             },
           );

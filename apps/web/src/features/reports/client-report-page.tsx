@@ -15,7 +15,9 @@ import {
   EmptyState,
   Field,
   FieldDescription,
+  FieldError,
   FieldLabel,
+  IconButton,
   PageHeader,
   Skeleton,
   Table,
@@ -38,13 +40,14 @@ import {
   LoaderCircleIcon,
   MailIcon,
 } from 'lucide-react';
-import { type FormEvent, type ReactNode, useId, useState } from 'react';
+import { type FormEvent, type ReactNode, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FormAlert } from '../../components/form-alert';
 import { LoadError } from '../../components/load-error';
 import { errorMessage } from '../../lib/errors';
 import { formatCalendarDate, formatDateTime, formatMonth, formatNumber } from '../../lib/format';
 import { monthParam } from '../../lib/search-params';
+import { useFocusAfterChange } from '../../lib/use-focus-after-change';
 import { CostPerResult, PlatformName } from '../campaigns/campaign-badges';
 import { PostPlatforms } from '../content/post-parts';
 import { EmailHistory } from '../email/email-history';
@@ -172,29 +175,31 @@ function MonthPicker({
   const shift = (months: number) => onChange(addMonths(`${month}-01`, months).slice(0, 7));
   return (
     <div className="flex flex-wrap items-end gap-2 rounded-lg border border-border bg-surface p-3">
-      <Button
+      <IconButton
         variant="outline"
         size="icon"
-        aria-label={t('reports.client.previousMonth')}
+        label={t('reports.client.previousMonth')}
         onClick={() => shift(-1)}
       >
         <ChevronRightIcon className="ltr:-scale-x-100" />
-      </Button>
+      </IconButton>
       <MonthSelect
         label={t('reports.client.month')}
         className="w-48"
         value={month}
         onChange={onChange}
       />
-      <Button
+      {/* Stays focusable on the current month, so reaching it keeps the focus here. */}
+      <IconButton
         variant="outline"
         size="icon"
-        aria-label={t('reports.client.nextMonth')}
+        label={t('reports.client.nextMonth')}
         disabled={month >= thisMonth}
+        focusableWhenDisabled
         onClick={() => shift(1)}
       >
         <ChevronLeftIcon className="ltr:-scale-x-100" />
-      </Button>
+      </IconButton>
     </div>
   );
 }
@@ -240,7 +245,7 @@ function SummaryEditor({ report, clientId }: { report: ClientMonthlyReport; clie
   const stored = report.summary?.text ?? '';
   const [text, setText] = useState(stored);
   const [failure, setFailure] = useState<string | null>(null);
-  const tooLong = text.length > CLIENT_REPORT_SUMMARY_MAX;
+  const tooLong = text.trim().length > CLIENT_REPORT_SUMMARY_MAX;
   const changed = text.trim() !== stored;
 
   async function submit(event: FormEvent) {
@@ -248,7 +253,9 @@ function SummaryEditor({ report, clientId }: { report: ClientMonthlyReport; clie
     if (tooLong || !changed) return;
     setFailure(null);
     try {
-      await save.mutateAsync({ month: report.month, summary: text });
+      const saved = await save.mutateAsync({ month: report.month, summary: text });
+      // The text as stored: trimmed, or empty once cleared.
+      setText(saved.summary?.text ?? '');
       toast.add({ title: t('reports.client.summarySaved'), type: 'success' });
     } catch (error) {
       setFailure(errorMessage(t, error));
@@ -280,10 +287,20 @@ function SummaryEditor({ report, clientId }: { report: ClientMonthlyReport; clie
                 when: formatDateTime(report.summary.updatedAt),
               })}`}
           </FieldDescription>
+          <FieldError match={tooLong}>
+            {t('reports.client.summaryTooLong', {
+              max: formatNumber(CLIENT_REPORT_SUMMARY_MAX),
+            })}
+          </FieldError>
         </Field>
         {failure && <FormAlert>{failure}</FormAlert>}
         <div>
-          <Button type="submit" disabled={save.isPending || tooLong || !changed}>
+          {/* Stays focusable once saved (nothing left to save), so the focus stays here. */}
+          <Button
+            type="submit"
+            disabled={save.isPending || tooLong || !changed}
+            focusableWhenDisabled
+          >
             {save.isPending ? t('common.saving') : t('reports.client.saveSummary')}
           </Button>
         </div>
@@ -388,10 +405,14 @@ function ProjectsSection({ report }: { report: ClientMonthlyReport }) {
                 <ProjectStatusBadge status={row.status} />
               </TableCell>
               <TableCell className="text-end tabular-nums">
-                {t('reports.client.progressOf', {
-                  delivered: formatNumber(row.deliveredTasks),
-                  total: formatNumber(row.totalTasks),
-                })}
+                {row.totalTasks === 0 ? (
+                  <span className="text-muted-foreground">{t('common.none')}</span>
+                ) : (
+                  t('reports.client.progressOf', {
+                    delivered: formatNumber(row.deliveredTasks),
+                    total: formatNumber(row.totalTasks),
+                  })
+                )}
               </TableCell>
               <TableCell className="whitespace-normal">
                 {row.milestonesDone.length === 0 ? (
@@ -554,6 +575,7 @@ function ApprovalsSection({ report }: { report: ClientMonthlyReport }) {
       label: t('reports.client.averageResponse'),
       value: average
         ? t(`reports.client.${average.unit}`, {
+            count: average.value,
             n: formatNumber(average.value, { maximumFractionDigits: 1 }),
           })
         : t('common.none'),
@@ -730,6 +752,16 @@ function ClientReportPdf({
   const [asked, setAsked] = useState(false);
   const [emailing, setEmailing] = useState(false);
   const ready = useQuery({ ...clientReportPdfReadyQuery(clientId, month), enabled: asked });
+  const state = !asked
+    ? 'idle'
+    : ready.isSuccess
+      ? 'ready'
+      : ready.isError
+        ? 'failed'
+        : 'preparing';
+  const prepareRef = useRef<HTMLButtonElement>(null);
+  const downloadRef = useRef<HTMLAnchorElement>(null);
+  useFocusAfterChange(state, () => (state === 'ready' ? downloadRef.current : prepareRef.current));
 
   async function ask() {
     try {
@@ -742,11 +774,18 @@ function ClientReportPdf({
     }
   }
 
-  if (asked && ready.isSuccess) {
+  if (state === 'ready') {
     return (
       <>
         <Button
-          render={<a href={clientReportPdfUrl(clientId, month)} target="_blank" rel="noopener" />}
+          render={
+            <a
+              ref={downloadRef}
+              href={clientReportPdfUrl(clientId, month)}
+              target="_blank"
+              rel="noopener"
+            />
+          }
         >
           <DownloadIcon />
           {t('reports.client.downloadPdf')}
@@ -766,25 +805,35 @@ function ClientReportPdf({
       </>
     );
   }
-  const gaveUp = asked && ready.isError;
-  if (asked && !gaveUp) {
-    return (
-      <span role="status" className="flex items-center gap-2 text-sm text-muted-foreground">
-        <LoaderCircleIcon
-          aria-hidden="true"
-          className="size-4 animate-spin motion-reduce:animate-none"
-        />
-        {t('reports.client.preparing')}
-      </span>
-    );
-  }
+  // One button while it is asked for and prepared, so the focus stays on it.
+  const preparing = state === 'preparing';
   return (
     <span className="flex flex-wrap items-center gap-2">
-      {gaveUp && <Badge tone="danger">{t('invoices.pdf.failed')}</Badge>}
-      <Button variant="outline" disabled={render.isPending} onClick={ask}>
-        <FileTextIcon />
-        {gaveUp ? t('invoices.pdf.renderAgain') : t('reports.client.preparePdf')}
+      {state === 'failed' && <Badge tone="danger">{t('invoices.pdf.failed')}</Badge>}
+      <Button
+        ref={prepareRef}
+        variant="outline"
+        disabled={preparing || render.isPending}
+        focusableWhenDisabled
+        onClick={ask}
+      >
+        {preparing ? (
+          <LoaderCircleIcon
+            aria-hidden="true"
+            className="animate-spin motion-reduce:animate-none"
+          />
+        ) : (
+          <FileTextIcon />
+        )}
+        {preparing
+          ? t('reports.client.preparing')
+          : state === 'failed'
+            ? t('invoices.pdf.renderAgain')
+            : t('reports.client.preparePdf')}
       </Button>
+      <span role="status" className="sr-only">
+        {preparing ? t('reports.client.preparing') : ''}
+      </span>
     </span>
   );
 }

@@ -78,6 +78,7 @@ import { QuotePdfService } from './quote-pdf.service.js';
 import { QuoteRecipients } from './quote-recipients.js';
 import {
   amounts,
+  draftContentHash,
   draftSnapshot,
   type InstallmentRow,
   type ItemRow,
@@ -97,7 +98,9 @@ const escapeLike = (value: string) => value.replace(/[\\%_]/g, (char) => `\\${ch
 
 /** `Q-2026-0007`, `2026-7` or `7`. */
 function numberSearch(search: string): SQL | undefined {
-  const full = /^(?:q-?)?(\d{4})-0*(\d{1,9})$/i.exec(search);
+  // The number as the screens show it, with its version (`Q-2026-0007 v2`): the list shows the
+  // latest version of a number anyway.
+  const full = /^(?:q-?)?(\d{4})-0*(\d{1,9})(?:\s*v\d{1,4})?$/i.exec(search);
   if (full) return and(eq(quotes.year, Number(full[1])), eq(quotes.number, Number(full[2])));
   if (/^\d{1,9}$/.test(search)) return eq(quotes.number, Number(search));
   return undefined;
@@ -352,7 +355,6 @@ export class QuotesService {
       const discountApproval =
         repriced && quote.discountApproval === 'approved' ? 'none' : quote.discountApproval;
 
-      await this.replaceChildren(tx, id, after);
       const fields = {
         contactId: input.contactId,
         title: input.title,
@@ -365,6 +367,12 @@ export class QuotesService {
         terms: input.terms,
         discountApproval,
       };
+      // A save that changes nothing (text that only differed by spaces) keeps `updatedAt` and
+      // writes no audit entry.
+      if (draftContentHash(pick(quote, fields), before) === draftContentHash(fields, after)) {
+        return this.toDetail(actor, quote, recipient, tx);
+      }
+      await this.replaceChildren(tx, id, after);
       const [updated] = await tx
         .update(quotes)
         .set({ ...fields, updatedAt: new Date() })

@@ -357,3 +357,21 @@ test('form errors from the contract schema show in Arabic, never in English', as
   await expect(dialog.getByText(ar.retainers.cycle.errors.amount)).toBeVisible();
   await expect(dialog.getByText(/cannot be zero/)).toHaveCount(0);
 });
+
+test('putting a project on hold from the menu gives the focus to "Resume", not the page', async ({
+  page,
+}) => {
+  await onProjectsToday(page);
+  await mockApi(page, { signedIn: true, me: employeeMe });
+  await page.goto('/projects');
+  await page.getByRole('link', { name: /الهوية البصرية الجديدة/ }).click();
+  const more = page.getByRole('button', { name: ar.projects.actions.more });
+  await more.click();
+  await page.getByRole('menuitem', { name: ar.projects.actions.hold }).click();
+  await expect(
+    page.locator('section').first().getByText(ar.projects.statuses.on_hold, { exact: true }),
+  ).toBeVisible();
+  // The menu left with the change: its successor, "Resume", takes the focus.
+  await expect(more).toHaveCount(0);
+  await expect(page.getByRole('button', { name: ar.projects.actions.resume })).toBeFocused();
+});

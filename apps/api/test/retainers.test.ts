@@ -231,7 +231,11 @@ describe('retainers', () => {
       expect(asEmployee.money).toBeUndefined();
       expect(asEmployee.permissions).toMatchObject({ canManage: false, canSeeMoney: false });
       const asFinance = await detail(created.id, finance.cookie);
-      expect(asFinance.money).toEqual({ currency: 'USD', monthlyFeeMinor: 90000 });
+      expect(asFinance.money).toEqual({
+        currency: 'USD',
+        monthlyFeeMinor: 90000,
+        creditPendingMinor: 0,
+      });
       expect(asFinance.permissions).toMatchObject({
         canManage: false,
         canEditMoney: false,
@@ -308,7 +312,24 @@ describe('retainers', () => {
       expect(actions).toEqual(['retainer.created', 'retainer.updated', 'retainer.money_updated']);
     });
 
-    it('locks the currency once a fee is set (M2) or an invoice exists (F13 rule 24)', async () => {
+    it('takes the same departments in another order as no change (no audit entry)', async () => {
+      const { id: clientId } = await cast.createClient();
+      const created = await cast.createRetainer(clientId, {
+        departments: ['design', 'content_management'],
+      });
+      const response = await patch(created.id, cast.am.cookie, {
+        departments: ['content_management', 'design'],
+      });
+      expect(response.status).toBe(200);
+      expect(retainerDetailSchema.parse(await response.json()).departments).toEqual([
+        'design',
+        'content_management',
+      ]);
+      const actions = (await auditOf(created.id)).map((entry) => entry.action);
+      expect(actions).toEqual(['retainer.created']);
+    });
+
+    it('locks the currency once a fee is set (M2), an invoice or a charge exists (F13, F05B)', async () => {
       const { id: clientId } = await cast.createClient();
       const created = await cast.createRetainer(clientId, { monthlyFeeMinor: 1000 });
       await expectError(
@@ -316,7 +337,12 @@ describe('retainers', () => {
         409,
         'CURRENCY_LOCKED',
       );
-      expect((await patch(created.id, cast.gm.cookie, { monthlyFeeMinor: null })).status).toBe(200);
+      // Once charged, the fee changes only by amendment (F05B A9).
+      await expectError(
+        await patch(created.id, cast.gm.cookie, { monthlyFeeMinor: null }),
+        409,
+        'FEE_CHANGE_NEEDS_AMENDMENT',
+      );
       // The first cycle's month was drafted when the retainer started.
       await expectError(
         await patch(created.id, cast.gm.cookie, { currency: 'SYP' }),
@@ -327,7 +353,15 @@ describe('retainers', () => {
       expect((await client.post(`/api/invoices/${draft?.id}/archive`, cast.gm.cookie)).status).toBe(
         204,
       );
-      expect((await patch(created.id, cast.gm.cookie, { currency: 'SYP' })).status).toBe(200);
+      // The month's charge keeps the currency it was created in (F05B edge case 12).
+      await expectError(
+        await patch(created.id, cast.gm.cookie, { currency: 'SYP' }),
+        409,
+        'CURRENCY_LOCKED',
+      );
+      // Without a fee, invoice or charge it changes.
+      const free = await cast.createRetainer(clientId);
+      expect((await patch(free.id, cast.gm.cookie, { currency: 'SYP' })).status).toBe(200);
     });
 
     it('fixes the start date once a cycle exists; an earlier start opens the cycle', async () => {

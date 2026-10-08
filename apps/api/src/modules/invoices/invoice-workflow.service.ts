@@ -55,7 +55,9 @@ export class InvoiceWorkflowService {
       }
       assertClientNotArchived(client);
       const lines = await this.invoices.lines(tx, id);
-      if (lines.length === 0 || invoice.totalMinor <= 0) {
+      // F05B C7: a total of 0 is issued (and paid at once) when a credit takes the whole amount.
+      const credited = lines.some((line) => line.unitPriceMinor < 0);
+      if (lines.length === 0 || invoice.totalMinor < 0 || (invoice.totalMinor === 0 && !credited)) {
         throw new CodedException(409, 'INVOICE_EMPTY', 'An invoice needs lines and a total');
       }
       const settings = await this.settings.row(tx);
@@ -83,7 +85,7 @@ export class InvoiceWorkflowService {
           dueOn,
           sypPerUsd: rate,
           snapshot,
-          status: 'sent',
+          status: invoice.totalMinor === 0 ? 'paid' : 'sent',
           issuedById: actor.id,
           pdfStatus: 'pending',
           ...NO_DRAFT_PDF,
@@ -138,6 +140,10 @@ export class InvoiceWorkflowService {
       if (input.dueOn < today || (invoice.issuedOn && input.dueOn < invoice.issuedOn)) {
         throw new CodedException(400, 'INVALID_DATES', 'The due date is in the past');
       }
+      // The same date is no change: no audit entry and no new version of the PDF.
+      if (input.dueOn === invoice.dueOn) {
+        return { detail: await this.invoices.toDetail(actor, invoice, client, tx), row: null };
+      }
       const status = invoiceStatus({ ...invoice, dueOn: input.dueOn, today });
       const snapshot = invoice.snapshot
         ? { ...(invoice.snapshot as InvoiceSnapshot), dueOn: input.dueOn }
@@ -158,7 +164,7 @@ export class InvoiceWorkflowService {
       });
       return { detail: await this.invoices.toDetail(actor, updated, client, tx), row: updated };
     });
-    await this.afterRender(row, null);
+    if (row) await this.afterRender(row, null);
     return detail;
   }
 

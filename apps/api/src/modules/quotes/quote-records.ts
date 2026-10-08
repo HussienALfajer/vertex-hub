@@ -95,6 +95,24 @@ export function totalsOf(
   });
 }
 
+/**
+ * What a draft save stores, without the ids each save makes anew: the same hash before and after
+ * a save that changes nothing.
+ */
+export function draftContentHash(fields: object, children: QuoteChildren): string {
+  const lines = [...children.lines].sort(
+    (a, b) => SECTION_ORDER[a.section] - SECTION_ORDER[b.section] || a.position - b.position,
+  );
+  return payloadHash({
+    fields,
+    lines: lines.map(({ id: _id, items, ...line }) => ({
+      ...line,
+      items: items.map(({ id: _item, lineId: _line, ...item }) => item),
+    })),
+    installments: children.installments.map(({ name, percent }) => ({ name, percent })),
+  });
+}
+
 /** The effective discount as a percentage with two decimals, as the audit log records it. */
 export const percentOf = (basisPoints: number) => basisPoints / 100;
 

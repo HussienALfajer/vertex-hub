@@ -35,13 +35,11 @@ import {
   MailIcon,
   MegaphoneIcon,
   MenuIcon,
-  MoonIcon,
   PackageIcon,
   ReceiptTextIcon,
   RepeatIcon,
   ScrollTextIcon,
   StampIcon,
-  SunIcon,
   SwatchBookIcon,
   TargetIcon,
   UsersIcon,
@@ -54,7 +52,7 @@ import { hasReports } from '../features/reports/reports-page';
 import { managesTeams } from '../features/tasks/task-access';
 import { authClient, can, leaveSession, useMe } from '../lib/auth';
 import { formatList } from '../lib/format';
-import { useTheme } from '../lib/theme';
+import { ThemeToggle } from './theme-toggle';
 
 interface NavItem {
   to: LinkProps['to'];
@@ -260,17 +258,6 @@ function TopBar({ me }: { me: MeResponse }) {
         <UserMenu me={me} />
       </div>
     </header>
-  );
-}
-
-function ThemeToggle() {
-  const { t } = useTranslation();
-  const { theme, toggle } = useTheme();
-  const label = theme === 'dark' ? t('theme.toLight') : t('theme.toDark');
-  return (
-    <Button variant="ghost" size="icon" onClick={toggle} aria-label={label} title={label}>
-      {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
-    </Button>
   );
 }
 

@@ -34,6 +34,7 @@ import {
   FieldDescription,
   FieldError,
   FieldLabel,
+  IconButton,
   Input,
   Select,
   SelectContent,
@@ -57,7 +58,7 @@ import {
   UndoIcon,
   UnlinkIcon,
 } from 'lucide-react';
-import { useId, useState } from 'react';
+import { type ComponentProps, useId, useRef, useState } from 'react';
 import { Controller, useForm, useWatch } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '../../components/confirm-dialog';
@@ -68,6 +69,7 @@ import { errorMessage, fieldError, SCREEN_ERROR } from '../../lib/errors';
 import { formatNumber } from '../../lib/format';
 import { ALL } from '../../lib/search-params';
 import { useDebouncedValue } from '../../lib/use-search-text';
+import { useShownWhileClosing } from '../../lib/use-shown-while-closing';
 import { PersonName, useDepartmentNames } from '../projects/project-badges';
 import { lineName } from '../retainers/retainer-badges';
 import { formatDue, TaskStatusBadge } from '../tasks/task-badges';
@@ -87,6 +89,8 @@ import { useCycleLineOptions } from './post-form';
  * and video tasks that produce the post's media. The client approves the post, never the task.
  */
 
+type FinalFocus = ComponentProps<typeof DialogContent>['finalFocus'];
+
 export function PostTasksSection({ post }: { post: PostDetail }) {
   const { t } = useTranslation();
   const departmentName = useDepartmentNames();
@@ -94,20 +98,47 @@ export function PostTasksSection({ post }: { post: PostDetail }) {
   const [linking, setLinking] = useState(false);
   const [unlinking, setUnlinking] = useState<PostTask | null>(null);
   const [returning, setReturning] = useState<PostTask | null>(null);
+  // The dialogs keep their task while they fade out after closing.
+  const shownUnlinking = useShownWhileClosing(unlinking);
+  const shownReturning = useShownWhileClosing(returning);
+  const heading = useRef<HTMLHeadingElement>(null);
+  const linkButton = useRef<HTMLButtonElement>(null);
+  const list = useRef<HTMLUListElement>(null);
+  // The row of the task being unlinked: its place takes the next row's button once it leaves.
+  const unlinkedAt = useRef(0);
   // Rule 3: linked tasks change only in `idea` and `in_production`.
   const canChange = post.permissions.canEditContent;
   // Rule 12: a task's work goes back only while the post is in production.
   const canReturn = post.permissions.canEdit && post.status === 'in_production';
   const tasks = post.linkedTasks;
+  // The button that opened a dialog, or "link a task", or the heading when the change took them
+  // off the page (the fifth link hides "link a task", a sent-back task loses its button).
+  const fallback = () =>
+    (linkButton.current?.isConnected ? linkButton.current : heading.current) ?? true;
+  const opener = useRef<HTMLElement | null>(null);
+  const remember = () => {
+    opener.current = document.activeElement as HTMLElement | null;
+  };
+  const backToOpener = () =>
+    opener.current?.isConnected && opener.current !== document.body ? opener.current : fallback();
 
   return (
     <TaskSection
       title={t('content.tasks.title')}
+      headingRef={heading}
       count={tasks.length > 0 ? formatNumber(tasks.length) : undefined}
       action={
         canChange &&
         tasks.length < POST_LIMITS.tasks && (
-          <Button variant="ghost" size="sm" onClick={() => setLinking(true)}>
+          <Button
+            ref={linkButton}
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              remember();
+              setLinking(true);
+            }}
+          >
             <LinkIcon />
             {t('content.tasks.link')}
           </Button>
@@ -119,8 +150,8 @@ export function PostTasksSection({ post }: { post: PostDetail }) {
           {canChange ? t('content.tasks.emptyHint') : t('content.tasks.empty')}
         </p>
       ) : (
-        <ul className="flex flex-col gap-2">
-          {tasks.map((task) => (
+        <ul ref={list} className="flex flex-col gap-2">
+          {tasks.map((task, index) => (
             <li
               key={task.id}
               className="flex flex-col gap-2 rounded-md border border-border p-3 sm:flex-row sm:items-center"
@@ -152,20 +183,29 @@ export function PostTasksSection({ post }: { post: PostDetail }) {
               <div className="flex flex-wrap items-center gap-1">
                 <TaskStatusBadge status={task.status} />
                 {canReturn && task.status === 'approved' && (
-                  <Button variant="ghost" size="sm" onClick={() => setReturning(task)}>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      remember();
+                      setReturning(task);
+                    }}
+                  >
                     <UndoIcon className="rtl:-scale-x-100" />
                     {t('content.tasks.return')}
                   </Button>
                 )}
                 {canChange && (
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    aria-label={t('content.tasks.unlinkNamed', { title: task.title })}
-                    onClick={() => setUnlinking(task)}
+                  <IconButton
+                    data-focus="remove"
+                    label={t('content.tasks.unlinkNamed', { title: task.title })}
+                    onClick={() => {
+                      unlinkedAt.current = index;
+                      setUnlinking(task);
+                    }}
                   >
                     <UnlinkIcon />
-                  </Button>
+                  </IconButton>
                 )}
               </div>
             </li>
@@ -178,17 +218,36 @@ export function PostTasksSection({ post }: { post: PostDetail }) {
         tasks.length > 0 && (
           <p className="text-xs text-muted-foreground">{t('content.tasks.lockedHint')}</p>
         )}
-      {linking && <LinkTaskDialog post={post} onClose={() => setLinking(false)} />}
-      {returning && (
-        <ReturnTaskDialog post={post} task={returning} onClose={() => setReturning(null)} />
+      <LinkTaskDialog
+        post={post}
+        open={linking}
+        onClose={() => setLinking(false)}
+        finalFocus={backToOpener}
+      />
+      {shownReturning && (
+        <ReturnTaskDialog
+          key={shownReturning.id}
+          post={post}
+          task={shownReturning}
+          open={returning !== null}
+          onClose={() => setReturning(null)}
+          finalFocus={backToOpener}
+        />
       )}
       <ConfirmDialog
         open={unlinking !== null}
         onClose={() => setUnlinking(null)}
-        title={t('content.tasks.unlinkTitle', { title: unlinking?.title ?? '' })}
+        title={t('content.tasks.unlinkTitle', { title: shownUnlinking?.title ?? '' })}
         body={t('content.tasks.unlinkBody')}
         action={t('content.tasks.unlink')}
         pending={unlink.isPending}
+        // The row leaves with its task: the next row's "unlink", or "link a task".
+        finalFocus={() => {
+          const rest = [
+            ...(list.current?.querySelectorAll<HTMLElement>('[data-focus="remove"]') ?? []),
+          ];
+          return rest[unlinkedAt.current] ?? rest.at(-1) ?? fallback();
+        }}
         onConfirm={async () => {
           if (unlinking) await unlink.mutateAsync(unlinking.id);
           toast.add({ title: t('content.tasks.unlinked'), type: 'success' });
@@ -205,11 +264,15 @@ export function PostTasksSection({ post }: { post: PostDetail }) {
 function ReturnTaskDialog({
   post,
   task,
+  open,
   onClose,
+  finalFocus,
 }: {
   post: PostDetail;
   task: PostTask;
+  open: boolean;
   onClose: () => void;
+  finalFocus: FinalFocus;
 }) {
   const { t } = useTranslation();
   const id = useId();
@@ -237,8 +300,17 @@ function ReturnTaskDialog({
     }
   });
   return (
-    <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent closeLabel={t('common.close')}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => !next && onClose()}
+      // After the exit animation, so the note does not empty while the dialog fades.
+      onOpenChangeComplete={(next) => {
+        if (next) return;
+        form.reset();
+        setFailure(null);
+      }}
+    >
+      <DialogContent closeLabel={t('common.close')} finalFocus={finalFocus}>
         <form className="grid gap-5" onSubmit={submit} noValidate>
           <DialogHeader>
             <DialogTitle>{t('content.tasks.returnTitle', { title: task.title })}</DialogTitle>
@@ -275,12 +347,27 @@ function ReturnTaskDialog({
  * The link-task dialog (screen 5): the client's open unlinked tasks, those of the publish month's
  * cycle first, or a new task requested from a department's queue.
  */
-function LinkTaskDialog({ post, onClose }: { post: PostDetail; onClose: () => void }) {
+function LinkTaskDialog({
+  post,
+  open,
+  onClose,
+  finalFocus,
+}: {
+  post: PostDetail;
+  open: boolean;
+  onClose: () => void;
+  finalFocus: FinalFocus;
+}) {
   const { t } = useTranslation();
   const [tab, setTab] = useState<'existing' | 'request'>('existing');
   return (
-    <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent closeLabel={t('common.close')} className="max-w-2xl">
+    <Dialog
+      open={open}
+      onOpenChange={(next) => !next && onClose()}
+      // The tab and both forms start again on the next opening (the content mounts anew).
+      onOpenChangeComplete={(next) => !next && setTab('existing')}
+    >
+      <DialogContent closeLabel={t('common.close')} className="max-w-2xl" finalFocus={finalFocus}>
         <DialogHeader>
           <DialogTitle>{t('content.link.title')}</DialogTitle>
           <DialogDescription>{t('content.link.body')}</DialogDescription>
@@ -362,6 +449,7 @@ function ExistingTasks({
             onChange={(event) => setText(event.target.value)}
             placeholder={t('content.link.search')}
             aria-label={t('content.link.search')}
+            maxLength={100}
             className="ps-9"
           />
         </div>
@@ -525,7 +613,7 @@ function RequestTask({ post, onDone }: { post: PostDetail; onDone: () => void })
         </Field>
         <Field invalid={!!errors.dueDate}>
           <FieldLabel>{t('tasks.form.dueDate')}</FieldLabel>
-          <Input type="date" min={businessDate()} {...form.register('dueDate')} />
+          <Input type="date" dir="ltr" min={businessDate()} {...form.register('dueDate')} />
           <FieldError match={!!errors.dueDate}>
             {fieldError(errors.dueDate, t('tasks.form.errors.dueDate'))}
           </FieldError>
@@ -544,6 +632,7 @@ function RequestTask({ post, onDone }: { post: PostDetail; onDone: () => void })
           {...form.register('brief')}
         />
         <FieldDescription>{t('content.link.briefHint')}</FieldDescription>
+        <FieldError match={!!errors.brief}>{t('tasks.form.errors.brief')}</FieldError>
       </Field>
       {lines.length > 0 && (
         <Field>

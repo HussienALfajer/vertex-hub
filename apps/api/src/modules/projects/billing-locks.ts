@@ -4,10 +4,10 @@ import { CodedException } from '../../core/errors/index.js';
 
 /** What the module that owns invoices answers about projects' billable work (F13, rule 25). */
 export interface BillingLockSource {
-  /** Whether a live invoice (a draft or a non-void issued one) bills the milestone or item. */
+  /** Whether a live invoice (a draft or a non-void issued one) bills the milestone, item or charge. */
   invoiced(
     tx: Transaction,
-    source: { type: 'milestone' | 'extra_work'; id: string },
+    source: { type: 'milestone' | 'extra_work' | 'retainer_charge'; id: string },
   ): Promise<boolean>;
   /** Whether the project or retainer has invoices that are not discarded drafts. */
   engagementInvoiced(
@@ -51,6 +51,11 @@ export class BillingLocks {
         `extra_work:${itemId}`,
       ]);
     }
+  }
+
+  /** F05B C10, T4: whether a live invoice bills the retainer charge. */
+  async chargeInvoiced(tx: Transaction, chargeId: string): Promise<boolean> {
+    return (await this.source?.invoiced(tx, { type: 'retainer_charge', id: chargeId })) ?? false;
   }
 
   /** Rule 24: the currency of an invoiced project or retainer is fixed. */

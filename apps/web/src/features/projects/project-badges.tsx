@@ -1,6 +1,13 @@
 import { useQuery } from '@tanstack/react-query';
 import type { DepartmentCode, ProjectStatus } from '@vertex-hub/contracts';
-import { AscentMeter, Avatar, Badge } from '@vertex-hub/ui';
+import {
+  AscentMeter,
+  Avatar,
+  Badge,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@vertex-hub/ui';
 import { ArchiveIcon, CalendarClockIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { formatList, formatNumber } from '../../lib/format';
@@ -83,6 +90,7 @@ export function DepartmentChips({
   codes: readonly DepartmentCode[];
   max?: number;
 }) {
+  const { t } = useTranslation();
   const nameOf = useDepartmentNames();
   const loaded = useQuery(departmentListQuery).isSuccess;
   if (!loaded) return null;
@@ -96,9 +104,17 @@ export function DepartmentChips({
         </Badge>
       ))}
       {hidden.length > 0 && (
-        <Badge tone="neutral" title={formatList(hidden.map(nameOf))}>
-          +{formatNumber(hidden.length)}
-        </Badge>
+        <Tooltip>
+          <TooltipTrigger
+            render={<Badge tone="neutral" render={<button type="button" />} />}
+            aria-label={t('projects.moreDepartments', {
+              departments: formatList(hidden.map(nameOf)),
+            })}
+          >
+            <span dir="ltr">+{formatNumber(hidden.length)}</span>
+          </TooltipTrigger>
+          <TooltipContent>{formatList(hidden.map(nameOf))}</TooltipContent>
+        </Tooltip>
       )}
     </span>
   );

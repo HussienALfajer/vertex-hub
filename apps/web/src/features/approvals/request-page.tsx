@@ -20,12 +20,13 @@ import {
   toast,
 } from '@vertex-hub/ui';
 import { ArrowRightIcon, BanIcon, BellRingIcon, MailIcon, RefreshCwIcon } from 'lucide-react';
-import { type ReactNode, useId, useState } from 'react';
+import { type ReactNode, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '../../components/confirm-dialog';
 import { isMissing, LoadError } from '../../components/load-error';
 import { errorMessage } from '../../lib/errors';
 import { formatDateTime, formatNumber } from '../../lib/format';
+import { useFocusAfterChange } from '../../lib/use-focus-after-change';
 import { PostFacts } from '../content/post-parts';
 import { EmailHistory } from '../email/email-history';
 import { FileThumbnail, VersionBadge } from '../files/file-parts';
@@ -89,13 +90,16 @@ export function RequestPage({ requestId }: { requestId: string }) {
 function RequestView({ request }: { request: ApprovalRequestDetail }) {
   const { t } = useTranslation();
   const decided = request.counts.approved + request.counts.changesRequested;
+  const heading = useRef<HTMLHeadingElement>(null);
+  // A revoke or a reissue swaps the header's buttons: the focus goes to the heading.
+  useFocusAfterChange(`${request.state}:${request.issuedAt}`, () => heading.current);
   return (
     <>
       <section className="flex flex-col gap-5 rounded-lg border border-border bg-surface p-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
           <div className="flex min-w-0 flex-1 flex-col gap-3">
             <p className="text-sm text-muted-foreground">{t('approvals.requestPage.kicker')}</p>
-            <h1 className="text-2xl font-bold">
+            <h1 ref={heading} tabIndex={-1} className="text-2xl font-bold wrap-anywhere">
               <Link
                 to="/clients/$clientId"
                 params={{ clientId: request.client.id }}
@@ -203,6 +207,8 @@ function RequestActions({ request }: { request: ApprovalRequestDetail }) {
   if (!canReissue && !canRevoke) return null;
 
   async function emailReminder() {
+    // Kept enabled while it sends, so the focus stays on it.
+    if (remindByEmail.isPending) return;
     try {
       await remindByEmail.mutateAsync(undefined);
       toast.add({ title: t('email.send.queued'), type: 'success' });
@@ -221,7 +227,7 @@ function RequestActions({ request }: { request: ApprovalRequestDetail }) {
         />
       )}
       {reminds && request.contactEmail && (
-        <Button variant="outline" disabled={remindByEmail.isPending} onClick={emailReminder}>
+        <Button variant="outline" onClick={emailReminder}>
           <MailIcon />
           {t('approvals.requestPage.remindByEmail')}
         </Button>
@@ -243,6 +249,7 @@ function RequestActions({ request }: { request: ApprovalRequestDetail }) {
         onClose={() => setConfirming(null)}
         title={t('approvals.requestPage.reissueTitle')}
         body={t('approvals.requestPage.reissueBody', {
+          count: APPROVAL_LIMITS.linkDays,
           days: formatNumber(APPROVAL_LIMITS.linkDays),
         })}
         action={t('approvals.requestPage.reissue')}

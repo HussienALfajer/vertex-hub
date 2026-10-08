@@ -30,7 +30,7 @@ import { archivedAt, id, minorAmount, timestamps } from './columns.js';
 import { fileItems } from './files.js';
 import { currencyEnum, projectMilestones, projects } from './projects.js';
 import { quotes } from './quotes.js';
-import { extraWorkItems, retainerCycles, retainers } from './retainers.js';
+import { extraWorkItems, retainerCharges, retainerCycles, retainers } from './retainers.js';
 
 /*
  * Invoices (F13, ADR 0024), owned by the api `invoices` module. Amounts are integer minor units
@@ -181,7 +181,12 @@ export const invoiceLines = pgTable(
     quantity: integer('quantity').notNull(),
     unitPriceMinor: minorAmount('unit_price_minor').notNull(),
     milestoneId: uuid('milestone_id').references(() => projectMilestones.id),
+    /**
+     * Deprecated by F05B: lines bill `retainerChargeId`. Kept, unused, until the release after
+     * F05B so older code still runs against this schema; then dropped.
+     */
     retainerCycleId: uuid('retainer_cycle_id').references(() => retainerCycles.id),
+    retainerChargeId: uuid('retainer_charge_id').references(() => retainerCharges.id),
     extraWorkItemId: uuid('extra_work_item_id').references(() => extraWorkItems.id),
     /** True while the invoice is neither void nor archived: the source is taken. */
     holdsSource: boolean('holds_source').notNull().default(true),
@@ -193,6 +198,7 @@ export const invoiceLines = pgTable(
     index('invoice_lines_invoice_id_idx').on(table.invoiceId, table.position),
     index('invoice_lines_milestone_id_idx').on(table.milestoneId),
     index('invoice_lines_retainer_cycle_id_idx').on(table.retainerCycleId),
+    index('invoice_lines_retainer_charge_id_idx').on(table.retainerChargeId),
     index('invoice_lines_extra_work_item_id_idx').on(table.extraWorkItemId),
     index('invoice_lines_service_id_idx').on(table.serviceId),
     uniqueIndex('invoice_lines_live_milestone_idx')
@@ -201,19 +207,27 @@ export const invoiceLines = pgTable(
     uniqueIndex('invoice_lines_live_retainer_cycle_idx')
       .on(table.retainerCycleId)
       .where(sql`${table.holdsSource}`),
+    uniqueIndex('invoice_lines_live_retainer_charge_idx')
+      .on(table.retainerChargeId)
+      .where(sql`${table.holdsSource}`),
     uniqueIndex('invoice_lines_live_extra_work_item_idx')
       .on(table.extraWorkItemId)
       .where(sql`${table.holdsSource}`),
     check(
       'invoice_lines_source_check',
-      sql`num_nonnulls(${table.milestoneId}, ${table.retainerCycleId}, ${table.extraWorkItemId}) <= 1`,
+      // A migrated line keeps its cycle next to the charge that replaced it (F05B).
+      sql`num_nonnulls(${table.milestoneId}, coalesce(${table.retainerChargeId}, ${table.retainerCycleId}), ${table.extraWorkItemId}) <= 1`,
     ),
     check(
       'invoice_lines_description_check',
       sql`char_length(${table.description}) between 1 and 300`,
     ),
     check('invoice_lines_quantity_check', sql`${table.quantity} between 1 and 999`),
-    check('invoice_lines_price_check', sql`${table.unitPriceMinor} >= 0`),
+    // A negative price bills a credit charge (F05B C7); the invoice total stays ≥ 0.
+    check(
+      'invoice_lines_price_check',
+      sql`${table.unitPriceMinor} >= 0 or ${table.retainerChargeId} is not null`,
+    ),
   ],
 );
 

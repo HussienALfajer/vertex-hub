@@ -523,7 +523,7 @@ describe('monthly client report (F15 rules 17–20)', () => {
     await workbook.xlsx.load(await response.arrayBuffer());
     expect(workbook.worksheets.map((sheet) => sheet.name)).toEqual([
       'ملخص الشهر',
-      'الباقات الشهرية',
+      'العقود الشهرية',
       'المشاريع',
       'الأعمال المسلّمة',
       'المنشورات المنشورة',

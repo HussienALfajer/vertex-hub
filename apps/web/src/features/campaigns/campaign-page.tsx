@@ -11,7 +11,9 @@ import {
   Callout,
   Card,
   cn,
+  type DialogContent,
   EmptyState,
+  IconButton,
   PageHeader,
   Skeleton,
   Table,
@@ -41,7 +43,7 @@ import {
   RotateCcwIcon,
   TriangleAlertIcon,
 } from 'lucide-react';
-import { type ReactNode, useState } from 'react';
+import { type ComponentProps, type ReactNode, type RefObject, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '../../components/confirm-dialog';
 import { isMissing, LoadError } from '../../components/load-error';
@@ -49,6 +51,8 @@ import { useMe } from '../../lib/auth';
 import { errorMessage } from '../../lib/errors';
 import { formatCalendarDate, formatMonth, formatNumber, isolateLtr } from '../../lib/format';
 import { formatMoney } from '../../lib/money';
+import { useFocusAfterChange } from '../../lib/use-focus-after-change';
+import { useShownWhileClosing } from '../../lib/use-shown-while-closing';
 import { ReasonDialog } from '../invoices/invoice-dialogs';
 import { ArchivedBadge, PersonName } from '../projects/project-badges';
 import { Money } from '../quotes/quote-badges';
@@ -112,7 +116,7 @@ export function CampaignPage({ campaignId }: { campaignId: string }) {
 
 type Dialog =
   | { kind: 'edit' }
-  | { kind: 'status'; to: AdCampaignStatus }
+  | { kind: 'status'; from: AdCampaignStatus; to: AdCampaignStatus }
   | { kind: 'archive' }
   | { kind: 'restore' }
   | { kind: 'addUpdate' }
@@ -120,16 +124,48 @@ type Dialog =
   | { kind: 'archiveUpdate'; update: CampaignUpdate }
   | null;
 
+type FinalFocus = ComponentProps<typeof DialogContent>['finalFocus'];
+
+/**
+ * Every dialog of the page stays mounted, so it fades out and gives the focus back: to the button
+ * that opened it, or, when the action took that button away (a status move, an archive), to the
+ * header's first action, else the heading.
+ */
 function Campaign({ campaign }: { campaign: CampaignDetail }) {
   const { t } = useTranslation();
   const [dialog, setDialog] = useState<Dialog>(null);
+  // The dialog's content stays while it fades out after closing.
+  const shown = useShownWhileClosing(dialog);
   const close = () => setDialog(null);
   const { permissions } = campaign;
   const archived = campaign.archivedAt !== null;
+  const heading = useRef<HTMLHeadingElement>(null);
+  const actions = useRef<HTMLDivElement>(null);
+  const addUpdate = useRef<HTMLButtonElement>(null);
+  const updatesHeading = useRef<HTMLHeadingElement>(null);
+  const opener = useRef<HTMLElement | null>(null);
+  const open = (next: Dialog) => {
+    opener.current = document.activeElement as HTMLElement | null;
+    setDialog(next);
+  };
+  const headerTarget = () =>
+    actions.current?.querySelector<HTMLElement>('button') ?? heading.current;
+  const finalFocus: FinalFocus = () =>
+    (opener.current?.isConnected && opener.current) || headerTarget() || true;
+  // A status move or an archive swaps the header's buttons.
+  useFocusAfterChange(`${campaign.status}:${campaign.archivedAt ?? ''}`, headerTarget);
+  // An archived update leaves the table: "add update", else the table's heading.
+  const updatesTarget: FinalFocus = () =>
+    (opener.current?.isConnected && opener.current) ||
+    addUpdate.current ||
+    updatesHeading.current ||
+    true;
+  const dialogs = { dialog, shown, onClose: close, finalFocus };
 
   return (
     <>
       <PageHeader
+        headingRef={heading}
         title={
           <span className="flex flex-wrap items-center gap-3">
             {campaign.name}
@@ -140,7 +176,11 @@ function Campaign({ campaign }: { campaign: CampaignDetail }) {
           </span>
         }
         description={<Facts campaign={campaign} />}
-        actions={<Actions campaign={campaign} onAction={(next) => setDialog(next)} />}
+        actions={
+          <div ref={actions} className="flex flex-wrap items-center gap-2">
+            <Actions campaign={campaign} onAction={open} />
+          </div>
+        }
       />
 
       {archived && (
@@ -164,15 +204,15 @@ function Campaign({ campaign }: { campaign: CampaignDetail }) {
       <MonthsCard campaign={campaign} />
       <UpdatesCard
         campaign={campaign}
-        onAdd={permissions.canAddUpdate ? () => setDialog({ kind: 'addUpdate' }) : undefined}
+        headingRef={updatesHeading}
+        addRef={addUpdate}
+        onAdd={permissions.canAddUpdate ? () => open({ kind: 'addUpdate' }) : undefined}
         onEdit={
-          permissions.canEditUpdates
-            ? (update) => setDialog({ kind: 'editUpdate', update })
-            : undefined
+          permissions.canEditUpdates ? (update) => open({ kind: 'editUpdate', update }) : undefined
         }
         onArchive={
           permissions.canEditUpdates
-            ? (update) => setDialog({ kind: 'archiveUpdate', update })
+            ? (update) => open({ kind: 'archiveUpdate', update })
             : undefined
         }
       />
@@ -184,28 +224,47 @@ function Campaign({ campaign }: { campaign: CampaignDetail }) {
       )}
 
       {permissions.canEdit && (
-        <CampaignDialog open={dialog?.kind === 'edit'} onClose={close} campaign={campaign} />
-      )}
-      <StatusDialogs campaign={campaign} dialog={dialog} onClose={close} />
-      <ArchiveDialogs campaign={campaign} dialog={dialog} onClose={close} />
-      {permissions.canAddUpdate && (
-        <UpdateDialog campaign={campaign} open={dialog?.kind === 'addUpdate'} onClose={close} />
-      )}
-      {dialog?.kind === 'editUpdate' && (
-        <UpdateDialog
-          key={dialog.update.id}
-          campaign={campaign}
-          update={dialog.update}
-          open
+        <CampaignDialog
+          open={dialog?.kind === 'edit'}
           onClose={close}
+          campaign={campaign}
+          finalFocus={finalFocus}
         />
       )}
-      <ArchiveUpdateDialog
-        update={dialog?.kind === 'archiveUpdate' ? dialog.update : null}
+      <StatusDialogs campaign={campaign} {...dialogs} />
+      <ArchiveDialogs campaign={campaign} {...dialogs} />
+      {permissions.canAddUpdate && (
+        <UpdateDialog
+          campaign={campaign}
+          open={dialog?.kind === 'addUpdate'}
+          onClose={close}
+          finalFocus={finalFocus}
+        />
+      )}
+      <UpdateDialog
+        campaign={campaign}
+        update={shown?.kind === 'editUpdate' ? shown.update : undefined}
+        open={dialog?.kind === 'editUpdate'}
         onClose={close}
+        finalFocus={finalFocus}
+      />
+      <ArchiveUpdateDialog
+        update={shown?.kind === 'archiveUpdate' ? shown.update : null}
+        open={dialog?.kind === 'archiveUpdate'}
+        onClose={close}
+        finalFocus={updatesTarget}
       />
     </>
   );
+}
+
+/** What the page's dialogs take: the one open now, the one still fading out, and the focus. */
+interface DialogsProps {
+  campaign: CampaignDetail;
+  dialog: Dialog;
+  shown: Dialog;
+  onClose: () => void;
+  finalFocus: FinalFocus;
 }
 
 function Facts({ campaign }: { campaign: CampaignDetail }) {
@@ -332,7 +391,7 @@ function Actions({
           <Button
             key={to}
             variant={label === 'start' || label === 'resume' ? 'primary' : 'outline'}
-            onClick={() => onAction({ kind: 'status', to })}
+            onClick={() => onAction({ kind: 'status', from: campaign.status, to })}
           >
             <Icon />
             {t(`campaigns.actions.${label}`)}
@@ -361,31 +420,29 @@ function Actions({
   );
 }
 
-function StatusDialogs({
-  campaign,
-  dialog,
-  onClose,
-}: {
-  campaign: CampaignDetail;
-  dialog: Dialog;
-  onClose: () => void;
-}) {
+function StatusDialogs({ campaign, dialog, shown, onClose, finalFocus }: DialogsProps) {
   const { t } = useTranslation();
   const change = useChangeCampaignStatus(campaign.id);
-  const to = dialog?.kind === 'status' ? dialog.to : null;
-  const label = to ? transitionLabel(campaign.status, to) : null;
+  // Labelled by the status it started from: the dialog keeps its words while it fades out.
+  const move = shown?.kind === 'status' ? shown : null;
+  const label = move ? transitionLabel(move.from, move.to) : null;
+  const isOpen = (name: ReturnType<typeof transitionLabel>) =>
+    dialog?.kind === 'status' && transitionLabel(dialog.from, dialog.to) === name;
   const done = () => toast.add({ title: t('campaigns.statusChanged'), type: 'success' });
-
-  if (label === 'start') {
-    return <StartDialog campaign={campaign} onClose={onClose} />;
-  }
   // Starting and cancelling have dialogs of their own.
-  const confirm = label === 'cancel' ? null : label;
+  const confirm = label === 'cancel' || label === 'start' ? null : label;
   return (
     <>
-      <ReasonDialog
-        open={label === 'cancel'}
+      <StartDialog
+        campaign={campaign}
+        open={isOpen('start')}
         onClose={onClose}
+        finalFocus={finalFocus}
+      />
+      <ReasonDialog
+        open={isOpen('cancel')}
+        onClose={onClose}
+        finalFocus={finalFocus}
         title={t('campaigns.cancel.title')}
         description={t('campaigns.cancel.hint')}
         action={t('campaigns.actions.cancel')}
@@ -397,16 +454,17 @@ function StatusDialogs({
         }}
       />
       <ConfirmDialog
-        open={confirm !== null}
+        open={dialog?.kind === 'status' && !isOpen('start') && !isOpen('cancel')}
         onClose={onClose}
+        finalFocus={finalFocus}
         title={confirm ? t(`campaigns.confirm.${confirm}.title`) : ''}
         body={confirm ? t(`campaigns.confirm.${confirm}.body`) : ''}
         action={confirm ? t(`campaigns.actions.${confirm}`) : ''}
         pending={change.isPending}
         onConfirm={async () => {
           // A campaign never moves back to planned.
-          if (!to || to === 'planned') return;
-          await change.mutateAsync({ to });
+          if (!move || move.to === 'planned') return;
+          await change.mutateAsync({ to: move.to });
           done();
         }}
       />
@@ -418,7 +476,17 @@ function StatusDialogs({
  * Rule 8: starting a wallet campaign whose remaining budget is more than the client's balance
  * warns; it is never refused.
  */
-function StartDialog({ campaign, onClose }: { campaign: CampaignDetail; onClose: () => void }) {
+function StartDialog({
+  campaign,
+  open,
+  onClose,
+  finalFocus,
+}: {
+  campaign: CampaignDetail;
+  open: boolean;
+  onClose: () => void;
+  finalFocus: FinalFocus;
+}) {
   const { t } = useTranslation();
   const change = useChangeCampaignStatus(campaign.id);
   const [failure, setFailure] = useState<string | null>(null);
@@ -426,8 +494,10 @@ function StartDialog({ campaign, onClose }: { campaign: CampaignDetail; onClose:
   const short = campaign.walletBalanceMinor !== null && remaining > campaign.walletBalanceMinor;
   return (
     <FormDialog
-      open
+      open={open}
       onClose={onClose}
+      onClosed={() => setFailure(null)}
+      finalFocus={finalFocus}
       submitting={change.isPending}
       title={t('campaigns.confirm.start.title')}
       description={t('campaigns.confirm.start.body')}
@@ -460,15 +530,7 @@ function StartDialog({ campaign, onClose }: { campaign: CampaignDetail; onClose:
   );
 }
 
-function ArchiveDialogs({
-  campaign,
-  dialog,
-  onClose,
-}: {
-  campaign: CampaignDetail;
-  dialog: Dialog;
-  onClose: () => void;
-}) {
+function ArchiveDialogs({ campaign, dialog, onClose, finalFocus }: DialogsProps) {
   const { t } = useTranslation();
   const archive = useArchiveCampaign(campaign.id);
   const restore = useRestoreCampaign(campaign.id);
@@ -477,6 +539,7 @@ function ArchiveDialogs({
       <ConfirmDialog
         open={dialog?.kind === 'archive'}
         onClose={onClose}
+        finalFocus={finalFocus}
         title={t('campaigns.archive.title')}
         body={t('campaigns.archive.body')}
         action={t('campaigns.actions.archive')}
@@ -490,6 +553,7 @@ function ArchiveDialogs({
       <ConfirmDialog
         open={dialog?.kind === 'restore'}
         onClose={onClose}
+        finalFocus={finalFocus}
         title={t('campaigns.restore.title')}
         body={t('campaigns.restore.body')}
         action={t('campaigns.actions.restore')}
@@ -505,17 +569,23 @@ function ArchiveDialogs({
 
 function ArchiveUpdateDialog({
   update,
+  open,
   onClose,
+  finalFocus,
 }: {
+  /** The update open now, or still shown while the dialog fades out. */
   update: CampaignUpdate | null;
+  open: boolean;
   onClose: () => void;
+  finalFocus: FinalFocus;
 }) {
   const { t } = useTranslation();
   const archive = useArchiveCampaignUpdate();
   return (
     <ConfirmDialog
-      open={update !== null}
+      open={open}
       onClose={onClose}
+      finalFocus={finalFocus}
       title={t('campaigns.updates.archiveTitle')}
       body={
         update
@@ -536,7 +606,6 @@ function ArchiveUpdateDialog({
     />
   );
 }
-
 function periodText(t: TFunction, period: { periodStart: string; periodEnd: string }) {
   return t('campaigns.dateRange', {
     from: formatCalendarDate(period.periodStart),
@@ -667,11 +736,15 @@ function MonthsCard({ campaign }: { campaign: CampaignDetail }) {
 
 function UpdatesCard({
   campaign,
+  headingRef,
+  addRef,
   onAdd,
   onEdit,
   onArchive,
 }: {
   campaign: CampaignDetail;
+  headingRef: RefObject<HTMLHeadingElement | null>;
+  addRef: RefObject<HTMLButtonElement | null>;
   onAdd?: () => void;
   onEdit?: (update: CampaignUpdate) => void;
   onArchive?: (update: CampaignUpdate) => void;
@@ -682,9 +755,11 @@ function UpdatesCard({
   return (
     <Card className="gap-4 p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-lg font-bold">{t('campaigns.updates.heading')}</h2>
+        <h2 ref={headingRef} tabIndex={-1} className="text-lg font-bold outline-none">
+          {t('campaigns.updates.heading')}
+        </h2>
         {onAdd && (
-          <Button size="sm" onClick={onAdd}>
+          <Button ref={addRef} size="sm" onClick={onAdd}>
             <PlusIcon />
             {t('campaigns.updates.add')}
           </Button>
@@ -727,26 +802,18 @@ function UpdatesCard({
                 {onEdit && onArchive && (
                   <TableCell>
                     <span className="flex items-center gap-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        aria-label={t('campaigns.updates.editOf', {
-                          period: periodText(t, update),
-                        })}
+                      <IconButton
+                        label={t('campaigns.updates.editOf', { period: periodText(t, update) })}
                         onClick={() => onEdit(update)}
                       >
                         <PencilIcon />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        aria-label={t('campaigns.updates.archiveOf', {
-                          period: periodText(t, update),
-                        })}
+                      </IconButton>
+                      <IconButton
+                        label={t('campaigns.updates.archiveOf', { period: periodText(t, update) })}
                         onClick={() => onArchive(update)}
                       >
                         <ArchiveIcon />
-                      </Button>
+                      </IconButton>
                     </span>
                   </TableCell>
                 )}
