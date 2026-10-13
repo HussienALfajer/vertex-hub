@@ -1,9 +1,12 @@
 import type { INestApplication } from '@nestjs/common';
 import {
+  addDays,
+  businessDate,
   type NotificationType,
   type TemplateRunInputBody,
   templateDetailSchema,
   templateRunSchema,
+  weekday,
 } from '@vertex-hub/contracts';
 import {
   createDatabase,
@@ -497,10 +500,13 @@ describe('notification events', () => {
   });
 
   describe('daily job (rules 9–12)', () => {
-    // Thursday 2026-10-08, Friday 09 (weekend), Saturday 10, Sunday 11 (ADR 0015 work week).
-    const thursday = '2026-10-08';
-    const saturday = '2026-10-10';
-    const sunday = '2026-10-11';
+    // The next Thursday after today, Friday (weekend), Saturday and Sunday (ADR 0016 work week):
+    // due dates may not be in the past, so the week moves with the clock.
+    let thursday = addDays(businessDate(), 1);
+    while (weekday(thursday) !== 4) thursday = addDays(thursday, 1);
+    const friday = addDays(thursday, 1);
+    const saturday = addDays(thursday, 2);
+    const sunday = addDays(thursday, 3);
     let reminders: TaskReminders;
     let late: Awaited<ReturnType<typeof cast.signedIn>>;
 
@@ -520,14 +526,14 @@ describe('notification events', () => {
     });
 
     it('reminds on Thursday about Friday and Saturday, once', async () => {
-      const friday = await assignedTo('2026-10-09');
+      const onFriday = await assignedTo(friday);
       const onSaturday = await assignedTo(saturday);
       const onSunday = await assignedTo(sunday);
 
       await reminders.remind(thursday);
       await reminders.remind(thursday);
-      expect(await inbox(late.id, friday.id)).toMatchObject([
-        { type: 'task_due_soon', actorId: null, data: { dueDate: '2026-10-09' } },
+      expect(await inbox(late.id, onFriday.id)).toMatchObject([
+        { type: 'task_due_soon', actorId: null, data: { dueDate: friday } },
       ]);
       expect(await typesOf(late.id, onSaturday.id)).toEqual(['task_due_soon']);
       expect(await typesOf(late.id, onSunday.id)).toEqual([]);
@@ -552,9 +558,11 @@ describe('notification events', () => {
       expect(await typesOf(cast.designManager.id, queued.id)).toEqual(['task_overdue']);
 
       // A new due date starts the cycle again.
-      await patch(`/api/tasks/${task.id}`, cast.designManager.cookie, { dueDate: '2026-10-12' });
+      await patch(`/api/tasks/${task.id}`, cast.designManager.cookie, {
+        dueDate: addDays(thursday, 4),
+      });
       await clear(task.id);
-      await reminders.remind('2026-10-13');
+      await reminders.remind(addDays(thursday, 5));
       expect(await typesOf(late.id, task.id)).toEqual(['task_overdue']);
       expect(await typesOf(cast.designManager.id, task.id)).toEqual([]);
     });
@@ -613,7 +621,7 @@ describe('notification events', () => {
 
     it('sends nothing for finished tasks or on the weekend', async () => {
       const task = await assignedTo(thursday);
-      await reminders.remind('2026-10-09');
+      await reminders.remind(friday);
       expect(await typesOf(late.id, task.id)).toEqual([]);
       await cast.moveOk(task.id, cast.designManager.cookie, {
         status: 'cancelled',
@@ -626,11 +634,12 @@ describe('notification events', () => {
 
     it('reminds the account manager 30 days before a renewal and on the date (rule 12)', async () => {
       const { id: clientId } = await cast.createClient();
-      const retainer = await cast.createRetainer(clientId, { renewalDate: '2026-11-07' });
+      const renewalDate = addDays(thursday, 30);
+      const retainer = await cast.createRetainer(clientId, { renewalDate });
       reminderSubjects.push(retainer.id);
       const renewals = app.get(RetainerRenewals);
 
-      await renewals.remind('2026-10-07');
+      await renewals.remind(addDays(thursday, -1));
       expect(await typesOf(cast.am.id, retainer.id)).toEqual([]);
       await renewals.remind(thursday);
       await renewals.remind(saturday);
@@ -638,11 +647,11 @@ describe('notification events', () => {
         {
           type: 'retainer_renewal_due',
           actorId: null,
-          data: { retainer: retainer.name, renewalDate: '2026-11-07', daysLeft: 30 },
+          data: { retainer: retainer.name, renewalDate, daysLeft: 30 },
         },
       ]);
-      await renewals.remind('2026-11-07');
-      await renewals.remind('2026-11-08');
+      await renewals.remind(renewalDate);
+      await renewals.remind(addDays(renewalDate, 1));
       expect((await inbox(cast.am.id, retainer.id)).map((row) => row.data)).toMatchObject([
         { daysLeft: 30 },
         { daysLeft: 0 },
@@ -651,12 +660,13 @@ describe('notification events', () => {
 
     it('sends no renewal reminder for a retainer of an archived client (F05 G2)', async () => {
       const { id: clientId } = await cast.createClient();
-      const retainer = await cast.createRetainer(clientId, { renewalDate: '2026-11-07' });
+      const renewalDate = addDays(thursday, 30);
+      const retainer = await cast.createRetainer(clientId, { renewalDate });
       reminderSubjects.push(retainer.id);
       expect((await client.post(`/api/clients/${clientId}/archive`, cast.gm.cookie)).status).toBe(
         200,
       );
-      await app.get(RetainerRenewals).remind('2026-11-07');
+      await app.get(RetainerRenewals).remind(renewalDate);
       expect(await typesOf(cast.am.id, retainer.id)).toEqual([]);
       const recorded = await db
         .select()
