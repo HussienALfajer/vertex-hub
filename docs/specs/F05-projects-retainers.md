@@ -2,6 +2,8 @@
 
 Status: Approved · Date: 2026-09-29 · Scope: `docs/product/v1-scope.md` §F05 (and A02, A09) · ADRs: 0006, 0007, 0008, 0013, 0014, 0015
 
+> Cycles are anchored on the start date since F05C (`docs/specs/F05C-retainer-anniversary-cycles.md`, ADR 0030): rules R2–R6 read with its rules Y1–Y6, J1 and P1–P4.
+
 ## Summary
 The agency sells two kinds of work and tracks neither today: one-off projects (a brand identity, a website) drift without a visible plan, and monthly retainers ("12 designs + 4 reels + a monthly report") are never checked against what was promised. F05 gives each client its projects, with milestones, a project manager, participating departments and a payment installment per milestone, and its retainers, with deliverable lines, a monthly cycle created automatically, a deliverables counter ("designs 9/12") with a "behind" warning, and a log of out-of-scope extra work for separate billing. Tasks (F06) attach to projects and retainer cycles and feed progress and the counter; invoices (F13) are later issued from milestones, retainer fees and extra work.
 

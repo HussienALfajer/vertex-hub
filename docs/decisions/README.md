@@ -18,7 +18,7 @@ Short records of decisions that shape the system. Each has a status: **Accepted*
 | [0012](0012-nestjs-12-native-standard-schema.md) | NestJS 12 with native Standard Schema validation instead of nestjs-zod | Accepted |
 | [0013](0013-engineering-conventions.md) | Engineering conventions: layout, module anatomy, data, errors, tests | Accepted |
 | [0014](0014-permissions-roles-and-departments.md) | Permissions from roles and department capabilities | Accepted |
-| [0015](0015-retainer-cycles-and-deliverables.md) | Retainer monthly cycles and the deliverables counter | Accepted |
+| [0015](0015-retainer-cycles-and-deliverables.md) | Retainer monthly cycles and the deliverables counter | Accepted (calendar-month cycle superseded by 0030) |
 | [0016](0016-task-workflow-and-revisions.md) | Task workflow, requests between departments and revision counting | Accepted |
 | [0017](0017-work-templates.md) | Work templates in work days; automatic tasks for each retainer cycle | Accepted |
 | [0018](0018-in-app-notifications.md) | In-app notifications: stored per user, pushed over SSE, reminders from one daily job | Accepted |
@@ -32,7 +32,9 @@ Short records of decisions that shape the system. Each has a status: **Accepted*
 | [0026](0026-leads-pipeline-quotes-and-conversion.md) | Leads: a follow-up date on every open lead, quotes on leads, conversion by the sales team | Accepted |
 | [0027](0027-reports-on-read-and-revenue-by-service.md) | Reports computed on read through module report services; revenue by service from invoice lines | Accepted |
 | [0028](0028-email-outbox-digest-and-client-emails.md) | Email: one outbox sent by the worker over Hostinger SMTP; batched notification emails, a morning digest, client emails sent by hand | Accepted |
-| [0029](0029-retainer-terms-charges-and-amendments.md) | Retainer terms, charges as the billing source, and amendments with approval of reductions | Accepted |
+| [0029](0029-retainer-terms-charges-and-amendments.md) | Retainer terms, charges as the billing source, and amendments with approval of reductions | Accepted (months read as cycles, 0030) |
+| [0030](0030-retainer-anniversary-cycles.md) | Retainer cycles anchored on the start date | Accepted |
+| [0031](0031-retainer-contracts.md) | Retainer contracts and annexes as numbered documents | Accepted |
 
 Template:
 

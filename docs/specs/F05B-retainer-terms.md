@@ -2,6 +2,8 @@
 
 Status: Approved · Date: 2026-10-07 · Scope: `docs/product/v1-scope.md` §F05 (retainer terms, added 2026-10-07), with changes to §F04 (A01), §F13 (A02) and §F15 · ADRs: 0006, 0015, 0023, 0024, 0029 (new)
 
+> Months read as anchored cycles since F05C (`docs/specs/F05C-retainer-anniversary-cycles.md`, ADR 0030): see its rules T1'–T5' and A1'–A2'.
+
 ## Summary
 Retainers today are open-ended: one monthly fee, a renewal date that is only a reminder, and no record of a fixed agreement ("3 months for 1,000 USD, paid 300 / 300 / 400"). When the agreed amount changes after a month is invoiced or paid, nothing links the change to the invoices, and an extra line a client asks for mid-contract has no price. F05B adds optional **terms** to a retainer (a number of months, the agreed total and a per-month **billing schedule**, with automatic renewal, ending or open-ended continuation at the end), turns every billable amount of a retainer into a **charge** that invoices bill, and records every later change as a numbered **amendment** (one month or onward, deliverable lines and money) that never rewrites an issued invoice: increases on an invoiced month draft a supplementary invoice, decreases become a credit taken off the next month's invoice, and reductions wait for the General Manager.
 
