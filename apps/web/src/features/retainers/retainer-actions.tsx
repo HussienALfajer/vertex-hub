@@ -537,12 +537,14 @@ function EditRetainer({ retainer }: { retainer: RetainerDetail }) {
 
   const submit = form.handleSubmit(async (values) => {
     setFailure(null);
-    if (!checkStartDate(form, t, values.startDate)) return;
     const dirty = form.formState.dirtyFields;
+    const sendsStart = !started && !charged && !!dirty.startDate;
+    // Only a start date that is sent is checked: a started retainer's stored one is in the past.
+    if (sendsStart && !checkStartDate(form, t, values.startDate)) return;
     const changes: UpdateRetainer = {
       ...(dirty.name && { name: values.name }),
       ...(dirty.departments && { departments: values.departments }),
-      ...(!started && !charged && dirty.startDate && { startDate: values.startDate }),
+      ...(sendsStart && { startDate: values.startDate }),
       ...(canEditMoney && !charged && dirty.currency && { currency: values.currency }),
       ...(canEditMoney &&
         !charged &&

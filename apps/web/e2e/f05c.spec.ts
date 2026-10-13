@@ -40,7 +40,11 @@ test('resuming inside a term opens its cycle now, as k of N (P3)', async ({ page
   ).toBeVisible();
   // Term 2 covers cycle 6: no choice to make, its charge is due anyway.
   await page.getByRole('button', { name: ar.retainers.actions.resume }).click();
-  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(
+    page.getByRole('dialog', {
+      name: fill(ar.retainers.resume.title, { name: 'الإعلانات الممولة' }),
+    }),
+  ).toHaveCount(0);
   await expect(page.getByText(ar.retainers.actions.done.active)).toBeVisible();
   await expect(
     thisCycle(page).getByText(fill(ar.retainers.cycleOf, { position: '1', cycles: '3' })),
@@ -77,4 +81,19 @@ test('reactivating from the next cycle opens nothing until its day (P2, P4)', as
     thisCycle(page).getByText(fill(ar.retainers.nextCycleOn, { date: '1 تشرين الثاني 2026' })),
   ).toBeVisible();
   await expect(page.getByTestId('cycle-period')).toHaveCount(0);
+});
+
+test('a retainer that started cycles ago is still edited by name (B1 checks a sent start date only)', async ({
+  page,
+}) => {
+  await onProjectsToday(page);
+  await mockApi(page, { signedIn: true });
+  await page.goto(`/retainers/${seedIds.socialRetainer}`);
+  // The header's edit button; the fee card has its own.
+  await page.getByRole('button', { name: ar.common.edit }).first().click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByLabel(ar.retainers.form.name).fill('إدارة السوشيال ميديا والمحتوى');
+  await dialog.getByRole('button', { name: ar.common.save }).click();
+  await expect(page.getByText(ar.projects.edit.saved)).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('إدارة السوشيال ميديا والمحتوى');
 });

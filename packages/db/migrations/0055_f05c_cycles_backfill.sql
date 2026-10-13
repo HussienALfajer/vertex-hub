@@ -15,9 +15,11 @@ LANGUAGE sql IMMUTABLE AS $$
   ) months
 $$;
 --> statement-breakpoint
+-- A month before the start month (a termination fee or a scheduled amendment of a retainer that
+-- had not started) maps to cycle 1: numbers are never below 1.
 CREATE OR REPLACE FUNCTION pg_temp.f05c_month_cycle(start_date date, month date) RETURNS integer
 LANGUAGE sql IMMUTABLE AS $$
-  SELECT pg_temp.f05c_cycle_at(start_date, (date_trunc('month', month) + interval '1 month - 1 day')::date)
+  SELECT greatest(1, pg_temp.f05c_cycle_at(start_date, (date_trunc('month', month) + interval '1 month - 1 day')::date))
 $$;
 --> statement-breakpoint
 CREATE OR REPLACE FUNCTION pg_temp.f05c_cycle_start(start_date date, n integer) RETURNS date
@@ -52,22 +54,21 @@ SET "start_cycle" = pg_temp.f05c_month_cycle(r."start_date", t."start_month"),
 FROM "retainers" r
 WHERE r."id" = t."retainer_id" AND t."start_cycle" IS NULL AND t."start_month" IS NOT NULL;
 --> statement-breakpoint
--- 4. Amendments: the cycle of their effective month and its start; schedules and effects name
---    the cycle of their month.
+-- 4. Amendments: the cycle of their effective month and its start; schedules and effects gain
+--    the cycle of their month and keep the month (expand only: the previous release reads it).
 UPDATE "retainer_amendments" a
 SET "effective_cycle" = pg_temp.f05c_month_cycle(r."start_date", a."effective_month"),
     "effective_date" = pg_temp.f05c_cycle_start(r."start_date", pg_temp.f05c_month_cycle(r."start_date", a."effective_month")),
     "schedule" = CASE WHEN a."schedule" IS NULL THEN NULL ELSE (
       SELECT coalesce(jsonb_agg(
-        jsonb_build_object(
-          'cycle', pg_temp.f05c_month_cycle(r."start_date", (item->>'month')::date),
-          'amountMinor', item->'amountMinor'
+        item || jsonb_build_object(
+          'cycle', pg_temp.f05c_month_cycle(r."start_date", (item->>'month')::date)
         ) ORDER BY position), '[]'::jsonb)
       FROM jsonb_array_elements(a."schedule") WITH ORDINALITY AS items(item, position)
     ) END,
     "effects" = (
       SELECT coalesce(jsonb_agg(
-        (effect - 'month') || jsonb_build_object(
+        effect || jsonb_build_object(
           'cycle', pg_temp.f05c_month_cycle(r."start_date", (effect->>'month')::date)
         ) ORDER BY position), '[]'::jsonb)
       FROM jsonb_array_elements(a."effects") WITH ORDINALITY AS items(effect, position)

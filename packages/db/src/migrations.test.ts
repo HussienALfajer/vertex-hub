@@ -178,6 +178,8 @@ describe('data migrations', () => {
         // Started on the 20th: September is its short first month, October its second.
         const anchored = await retainer('Anchored', '2026-09-20', '2027-01-01');
         const openEnded = await retainer('Open-ended', '2026-01-31', '2026-12-01');
+        // Ended in October with a fee before its December start: the fee's month is before it.
+        const notStarted = await retainer('Not started', '2026-12-20', null);
         for (const [month, periodStart, periodEnd] of [
           ['2026-09-01', '2026-09-20', '2026-09-30'],
           ['2026-10-01', '2026-10-01', '2026-10-05'],
@@ -220,6 +222,12 @@ describe('data migrations', () => {
           kind: 'monthly',
           amountMinor: 50_000,
         });
+        await tx.insert(retainerCharges).values({
+          retainerId: notStarted,
+          month: '2026-10-01',
+          kind: 'termination_fee',
+          amountMinor: 10_000,
+        });
         await tx.insert(retainerAmendments).values({
           retainerId: anchored,
           number: 1,
@@ -246,10 +254,11 @@ describe('data migrations', () => {
           await tx.execute(sql.raw(statement));
         }
 
-        const ids = sql`(${anchored}, ${openEnded})`;
+        const ids = sql`(${anchored}, ${openEnded}, ${notStarted})`;
         const result = {
           anchored,
           openEnded,
+          notStarted,
           cycles: await tx
             .select({
               retainerId: retainerCycles.retainerId,
@@ -268,7 +277,7 @@ describe('data migrations', () => {
             })
             .from(retainerCharges)
             .where(sql`${retainerCharges.retainerId} in ${ids}`)
-            .orderBy(asc(retainerCharges.month)),
+            .orderBy(asc(retainerCharges.month), asc(retainerCharges.cycleStart)),
           term: (
             await tx
               .select({
@@ -313,6 +322,13 @@ describe('data migrations', () => {
       // 31 Jan anchor: cycle 1 runs 31 Jan – 27 Feb, cycle 2 from 28 Feb.
       { retainerId: seen.openEnded, month: '2026-02-01', cycleNumber: 2, cycleStart: '2026-02-28' },
       { retainerId: seen.anchored, month: '2026-10-01', cycleNumber: 2, cycleStart: '2026-10-20' },
+      // Before the start month: cycle 1, never below it.
+      {
+        retainerId: seen.notStarted,
+        month: '2026-10-01',
+        cycleNumber: 1,
+        cycleStart: '2026-12-20',
+      },
       { retainerId: seen.anchored, month: '2026-11-01', cycleNumber: 3, cycleStart: '2026-11-20' },
       { retainerId: seen.anchored, month: '2026-12-01', cycleNumber: 4, cycleStart: '2026-12-20' },
     ]);
@@ -325,12 +341,14 @@ describe('data migrations', () => {
     expect(seen.amendment).toEqual({
       effectiveCycle: 3,
       effectiveDate: '2026-11-20',
+      // Expand only: the month stays for the previous release.
       schedule: [
-        { cycle: 3, amountMinor: 20_000 },
-        { cycle: 4, amountMinor: 40_000 },
+        { month: '2026-11-01', cycle: 3, amountMinor: 20_000 },
+        { month: '2026-12-01', cycle: 4, amountMinor: 40_000 },
       ],
       effects: [
         {
+          month: '2026-11-01',
           cycle: 3,
           effect: 'charge_changed',
           invoice: null,
@@ -350,6 +368,7 @@ describe('data migrations', () => {
     ).toEqual({
       [seen.anchored]: '2027-01-20',
       [seen.openEnded]: null,
+      [seen.notStarted]: null,
     });
   });
 });
