@@ -36,7 +36,8 @@ export interface TermDraft {
   endAction: TermEndAction;
 }
 
-export type TermProblems = Partial<Record<'cycles' | 'total' | 'schedule', true>>;
+/** `current`: a backdated retainer's term does not reach the current cycle (F05C B5). */
+export type TermProblems = Partial<Record<'cycles' | 'total' | 'schedule' | 'current', true>>;
 
 export const EMPTY_TERM: TermDraft = {
   cycles: 3,
@@ -140,7 +141,7 @@ export function TermPlanEditor({
   return (
     <div className="flex flex-col gap-5">
       <div className="grid gap-5 sm:grid-cols-2">
-        <Field invalid={!!problems.cycles}>
+        <Field invalid={!!problems.cycles || !!problems.current}>
           <FieldLabel htmlFor={ids.cycles}>{t('retainers.terms.cycles')}</FieldLabel>
           <Input
             id={ids.cycles}
@@ -158,6 +159,9 @@ export function TermPlanEditor({
           />
           <FieldDescription>{t('retainers.terms.cyclesHint')}</FieldDescription>
           <FieldError match={!!problems.cycles}>{t('retainers.terms.errors.cycles')}</FieldError>
+          <FieldError match={!problems.cycles && !!problems.current}>
+            {t('retainers.terms.errors.current')}
+          </FieldError>
         </Field>
         <Field invalid={!!problems.total}>
           <FieldLabel htmlFor={ids.total}>{t('retainers.terms.agreedTotal')}</FieldLabel>

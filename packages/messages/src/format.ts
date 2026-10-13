@@ -111,3 +111,6 @@ export function formatRetainerCycle(
   const label = `الدورة ${formatNumber(cycle.number)} (${formatPeriod(cycle.periodStart, cycle.periodEnd)})`;
   return term ? `${label} (${formatNumber(term.position)} من ${formatNumber(term.cycles)})` : label;
 }
+
+/** F05C B3: the settle note of a backdated cycle's charge billed outside the system. */
+export const RETAINER_BILLED_OUTSIDE_NOTE = 'فوترت خارج النظام';

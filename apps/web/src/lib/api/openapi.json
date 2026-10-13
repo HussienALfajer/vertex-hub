@@ -14623,6 +14623,7 @@
           "project_milestone.archived",
           "retainer.created",
           "retainer.updated",
+          "retainer.backdated",
           "retainer.status_changed",
           "retainer.deliverables_updated",
           "retainer.money_updated",
@@ -26550,6 +26551,13 @@
                 "$ref": "#/components/schemas/RetainerTermInput"
               }
             ]
+          },
+          "catchUp": {
+            "maxItems": 12,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CatchUpEntry"
+            }
           }
         },
         "required": [
@@ -26624,6 +26632,58 @@
           "cycles",
           "agreedTotalMinor",
           "schedule"
+        ]
+      },
+      "CatchUpEntry": {
+        "type": "object",
+        "properties": {
+          "cycle": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1200
+          },
+          "billing": {
+            "default": "billed_externally",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CatchUpBilling"
+              }
+            ]
+          },
+          "delivery": {
+            "default": "untracked",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CatchUpDelivery"
+              }
+            ]
+          },
+          "delivered": {
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 999
+            }
+          }
+        },
+        "required": [
+          "cycle"
+        ]
+      },
+      "CatchUpBilling": {
+        "type": "string",
+        "enum": [
+          "billed_externally",
+          "draft_now"
+        ]
+      },
+      "CatchUpDelivery": {
+        "type": "string",
+        "enum": [
+          "untracked",
+          "entered"
         ]
       },
       "UpdateRetainer": {

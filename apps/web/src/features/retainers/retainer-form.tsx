@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import {
   addDays,
   addMonths,
+  BACKDATE_LIMIT_MONTHS,
   businessDate,
   type ClientResponse,
   type CreateRetainer,
@@ -84,13 +85,23 @@ const FIELD_OF_CODE: Record<string, 'name' | 'startDate' | 'currency' | 'monthly
 
 /**
  * F05C B1 before the round trip: the start date falls in the cycle that holds today, or later
- * (earlier cycles would need the catch-up of a backdated retainer).
+ * (an edited start date, or a user without money access, who cannot send the catch-up). With
+ * `backdate` (the new retainer form, with money access) it may be up to 12 months back.
  */
-export function checkStartDate(form: RetainerFormMethods, t: TFunction, start: string) {
-  if (!start || addMonths(start, 1) > businessDate()) return true;
+export function checkStartDate(
+  form: RetainerFormMethods,
+  t: TFunction,
+  start: string,
+  options: { backdate?: boolean } = {},
+) {
+  const today = businessDate();
+  const message = options.backdate
+    ? start && start < addMonths(today, -BACKDATE_LIMIT_MONTHS) && 'startTooEarly'
+    : start && addMonths(start, 1) <= today && 'startInEndedCycle';
+  if (!message) return true;
   form.setError(
     'startDate',
-    { type: SCREEN_ERROR, message: t('retainers.form.errors.startInEndedCycle') },
+    { type: SCREEN_ERROR, message: t(`retainers.form.errors.${message}`) },
     { shouldFocus: true },
   );
   return false;
@@ -212,9 +223,12 @@ export function DepartmentsField({ form }: { form: RetainerFormMethods }) {
 export function StartDateField({
   form,
   startLocked = false,
+  backdate = false,
 }: {
   form: RetainerFormMethods;
   startLocked?: boolean;
+  /** F05C B1: the new retainer form with money access, up to 12 months back. */
+  backdate?: boolean;
 }) {
   const { t } = useTranslation();
   const start = useWatch({ control: form.control, name: 'startDate' });
@@ -226,7 +240,11 @@ export function StartDateField({
       <Input
         type="date"
         dir="ltr"
-        min={addDays(addMonths(businessDate(), -1), 1)}
+        min={
+          backdate
+            ? addMonths(businessDate(), -BACKDATE_LIMIT_MONTHS)
+            : addDays(addMonths(businessDate(), -1), 1)
+        }
         disabled={startLocked}
         {...form.register('startDate')}
       />

@@ -1,5 +1,10 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { type CalendarDate, type CycleEffect, cyclePeriod } from '@vertex-hub/contracts';
+import {
+  type CalendarDate,
+  type CatchUpBilling,
+  type CycleEffect,
+  cyclePeriod,
+} from '@vertex-hub/contracts';
 import {
   type Database,
   retainerCharges,
@@ -7,6 +12,7 @@ import {
   retainers,
   type Transaction,
 } from '@vertex-hub/db';
+import { RETAINER_BILLED_OUTSIDE_NOTE } from '@vertex-hub/messages';
 import { and, asc, desc, eq, isNotNull, isNull, lte, ne, or } from 'drizzle-orm';
 import { CodedException } from '../../core/errors/index.js';
 import { type AuditActor, recordAudit } from '../audit/index.js';
@@ -224,6 +230,57 @@ export class RetainerCharges {
     const start = cyclePeriod(retainer.startDate, cycle.number).periodStart;
     await this.createMonthly(tx, retainer.id, { number: cycle.number, start }, feeMinor, actor);
     await this.runDue(tx, retainer.id, today, actor);
+  }
+
+  /**
+   * F05C B3: a past cycle of a backdated retainer gets its `monthly` charge: the term's schedule
+   * amount (created with the term) or the fee, none for no amount. `billed_externally` settles it
+   * outside the system at once (it never drafts); `draft_now` leaves it pending, so the caller's
+   * `runDue` drafts it. Returns the charged amount, null without a charge.
+   */
+  async catchUp(
+    tx: Transaction,
+    retainerId: string,
+    cycle: ChargeCycle,
+    billing: CatchUpBilling,
+    feeMinor: number | null,
+    actor: AuditActor | null,
+  ): Promise<number | null> {
+    await this.createMonthly(tx, retainerId, cycle, feeMinor, actor);
+    const [charge] = await tx
+      .select({ id: retainerCharges.id, amountMinor: retainerCharges.amountMinor })
+      .from(retainerCharges)
+      .where(
+        and(
+          eq(retainerCharges.retainerId, retainerId),
+          eq(retainerCharges.cycleNumber, cycle.number),
+          eq(retainerCharges.kind, 'monthly'),
+          eq(retainerCharges.status, 'pending'),
+        ),
+      );
+    // B3: a term cycle of 0 bills nothing, as any term cycle of 0.
+    if (!charge || charge.amountMinor <= 0) return null;
+    if (billing === 'billed_externally') {
+      await tx
+        .update(retainerCharges)
+        .set({ status: 'settled_outside', settleNote: RETAINER_BILLED_OUTSIDE_NOTE })
+        .where(eq(retainerCharges.id, charge.id));
+      await recordAudit(tx, {
+        actor,
+        action: 'retainer_charge.settled_outside',
+        entityType: 'retainer_charge',
+        entityId: charge.id,
+        before: { status: 'pending' },
+        after: {
+          status: 'settled_outside',
+          settleNote: RETAINER_BILLED_OUTSIDE_NOTE,
+          cycle: cycle.number,
+          amountMinor: charge.amountMinor,
+          retainerId,
+        },
+      });
+    }
+    return charge.amountMinor;
   }
 
   /** Edge case 12: a retainer with a charge keeps its currency. */

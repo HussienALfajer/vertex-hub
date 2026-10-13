@@ -363,6 +363,44 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await screenshot(page, testInfo, `new-retainer-${colorScheme}`);
     });
 
+    test('backdated retainer (F05C)', async ({ page }, testInfo) => {
+      await page.setViewportSize({ width: 1280, height: 2100 });
+      await page.clock.setFixedTime(new Date(`${PROJECTS_TODAY}T09:00:00+03:00`));
+      await mockApi(page, { signedIn: true });
+      await page.goto(`/retainers/new?clientId=${seedIds.jasmine}`);
+      await page.getByLabel(ar.retainers.form.name).fill('عقد بأثر رجعي');
+      const departments = page.getByLabel(ar.projects.form.departments);
+      await departments.fill('التصميم');
+      await page.getByRole('option', { name: 'التصميم' }).click();
+      await page.getByLabel(ar.retainers.form.monthlyFee).fill('500');
+      for (const kind of [ar.retainers.kinds.design, ar.retainers.kinds.reel]) {
+        await page.getByRole('button', { name: kind, exact: true }).click();
+      }
+      await page.getByLabel(ar.retainers.lines.quantity.replace('{{position}}', '1')).fill('12');
+      await page.getByLabel(ar.retainers.lines.quantity.replace('{{position}}', '2')).fill('4');
+      await page.getByLabel(ar.retainers.form.startDate).fill('2026-07-20');
+      const past = page.getByTestId('past-cycles');
+      await expect(past.getByRole('listitem')).toHaveCount(2);
+      const first = past.getByRole('listitem').first();
+      await first.getByRole('button', { name: ar.retainers.past.deliveries.entered }).click();
+      await first.getByLabel(ar.retainers.kinds.design).fill('10');
+      await first.getByLabel(ar.retainers.kinds.reel).fill('4');
+      await past
+        .getByRole('listitem')
+        .nth(1)
+        .getByRole('button', { name: ar.retainers.past.billings.draft_now })
+        .click();
+      await past.scrollIntoViewIfNeeded();
+      await screenshot(page, testInfo, `new-retainer-past-cycles-${colorScheme}`);
+
+      await page.setViewportSize({ width: 1280, height: 1000 });
+      await page.getByRole('button', { name: ar.retainers.form.create }).click();
+      await expect(page.getByRole('heading', { level: 1 })).toHaveText('عقد بأثر رجعي');
+      await page.getByRole('tab', { name: ar.retainers.page.tabs.history }).click();
+      await expect(page.getByText(ar.retainers.history.untracked)).toBeVisible();
+      await screenshot(page, testInfo, `retainer-history-backdated-${colorScheme}`);
+    });
+
     test('retainer page tabs', async ({ page }, testInfo) => {
       await page.setViewportSize({ width: 1280, height: 1500 });
       await page.clock.setFixedTime(new Date(`${PROJECTS_TODAY}T09:00:00+03:00`));
