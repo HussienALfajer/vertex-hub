@@ -141,7 +141,9 @@ export class RetainerTermsService {
    * T2–T4, F05C T1'–T2' in the caller's transaction, on a retainer it locked: checks the schedule
    * and the placement, frees an open-ended charge of a cycle that already began, creates the term
    * and its charges and, when its first cycle began, marks its charge due (its draft follows, C3,
-   * C4).
+   * C4). `backdated` (F05C B5): the term of a new backdated retainer starts at cycle 1 and must
+   * include the current cycle (`INVALID_DATES`); the caller marks its charges due after the
+   * catch-up settled the past ones.
    */
   async createIn(
     tx: Transaction,
@@ -149,10 +151,20 @@ export class RetainerTermsService {
     retainer: TermRetainer,
     plan: TermPlan,
     today: CalendarDate,
-    options: { renewedFromId?: string; quoteId?: string } = {},
+    options: { renewedFromId?: string; quoteId?: string; backdated?: boolean } = {},
   ): Promise<TermRow> {
     assertSchedule(plan);
-    await this.assertPlacement(tx, retainer, plan.startCycle, today);
+    if (options.backdated) {
+      if (plan.startCycle + plan.cycles - 1 < currentCycleNumber(retainer.startDate, today)) {
+        throw new CodedException(
+          400,
+          'INVALID_DATES',
+          'The term of a backdated retainer includes the current cycle',
+        );
+      }
+    } else {
+      await this.assertPlacement(tx, retainer, plan.startCycle, today);
+    }
     const startDate = cyclePeriod(retainer.startDate, plan.startCycle).periodStart;
     const active = startDate <= today;
     if (active) await this.freeCycle(tx, retainer.id, plan.startCycle, actor);
@@ -207,7 +219,7 @@ export class RetainerTermsService {
         retainerId: retainer.id,
       },
     });
-    if (active) await this.charges.runDue(tx, retainer.id, today, actor);
+    if (active && !options.backdated) await this.charges.runDue(tx, retainer.id, today, actor);
     await this.syncRenewalDate(tx, retainer.id, actor);
     return term;
   }

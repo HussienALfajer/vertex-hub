@@ -6,6 +6,7 @@ import {
   type CreateRetainer,
   type CreateRetainerInput,
   createRetainerSchema,
+  currentCycleNumber,
   cyclePeriod,
   dayAfterTerm,
   termEndDate,
@@ -37,6 +38,12 @@ import { DepartmentChips } from '../projects/project-badges';
 import { useProjectClients } from '../projects/project-form';
 import { MonthlyTemplateField } from '../templates/template-pickers';
 import { useSetRetainerTemplate } from '../templates/templates.queries';
+import {
+  type PastCycleDraft,
+  PastCyclesSection,
+  parsePastCycles,
+  pastCycleDrafts,
+} from './past-cycles';
 import { DeliverableIcon, lineName, RetainerStatusBadge } from './retainer-badges';
 import {
   ClientField,
@@ -85,6 +92,9 @@ export function NewRetainerPage({ search }: { search: NewRetainerSearch }) {
   // F05B: an optional fixed term, a money field; kept beside the form while it is typed.
   const [term, setTerm] = useState<TermDraft | null>(null);
   const [termProblems, setTermProblems] = useState<TermProblems>({});
+  // F05C B2: the catch-up of a start date before the current cycle, a money field.
+  const [pastDrafts, setPastDrafts] = useState<PastCycleDraft[]>([]);
+  const [pastInvalid, setPastInvalid] = useState<number[]>([]);
   const formRef = useRef<HTMLFormElement>(null);
   const form = useForm<CreateRetainerInput, unknown, CreateRetainer>({
     resolver: standardSchemaResolver(createRetainerSchema),
@@ -103,6 +113,10 @@ export function NewRetainerPage({ search }: { search: NewRetainerSearch }) {
   // The lines editor also edits an existing retainer's lines; this form holds them the same way.
   const linesForm = form as unknown as DeliverablesFormMethods;
   const clientId = useWatch({ control: form.control, name: 'clientId' });
+  const startDate = useWatch({ control: form.control, name: 'startDate' });
+  const deliverables = useWatch({ control: form.control, name: 'deliverables' }) ?? [];
+  const fee = useWatch({ control: form.control, name: 'monthlyFeeMinor' }) ?? null;
+  const currency = useWatch({ control: form.control, name: 'currency' }) ?? 'USD';
   useFocusFirstError(form.formState.submitCount, formRef);
   // The first field to fill: the client, or the name when the client profile preset it.
   const presetClient = !!search.clientId;
@@ -118,38 +132,70 @@ export function NewRetainerPage({ search }: { search: NewRetainerSearch }) {
       } as const)
     : ({ to: '/retainers' } as const);
 
+  // B1: the cycles that ended before today, recorded by the catch-up (money access only).
+  const pastCount = money && isDate(startDate) ? pastCyclesOf(startDate) : 0;
+  const past = pastCycleDrafts(pastDrafts, pastCount);
+  const lines = deliverables.flatMap((line) => (line?.kind ? [{ ...line, kind: line.kind }] : []));
+
   /** The term is checked with the rest of the form, also when other fields are invalid. */
   const checkTerm = () => {
     const parsed = money && term !== null ? parseTerm(term) : null;
-    setTermProblems(parsed && isTermProblems(parsed) ? parsed : {});
+    const problems = parsed && isTermProblems(parsed) ? { ...parsed } : {};
+    // B5: a backdated retainer's term runs from cycle 1 through the current cycle at least.
+    if (pastCount > 0 && term?.cycles && term.cycles <= pastCount) problems.current = true;
+    setTermProblems(problems);
+    return Object.keys(problems).length > 0 ? problems : parsed;
+  };
+
+  const checkPast = () => {
+    const parsed = parsePastCycles(past, pastCount, lines.length);
+    setPastInvalid('invalid' in parsed ? parsed.invalid : []);
     return parsed;
   };
 
-  const submit = form.handleSubmit(async (values) => {
-    setFailure(null);
-    const startOk = checkStartDate(form, t, values.startDate);
-    const linesOk = checkDuplicateLines(linesForm, t, values.deliverables);
-    const parsedTerm = checkTerm();
-    if (!startOk || !linesOk || (parsedTerm && isTermProblems(parsedTerm))) return;
-    // Without money access the API refuses money fields, so none are sent (M1). A term sets the
-    // renewal date (F05C T3').
-    const input: CreateRetainer = money
-      ? { ...values, ...(parsedTerm && { term: parsedTerm }) }
-      : { ...values, currency: undefined, monthlyFeeMinor: undefined };
-    try {
-      const retainer = await create.mutateAsync(input);
-      toast.add({ title: t('retainers.new.created'), type: 'success' });
-      // The link is a second call: when it fails the retainer stays, and its page can link again.
-      if (templateId) {
-        await link
-          .mutateAsync({ retainerId: retainer.id, templateId })
-          .catch(() => toast.add({ title: t('templates.retainer.linkFailed'), type: 'error' }));
+  const submit = form.handleSubmit(
+    async (values) => {
+      setFailure(null);
+      const startOk = checkStartDate(form, t, values.startDate, { backdate: money });
+      const linesOk = checkDuplicateLines(linesForm, t, values.deliverables);
+      const parsedTerm = checkTerm();
+      const parsedPast = checkPast();
+      if (
+        !startOk ||
+        !linesOk ||
+        (parsedTerm && isTermProblems(parsedTerm)) ||
+        'invalid' in parsedPast
+      ) {
+        return;
       }
-      await navigate({ to: '/retainers/$retainerId', params: { retainerId: retainer.id } });
-    } catch (error) {
-      setFailure(retainerFormFailure(form, t, error));
-    }
-  }, checkTerm);
+      // Without money access the API refuses money fields, so none are sent (M1). A term sets the
+      // renewal date (F05C T3'); past cycles come with their catch-up (B2).
+      const input: CreateRetainer = money
+        ? {
+            ...values,
+            ...(parsedTerm && { term: parsedTerm }),
+            ...(pastCount > 0 && { catchUp: parsedPast.entries }),
+          }
+        : { ...values, currency: undefined, monthlyFeeMinor: undefined };
+      try {
+        const retainer = await create.mutateAsync(input);
+        toast.add({ title: t('retainers.new.created'), type: 'success' });
+        // The link is a second call: when it fails the retainer stays, and its page can link again.
+        if (templateId) {
+          await link
+            .mutateAsync({ retainerId: retainer.id, templateId })
+            .catch(() => toast.add({ title: t('templates.retainer.linkFailed'), type: 'error' }));
+        }
+        await navigate({ to: '/retainers/$retainerId', params: { retainerId: retainer.id } });
+      } catch (error) {
+        setFailure(retainerFormFailure(form, t, error));
+      }
+    },
+    () => {
+      checkTerm();
+      checkPast();
+    },
+  );
 
   return (
     <>
@@ -176,12 +222,23 @@ export function NewRetainerPage({ search }: { search: NewRetainerSearch }) {
             <DepartmentsField form={form} />
           </FormSection>
           <FormSection title={t('retainers.form.term')} hint={t('retainers.form.termHint')}>
-            <StartDateField form={form} />
+            <StartDateField form={form} backdate={money} />
             <FirstCycleNote form={form} />
             {money && <MoneyFields form={form} />}
           </FormSection>
           {money && (
             <FixedTermSection form={form} value={term} onChange={setTerm} problems={termProblems} />
+          )}
+          {pastCount > 0 && isDate(startDate) && (
+            <PastCyclesSection
+              anchor={startDate}
+              value={past}
+              onChange={setPastDrafts}
+              lines={lines}
+              amountOf={(cycle) => (term ? (term.schedule[cycle - 1] ?? null) : fee)}
+              currency={currency}
+              invalid={pastInvalid}
+            />
           )}
           <FormSection title={t('retainers.lines.title')} hint={t('retainers.form.linesHint')}>
             <DeliverablesEditor form={linesForm} />
@@ -261,6 +318,9 @@ function FixedTermSection({
   );
 }
 
+/** F05C B1: the cycles of a start date that ended before today. */
+const pastCyclesOf = (start: string) => Math.max(0, currentCycleNumber(start, businessDate()) - 1);
+
 /** A complete `YYYY-MM-DD` date, as the date input gives it. */
 const isDate = (value: string | undefined): value is string =>
   /^\d{4}-\d{2}-\d{2}$/.test(value ?? '');
@@ -274,12 +334,20 @@ function FirstCycleNote({ form }: { form: RetainerFormMethods }) {
   const start = useWatch({ control: form.control, name: 'startDate' });
   if (!isDate(start)) return null;
   const now = start <= businessDate();
-  const first = cyclePeriod(start, 1);
+  // B1: a backdated start opens its current cycle; the earlier ones are past cycles.
+  const number = Math.max(1, currentCycleNumber(start, businessDate()));
+  const first = cyclePeriod(start, number);
   const period = formatPeriod(first.periodStart, first.periodEnd);
   return (
     <Callout
       icon={<CalendarPlusIcon />}
-      title={now ? t('retainers.form.cycleNow') : t('retainers.form.cycleLater')}
+      title={
+        number > 1
+          ? t('retainers.form.cycleCurrent', { number: formatNumber(number) })
+          : now
+            ? t('retainers.form.cycleNow')
+            : t('retainers.form.cycleLater')
+      }
       description={
         now
           ? t('retainers.form.cycleNowBody', { period })

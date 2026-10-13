@@ -633,9 +633,15 @@ export const clientMonthlyReportSchema = z
             kind: deliverableKindSchema,
             label: z.string().nullable(),
             committed: countSchema,
-            /** Frozen at close for a closed cycle, live for an open one. */
-            delivered: countSchema,
-            /** R13 over the line alone: whole percent, rounded down; null with nothing committed. */
+            /**
+             * Frozen at close for a closed cycle, live for an open one; null for a backdated cycle
+             * whose delivery was not recorded (F05C B4).
+             */
+            delivered: countSchema.nullable(),
+            /**
+             * R13 over the line alone: whole percent, rounded down; null with nothing committed or
+             * no delivered count.
+             */
             percent: z.number().int().min(0).max(100).nullable(),
           }),
         ),

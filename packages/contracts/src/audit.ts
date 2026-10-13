@@ -52,6 +52,7 @@ export const AUDIT_ACTIONS = [
   'project_milestone.archived',
   'retainer.created',
   'retainer.updated',
+  'retainer.backdated',
   'retainer.status_changed',
   'retainer.deliverables_updated',
   'retainer.money_updated',

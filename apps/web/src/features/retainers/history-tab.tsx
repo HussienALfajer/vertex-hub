@@ -133,7 +133,9 @@ function ClosedCycleRow({
                 <DeliverableIcon kind={line.kind} className="text-muted-foreground" />
                 {lineName(t, line)}
                 <span className="font-medium tabular-nums">
-                  {formatNumber(line.delivered)}/{formatNumber(line.committed)}
+                  {/* F05C B4: a cycle whose delivery was not recorded has no count. */}
+                  {cycle.untracked ? t('common.none') : formatNumber(line.delivered)}/
+                  {formatNumber(line.committed)}
                 </span>
                 {line.deliveredAfterClose > 0 && (
                   <span className="text-xs text-muted-foreground tabular-nums">

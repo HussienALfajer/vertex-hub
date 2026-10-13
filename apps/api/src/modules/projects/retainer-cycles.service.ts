@@ -298,22 +298,7 @@ export class RetainerCyclesService implements OnModuleInit {
       .update(retainers)
       .set({ cyclesFrom: null })
       .where(and(eq(retainers.id, retainerId), lte(retainers.cyclesFrom, anchored.periodStart)));
-    const standing = await tx
-      .select({
-        id: retainerDeliverables.id,
-        kind: retainerDeliverables.kind,
-        label: retainerDeliverables.label,
-        monthlyQuantity: retainerDeliverables.monthlyQuantity,
-        revisionLimit: retainerDeliverables.revisionLimit,
-      })
-      .from(retainerDeliverables)
-      .where(
-        and(
-          eq(retainerDeliverables.retainerId, retainerId),
-          isNull(retainerDeliverables.archivedAt),
-        ),
-      )
-      .orderBy(asc(retainerDeliverables.position), asc(retainerDeliverables.id));
+    const standing = await this.standingLines(tx, retainerId);
     const lines = standing.map((line, index) => ({
       cycleId: created.id,
       deliverableId: line.id,
@@ -356,6 +341,67 @@ export class RetainerCyclesService implements OnModuleInit {
     );
     await this.charges.runDue(tx, retainerId, today, actor);
     return created.id;
+  }
+
+  /**
+   * F05C B4: a past cycle of a backdated retainer, recorded closed with its period and the
+   * standing lines' full quantities: `untracked` without delivered counts, or `entered` with
+   * `delivered` (one per standing line, in order) frozen as at close. No tasks, hooks, charge or
+   * notification; the creation's `retainer.backdated` entry records it (B7).
+   */
+  async createBackdated(
+    tx: Transaction,
+    retainer: { id: string; startDate: CalendarDate },
+    number: number,
+    delivered: readonly number[] | undefined,
+  ): Promise<void> {
+    const [created] = await tx
+      .insert(retainerCycles)
+      .values({
+        retainerId: retainer.id,
+        number,
+        ...cyclePeriod(retainer.startDate, number),
+        status: 'closed',
+        closedAt: new Date(),
+        backdated: true,
+        untracked: delivered === undefined,
+      })
+      .returning({ id: retainerCycles.id });
+    if (!created) throw new Error('Cycle insert returned no row');
+    const standing = await this.standingLines(tx, retainer.id);
+    if (standing.length === 0) return;
+    await tx.insert(retainerCycleLines).values(
+      standing.map((line, index) => ({
+        cycleId: created.id,
+        deliverableId: line.id,
+        kind: line.kind,
+        label: line.label,
+        committedQuantity: line.monthlyQuantity,
+        revisionLimit: line.revisionLimit,
+        deliveredAtClose: delivered ? (delivered[index] ?? 0) : null,
+        position: index + 1,
+      })),
+    );
+  }
+
+  /** The retainer's standing lines, in order: a new cycle's lines (R3). */
+  private standingLines(tx: Transaction, retainerId: string) {
+    return tx
+      .select({
+        id: retainerDeliverables.id,
+        kind: retainerDeliverables.kind,
+        label: retainerDeliverables.label,
+        monthlyQuantity: retainerDeliverables.monthlyQuantity,
+        revisionLimit: retainerDeliverables.revisionLimit,
+      })
+      .from(retainerDeliverables)
+      .where(
+        and(
+          eq(retainerDeliverables.retainerId, retainerId),
+          isNull(retainerDeliverables.archivedAt),
+        ),
+      )
+      .orderBy(asc(retainerDeliverables.position), asc(retainerDeliverables.id));
   }
 
   /** R5: ending closes every open cycle; the current one ends `today`. */

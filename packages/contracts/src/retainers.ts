@@ -908,10 +908,70 @@ const retainerFieldsSchema = z.object({
   monthlyFeeMinor: minorAmountSchema.nullable(),
 });
 
+// Backdated start (spec F05C B1–B5)
+
+/** B1: how far back a new retainer may start, and so the most past cycles a catch-up holds. */
+export const BACKDATE_LIMIT_MONTHS = 12;
+
+export const CATCH_UP_BILLINGS = ['billed_externally', 'draft_now'] as const;
+
+export const catchUpBillingSchema = z.enum(CATCH_UP_BILLINGS).meta({ id: 'CatchUpBilling' });
+
+export type CatchUpBilling = z.infer<typeof catchUpBillingSchema>;
+
+export const CATCH_UP_DELIVERIES = ['untracked', 'entered'] as const;
+
+export const catchUpDeliverySchema = z.enum(CATCH_UP_DELIVERIES).meta({ id: 'CatchUpDelivery' });
+
+export type CatchUpDelivery = z.infer<typeof catchUpDeliverySchema>;
+
 /**
- * The start date's range is checked by the API (`INVALID_DATES`). A `term` starts at the
- * retainer's current cycle (its first one when the start date is today or later) and sets the
- * renewal date (F05C T3'). The renewal date is derived and never sent (strict: 400).
+ * One past cycle of a backdated retainer (B3, B4). `delivered` holds one count per deliverable
+ * line of the request, in order, and only with `entered` delivery.
+ */
+export const catchUpEntrySchema = z
+  .object({
+    cycle: cycleNumberSchema,
+    billing: catchUpBillingSchema.default('billed_externally'),
+    delivery: catchUpDeliverySchema.default('untracked'),
+    delivered: z
+      .array(z.number().int().min(0).max(999))
+      .max(RETAINER_LIMITS.deliverables)
+      .optional(),
+  })
+  .refine((entry) => (entry.delivery === 'entered') === (entry.delivered !== undefined), {
+    message: 'Delivered counts come with "entered" delivery only',
+    path: ['delivered'],
+  })
+  .meta({ id: 'CatchUpEntry' });
+
+export type CatchUpEntry = z.infer<typeof catchUpEntrySchema>;
+
+export type CatchUpEntryInput = z.input<typeof catchUpEntrySchema>;
+
+/**
+ * B2: the catch-up names each past cycle `1 … pastCycles` once, in any order, and an `entered`
+ * entry counts every deliverable line (`CATCH_UP_REQUIRED` otherwise). Without past cycles it is
+ * empty.
+ */
+export function catchUpComplete(
+  entries: readonly Pick<CatchUpEntry, 'cycle' | 'delivered'>[],
+  pastCycles: number,
+  lineCount: number,
+): boolean {
+  if (entries.length !== pastCycles) return false;
+  const cycles = new Set(entries.map((entry) => entry.cycle));
+  if (cycles.size !== pastCycles) return false;
+  for (let cycle = 1; cycle <= pastCycles; cycle += 1) if (!cycles.has(cycle)) return false;
+  return entries.every((entry) => !entry.delivered || entry.delivered.length === lineCount);
+}
+
+/**
+ * The start date's range is checked by the API: from today − 12 months (`INVALID_DATES`, B1).
+ * A start date before the current cycle needs `catchUp` (B2, money access). A `term` starts at the
+ * retainer's current cycle (its first one when the start date is today or later), or at cycle 1
+ * of a backdated retainer (B5), and sets the renewal date (F05C T3'). The renewal date is derived
+ * and never sent (strict: 400).
  */
 export const createRetainerSchema = retainerFieldsSchema
   .extend({
@@ -920,6 +980,8 @@ export const createRetainerSchema = retainerFieldsSchema
     deliverables: z.array(newDeliverableLineSchema).default([]),
     /** Money field (F05B). */
     term: retainerTermInputSchema.optional(),
+    /** B2: one entry per past cycle; money field. */
+    catchUp: z.array(catchUpEntrySchema).max(BACKDATE_LIMIT_MONTHS).optional(),
   })
   .partial({ currency: true, monthlyFeeMinor: true })
   .strict()

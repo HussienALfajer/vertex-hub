@@ -62,7 +62,7 @@ export function clientReportHtml(snapshot: ClientReportSnapshot, assets: Templat
           [
             ...retainer.lines.map(
               (line) =>
-                `<tr>${cell(line.label ?? VALUES.deliverableKinds[line.kind])}${cell(count(line.committed), { num: true })}${cell(count(line.delivered), { num: true })}${cell(line.percent === null ? null : `${line.percent}%`, { num: true })}</tr>`,
+                `<tr>${cell(line.label ?? VALUES.deliverableKinds[line.kind])}${cell(count(line.committed), { num: true })}${cell(line.delivered === null ? null : count(line.delivered), { num: true })}${cell(line.percent === null ? null : `${line.percent}%`, { num: true })}</tr>`,
             ),
             `<tr class="total">${cell(L.completion)}<td></td><td></td>${cell(retainer.completion === null ? null : `${retainer.completion}%`, { num: true })}</tr>`,
           ],

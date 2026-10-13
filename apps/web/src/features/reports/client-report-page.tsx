@@ -368,7 +368,7 @@ function RetainersSection({ report }: { report: ClientMonthlyReport }) {
                     {formatNumber(line.committed)}
                   </TableCell>
                   <TableCell className="text-end tabular-nums">
-                    {formatNumber(line.delivered)}
+                    {line.delivered === null ? t('common.none') : formatNumber(line.delivered)}
                   </TableCell>
                   <TableCell className="text-end tabular-nums">
                     {line.percent === null

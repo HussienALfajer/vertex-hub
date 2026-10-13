@@ -2239,6 +2239,9 @@ interface CycleRecord {
   status: CycleStatus;
   closedAt: string | null;
   lines: CycleLineRecord[];
+  /** F05C B3, B4: recorded by the catch-up of a backdated retainer. */
+  backdated?: boolean;
+  untracked?: boolean;
 }
 
 interface DeliverableRecord {
@@ -2778,10 +2781,10 @@ function retainerRoutes({ users, clients, retainers, me }: RetainerState) {
       periodStart: c.periodStart,
       periodEnd: c.periodEnd,
       status: c.status,
-      backdated: false,
-      untracked: false,
+      backdated: c.backdated ?? false,
+      untracked: c.untracked ?? false,
       closedAt: c.closedAt,
-      deliveryRate: rateOf(lines),
+      deliveryRate: c.untracked ? null : rateOf(lines),
       behind: lines.some((line) => line.behind),
       lines,
     };
@@ -2979,7 +2982,10 @@ function retainerRoutes({ users, clients, retainers, me }: RetainerState) {
                 id: id(next++),
                 number: 1,
                 status: input.startDate <= today ? 'active' : 'scheduled',
-                startCycle: Math.max(1, currentCycleNumber(input.startDate, today)),
+                // F05C B5: a backdated retainer's term starts at cycle 1.
+                startCycle: input.catchUp?.length
+                  ? 1
+                  : Math.max(1, currentCycleNumber(input.startDate, today)),
                 cycles: input.term.cycles,
                 endAction: input.term.endAction ?? 'renew',
                 schedule: input.term.schedule,
@@ -2993,6 +2999,21 @@ function retainerRoutes({ users, clients, retainers, me }: RetainerState) {
       };
       syncRenewal(created);
       if (!clientScope(created)) return fail(route, 403, null);
+      // F05C B4: the past cycles, closed as the catch-up recorded them.
+      for (const entry of input.catchUp ?? []) {
+        created.cycles.push({
+          id: id(next++),
+          number: entry.cycle,
+          ...cyclePeriod(input.startDate, entry.cycle),
+          status: 'closed',
+          closedAt: new Date().toISOString(),
+          backdated: true,
+          untracked: entry.delivery === 'untracked',
+          lines: live(created).map((d, index) =>
+            cycleLine(next++, d, d.monthlyQuantity, entry.delivered?.[index] ?? 0, true),
+          ),
+        });
+      }
       openCurrent(created);
       retainers.push(created);
       return json(route, detail(created), 201);

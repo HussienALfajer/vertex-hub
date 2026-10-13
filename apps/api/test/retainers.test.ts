@@ -4,14 +4,23 @@ import {
   addDays,
   addMonths,
   businessDate,
+  clientMonthlyReportSchema,
+  cycleAt,
+  cyclePageSchema,
   cyclePeriod,
   deliverableLineListSchema,
   retainerDetailSchema,
   retainerPageSchema,
 } from '@vertex-hub/contracts';
-import { auditEntries, createDatabase, invoices, retainerCharges } from '@vertex-hub/db';
+import {
+  auditEntries,
+  createDatabase,
+  invoiceLines,
+  invoices,
+  retainerCharges,
+} from '@vertex-hub/db';
 import { testDatabaseUrl } from '@vertex-hub/db/testing';
-import { eq } from 'drizzle-orm';
+import { asc, eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { RetainerCyclesService } from '../src/modules/projects/retainer-cycles.service.js';
 import { expectError, seedClientCast } from './client-cast.js';
@@ -186,12 +195,12 @@ describe('retainers', () => {
 
     it('checks dates, names, duplicate lines and the line limit', async () => {
       const { id: clientId } = await cast.createClient();
-      // F05C B1, B2: a start date whose first cycle already ended needs the catch-up.
+      // F05C B1: at most 12 months back.
       await expectError(
         await client.post(
           '/api/retainers',
           cast.gm.cookie,
-          body(clientId, { startDate: addMonths(today, -1) }),
+          body(clientId, { startDate: addDays(addMonths(today, -12), -1) }),
         ),
         400,
         'INVALID_DATES',
@@ -239,6 +248,232 @@ describe('retainers', () => {
         409,
         'LIMIT_REACHED',
       );
+    });
+  });
+
+  describe('backdated start (F05C B1–B7)', () => {
+    /** Two past cycles: the start date is two months ago, so today is in cycle 3. */
+    const start = addMonths(today, -2);
+    const lines = [
+      { kind: 'design', monthlyQuantity: 12 },
+      { kind: 'reel', monthlyQuantity: 4 },
+    ];
+    const create = (cookie: string, clientId: string, extra: object = {}) =>
+      client.post(
+        '/api/retainers',
+        cookie,
+        body(clientId, {
+          startDate: start,
+          currency: 'USD',
+          monthlyFeeMinor: 50000,
+          deliverables: lines,
+          ...extra,
+        }),
+      );
+    const cyclesOf = async (id: string) => {
+      const response = await client.get(`/api/retainers/${id}/cycles?pageSize=50`, cast.gm.cookie);
+      expect(response.status).toBe(200);
+      return cyclePageSchema.parse(await response.json()).items.sort((a, b) => a.number - b.number);
+    };
+    const chargesOf = (retainerId: string) =>
+      db
+        .select()
+        .from(retainerCharges)
+        .where(eq(retainerCharges.retainerId, retainerId))
+        .orderBy(asc(retainerCharges.cycleNumber));
+    const draftLines = (retainerId: string) =>
+      db
+        .select({ description: invoiceLines.description, totalMinor: invoices.totalMinor })
+        .from(invoices)
+        .innerJoin(invoiceLines, eq(invoiceLines.invoiceId, invoices.id))
+        .where(eq(invoices.retainerId, retainerId))
+        .orderBy(asc(invoiceLines.description));
+
+    it('refuses a backdated start without a complete catch-up (B2)', async () => {
+      const { id: clientId } = await cast.createClient();
+      for (const catchUp of [
+        undefined,
+        [{ cycle: 1 }],
+        [{ cycle: 1 }, { cycle: 3 }],
+        [{ cycle: 1 }, { cycle: 2, delivery: 'entered', delivered: [3] }],
+      ]) {
+        await expectError(
+          await create(cast.gm.cookie, clientId, catchUp ? { catchUp } : {}),
+          400,
+          'CATCH_UP_REQUIRED',
+        );
+      }
+      // A retainer starting in the current cycle takes no catch-up.
+      await expectError(
+        await create(cast.gm.cookie, clientId, {
+          startDate: addDays(addMonths(today, -1), 1),
+          catchUp: [{ cycle: 1 }],
+        }),
+        400,
+        'CATCH_UP_REQUIRED',
+      );
+    });
+
+    it('needs money access and client scope', async () => {
+      const own = await cast.createClient();
+      const other = await cast.createClient({ accountManagerId: cast.otherAm.id });
+      const catchUp = [{ cycle: 1 }, { cycle: 2 }];
+      expect((await create(cast.am.cookie, other.id, { catchUp })).status).toBe(403);
+      expect((await create(cast.employee.cookie, own.id, { catchUp })).status).toBe(403);
+      expect((await create(finance.cookie, own.id, { catchUp })).status).toBe(403);
+      expect((await create(cast.am.cookie, own.id, { catchUp })).status).toBe(201);
+    });
+
+    it('records past cycles closed, billed by choice, and opens the current one (B3, B4, Y3)', async () => {
+      const { id: clientId } = await cast.createClient();
+      const response = await create(cast.am.cookie, clientId, {
+        catchUp: [
+          { cycle: 2, billing: 'draft_now', delivery: 'entered', delivered: [10, 4] },
+          { cycle: 1 },
+        ],
+      });
+      expect(response.status).toBe(201);
+      const created = retainerDetailSchema.parse(await response.json());
+      expect(created.currentCycle).toMatchObject({
+        number: 3,
+        ...cyclePeriod(start, 3),
+        status: 'open',
+        backdated: false,
+      });
+
+      const cycles = await cyclesOf(created.id);
+      expect(
+        cycles.map((cycle) => [
+          cycle.number,
+          cycle.periodStart,
+          cycle.status,
+          cycle.backdated,
+          cycle.untracked,
+          cycle.deliveryRate,
+        ]),
+      ).toEqual([
+        [1, start, 'closed', true, true, null],
+        [2, cyclePeriod(start, 2).periodStart, 'closed', true, false, 87],
+        [3, cyclePeriod(start, 3).periodStart, 'open', false, false, 0],
+      ]);
+      expect(cycles[0]?.lines.map((line) => [line.committed, line.delivered])).toEqual([
+        [12, 0],
+        [4, 0],
+      ]);
+      expect(cycles[1]?.lines.map((line) => [line.committed, line.delivered])).toEqual([
+        [12, 10],
+        [4, 4],
+      ]);
+      // B4: no tasks for a backdated cycle.
+      expect(cycles[0]?.lines.every((line) => line.tasks.total === 0)).toBe(true);
+      // B4, R4: the client report gives an untracked cycle no delivered count and no percent.
+      const report = await client.get(
+        `/api/clients/${clientId}/monthly-report?month=${start.slice(0, 7)}`,
+        cast.gm.cookie,
+      );
+      expect(report.status).toBe(200);
+      const shown = clientMonthlyReportSchema
+        .parse(await report.json())
+        .retainers.find((row) => row.retainer.id === created.id && row.cycle === 1);
+      expect(shown?.lines.map((line) => [line.committed, line.delivered, line.percent])).toEqual([
+        [12, null, null],
+        [4, null, null],
+      ]);
+      expect(shown?.completion).toBeNull();
+
+      const charges = await chargesOf(created.id);
+      expect(
+        charges.map((row) => [row.cycleNumber, row.amountMinor, row.status, !!row.dueAt]),
+      ).toEqual([
+        [1, 50000, 'settled_outside', false],
+        [2, 50000, 'pending', true],
+        [3, 50000, 'pending', true],
+      ]);
+      expect(charges[0]?.settleNote).toBeTruthy();
+      // J3: one draft per drafted cycle, each named by its cycle; none for cycle 1.
+      const drafts = await draftLines(created.id);
+      expect(drafts.map((row) => row.totalMinor)).toEqual([50000, 50000]);
+      expect(drafts.map((row) => row.description.match(/الدورة (\d+)/)?.[1]).sort()).toEqual([
+        '2',
+        '3',
+      ]);
+
+      // B7: the creation and one entry for the past cycles.
+      const actions = (await auditOf(created.id)).map((entry) => entry.action);
+      expect(actions.slice(0, 2)).toEqual(['retainer.created', 'retainer.backdated']);
+      const backdated = (await auditOf(created.id)).find(
+        (entry) => entry.action === 'retainer.backdated',
+      );
+      expect(backdated?.actorId).toBe(cast.am.id);
+      expect(backdated?.after).toMatchObject({
+        startDate: start,
+        pastCycles: [
+          { cycle: 1, billing: 'billed_externally', delivery: 'untracked', amountMinor: 50000 },
+          {
+            cycle: 2,
+            billing: 'draft_now',
+            delivery: 'entered',
+            delivered: [10, 4],
+            amountMinor: 50000,
+          },
+        ],
+      });
+    });
+
+    it('starts a term at cycle 1 that includes the current cycle (B5, edge case 7)', async () => {
+      const { id: clientId } = await cast.createClient();
+      const catchUp = [
+        { cycle: 1, billing: 'draft_now' },
+        { cycle: 2, billing: 'draft_now' },
+      ];
+      await expectError(
+        await create(cast.gm.cookie, clientId, {
+          catchUp,
+          term: { cycles: 2, agreedTotalMinor: 80000, schedule: [40000, 40000] },
+        }),
+        400,
+        'INVALID_DATES',
+      );
+      const response = await create(cast.gm.cookie, clientId, {
+        catchUp,
+        term: { cycles: 4, agreedTotalMinor: 120000, schedule: [0, 40000, 40000, 40000] },
+      });
+      expect(response.status).toBe(201);
+      const created = retainerDetailSchema.parse(await response.json());
+      expect(created.currentCycle).toMatchObject({ number: 3, termPosition: 3, termCycles: 4 });
+      expect(created.renewalDate).toBe(addDays(cyclePeriod(start, 4).periodEnd, 1));
+      const charges = await chargesOf(created.id);
+      expect(
+        charges.map((row) => [row.cycleNumber, row.amountMinor, row.status, !!row.dueAt]),
+      ).toEqual([
+        [1, 0, 'pending', true],
+        [2, 40000, 'pending', true],
+        [3, 40000, 'pending', true],
+        [4, 40000, 'pending', false],
+      ]);
+      // Edge case 7: the cycle of 0 is never drafted.
+      const drafts = await draftLines(created.id);
+      expect(drafts.map((row) => row.description.match(/الدورة (\d+)/)?.[1]).sort()).toEqual([
+        '2',
+        '3',
+      ]);
+    });
+
+    it('drafts every past cycle in one request (edge case 6)', async () => {
+      const { id: clientId } = await cast.createClient();
+      const longAgo = addMonths(today, -12);
+      const past = (cycleAt(longAgo, today) ?? 1) - 1;
+      const response = await create(cast.gm.cookie, clientId, {
+        startDate: longAgo,
+        catchUp: Array.from({ length: past }, (_, index) => ({
+          cycle: index + 1,
+          billing: 'draft_now',
+        })),
+      });
+      expect(response.status).toBe(201);
+      const created = retainerDetailSchema.parse(await response.json());
+      expect(created.currentCycle?.number).toBe(past + 1);
+      expect(await draftLines(created.id)).toHaveLength(past + 1);
     });
   });
 

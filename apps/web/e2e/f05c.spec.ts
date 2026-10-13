@@ -97,3 +97,52 @@ test('a retainer that started cycles ago is still edited by name (B1 checks a se
   await expect(page.getByText(ar.projects.edit.saved)).toBeVisible();
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('إدارة السوشيال ميديا والمحتوى');
 });
+
+test('a backdated retainer records its past cycles with the catch-up (B2–B4)', async ({ page }) => {
+  await onProjectsToday(page);
+  await mockApi(page, { signedIn: true });
+  await page.goto(`/retainers/new?clientId=${seedIds.jasmine}`);
+  await page.getByLabel(ar.retainers.form.name).fill('عقد بأثر رجعي');
+  const departments = page.getByLabel(ar.projects.form.departments);
+  await departments.fill('التصميم');
+  await page.getByRole('option', { name: 'التصميم' }).click();
+  await page.getByLabel(ar.retainers.form.monthlyFee).fill('500');
+  for (const kind of [ar.retainers.kinds.design, ar.retainers.kinds.reel]) {
+    await page.getByRole('button', { name: kind, exact: true }).click();
+  }
+  await page.getByLabel(fill(ar.retainers.lines.quantity, { position: '1' })).fill('12');
+  await page.getByLabel(fill(ar.retainers.lines.quantity, { position: '2' })).fill('4');
+  // From 20 August, 10 October is in cycle 2: cycle 1 has closed.
+  await page.getByLabel(ar.retainers.form.startDate).fill('2026-08-20');
+  await expect(page.getByText(fill(ar.retainers.form.cycleCurrent, { number: '2' }))).toBeVisible();
+  const past = page.getByTestId('past-cycles');
+  await expect(past.getByRole('listitem')).toHaveCount(1);
+  await expect(past).toContainText('20 آب – 19 أيلول 2026');
+  await expect(past).toContainText('500.00');
+  await expect(
+    past.getByRole('button', { name: ar.retainers.past.billings.billed_externally }),
+  ).toHaveAttribute('aria-pressed', 'true');
+  await past.getByRole('button', { name: ar.retainers.past.deliveries.entered }).click();
+
+  // Counts are required once delivery is entered.
+  await page.getByRole('button', { name: ar.retainers.form.create }).click();
+  await expect(past.getByRole('alert')).toHaveText(ar.retainers.past.errors.delivered);
+
+  await past.getByLabel(ar.retainers.kinds.design).fill('10');
+  await past.getByLabel(ar.retainers.kinds.reel).fill('4');
+  const request = page.waitForRequest(
+    (r) => r.url().endsWith('/api/retainers') && r.method() === 'POST',
+  );
+  await page.getByRole('button', { name: ar.retainers.form.create }).click();
+  expect((await request).postDataJSON().catchUp).toEqual([
+    { cycle: 1, billing: 'billed_externally', delivery: 'entered', delivered: [10, 4] },
+  ]);
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('عقد بأثر رجعي');
+  await expect(
+    thisCycle(page).getByText(fill(ar.retainers.cycleNumber, { number: '2' })),
+  ).toBeVisible();
+  await page.getByRole('tab', { name: ar.retainers.page.tabs.history }).click();
+  const history = page.getByRole('list', { name: ar.retainers.history.title });
+  await expect(history.getByText(ar.retainers.history.backdated)).toBeVisible();
+  await expect(history).toContainText('87');
+});

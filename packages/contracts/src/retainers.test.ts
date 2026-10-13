@@ -14,6 +14,7 @@ import {
   type CycleChargeState,
   canChangeRetainerStatus,
   cancelRetainerTermSchema,
+  catchUpComplete,
   createAmendmentSchema,
   createCycleAdjustmentSchema,
   createCycleLineSchema,
@@ -121,6 +122,43 @@ describe('createRetainerSchema', () => {
     expect(createRetainerSchema.safeParse({ ...retainer, renewalDate: '2027-10-01' }).success).toBe(
       false,
     );
+  });
+});
+
+describe('catch-up (F05C B2–B4)', () => {
+  const parse = (catchUp: object[]) => createRetainerSchema.safeParse({ ...retainer, catchUp });
+
+  it('defaults to billed outside and not tracked', () => {
+    expect(parse([{ cycle: 1 }]).data?.catchUp).toEqual([
+      { cycle: 1, billing: 'billed_externally', delivery: 'untracked' },
+    ]);
+  });
+
+  it('takes delivered counts with "entered" delivery only, each 0–999', () => {
+    expect(parse([{ cycle: 1, delivery: 'entered', delivered: [0, 999] }]).success).toBe(true);
+    expect(parse([{ cycle: 1, delivery: 'entered' }]).success).toBe(false);
+    expect(parse([{ cycle: 1, delivery: 'untracked', delivered: [1] }]).success).toBe(false);
+    expect(parse([{ cycle: 1, delivery: 'entered', delivered: [1000] }]).success).toBe(false);
+    expect(parse([{ cycle: 1, delivery: 'entered', delivered: [-1] }]).success).toBe(false);
+  });
+
+  it('holds at most 12 past cycles and known choices', () => {
+    const cycles = (n: number) => Array.from({ length: n }, (_, index) => ({ cycle: index + 1 }));
+    expect(parse(cycles(12)).success).toBe(true);
+    expect(parse(cycles(13)).success).toBe(false);
+    expect(parse([{ cycle: 0 }]).success).toBe(false);
+    expect(parse([{ cycle: 1, billing: 'free' }]).success).toBe(false);
+  });
+
+  it('is complete with each past cycle once and a count per line (B2)', () => {
+    const entered = { delivery: 'entered' as const, delivered: [10, 4] };
+    expect(catchUpComplete([], 0, 2)).toBe(true);
+    expect(catchUpComplete([{ cycle: 2 }, { cycle: 1, ...entered }], 2, 2)).toBe(true);
+    expect(catchUpComplete([{ cycle: 1 }], 2, 2)).toBe(false);
+    expect(catchUpComplete([{ cycle: 1 }, { cycle: 1 }], 2, 2)).toBe(false);
+    expect(catchUpComplete([{ cycle: 1 }, { cycle: 3 }], 2, 2)).toBe(false);
+    expect(catchUpComplete([{ cycle: 1 }], 0, 2)).toBe(false);
+    expect(catchUpComplete([{ cycle: 1, delivered: [10] }], 1, 2)).toBe(false);
   });
 });
 

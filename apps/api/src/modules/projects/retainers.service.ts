@@ -9,12 +9,14 @@ import {
   type AuditAction,
   addDays,
   addMonths,
+  BACKDATE_LIMIT_MONTHS,
   businessDate,
   type CalendarDate,
   type CreateRetainer,
   type CurrentCycle,
   type Cycle,
   canChangeRetainerStatus,
+  catchUpComplete,
   currentCycleNumber,
   cycleDaysLeft,
   cyclePeriod,
@@ -291,17 +293,24 @@ export class RetainersService {
       const today = businessDate();
       // A cycle opening at once may assign its tasks (F07 rule 16): users must stay active.
       if (input.startDate <= today) await lockAccessChanges(tx);
-      const created = await this.createIn(tx, actor, input);
-      // F05B, F05C: the term starts at the current cycle, before that cycle opens.
+      const created = await this.createIn(tx, actor, input, { backdate: true });
+      const backdated = pastCycles(input.startDate, today) > 0;
+      // F05B, F05C: the term starts at the current cycle, before that cycle opens; at cycle 1 on
+      // a backdated retainer (B5).
       if (input.term) {
         await this.terms.createIn(
           tx,
           actorOf(actor),
           { id: created, startDate: input.startDate },
-          { ...input.term, startCycle: Math.max(1, currentCycleNumber(input.startDate, today)) },
+          {
+            ...input.term,
+            startCycle: backdated ? 1 : Math.max(1, currentCycleNumber(input.startDate, today)),
+          },
           today,
+          { backdated },
         );
       }
+      if (backdated) await this.catchUp(tx, actor, created, input, today);
       // R3, Y3: a retainer that has started gets its current cycle at once.
       await this.start(tx, actor, created, input.startDate);
       return created;
@@ -310,10 +319,55 @@ export class RetainersService {
   }
 
   /**
-   * Creates a retainer and its standing lines in the caller's transaction, without its first
-   * cycle: `start` opens it, once the caller linked a template (F04 A8).
+   * F05C B3, B4, B7: the past cycles of a new backdated retainer, oldest first: each recorded
+   * closed with its delivery choice and charged with its billing choice; the charges drafted now
+   * become due (their drafts follow, C3, C4) before the current cycle opens.
    */
-  async createIn(tx: Transaction, actor: CurrentUserInfo, input: CreateRetainer): Promise<string> {
+  private async catchUp(
+    tx: Transaction,
+    actor: CurrentUserInfo,
+    retainerId: string,
+    input: CreateRetainer,
+    today: CalendarDate,
+  ): Promise<void> {
+    const retainer = { id: retainerId, startDate: input.startDate };
+    const entries = [...(input.catchUp ?? [])].sort((a, b) => a.cycle - b.cycle);
+    const recorded = [];
+    for (const entry of entries) {
+      const period = cyclePeriod(input.startDate, entry.cycle);
+      await this.cycles.createBackdated(tx, retainer, entry.cycle, entry.delivered);
+      const amountMinor = await this.charges.catchUp(
+        tx,
+        retainerId,
+        { number: entry.cycle, start: period.periodStart },
+        entry.billing,
+        input.monthlyFeeMinor ?? null,
+        actorOf(actor),
+      );
+      recorded.push({ ...entry, ...period, amountMinor });
+    }
+    await recordAudit(tx, {
+      actor: actorOf(actor),
+      action: 'retainer.backdated',
+      entityType: 'retainer',
+      entityId: retainerId,
+      after: { startDate: input.startDate, pastCycles: recorded },
+    });
+    await this.charges.runDue(tx, retainerId, today, actorOf(actor));
+  }
+
+  /**
+   * Creates a retainer and its standing lines in the caller's transaction, without its first
+   * cycle: `start` opens it, once the caller linked a template (F04 A8). `backdate`: the new
+   * retainer form, whose start date may be up to 12 months back with its catch-up (F05C B1, B2);
+   * otherwise (quote acceptance, B6) it starts in the cycle holding today or later.
+   */
+  async createIn(
+    tx: Transaction,
+    actor: CurrentUserInfo,
+    input: CreateRetainer,
+    options: { backdate?: boolean } = {},
+  ): Promise<string> {
     const client = await this.clients.summary(input.clientId, tx, { forUpdate: true });
     if (!client) throw new NotFoundException();
     if (!coversClient(actor, client)) throw new ForbiddenException();
@@ -321,12 +375,19 @@ export class RetainersService {
     if (
       input.currency !== undefined ||
       input.monthlyFeeMinor !== undefined ||
-      input.term !== undefined
+      input.term !== undefined ||
+      input.catchUp !== undefined
     ) {
       assertCanEditMoney(actor, client);
     }
     assertLines(input.deliverables);
-    assertStartDate(input.startDate, businessDate());
+    const today = businessDate();
+    if (options.backdate) {
+      assertBackdate(input.startDate, today);
+      assertCatchUp(input, today);
+    } else {
+      assertStartDate(input.startDate, today);
+    }
     await this.assertNameFree(tx, client.id, input.name);
 
     const values = {
@@ -816,9 +877,38 @@ function assertLines(lines: { kind: DeliverableLine['kind']; label?: string | nu
   }
 }
 
+/** F05C B1: the cycles of a retainer that ended before the current one; 0 when it starts later. */
+function pastCycles(startDate: CalendarDate, today: CalendarDate): number {
+  return Math.max(0, currentCycleNumber(startDate, today) - 1);
+}
+
+/** F05C B1: a new retainer starts from today − 12 months (`INVALID_DATES` beyond). */
+function assertBackdate(startDate: CalendarDate, today: CalendarDate): void {
+  if (startDate < addMonths(today, -BACKDATE_LIMIT_MONTHS)) {
+    throw new CodedException(
+      400,
+      'INVALID_DATES',
+      'A retainer starts at most 12 months before today',
+    );
+  }
+}
+
+/** F05C B2: one complete catch-up entry per past cycle, none without past cycles. */
+function assertCatchUp(input: CreateRetainer, today: CalendarDate): void {
+  const past = pastCycles(input.startDate, today);
+  if (!catchUpComplete(input.catchUp ?? [], past, input.deliverables.length)) {
+    throw new CodedException(
+      400,
+      'CATCH_UP_REQUIRED',
+      'Each past cycle needs its billing and delivery, with a count per line when entered',
+      { pastCycles: past },
+    );
+  }
+}
+
 /**
- * A start date falls in the cycle that holds `today` or later: earlier cycles need the catch-up
- * of a backdated retainer (F05C B1, B2, not yet offered), so `INVALID_DATES` until then.
+ * A start date falls in the cycle that holds `today` or later (quote acceptance, F05C B6; an
+ * edited start date): earlier cycles need the new retainer form's catch-up.
  */
 function assertStartDate(startDate: CalendarDate, today: CalendarDate): void {
   if (addMonths(startDate, 1) <= today) {
