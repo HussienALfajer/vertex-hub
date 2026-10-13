@@ -59,13 +59,13 @@ Not in PR 1: the catch-up and start dates before the current cycle (PR 2: until 
 - [x] `fixtures.ts` mocks moved to cycles
 - [x] Flow spec: the header chip and the resume dialog
 - [x] Screenshots light and dark: header with the cycle chip, resume dialog, History
-- [ ] Gate: `pnpm test:e2e`; screenshots opened and checked (header with the cycle chip, resume dialog, History: checked)
+- [x] Gate: `pnpm test:e2e` (374: 372 passed; the F05C P3 test locator fixed, then 12/12; the f15 line-service test failed once under load and passed 3/3 alone); screenshots opened and checked (header with the cycle chip, resume dialog, History, client report)
 - [x] Found: task-generation, template and audit texts still said "this month"; now "this cycle" (runs already count on the cycle's period)
 
 ### Close PR 1
-- [ ] Wiring checklist against the diff; docs (spec: backfill by the month's last day, `month` scope kept in the enum, the PR 1 start-date rule: done)
-- [ ] Full checks through `checker` (lint, typecheck, test, build, E2E, migration drift)
-- [ ] `reviewer` with the spec; blocking findings fixed
+- [x] Wiring checklist against the diff; docs (spec: backfill by the month's last day, `month` scope kept in the enum, the PR 1 start-date rule: done)
+- [x] Full checks through `checker` (lint, typecheck, test, build, migration drift, OpenAPI fresh: all pass; E2E above)
+- [x] `reviewer` with the spec; blocking findings fixed (edit dialog start-date check, backfill keeps the month keys, cycle numbers never below 1)
 - [ ] Owner acceptance (browser steps); then `/ship`
 
 ## PR 2 — backdated start and catch-up
