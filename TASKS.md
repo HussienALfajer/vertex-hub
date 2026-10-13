@@ -109,8 +109,44 @@ PR 1 is merged (#111). No migration: `retainer_cycles.backdated`/`untracked` and
 - [x] `reviewer` with the spec; blocking finding fixed (an untracked cycle's lines showed 0 delivered and 0 % in History and the client report; now no count: `delivered` and `percent` null in the report, "—" on screen, PDF and Excel; API test added)
 - [x] Owner acceptance (accepted 2026-10-13); PR opened with auto-merge
 
-## PR 3 — cycle reports
-- [ ] Planned when PR 2 is merged
+## PR 3 — cycle reports (branch `claude/charming-hopper-85pv60`)
+
+PR 2 is merged (#112). Ownership: ADR 0027 lets no module import `reports`, so `retainer_cycle_reports`, the cycle report service and its routes belong to `reports` (spec updated: it said `projects` owns every new table); `projects` tells it a cycle closed through a new `CycleClosedHooks` (as `CycleOpenedHooks`). Not in PR 3: legal details and contracts (PR 4, PR 5).
+
+### 1. contracts
+- [ ] `reports.ts`: `cycleReportSchema` (R2: client, retainer, cycle number and period, `preliminary`, summary, this cycle's retainer section with lines, committed, frozen delivered, percent and delivery rate; delivered work, published content, shoots, approvals, campaigns and ad budget with `campaigns.read`, next period; no projects), `updateCycleReportSummarySchema`, `cycleReportSnapshotSchema`; `reportPdfJobSchema` gains kind `cycle_report`
+- [ ] Notification type `retainer_cycle_report_ready` (`clients_projects`, subject `retainer`, mutable) with its data; text and link in `packages/messages`; audit action `retainer_cycle_report.summary_changed` and entity type; `ar.json` keys
+- [ ] Unit tests (schemas, notification data); gate: `contracts` test, root `typecheck`
+
+### 2. db (`/db-migration`, expand only)
+- [ ] `retainer_cycle_reports` (`cycle_id` PK → `retainer_cycles.id`, `summary` ≤ 4,000 default empty, `pdf_status`, `storage_key`, `hash`, `size_bytes`, `rendered_at`, `updated_at`, `updated_by_id`); owner `reports` in `TABLE_OWNERS`; natural key in `conventions.test.ts`; `notification_type` enum value
+- [ ] Gate: `db` test, migration drift
+
+### 3. api
+- [ ] `projects`: `CycleClosedHooks` run in the closing transaction by the job (J1 step 3, with `backdated` skipped) and by ending (Y4); `EngagementReports` read of one cycle with its retainer and client
+- [ ] `reports`: `CycleReportService`: R1 (row, queued PDF, one `retainer_cycle_report_ready` to the account manager), R2 (sections over the cycle period), R3 (summary saves audit and mark the PDF outdated; render again on download), `reports.pdf-ready` for kind `cycle_report`
+- [ ] Controller: `GET …/report`, `/export` (xlsx), `PUT …/report/summary`, `POST` · `GET …/report/pdf`; `reports.read` covering the client, 404 outside
+- [ ] Tests `retainer-cycle-reports.test.ts`: each endpoint success, 401, 403, out of scope; R1–R3, backdated none, edge cases 3, 5 and 15, idempotent job; gate: api test files, `architecture.test.ts`, `api` typecheck
+
+### 4. worker
+- [ ] `reports.pdf` kind `cycle_report`: template (Arabic RTL, preliminary mark), worker test with screenshot; gate: `worker` test, typecheck
+
+### 5. bridge
+- [ ] `pnpm build`, `openapi:export`, `api:generate`
+
+### 6. web
+- [ ] Cycle report page `/retainers/$retainerId/cycles/$cycleId/report` (sections, preliminary badge, summary editor, Download PDF, Export to Excel); "Report" link per closed cycle in History; link from the client's report page; notification link
+- [ ] `ar.json` texts; gate: `web` typecheck, lint, `web` test
+
+### 7. e2e
+- [ ] `fixtures.ts` mocks; flow spec: the report from History, summary saved; screenshots light and dark of the cycle report
+- [ ] Gate: `pnpm test:e2e`; screenshots opened and checked
+
+### Close PR 3
+- [ ] Wiring checklist; spec updated (table ownership)
+- [ ] Full checks through `checker`
+- [ ] `reviewer` with the spec; blocking findings fixed
+- [ ] Owner acceptance; then `/ship`
 
 ## PR 4 — legal details
 - [ ] Planned when PR 3 is merged
