@@ -68,8 +68,46 @@ Not in PR 1: the catch-up and start dates before the current cycle (PR 2: until 
 - [x] `reviewer` with the spec; blocking findings fixed (edit dialog start-date check, backfill keeps the month keys, cycle numbers never below 1)
 - [ ] Owner acceptance (browser steps); then `/ship`
 
-## PR 2 — backdated start and catch-up
-- [ ] Planned when PR 1 is merged
+## PR 2 — backdated start and catch-up (branch `ccr-3689328e-v5jhy8`)
+
+PR 1 is merged (#111). No migration: `retainer_cycles.backdated`/`untracked` and `settled_outside` on `monthly` charges shipped in PR 1. Not in PR 2: cycle reports (PR 3; backdated cycles never get one), legal details and contracts (PR 4, PR 5). The quote accept dialog keeps rule B6 (no backdating there).
+
+### 1. contracts
+- [ ] `retainers.ts`: `catchUpEntrySchema` (`cycle`, `billing` `billed_externally`|`draft_now`, `delivery` `untracked`|`entered`, `delivered[]` per deliverable line 0–999) and `catchUp[]` (≤ 12) on `createRetainerSchema`; the term may start at cycle 1 with a backdated start (B5)
+- [ ] Error code `CATCH_UP_REQUIRED`; audit action `retainer.backdated`; `ar.json` keys (error, audit action and fields)
+- [ ] Unit tests: catch-up schema (B2: entries, choices, delivered counts, limits)
+- [ ] Gate: `contracts` test, root `typecheck`
+
+### 2. api
+- [ ] `POST /api/retainers`: start date from today − 12 months (B1); past cycles 1…current − 1 need one complete catch-up entry each (B2, `CATCH_UP_REQUIRED`), money access for it
+- [ ] B3 billing: `billed_externally` → monthly charge `settled_outside` with the note; `draft_now` → charge due now, drafted at once with the cycle label (J3); amount from the term schedule or the fee; no amount → no charge
+- [ ] B4 delivery: closed `backdated` cycles, `untracked` (no delivered counts, null rate) or `entered` (frozen `delivered_at_close`); no tasks, no A09, no notifications
+- [ ] B5 term from cycle 1 that includes the current cycle, created `active` (`INVALID_DATES` otherwise); renewal as usual
+- [ ] B7 audit: `retainer.created` and one `retainer.backdated` with each cycle's choices and counts
+- [ ] Tests in `retainers.test.ts` (or `retainer-backdated.test.ts`): B1–B5, B7, edge cases 6 and 7, 403 without money access, the current cycle still opens and drafts as Y3
+- [ ] Gate: api test files, `test/architecture.test.ts`, `api` typecheck
+
+### 3. bridge
+- [ ] `pnpm build`, `openapi:export`, `api:generate`; commit `openapi.json` and `schema.gen.ts`
+
+### 4. web
+- [ ] New retainer: start date back to 12 months; a **Past cycles** step for a start before the current cycle: one row per past cycle (number, period, amount), billing (billed outside / draft invoice now), delivery (not tracked / enter delivered, expanding an input per line)
+- [ ] Term section: may start at cycle 1 on a backdated start, schedule periods per cycle
+- [ ] History: "backdated" and "not tracked" badges (check what PR 1 already shows)
+- [ ] `ar.json` texts
+- [ ] Gate: `web` typecheck, lint, `web` test
+
+### 5. e2e
+- [ ] `fixtures.ts`: backdated create and History mocks
+- [ ] Flow spec: a backdated retainer with the catch-up
+- [ ] Screenshots light and dark: new retainer with Past cycles, History with backdated badges
+- [ ] Gate: `pnpm test:e2e`; screenshots opened and checked
+
+### Close PR 2
+- [ ] Wiring checklist against the diff; spec updated (B1's PR 1 note removed)
+- [ ] Full checks through `checker` (lint, typecheck, test, build, OpenAPI fresh; E2E)
+- [ ] `reviewer` with the spec; blocking findings fixed
+- [ ] Owner acceptance (browser steps 1–2 of the spec); then `/ship`
 
 ## PR 3 — cycle reports
 - [ ] Planned when PR 2 is merged
