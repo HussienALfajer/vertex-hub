@@ -11,7 +11,6 @@ import {
   type AcceptPlanQuery,
   type AcceptQuote,
   addDays,
-  addMonths,
   businessDate,
   type CalendarDate,
   type CountedQuoteItem,
@@ -200,15 +199,14 @@ export class QuoteAcceptService {
         name: quote.title,
         departments: derived.monthly.departments,
         startDate,
-        renewalDate: months ? addMonths(startDate, months) : null,
         template: template ? { id: template.id, name: template.name } : null,
         currency: quote.currency,
         monthlyFeeMinor,
         lines: derived.monthly.lines,
-        // F05B Q1: the quote's term, at the monthly net each month, renewing.
+        // F05B Q1: the quote's term, a cycle per month, at the monthly net each cycle, renewing.
         term: months
           ? {
-              months,
+              cycles: months,
               agreedTotalMinor: monthlyFeeMinor * months,
               schedule: splitEvenly(monthlyFeeMinor * months, months),
               endAction: 'renew',
@@ -216,10 +214,11 @@ export class QuoteAcceptService {
           : null,
         renewable: renewable
           .filter((candidate) => candidate.currency === quote.currency)
-          .map(({ id: retainerId, name, status, renewsFrom, afterTerm }) => ({
+          .map(({ id: retainerId, name, status, renewsFromCycle, renewsFrom, afterTerm }) => ({
             id: retainerId,
             name,
             status,
+            renewsFromCycle,
             renewsFrom,
             afterTerm,
           })),
@@ -374,7 +373,6 @@ export class QuoteAcceptService {
               name: choice.name,
               departments: choice.departments,
               startDate: choice.startDate,
-              renewalDate: choice.renewalDate,
               currency: quote.currency,
               monthlyFeeMinor: totals.monthly.netMinor,
               deliverables: lines,
@@ -382,7 +380,7 @@ export class QuoteAcceptService {
             },
             { quoteId: quote.id },
           );
-          // A8: linked before the first cycle opens, so F07 generates the month's tasks.
+          // A8: linked before the first cycle opens, so F07 generates the cycle's tasks.
           if (choice.templateId) {
             await this.runner.linkRetainerTemplate(tx, actor, retainerId, choice.templateId);
           }
@@ -390,7 +388,7 @@ export class QuoteAcceptService {
           retainer = { id: retainerId, name: choice.name };
           for (const code of choice.departments) departments.add(code);
         } else {
-          // F05B Q2: the lines, fee and term take effect after the active term, else next month.
+          // F05B Q2: the lines, fee and term take effect after the active term, else next cycle.
           const renewed = await this.engagements.renewRetainer(tx, actor, choice.retainerId, {
             quoteId: quote.id,
             clientId: client.id,
@@ -398,7 +396,7 @@ export class QuoteAcceptService {
             deliverables: lines,
             monthlyFeeMinor: totals.monthly.netMinor,
             term: choice.term,
-            // Linked with the lines, in the renewal's month (owner decision 2026-10-07).
+            // Linked with the lines, in the renewal's cycle (owner decision 2026-10-07).
             templateId: choice.templateId && (await this.renewalTemplate(tx, choice.templateId)),
             reason: `${quoteDisplayNumber(quote)} — ${quote.title}`.slice(0, 500),
           });

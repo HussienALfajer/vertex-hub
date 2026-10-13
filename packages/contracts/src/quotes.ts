@@ -791,8 +791,6 @@ export const acceptPlanSchema = z
         name: z.string(),
         departments: z.array(departmentCodeSchema),
         startDate: calendarDateSchema,
-        /** Start + the term when a term is set. */
-        renewalDate: calendarDateSchema.nullable(),
         /** The default monthly template; null when none is offered. */
         template: acceptPersonSchema.nullable(),
         currency: currencySchema,
@@ -808,8 +806,8 @@ export const acceptPlanSchema = z
           }),
         ),
         /**
-         * F05B Q1: the term the quote's monthly term proposes: its months, the monthly net times
-         * the months, split evenly, renewing; null when the quote has no term.
+         * F05B Q1: the term the quote's monthly term proposes: its months as cycles, the monthly
+         * net times the cycles, split evenly, renewing; null when the quote has no term.
          */
         term: retainerTermInputSchema
           .extend({ endAction: termEndActionSchema })
@@ -820,9 +818,10 @@ export const acceptPlanSchema = z
           acceptPersonSchema.extend({
             status: retainerStatusSchema,
             /**
-             * F05B Q2: the month a renewal takes effect (its lines, fee and term): the month after
-             * the active term, else next month.
+             * F05B Q2, F05C: the cycle a renewal takes effect in (its lines, fee and term): the
+             * cycle after the active term, else the next cycle; `renewsFrom` is its first day.
              */
+            renewsFromCycle: z.number().int().min(1),
             renewsFrom: calendarDateSchema,
             /** Whether the retainer has an active term the renewal waits for. */
             afterTerm: z.boolean(),
@@ -843,25 +842,27 @@ export type AcceptPlan = z.infer<typeof acceptPlanSchema>;
 const acceptTermSchema = retainerTermInputSchema.nullable().default(null);
 
 const acceptRetainerSchema = z.discriminatedUnion('mode', [
-  z.object({
-    mode: z.literal('new'),
-    name: projectNameSchema,
-    departments: engagementDepartmentsSchema,
-    startDate: calendarDateSchema,
-    /** Null with a term: the term sets it (`RENEWAL_DATE_FROM_TERM`). */
-    renewalDate: calendarDateSchema.nullable(),
-    templateId: z.uuid().nullable(),
-    /** F05B Q1: starts in the start date's month. */
-    term: acceptTermSchema,
-  }),
+  z
+    .object({
+      mode: z.literal('new'),
+      name: projectNameSchema,
+      departments: engagementDepartmentsSchema,
+      /** F05C B6: from the start of the current cycle such a date would have, today − 1 month + 1. */
+      startDate: calendarDateSchema,
+      templateId: z.uuid().nullable(),
+      /** F05B Q1: starts at the retainer's current cycle (its first when it starts today or later). */
+      term: acceptTermSchema,
+      // F05C T3': the renewal date is derived from the term; sending one is refused (400).
+    })
+    .strict(),
   z.object({
     mode: z.literal('renew'),
     retainerId: z.uuid(),
     /** Replaces the retainer's monthly template when set (A7). */
     templateId: z.uuid().nullable(),
     /**
-     * F05B Q2: starts the month after the retainer's active term, else next month; without one, an
-     * active term continues monthly after it ends.
+     * F05B Q2: starts the cycle after the retainer's active term, else the next cycle; without
+     * one, an active term continues cycle by cycle after it ends.
      */
     term: acceptTermSchema,
   }),

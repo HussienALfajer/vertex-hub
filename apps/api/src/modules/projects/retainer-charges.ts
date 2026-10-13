@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { type CalendarDate, firstOfMonth, type MonthEffect } from '@vertex-hub/contracts';
+import { type CalendarDate, type CycleEffect, cyclePeriod } from '@vertex-hub/contracts';
 import {
   type Database,
   retainerCharges,
@@ -7,16 +7,36 @@ import {
   retainers,
   type Transaction,
 } from '@vertex-hub/db';
-import { and, asc, eq, isNotNull, isNull, lte, ne, or } from 'drizzle-orm';
+import { and, asc, desc, eq, isNotNull, isNull, lte, ne, or } from 'drizzle-orm';
 import { CodedException } from '../../core/errors/index.js';
 import { type AuditActor, recordAudit } from '../audit/index.js';
 import { BillingLocks } from './billing-locks.js';
 import { ChargeInvoices } from './charge-invoices.js';
 import { RetainerChargeDueHooks } from './retainer-charge-due-hooks.js';
 
+/** A retainer cycle a charge belongs to: its number and its `cyclePeriod` start (F05C). */
+export interface ChargeCycle {
+  number: number;
+  start: CalendarDate;
+}
+
+/** A cycle's live `monthly` charge, as amendments change it (C6). */
+export interface CycleCharge {
+  id: string;
+  cycle: ChargeCycle;
+  amountMinor: number;
+  dueAt: Date | null;
+}
+
+/** A charge row's cycle; every row has one once F05C's backfill ran. */
+export const chargeCycleOf = (row: {
+  cycleNumber: number | null;
+  cycleStart: CalendarDate | null;
+}): ChargeCycle => ({ number: row.cycleNumber ?? 0, start: row.cycleStart ?? '' });
+
 /**
  * The charges of retainers (spec F05B, ADR 0029): every billable amount of a retainer is a charge
- * that invoices bill. Callers hold the retainer row lock (G2).
+ * that invoices bill, in a cycle of the retainer (F05C). Callers hold the retainer row lock (G2).
  */
 @Injectable()
 export class RetainerCharges {
@@ -26,19 +46,20 @@ export class RetainerCharges {
     private readonly invoices: ChargeInvoices,
   ) {}
 
-  /** T4: a term's `monthly` charges, one per month, its schedule (`base` = the amount). */
-  async createTermMonths(
+  /** T4: a term's `monthly` charges, one per cycle, its schedule (`base` = the amount). */
+  async createTermCycles(
     tx: Transaction,
     retainerId: string,
     termId: string,
-    months: { month: CalendarDate; amountMinor: number }[],
+    cycles: { cycle: ChargeCycle; amountMinor: number }[],
   ): Promise<void> {
-    if (months.length === 0) return;
+    if (cycles.length === 0) return;
     await tx.insert(retainerCharges).values(
-      months.map(({ month, amountMinor }) => ({
+      cycles.map(({ cycle, amountMinor }) => ({
         retainerId,
         termId,
-        month,
+        cycleNumber: cycle.number,
+        cycleStart: cycle.start,
         kind: 'monthly' as const,
         amountMinor,
         baseAmountMinor: amountMinor,
@@ -47,12 +68,12 @@ export class RetainerCharges {
   }
 
   /**
-   * T5: a scheduled term's month gets a new schedule amount (its charge is not due and on no
-   * invoice: drafts start in the term's first month).
+   * T5: a scheduled term's cycle gets a new schedule amount (its charge is not due and on no
+   * invoice: drafts start in the term's first cycle).
    */
   async setScheduleAmount(
     tx: Transaction,
-    charge: { id: string; month: CalendarDate; amountMinor: number },
+    charge: { id: string; cycle: number; amountMinor: number },
     amountMinor: number,
     retainerId: string,
     actor: AuditActor | null,
@@ -68,7 +89,7 @@ export class RetainerCharges {
       entityType: 'retainer_charge',
       entityId: charge.id,
       before: { amountMinor: charge.amountMinor },
-      after: { month: charge.month, amountMinor, retainerId },
+      after: { cycle: charge.cycle, amountMinor, retainerId },
     });
   }
 
@@ -78,7 +99,7 @@ export class RetainerCharges {
    */
   async cancel(
     tx: Transaction,
-    charges: { id: string; month: CalendarDate; kind: string; amountMinor: number }[],
+    charges: { id: string; cycle: number; kind: string; amountMinor: number }[],
     retainerId: string,
     actor: AuditActor | null,
   ): Promise<number> {
@@ -97,7 +118,7 @@ export class RetainerCharges {
         before: { status: 'pending' },
         after: {
           status: 'cancelled',
-          month: charge.month,
+          cycle: charge.cycle,
           kind: charge.kind,
           amountMinor: charge.amountMinor,
           retainerId,
@@ -108,18 +129,24 @@ export class RetainerCharges {
     return cancelled;
   }
 
-  /** E2: an early termination fee of the current month, due at once (its draft follows, C4). */
+  /** E2: an early termination fee of the current cycle, due at once (its draft follows, C4). */
   async createTerminationFee(
     tx: Transaction,
     retainerId: string,
+    cycle: ChargeCycle,
     today: CalendarDate,
     termination: { feeMinor: number; reason: string },
     actor: AuditActor | null,
   ): Promise<void> {
-    const month = firstOfMonth(today);
     const [created] = await tx
       .insert(retainerCharges)
-      .values({ retainerId, month, kind: 'termination_fee', amountMinor: termination.feeMinor })
+      .values({
+        retainerId,
+        cycleNumber: cycle.number,
+        cycleStart: cycle.start,
+        kind: 'termination_fee',
+        amountMinor: termination.feeMinor,
+      })
       .returning({ id: retainerCharges.id });
     if (!created) throw new Error('Charge insert returned no row');
     await recordAudit(tx, {
@@ -128,7 +155,7 @@ export class RetainerCharges {
       entityType: 'retainer_charge',
       entityId: created.id,
       after: {
-        month,
+        cycle: cycle.number,
         kind: 'termination_fee',
         amountMinor: termination.feeMinor,
         reason: termination.reason,
@@ -139,20 +166,26 @@ export class RetainerCharges {
   }
 
   /**
-   * C2: an open-ended month's `monthly` charge at the retainer's fee, when the fee is > 0 and the
-   * month has none yet.
+   * C2: an open-ended cycle's `monthly` charge at the retainer's fee, when the fee is > 0 and the
+   * cycle has none yet (a term cycle has its schedule's).
    */
   async createMonthly(
     tx: Transaction,
     retainerId: string,
-    month: CalendarDate,
+    cycle: ChargeCycle,
     feeMinor: number | null,
     actor: AuditActor | null,
   ): Promise<void> {
     if (!feeMinor || feeMinor <= 0) return;
     const [created] = await tx
       .insert(retainerCharges)
-      .values({ retainerId, month, kind: 'monthly', amountMinor: feeMinor })
+      .values({
+        retainerId,
+        cycleNumber: cycle.number,
+        cycleStart: cycle.start,
+        kind: 'monthly',
+        amountMinor: feeMinor,
+      })
       .onConflictDoNothing()
       .returning();
     if (!created) return;
@@ -161,35 +194,36 @@ export class RetainerCharges {
       action: 'retainer_charge.created',
       entityType: 'retainer_charge',
       entityId: created.id,
-      after: { month, kind: created.kind, amountMinor: created.amountMinor, retainerId },
+      after: {
+        cycle: cycle.number,
+        kind: created.kind,
+        amountMinor: created.amountMinor,
+        retainerId,
+      },
     });
   }
 
   /**
-   * C2 for a fee set after the month's cycle opened without one (F05 M4 "fee missing"): the
-   * cycle's month gets its charge at the new fee, due at once, as if the cycle had opened with it.
+   * C2 for a fee set after the cycle opened without one (F05 M4 "fee missing"): the open cycle
+   * gets its charge at the new fee, due at once, as if it had opened with it.
    */
-  async chargeOpenMonth(
+  async chargeOpenCycle(
     tx: Transaction,
-    retainerId: string,
+    retainer: { id: string; startDate: CalendarDate },
     today: CalendarDate,
     feeMinor: number | null,
     actor: AuditActor | null,
   ): Promise<void> {
-    const month = firstOfMonth(today);
     const [cycle] = await tx
-      .select({ id: retainerCycles.id })
+      .select({ number: retainerCycles.number })
       .from(retainerCycles)
-      .where(
-        and(
-          eq(retainerCycles.retainerId, retainerId),
-          eq(retainerCycles.month, month),
-          eq(retainerCycles.status, 'open'),
-        ),
-      );
-    if (!cycle) return;
-    await this.createMonthly(tx, retainerId, month, feeMinor, actor);
-    await this.runDue(tx, retainerId, today, actor);
+      .where(and(eq(retainerCycles.retainerId, retainer.id), eq(retainerCycles.status, 'open')))
+      .orderBy(desc(retainerCycles.number))
+      .limit(1);
+    if (!cycle?.number) return;
+    const start = cyclePeriod(retainer.startDate, cycle.number).periodStart;
+    await this.createMonthly(tx, retainer.id, { number: cycle.number, start }, feeMinor, actor);
+    await this.runDue(tx, retainer.id, today, actor);
   }
 
   /** Edge case 12: a retainer with a charge keeps its currency. */
@@ -203,16 +237,16 @@ export class RetainerCharges {
   }
 
   /**
-   * C6 for one month, as planned by `planMonthChange`: a free charge changes; a draft's charge
-   * changes and the draft follows; an issued month gets an `addition` or a `credit` of the
-   * difference, due at once (its draft follows, C4). `onward` amounts also move the month's base
+   * C6 for one cycle, as planned by `planCycleChange`: a free charge changes; a draft's charge
+   * changes and the draft follows; an issued cycle gets an `addition` or a `credit` of the
+   * difference, due at once (its draft follows, C4). `onward` amounts also move the cycle's base
    * (what a renewal copies, A3, T7); `amendmentId` names the addition or credit's amendment.
    */
-  async changeMonth(
+  async changeCycle(
     tx: Transaction,
     retainerId: string,
-    charge: { id: string; month: CalendarDate; amountMinor: number; dueAt: Date | null },
-    effect: MonthEffect,
+    charge: CycleCharge,
+    effect: CycleEffect,
     options: {
       deltaMinor: number;
       onward: boolean;
@@ -228,7 +262,8 @@ export class RetainerCharges {
         .insert(retainerCharges)
         .values({
           retainerId,
-          month: charge.month,
+          cycleNumber: charge.cycle.number,
+          cycleStart: charge.cycle.start,
           kind: effect.effect,
           amountMinor: deltaMinor,
           amendmentId: options.amendmentId,
@@ -241,7 +276,7 @@ export class RetainerCharges {
         entityType: 'retainer_charge',
         entityId: created.id,
         after: {
-          month: charge.month,
+          cycle: charge.cycle.number,
           kind: effect.effect,
           amountMinor: deltaMinor,
           amendmentId: options.amendmentId,
@@ -263,41 +298,46 @@ export class RetainerCharges {
       entityType: 'retainer_charge',
       entityId: charge.id,
       before: { amountMinor: charge.amountMinor },
-      after: { month: charge.month, amountMinor, amendmentId: options.amendmentId, retainerId },
+      after: {
+        cycle: charge.cycle.number,
+        amountMinor,
+        amendmentId: options.amendmentId,
+        retainerId,
+      },
     });
     if (effect.effect === 'draft_synced') {
       await this.invoices.syncDraft(tx, charge.id, amountMinor, actor);
       return;
     }
-    // C6: a due month that never drafted (its amount was 0) drafts once its amount is > 0.
+    // C6: a due cycle that never drafted (its amount was 0) drafts once its amount is > 0.
     if (charge.dueAt && charge.amountMinor <= 0 && amountMinor > 0) {
       await this.dueHooks.run(tx, {
         chargeId: charge.id,
         retainerId,
         kind: 'monthly',
-        month: charge.month,
+        cycle: charge.cycle.number,
         amountMinor,
         actor,
       });
     }
   }
 
-  /** A6: a reschedule's new amount for a month that no issued invoice bills (C6, base follows). */
+  /** A6: a reschedule's new amount for a cycle that no issued invoice bills (C6, base follows). */
   async reschedule(
     tx: Transaction,
     retainerId: string,
-    charge: { id: string; month: CalendarDate; amountMinor: number; dueAt: Date | null },
+    charge: CycleCharge,
     amountMinor: number,
     options: { amendmentId: string; draft: boolean; today: CalendarDate; actor: AuditActor },
   ): Promise<void> {
     const deltaMinor = amountMinor - charge.amountMinor;
     if (deltaMinor === 0) return;
-    await this.changeMonth(
+    await this.changeCycle(
       tx,
       retainerId,
       charge,
       {
-        month: charge.month,
+        cycle: charge.cycle.number,
         effect: options.draft ? 'draft_synced' : 'charge_changed',
         beforeMinor: charge.amountMinor,
         afterMinor: amountMinor,
@@ -309,19 +349,15 @@ export class RetainerCharges {
 
   /**
    * C5: the retainer's due, pending credits that no live invoice bills, oldest first (what a
-   * month's draft takes, and what is owed to the client, C9).
+   * cycle's draft takes, and what is owed to the client, C9).
    */
   async pendingCredits(
     executor: Database | Transaction,
     retainerId: string,
     tx?: Transaction,
-  ): Promise<{ id: string; month: CalendarDate; amountMinor: number }[]> {
+  ): Promise<{ id: string; amountMinor: number }[]> {
     const rows = await executor
-      .select({
-        id: retainerCharges.id,
-        month: retainerCharges.month,
-        amountMinor: retainerCharges.amountMinor,
-      })
+      .select({ id: retainerCharges.id, amountMinor: retainerCharges.amountMinor })
       .from(retainerCharges)
       .where(
         and(
@@ -331,7 +367,11 @@ export class RetainerCharges {
           isNotNull(retainerCharges.dueAt),
         ),
       )
-      .orderBy(asc(retainerCharges.month), asc(retainerCharges.createdAt), asc(retainerCharges.id));
+      .orderBy(
+        asc(retainerCharges.cycleNumber),
+        asc(retainerCharges.createdAt),
+        asc(retainerCharges.id),
+      );
     if (!tx) return rows;
     const free = [];
     for (const row of rows) if (!(await this.locks.chargeInvoiced(tx, row.id))) free.push(row);
@@ -340,7 +380,7 @@ export class RetainerCharges {
 
   /**
    * C5: a credit larger than what its draft could take keeps `appliedMinor`; the remainder
-   * becomes a new pending credit of the same month, due at once, split from it.
+   * becomes a new pending credit of the same cycle, due at once, split from it.
    */
   async splitCredit(
     tx: Transaction,
@@ -358,7 +398,8 @@ export class RetainerCharges {
       .insert(retainerCharges)
       .values({
         retainerId: credit.retainerId,
-        month: credit.month,
+        cycleNumber: credit.cycleNumber,
+        cycleStart: credit.cycleStart,
         kind: 'credit',
         amountMinor: split.remainderMinor,
         amendmentId: credit.amendmentId,
@@ -393,7 +434,7 @@ export class RetainerCharges {
     note: string,
     actor: AuditActor,
   ): Promise<void> {
-    // G2: the retainer lock orders this with the month drafts that take credits (C5).
+    // G2: the retainer lock orders this with the cycle drafts that take credits (C5).
     await tx
       .select({ id: retainers.id })
       .from(retainers)
@@ -429,14 +470,14 @@ export class RetainerCharges {
       after: {
         status: 'settled_outside',
         settleNote: note,
-        month: charge.month,
+        cycle: charge.cycleNumber,
         amountMinor: charge.amountMinor,
         retainerId,
       },
     });
   }
 
-  /** A3, T7: an onward amount moves a term month's base (open-ended months have none). */
+  /** A3, T7: an onward amount moves a term cycle's base (open-ended cycles have none). */
   private async moveBase(tx: Transaction, chargeId: string, deltaMinor: number): Promise<void> {
     const [charge] = await tx
       .select({ baseAmountMinor: retainerCharges.baseAmountMinor })
@@ -451,8 +492,8 @@ export class RetainerCharges {
 
   /**
    * C3: the retainer's pending charges that are due on `today` and were never marked (a `monthly`
-   * charge from the first day of its month, any other kind at once) get `due_at`, then the due
-   * hooks run for each, oldest month first, in the caller's transaction.
+   * charge from the first day of its cycle, any other kind at once) get `due_at`, then the due
+   * hooks run for each, oldest cycle first, in the caller's transaction.
    */
   async runDue(
     tx: Transaction,
@@ -464,7 +505,7 @@ export class RetainerCharges {
       .select({
         id: retainerCharges.id,
         kind: retainerCharges.kind,
-        month: retainerCharges.month,
+        cycle: retainerCharges.cycleNumber,
         amountMinor: retainerCharges.amountMinor,
       })
       .from(retainerCharges)
@@ -473,16 +514,26 @@ export class RetainerCharges {
           eq(retainerCharges.retainerId, retainerId),
           eq(retainerCharges.status, 'pending'),
           isNull(retainerCharges.dueAt),
-          or(ne(retainerCharges.kind, 'monthly'), lte(retainerCharges.month, firstOfMonth(today))),
+          or(ne(retainerCharges.kind, 'monthly'), lte(retainerCharges.cycleStart, today)),
         ),
       )
-      .orderBy(asc(retainerCharges.month), asc(retainerCharges.createdAt), asc(retainerCharges.id));
+      .orderBy(
+        asc(retainerCharges.cycleNumber),
+        asc(retainerCharges.createdAt),
+        asc(retainerCharges.id),
+      );
     for (const charge of due) {
       await tx
         .update(retainerCharges)
         .set({ dueAt: new Date() })
         .where(eq(retainerCharges.id, charge.id));
-      await this.dueHooks.run(tx, { chargeId: charge.id, retainerId, ...charge, actor });
+      await this.dueHooks.run(tx, {
+        chargeId: charge.id,
+        retainerId,
+        ...charge,
+        cycle: charge.cycle ?? 0,
+        actor,
+      });
     }
     return due.length;
   }

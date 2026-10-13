@@ -137,20 +137,20 @@ export const NOTIFICATION_TEXT = {
   },
   retainer_term_renewed: 'جُدّد عقد «{{retainer}}» تلقائيًا: المدة {{term}} من {{start}} إلى {{end}}',
   retainer_behind: {
-    zero: 'عقد «{{retainer}}» متأخر: انتهى الشهر',
-    one: 'عقد «{{retainer}}» متأخر: بقي يوم واحد على نهاية الشهر',
-    two: 'عقد «{{retainer}}» متأخر: بقي يومان على نهاية الشهر',
-    few: 'عقد «{{retainer}}» متأخر: بقيت {{n}} أيام على نهاية الشهر',
-    many: 'عقد «{{retainer}}» متأخر: بقي {{n}} يومًا على نهاية الشهر',
-    other: 'عقد «{{retainer}}» متأخر: بقي {{n}} يوم على نهاية الشهر',
+    zero: 'عقد «{{retainer}}» متأخر: انتهت الدورة',
+    one: 'عقد «{{retainer}}» متأخر: بقي يوم واحد على نهاية الدورة',
+    two: 'عقد «{{retainer}}» متأخر: بقي يومان على نهاية الدورة',
+    few: 'عقد «{{retainer}}» متأخر: بقيت {{n}} أيام على نهاية الدورة',
+    many: 'عقد «{{retainer}}» متأخر: بقي {{n}} يومًا على نهاية الدورة',
+    other: 'عقد «{{retainer}}» متأخر: بقي {{n}} يوم على نهاية الدورة',
   },
   retainer_behind_last: {
-    zero: 'تذكير أخير: عقد «{{retainer}}» متأخر وانتهى الشهر',
-    one: 'تذكير أخير: عقد «{{retainer}}» متأخر وبقي يوم واحد على نهاية الشهر',
-    two: 'تذكير أخير: عقد «{{retainer}}» متأخر وبقي يومان على نهاية الشهر',
-    few: 'تذكير أخير: عقد «{{retainer}}» متأخر وبقيت {{n}} أيام على نهاية الشهر',
-    many: 'تذكير أخير: عقد «{{retainer}}» متأخر وبقي {{n}} يومًا على نهاية الشهر',
-    other: 'تذكير أخير: عقد «{{retainer}}» متأخر وبقي {{n}} يوم على نهاية الشهر',
+    zero: 'تذكير أخير: عقد «{{retainer}}» متأخر وانتهت الدورة',
+    one: 'تذكير أخير: عقد «{{retainer}}» متأخر وبقي يوم واحد على نهاية الدورة',
+    two: 'تذكير أخير: عقد «{{retainer}}» متأخر وبقي يومان على نهاية الدورة',
+    few: 'تذكير أخير: عقد «{{retainer}}» متأخر وبقيت {{n}} أيام على نهاية الدورة',
+    many: 'تذكير أخير: عقد «{{retainer}}» متأخر وبقي {{n}} يومًا على نهاية الدورة',
+    other: 'تذكير أخير: عقد «{{retainer}}» متأخر وبقي {{n}} يوم على نهاية الدورة',
   },
   task_over_limit_pending: 'قرار معلّق منذ {{date}}: التعديل رقم {{n}} على «{{task}}» تجاوز الحد',
   task_medical_review_requested: '«{{task}}» تنتظر المراجعة الطبية',
@@ -502,8 +502,12 @@ export function notificationText(
         text: fill(text.retainer_term_renewed, {
           retainer: data.retainer,
           term: formatNumber(data.termNumber),
-          start: formatMonth(data.startMonth.slice(0, 7)),
-          end: formatMonth(data.endMonth.slice(0, 7)),
+          start: data.startDate
+            ? formatCalendarDate(data.startDate)
+            : formatMonth((data.startMonth ?? '').slice(0, 7)),
+          end: data.endDate
+            ? formatCalendarDate(data.endDate)
+            : formatMonth((data.endMonth ?? '').slice(0, 7)),
         }),
         context: data.client,
       };

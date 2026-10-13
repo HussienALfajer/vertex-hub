@@ -284,7 +284,6 @@ describe('acceptQuoteSchema', () => {
           name: 'Social',
           departments: ['design', 'design'],
           startDate: '2026-10-02',
-          renewalDate: null,
           templateId: null,
         },
       }).data?.retainer,
@@ -296,7 +295,7 @@ describe('acceptQuoteSchema', () => {
     expect(
       acceptQuoteSchema.parse({ respondedOn: '2026-10-02', retainer: renew }).retainer,
     ).toMatchObject({ term: null });
-    const term = { months: 3, agreedTotalMinor: 100000, schedule: [33333, 33333, 33334] };
+    const term = { cycles: 3, agreedTotalMinor: 100000, schedule: [33333, 33333, 33334] };
     expect(
       acceptQuoteSchema.parse({ respondedOn: '2026-10-02', retainer: { ...renew, term } }).retainer
         ?.term,
@@ -304,7 +303,7 @@ describe('acceptQuoteSchema', () => {
     expect(
       acceptQuoteSchema.safeParse({
         respondedOn: '2026-10-02',
-        retainer: { ...renew, term: { ...term, months: 37 } },
+        retainer: { ...renew, term: { ...term, cycles: 37 } },
       }).success,
     ).toBe(false);
   });

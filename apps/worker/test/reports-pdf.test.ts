@@ -33,6 +33,9 @@ const report: ClientReportSnapshot = {
   retainers: [
     {
       retainer: { id: uuid(3), name: 'باقة السوشيال' },
+      cycle: 2,
+      periodStart: '2026-08-20',
+      periodEnd: '2026-09-19',
       status: 'closed',
       lines: [
         { kind: 'post', label: null, committed: 12, delivered: 10, percent: 83 },

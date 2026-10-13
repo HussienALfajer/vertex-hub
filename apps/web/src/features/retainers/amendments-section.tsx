@@ -34,7 +34,7 @@ import { LoadError } from '../../components/load-error';
 import { MoneyInput } from '../../components/money-input';
 import { can, useMe } from '../../lib/auth';
 import { errorMessage } from '../../lib/errors';
-import { formatDateTime, formatMonth, formatNumber, isolateLtr } from '../../lib/format';
+import { formatDateTime, formatNumber, formatPeriod, isolateLtr } from '../../lib/format';
 import { formatMoney } from '../../lib/money';
 import { useFocusAfterChange } from '../../lib/use-focus-after-change';
 import { AmendmentDialog, EffectText } from './amendment-dialog';
@@ -133,14 +133,13 @@ function AmendmentCard({
   // preview); a rejected, withdrawn or cancelled one changed nothing.
   const planned = amendment.status === 'pending_approval' || amendment.status === 'scheduled';
   const effectsShown = planned || amendment.status === 'applied';
+  const cycle = t('retainers.cycleNumber', { number: formatNumber(amendment.effectiveCycle) });
   const title =
     amendment.kind === 'reschedule'
       ? t('retainers.amendments.reschedule')
       : amendment.kind === 'quote_renewal'
-        ? t('retainers.amendments.quoteRenewal', { month: formatMonth(amendment.effectiveMonth) })
-        : t(`retainers.amendments.scopeOf.${amendment.scope ?? 'month'}`, {
-            month: formatMonth(amendment.effectiveMonth),
-          });
+        ? t('retainers.amendments.quoteRenewal', { cycle })
+        : t(`retainers.amendments.scopeOf.${amendment.scope ?? 'cycle'}`, { cycle });
 
   async function act(action: 'approve' | 'withdraw') {
     try {
@@ -181,7 +180,7 @@ function AmendmentCard({
             {t(
               amendment.scope === 'onward'
                 ? 'retainers.amendments.amountOnward'
-                : 'retainers.amendments.amountMonth',
+                : 'retainers.amendments.amountCycle',
               {
                 amount: isolateLtr(
                   `${money.amountDeltaMinor > 0 ? '+' : '−'}${formatMoney(
@@ -189,7 +188,7 @@ function AmendmentCard({
                     currency,
                   )}`,
                 ),
-                month: formatMonth(amendment.effectiveMonth),
+                cycle,
               },
             )}
           </p>
@@ -215,9 +214,10 @@ function AmendmentCard({
       {money?.schedule && (
         <ul className="flex flex-wrap gap-2 text-sm">
           {money.schedule.map((entry) => (
-            <li key={entry.month}>
+            <li key={entry.cycle}>
               <Badge tone="outline">
-                {formatMonth(entry.month)}: {isolateLtr(formatMoney(entry.amountMinor, currency))}
+                {t('retainers.cycleNumber', { number: formatNumber(entry.cycle) })}:{' '}
+                {isolateLtr(formatMoney(entry.amountMinor, currency))}
               </Badge>
             </li>
           ))}
@@ -234,7 +234,7 @@ function AmendmentCard({
           )}
           <ul className="flex flex-col gap-1.5">
             {amendment.effects.map((effect) => (
-              <li key={`${effect.month}-${effect.effect}`}>
+              <li key={`${effect.cycle}-${effect.effect}`}>
                 <EffectText effect={effect} currency={currency} />
               </li>
             ))}
@@ -388,7 +388,7 @@ function RejectDialog({
 }
 
 /**
- * A6: new amounts for the term's months that no issued invoice bills, with the same sum; saved
+ * A6: new amounts for the term's cycles that no issued invoice bills, with the same sum; saved
  * at once without approval.
  */
 export function RescheduleDialog({
@@ -402,7 +402,7 @@ export function RescheduleDialog({
   term: RetainerTerm;
   currency: Currency;
   invoices: Map<string, SourceInvoice | null>;
-  /** Where the focus goes when the button is gone (fewer than two months left to move). */
+  /** Where the focus goes when the button is gone (fewer than two cycles left to move). */
   fallback: RefObject<HTMLElement | null>;
 }) {
   const { t } = useTranslation();
@@ -410,9 +410,9 @@ export function RescheduleDialog({
   const reschedule = useRescheduleTerm(retainerId);
   const openButton = useRef<HTMLButtonElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
-  const months = term.schedule.filter((month) => {
-    if (!month.chargeId || month.status !== 'pending' || !month.money) return false;
-    const invoice = invoices.get(month.chargeId);
+  const cycles = term.schedule.filter((cycle) => {
+    if (!cycle.chargeId || cycle.status !== 'pending' || !cycle.money) return false;
+    const invoice = invoices.get(cycle.chargeId);
     return !invoice || invoice.status === 'draft';
   });
   const [open, setOpen] = useState(false);
@@ -420,7 +420,7 @@ export function RescheduleDialog({
   const [reason, setReason] = useState('');
   const [problems, setProblems] = useState<{ reason?: true; total?: true }>({});
   const [failure, setFailure] = useState<string | null>(null);
-  const before = months.reduce((total, month) => total + (month.money?.amountMinor ?? 0), 0);
+  const before = cycles.reduce((total, cycle) => total + (cycle.money?.amountMinor ?? 0), 0);
   const after = amounts.reduce<number>((total, amount) => total + (amount ?? 0), 0);
 
   async function submit(event: React.FormEvent) {
@@ -432,7 +432,7 @@ export function RescheduleDialog({
     };
     setProblems(next);
     if (next.reason || next.total) {
-      // The first month when the amounts do not add up, else the reason.
+      // The first cycle when the amounts do not add up, else the reason.
       const target = next.total ? 'input' : 'textarea';
       formRef.current?.querySelector<HTMLElement>(target)?.focus();
       return;
@@ -441,8 +441,8 @@ export function RescheduleDialog({
       await reschedule.mutateAsync({
         termId: term.id,
         reason: reason.trim(),
-        schedule: months.map((month, index) => ({
-          month: month.month,
+        schedule: cycles.map((cycle, index) => ({
+          cycle: cycle.cycle,
           amountMinor: amounts[index] ?? 0,
         })),
       });
@@ -453,7 +453,7 @@ export function RescheduleDialog({
     }
   }
 
-  if (months.length < 2) return null;
+  if (cycles.length < 2) return null;
   return (
     <>
       <Button
@@ -461,7 +461,7 @@ export function RescheduleDialog({
         variant="outline"
         size="sm"
         onClick={() => {
-          setAmounts(months.map((month) => month.money?.amountMinor ?? 0));
+          setAmounts(cycles.map((cycle) => cycle.money?.amountMinor ?? 0));
           setReason('');
           setProblems({});
           setFailure(null);
@@ -487,15 +487,22 @@ export function RescheduleDialog({
               <DialogDescription>{t('retainers.amendments.rescheduleHint')}</DialogDescription>
             </DialogHeader>
             <ol className="flex flex-col divide-y divide-border rounded-lg border border-border">
-              {months.map((month, index) => (
+              {cycles.map((cycle, index) => (
                 <li
-                  key={month.month}
+                  key={cycle.cycle}
                   className="grid grid-cols-[minmax(0,1fr)_11rem] items-center gap-3 px-3 py-2"
                 >
-                  <span className="text-sm font-medium">{formatMonth(month.month)}</span>
+                  <span className="flex min-w-0 flex-col">
+                    <span className="text-sm font-medium">
+                      {t('retainers.cycleNumber', { number: formatNumber(cycle.cycle) })}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {formatPeriod(cycle.periodStart, cycle.periodEnd)}
+                    </span>
+                  </span>
                   <MoneyInput
-                    aria-label={t('retainers.terms.monthAmount', {
-                      month: formatMonth(month.month),
+                    aria-label={t('retainers.terms.cycleAmount', {
+                      cycle: t('retainers.cycleNumber', { number: formatNumber(cycle.cycle) }),
                     })}
                     aria-invalid={!!problems.total || undefined}
                     currency={currency}

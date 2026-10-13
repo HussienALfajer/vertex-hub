@@ -1,6 +1,9 @@
 import { Inject, Injectable } from '@nestjs/common';
 import {
+  type CalendarDate,
   type Currency,
+  type CyclePeriod,
+  cyclePeriod,
   type ExtraWorkBilling,
   type InvoiceSource,
   type InvoiceSourceType,
@@ -8,8 +11,8 @@ import {
   type RetainerChargeKind,
   type RetainerChargeListQuery,
   type RetainerChargeStatus,
-  termPosition,
 } from '@vertex-hub/contracts';
+import { formatRetainerCycle } from '@vertex-hub/messages';
 import {
   type Database,
   extraWorkItems,
@@ -41,9 +44,9 @@ export interface BillingEngagement {
 export interface BillingSource {
   type: InvoiceSourceType;
   id: string;
-  /** The milestone or extra work name; the charge's month for a retainer charge. */
+  /** The milestone or extra work name; the charge's cycle for a retainer charge. */
   name: string;
-  /** The default line text: "<engagement> — <milestone or month>", or the extra work title. */
+  /** The default line text: "<engagement> — <milestone or cycle>", or the extra work title. */
   description: string;
   /** The installment, the charge's amount or the estimate; null when it has none. */
   amountMinor: number | null;
@@ -63,13 +66,13 @@ export interface BillableWork {
     status: MilestoneStatus;
     installmentMinor: number;
   }[];
-  charges: {
+  charges: ({
     id: string;
     retainer: { id: string; name: string };
-    month: string;
+    cycle: number;
     kind: RetainerChargeKind;
     amountMinor: number;
-  }[];
+  } & CyclePeriod)[];
   extraWork: {
     id: string;
     project: { id: string; name: string } | null;
@@ -89,13 +92,13 @@ export interface BillingMilestone {
 }
 
 /** A retainer's charge as its billing summary and charge list show it (F05B). */
-export interface RetainerChargeRow {
+export interface RetainerChargeRow extends CyclePeriod {
   id: string;
-  month: string;
+  cycle: number;
   kind: RetainerChargeKind;
   amountMinor: number;
   status: RetainerChargeStatus;
-  /** A term month's `monthly` charge: its place in the term (F05B C4). */
+  /** A term cycle's `monthly` charge: its place in the term (F05B C4). */
   term: ChargeTerm | null;
   /** The amendment of an addition or a credit (C6). */
   amendment: { id: string; number: number } | null;
@@ -106,32 +109,41 @@ export interface RetainerChargeRow {
 export interface ChargeTerm {
   number: number;
   position: number;
-  months: number;
+  cycles: number;
 }
 
 const chargeTermColumns = {
   number: retainerTerms.number,
-  startMonth: retainerTerms.startMonth,
-  months: retainerTerms.months,
+  startCycle: retainerTerms.startCycle,
+  cycles: retainerTerms.cycles,
 };
 
 /** "2 of 3" of the charge's term, read from the joined term columns. */
 function chargeTerm(
-  month: string,
-  term: { number: number; startMonth: string; months: number } | null,
+  cycle: number,
+  term: { number: number; startCycle: number | null; cycles: number | null } | null,
 ): ChargeTerm | null {
   if (!term) return null;
   return {
     number: term.number,
-    position: termPosition(term.startMonth, month),
-    months: term.months,
+    position: cycle - (term.startCycle ?? cycle) + 1,
+    cycles: term.cycles ?? 1,
   };
+}
+
+/** A charge row's cycle and its anchored period (F05C). */
+function chargeCycle(
+  row: { cycleNumber: number | null },
+  startDate: CalendarDate,
+): { cycle: number } & CyclePeriod {
+  const cycle = row.cycleNumber ?? 1;
+  return { cycle, ...cyclePeriod(startDate, cycle) };
 }
 
 /** What a retainer's billing summary lists (F13). */
 export interface RetainerWork {
   monthlyFeeMinor: number | null;
-  /** Newest month first. */
+  /** Newest cycle first. */
   charges: RetainerChargeRow[];
   extraWork: {
     id: string;
@@ -141,35 +153,29 @@ export interface RetainerWork {
   }[];
 }
 
-/** "تشرين الأول 2026" for a cycle month (Syrian month names, Latin digits). */
-const monthName = new Intl.DateTimeFormat('ar-SY-u-nu-latn', {
-  month: 'long',
-  year: 'numeric',
-  timeZone: 'UTC',
-});
-
-export const cycleMonthName = (month: string) => monthName.format(new Date(`${month}T00:00:00Z`));
-
 /**
- * F05B C4: a charge's line text after its retainer's name: the month (with "n من N" in a term),
- * the amendment of an addition or a credit, or the termination fee.
+ * F05B C4, F05C J3: a charge's line text after its retainer's name: the cycle and its period
+ * (with "n من N" in a term), the amendment of an addition or a credit, or the termination fee.
  */
 function chargeName(row: {
   kind: RetainerChargeKind;
-  month: string;
+  cycle: { cycle: number } & CyclePeriod;
   term: ChargeTerm | null;
   amendmentNumber: number | null;
 }): string {
-  const month = cycleMonthName(row.month);
+  const cycle = formatRetainerCycle({ number: row.cycle.cycle, ...row.cycle });
   switch (row.kind) {
     case 'monthly':
-      return row.term ? `${month} (${row.term.position} من ${row.term.months})` : month;
+      return formatRetainerCycle(
+        { number: row.cycle.cycle, ...row.cycle },
+        row.term && { position: row.term.position, cycles: row.term.cycles },
+      );
     case 'addition':
-      return `تعديل ${row.amendmentNumber ?? ''} — ${month}`;
+      return `تعديل ${row.amendmentNumber ?? ''} — ${cycle}`;
     case 'credit':
-      return `رصيد دائن (تعديل ${row.amendmentNumber ?? ''}) — ${month}`;
+      return `رصيد دائن (تعديل ${row.amendmentNumber ?? ''}) — ${cycle}`;
     case 'termination_fee':
-      return `رسوم إنهاء مبكر — ${month}`;
+      return `رسوم إنهاء مبكر — ${cycle}`;
   }
 }
 
@@ -279,7 +285,8 @@ export class BillingSources {
       const query = executor
         .select({
           id: retainerCharges.id,
-          month: retainerCharges.month,
+          cycleNumber: retainerCharges.cycleNumber,
+          startDate: retainers.startDate,
           kind: retainerCharges.kind,
           amountMinor: retainerCharges.amountMinor,
           status: retainerCharges.status,
@@ -300,7 +307,8 @@ export class BillingSources {
           type: 'retainer',
           ...withoutArchivedAt(row.engagement),
         };
-        const name = chargeName({ ...row, term: chargeTerm(row.month, row.term) });
+        const cycle = chargeCycle(row, row.startDate);
+        const name = chargeName({ ...row, cycle, term: chargeTerm(cycle.cycle, row.term) });
         result.set(sourceKey({ type: 'retainer_charge', id: row.id }), {
           type: 'retainer_charge',
           id: row.id,
@@ -394,7 +402,8 @@ export class BillingSources {
           id: retainerCharges.id,
           retainerId: retainers.id,
           retainerName: retainers.name,
-          month: retainerCharges.month,
+          startDate: retainers.startDate,
+          cycleNumber: retainerCharges.cycleNumber,
           kind: retainerCharges.kind,
           amountMinor: retainerCharges.amountMinor,
         })
@@ -409,7 +418,7 @@ export class BillingSources {
         )
         .orderBy(
           asc(retainers.name),
-          desc(retainerCharges.month),
+          desc(retainerCharges.cycleNumber),
           asc(retainerCharges.createdAt),
           asc(retainerCharges.id),
         ),
@@ -453,7 +462,7 @@ export class BillingSources {
       charges: charges.map((row) => ({
         id: row.id,
         retainer: { id: row.retainerId, name: row.retainerName },
-        month: row.month,
+        ...chargeCycle(row, row.startDate),
         kind: row.kind,
         amountMinor: row.amountMinor,
       })),
@@ -488,7 +497,7 @@ export class BillingSources {
   }
 
   /**
-   * F13 retainer billing: the retainer's current fee, its charges (newest month first, F05B) and
+   * F13 retainer billing: the retainer's current fee, its charges (newest cycle first, F05B) and
    * its non-archived extra work (newest first).
    */
   async retainerWork(retainerId: string): Promise<RetainerWork> {
@@ -512,7 +521,7 @@ export class BillingSources {
     return { monthlyFeeMinor: retainer?.monthlyFeeMinor ?? null, charges, extraWork };
   }
 
-  /** F05B: one page of a retainer's charges, newest month first. */
+  /** F05B: one page of a retainer's charges, newest cycle first. */
   async retainerCharges(
     retainerId: string,
     query: RetainerChargeListQuery,
@@ -544,7 +553,8 @@ export class BillingSources {
     const query = this.db
       .select({
         id: retainerCharges.id,
-        month: retainerCharges.month,
+        cycleNumber: retainerCharges.cycleNumber,
+        startDate: retainers.startDate,
         kind: retainerCharges.kind,
         amountMinor: retainerCharges.amountMinor,
         status: retainerCharges.status,
@@ -555,24 +565,31 @@ export class BillingSources {
         amendmentNumber: retainerAmendments.number,
       })
       .from(retainerCharges)
+      .innerJoin(retainers, eq(retainers.id, retainerCharges.retainerId))
       .leftJoin(retainerTerms, eq(retainerTerms.id, retainerCharges.termId))
       .leftJoin(retainerAmendments, eq(retainerAmendments.id, retainerCharges.amendmentId))
       .where(where)
       .orderBy(
-        desc(retainerCharges.month),
+        desc(retainerCharges.cycleNumber),
         asc(retainerCharges.createdAt),
         asc(retainerCharges.id),
       );
     const rows = page ? await query.limit(page.limit).offset(page.offset) : await query;
-    return rows.map(({ dueAt, term, amendmentId, amendmentNumber, ...row }) => ({
-      ...row,
-      term: chargeTerm(row.month, term),
-      amendment:
-        amendmentId && amendmentNumber !== null
-          ? { id: amendmentId, number: amendmentNumber }
-          : null,
-      due: dueAt !== null,
-    }));
+    return rows.map(
+      ({ dueAt, term, amendmentId, amendmentNumber, cycleNumber, startDate, ...row }) => {
+        const cycle = chargeCycle({ cycleNumber }, startDate);
+        return {
+          ...row,
+          ...cycle,
+          term: chargeTerm(cycle.cycle, term),
+          amendment:
+            amendmentId && amendmentNumber !== null
+              ? { id: amendmentId, number: amendmentNumber }
+              : null,
+          due: dueAt !== null,
+        };
+      },
+    );
   }
 
   /**

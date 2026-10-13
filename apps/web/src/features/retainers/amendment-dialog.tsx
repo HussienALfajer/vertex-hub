@@ -2,16 +2,16 @@ import {
   type AmendmentEffect,
   type AmendmentPreview,
   type AmendmentScope,
-  addMonths,
   businessDate,
   type CalendarDate,
+  currentCycleNumber,
+  cyclePeriod,
   type CreateAmendment,
   type Currency,
   DELIVERABLE_KINDS,
   type DeliverableKind,
   type DeliverableLine,
   deliverableKey,
-  firstOfMonth,
   RETAINER_LIMITS,
   type RetainerDetail,
 } from '@vertex-hub/contracts';
@@ -43,6 +43,7 @@ import {
   ToggleGroupItem,
   toast,
 } from '@vertex-hub/ui';
+import type { TFunction } from 'i18next';
 import { FilePenLineIcon, MinusIcon, PlusIcon, ShieldAlertIcon, XIcon } from 'lucide-react';
 import { useEffect, useId, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
@@ -53,7 +54,7 @@ import { ApiError } from '../../lib/api/client';
 import { errorMessage } from '../../lib/errors';
 import { focusAfterRemoval } from '../../lib/focus-after-removal';
 import { focusFirstInvalid } from '../../lib/focus-first-invalid';
-import { formatMonth, formatNumber, isolateLtr } from '../../lib/format';
+import { formatNumber, formatPeriod, isolateLtr } from '../../lib/format';
 import { formatMoney } from '../../lib/money';
 import { DeliverableIcon, lineName } from './retainer-badges';
 import { useCreateAmendment, usePreviewAmendment } from './retainers.queries';
@@ -75,32 +76,44 @@ interface Problems {
   reason?: true;
   /** A new line without a quantity, or "other" without a name. */
   lines?: true;
-  /** The API refused the month or the amount (`INVALID_EFFECTIVE_MONTH`, `NEGATIVE_AMOUNT`). */
-  month?: string;
+  /** The API refused the cycle or the amount (`INVALID_EFFECTIVE_CYCLE`, `NEGATIVE_AMOUNT`). */
+  cycle?: string;
   amount?: string;
 }
 
-/** The refusals that belong to a field: the month or the amount. */
-const FIELD_OF_CODE: Record<string, 'month' | 'amount'> = {
-  INVALID_EFFECTIVE_MONTH: 'month',
+/** The refusals that belong to a field: the cycle or the amount. */
+const FIELD_OF_CODE: Record<string, 'cycle' | 'amount'> = {
+  INVALID_EFFECTIVE_CYCLE: 'cycle',
   NEGATIVE_AMOUNT: 'amount',
 };
 
 const PREVIEW_DELAY_MS = 400;
 
-/** The months an amendment may take effect in: this month and the next two years (A1). */
-function effectiveMonths(): CalendarDate[] {
-  const first = firstOfMonth(businessDate());
-  return Array.from({ length: 25 }, (_, index) => addMonths(first, index));
+/** F05C A1': the retainer's current cycle (its first before it starts). */
+const currentCycleOf = (retainer: RetainerDetail) =>
+  Math.max(1, currentCycleNumber(retainer.startDate, businessDate()));
+
+/** A cycle with its period, as the pickers and effects name it: "الدورة 7 · 20 … – 19 …". */
+export function cycleLabel(
+  t: TFunction,
+  startDate: CalendarDate,
+  number: number,
+): string {
+  const period = cyclePeriod(startDate, number);
+  return t('retainers.terms.cycleOption', {
+    cycle: t('retainers.cycleNumber', { number: formatNumber(number) }),
+    period: formatPeriod(period.periodStart, period.periodEnd),
+  });
 }
 
 /**
- * F05B screen 3, "New amendment": one month or onward, line changes, an amount change per month
- * and a reason, with a live preview of what happens to each month and the approval notice (A4).
+ * F05B screen 3, F05C screen 5, "New amendment": this cycle only or from a cycle onward, line
+ * changes, an amount change per cycle and a reason, with a live preview of what happens to each
+ * cycle and the approval notice (A4).
  */
 export function AmendmentDialog({ retainer }: { retainer: RetainerDetail }) {
   const { t } = useTranslation();
-  const ids = { month: useId(), reason: useId(), amount: useId(), scope: useId() };
+  const ids = { cycle: useId(), reason: useId(), amount: useId(), scope: useId() };
   const currency = retainer.money?.currency ?? 'USD';
   const create = useCreateAmendment(retainer.id);
   const preview = usePreviewAmendment(retainer.id);
@@ -109,8 +122,8 @@ export function AmendmentDialog({ retainer }: { retainer: RetainerDetail }) {
   // Only the latest preview is shown: an earlier answer may arrive after a later one.
   const previewRequest = useRef(0);
   const [open, setOpen] = useState(false);
-  const [scope, setScope] = useState<AmendmentScope>('month');
-  const [month, setMonth] = useState<CalendarDate>(firstOfMonth(businessDate()));
+  const [scope, setScope] = useState<AmendmentScope>('cycle');
+  const [cycle, setCycle] = useState<number>(currentCycleOf(retainer));
   const [lines, setLines] = useState<LineDraft[]>([]);
   const [direction, setDirection] = useState<Direction>('increase');
   const [amount, setAmount] = useState<number | null>(null);
@@ -119,11 +132,14 @@ export function AmendmentDialog({ retainer }: { retainer: RetainerDetail }) {
   const [failure, setFailure] = useState<string | null>(null);
   const [shown, setShown] = useState<AmendmentPreview | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
-  const months = effectiveMonths().map((value) => ({ value, label: formatMonth(value) }));
+  // The current cycle and the next two years (A1').
+  const cycles = Array.from({ length: 25 }, (_, index) => currentCycleOf(retainer) + index).map(
+    (value) => ({ value, label: cycleLabel(t, retainer.startDate, value) }),
+  );
 
   const body: CreateAmendment = {
     scope,
-    effectiveMonth: month,
+    effectiveCycle: cycle,
     lines: lines
       .filter((line) => line.added || line.delta !== 0)
       .map((line) => ({
@@ -171,8 +187,8 @@ export function AmendmentDialog({ retainer }: { retainer: RetainerDetail }) {
   }, [open, request]);
 
   function openDialog() {
-    setScope('month');
-    setMonth(firstOfMonth(businessDate()));
+    setScope('cycle');
+    setCycle(currentCycleOf(retainer));
     setLines([]);
     setDirection('increase');
     setAmount(null);
@@ -251,44 +267,44 @@ export function AmendmentDialog({ retainer }: { retainer: RetainerDetail }) {
                   onValueChange={(next: AmendmentScope[]) => {
                     if (!next[0]) return;
                     setScope(next[0]);
-                    setProblems(({ month: _, ...rest }) => rest);
+                    setProblems(({ cycle: _, ...rest }) => rest);
                   }}
                 >
-                  {(['month', 'onward'] as const).map((value) => (
+                  {(['cycle', 'onward'] as const).map((value) => (
                     <ToggleGroupItem key={value} value={value}>
                       {t(`retainers.amendments.scopes.${value}`)}
                     </ToggleGroupItem>
                   ))}
                 </ToggleGroup>
               </Field>
-              <Field invalid={!!problems.month}>
-                <FieldLabel htmlFor={ids.month}>
-                  {scope === 'month'
-                    ? t('retainers.amendments.month')
-                    : t('retainers.amendments.fromMonth')}
+              <Field invalid={!!problems.cycle}>
+                <FieldLabel htmlFor={ids.cycle}>
+                  {scope === 'cycle'
+                    ? t('retainers.amendments.cycle')
+                    : t('retainers.amendments.fromCycle')}
                 </FieldLabel>
                 <Select
-                  items={months}
-                  value={month}
-                  onValueChange={(value: CalendarDate | null) => {
+                  items={cycles}
+                  value={cycle}
+                  onValueChange={(value: number | null) => {
                     if (!value) return;
-                    setMonth(value);
-                    setProblems(({ month: _, ...rest }) => rest);
+                    setCycle(value);
+                    setProblems(({ cycle: _, ...rest }) => rest);
                   }}
                 >
-                  <SelectTrigger id={ids.month}>
+                  <SelectTrigger id={ids.cycle}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {months.map((item) => (
+                    {cycles.map((item) => (
                       <SelectItem key={item.value} value={item.value}>
                         {item.label}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-                <FieldError match={!!problems.month} role="alert">
-                  {problems.month}
+                <FieldError match={!!problems.cycle} role="alert">
+                  {problems.cycle}
                 </FieldError>
               </Field>
             </div>
@@ -343,8 +359,8 @@ export function AmendmentDialog({ retainer }: { retainer: RetainerDetail }) {
                 />
               </div>
               <FieldDescription>
-                {scope === 'month'
-                  ? t('retainers.amendments.amountHintMonth')
+                {scope === 'cycle'
+                  ? t('retainers.amendments.amountHintCycle')
                   : t('retainers.amendments.amountHintOnward')}
               </FieldDescription>
               <FieldError match={!!problems.amount} role="alert">
@@ -562,7 +578,7 @@ function LinesEditor({
   );
 }
 
-/** C6: per month what saving would do, and whether it waits for the General Manager (A4). */
+/** C6: per cycle what saving would do, and whether it waits for the General Manager (A4). */
 function PreviewPanel({
   currency,
   empty,
@@ -594,12 +610,12 @@ function PreviewPanel({
         <Skeleton className="h-10" />
       ) : (
         <>
-          {preview.months.length === 0 ? (
+          {preview.cycles.length === 0 ? (
             <p className="text-sm text-muted-foreground">{t('retainers.amendments.linesOnly')}</p>
           ) : (
             <ul className="flex flex-col gap-1.5 text-sm">
-              {preview.months.map((effect) => (
-                <li key={`${effect.month}-${effect.effect}`}>
+              {preview.cycles.map((effect) => (
+                <li key={`${effect.cycle}-${effect.effect}`}>
                   <EffectText effect={effect} currency={currency} />
                 </li>
               ))}
@@ -619,12 +635,15 @@ function PreviewPanel({
   );
 }
 
-/** "Nov 2026: draft updated 300 → 400", "Oct 2026: INV-… already sent — supplementary 100". */
+/**
+ * "Cycle 7 (20 Oct – 19 Nov): draft updated 300 → 400", "Cycle 6: INV-… already sent —
+ * supplementary 100".
+ */
 export function EffectText({ effect, currency }: { effect: AmendmentEffect; currency: Currency }) {
   const { t } = useTranslation();
   const money = effect.money;
   const values = {
-    month: formatMonth(effect.month),
+    cycle: t('retainers.cycleNumber', { number: formatNumber(effect.cycle) }),
     invoice: effect.invoice?.displayNumber ?? '',
     before: money ? isolateLtr(formatMoney(money.beforeMinor, currency)) : '',
     after: money ? isolateLtr(formatMoney(money.afterMinor, currency)) : '',
@@ -639,8 +658,11 @@ export function EffectText({ effect, currency }: { effect: AmendmentEffect; curr
           effect.effect === 'credit' ? 'warning' : effect.effect === 'addition' ? 'info' : 'neutral'
         }
       >
-        {formatMonth(effect.month)}
+        {t('retainers.cycleNumber', { number: formatNumber(effect.cycle) })}
       </Badge>
+      <span className="text-muted-foreground">
+        {formatPeriod(effect.periodStart, effect.periodEnd)}
+      </span>
       <span>
         {money
           ? t(`retainers.amendments.effects.${effect.effect}`, values)

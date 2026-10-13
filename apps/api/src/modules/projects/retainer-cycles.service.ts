@@ -10,12 +10,12 @@ import {
   type CycleListQuery,
   type CyclePage,
   type CycleStatus,
+  currentCycleNumber,
+  cyclePeriod,
   type DeliverableKind,
   deliverableKey,
   deliveryRate,
-  firstOfMonth,
   isLineBehind,
-  lastOfMonth,
   RETAINER_CYCLES_JOB,
   RETAINER_LIMITS,
   type RetainerStatus,
@@ -30,7 +30,22 @@ import {
   retainers,
   type Transaction,
 } from '@vertex-hub/db';
-import { and, asc, count, desc, eq, inArray, isNull, lt, max, sql, sum } from 'drizzle-orm';
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  gte,
+  inArray,
+  isNull,
+  lt,
+  lte,
+  max,
+  or,
+  sql,
+  sum,
+} from 'drizzle-orm';
 import { DATABASE } from '../../core/database/database.module.js';
 import { CodedException } from '../../core/errors/index.js';
 import { JobQueue, runEach } from '../../core/jobs/index.js';
@@ -50,21 +65,26 @@ type Executor = Database | Transaction;
 const cycleColumns = {
   id: retainerCycles.id,
   retainerId: retainerCycles.retainerId,
-  month: retainerCycles.month,
+  number: retainerCycles.number,
   periodStart: retainerCycles.periodStart,
   periodEnd: retainerCycles.periodEnd,
   status: retainerCycles.status,
   closedAt: retainerCycles.closedAt,
+  backdated: retainerCycles.backdated,
+  untracked: retainerCycles.untracked,
 };
 
 export interface CycleRow {
   id: string;
   retainerId: string;
-  month: string;
+  /** Set on every row once F05C's backfill ran. */
+  number: number | null;
   periodStart: string;
   periodEnd: string;
   status: CycleStatus;
   closedAt: Date | null;
+  backdated: boolean;
+  untracked: boolean;
 }
 
 const lineColumns = {
@@ -94,8 +114,9 @@ interface LineRow {
 const later = (a: string, b: string) => (a > b ? a : b);
 
 /**
- * Monthly cycles of retainers (spec F05 R2–R9, ADR 0015): opening and closing them, the
- * deliverables counter, and the daily `retainers.cycles` job that `apps/worker` schedules.
+ * Cycles of retainers anchored on their start date (spec F05 R2–R9, F05C, ADR 0015, ADR 0030):
+ * opening and closing them, the deliverables counter, and the daily `retainers.cycles` job that
+ * `apps/worker` schedules.
  */
 @Injectable()
 export class RetainerCyclesService implements OnModuleInit {
@@ -124,13 +145,13 @@ export class RetainerCyclesService implements OnModuleInit {
   }
 
   /**
-   * R2 and F05B "Jobs": for every non-archived retainer of a non-archived client, in one
-   * transaction under its lock and in this order: starts and completes terms, ends the retainer
-   * when a term ending with `end` completed (T8), applies the month's scheduled amendments (A5),
-   * closes open cycles that ended before `today`
-   * and opens the current month's for an active, started retainer (with its open-ended charge,
-   * C2), marks the charges that became due and runs their hooks (C3), unless the retainer ended,
-   * and schedules renewal terms (T7). Idempotent.
+   * F05C J1: for every non-archived retainer of a non-archived client, in one transaction under
+   * its lock and in this order: starts and completes terms, ending the retainer when a term ending
+   * with `end` completed (T8); applies scheduled amendments that took effect (A5); closes open
+   * cycles that ended before `today` or precede the current cycle; opens the current cycle of an
+   * active, started retainer unless it starts before `cycles_from` (P2), with its open-ended charge
+   * (C2); marks the charges that became due and runs their hooks (C3), unless the retainer ended;
+   * schedules renewal terms (T7). Idempotent (J2).
    */
   async runDaily(today: string = businessDate()): Promise<{
     closed: number;
@@ -166,6 +187,7 @@ export class RetainerCyclesService implements OnModuleInit {
               name: retainers.name,
               status: retainers.status,
               startDate: retainers.startDate,
+              cyclesFrom: retainers.cyclesFrom,
               archivedAt: retainers.archivedAt,
               clientId: retainers.clientId,
             })
@@ -175,16 +197,17 @@ export class RetainerCyclesService implements OnModuleInit {
           if (!retainer || retainer.archivedAt) return;
           const client = await this.clients.summary(retainer.clientId, tx);
           if (!client || client.archived) return;
-          const { endOn } = await this.terms.advance(tx, id, retainer.status, today);
+          const { endOn } = await this.terms.advance(tx, retainer, retainer.status, today);
           if (endOn) {
-            await this.endAfterTerm(tx, id, retainer.status, endOn, today);
+            await this.endAfterTerm(tx, retainer, retainer.status, endOn, today);
             retainer.status = 'ended';
             endedCount += 1;
           }
-          // A5: the month's amendments apply before its cycle opens and its charges become due.
+          // A5: the cycle's amendments apply before it opens and its charges become due.
           if (retainer.status !== 'ended') {
             applied += await this.amendments.applyScheduled(tx, retainer, today);
           }
+          const current = currentCycleNumber(retainer.startDate, today);
           const ended = await tx
             .select(cycleColumns)
             .from(retainerCycles)
@@ -192,16 +215,19 @@ export class RetainerCyclesService implements OnModuleInit {
               and(
                 eq(retainerCycles.retainerId, id),
                 eq(retainerCycles.status, 'open'),
-                lt(retainerCycles.periodEnd, today),
+                or(lt(retainerCycles.periodEnd, today), lt(retainerCycles.number, current)),
               ),
             );
           for (const cycle of ended) {
             await this.close(tx, cycle, null);
             closed += 1;
           }
-          if (retainer.status === 'active' && retainer.startDate <= today) {
-            if (await this.open(tx, id, retainer.startDate, today, null)) opened += 1;
-          }
+          const opens =
+            retainer.status === 'active' &&
+            current > 0 &&
+            (!retainer.cyclesFrom ||
+              cyclePeriod(retainer.startDate, current).periodStart >= retainer.cyclesFrom);
+          if (opens && (await this.open(tx, retainer, today, null))) opened += 1;
           if (retainer.status !== 'ended') due += await this.charges.runDue(tx, id, today, null);
           if (await this.terms.renew(tx, retainer, today)) renewed += 1;
         });
@@ -212,18 +238,19 @@ export class RetainerCyclesService implements OnModuleInit {
 
   /**
    * T8: the job ends a retainer whose term ending with `end` completed, on the term's last day,
-   * with a null actor, closing its cycles (F05 R5) and cancelling later months (E1).
+   * with a null actor, closing its cycles (F05 R5) and cancelling later cycles (E1).
    */
   private async endAfterTerm(
     tx: Transaction,
-    retainerId: string,
+    retainer: { id: string; startDate: CalendarDate },
     from: RetainerStatus,
     endOn: CalendarDate,
     today: CalendarDate,
   ): Promise<void> {
+    const retainerId = retainer.id;
     await tx
       .update(retainers)
-      .set({ status: 'ended', endedOn: endOn })
+      .set({ status: 'ended', endedOn: endOn, cyclesFrom: null })
       .where(eq(retainers.id, retainerId));
     await recordAudit(tx, {
       actor: null,
@@ -234,33 +261,43 @@ export class RetainerCyclesService implements OnModuleInit {
       after: { status: 'ended', endedOn: endOn },
     });
     await this.closeAll(tx, retainerId, endOn, null);
-    await this.terms.endEarly(tx, retainerId, today, null);
+    await this.terms.endEarly(tx, retainer, today, null);
     await this.amendments.cancelOpen(tx, retainerId, null);
   }
 
   /**
-   * R3, R4: opens the retainer's cycle for the month of `today` unless one exists, copying the
-   * retainer's lines with their full quantities. The period starts on the 1st or on `from`,
-   * whichever is later, then runs the `CycleOpenedHooks` in the same transaction (F07 rule 16).
-   * Creates the month's open-ended charge at the retainer's fee (F05B C2) and, the month having
-   * begun, marks it due at once (C3). Returns the new cycle's id, or null when the month already
-   * has one.
+   * R3, R4, F05C Y1–Y3: opens the retainer's current cycle unless it has one, copying the
+   * retainer's lines with their full quantities. The period is the cycle's `cyclePeriod`; with
+   * `startNow` (resuming, P2, P3) it starts `today` instead. Runs the `CycleOpenedHooks` in the
+   * same transaction (F07 rule 16), creates the cycle's open-ended charge at the retainer's fee
+   * (F05B C2) and, the cycle having begun, marks its charges due (C3). Clears `cycles_from`.
+   * Returns the new cycle's id, or null when the cycle already exists or has not begun.
    */
   async open(
     tx: Transaction,
-    retainerId: string,
-    from: string,
-    today: string,
+    retainer: { id: string; startDate: CalendarDate },
+    today: CalendarDate,
     actor: AuditActor | null,
+    options: { startNow?: boolean } = {},
   ): Promise<string | null> {
-    const month = firstOfMonth(today);
-    const period = { periodStart: later(from, month), periodEnd: lastOfMonth(today) };
+    const retainerId = retainer.id;
+    const number = currentCycleNumber(retainer.startDate, today);
+    if (number === 0) return null;
+    const anchored = cyclePeriod(retainer.startDate, number);
+    const period = {
+      periodStart: options.startNow ? later(today, anchored.periodStart) : anchored.periodStart,
+      periodEnd: anchored.periodEnd,
+    };
     const [created] = await tx
       .insert(retainerCycles)
-      .values({ retainerId, month, ...period })
-      .onConflictDoNothing({ target: [retainerCycles.retainerId, retainerCycles.month] })
+      .values({ retainerId, number, ...period })
+      .onConflictDoNothing({ target: [retainerCycles.retainerId, retainerCycles.number] })
       .returning({ id: retainerCycles.id });
     if (!created) return null;
+    await tx
+      .update(retainers)
+      .set({ cyclesFrom: null })
+      .where(and(eq(retainers.id, retainerId), lte(retainers.cyclesFrom, anchored.periodStart)));
     const standing = await tx
       .select({
         id: retainerDeliverables.id,
@@ -287,15 +324,15 @@ export class RetainerCyclesService implements OnModuleInit {
       position: index + 1,
     }));
     if (lines.length > 0) await tx.insert(retainerCycleLines).values(lines);
-    // F05B A2: month-scope line changes already applied for this month.
-    await this.amendments.openWithAmendments(tx, retainerId, created.id, month);
+    // F05B A2: cycle-scope line changes already applied for this cycle.
+    await this.amendments.openWithAmendments(tx, retainerId, created.id, number);
     await recordAudit(tx, {
       actor,
       action: 'retainer_cycle.created',
       entityType: 'retainer_cycle',
       entityId: created.id,
       after: {
-        month,
+        number,
         ...period,
         lines: lines.map(({ kind, label, committedQuantity }) => ({
           kind,
@@ -306,15 +343,15 @@ export class RetainerCyclesService implements OnModuleInit {
       },
     });
     await this.openedHooks.run(tx, { cycleId: created.id, retainerId, today, actor });
-    const [retainer] = await tx
+    const [fee] = await tx
       .select({ monthlyFeeMinor: retainers.monthlyFeeMinor })
       .from(retainers)
       .where(eq(retainers.id, retainerId));
     await this.charges.createMonthly(
       tx,
       retainerId,
-      month,
-      retainer?.monthlyFeeMinor ?? null,
+      { number, start: anchored.periodStart },
+      fee?.monthlyFeeMinor ?? null,
       actor,
     );
     await this.charges.runDue(tx, retainerId, today, actor);
@@ -332,7 +369,7 @@ export class RetainerCyclesService implements OnModuleInit {
 
   /**
    * R8: freezes each line's delivered count and closes the cycle. `endOn` shortens the period
-   * when the retainer ends before the month does.
+   * when the retainer ends before the cycle does (F05C Y4).
    */
   private async close(
     tx: Transaction,
@@ -368,6 +405,8 @@ export class RetainerCyclesService implements OnModuleInit {
       before: { status: 'open', periodEnd: cycle.periodEnd },
       after: {
         status: 'closed',
+        number: cycle.number,
+        periodStart: cycle.periodStart,
         periodEnd,
         lines: lines.map((line) => ({
           kind: line.kind,
@@ -398,7 +437,7 @@ export class RetainerCyclesService implements OnModuleInit {
           eq(retainerCycles.status, 'open'),
         ),
       )
-      .orderBy(desc(retainerCycles.month));
+      .orderBy(desc(retainerCycles.number));
     const newest = new Map<string, CycleRow>();
     for (const row of rows) if (!newest.has(row.retainerId)) newest.set(row.retainerId, row);
     const statuses = new Map(retainerRows.map((row) => [row.id, row.status]));
@@ -418,7 +457,7 @@ export class RetainerCyclesService implements OnModuleInit {
         .select(cycleColumns)
         .from(retainerCycles)
         .where(where)
-        .orderBy(desc(retainerCycles.month))
+        .orderBy(desc(retainerCycles.number))
         .limit(query.pageSize)
         .offset((query.page - 1) * query.pageSize),
       this.db.select({ value: count() }).from(retainerCycles).where(where),
@@ -591,7 +630,7 @@ export class RetainerCyclesService implements OnModuleInit {
     return this.presentLine(actor, retainerId, cycleId, lineId);
   }
 
-  /** Whether the retainer has had any cycle (its start date is then fixed). */
+  /** Whether the retainer has had any cycle (its start date is then fixed, F05C). */
   async hasCycles(tx: Transaction, retainerId: string): Promise<boolean> {
     const [row] = await tx
       .select({ id: retainerCycles.id })
@@ -632,10 +671,15 @@ export class RetainerCyclesService implements OnModuleInit {
   }
 
   /**
-   * The cycles of the retainers for a month (first day), open or closed, as their pages show them
-   * (F15 monthly client report): frozen counts for closed cycles, live ones for open cycles.
+   * The cycles of the retainers whose period overlaps `from`–`to`, open or closed, as their pages
+   * show them (F15 monthly client report, F05C R4): frozen counts for closed cycles, live ones for
+   * open cycles; by cycle number.
    */
-  async ofMonth(retainers: ReadonlyMap<string, RetainerStatus>, month: CalendarDate) {
+  async overlapping(
+    retainers: ReadonlyMap<string, RetainerStatus>,
+    from: CalendarDate,
+    to: CalendarDate,
+  ) {
     if (retainers.size === 0) return [];
     const rows = await this.db
       .select(cycleColumns)
@@ -643,9 +687,11 @@ export class RetainerCyclesService implements OnModuleInit {
       .where(
         and(
           inArray(retainerCycles.retainerId, [...retainers.keys()]),
-          eq(retainerCycles.month, month),
+          lte(retainerCycles.periodStart, to),
+          gte(retainerCycles.periodEnd, from),
         ),
-      );
+      )
+      .orderBy(asc(retainerCycles.number));
     return this.present(rows, new Map(retainers));
   }
 
@@ -693,12 +739,15 @@ export class RetainerCyclesService implements OnModuleInit {
       return {
         id: cycle.id,
         retainerId: cycle.retainerId,
-        month: cycle.month,
+        number: cycle.number ?? 0,
         periodStart: cycle.periodStart,
         periodEnd: cycle.periodEnd,
         status: cycle.status,
+        backdated: cycle.backdated,
+        untracked: cycle.untracked,
         closedAt: cycle.closedAt?.toISOString() ?? null,
-        deliveryRate: deliveryRate(presented),
+        // F05C B4: a backdated cycle whose delivery was not recorded has no rate.
+        deliveryRate: cycle.untracked ? null : deliveryRate(presented),
         behind: presented.some((line) => line.behind),
         lines: presented,
       };

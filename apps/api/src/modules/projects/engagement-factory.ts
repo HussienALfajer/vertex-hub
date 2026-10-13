@@ -5,9 +5,9 @@ import {
   type CreateProject,
   type CreateRetainer,
   type Currency,
+  currentCycleNumber,
   type DeliverableKind,
   type DepartmentCode,
-  firstOfMonth,
   type RetainerStatus,
   type RetainerTermInput,
 } from '@vertex-hub/contracts';
@@ -30,7 +30,8 @@ export interface RenewableRetainer {
   name: string;
   status: RetainerStatus;
   currency: Currency;
-  /** F05B Q2: the month after its active term, else next month. */
+  /** F05B Q2, F05C: the cycle after its active term, else the next cycle, and its first day. */
+  renewsFromCycle: number;
   renewsFrom: CalendarDate;
   /** Whether it has an active term the renewal waits for. */
   afterTerm: boolean;
@@ -53,7 +54,7 @@ export interface RetainerRenewal {
   monthlyFeeMinor: number;
   /** The monthly template linked with the renewal (owner decision); null keeps the retainer's. */
   templateId: string | null;
-  /** The new term; null: none (an active term continues monthly after it ends). */
+  /** The new term; null: none (an active term continues cycle by cycle after it ends). */
   term: RetainerTermInput | null;
   /** The quote renewal amendment's reason (the quote's number and title). */
   reason: string;
@@ -91,9 +92,9 @@ export class EngagementFactory {
   }
 
   /**
-   * Without its first cycle: link its template, then `startRetainer` (A8). A `term` starts in the
-   * start date's month, or the current month when that is later, and records the quote that
-   * created it (F05B Q1).
+   * Without its first cycle: link its template, then `startRetainer` (A8). A `term` starts at the
+   * retainer's current cycle (its first one when it starts today or later) and records the quote
+   * that created it (F05B Q1, F05C B6).
    */
   async createRetainer(
     tx: Transaction,
@@ -101,23 +102,14 @@ export class EngagementFactory {
     input: CreateRetainer,
     options: { quoteId?: string } = {},
   ): Promise<string> {
-    if (input.term && input.renewalDate) {
-      throw new CodedException(
-        409,
-        'RENEWAL_DATE_FROM_TERM',
-        'A retainer with a term takes its renewal date from the term',
-      );
-    }
     const id = await this.retainers.createIn(tx, actor, input);
     if (input.term) {
-      // A start date in an earlier month starts the term this month (owner decision 2026-10-07).
       const today = businessDate();
-      const startMonth = [firstOfMonth(input.startDate), firstOfMonth(today)].sort()[1];
       await this.terms.createIn(
         tx,
         actorOf(actor),
         { id, startDate: input.startDate },
-        { ...input.term, startMonth: startMonth ?? firstOfMonth(today) },
+        { ...input.term, startCycle: Math.max(1, currentCycleNumber(input.startDate, today)) },
         today,
         { quoteId: options.quoteId },
       );
@@ -125,7 +117,7 @@ export class EngagementFactory {
     return id;
   }
 
-  /** R3: a retainer whose start date is today or earlier opens this month's cycle. */
+  /** R3: a retainer whose start date is today or earlier opens its current cycle. */
   startRetainer(
     tx: Transaction,
     actor: CurrentUserInfo,
@@ -160,15 +152,25 @@ export class EngagementFactory {
     const starts = await this.terms.renewalStarts(executor, rows, businessDate());
     return rows.flatMap(({ startDate: _startDate, ...row }) => {
       const start = starts.get(row.id);
-      return start ? [{ ...row, ...start }] : [];
+      return start
+        ? [
+            {
+              ...row,
+              renewsFromCycle: start.cycle,
+              renewsFrom: start.renewsFrom,
+              afterTerm: start.afterTerm,
+            },
+          ]
+        : [];
     });
   }
 
   /**
    * A7 with F05B Q2: the quote's term (if any) is placed after the active term, replacing a
    * scheduled one, and its lines, fee and monthly template become a `quote_renewal` amendment of
-   * that month.
-   * Returns the retainer's name and departments and the month the renewal takes effect in.
+   * that cycle.
+   * Returns the retainer's name and departments and the first day of the cycle the renewal takes
+   * effect in.
    */
   async renewRetainer(
     tx: Transaction,
@@ -186,7 +188,7 @@ export class EngagementFactory {
       );
     }
     assertCanEditMoney(actor, retainer.client);
-    const renewsFrom = await this.terms.renewForQuote(
+    const start = await this.terms.renewForQuote(
       tx,
       actorOf(actor),
       retainer,
@@ -195,7 +197,8 @@ export class EngagementFactory {
     );
     await this.amendments.createQuoteRenewal(tx, retainerId, actorOf(actor), {
       quoteId: renewal.quoteId,
-      effectiveMonth: renewsFrom,
+      effectiveCycle: start.cycle,
+      effectiveDate: start.renewsFrom,
       feeMinor: renewal.monthlyFeeMinor,
       templateId: renewal.templateId,
       lines: renewal.deliverables,
@@ -206,6 +209,6 @@ export class EngagementFactory {
       .from(retainers)
       .where(eq(retainers.id, retainerId));
     if (!row) throw new Error('The retainer disappeared');
-    return { ...row, renewsFrom };
+    return { ...row, renewsFrom: start.renewsFrom };
   }
 }

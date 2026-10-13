@@ -2,17 +2,18 @@ import { randomUUID } from 'node:crypto';
 import type { INestApplication } from '@nestjs/common';
 import {
   addDays,
+  addMonths,
   businessDate,
+  cyclePeriod,
   deliverableLineListSchema,
-  firstOfMonth,
-  lastOfMonth,
   retainerDetailSchema,
   retainerPageSchema,
 } from '@vertex-hub/contracts';
-import { auditEntries, createDatabase, invoices } from '@vertex-hub/db';
+import { auditEntries, createDatabase, invoices, retainerCharges } from '@vertex-hub/db';
 import { testDatabaseUrl } from '@vertex-hub/db/testing';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { RetainerCyclesService } from '../src/modules/projects/retainer-cycles.service.js';
 import { expectError, seedClientCast } from './client-cast.js';
 import { api } from './helpers.js';
 import { startApp } from './start-app.js';
@@ -85,11 +86,10 @@ describe('retainers', () => {
   });
 
   describe('create', () => {
-    it('creates a started retainer with this month’s cycle at full quantities, audited', async () => {
+    it('creates a started retainer with its first full cycle at full quantities, audited', async () => {
       const { id: clientId } = await cast.createClient();
       const created = await cast.createRetainer(clientId, {
         departments: ['design', 'content_management', 'design'],
-        renewalDate: addDays(today, 200),
         currency: 'USD',
         monthlyFeeMinor: 150000,
         deliverables: [
@@ -104,7 +104,9 @@ describe('retainers', () => {
         accountManager: { id: cast.am.id },
         startDate: today,
         endedOn: null,
+        renewalDate: null,
         renewal: null,
+        nextCycleStart: null,
         money: { currency: 'USD', monthlyFeeMinor: 150000 },
         permissions: {
           canManage: true,
@@ -119,12 +121,14 @@ describe('retainers', () => {
         ['reel', 4],
         ['monthly_report', 1],
       ]);
+      // F05C Y1, Y3: one full month from the start date, never a partial first cycle.
       expect(created.currentCycle).toMatchObject({
-        month: firstOfMonth(today),
+        number: 1,
         periodStart: today,
-        periodEnd: lastOfMonth(today),
+        periodEnd: addDays(addMonths(today, 1), -1),
         status: 'open',
         deliveryRate: 0,
+        termPosition: null,
       });
       expect(
         created.currentCycle?.lines.map((line) => [line.kind, line.committed, line.delivered]),
@@ -182,11 +186,26 @@ describe('retainers', () => {
 
     it('checks dates, names, duplicate lines and the line limit', async () => {
       const { id: clientId } = await cast.createClient();
+      // F05C B1, B2: a start date whose first cycle already ended needs the catch-up.
       await expectError(
-        await client.post('/api/retainers', cast.gm.cookie, body(clientId, { renewalDate: today })),
+        await client.post(
+          '/api/retainers',
+          cast.gm.cookie,
+          body(clientId, { startDate: addMonths(today, -1) }),
+        ),
         400,
         'INVALID_DATES',
       );
+      // F05C T3': the renewal date is derived from the term, never sent.
+      expect(
+        (
+          await client.post(
+            '/api/retainers',
+            cast.gm.cookie,
+            body(clientId, { renewalDate: addDays(today, 200) }),
+          )
+        ).status,
+      ).toBe(400);
       const first = await cast.createRetainer(clientId);
       await expectError(
         await client.post('/api/retainers', cast.gm.cookie, {
@@ -248,8 +267,20 @@ describe('retainers', () => {
     it('filters by client, account manager, status, search and renewal', async () => {
       const own = await cast.createClient();
       const other = await cast.createClient({ accountManagerId: cast.otherAm.id });
-      const soon = await cast.createRetainer(own.id, { renewalDate: addDays(today, 10) });
-      const later = await cast.createRetainer(own.id, { renewalDate: addDays(today, 90) });
+      // F05C T3': the renewal date follows the term. A one-cycle term that started 20 days ago
+      // renews in about ten days; a six-cycle term much later.
+      const term = (cycles: number) => ({
+        cycles,
+        agreedTotalMinor: 0,
+        schedule: Array.from({ length: cycles }, () => 0),
+      });
+      const soon = await cast.createRetainer(own.id, {
+        startDate: addDays(today, -20),
+        term: term(1),
+      });
+      const later = await cast.createRetainer(own.id, { term: term(6) });
+      expect(soon.renewalDate).toBe(addMonths(addDays(today, -20), 1));
+      expect(later.renewalDate).toBe(addMonths(today, 6));
       const theirs = await cast.createRetainer(other.id);
       const ids = (page: { items: { id: string }[] }) => page.items.map((item) => item.id).sort();
 
@@ -299,7 +330,6 @@ describe('retainers', () => {
       const created = await cast.createRetainer(clientId, { startDate: addDays(today, 40) });
       const response = await patch(created.id, cast.am.cookie, {
         name: `${created.name} 2`,
-        renewalDate: addDays(today, 400),
         currency: 'SYP',
         monthlyFeeMinor: 5000000,
       });
@@ -364,7 +394,7 @@ describe('retainers', () => {
       expect((await patch(free.id, cast.gm.cookie, { currency: 'SYP' })).status).toBe(200);
     });
 
-    it('fixes the start date once a cycle exists; an earlier start opens the cycle', async () => {
+    it('fixes the start date once a cycle or a charge exists; an earlier start opens the cycle', async () => {
       const { id: clientId } = await cast.createClient();
       const started = await cast.createRetainer(clientId);
       await expectError(
@@ -372,14 +402,25 @@ describe('retainers', () => {
         409,
         'RETAINER_STARTED',
       );
-      const later = await cast.createRetainer(clientId, { startDate: addDays(today, 40) });
-      const moved = await patch(later.id, cast.gm.cookie, { startDate: today });
-      expect(retainerDetailSchema.parse(await moved.json()).currentCycle?.status).toBe('open');
+      // F05C edge case 8: a future retainer with a term has charges, so its start date is fixed.
+      const termed = await cast.createRetainer(clientId, {
+        startDate: addDays(today, 40),
+        term: { cycles: 2, agreedTotalMinor: 0, schedule: [0, 0] },
+      });
       await expectError(
-        await patch(later.id, cast.gm.cookie, { renewalDate: addDays(today, -5) }),
+        await patch(termed.id, cast.gm.cookie, { startDate: addDays(today, 41) }),
+        409,
+        'RETAINER_STARTED',
+      );
+      const later = await cast.createRetainer(clientId, { startDate: addDays(today, 40) });
+      await expectError(
+        await patch(later.id, cast.gm.cookie, { startDate: addMonths(today, -1) }),
         400,
         'INVALID_DATES',
       );
+      const moved = await patch(later.id, cast.gm.cookie, { startDate: today });
+      expect(retainerDetailSchema.parse(await moved.json()).currentCycle?.status).toBe('open');
+      expect((await patch(later.id, cast.gm.cookie, { renewalDate: null })).status).toBe(400);
     });
 
     it('refuses callers outside client scope and money writes without money access', async () => {
@@ -478,7 +519,7 @@ describe('retainers', () => {
   });
 
   describe('status', () => {
-    it('keeps the same cycle through pause and resume in one month (edge case 5)', async () => {
+    it('keeps the same cycle through pause and resume in one cycle (edge case 5, F05C P2)', async () => {
       const { id: clientId } = await cast.createClient();
       const created = await cast.createRetainer(clientId);
       const cycleId = created.currentCycle?.id;
@@ -490,7 +531,11 @@ describe('retainers', () => {
       const resumed = retainerDetailSchema.parse(
         await (await status(created.id, cast.am.cookie, 'active')).json(),
       );
-      expect(resumed).toMatchObject({ status: 'active', currentCycle: { id: cycleId } });
+      expect(resumed).toMatchObject({
+        status: 'active',
+        currentCycle: { id: cycleId },
+        nextCycleStart: null,
+      });
     });
 
     it('ends by closing the open cycle, is then read-only, and reactivates with scope all', async () => {
@@ -519,15 +564,141 @@ describe('retainers', () => {
       expect((await status(created.id, cast.am.cookie, 'active')).status).toBe(403);
       const reactivated = await status(created.id, cast.operations.cookie, 'active');
       expect(reactivated.status).toBe(200);
+      // F05C P4: the cycle that closed on ending stays closed; it starts at the next cycle.
+      const nextStart = addMonths(today, 1);
       expect(retainerDetailSchema.parse(await reactivated.json())).toMatchObject({
         status: 'active',
         endedOn: null,
+        currentCycle: null,
+        nextCycleStart: nextStart,
       });
       const actions = (await auditOf(created.id)).map((entry) => [entry.action, entry.after]);
       expect(actions.slice(1)).toEqual([
         ['retainer.status_changed', { status: 'ended' }],
-        ['retainer.status_changed', { status: 'active' }],
+        ['retainer.status_changed', { status: 'active', cyclesFrom: nextStart }],
       ]);
+    });
+
+    it('refuses "start now" in the cycle that closed on ending (F05C P4)', async () => {
+      const { id: clientId } = await cast.createClient();
+      const created = await cast.createRetainer(clientId);
+      await status(created.id, cast.gm.cookie, 'ended');
+      await expectError(
+        await client.post(`/api/retainers/${created.id}/status`, cast.gm.cookie, {
+          status: 'active',
+          startNow: true,
+        }),
+        409,
+        'CYCLE_CLOSED',
+      );
+      expect(
+        (
+          await client.post(`/api/retainers/${created.id}/status`, cast.gm.cookie, {
+            status: 'paused',
+            startNow: true,
+          })
+        ).status,
+      ).toBe(400);
+    });
+
+    describe('resuming in a later cycle (F05C P2, P3)', () => {
+      const on = <T>(day: string, body: (cookie: string) => Promise<T>) => cast.onDay(day, body);
+      const chargesOf = (retainerId: string) =>
+        db
+          .select({
+            cycle: retainerCharges.cycleNumber,
+            amountMinor: retainerCharges.amountMinor,
+            status: retainerCharges.status,
+            due: retainerCharges.dueAt,
+          })
+          .from(retainerCharges)
+          .where(eq(retainerCharges.retainerId, retainerId))
+          .orderBy(retainerCharges.cycleNumber);
+      /** A retainer paused in cycle 1, on the third day of cycle 2 after the job ran. */
+      const pausedIntoCycleTwo = async (extra: object = {}) => {
+        const { id: clientId } = await cast.createClient();
+        const created = await cast.createRetainer(clientId, { monthlyFeeMinor: 50000, ...extra });
+        await status(created.id, cast.gm.cookie, 'paused');
+        const day = addDays(cyclePeriod(today, 2).periodStart, 2);
+        await app.get(RetainerCyclesService).runDaily(day);
+        return { created, day };
+      };
+
+      it('starts an open-ended retainer at the next cycle by default (P2)', async () => {
+        const { created, day } = await pausedIntoCycleTwo();
+        const third = cyclePeriod(today, 3).periodStart;
+        const resumed = await on(day, async (cookie) =>
+          retainerDetailSchema.parse(await (await status(created.id, cookie, 'active')).json()),
+        );
+        expect(resumed).toMatchObject({ currentCycle: null, nextCycleStart: third });
+        // No charge for the rest of cycle 2 (P1, P2).
+        expect((await chargesOf(created.id)).map((row) => row.cycle)).toEqual([1]);
+        await app.get(RetainerCyclesService).runDaily(addDays(third, -1));
+        expect((await detail(created.id, cast.gm.cookie)).currentCycle).toBeNull();
+        await app.get(RetainerCyclesService).runDaily(third);
+        const opened = await detail(created.id, cast.gm.cookie);
+        expect(opened).toMatchObject({
+          currentCycle: { number: 3, ...cyclePeriod(today, 3) },
+          nextCycleStart: null,
+        });
+        expect((await chargesOf(created.id)).map((row) => [row.cycle, row.amountMinor])).toEqual([
+          [1, 50000],
+          [3, 50000],
+        ]);
+      });
+
+      it('starts a full cycle now on request, with the full fee due at once (P2)', async () => {
+        const { created, day } = await pausedIntoCycleTwo();
+        const resumed = await on(day, async (cookie) =>
+          retainerDetailSchema.parse(
+            await (
+              await client.post(`/api/retainers/${created.id}/status`, cookie, {
+                status: 'active',
+                startNow: true,
+              })
+            ).json(),
+          ),
+        );
+        expect(resumed.currentCycle).toMatchObject({
+          number: 2,
+          periodStart: day,
+          periodEnd: cyclePeriod(today, 2).periodEnd,
+        });
+        expect(resumed.currentCycle?.lines.map((line) => line.committed)).toEqual([12, 4]);
+        const charges = await chargesOf(created.id);
+        expect(charges.map((row) => [row.cycle, row.amountMinor, row.due !== null])).toEqual([
+          [1, 50000, true],
+          [2, 50000, true],
+        ]);
+        const [entry] = (await auditOf(created.id)).filter(
+          (row) => row.action === 'retainer.status_changed' && row.before?.status === 'paused',
+        );
+        expect(entry?.after).toEqual({ status: 'active', startNow: true });
+      });
+
+      it("opens a term cycle at once, its charge already due while paused (P3, T5')", async () => {
+        const { created, day } = await pausedIntoCycleTwo({
+          term: { cycles: 3, agreedTotalMinor: 120000, schedule: [40000, 40000, 40000] },
+        });
+        // T5': the term's cycle 2 charge became due while paused.
+        expect(
+          (await chargesOf(created.id)).map((row) => [row.cycle, row.status, row.due !== null]),
+        ).toEqual([
+          [1, 'pending', true],
+          [2, 'pending', true],
+          [3, 'pending', false],
+        ]);
+        const resumed = await on(day, async (cookie) =>
+          retainerDetailSchema.parse(await (await status(created.id, cookie, 'active')).json()),
+        );
+        expect(resumed.currentCycle).toMatchObject({
+          number: 2,
+          periodStart: day,
+          termPosition: 2,
+          termCycles: 3,
+        });
+        expect(resumed.nextCycleStart).toBeNull();
+      });
     });
 
     it('refuses callers outside client scope and unknown transitions', async () => {

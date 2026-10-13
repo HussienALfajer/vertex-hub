@@ -11,19 +11,20 @@ import {
   businessDate,
   type CalendarDate,
   type CreateAmendment,
+  type CycleEffect,
+  currentCycleNumber,
+  cyclePeriod,
   type DeliverableKind,
   deliverableKey,
   duplicateDeliverables,
-  firstOfMonth,
   hasPermission,
-  type MonthEffect,
   type PendingAmendmentListQuery,
-  planMonthChange,
+  planCycleChange,
   RETAINER_LIMITS,
   type RejectAmendment,
   type RescheduleTerm,
   type RetainerAmendmentPage,
-  termMonths,
+  termCycles,
 } from '@vertex-hub/contracts';
 import {
   type AmendmentEffectRow,
@@ -49,7 +50,7 @@ import { ChargeInvoices } from './charge-invoices.js';
 import { actorOf, assertCanEditMoney, coversClient, seesMoney } from './project-access.js';
 import { QuoteRenewalHooks } from './quote-renewal-hooks.js';
 import { type RetainerAccess, readableRetainer, workableRetainer } from './retainer-access.js';
-import { RetainerCharges } from './retainer-charges.js';
+import { type CycleCharge, chargeCycleOf, RetainerCharges } from './retainer-charges.js';
 
 type Executor = Database | Transaction;
 
@@ -75,11 +76,12 @@ interface AmendmentLineInput {
 /** What an accepted quote renews a retainer with (F04 A7, F05B Q2). */
 export interface QuoteRenewalInput {
   quoteId: string;
-  /** The month it takes effect in: after the active term, else next month. */
-  effectiveMonth: CalendarDate;
-  /** The quote's monthly net: the open-ended fee from that month. */
+  /** The cycle it takes effect in (after the active term, else the next cycle) and its first day. */
+  effectiveCycle: number;
+  effectiveDate: CalendarDate;
+  /** The quote's monthly net: the open-ended fee from that cycle. */
   feeMinor: number;
-  /** The monthly template to link in that month; null keeps the retainer's. */
+  /** The monthly template to link in that cycle; null keeps the retainer's. */
   templateId: string | null;
   /** The quote's merged lines, which replace the standing lines. */
   lines: {
@@ -92,23 +94,18 @@ export interface QuoteRenewalInput {
 }
 
 /** What a `change` amendment asks for (A1–A3). */
-type ChangeInput = Pick<CreateAmendment, 'scope' | 'effectiveMonth' | 'lines' | 'amountDeltaMinor'>;
+type ChangeInput = Pick<CreateAmendment, 'scope' | 'effectiveCycle' | 'lines' | 'amountDeltaMinor'>;
 
-interface MonthlyCharge {
-  id: string;
-  month: CalendarDate;
-  amountMinor: number;
-  dueAt: Date | null;
-}
-
-/** One month's amount change: on its monthly charge, or a charge the apply creates. */
-interface MonthPlan {
-  charge: MonthlyCharge | null;
-  effect: MonthEffect;
-  /** A term month (an onward change moves its base, A3). */
-  termMonth: boolean;
+/** One cycle's amount change: on its monthly charge, or a charge the apply creates. */
+interface CyclePlan {
+  charge: CycleCharge | null;
+  effect: CycleEffect;
+  /** A term cycle (an onward change moves its base, A3). */
+  termCycle: boolean;
   /** Without a charge: the amount the apply creates it at (the fee plus the change). */
   createMinor: number;
+  /** The cycle's first day, for a charge the apply creates. */
+  start: CalendarDate;
 }
 
 /** A line change on the standing lines or on a cycle (A2). */
@@ -123,12 +120,12 @@ interface LinePlan {
 
 /** What applying a `change` amendment does, worked out against the current state. */
 interface ChangePlan {
-  months: MonthPlan[];
+  cycles: CyclePlan[];
   fee: { beforeMinor: number; afterMinor: number } | null;
   standing: LinePlan[];
-  /** The effective month's cycle, when it has one; null: no cycle yet. */
+  /** The effective cycle's row, when it has one; null: no cycle yet. */
   cycle: { id: string; lines: LinePlan[] } | null;
-  /** A month-scope line change on a month that began without a cycle (edge case 5). */
+  /** A cycle-scope line change on a cycle that began without a cycle row (edge case 5). */
   noCycle: boolean;
   effects: AmendmentEffectRow[];
   moneyDeltaMinor: number;
@@ -139,10 +136,10 @@ const OPEN_TERM_STATUSES = ['active', 'scheduled'] as const;
 const OPEN_AMENDMENT_STATUSES = ['pending_approval', 'scheduled'] as const;
 
 /**
- * Amendments of retainers (spec F05B A1–A9, C6, ADR 0029): every later change of a retainer's
- * lines and amounts is a numbered amendment, applied at once, in its month by the daily job, or
- * after the General Manager approves a reduction. Every change holds the retainer row lock (G2)
- * and writes its audit entry in the same transaction (G1).
+ * Amendments of retainers (spec F05B A1–A9, C6, F05C A1'–A2', ADR 0029): every later change of a
+ * retainer's lines and amounts is a numbered amendment, applied at once, in its cycle by the
+ * daily job, or after the General Manager approves a reduction. Every change holds the retainer
+ * row lock (G2) and writes its audit entry in the same transaction (G1).
  */
 @Injectable()
 export class RetainerAmendmentsService {
@@ -177,7 +174,12 @@ export class RetainerAmendmentsService {
       this.db.select({ value: count() }).from(retainerAmendments).where(where),
     ]);
     return {
-      items: await this.present(this.db, rows, seesMoney(actor, retainer.client)),
+      items: await this.present(
+        this.db,
+        rows,
+        startOf(retainer),
+        seesMoney(actor, retainer.client),
+      ),
       total: total?.value ?? 0,
       page: query.page,
       pageSize: query.pageSize,
@@ -198,7 +200,11 @@ export class RetainerAmendmentsService {
       this.db
         .select({
           amendment: retainerAmendments,
-          retainer: { name: retainers.name, currency: retainers.currency },
+          retainer: {
+            name: retainers.name,
+            currency: retainers.currency,
+            startDate: retainers.startDate,
+          },
           clientId: retainers.clientId,
         })
         .from(retainerAmendments)
@@ -213,9 +219,11 @@ export class RetainerAmendmentsService {
         .innerJoin(retainers, eq(retainers.id, retainerAmendments.retainerId))
         .where(where),
     ]);
+    const starts = new Map(rows.map((row) => [row.amendment.retainerId, row.retainer.startDate]));
     const presented = await this.present(
       this.db,
       rows.map((row) => row.amendment),
+      (retainerId) => starts.get(retainerId) ?? '',
       true,
     );
     const clients = await this.clients.summaries(rows.map((row) => row.clientId));
@@ -249,7 +257,7 @@ export class RetainerAmendmentsService {
       assertCanEditMoney(actor, retainer.client);
       const plan = await this.plan(tx, retainer, input, businessDate());
       return {
-        months: plan.effects.map((effect) => presentEffect(effect, true)),
+        cycles: plan.effects.map((effect) => presentEffect(effect, retainer.startDate, true)),
         moneyDeltaMinor: plan.moneyDeltaMinor,
         needsApproval: amendmentNeedsApproval(plan.moneyDeltaMinor, canApprove(actor)),
       };
@@ -258,7 +266,7 @@ export class RetainerAmendmentsService {
 
   /**
    * A1–A5: an amendment that reduces waits for approval; any other applies at once in the current
-   * month, or is scheduled for its month.
+   * cycle, or is scheduled for its cycle.
    */
   async create(
     actor: CurrentUserInfo,
@@ -273,13 +281,14 @@ export class RetainerAmendmentsService {
       const pending = amendmentNeedsApproval(plan.moneyDeltaMinor, canApprove(actor));
       const status = pending
         ? 'pending_approval'
-        : input.effectiveMonth <= firstOfMonth(today)
+        : input.effectiveCycle <= currentCycleNumber(retainer.startDate, today)
           ? 'applied'
           : 'scheduled';
       const row = await this.insert(tx, retainer.id, actorOf(actor), {
         kind: 'change',
         scope: input.scope,
-        effectiveMonth: input.effectiveMonth,
+        effectiveCycle: input.effectiveCycle,
+        effectiveDate: cyclePeriod(retainer.startDate, input.effectiveCycle).periodStart,
         amountDeltaMinor: input.amountDeltaMinor,
         moneyDeltaMinor: plan.moneyDeltaMinor,
         reason: input.reason,
@@ -321,7 +330,7 @@ export class RetainerAmendmentsService {
         }
         throw error;
       }
-      const applies = row.effectiveMonth <= firstOfMonth(today);
+      const applies = effectiveCycleOf(row) <= currentCycleNumber(retainer.startDate, today);
       const note = input.note || null;
       await tx
         .update(retainerAmendments)
@@ -408,7 +417,7 @@ export class RetainerAmendmentsService {
   }
 
   /**
-   * A6: new amounts for months of the active or a scheduled term that no issued invoice bills,
+   * A6: new amounts for cycles of the active or a scheduled term that no issued invoice bills,
    * with the same sum; applied at once, no approval. Drafts are synced (C6), bases follow.
    */
   async reschedule(
@@ -428,16 +437,16 @@ export class RetainerAmendmentsService {
       if (term.status !== 'active' && term.status !== 'scheduled') {
         throw new CodedException(409, 'TERM_STARTED', 'Only an active or scheduled term changes');
       }
-      const months = termMonths(term.startMonth, term.months);
-      const chosen = input.schedule.map((entry) => entry.month);
+      const cycles = termCycles(term.startCycle ?? 1, term.cycles ?? 0);
+      const chosen = input.schedule.map((entry) => entry.cycle);
       if (
         new Set(chosen).size !== chosen.length ||
-        chosen.some((month) => !months.includes(month))
+        chosen.some((cycle) => !cycles.includes(cycle))
       ) {
         throw new CodedException(
           409,
           'SCHEDULE_TOTAL_MISMATCH',
-          'Each month of the term is listed once',
+          'Each cycle of the term is listed once',
         );
       }
       const charges = await this.monthlyCharges(tx, retainerId, chosen);
@@ -449,9 +458,9 @@ export class RetainerAmendmentsService {
       if (issued.length > 0 || charges.length !== chosen.length) {
         throw new CodedException(
           409,
-          'MONTH_INVOICED',
-          'A month is on an issued invoice; change its amount by amendment',
-          issued.map((charge) => charge.month),
+          'CYCLE_INVOICED',
+          'A cycle is on an issued invoice; change its amount by amendment',
+          issued.map((charge) => String(charge.cycle.number)),
         );
       }
       const before = charges.reduce((total, charge) => total + charge.amountMinor, 0);
@@ -460,16 +469,16 @@ export class RetainerAmendmentsService {
         throw new CodedException(
           409,
           'SCHEDULE_TOTAL_MISMATCH',
-          'The new amounts must sum to the months’ current total',
+          'The new amounts must sum to the cycles’ current total',
         );
       }
       const effects: AmendmentEffectRow[] = [];
-      for (const entry of [...input.schedule].sort((a, b) => a.month.localeCompare(b.month))) {
-        const charge = charges.find((row) => row.month === entry.month);
+      for (const entry of [...input.schedule].sort((a, b) => a.cycle - b.cycle)) {
+        const charge = charges.find((row) => row.cycle.number === entry.cycle);
         if (!charge || charge.amountMinor === entry.amountMinor) continue;
         const invoice = invoiced.get(charge.id) ?? null;
         effects.push({
-          month: entry.month,
+          cycle: entry.cycle,
           effect: invoice ? 'draft_synced' : 'charge_changed',
           invoice: invoice ? { id: invoice.id, displayNumber: invoice.displayNumber } : null,
           beforeMinor: charge.amountMinor,
@@ -479,7 +488,8 @@ export class RetainerAmendmentsService {
       const row = await this.insert(tx, retainerId, actorOf(actor), {
         kind: 'reschedule',
         scope: null,
-        effectiveMonth: [...chosen].sort()[0] as CalendarDate,
+        effectiveCycle: Math.min(...chosen),
+        effectiveDate: cyclePeriod(retainer.startDate, Math.min(...chosen)).periodStart,
         amountDeltaMinor: 0,
         moneyDeltaMinor: 0,
         reason: input.reason,
@@ -490,7 +500,7 @@ export class RetainerAmendmentsService {
       });
       const today = businessDate();
       for (const entry of input.schedule) {
-        const charge = charges.find((item) => item.month === entry.month);
+        const charge = charges.find((item) => item.cycle.number === entry.cycle);
         if (!charge) continue;
         await this.charges.reschedule(tx, retainerId, charge, entry.amountMinor, {
           amendmentId: row.id,
@@ -506,9 +516,9 @@ export class RetainerAmendmentsService {
   }
 
   /**
-   * A5, the job's step on a retainer it locked: scheduled amendments of the current month or
-   * earlier apply in number order, before the month's charges become due and its cycle opens.
-   * One the retainer's state no longer allows is cancelled (its month left the term, A8).
+   * A5, F05C J1 step 2 on a retainer the job locked: scheduled amendments whose cycle began apply
+   * in number order, before the cycle's charges become due and it opens. One the retainer's state
+   * no longer allows is cancelled (its cycle left the term, A8).
    */
   async applyScheduled(
     tx: Transaction,
@@ -522,7 +532,7 @@ export class RetainerAmendmentsService {
         and(
           eq(retainerAmendments.retainerId, retainer.id),
           eq(retainerAmendments.status, 'scheduled'),
-          lte(retainerAmendments.effectiveMonth, firstOfMonth(today)),
+          lte(retainerAmendments.effectiveDate, today),
         ),
       )
       .orderBy(asc(retainerAmendments.number));
@@ -553,7 +563,7 @@ export class RetainerAmendmentsService {
 
   /**
    * F05B Q2 on a retainer the caller locked: the quote's lines and fee become a `quote_renewal`
-   * amendment of its effective month, applied by the job like any scheduled amendment (A5), with
+   * amendment of its effective cycle, applied by the job like any scheduled amendment (A5), with
    * no approval (the quote's own discount approval covers it). A quote renewal still scheduled is
    * replaced by the newer one.
    */
@@ -585,7 +595,8 @@ export class RetainerAmendmentsService {
     const row = await this.insert(tx, retainerId, actor, {
       kind: 'quote_renewal',
       scope: 'onward',
-      effectiveMonth: input.effectiveMonth,
+      effectiveCycle: input.effectiveCycle,
+      effectiveDate: input.effectiveDate,
       amountDeltaMinor: deltaMinor,
       moneyDeltaMinor: deltaMinor,
       reason: input.reason,
@@ -595,7 +606,7 @@ export class RetainerAmendmentsService {
           ? []
           : [
               {
-                month: input.effectiveMonth,
+                cycle: input.effectiveCycle,
                 effect: 'fee_changed',
                 invoice: null,
                 beforeMinor,
@@ -613,15 +624,15 @@ export class RetainerAmendmentsService {
         revisionLimit: line.revisionLimit,
       })),
     });
-    if (input.effectiveMonth <= firstOfMonth(businessDate())) {
+    if (input.effectiveDate <= businessDate()) {
       await this.applyQuoteRenewal(tx, row, await this.lines(tx, [row.id]), actor);
     }
   }
 
   /**
-   * Applies a `quote_renewal` in its month (A5): the quote's lines replace the standing lines
+   * Applies a `quote_renewal` in its cycle (A5): the quote's lines replace the standing lines
    * (same kind and label keep their identity, the others are archived) and its monthly template is
-   * linked before the month's cycle opens and copies them, and its fee becomes the open-ended rate.
+   * linked before the cycle opens and copies them, and its fee becomes the open-ended rate.
    */
   private async applyQuoteRenewal(
     tx: Transaction,
@@ -684,7 +695,7 @@ export class RetainerAmendmentsService {
         after: { monthlyFeeMinor: row.feeMinor, amendmentId: row.id },
       });
       effects.push({
-        month: row.effectiveMonth,
+        cycle: effectiveCycleOf(row),
         effect: 'fee_changed',
         invoice: null,
         beforeMinor: beforeMinor ?? 0,
@@ -734,11 +745,11 @@ export class RetainerAmendmentsService {
     return wanted ? exists : sql`not ${exists}`;
   }
 
-  /** Month-scope line changes applied for `month` (a cycle opening later takes them, A2). */
-  async monthLines(
+  /** Cycle-scope line changes applied for `cycle` (the cycle opening later takes them, A2). */
+  async cycleLines(
     tx: Transaction,
     retainerId: string,
-    month: CalendarDate,
+    cycle: number,
   ): Promise<{ amendmentId: string; lines: LineRow[] }[]> {
     const rows = await tx
       .select({ id: retainerAmendments.id })
@@ -748,8 +759,8 @@ export class RetainerAmendmentsService {
           eq(retainerAmendments.retainerId, retainerId),
           eq(retainerAmendments.status, 'applied'),
           eq(retainerAmendments.kind, 'change'),
-          eq(retainerAmendments.scope, 'month'),
-          eq(retainerAmendments.effectiveMonth, month),
+          inArray(retainerAmendments.scope, ['month', 'cycle']),
+          eq(retainerAmendments.effectiveCycle, cycle),
         ),
       )
       .orderBy(asc(retainerAmendments.number));
@@ -767,7 +778,7 @@ export class RetainerAmendmentsService {
 
   /**
    * Works out a `change` amendment against the retainer's current state, or throws the coded
-   * error of the first rule it breaks. `fromJob`: the job applies it in its own month.
+   * error of the first rule it breaks. `fromJob`: the job applies it in its own cycle.
    */
   private async plan(
     tx: Transaction,
@@ -782,8 +793,8 @@ export class RetainerAmendmentsService {
     if (retainer.status === 'ended') {
       throw new CodedException(409, 'RETAINER_ENDED', 'Reactivate the retainer before changing it');
     }
-    const current = firstOfMonth(today);
-    const month = input.effectiveMonth;
+    const current = currentCycleNumber(retainer.startDate, today);
+    const effective = input.effectiveCycle;
     if (input.lines.length === 0 && input.amountDeltaMinor === 0) {
       throw new CodedException(400, 'EMPTY_AMENDMENT', 'Change a line or the amount');
     }
@@ -794,39 +805,50 @@ export class RetainerAmendmentsService {
         'Restore the client before changing its work',
       );
     }
-    if (month < current && !options.fromJob) throw invalidMonth();
-    // An amendment never reaches a month before the retainer starts.
-    if (month < firstOfMonth(retainer.startDate)) throw invalidMonth();
-    const terms = await tx
-      .select()
-      .from(retainerTerms)
-      .where(
-        and(
-          eq(retainerTerms.retainerId, retainer.id),
-          inArray(retainerTerms.status, [...OPEN_TERM_STATUSES]),
-        ),
-      )
-      .orderBy(asc(retainerTerms.startMonth));
-    const termMonthSet = new Set(terms.flatMap((term) => termMonths(term.startMonth, term.months)));
+    if (effective < current && !options.fromJob) throw invalidCycle();
+    const terms = (
+      await tx
+        .select()
+        .from(retainerTerms)
+        .where(
+          and(
+            eq(retainerTerms.retainerId, retainer.id),
+            inArray(retainerTerms.status, [...OPEN_TERM_STATUSES]),
+          ),
+        )
+    )
+      .map((term) => ({
+        startCycle: term.startCycle ?? 1,
+        cycles: term.cycles ?? 0,
+        endAction: term.endAction,
+      }))
+      .sort((a, b) => a.startCycle - b.startCycle);
+    const termCycleSet = new Set(terms.flatMap((term) => termCycles(term.startCycle, term.cycles)));
     const first = terms[0];
     const last = terms.at(-1);
     const openEnded =
       !first ||
-      month < first.startMonth ||
-      (last !== undefined && month > last.endMonth && last.endAction === 'continue');
-    if (!termMonthSet.has(month) && !openEnded) throw invalidMonth();
+      effective < first.startCycle ||
+      (last !== undefined &&
+        effective > last.startCycle + last.cycles - 1 &&
+        last.endAction === 'continue');
+    if (!termCycleSet.has(effective) && !openEnded) throw invalidCycle();
 
     // Money (A3, C6)
     const delta = input.amountDeltaMinor;
     const affected =
-      input.scope === 'month' ? [month] : [...termMonthSet].filter((item) => item >= month).sort();
-    if (input.scope === 'onward' && openEnded && !affected.includes(month)) affected.unshift(month);
+      input.scope === 'cycle'
+        ? [effective]
+        : [...termCycleSet].filter((item) => item >= effective).sort((a, b) => a - b);
+    if (input.scope === 'onward' && openEnded && !affected.includes(effective)) {
+      affected.unshift(effective);
+    }
     const [fee] = await tx
       .select({ monthlyFeeMinor: retainers.monthlyFeeMinor })
       .from(retainers)
       .where(eq(retainers.id, retainer.id));
     const feeMinor = fee?.monthlyFeeMinor ?? null;
-    const months: MonthPlan[] = [];
+    const cycles: CyclePlan[] = [];
     if (delta !== 0) {
       const charges = await this.monthlyCharges(tx, retainer.id, affected);
       const invoiced = await this.invoices.of(
@@ -835,22 +857,22 @@ export class RetainerAmendmentsService {
       );
       const extras = await this.extras(tx, retainer.id, affected);
       for (const item of affected) {
-        const charge = charges.find((row) => row.month === item) ?? null;
-        const termMonth = termMonthSet.has(item);
-        // An open-ended onward month without a charge takes the new fee when its cycle opens.
+        const charge = charges.find((row) => row.cycle.number === item) ?? null;
+        const termCycle = termCycleSet.has(item);
+        // An open-ended onward cycle without a charge takes the new fee when it opens.
         if (!charge && input.scope === 'onward') continue;
-        // C2: a month without its charge is charged only when its cycle opens, which an active,
-        // started retainer does in its month; a paused or not yet started month takes no amount.
+        // C2: a cycle without its charge is charged only when it opens, which an active, started
+        // retainer does on its first day; a paused or not yet started cycle takes no amount.
         if (
           !charge &&
           item <= current &&
           !(retainer.status === 'active' && retainer.startDate <= today)
         ) {
-          throw invalidMonth();
+          throw invalidCycle();
         }
-        const effect = planMonthChange(
+        const effect = planCycleChange(
           {
-            month: item,
+            cycle: item,
             amountMinor: charge?.amountMinor ?? feeMinor ?? 0,
             invoice: (charge && invoiced.get(charge.id)) || null,
             extrasMinor: extras.get(item) ?? 0,
@@ -859,7 +881,13 @@ export class RetainerAmendmentsService {
         );
         if (effect === 'negative') throw negative();
         if (effect) {
-          months.push({ charge, effect, termMonth, createMinor: (feeMinor ?? 0) + delta });
+          cycles.push({
+            charge,
+            effect,
+            termCycle,
+            createMinor: (feeMinor ?? 0) + delta,
+            start: cyclePeriod(retainer.startDate, item).periodStart,
+          });
         }
       }
     }
@@ -896,7 +924,7 @@ export class RetainerAmendmentsService {
     const [cycleRow] = await tx
       .select({ id: retainerCycles.id, status: retainerCycles.status })
       .from(retainerCycles)
-      .where(and(eq(retainerCycles.retainerId, retainer.id), eq(retainerCycles.month, month)));
+      .where(and(eq(retainerCycles.retainerId, retainer.id), eq(retainerCycles.number, effective)));
     const cycleLines = cycleRow
       ? await tx
           .select({
@@ -932,34 +960,40 @@ export class RetainerAmendmentsService {
           throw limit();
         }
         cycle = { id: cycleRow.id, lines };
-      } else if (cycleRow && input.scope === 'month') {
-        throw new CodedException(409, 'CYCLE_CLOSED', 'The month’s cycle is closed');
+      } else if (cycleRow && input.scope === 'cycle') {
+        throw new CodedException(409, 'CYCLE_CLOSED', 'The cycle is closed');
       }
     }
     const noCycle =
       !options.fromJob &&
-      input.scope === 'month' &&
+      input.scope === 'cycle' &&
       input.lines.length > 0 &&
       !cycleRow &&
-      month <= current;
+      effective <= current;
 
-    const effects: AmendmentEffectRow[] = months.map(({ effect }) => ({
-      month: effect.month,
+    const effects: AmendmentEffectRow[] = cycles.map(({ effect }) => ({
+      cycle: effect.cycle,
       effect: effect.effect,
       invoice: effect.invoice,
       beforeMinor: effect.beforeMinor,
       afterMinor: effect.afterMinor,
     }));
     if (feePlan) {
-      effects.push({ month, effect: 'fee_changed', invoice: null, ...feePlan });
+      effects.push({ cycle: effective, effect: 'fee_changed', invoice: null, ...feePlan });
     }
     if (noCycle) {
-      effects.push({ month, effect: 'no_cycle', invoice: null, beforeMinor: 0, afterMinor: 0 });
+      effects.push({
+        cycle: effective,
+        effect: 'no_cycle',
+        invoice: null,
+        beforeMinor: 0,
+        afterMinor: 0,
+      });
     }
-    effects.sort((a, b) => a.month.localeCompare(b.month));
-    const counted = months.filter((item) => item.termMonth || input.scope === 'month').length;
+    effects.sort((a, b) => a.cycle - b.cycle);
+    const counted = cycles.filter((item) => item.termCycle || input.scope === 'cycle').length;
     return {
-      months,
+      cycles,
       fee: feePlan,
       standing,
       cycle,
@@ -967,7 +1001,7 @@ export class RetainerAmendmentsService {
       effects,
       moneyDeltaMinor: amendmentMoneyDelta({
         amountDeltaMinor: delta,
-        months: delta === 0 ? 0 : Math.max(counted, input.scope === 'month' ? 1 : 0),
+        cycles: delta === 0 ? 0 : Math.max(counted, input.scope === 'cycle' ? 1 : 0),
         changesFee: feePlan !== null,
       }),
     };
@@ -982,22 +1016,22 @@ export class RetainerAmendmentsService {
     actor: AuditActor | null,
   ): Promise<void> {
     const onward = row.scope === 'onward';
-    for (const month of plan.months) {
-      if (month.charge) {
-        await this.charges.changeMonth(tx, row.retainerId, month.charge, month.effect, {
+    for (const cycle of plan.cycles) {
+      if (cycle.charge) {
+        await this.charges.changeCycle(tx, row.retainerId, cycle.charge, cycle.effect, {
           deltaMinor: row.amountDeltaMinor,
-          onward: onward && month.termMonth,
+          onward: onward && cycle.termCycle,
           amendmentId: row.id,
           today,
           actor,
         });
       } else {
-        // A month without its charge yet (its cycle has not opened): created at the new amount.
+        // A cycle without its charge yet (it has not opened): created at the new amount.
         await this.charges.createMonthly(
           tx,
           row.retainerId,
-          month.effect.month,
-          month.createMinor,
+          { number: cycle.effect.cycle, start: cycle.start },
+          cycle.createMinor,
           actor,
         );
         await this.charges.runDue(tx, row.retainerId, today, actor);
@@ -1117,14 +1151,14 @@ export class RetainerAmendmentsService {
     }
   }
 
-  /** A2: a cycle opening in a month takes the month-scope line changes applied for it. */
+  /** A2: a cycle opening takes the cycle-scope line changes applied for it. */
   async openWithAmendments(
     tx: Transaction,
     retainerId: string,
     cycleId: string,
-    month: CalendarDate,
+    cycle: number,
   ): Promise<void> {
-    for (const { amendmentId, lines } of await this.monthLines(tx, retainerId, month)) {
+    for (const { amendmentId, lines } of await this.cycleLines(tx, retainerId, cycle)) {
       const current = await tx
         .select({
           id: retainerCycleLines.id,
@@ -1186,13 +1220,14 @@ export class RetainerAmendmentsService {
     values: {
       kind: AmendmentRow['kind'];
       scope: AmendmentRow['scope'];
-      effectiveMonth: CalendarDate;
+      effectiveCycle: number;
+      effectiveDate: CalendarDate;
       amountDeltaMinor: number;
       moneyDeltaMinor: number;
       reason: string;
       status: AmendmentRow['status'];
       effects: AmendmentEffectRow[];
-      schedule?: { month: string; amountMinor: number }[];
+      schedule?: { cycle: number; amountMinor: number }[];
       quoteId?: string;
       feeMinor?: number;
       templateId?: string | null;
@@ -1240,7 +1275,7 @@ export class RetainerAmendmentsService {
         number: row.number,
         kind: row.kind,
         scope: row.scope,
-        effectiveMonth: row.effectiveMonth,
+        effectiveCycle: row.effectiveCycle,
         status: row.status,
         amountDeltaMinor: row.amountDeltaMinor,
         moneyDeltaMinor: row.moneyDeltaMinor,
@@ -1331,7 +1366,12 @@ export class RetainerAmendmentsService {
   private async one(actor: CurrentUserInfo, retainerId: string, id: string): Promise<Amendment> {
     const retainer = await readableRetainer(this.db, this.clients, actor, retainerId);
     const row = await this.row(this.db, retainerId, id);
-    const [amendment] = await this.present(this.db, [row], seesMoney(actor, retainer.client));
+    const [amendment] = await this.present(
+      this.db,
+      [row],
+      startOf(retainer),
+      seesMoney(actor, retainer.client),
+    );
     if (!amendment) throw new NotFoundException();
     return amendment;
   }
@@ -1362,17 +1402,18 @@ export class RetainerAmendmentsService {
       .orderBy(asc(retainerAmendmentLines.position));
   }
 
-  /** The live `monthly` charges of the months. */
-  private monthlyCharges(
+  /** The live `monthly` charges of the cycles. */
+  private async monthlyCharges(
     executor: Executor,
     retainerId: string,
-    months: readonly CalendarDate[],
-  ): Promise<MonthlyCharge[]> {
-    if (months.length === 0) return Promise.resolve([]);
-    return executor
+    cycles: readonly number[],
+  ): Promise<CycleCharge[]> {
+    if (cycles.length === 0) return [];
+    const rows = await executor
       .select({
         id: retainerCharges.id,
-        month: retainerCharges.month,
+        cycleNumber: retainerCharges.cycleNumber,
+        cycleStart: retainerCharges.cycleStart,
         amountMinor: retainerCharges.amountMinor,
         dueAt: retainerCharges.dueAt,
       })
@@ -1382,37 +1423,47 @@ export class RetainerAmendmentsService {
           eq(retainerCharges.retainerId, retainerId),
           eq(retainerCharges.kind, 'monthly'),
           ne(retainerCharges.status, 'cancelled'),
-          inArray(retainerCharges.month, [...months]),
+          inArray(retainerCharges.cycleNumber, [...cycles]),
         ),
       );
+    return rows.map((row) => ({
+      id: row.id,
+      cycle: chargeCycleOf(row),
+      amountMinor: row.amountMinor,
+      dueAt: row.dueAt,
+    }));
   }
 
-  /** Σ of each month's non-cancelled additions and credits. */
+  /** Σ of each cycle's non-cancelled additions and credits. */
   private async extras(
     executor: Executor,
     retainerId: string,
-    months: readonly CalendarDate[],
-  ): Promise<Map<string, number>> {
-    if (months.length === 0) return new Map();
+    cycles: readonly number[],
+  ): Promise<Map<number, number>> {
+    if (cycles.length === 0) return new Map();
     const rows = await executor
-      .select({ month: retainerCharges.month, amountMinor: retainerCharges.amountMinor })
+      .select({ cycle: retainerCharges.cycleNumber, amountMinor: retainerCharges.amountMinor })
       .from(retainerCharges)
       .where(
         and(
           eq(retainerCharges.retainerId, retainerId),
           inArray(retainerCharges.kind, ['addition', 'credit']),
           ne(retainerCharges.status, 'cancelled'),
-          inArray(retainerCharges.month, [...months]),
+          inArray(retainerCharges.cycleNumber, [...cycles]),
         ),
       );
-    const totals = new Map<string, number>();
-    for (const row of rows) totals.set(row.month, (totals.get(row.month) ?? 0) + row.amountMinor);
+    const totals = new Map<number, number>();
+    for (const row of rows) {
+      const cycle = row.cycle ?? 0;
+      totals.set(cycle, (totals.get(cycle) ?? 0) + row.amountMinor);
+    }
     return totals;
   }
 
   private async present(
     executor: Executor,
     rows: AmendmentRow[],
+    startDateOf: (retainerId: string) => CalendarDate,
     withMoney: boolean,
   ): Promise<Amendment[]> {
     const lines = await this.lines(
@@ -1429,8 +1480,9 @@ export class RetainerAmendmentsService {
       retainerId: row.retainerId,
       number: row.number,
       kind: row.kind,
-      scope: row.scope,
-      effectiveMonth: row.effectiveMonth,
+      scope: scopeOf(row),
+      effectiveCycle: effectiveCycleOf(row),
+      effectiveDate: row.effectiveDate ?? '',
       status: row.status,
       reason: row.reason,
       lines: lines
@@ -1455,7 +1507,9 @@ export class RetainerAmendmentsService {
             }
           : null,
       appliedAt: row.appliedAt?.toISOString() ?? null,
-      effects: row.effects.map((effect) => presentEffect(effect, withMoney)),
+      effects: row.effects.map((effect) =>
+        presentEffect(effect, startDateOf(row.retainerId), withMoney),
+      ),
       ...(withMoney && {
         money: {
           amountDeltaMinor: row.amountDeltaMinor,
@@ -1476,11 +1530,26 @@ function canApprove(actor: CurrentUserInfo): boolean {
   return hasPermission(actor.access, 'retainers.approve_reduction');
 }
 
+/** The stored scope: rows written before F05C say `month` for `cycle`. */
+function scopeOf(row: AmendmentRow): Amendment['scope'] {
+  return row.scope === 'month' ? 'cycle' : row.scope;
+}
+
+/** The effective cycle, set on every row once F05C's backfill ran. */
+function effectiveCycleOf(row: AmendmentRow): number {
+  return row.effectiveCycle ?? 0;
+}
+
+/** The start date of the one retainer an amendment list belongs to. */
+function startOf(retainer: { startDate: CalendarDate }): () => CalendarDate {
+  return () => retainer.startDate;
+}
+
 /** A stored amendment as the planner's input. */
 function changeOf(row: AmendmentRow, lines: LineRow[]): ChangeInput {
   return {
-    scope: row.scope ?? 'month',
-    effectiveMonth: row.effectiveMonth,
+    scope: scopeOf(row) ?? 'cycle',
+    effectiveCycle: effectiveCycleOf(row),
     amountDeltaMinor: row.amountDeltaMinor,
     lines: lines.map((line) => ({
       kind: line.kind,
@@ -1529,20 +1598,25 @@ function changeLines(
   });
 }
 
-function presentEffect(effect: AmendmentEffectRow, withMoney: boolean): AmendmentEffect {
+function presentEffect(
+  effect: AmendmentEffectRow,
+  startDate: CalendarDate,
+  withMoney: boolean,
+): AmendmentEffect {
   return {
-    month: effect.month,
+    cycle: effect.cycle,
+    ...cyclePeriod(startDate, effect.cycle),
     effect: effect.effect as AmendmentEffect['effect'],
     invoice: withMoney ? effect.invoice : null,
     ...(withMoney && { money: { beforeMinor: effect.beforeMinor, afterMinor: effect.afterMinor } }),
   };
 }
 
-function invalidMonth() {
+function invalidCycle() {
   return new CodedException(
     400,
-    'INVALID_EFFECTIVE_MONTH',
-    'The effective month is the current month or later, within a term or open-ended',
+    'INVALID_EFFECTIVE_CYCLE',
+    'The effective cycle is the current cycle or later, within a term or open-ended',
   );
 }
 
@@ -1555,7 +1629,7 @@ function invalidQuantity() {
 }
 
 function negative() {
-  return new CodedException(409, 'NEGATIVE_AMOUNT', 'No month’s amount goes below 0');
+  return new CodedException(409, 'NEGATIVE_AMOUNT', 'No cycle’s amount goes below 0');
 }
 
 function limit() {

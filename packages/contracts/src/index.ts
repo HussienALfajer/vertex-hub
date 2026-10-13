@@ -28,6 +28,7 @@ export * from './projects.js';
 export * from './quotes.js';
 export * from './report-labels.js';
 export * from './reports.js';
+export * from './retainer-cycles.js';
 export * from './retainers.js';
 export * from './roles.js';
 export * from './tasks.js';

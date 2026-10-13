@@ -1,7 +1,7 @@
 import {
-  addMonths,
   type CalendarDate,
   type Currency,
+  cyclePeriod,
   type RetainerTerm,
   type RetainerTermInput,
   scheduleMatches,
@@ -25,21 +25,21 @@ import { CheckIcon, SplitIcon } from 'lucide-react';
 import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
 import { MoneyInput } from '../../components/money-input';
-import { formatMonth, formatNumber } from '../../lib/format';
+import { formatNumber, formatPeriod } from '../../lib/format';
 import { formatMoney } from '../../lib/money';
 
 /** A term being filled in: amounts stay empty until typed. */
 export interface TermDraft {
-  months: number | null;
+  cycles: number | null;
   agreedTotalMinor: number | null;
   schedule: (number | null)[];
   endAction: TermEndAction;
 }
 
-export type TermProblems = Partial<Record<'months' | 'total' | 'schedule', true>>;
+export type TermProblems = Partial<Record<'cycles' | 'total' | 'schedule', true>>;
 
 export const EMPTY_TERM: TermDraft = {
-  months: 3,
+  cycles: 3,
   agreedTotalMinor: null,
   schedule: [null, null, null],
   endAction: 'renew',
@@ -48,32 +48,32 @@ export const EMPTY_TERM: TermDraft = {
 /** A scheduled term as the edit dialog starts from it (its base amounts). */
 export function draftOf(term: RetainerTerm): TermDraft {
   return {
-    months: term.months,
+    cycles: term.cycles,
     agreedTotalMinor: term.money?.agreedTotalMinor ?? null,
-    schedule: term.schedule.map((month) => month.money?.baseAmountMinor ?? null),
+    schedule: term.schedule.map((cycle) => cycle.money?.baseAmountMinor ?? null),
     endAction: term.endAction,
   };
 }
 
-/** T3 before the round trip: whole months, a total, and a schedule that adds up to it. */
+/** T3 before the round trip: whole cycles, a total, and a schedule that adds up to it. */
 export function parseTerm(draft: TermDraft): RetainerTermInput | TermProblems {
   const problems: TermProblems = {};
-  const { months, agreedTotalMinor } = draft;
-  if (!months || months < TERM_LIMITS.minMonths || months > TERM_LIMITS.maxMonths) {
-    problems.months = true;
+  const { cycles, agreedTotalMinor } = draft;
+  if (!cycles || cycles < TERM_LIMITS.minCycles || cycles > TERM_LIMITS.maxCycles) {
+    problems.cycles = true;
   }
   if (agreedTotalMinor === null) problems.total = true;
   const schedule = draft.schedule.map((amount) => amount ?? 0);
   if (
-    !problems.months &&
+    !problems.cycles &&
     !problems.total &&
-    !scheduleMatches({ months: months ?? 0, agreedTotalMinor: agreedTotalMinor ?? 0, schedule })
+    !scheduleMatches({ cycles: cycles ?? 0, agreedTotalMinor: agreedTotalMinor ?? 0, schedule })
   ) {
     problems.schedule = true;
   }
   if (Object.keys(problems).length > 0) return problems;
   return {
-    months: months ?? 0,
+    cycles: cycles ?? 0,
     agreedTotalMinor: agreedTotalMinor ?? 0,
     schedule,
     endAction: draft.endAction,
@@ -83,12 +83,12 @@ export function parseTerm(draft: TermDraft): RetainerTermInput | TermProblems {
 export const isTermProblems = (value: RetainerTermInput | TermProblems): value is TermProblems =>
   !('endAction' in value);
 
-/** A new count of months re-splits the total evenly (T3's default). */
-function withMonths(draft: TermDraft, months: number | null): TermDraft {
-  const count = months && months > 0 ? Math.min(months, TERM_LIMITS.maxMonths) : 0;
+/** A new count of cycles re-splits the total evenly (T3's default). */
+function withCycles(draft: TermDraft, cycles: number | null): TermDraft {
+  const count = cycles && cycles > 0 ? Math.min(cycles, TERM_LIMITS.maxCycles) : 0;
   return {
     ...draft,
-    months,
+    cycles,
     schedule:
       draft.agreedTotalMinor === null
         ? Array.from({ length: count }, () => null)
@@ -97,35 +97,41 @@ function withMonths(draft: TermDraft, months: number | null): TermDraft {
 }
 
 function withTotal(draft: TermDraft, total: number | null): TermDraft {
-  const count = draft.months ?? 0;
+  const count = draft.cycles ?? 0;
   return {
     ...draft,
     agreedTotalMinor: total,
     schedule:
-      total === null ? draft.schedule : splitEvenly(total, Math.min(count, TERM_LIMITS.maxMonths)),
+      total === null ? draft.schedule : splitEvenly(total, Math.min(count, TERM_LIMITS.maxCycles)),
   };
 }
 
+/** Where a term's cycles fall: the retainer's start date (the anchor) and the term's first cycle. */
+export interface TermCycles {
+  anchor: CalendarDate;
+  startCycle: number;
+}
+
 /**
- * Spec screen 1: the term's months, agreed total and schedule (one row per month, "Split
- * evenly", the running difference from the total), and its end action.
+ * Spec screen 1, F05C: the term's cycles, agreed total and schedule (one row per cycle with its
+ * period, "Split evenly", the running difference from the total), and its end action.
  */
 export function TermPlanEditor({
   value,
   onChange,
-  startMonth,
+  cycles,
   currency,
   problems,
 }: {
   value: TermDraft;
   onChange: (next: TermDraft) => void;
-  /** The first day of the term's first month, for the month names; null while unknown. */
-  startMonth: CalendarDate | null;
+  /** Where the term's cycles fall, for their periods; null while unknown. */
+  cycles: TermCycles | null;
   currency: Currency;
   problems: TermProblems;
 }) {
   const { t } = useTranslation();
-  const ids = { months: useId(), total: useId(), schedule: useId(), scheduleError: useId() };
+  const ids = { cycles: useId(), total: useId(), schedule: useId(), scheduleError: useId() };
   const scheduled = value.schedule.reduce<number>((sum, amount) => sum + (amount ?? 0), 0);
   const remaining = (value.agreedTotalMinor ?? 0) - scheduled;
   // The mismatch shows until the amounts add up again, without another save.
@@ -134,24 +140,24 @@ export function TermPlanEditor({
   return (
     <div className="flex flex-col gap-5">
       <div className="grid gap-5 sm:grid-cols-2">
-        <Field invalid={!!problems.months}>
-          <FieldLabel htmlFor={ids.months}>{t('retainers.terms.months')}</FieldLabel>
+        <Field invalid={!!problems.cycles}>
+          <FieldLabel htmlFor={ids.cycles}>{t('retainers.terms.cycles')}</FieldLabel>
           <Input
-            id={ids.months}
+            id={ids.cycles}
             type="number"
             inputMode="numeric"
-            min={TERM_LIMITS.minMonths}
-            max={TERM_LIMITS.maxMonths}
+            min={TERM_LIMITS.minCycles}
+            max={TERM_LIMITS.maxCycles}
             className="text-end tabular-nums"
-            value={value.months ?? ''}
+            value={value.cycles ?? ''}
             onChange={(event) =>
               onChange(
-                withMonths(value, event.target.value === '' ? null : Number(event.target.value)),
+                withCycles(value, event.target.value === '' ? null : Number(event.target.value)),
               )
             }
           />
-          <FieldDescription>{t('retainers.terms.monthsHint')}</FieldDescription>
-          <FieldError match={!!problems.months}>{t('retainers.terms.errors.months')}</FieldError>
+          <FieldDescription>{t('retainers.terms.cyclesHint')}</FieldDescription>
+          <FieldError match={!!problems.cycles}>{t('retainers.terms.errors.cycles')}</FieldError>
         </Field>
         <Field invalid={!!problems.total}>
           <FieldLabel htmlFor={ids.total}>{t('retainers.terms.agreedTotal')}</FieldLabel>
@@ -166,7 +172,7 @@ export function TermPlanEditor({
       </div>
 
       {value.schedule.length > 0 && (
-        // Not a `Field`: it would name every month's input after the schedule's label.
+        // Not a `Field`: it would name every cycle's input after the schedule's label.
         <div className="flex flex-col gap-2">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <span id={ids.schedule} className="text-sm font-medium">
@@ -187,23 +193,31 @@ export function TermPlanEditor({
             className="flex flex-col divide-y divide-border rounded-lg border border-border"
           >
             {value.schedule.map((amount, index) => {
-              const month = startMonth ? formatMonth(addMonths(startMonth, index)) : null;
-              const label = t('retainers.terms.position', {
+              const number = cycles ? cycles.startCycle + index : null;
+              const period = cycles && number ? cyclePeriod(cycles.anchor, number) : null;
+              const position = t('retainers.terms.position', {
                 position: formatNumber(index + 1),
-                months: formatNumber(value.schedule.length),
+                cycles: formatNumber(value.schedule.length),
               });
+              const label = number
+                ? t('retainers.cycleNumber', { number: formatNumber(number) })
+                : position;
               return (
                 <li
-                  // biome-ignore lint/suspicious/noArrayIndexKey: one row per month, by position
+                  // biome-ignore lint/suspicious/noArrayIndexKey: one row per cycle, by position
                   key={index}
                   className="grid grid-cols-[minmax(0,1fr)_11rem] items-center gap-3 px-3 py-2"
                 >
                   <span className="flex min-w-0 flex-col">
-                    <span className="truncate text-sm font-medium">{month ?? label}</span>
-                    {month && <span className="text-xs text-muted-foreground">{label}</span>}
+                    <span className="truncate text-sm font-medium">{label}</span>
+                    {period && (
+                      <span className="text-xs text-muted-foreground">
+                        {formatPeriod(period.periodStart, period.periodEnd)} · {position}
+                      </span>
+                    )}
                   </span>
                   <MoneyInput
-                    aria-label={t('retainers.terms.monthAmount', { month: month ?? label })}
+                    aria-label={t('retainers.terms.cycleAmount', { cycle: label })}
                     aria-invalid={scheduleInvalid || undefined}
                     aria-describedby={scheduleInvalid ? ids.scheduleError : undefined}
                     currency={currency}
@@ -257,7 +271,7 @@ export function TermPlanEditor({
   );
 }
 
-/** T7–T9: renew (default), end, or continue open-ended at the monthly fee. */
+/** T7–T9: renew (default), end, or continue open-ended at the fee per cycle. */
 export function EndActionField({
   value,
   onChange,

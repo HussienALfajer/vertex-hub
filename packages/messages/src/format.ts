@@ -82,3 +82,32 @@ export function formatMonth(month: string): string {
     timeZone: 'UTC',
   }).format(new Date(`${month}-01T00:00:00Z`));
 }
+
+const dayAndMonth = new Intl.DateTimeFormat(APP_LOCALE, {
+  day: 'numeric',
+  month: 'long',
+  timeZone: 'UTC',
+});
+
+/**
+ * A period of calendar days, the year once when both ends share it: "20 تشرين الأول – 19 تشرين
+ * الثاني 2026", "20 كانون الأول 2026 – 19 كانون الثاني 2027" (spec F05C, Screens).
+ */
+export function formatPeriod(start: string, end: string): string {
+  if (start.slice(0, 4) !== end.slice(0, 4)) {
+    return `${formatCalendarDate(start)} – ${formatCalendarDate(end)}`;
+  }
+  return `${dayAndMonth.format(new Date(`${start}T00:00:00Z`))} – ${formatCalendarDate(end)}`;
+}
+
+/**
+ * F05C J3: a retainer cycle as invoice lines name it, "الدورة 7 (20 تشرين الأول – 19 تشرين
+ * الثاني 2026)", with " (3 من 6)" for a term cycle.
+ */
+export function formatRetainerCycle(
+  cycle: { number: number; periodStart: string; periodEnd: string },
+  term?: { position: number; cycles: number } | null,
+): string {
+  const label = `الدورة ${formatNumber(cycle.number)} (${formatPeriod(cycle.periodStart, cycle.periodEnd)})`;
+  return term ? `${label} (${formatNumber(term.position)} من ${formatNumber(term.cycles)})` : label;
+}

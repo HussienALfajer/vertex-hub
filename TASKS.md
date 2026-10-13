@@ -9,39 +9,41 @@ PR split (from the spec): PR 1 anniversary cycles · PR 2 backdated start and ca
 Not in PR 1: the catch-up and start dates before the current cycle (PR 2: until then a start date before today − 1 month + 1 day is `INVALID_DATES`), cycle reports and `retainer_cycle_report_ready` (PR 3), legal details and contracts (PR 4, PR 5).
 
 ### 1. contracts
-- [ ] `retainer-cycles.ts`: `addMonths` (clamped, from the start date), `cyclePeriod`, `cycleAt`, term end date, days left; re-exported from `index.ts`; unit tests (anchors 1, 15, 28, 29, 30, 31; leap years; before the start)
-- [ ] `retainers.ts`: `renewalDate` removed from create/update inputs; `cycles_from`/`nextCycleStart`, `currentCycle { number, periodStart, periodEnd, daysLeft, termPosition?, termCycles? }` on list and detail; cycles carry `number` (no `month`); terms `startCycle`/`cycles`/`startDate`/`endDate`; charges `cycle`/`periodStart`/`periodEnd`; amendments scope `cycle`|`onward`, `effectiveCycle`, schedule `{ cycle, amountMinor }`, effects by cycle; status change `startNow?`
-- [ ] `quotes.ts` accept: retainer part without `renewalDate`; start date rule B6
-- [ ] `reports.ts`: client report retainers section by cycles overlapping the month (R4)
-- [ ] Error codes: `RETAINER_STARTED`, `CYCLE_CLOSED`, `INVALID_EFFECTIVE_CYCLE` (replaces `INVALID_EFFECTIVE_MONTH`), `CYCLE_ALREADY_CHARGED` (replaces `MONTH_ALREADY_CHARGED`) with `ar.json` keys
-- [ ] Gate: `contracts` test, root `typecheck`
+- [x] `retainer-cycles.ts`: `addMonths` (clamped, from the start date), `cyclePeriod`, `cycleAt`, term end date, days left; re-exported from `index.ts`; unit tests (anchors 1, 15, 28, 29, 30, 31; leap years; before the start)
+- [x] `retainers.ts`: `renewalDate` removed from create/update inputs; `cycles_from`/`nextCycleStart`, `currentCycle { number, periodStart, periodEnd, daysLeft, termPosition?, termCycles? }` on list and detail; cycles carry `number` (no `month`); terms `startCycle`/`cycles`/`startDate`/`endDate`; charges `cycle`/`periodStart`/`periodEnd`; amendments scope `cycle`|`onward`, `effectiveCycle`, schedule `{ cycle, amountMinor }`, effects by cycle; status change `startNow?`
+- [x] `quotes.ts` accept: retainer part without `renewalDate`; start date rule B6
+- [x] `reports.ts`: client report retainers section by cycles overlapping the month (R4)
+- [x] Error codes: `CYCLE_ALREADY_CHARGED`, `CYCLE_INVOICED`, `INVALID_EFFECTIVE_CYCLE` replace the month codes; `RENEWAL_DATE_FROM_TERM` removed (the renewal date is never sent: strict inputs answer 400); `ar.json` keys
+- [x] Gate: `contracts` test, root `typecheck`
 
 ### 2. db (`/db-migration`, expand only)
-- [ ] `retainers.cycles_from`; `retainer_cycles.number` (unique with `retainer_id`), `backdated`, `untracked`, `month` optional
-- [ ] `retainer_charges.cycle_number`, `cycle_start`, new unique monthly index on `(retainer_id, cycle_number)`; `month` optional; `settled_outside` allowed for `monthly` (used in PR 2, check only)
-- [ ] `retainer_terms.start_cycle`, `cycles`, `start_date`, `end_date`; old columns optional
-- [ ] `retainer_amendments.effective_cycle`, `effective_date`, scope `cycle`; `effective_month` optional
-- [ ] Backfill SQL per spec "Migration" (numbers from `cycleAt`, schedules and effects mapped, `renewal_date` null without an active or scheduled term); SQL reviewed
-- [ ] Gate: `db` test, migration drift
+- [x] `retainers.cycles_from`; `retainer_cycles.number` (unique with `retainer_id`), `backdated`, `untracked`, `month` optional
+- [x] `retainer_charges.cycle_number`, `cycle_start`, new unique monthly index on `(retainer_id, cycle_number)`; `month` optional; `settled_outside` allowed for `monthly` (used in PR 2, check only)
+- [x] `retainer_terms.start_cycle`, `cycles`, `start_date`, `end_date`; old columns optional
+- [x] `retainer_amendments.effective_cycle`, `effective_date`, scope `cycle`; `effective_month` optional
+- [x] Backfill SQL per spec "Migration" (numbers from `cycleAt`, schedules and effects mapped, `renewal_date` null without an active or scheduled term); SQL reviewed
+- [x] Gate: `db` test, migration drift
 
 ### 3. api
-- [ ] Cycle engine on `cyclePeriod`/`cycleAt` (Y1–Y4): create opens the current cycle, ending closes with the end day
-- [ ] Day-one job `retainers.cycles` in J1 order, idempotent (J2), drafts named by cycle (J3)
-- [ ] Terms in cycles (T1'–T5'), derived `renewal_date`, renewal 30 days before `end_date`, `retainer_renewal_due` for terms only
-- [ ] Charges and billing sources by cycle; invoice draft labels (J3)
-- [ ] Amendments by cycle (A1'–A2')
-- [ ] Pause / resume / reactivate (P1–P4) with `startNow` and `cycles_from`
-- [ ] `PATCH` start date only before a cycle or charge (`RETAINER_STARTED`); `renewalDate` refused
-- [ ] Behind and delivery rate on the period; A09 texts and the short-cycle rule (Y5) in `packages/messages`
-- [ ] Quote accept (B6, no renewal date); quote renewal hooks by cycle
-- [ ] F15 client report and dashboard: cycles overlapping the month (R4)
-- [ ] `db:seed` rewritten to anchored cycles
-- [ ] Tests: `retainer-cycles`, `retainer-terms`, `retainer-amendments`, `retainers`, `quote-accept`, report tests updated; every PR 1 rule and error code
-- [ ] Gate: api test files above, `test/architecture.test.ts`, `api` typecheck
+- [x] Cycle engine on `cyclePeriod`/`cycleAt` (Y1–Y4): create opens the current cycle, ending closes with the end day
+- [x] Day-one job `retainers.cycles` in J1 order, idempotent (J2), drafts named by cycle (J3)
+- [x] Terms in cycles (T1'–T5'), derived `renewal_date`, renewal 30 days before `end_date`, `retainer_renewal_due` for terms only
+- [x] Charges and billing sources by cycle; invoice draft labels (J3)
+- [x] Amendments by cycle (A1'–A2')
+- [x] Pause / resume / reactivate (P1–P4) with `startNow` and `cycles_from`
+- [x] `PATCH` start date only before a cycle or charge (`RETAINER_STARTED`); `renewalDate` refused
+- [x] Behind and delivery rate on the period; A09 texts and the short-cycle rule (Y5) in `packages/messages`
+- [x] Quote accept (B6, no renewal date); quote renewal hooks by cycle
+- [x] F15 client report and dashboard: cycles overlapping the month (R4)
+- [x] `db:seed` rewritten to anchored cycles
+- [x] Tests: `retainer-cycles`, `retainer-terms`, `retainer-amendments`, `retainers`, `quote-accept`, report tests updated; every PR 1 rule and error code
+- [x] Gate: api test files above, `test/architecture.test.ts`, `api` typecheck
+
+- [x] Found while testing: templates contracts (run and retainer template cycle) named the month; worker client report PDF and Excel name each cycle (R4); `cast.onDay` test helper for later cycles
 
 ### 4. bridge
-- [ ] `pnpm build`, `openapi:export`, `api:generate`; commit `openapi.json` and `schema.gen.ts`
-- [ ] Gate: `web` typecheck
+- [x] `pnpm build`, `openapi:export`, `api:generate`; commit `openapi.json` and `schema.gen.ts`
+- [x] Gate: `web` typecheck (runs with the web layer)
 
 ### 5. web
 - [ ] New retainer: start-date note (cycle day / last day of the month), no renewal date, term section in cycles with each cycle's period

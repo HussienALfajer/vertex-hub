@@ -1,12 +1,12 @@
 import { useQuery } from '@tanstack/react-query';
 import {
-  addMonths,
   businessDate,
-  type CalendarDate,
-  firstOfMonth,
+  currentCycleNumber,
+  cyclePeriod,
+  dayAfterTerm,
   type RetainerDetail,
   type RetainerTerm,
-  type RetainerTermMonth,
+  type RetainerTermCycle,
   type SourceInvoice,
   type TermEndAction,
   type TermStatus,
@@ -50,7 +50,7 @@ import { LoadError } from '../../components/load-error';
 import { ApiError } from '../../lib/api/client';
 import { errorMessage } from '../../lib/errors';
 import { focusFirstInvalid } from '../../lib/focus-first-invalid';
-import { formatMonth, formatNumber } from '../../lib/format';
+import { formatCalendarDate, formatNumber, formatPeriod } from '../../lib/format';
 import { formatMoney } from '../../lib/money';
 import { retainerBillingQuery } from '../invoices/invoices.queries';
 import { SourceInvoiceCell } from '../invoices/source-invoice';
@@ -80,8 +80,9 @@ const STATUS_TONES: Record<TermStatus, NonNullable<BadgeProps['tone']>> = {
 };
 
 /**
- * F05B screen 3: the retainer's current and scheduled terms with their schedules, then past
- * terms. Amounts and changes need money access (G3); others see months and end actions.
+ * F05B screen 3, F05C screen 5: the retainer's current and scheduled terms with their schedules
+ * by cycle, then past terms. Amounts and changes need money access (G3); others see cycles and
+ * end actions.
  */
 export function ContractTab({ retainer }: { retainer: RetainerDetail }) {
   const { t } = useTranslation();
@@ -230,12 +231,20 @@ function TermCard({
           </div>
           <p className="text-sm text-muted-foreground">
             {t('retainers.terms.range', {
-              start: formatMonth(term.startMonth),
-              end: formatMonth(term.endMonth),
+              start: formatCalendarDate(term.startDate),
+              end: formatCalendarDate(term.endDate),
             })}
             {' · '}
-            {t('retainers.terms.monthsCount', { count: term.months, n: formatNumber(term.months) })}
+            {t('retainers.terms.cyclesCount', { count: term.cycles, n: formatNumber(term.cycles) })}
           </p>
+          {open && term.endAction === 'renew' && (
+            <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
+              <RepeatIcon aria-hidden="true" className="size-4" />
+              {t('retainers.terms.renewsOn', {
+                date: formatCalendarDate(dayAfterTerm(term.endDate)),
+              })}
+            </p>
+          )}
           {term.renewedFrom && (
             <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
               <RepeatIcon aria-hidden="true" className="size-4" />
@@ -315,7 +324,7 @@ function TermCard({
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>{t('retainers.terms.columns.month')}</TableHead>
+            <TableHead>{t('retainers.terms.columns.cycle')}</TableHead>
             {money && (
               <TableHead className="text-end">{t('retainers.terms.columns.base')}</TableHead>
             )}
@@ -326,31 +335,35 @@ function TermCard({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {term.schedule.map((month) => (
-            <TableRow key={month.month}>
+          {term.schedule.map((cycle) => (
+            <TableRow key={cycle.cycle}>
               <TableCell>
                 <span className="flex flex-col">
-                  <span className="font-medium">{formatMonth(month.month)}</span>
+                  <span className="font-medium">
+                    {t('retainers.cycleNumber', { number: formatNumber(cycle.cycle) })}
+                  </span>
                   <span className="text-xs text-muted-foreground">
+                    {formatPeriod(cycle.periodStart, cycle.periodEnd)}
+                    {' · '}
                     {t('retainers.terms.position', {
-                      position: formatNumber(month.position),
-                      months: formatNumber(term.months),
+                      position: formatNumber(cycle.position),
+                      cycles: formatNumber(term.cycles),
                     })}
                   </span>
                 </span>
               </TableCell>
-              {month.money && (
+              {cycle.money && (
                 <TableCell className="text-end">
-                  <Money minor={month.money.baseAmountMinor} currency={currency} />
+                  <Money minor={cycle.money.baseAmountMinor} currency={currency} />
                 </TableCell>
               )}
-              {month.money && (
+              {cycle.money && (
                 <TableCell className="text-end font-medium">
-                  <Money minor={month.money.totalMinor} currency={currency} />
+                  <Money minor={cycle.money.totalMinor} currency={currency} />
                 </TableCell>
               )}
               <TableCell>
-                <MonthState month={month} invoices={invoices} withMoney={!!money} />
+                <CycleState cycle={cycle} invoices={invoices} withMoney={!!money} />
               </TableCell>
             </TableRow>
           ))}
@@ -360,24 +373,24 @@ function TermCard({
   );
 }
 
-/** "not due", "due", the invoice that bills the month (money access), or "cancelled". */
-function MonthState({
-  month,
+/** "not due", "due", the invoice that bills the cycle (money access), or "cancelled". */
+function CycleState({
+  cycle,
   invoices,
   withMoney,
 }: {
-  month: RetainerTermMonth;
+  cycle: RetainerTermCycle;
   invoices: Map<string, SourceInvoice | null>;
   withMoney: boolean;
 }) {
   const { t } = useTranslation();
   const muted = (text: string) => <span className="text-muted-foreground">{text}</span>;
-  if (!month.status || month.status === 'cancelled')
+  if (!cycle.status || cycle.status === 'cancelled')
     return muted(t('retainers.terms.states.cancelled'));
-  if (month.status === 'settled_outside') return muted(t('retainers.terms.states.settled_outside'));
-  if (!month.due) return muted(t('retainers.terms.states.notDue'));
-  if (withMoney && month.chargeId) {
-    return <SourceInvoiceCell invoice={invoices.get(month.chargeId) ?? null} />;
+  if (cycle.status === 'settled_outside') return muted(t('retainers.terms.states.settled_outside'));
+  if (!cycle.due) return muted(t('retainers.terms.states.notDue'));
+  if (withMoney && cycle.chargeId) {
+    return <SourceInvoiceCell invoice={invoices.get(cycle.chargeId) ?? null} />;
   }
   return <span>{t('retainers.terms.states.due')}</span>;
 }
@@ -420,23 +433,20 @@ function EndActionSelect({ retainerId, term }: { retainerId: string; term: Retai
 }
 
 /**
- * The first month a term may start in (T2): this month or later, not before the retainer's start
- * date, and after every other term that is not cancelled.
+ * The first cycle a term may start at (F05C T2'): the current cycle or later (the first one
+ * before the retainer starts), and after every other term that is not cancelled.
  */
-export function earliestStart(retainer: RetainerDetail, others: RetainerTerm[]): CalendarDate {
-  let month = firstOfMonth(businessDate());
-  const start = firstOfMonth(retainer.startDate);
-  if (start > month) month = start;
+export function earliestStart(retainer: RetainerDetail, others: RetainerTerm[]): number {
+  let cycle = Math.max(1, currentCycleNumber(retainer.startDate, businessDate()));
   for (const other of others) {
-    if (other.status !== 'cancelled' && other.endMonth >= month) {
-      month = addMonths(other.endMonth, 1);
-    }
+    const end = other.startCycle + other.cycles - 1;
+    if (other.status !== 'cancelled' && end >= cycle) cycle = end + 1;
   }
-  return month;
+  return cycle;
 }
 
-/** The refusals that concern the start month, shown on that field. */
-const START_CODES = new Set(['TERM_OVERLAP', 'MONTH_ALREADY_CHARGED', 'INVALID_DATES']);
+/** The refusals that concern the start cycle, shown on that field. */
+const START_CODES = new Set(['TERM_OVERLAP', 'CYCLE_ALREADY_CHARGED', 'INVALID_DATES']);
 
 /** "Add term" (T2–T4), or "Edit" a scheduled term (T5). */
 function TermDialog({
@@ -447,8 +457,8 @@ function TermDialog({
 }: {
   retainer: RetainerDetail;
   term?: RetainerTerm;
-  /** The first month offered: the months before it would overlap or be in the past. */
-  earliest: CalendarDate;
+  /** The first cycle offered: the cycles before it would overlap or be in the past. */
+  earliest: number;
   fallback: Fallback;
 }) {
   const { t } = useTranslation();
@@ -458,19 +468,26 @@ function TermDialog({
   const create = useCreateTerm(retainer.id);
   const update = useUpdateTerm(retainer.id);
   const [open, setOpen] = useState(false);
-  const [startMonth, setStartMonth] = useState<CalendarDate | null>(null);
+  const [startCycle, setStartCycle] = useState<number | null>(null);
   const [draft, setDraft] = useState<TermDraft>(EMPTY_TERM);
   // `start` is true when none was chosen, or the API's reason when it refused the month.
   const [problems, setProblems] = useState<TermProblems & { start?: true | string }>({});
   const [failure, setFailure] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
-  // This month and the next two years, from the first month a term may start in.
-  const items = Array.from({ length: 25 }, (_, index) => addMonths(earliest, index)).map(
-    (month) => ({ value: month, label: formatMonth(month) }),
-  );
+  // The next two years of cycles, from the first cycle a term may start at.
+  const items = Array.from({ length: 25 }, (_, index) => earliest + index).map((number) => {
+    const period = cyclePeriod(retainer.startDate, number);
+    return {
+      value: number,
+      label: t('retainers.terms.cycleOption', {
+        cycle: t('retainers.cycleNumber', { number: formatNumber(number) }),
+        period: formatPeriod(period.periodStart, period.periodEnd),
+      }),
+    };
+  });
 
   function openDialog() {
-    setStartMonth(term?.startMonth ?? earliest);
+    setStartCycle(term?.startCycle ?? earliest);
     setDraft(term ? draftOf(term) : EMPTY_TERM);
     setProblems({});
     setFailure(null);
@@ -483,10 +500,10 @@ function TermDialog({
     const parsed = parseTerm(draft);
     const next = {
       ...(isTermProblems(parsed) ? parsed : {}),
-      ...(!startMonth && { start: true as const }),
+      ...(!startCycle && { start: true as const }),
     };
     setProblems(next);
-    if (isTermProblems(parsed) || !startMonth) {
+    if (isTermProblems(parsed) || !startCycle) {
       // After the render marks the fields: the first one to fix takes the focus.
       setTimeout(() => focusFirstInvalid(formRef.current));
       return;
@@ -494,7 +511,7 @@ function TermDialog({
     // Editing without a change: close without a request or a "saved" toast.
     if (
       term &&
-      startMonth === term.startMonth &&
+      startCycle === term.startCycle &&
       JSON.stringify(parsed) === JSON.stringify(parseTerm(draftOf(term)))
     ) {
       setOpen(false);
@@ -503,10 +520,10 @@ function TermDialog({
     setPending(true);
     try {
       if (term) {
-        await update.mutateAsync({ termId: term.id, startMonth, ...parsed });
+        await update.mutateAsync({ termId: term.id, startCycle, ...parsed });
         toast.add({ title: t('retainers.terms.saved'), type: 'success' });
       } else {
-        await create.mutateAsync({ startMonth, ...parsed });
+        await create.mutateAsync({ startCycle, ...parsed });
         toast.add({ title: t('retainers.terms.created'), type: 'success' });
       }
       setOpen(false);
@@ -555,17 +572,17 @@ function TermDialog({
               </DialogDescription>
             </DialogHeader>
             <Field invalid={!!problems.start}>
-              <FieldLabel htmlFor={ids.start}>{t('retainers.terms.startMonth')}</FieldLabel>
+              <FieldLabel htmlFor={ids.start}>{t('retainers.terms.startCycle')}</FieldLabel>
               <Select
                 items={items}
-                value={startMonth}
-                onValueChange={(value: CalendarDate | null) => {
-                  setStartMonth(value);
+                value={startCycle}
+                onValueChange={(value: number | null) => {
+                  setStartCycle(value);
                   setProblems(({ start: _, ...rest }) => rest);
                 }}
               >
                 <SelectTrigger id={ids.start}>
-                  <SelectValue placeholder={t('retainers.terms.startMonth')} />
+                  <SelectValue placeholder={t('retainers.terms.startCycle')} />
                 </SelectTrigger>
                 <SelectContent>
                   {items.map((item) => (
@@ -581,14 +598,14 @@ function TermDialog({
               >
                 {typeof problems.start === 'string'
                   ? problems.start
-                  : t('retainers.terms.errors.startMonth')}
+                  : t('retainers.terms.errors.startCycle')}
               </FieldError>
               <FieldDescription>{t('retainers.terms.startHint')}</FieldDescription>
             </Field>
             <TermPlanEditor
               value={draft}
               onChange={setDraft}
-              startMonth={startMonth}
+              cycles={startCycle ? { anchor: retainer.startDate, startCycle } : null}
               currency={retainer.money?.currency ?? 'USD'}
               problems={problems}
             />

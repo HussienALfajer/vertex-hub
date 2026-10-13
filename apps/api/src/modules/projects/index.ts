@@ -6,7 +6,6 @@ export {
   type BillingMilestone,
   type BillingSource,
   BillingSources,
-  cycleMonthName,
   type RetainerChargeRow,
   type RetainerWork,
   sourceKey,

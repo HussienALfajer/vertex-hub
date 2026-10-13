@@ -8,16 +8,21 @@ import {
 import {
   type AuditAction,
   addDays,
+  addMonths,
   businessDate,
+  type CalendarDate,
   type CreateRetainer,
+  type CurrentCycle,
   type Cycle,
   canChangeRetainerStatus,
+  currentCycleNumber,
+  cycleDaysLeft,
+  cyclePeriod,
   type DeliverableLine,
   type DeliverableLineInput,
   type DeliverableLineList,
   deliverableKey,
   duplicateDeliverables,
-  firstOfMonth,
   permissionScopes,
   RENEWAL_NOTICE_DAYS,
   RETAINER_LIMITS,
@@ -35,6 +40,7 @@ import {
 import {
   type Database,
   extraWorkItems,
+  retainerCycles,
   retainerDeliverables,
   retainers,
   type Transaction,
@@ -100,6 +106,8 @@ const summaryColumns = {
   clientId: retainers.clientId,
   departments: retainers.departments,
   status: retainers.status,
+  startDate: retainers.startDate,
+  cyclesFrom: retainers.cyclesFrom,
   renewalDate: retainers.renewalDate,
 };
 
@@ -109,6 +117,8 @@ type SummaryRow = {
   clientId: string;
   departments: Retainer['departments'];
   status: RetainerStatus;
+  startDate: CalendarDate;
+  cyclesFrom: CalendarDate | null;
   renewalDate: string | null;
 };
 
@@ -234,7 +244,6 @@ export class RetainersService {
       this.db
         .select({
           ...summaryColumns,
-          startDate: retainers.startDate,
           endedOn: retainers.endedOn,
           currency: retainers.currency,
           monthlyFeeMinor: retainers.monthlyFeeMinor,
@@ -249,7 +258,7 @@ export class RetainersService {
     const [currentCycles, people, term, pending, credits] = await Promise.all([
       this.cycles.current([row]),
       this.users.summaries([access.client.accountManagerId]),
-      this.terms.summaryWithMoney(this.db, id, money),
+      this.terms.summaryWithMoney(this.db, row, money),
       this.amendments.pendingCounts(this.db, [id]),
       money ? this.creditPending(id) : Promise.resolve(0),
     ]);
@@ -278,28 +287,22 @@ export class RetainersService {
   }
 
   async create(actor: CurrentUserInfo, input: CreateRetainer): Promise<RetainerDetail> {
-    if (input.term && input.renewalDate) {
-      throw new CodedException(
-        409,
-        'RENEWAL_DATE_FROM_TERM',
-        'A retainer with a term takes its renewal date from the term',
-      );
-    }
     const id = await this.db.transaction(async (tx) => {
+      const today = businessDate();
       // A cycle opening at once may assign its tasks (F07 rule 16): users must stay active.
-      if (input.startDate <= businessDate()) await lockAccessChanges(tx);
+      if (input.startDate <= today) await lockAccessChanges(tx);
       const created = await this.createIn(tx, actor, input);
-      // F05B: the term starts in the start date's month, before the first cycle opens.
+      // F05B, F05C: the term starts at the current cycle, before that cycle opens.
       if (input.term) {
         await this.terms.createIn(
           tx,
           actorOf(actor),
           { id: created, startDate: input.startDate },
-          { ...input.term, startMonth: firstOfMonth(input.startDate) },
-          businessDate(),
+          { ...input.term, startCycle: Math.max(1, currentCycleNumber(input.startDate, today)) },
+          today,
         );
       }
-      // R3: a retainer that has started gets this month's cycle at once.
+      // R3, Y3: a retainer that has started gets its current cycle at once.
       await this.start(tx, actor, created, input.startDate);
       return created;
     });
@@ -323,14 +326,13 @@ export class RetainersService {
       assertCanEditMoney(actor, client);
     }
     assertLines(input.deliverables);
-    assertDates(input.startDate, input.renewalDate ?? null);
+    assertStartDate(input.startDate, businessDate());
     await this.assertNameFree(tx, client.id, input.name);
 
     const values = {
       name: input.name,
       departments: input.departments,
       startDate: input.startDate,
-      renewalDate: input.renewalDate ?? null,
       currency: input.currency ?? 'USD',
       monthlyFeeMinor: input.monthlyFeeMinor ?? null,
     };
@@ -361,7 +363,7 @@ export class RetainersService {
     return created.id;
   }
 
-  /** R3: a retainer that has started gets this month's cycle, from its start date. */
+  /** R3, F05C Y3: a retainer that has started gets its current cycle. */
   async start(
     tx: Transaction,
     actor: CurrentUserInfo,
@@ -370,7 +372,7 @@ export class RetainersService {
   ): Promise<void> {
     const today = businessDate();
     if (startDate <= today) {
-      await this.cycles.open(tx, retainerId, startDate, today, actorOf(actor));
+      await this.cycles.open(tx, { id: retainerId, startDate }, today, actorOf(actor));
     }
   }
 
@@ -385,7 +387,6 @@ export class RetainersService {
           name: retainers.name,
           departments: retainers.departments,
           startDate: retainers.startDate,
-          renewalDate: retainers.renewalDate,
           currency: retainers.currency,
           monthlyFeeMinor: retainers.monthlyFeeMinor,
         })
@@ -396,40 +397,18 @@ export class RetainersService {
         assertCanEditMoney(actor, retainer.client);
       }
       const startChanges = input.startDate !== undefined && input.startDate !== current.startDate;
-      if (startChanges && (await this.cycles.hasCycles(tx, id))) {
-        throw new CodedException(
-          409,
-          'RETAINER_STARTED',
-          'The start date is fixed once the retainer has a cycle',
-        );
-      }
-      assertDates(
-        input.startDate ?? current.startDate,
-        input.renewalDate === undefined ? current.renewalDate : input.renewalDate,
-      );
-      // F05B T2: a term never starts before the month of the retainer's start date.
-      if (startChanges && input.startDate) {
-        const termStart = await this.terms.firstOpenMonth(tx, id);
-        if (termStart && firstOfMonth(input.startDate) > termStart) {
-          throw new CodedException(
-            400,
-            'INVALID_DATES',
-            'The start date falls after the start of the retainer’s term',
-          );
-        }
-      }
-      // F05B T11: with an active or scheduled term the renewal date is derived from it.
+      // F05C edge case 8: cycle numbers never move once a cycle or a charge exists.
       if (
-        input.renewalDate !== undefined &&
-        input.renewalDate !== current.renewalDate &&
-        (await this.terms.hasOpenTerm(tx, id))
+        startChanges &&
+        ((await this.cycles.hasCycles(tx, id)) || (await this.charges.hasCharges(tx, id)))
       ) {
         throw new CodedException(
           409,
-          'RENEWAL_DATE_FROM_TERM',
-          'The renewal date follows the retainer term',
+          'RETAINER_STARTED',
+          'The start date is fixed once the retainer has a cycle or a charge',
         );
       }
+      if (startChanges && input.startDate) assertStartDate(input.startDate, businessDate());
       if (input.name !== undefined && input.name.toLowerCase() !== current.name.toLowerCase()) {
         await this.assertNameFree(tx, retainer.clientId, input.name, id);
       }
@@ -439,13 +418,11 @@ export class RetainersService {
           name: current.name,
           departments: current.departments,
           startDate: current.startDate,
-          renewalDate: current.renewalDate,
         },
         {
           name: input.name,
           departments: changedDepartments(current.departments, input.departments),
           startDate: input.startDate,
-          renewalDate: input.renewalDate,
         },
       );
       const money = changedFields(
@@ -487,19 +464,15 @@ export class RetainersService {
       await audit('retainer.money_updated', money);
       // R3: moving the start date to today or earlier starts the retainer at once.
       const today = businessDate();
-      if (
-        startChanges &&
-        input.startDate &&
-        input.startDate <= today &&
-        retainer.status === 'active'
-      ) {
-        await this.cycles.open(tx, id, input.startDate, today, actorOf(actor));
+      const startDate = input.startDate ?? current.startDate;
+      if (startChanges && startDate <= today && retainer.status === 'active') {
+        await this.cycles.open(tx, { id, startDate }, today, actorOf(actor));
       }
-      // F05B C2: a fee set while the month's open cycle has none charges that month.
+      // F05B C2: a fee set while the open cycle has none charges that cycle.
       if (money?.after.monthlyFeeMinor && !current.monthlyFeeMinor) {
-        await this.charges.chargeOpenMonth(
+        await this.charges.chargeOpenCycle(
           tx,
-          id,
+          { id, startDate },
           today,
           money.after.monthlyFeeMinor,
           actorOf(actor),
@@ -594,7 +567,10 @@ export class RetainersService {
     });
   }
 
-  /** The status diagram (R3, R5): who may make each change is checked after it is allowed. */
+  /**
+   * The status diagram (R3, R5, F05C P1–P4): who may make each change is checked after it is
+   * allowed.
+   */
   async changeStatus(
     actor: CurrentUserInfo,
     id: string,
@@ -612,6 +588,9 @@ export class RetainersService {
         }
         assertCanEditMoney(actor, retainer.client);
       }
+      if (change.startNow !== undefined && to !== 'active') {
+        throw new BadRequestException('"Start now" comes only with resuming or reactivating');
+      }
       assertRetainerNotArchived(retainer);
       if (!canChangeRetainerStatus(retainer.status, to)) {
         throw new CodedException(
@@ -624,12 +603,14 @@ export class RetainersService {
       if (reactivating && !holdsAll(actor, 'projects.manage')) throw new ForbiddenException();
 
       const today = businessDate();
+      const resume = to === 'active' ? await this.resumePlan(tx, retainer, change, today) : null;
       await tx
         .update(retainers)
         .set({
           status: to,
-          ...(to === 'ended' && { endedOn: today }),
+          ...(to === 'ended' && { endedOn: today, cyclesFrom: null }),
           ...(reactivating && { endedOn: null }),
+          ...(resume && { cyclesFrom: resume.cyclesFrom }),
         })
         .where(eq(retainers.id, id));
       await recordAudit(tx, {
@@ -638,29 +619,75 @@ export class RetainersService {
         entityType: 'retainer',
         entityId: id,
         before: { status: retainer.status },
-        after: { status: to },
+        after: {
+          status: to,
+          ...(resume?.opensNow && { startNow: true }),
+          ...(resume?.cyclesFrom && { cyclesFrom: resume.cyclesFrom }),
+        },
       });
       if (to === 'ended') {
         await this.cycles.closeAll(tx, id, today, actorOf(actor));
-        // F05B E1, E2: later months are cancelled; a termination fee drafts at once.
-        await this.terms.endEarly(tx, id, today, actorOf(actor));
+        // F05B E1, E2: later cycles are cancelled; a termination fee drafts at once.
+        await this.terms.endEarly(tx, retainer, today, actorOf(actor));
         await this.amendments.cancelOpen(tx, id, actorOf(actor));
         if (change.termination) {
+          const number = Math.max(1, currentCycleNumber(retainer.startDate, today));
           await this.charges.createTerminationFee(
             tx,
             id,
+            { number, start: cyclePeriod(retainer.startDate, number).periodStart },
             today,
             change.termination,
             actorOf(actor),
           );
         }
       }
-      // R3: resuming or reactivating a started retainer opens this month's cycle, from today.
-      if (to === 'active' && retainer.startDate <= today) {
-        await this.cycles.open(tx, id, today, today, actorOf(actor));
+      // P2, P3: a cycle started now runs from today to the end of its period.
+      if (resume?.opensNow) {
+        await this.cycles.open(tx, retainer, today, actorOf(actor), { startNow: true });
       }
     });
     return this.detail(actor, id);
+  }
+
+  /**
+   * F05C P2–P4: what resuming or reactivating does to the current cycle. With an open cycle row
+   * nothing changes (paused and resumed in the same cycle). Without one, a term's cycle opens now
+   * (its charge is due anyway, P3); an open-ended retainer starts now on request, else at the
+   * next cycle (`cycles_from`). A cycle that closed when the retainer ended stays closed
+   * (`CYCLE_CLOSED` for "start now").
+   */
+  private async resumePlan(
+    tx: Transaction,
+    retainer: { id: string; startDate: CalendarDate },
+    change: RetainerStatusChange,
+    today: CalendarDate,
+  ): Promise<{ opensNow: boolean; cyclesFrom: CalendarDate | null }> {
+    const current = currentCycleNumber(retainer.startDate, today);
+    // Not started yet: its first cycle opens on its start date.
+    if (current === 0) return { opensNow: false, cyclesFrom: null };
+    const [row] = await tx
+      .select({ status: retainerCycles.status })
+      .from(retainerCycles)
+      .where(and(eq(retainerCycles.retainerId, retainer.id), eq(retainerCycles.number, current)));
+    const nextStart = cyclePeriod(retainer.startDate, current + 1).periodStart;
+    if (row?.status === 'open') return { opensNow: false, cyclesFrom: null };
+    if (row) {
+      if (change.startNow) {
+        throw new CodedException(
+          409,
+          'CYCLE_CLOSED',
+          'The current cycle closed; the retainer starts again at the next cycle',
+        );
+      }
+      return { opensNow: false, cyclesFrom: nextStart };
+    }
+    if (await this.terms.covering(tx, retainer.id, current)) {
+      return { opensNow: true, cyclesFrom: null };
+    }
+    return change.startNow
+      ? { opensNow: true, cyclesFrom: null }
+      : { opensNow: false, cyclesFrom: nextStart };
   }
 
   async archive(actor: CurrentUserInfo, id: string): Promise<RetainerDetail> {
@@ -789,11 +816,53 @@ function assertLines(lines: { kind: DeliverableLine['kind']; label?: string | nu
   }
 }
 
-/** The renewal date comes after the start date. */
-function assertDates(startDate: string, renewalDate: string | null): void {
-  if (renewalDate !== null && renewalDate <= startDate) {
-    throw new CodedException(400, 'INVALID_DATES', 'The renewal date is not after the start date');
+/**
+ * A start date falls in the cycle that holds `today` or later: earlier cycles need the catch-up
+ * of a backdated retainer (F05C B1, B2, not yet offered), so `INVALID_DATES` until then.
+ */
+function assertStartDate(startDate: CalendarDate, today: CalendarDate): void {
+  if (addMonths(startDate, 1) <= today) {
+    throw new CodedException(
+      400,
+      'INVALID_DATES',
+      'The start date falls in a cycle that has already ended',
+    );
   }
+}
+
+/** F05C Y6: the open cycle as the header shows it, with its place in the term covering it. */
+function presentCurrent(
+  cycle: Cycle | undefined,
+  term: RetainerTermSummary | undefined,
+  today: CalendarDate,
+): CurrentCycle | null {
+  if (!cycle) return null;
+  const covered =
+    term && term.startCycle <= cycle.number && cycle.number < term.startCycle + term.cycles;
+  return {
+    ...cycle,
+    daysLeft: cycleDaysLeft(cycle, today),
+    termPosition: covered ? cycle.number - term.startCycle + 1 : null,
+    termCycles: covered ? term.cycles : null,
+  };
+}
+
+/**
+ * F05C Y6: when the next cycle opens, for a retainer without an open cycle that will open one:
+ * its start date before it starts, `cycles_from` once resumed "from the next cycle", the next
+ * anchor day while paused or between cycles; null once ended or with an open cycle (unless
+ * paused, which opens none).
+ */
+function nextCycleStart(
+  row: SummaryRow,
+  cycle: Cycle | undefined,
+  today: CalendarDate,
+): CalendarDate | null {
+  if (row.status === 'ended') return null;
+  if (row.startDate > today) return row.startDate;
+  if (row.status === 'active' && cycle) return null;
+  if (row.status === 'active' && row.cyclesFrom) return row.cyclesFrom;
+  return cyclePeriod(row.startDate, currentCycleNumber(row.startDate, today) + 1).periodStart;
 }
 
 function toRetainer(
@@ -809,6 +878,8 @@ function toRetainer(
 ): Retainer {
   const client = context.clients.get(row.clientId);
   const managerId = client?.accountManagerId ?? '';
+  const cycle = context.currentCycles.get(row.id);
+  const term = context.terms.get(row.id);
   return {
     id: row.id,
     name: row.name,
@@ -818,8 +889,9 @@ function toRetainer(
     status: row.status,
     renewalDate: row.renewalDate,
     renewal: renewalState(row.renewalDate, row.status, context.today),
-    term: context.terms.get(row.id) ?? null,
+    term: term ?? null,
     pendingAmendments: context.pending.get(row.id) ?? 0,
-    currentCycle: context.currentCycles.get(row.id) ?? null,
+    currentCycle: presentCurrent(cycle, term, context.today),
+    nextCycleStart: nextCycleStart(row, cycle, context.today),
   };
 }

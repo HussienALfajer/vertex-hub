@@ -1,27 +1,26 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import {
   addDays,
-  addMonths,
   businessDate,
   type CalendarDate,
   type CancelRetainerTerm,
   type CreateRetainerTerm,
+  currentCycleNumber,
+  cyclePeriod,
   dayAfterTerm,
-  firstOfMonth,
-  lastOfMonth,
   type RetainerChargeKind,
   type RetainerChargeStatus,
   type RetainerStatus,
   type RetainerTerm,
+  type RetainerTermCycle,
   type RetainerTermInput,
   type RetainerTermList,
-  type RetainerTermMonth,
   type RetainerTermSummary,
   scheduleMatches,
   TERM_RENEWAL_DAYS,
   type TermEndAction,
-  termEndMonth,
-  termMonths,
+  termCycles,
+  termEndDate,
   type UpdateRetainerTerm,
 } from '@vertex-hub/contracts';
 import {
@@ -45,12 +44,35 @@ import { RetainerCharges } from './retainer-charges.js';
 
 type Executor = Database | Transaction;
 
-type TermRow = typeof retainerTerms.$inferSelect;
+type StoredTerm = typeof retainerTerms.$inferSelect;
 
-/** What a term is made of when it is created (T2–T4). */
+/** A term row with its cycle columns, which every row has once F05C's backfill ran. */
+type TermRow = Omit<StoredTerm, 'startCycle' | 'cycles' | 'startDate' | 'endDate'> & {
+  startCycle: number;
+  cycles: number;
+  startDate: CalendarDate;
+  endDate: CalendarDate;
+};
+
+const termRow = (row: StoredTerm): TermRow => ({
+  ...row,
+  startCycle: row.startCycle ?? 1,
+  cycles: row.cycles ?? 1,
+  startDate: row.startDate ?? '',
+  endDate: row.endDate ?? '',
+});
+
+/** The last cycle of a term. */
+const endCycleOf = (term: { startCycle: number; cycles: number }) =>
+  term.startCycle + term.cycles - 1;
+
+/** The retainer a term belongs to: its cycles are anchored on its start date (F05C). */
+type TermRetainer = { id: string; startDate: CalendarDate };
+
+/** What a term is made of when it is created (T2–T4, F05C T1'). */
 interface TermPlan {
-  startMonth: CalendarDate;
-  months: number;
+  startCycle: number;
+  cycles: number;
   agreedTotalMinor: number;
   schedule: number[];
   endAction: TermEndAction;
@@ -58,7 +80,7 @@ interface TermPlan {
 
 interface ChargeRow {
   id: string;
-  month: string;
+  cycle: number | null;
   kind: RetainerChargeKind;
   amountMinor: number;
   baseAmountMinor: number | null;
@@ -69,7 +91,7 @@ interface ChargeRow {
 
 const chargeColumns = {
   id: retainerCharges.id,
-  month: retainerCharges.month,
+  cycle: retainerCharges.cycleNumber,
   kind: retainerCharges.kind,
   amountMinor: retainerCharges.amountMinor,
   baseAmountMinor: retainerCharges.baseAmountMinor,
@@ -81,9 +103,10 @@ const chargeColumns = {
 const OPEN_STATUSES = ['active', 'scheduled'] as const;
 
 /**
- * Fixed terms of retainers (spec F05B T1–T12, E1–E3, ADR 0029): a term's schedule is its
- * `monthly` charges. Every change holds the retainer row lock (G2) and writes its audit entry in
- * the same transaction (G1); the daily `retainers.cycles` job starts, completes and renews terms.
+ * Fixed terms of retainers (spec F05B T1–T12, E1–E3, F05C T1'–T5', ADR 0029, ADR 0030): a term
+ * covers consecutive cycles and its schedule is its `monthly` charges. Every change holds the
+ * retainer row lock (G2) and writes its audit entry in the same transaction (G1); the daily
+ * `retainers.cycles` job starts, completes and renews terms.
  */
 @Injectable()
 export class RetainerTermsService {
@@ -97,7 +120,7 @@ export class RetainerTermsService {
 
   async list(actor: CurrentUserInfo, retainerId: string): Promise<RetainerTermList> {
     const retainer = await readableRetainer(this.db, this.clients, actor, retainerId);
-    return { items: await this.present(this.db, retainerId, seesMoney(actor, retainer.client)) };
+    return { items: await this.present(this.db, retainer, seesMoney(actor, retainer.client)) };
   }
 
   async create(
@@ -115,34 +138,37 @@ export class RetainerTermsService {
   }
 
   /**
-   * T2–T4 in the caller's transaction, on a retainer it locked: checks the schedule and the
-   * placement, frees an open-ended charge of a month that already began, creates the term and its
-   * charges and, when the start month began, marks its charge due (its draft follows, C3, C4).
+   * T2–T4, F05C T1'–T2' in the caller's transaction, on a retainer it locked: checks the schedule
+   * and the placement, frees an open-ended charge of a cycle that already began, creates the term
+   * and its charges and, when its first cycle began, marks its charge due (its draft follows, C3,
+   * C4).
    */
   async createIn(
     tx: Transaction,
     actor: AuditActor | null,
-    retainer: { id: string; startDate: CalendarDate },
+    retainer: TermRetainer,
     plan: TermPlan,
     today: CalendarDate,
     options: { renewedFromId?: string; quoteId?: string } = {},
   ): Promise<TermRow> {
     assertSchedule(plan);
-    await this.assertPlacement(tx, retainer, plan.startMonth, today);
-    const active = plan.startMonth <= firstOfMonth(today);
-    if (active) await this.freeMonth(tx, retainer.id, plan.startMonth, actor);
+    await this.assertPlacement(tx, retainer, plan.startCycle, today);
+    const startDate = cyclePeriod(retainer.startDate, plan.startCycle).periodStart;
+    const active = startDate <= today;
+    if (active) await this.freeCycle(tx, retainer.id, plan.startCycle, actor);
     const [top] = await tx
       .select({ value: max(retainerTerms.number) })
       .from(retainerTerms)
       .where(eq(retainerTerms.retainerId, retainer.id));
-    const [term] = await tx
+    const [inserted] = await tx
       .insert(retainerTerms)
       .values({
         retainerId: retainer.id,
         number: (top?.value ?? 0) + 1,
-        startMonth: plan.startMonth,
-        months: plan.months,
-        endMonth: termEndMonth(plan.startMonth, plan.months),
+        startCycle: plan.startCycle,
+        cycles: plan.cycles,
+        startDate,
+        endDate: termEndDate(retainer.startDate, plan.startCycle, plan.cycles),
         agreedTotalMinor: plan.agreedTotalMinor,
         endAction: plan.endAction,
         status: active ? 'active' : 'scheduled',
@@ -150,13 +176,14 @@ export class RetainerTermsService {
         quoteId: options.quoteId ?? null,
       })
       .returning();
-    if (!term) throw new Error('Term insert returned no row');
-    await this.charges.createTermMonths(
+    if (!inserted) throw new Error('Term insert returned no row');
+    const term = termRow(inserted);
+    await this.charges.createTermCycles(
       tx,
       retainer.id,
       term.id,
-      termMonths(plan.startMonth, plan.months).map((month, index) => ({
-        month,
+      termCycles(plan.startCycle, plan.cycles).map((number, index) => ({
+        cycle: { number, start: cyclePeriod(retainer.startDate, number).periodStart },
         amountMinor: plan.schedule[index] ?? 0,
       })),
     );
@@ -168,9 +195,10 @@ export class RetainerTermsService {
       after: {
         number: term.number,
         status: term.status,
-        startMonth: term.startMonth,
-        endMonth: term.endMonth,
-        months: term.months,
+        startCycle: term.startCycle,
+        cycles: term.cycles,
+        startDate: term.startDate,
+        endDate: term.endDate,
         agreedTotalMinor: term.agreedTotalMinor,
         schedule: plan.schedule,
         endAction: term.endAction,
@@ -200,8 +228,8 @@ export class RetainerTermsService {
       const schedule = await this.schedule(tx, term);
       if (term.status === 'active') {
         const changes =
-          (input.startMonth !== undefined && input.startMonth !== term.startMonth) ||
-          (input.months !== undefined && input.months !== term.months) ||
+          (input.startCycle !== undefined && input.startCycle !== term.startCycle) ||
+          (input.cycles !== undefined && input.cycles !== term.cycles) ||
           (input.agreedTotalMinor !== undefined &&
             input.agreedTotalMinor !== term.agreedTotalMinor) ||
           (input.schedule !== undefined && !sameAmounts(input.schedule, schedule));
@@ -244,84 +272,84 @@ export class RetainerTermsService {
   }
 
   /**
-   * F05B Q2: the month a quote renewal takes effect in, per retainer: the month after its active
-   * term (`afterTerm`), else next month, and never before the retainer's start month (T2).
+   * F05B Q2, F05C: the cycle a quote renewal takes effect in, per retainer: the cycle after its
+   * active term (`afterTerm`), else the next cycle (the first one before the retainer starts),
+   * with that cycle's first day.
    */
   async renewalStarts(
     executor: Executor,
-    retainers: readonly { id: string; startDate: CalendarDate }[],
+    retainers: readonly TermRetainer[],
     today: CalendarDate,
-  ): Promise<Map<string, { renewsFrom: CalendarDate; afterTerm: boolean }>> {
+  ): Promise<Map<string, { cycle: number; renewsFrom: CalendarDate; afterTerm: boolean }>> {
     const retainerIds = retainers.map((retainer) => retainer.id);
     const active =
       retainerIds.length === 0
         ? []
-        : await executor
-            .select({ retainerId: retainerTerms.retainerId, endMonth: retainerTerms.endMonth })
-            .from(retainerTerms)
-            .where(
-              and(
-                inArray(retainerTerms.retainerId, [...retainerIds]),
-                eq(retainerTerms.status, 'active'),
-              ),
-            );
-    const nextMonth = addMonths(firstOfMonth(today), 1);
+        : (
+            await executor
+              .select()
+              .from(retainerTerms)
+              .where(
+                and(
+                  inArray(retainerTerms.retainerId, [...retainerIds]),
+                  eq(retainerTerms.status, 'active'),
+                ),
+              )
+          ).map(termRow);
     return new Map(
       retainers.map(({ id, startDate }) => {
         const term = active.find((row) => row.retainerId === id);
-        // A term that ended but the job has not completed yet: next month.
-        const candidates = [
-          nextMonth,
-          firstOfMonth(startDate),
-          ...(term ? [dayAfterTerm(term.endMonth)] : []),
-        ].sort();
-        return [id, { renewsFrom: candidates.at(-1) ?? nextMonth, afterTerm: !!term }];
+        // A term that ended but the job has not completed yet: the next cycle.
+        const cycle = Math.max(
+          currentCycleNumber(startDate, today) + 1,
+          term ? endCycleOf(term) + 1 : 1,
+        );
+        return [
+          id,
+          { cycle, renewsFrom: cyclePeriod(startDate, cycle).periodStart, afterTerm: !!term },
+        ];
       }),
     );
   }
 
   /**
    * F05B Q2 on a retainer the caller locked: a quote renewal replaces the scheduled term; with a
-   * term, the new term starts the month after the active term (else next month); without one, an
-   * active term continues monthly after it ends. Returns the month the renewal takes effect in.
+   * term, the new term starts at the cycle after the active term (else the next cycle); without
+   * one, an active term continues cycle by cycle after it ends. Returns the cycle the renewal takes
+   * effect in, with its first day.
    */
   async renewForQuote(
     tx: Transaction,
     actor: AuditActor,
-    retainer: { id: string; startDate: CalendarDate },
+    retainer: TermRetainer,
     input: { quoteId: string; term: RetainerTermInput | null },
     today: CalendarDate,
-  ): Promise<CalendarDate> {
-    const open = await tx
-      .select()
-      .from(retainerTerms)
-      .where(
-        and(
-          eq(retainerTerms.retainerId, retainer.id),
-          inArray(retainerTerms.status, [...OPEN_STATUSES]),
-        ),
-      );
+  ): Promise<{ cycle: number; renewsFrom: CalendarDate }> {
+    const open = await this.openTerms(tx, retainer.id);
     const active = open.find((term) => term.status === 'active');
     const scheduled = open.find((term) => term.status === 'scheduled');
     const start = (await this.renewalStarts(tx, [retainer], today)).get(retainer.id);
-    if (!start) throw new Error('No renewal month');
+    if (!start) throw new Error('No renewal cycle');
     if (scheduled) await this.cancelTerm(tx, scheduled, actor, { cause: 'quote_renewal' });
     if (input.term) {
-      await this.createIn(
-        tx,
-        actor,
-        retainer,
-        { ...input.term, startMonth: start.renewsFrom },
-        today,
-        { quoteId: input.quoteId },
-      );
-      return start.renewsFrom;
+      await this.createIn(tx, actor, retainer, { ...input.term, startCycle: start.cycle }, today, {
+        quoteId: input.quoteId,
+      });
+      return start;
     }
     if (active && active.endAction !== 'continue') {
       await this.setEndAction(tx, active, 'continue', actor);
     }
     if (scheduled) await this.syncRenewalDate(tx, retainer.id, actor, { clearWhenNone: true });
-    return start.renewsFrom;
+    return start;
+  }
+
+  /** F05C P3: the active term covering a cycle of the retainer, if any. */
+  async covering(executor: Executor, retainerId: string, cycle: number): Promise<boolean> {
+    const terms = await this.openTerms(executor, retainerId);
+    return terms.some(
+      (term) => term.status === 'active' && term.startCycle <= cycle && endCycleOf(term) >= cycle,
+    );
   }
 
   /** T11: whether the retainer has an active or scheduled term (its renewal date is derived). */
@@ -339,22 +367,6 @@ export class RetainerTermsService {
     return !!row;
   }
 
-  /** T2: the first month of the retainer's earliest active or scheduled term, if any. */
-  async firstOpenMonth(executor: Executor, retainerId: string): Promise<CalendarDate | null> {
-    const [row] = await executor
-      .select({ startMonth: retainerTerms.startMonth })
-      .from(retainerTerms)
-      .where(
-        and(
-          eq(retainerTerms.retainerId, retainerId),
-          inArray(retainerTerms.status, [...OPEN_STATUSES]),
-        ),
-      )
-      .orderBy(asc(retainerTerms.startMonth))
-      .limit(1);
-    return row?.startMonth ?? null;
-  }
-
   /** T11: the end action of the retainer's last active or scheduled term, for the reminder. */
   async lastEndAction(executor: Executor, retainerId: string): Promise<TermEndAction | null> {
     const [row] = await executor
@@ -366,32 +378,23 @@ export class RetainerTermsService {
           inArray(retainerTerms.status, [...OPEN_STATUSES]),
         ),
       )
-      .orderBy(desc(retainerTerms.endMonth))
+      .orderBy(desc(retainerTerms.endDate))
       .limit(1);
     return row?.endAction ?? null;
   }
 
   /**
-   * E1: ending a retainer keeps the current month; later `monthly` charges that no live invoice
-   * bills are cancelled, and its active and scheduled terms become `cancelled` (`end_month` kept).
+   * E1: ending a retainer keeps the current cycle; later `monthly` charges that no live invoice
+   * bills are cancelled, and its active and scheduled terms become `cancelled` (`end_date` kept).
    * Pending credits stay (C9).
    */
   async endEarly(
     tx: Transaction,
-    retainerId: string,
+    retainer: TermRetainer,
     today: CalendarDate,
     actor: AuditActor | null,
   ): Promise<void> {
-    const open = await tx
-      .select()
-      .from(retainerTerms)
-      .where(
-        and(
-          eq(retainerTerms.retainerId, retainerId),
-          inArray(retainerTerms.status, [...OPEN_STATUSES]),
-        ),
-      )
-      .orderBy(asc(retainerTerms.number));
+    const open = (await this.openTerms(tx, retainer.id)).sort((a, b) => a.number - b.number);
     for (const term of open) {
       await this.cancelTerm(tx, term, actor, { cause: 'retainer_ended', keepCharges: true });
     }
@@ -400,57 +403,55 @@ export class RetainerTermsService {
       .from(retainerCharges)
       .where(
         and(
-          eq(retainerCharges.retainerId, retainerId),
+          eq(retainerCharges.retainerId, retainer.id),
           eq(retainerCharges.kind, 'monthly'),
           eq(retainerCharges.status, 'pending'),
-          gt(retainerCharges.month, firstOfMonth(today)),
+          gt(retainerCharges.cycleNumber, currentCycleNumber(retainer.startDate, today)),
         ),
       )
-      .orderBy(asc(retainerCharges.month));
-    await this.charges.cancel(tx, later, retainerId, actor);
+      .orderBy(asc(retainerCharges.cycleNumber));
+    await this.charges.cancel(tx, later.map(cycleCharge), retainer.id, actor);
   }
 
   /**
-   * The job's term steps (spec "Jobs") on a retainer the caller locked: completes active terms
-   * whose last month ended, starts the scheduled term whose month began (then completes it too
-   * when the job missed its whole span). Returns the day the retainer ends on when a term with
+   * The job's term steps (F05C J1 step 1) on a retainer the caller locked: completes active terms
+   * whose last day passed, starts the scheduled term whose first cycle began (then completes it
+   * too when the job missed its whole span). Returns the day the retainer ends on when a term with
    * end action `end` just completed and no term follows it (T8).
    */
   async advance(
     tx: Transaction,
-    retainerId: string,
+    retainer: TermRetainer,
     status: RetainerStatus,
     today: CalendarDate,
   ): Promise<{ endOn: CalendarDate | null }> {
-    const month = firstOfMonth(today);
-    const completed = await this.complete(tx, retainerId, month);
+    const retainerId = retainer.id;
+    const completed = await this.complete(tx, retainerId, today);
     if (status !== 'ended') {
-      const [scheduled] = await tx
-        .select()
-        .from(retainerTerms)
-        .where(
-          and(eq(retainerTerms.retainerId, retainerId), eq(retainerTerms.status, 'scheduled')),
-        );
-      if (scheduled && scheduled.startMonth <= month) {
+      const scheduled = (await this.openTerms(tx, retainerId)).find(
+        (term) => term.status === 'scheduled',
+      );
+      if (scheduled && scheduled.startDate <= today) {
         await tx
           .update(retainerTerms)
           .set({ status: 'active' })
           .where(eq(retainerTerms.id, scheduled.id));
         await this.audit(tx, null, 'retainer_term.started', scheduled, 'scheduled', 'active');
-        completed.push(...(await this.complete(tx, retainerId, month)));
+        completed.push(...(await this.complete(tx, retainerId, today)));
       }
     }
     const ending = completed.find((term) => term.endAction === 'end');
     if (status === 'ended' || !ending || (await this.hasOpenTerm(tx, retainerId))) {
       return { endOn: null };
     }
-    return { endOn: lastOfMonth(ending.endMonth) };
+    return { endOn: ending.endDate };
   }
 
   /**
-   * T7: on the first run on or after 30 days before the end of an active term that renews, with
-   * no scheduled term, the next term is scheduled with the same months and the ending term's base
-   * amounts by position; the account manager is notified. Returns whether it renewed.
+   * T7, F05C T3': on the first run on or after 30 days before the end of an active term that
+   * renews, with no scheduled term, the next term is scheduled from the cycle after its last one,
+   * with as many cycles and the ending term's base amounts by position; the account manager is
+   * notified. Returns whether it renewed.
    */
   async renew(
     tx: Transaction,
@@ -464,15 +465,7 @@ export class RetainerTermsService {
     today: CalendarDate,
   ): Promise<boolean> {
     if (retainer.status === 'ended') return false;
-    const terms = await tx
-      .select()
-      .from(retainerTerms)
-      .where(
-        and(
-          eq(retainerTerms.retainerId, retainer.id),
-          inArray(retainerTerms.status, [...OPEN_STATUSES]),
-        ),
-      );
+    const terms = await this.openTerms(tx, retainer.id);
     const active = terms.find((term) => term.status === 'active');
     if (active?.endAction !== 'renew') return false;
     if (terms.some((term) => term.status === 'scheduled')) return false;
@@ -490,15 +483,15 @@ export class RetainerTermsService {
       )
       .limit(1);
     if (refused) return false;
-    if (today < addDays(dayAfterTerm(active.endMonth), -TERM_RENEWAL_DAYS)) return false;
+    if (today < addDays(dayAfterTerm(active.endDate), -TERM_RENEWAL_DAYS)) return false;
     const schedule = await this.schedule(tx, active);
     const term = await this.createIn(
       tx,
       null,
       retainer,
       {
-        startMonth: dayAfterTerm(active.endMonth),
-        months: active.months,
+        startCycle: endCycleOf(active) + 1,
+        cycles: active.cycles,
         agreedTotalMinor: schedule.reduce((total, amount) => total + amount, 0),
         schedule,
         endAction: 'renew',
@@ -517,8 +510,8 @@ export class RetainerTermsService {
           retainer: retainer.name,
           client: client.name,
           termNumber: term.number,
-          startMonth: term.startMonth,
-          endMonth: term.endMonth,
+          startDate: term.startDate,
+          endDate: term.endDate,
         },
       });
     }
@@ -531,15 +524,17 @@ export class RetainerTermsService {
     retainerIds: readonly string[],
   ): Promise<Map<string, RetainerTermSummary>> {
     if (retainerIds.length === 0) return new Map();
-    const rows = await executor
-      .select()
-      .from(retainerTerms)
-      .where(
-        and(
-          inArray(retainerTerms.retainerId, [...retainerIds]),
-          inArray(retainerTerms.status, [...OPEN_STATUSES]),
-        ),
-      );
+    const rows = (
+      await executor
+        .select()
+        .from(retainerTerms)
+        .where(
+          and(
+            inArray(retainerTerms.retainerId, [...retainerIds]),
+            inArray(retainerTerms.status, [...OPEN_STATUSES]),
+          ),
+        )
+    ).map(termRow);
     const chosen = new Map<string, TermRow>();
     for (const row of rows) {
       const current = chosen.get(row.retainerId);
@@ -551,23 +546,23 @@ export class RetainerTermsService {
   /** The retainer's term summary with its money (T6), for its page. */
   async summaryWithMoney(
     executor: Executor,
-    retainerId: string,
+    retainer: TermRetainer,
     withMoney: boolean,
   ): Promise<RetainerTermSummary | null> {
-    const summary = (await this.summaries(executor, [retainerId])).get(retainerId);
+    const summary = (await this.summaries(executor, [retainer.id])).get(retainer.id);
     if (!summary || !withMoney) return summary ?? null;
     const [term] = await executor
       .select()
       .from(retainerTerms)
       .where(eq(retainerTerms.id, summary.id));
     if (!term) return summary;
-    const charges = await this.chargeRows(executor, retainerId);
+    const charges = await this.chargeRows(executor, retainer.id);
     return {
       ...summary,
       money: {
         agreedTotalMinor: term.agreedTotalMinor,
-        currentTotalMinor: monthsOf(term, charges).reduce(
-          (total, month) => total + (month.money?.totalMinor ?? 0),
+        currentTotalMinor: cyclesOf(termRow(term), charges, retainer.startDate).reduce(
+          (total, cycle) => total + (cycle.money?.totalMinor ?? 0),
           0,
         ),
       },
@@ -587,18 +582,20 @@ export class RetainerTermsService {
 
   private async present(
     executor: Executor,
-    retainerId: string,
+    retainer: TermRetainer,
     withMoney: boolean,
   ): Promise<RetainerTerm[]> {
-    const terms = await executor
-      .select()
-      .from(retainerTerms)
-      .where(eq(retainerTerms.retainerId, retainerId))
-      .orderBy(desc(retainerTerms.number));
-    const charges = await this.chargeRows(executor, retainerId);
+    const terms = (
+      await executor
+        .select()
+        .from(retainerTerms)
+        .where(eq(retainerTerms.retainerId, retainer.id))
+        .orderBy(desc(retainerTerms.number))
+    ).map(termRow);
+    const charges = await this.chargeRows(executor, retainer.id);
     const numbers = new Map(terms.map((term) => [term.id, term.number]));
     return terms.map((term) => {
-      const months = monthsOf(term, charges);
+      const cycles = cyclesOf(term, charges, retainer.startDate);
       const renewedFromNumber = term.renewedFromId ? numbers.get(term.renewedFromId) : undefined;
       return {
         ...summaryOf(term),
@@ -612,13 +609,13 @@ export class RetainerTermsService {
         ...(withMoney && {
           money: {
             agreedTotalMinor: term.agreedTotalMinor,
-            currentTotalMinor: months.reduce(
+            currentTotalMinor: cycles.reduce(
               (total, row) => total + (row.money?.totalMinor ?? 0),
               0,
             ),
           },
         }),
-        schedule: withMoney ? months : months.map(({ money: _money, ...row }) => row),
+        schedule: withMoney ? cycles : cycles.map(({ money: _money, ...row }) => row),
       };
     });
   }
@@ -633,67 +630,92 @@ export class RetainerTermsService {
           ne(retainerCharges.kind, 'termination_fee'),
         ),
       )
-      .orderBy(asc(retainerCharges.month), asc(retainerCharges.createdAt), asc(retainerCharges.id));
+      .orderBy(
+        asc(retainerCharges.cycleNumber),
+        asc(retainerCharges.createdAt),
+        asc(retainerCharges.id),
+      );
   }
 
-  /** T5 on a scheduled term: new fields, its charges rebuilt month by month. */
+  /** The retainer's active and scheduled terms. */
+  private async openTerms(executor: Executor, retainerId: string): Promise<TermRow[]> {
+    const rows = await executor
+      .select()
+      .from(retainerTerms)
+      .where(
+        and(
+          eq(retainerTerms.retainerId, retainerId),
+          inArray(retainerTerms.status, [...OPEN_STATUSES]),
+        ),
+      );
+    return rows.map(termRow);
+  }
+
+  /** T5 on a scheduled term: new fields, its charges rebuilt cycle by cycle. */
   private async reschedule(
     tx: Transaction,
     actor: AuditActor,
-    retainer: { id: string; startDate: CalendarDate },
+    retainer: TermRetainer,
     term: TermRow,
     schedule: number[],
     input: UpdateRetainerTerm,
     today: CalendarDate,
   ): Promise<void> {
     const next: TermPlan = {
-      startMonth: input.startMonth ?? term.startMonth,
-      months: input.months ?? term.months,
+      startCycle: input.startCycle ?? term.startCycle,
+      cycles: input.cycles ?? term.cycles,
       agreedTotalMinor: input.agreedTotalMinor ?? term.agreedTotalMinor,
       schedule: input.schedule ?? schedule,
       endAction: input.endAction ?? term.endAction,
     };
     const before = {
-      startMonth: term.startMonth,
-      months: term.months,
+      startCycle: term.startCycle,
+      cycles: term.cycles,
       agreedTotalMinor: term.agreedTotalMinor,
       schedule,
       endAction: term.endAction,
     };
     if (JSON.stringify(before) === JSON.stringify(next)) return;
     assertSchedule(next);
-    await this.assertPlacement(tx, retainer, next.startMonth, today, term.id);
-    const active = next.startMonth <= firstOfMonth(today);
-    if (active) await this.freeMonth(tx, retainer.id, next.startMonth, actor);
+    await this.assertPlacement(tx, retainer, next.startCycle, today, term.id);
+    const startDate = cyclePeriod(retainer.startDate, next.startCycle).periodStart;
+    const active = startDate <= today;
+    if (active) await this.freeCycle(tx, retainer.id, next.startCycle, actor);
 
-    const months = termMonths(next.startMonth, next.months);
+    const cycles = termCycles(next.startCycle, next.cycles);
     const existing = (
       await tx
         .select(chargeColumns)
         .from(retainerCharges)
         .where(and(eq(retainerCharges.termId, term.id), eq(retainerCharges.status, 'pending')))
-    ).filter((charge) => charge.kind === 'monthly');
-    // Months leaving the term free the unique monthly index before new months take theirs.
+    )
+      .filter((charge) => charge.kind === 'monthly')
+      .map(cycleCharge);
+    // Cycles leaving the term free the unique monthly index before new cycles take theirs.
     await this.charges.cancel(
       tx,
-      existing.filter((charge) => !months.includes(charge.month)),
+      existing.filter((charge) => !cycles.includes(charge.cycle)),
       retainer.id,
       actor,
     );
-    const added: { month: CalendarDate; amountMinor: number }[] = [];
-    for (const [index, month] of months.entries()) {
+    const added: { cycle: { number: number; start: CalendarDate }; amountMinor: number }[] = [];
+    for (const [index, number] of cycles.entries()) {
       const amountMinor = next.schedule[index] ?? 0;
-      const charge = existing.find((row) => row.month === month);
+      const charge = existing.find((row) => row.cycle === number);
       if (charge) await this.charges.setScheduleAmount(tx, charge, amountMinor, retainer.id, actor);
-      else added.push({ month, amountMinor });
+      else {
+        const start = cyclePeriod(retainer.startDate, number).periodStart;
+        added.push({ cycle: { number, start }, amountMinor });
+      }
     }
-    await this.charges.createTermMonths(tx, retainer.id, term.id, added);
+    await this.charges.createTermCycles(tx, retainer.id, term.id, added);
     await tx
       .update(retainerTerms)
       .set({
-        startMonth: next.startMonth,
-        months: next.months,
-        endMonth: termEndMonth(next.startMonth, next.months),
+        startCycle: next.startCycle,
+        cycles: next.cycles,
+        startDate,
+        endDate: termEndDate(retainer.startDate, next.startCycle, next.cycles),
         agreedTotalMinor: next.agreedTotalMinor,
         endAction: next.endAction,
         status: active ? 'active' : 'scheduled',
@@ -738,7 +760,7 @@ export class RetainerTermsService {
       .from(retainerTerms)
       .where(and(eq(retainerTerms.renewedFromId, term.id), eq(retainerTerms.status, 'scheduled')));
     if (renewal) {
-      await this.cancelTerm(tx, renewal, actor, { cause: 'end_action_changed' });
+      await this.cancelTerm(tx, termRow(renewal), actor, { cause: 'end_action_changed' });
       await this.syncRenewalDate(tx, term.retainerId, actor);
     }
   }
@@ -777,18 +799,15 @@ export class RetainerTermsService {
       .select(chargeColumns)
       .from(retainerCharges)
       .where(and(eq(retainerCharges.termId, term.id), eq(retainerCharges.status, 'pending')))
-      .orderBy(asc(retainerCharges.month));
-    await this.charges.cancel(tx, pending, term.retainerId, actor);
+      .orderBy(asc(retainerCharges.cycleNumber));
+    await this.charges.cancel(tx, pending.map(cycleCharge), term.retainerId, actor);
   }
 
-  /** Active terms whose last month ended before `month` become `completed`. */
-  private async complete(tx: Transaction, retainerId: string, month: CalendarDate) {
-    const ended = (
-      await tx
-        .select()
-        .from(retainerTerms)
-        .where(and(eq(retainerTerms.retainerId, retainerId), eq(retainerTerms.status, 'active')))
-    ).filter((term) => term.endMonth < month);
+  /** Active terms whose last day is before `today` become `completed`. */
+  private async complete(tx: Transaction, retainerId: string, today: CalendarDate) {
+    const ended = (await this.openTerms(tx, retainerId)).filter(
+      (term) => term.status === 'active' && term.endDate < today,
+    );
     for (const term of ended) {
       await tx
         .update(retainerTerms)
@@ -818,48 +837,50 @@ export class RetainerTermsService {
   }
 
   /**
-   * T2: a term starts in the current month or later, not before the retainer's start month
-   * (`INVALID_DATES`), and after every other non-cancelled term, with at most one scheduled
+   * T2, F05C T2': a term starts at the current cycle or later, never before the retainer's first
+   * cycle (`INVALID_DATES`), and after every other non-cancelled term, with at most one scheduled
    * (`TERM_OVERLAP`).
    */
   private async assertPlacement(
     tx: Transaction,
-    retainer: { id: string; startDate: CalendarDate },
-    startMonth: CalendarDate,
+    retainer: TermRetainer,
+    startCycle: number,
     today: CalendarDate,
     exceptId?: string,
   ): Promise<void> {
-    if (startMonth < firstOfMonth(today) || startMonth < firstOfMonth(retainer.startDate)) {
+    if (startCycle < Math.max(1, currentCycleNumber(retainer.startDate, today))) {
       throw new CodedException(
         400,
         'INVALID_DATES',
-        'A term starts in the current month or later, and not before the retainer',
+        'A term starts at the current cycle or later, and not before the retainer',
       );
     }
-    const others = await tx
-      .select({ status: retainerTerms.status, endMonth: retainerTerms.endMonth })
-      .from(retainerTerms)
-      .where(
-        and(
-          eq(retainerTerms.retainerId, retainer.id),
-          ne(retainerTerms.status, 'cancelled'),
-          exceptId ? ne(retainerTerms.id, exceptId) : undefined,
-        ),
-      );
-    if (others.some((term) => term.status === 'scheduled' || term.endMonth >= startMonth)) {
+    const others = (
+      await tx
+        .select()
+        .from(retainerTerms)
+        .where(
+          and(
+            eq(retainerTerms.retainerId, retainer.id),
+            ne(retainerTerms.status, 'cancelled'),
+            exceptId ? ne(retainerTerms.id, exceptId) : undefined,
+          ),
+        )
+    ).map(termRow);
+    if (others.some((term) => term.status === 'scheduled' || endCycleOf(term) >= startCycle)) {
       throw new CodedException(409, 'TERM_OVERLAP', 'The term overlaps another term');
     }
   }
 
   /**
-   * T4: a month that began may already have a monthly charge (open-ended, or kept by a term
-   * cancelled when the retainer ended this month, E1): replaced when no live invoice bills it,
-   * else the term is refused (`MONTH_ALREADY_CHARGED`).
+   * T4: a cycle that began may already have a monthly charge (open-ended, or kept by a term
+   * cancelled when the retainer ended in this cycle, E1): replaced when no live invoice bills it,
+   * else the term is refused (`CYCLE_ALREADY_CHARGED`).
    */
-  private async freeMonth(
+  private async freeCycle(
     tx: Transaction,
     retainerId: string,
-    month: CalendarDate,
+    cycle: number,
     actor: AuditActor | null,
   ): Promise<void> {
     const charged = await tx
@@ -868,7 +889,7 @@ export class RetainerTermsService {
       .where(
         and(
           eq(retainerCharges.retainerId, retainerId),
-          eq(retainerCharges.month, month),
+          eq(retainerCharges.cycleNumber, cycle),
           eq(retainerCharges.kind, 'monthly'),
           ne(retainerCharges.status, 'cancelled'),
         ),
@@ -877,17 +898,17 @@ export class RetainerTermsService {
       if (charge.status !== 'pending' || (await this.locks.chargeInvoiced(tx, charge.id))) {
         throw new CodedException(
           409,
-          'MONTH_ALREADY_CHARGED',
-          'The month is already invoiced; start the term next month',
+          'CYCLE_ALREADY_CHARGED',
+          'The cycle is already invoiced; start the term at the next cycle',
         );
       }
     }
-    await this.charges.cancel(tx, charged, retainerId, actor);
+    await this.charges.cancel(tx, charged.map(cycleCharge), retainerId, actor);
   }
 
   /**
-   * T11: with an active or scheduled term, the renewal date is the day after its last term.
-   * `clearWhenNone`: a cancellation that leaves no such term clears the derived date.
+   * T11, F05C T3': with an active or scheduled term, the renewal date is the day after its last
+   * term. `clearWhenNone`: a cancellation that leaves no such term clears the derived date.
    */
   private async syncRenewalDate(
     tx: Transaction,
@@ -896,7 +917,7 @@ export class RetainerTermsService {
     options: { clearWhenNone?: boolean } = {},
   ): Promise<void> {
     const [last] = await tx
-      .select({ endMonth: retainerTerms.endMonth })
+      .select({ endDate: retainerTerms.endDate })
       .from(retainerTerms)
       .where(
         and(
@@ -904,10 +925,10 @@ export class RetainerTermsService {
           inArray(retainerTerms.status, [...OPEN_STATUSES]),
         ),
       )
-      .orderBy(desc(retainerTerms.endMonth))
+      .orderBy(desc(retainerTerms.endDate))
       .limit(1);
     if (!last && !options.clearWhenNone) return;
-    const renewalDate = last ? dayAfterTerm(last.endMonth) : null;
+    const renewalDate = last?.endDate ? dayAfterTerm(last.endDate) : null;
     const [row] = await tx
       .select({ renewalDate: retainers.renewalDate })
       .from(retainers)
@@ -924,15 +945,15 @@ export class RetainerTermsService {
     });
   }
 
-  /** The term's base amount per month, by position (what a renewal copies, T7). */
+  /** The term's base amount per cycle, by position (what a renewal copies, T7). */
   private async schedule(executor: Executor, term: TermRow): Promise<number[]> {
     const rows = await executor
       .select(chargeColumns)
       .from(retainerCharges)
       .where(and(eq(retainerCharges.termId, term.id), eq(retainerCharges.kind, 'monthly')))
       .orderBy(asc(retainerCharges.createdAt), asc(retainerCharges.id));
-    return termMonths(term.startMonth, term.months).map((month) => {
-      const own = rows.filter((row) => row.month === month);
+    return termCycles(term.startCycle, term.cycles).map((cycle) => {
+      const own = rows.filter((row) => row.cycle === cycle);
       const charge = own.find((row) => row.status !== 'cancelled') ?? own.at(-1);
       return charge ? (charge.baseAmountMinor ?? charge.amountMinor) : 0;
     });
@@ -944,17 +965,22 @@ export class RetainerTermsService {
       .from(retainerTerms)
       .where(and(eq(retainerTerms.id, termId), eq(retainerTerms.retainerId, retainerId)));
     if (!row) throw new NotFoundException();
-    return row;
+    return termRow(row);
   }
 }
 
-/** T3: one amount per month, summing to the agreed total. */
+/** A charge row with its cycle number (set on every row once F05C's backfill ran). */
+function cycleCharge<T extends { cycle: number | null }>(row: T): T & { cycle: number } {
+  return { ...row, cycle: row.cycle ?? 0 };
+}
+
+/** T3: one amount per cycle, summing to the agreed total. */
 function assertSchedule(plan: TermPlan): void {
   if (!scheduleMatches(plan)) {
     throw new CodedException(
       409,
       'SCHEDULE_TOTAL_MISMATCH',
-      'The schedule needs one amount per month, summing to the agreed total',
+      'The schedule needs one amount per cycle, summing to the agreed total',
     );
   }
 }
@@ -978,37 +1004,43 @@ function summaryOf(term: TermRow): RetainerTermSummary {
     id: term.id,
     number: term.number,
     status: term.status,
-    startMonth: term.startMonth,
-    endMonth: term.endMonth,
-    months: term.months,
+    startCycle: term.startCycle,
+    cycles: term.cycles,
+    startDate: term.startDate,
+    endDate: term.endDate,
     endAction: term.endAction,
   };
 }
 
 /**
- * A term's months with their `monthly` charge (the live one, else the last cancelled) and T6's
- * total: the charge plus the month's additions and credits, unless the term was cancelled.
+ * A term's cycles with their `monthly` charge (the live one, else the last cancelled) and T6's
+ * total: the charge plus the cycle's additions and credits, unless the term was cancelled.
  */
-function monthsOf(term: TermRow, charges: readonly ChargeRow[]): RetainerTermMonth[] {
-  return termMonths(term.startMonth, term.months).map((month, index) => {
-    const own = charges.filter((row) => row.termId === term.id && row.month === month);
+function cyclesOf(
+  term: TermRow,
+  charges: readonly ChargeRow[],
+  retainerStart: CalendarDate,
+): RetainerTermCycle[] {
+  return termCycles(term.startCycle, term.cycles).map((cycle, index) => {
+    const own = charges.filter((row) => row.termId === term.id && row.cycle === cycle);
     const charge = own.find((row) => row.status !== 'cancelled') ?? own.at(-1);
     const live = charge && charge.status !== 'cancelled' ? charge.amountMinor : 0;
-    // T6: the month's additions and credits count while the term still charges the month. A
-    // cancelled month (an early end, a cancelled scheduled term) leaves them to whoever bills it.
+    // T6: the cycle's additions and credits count while the term still charges the cycle. A
+    // cancelled cycle (an early end, a cancelled scheduled term) leaves them to whoever bills it.
     const extras =
       !charge || charge.status === 'cancelled'
         ? 0
         : charges
             .filter(
               (row) =>
-                row.month === month &&
+                row.cycle === cycle &&
                 (row.kind === 'addition' || row.kind === 'credit') &&
                 row.status !== 'cancelled',
             )
             .reduce((total, row) => total + row.amountMinor, 0);
     return {
-      month,
+      cycle,
+      ...cyclePeriod(retainerStart, cycle),
       position: index + 1,
       chargeId: charge?.id ?? null,
       status: charge?.status ?? null,

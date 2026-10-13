@@ -1,5 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import {
+  addDays,
+  addMonths,
+  businessDate,
   type ClientResponse,
   type CreateRetainer,
   type CreateRetainerInput,
@@ -71,32 +74,38 @@ export function retainerFormFailure(
   return errorMessage(t, error);
 }
 
-const FIELD_OF_CODE: Record<
-  string,
-  'name' | 'startDate' | 'renewalDate' | 'currency' | 'monthlyFeeMinor'
-> = {
+const FIELD_OF_CODE: Record<string, 'name' | 'startDate' | 'currency' | 'monthlyFeeMinor'> = {
   RETAINER_NAME_TAKEN: 'name',
   RETAINER_STARTED: 'startDate',
-  INVALID_DATES: 'renewalDate',
-  RENEWAL_DATE_FROM_TERM: 'renewalDate',
+  INVALID_DATES: 'startDate',
   CURRENCY_LOCKED: 'currency',
   FEE_CHANGE_NEEDS_AMENDMENT: 'monthlyFeeMinor',
 };
 
-/** R6 before the round trip: a renewal date, when set, comes after the start date. */
-export function checkRenewal(
-  form: RetainerFormMethods,
-  t: TFunction,
-  start: string,
-  renewal: string | null | undefined,
-) {
-  if (!renewal || renewal > start) return true;
+/**
+ * F05C B1 before the round trip: the start date falls in the cycle that holds today, or later
+ * (earlier cycles would need the catch-up of a backdated retainer).
+ */
+export function checkStartDate(form: RetainerFormMethods, t: TFunction, start: string) {
+  if (!start || addMonths(start, 1) > businessDate()) return true;
   form.setError(
-    'renewalDate',
-    { type: SCREEN_ERROR, message: t('retainers.form.errors.renewalAfterStart') },
+    'startDate',
+    { type: SCREEN_ERROR, message: t('retainers.form.errors.startInEndedCycle') },
     { shouldFocus: true },
   );
   return false;
+}
+
+/**
+ * F05C Y1, spec screen 1: how the cycles of a start date run, "from day 20 to day 19 of the next
+ * month", or from the last day of the month for an anchor on the 29th to the 31st.
+ */
+export function cycleDaysNote(t: TFunction, start: string): string {
+  const day = Number(start.slice(8, 10));
+  if (day === 1) return t('retainers.form.cycleDaysFirst');
+  const before = formatNumber(day - 1);
+  if (day >= 29) return t('retainers.form.cycleDaysEnd', { day: formatNumber(day), before });
+  return t('retainers.form.cycleDays', { day: formatNumber(day), before });
 }
 
 export function ClientField({
@@ -197,54 +206,41 @@ export function DepartmentsField({ form }: { form: RetainerFormMethods }) {
 }
 
 /**
- * Start and renewal dates side by side. The start date is locked once a cycle exists; the renewal
- * date while a term sets it (F05B T11).
+ * The start date, the anchor of every cycle (F05C Y1), with how its cycles run. Locked once a
+ * cycle or a charge exists (edge case 8). There is no renewal date: a term sets it (T3').
  */
-export function DatesFields({
+export function StartDateField({
   form,
   startLocked = false,
-  renewalLocked = false,
 }: {
   form: RetainerFormMethods;
   startLocked?: boolean;
-  renewalLocked?: boolean;
 }) {
   const { t } = useTranslation();
   const start = useWatch({ control: form.control, name: 'startDate' });
   const startError = form.formState.errors.startDate;
-  const renewalError = form.formState.errors.renewalDate;
+  const valid = /^\d{4}-\d{2}-\d{2}$/.test(start ?? '');
   return (
-    <div className="grid gap-5 sm:grid-cols-2">
-      <Field invalid={!!startError}>
-        <FieldLabel>{t('retainers.form.startDate')}</FieldLabel>
-        <Input type="date" dir="ltr" disabled={startLocked} {...form.register('startDate')} />
-        <FieldDescription>
-          {startLocked ? t('retainers.form.startLocked') : t('retainers.form.startHint')}
-        </FieldDescription>
-        <FieldError match={!!startError} role={errorRole(startError)}>
-          {fieldError(startError, t('projects.form.errors.date'))}
-        </FieldError>
-      </Field>
-      <Field invalid={!!renewalError}>
-        <FieldLabel>
-          {t('retainers.form.renewalDate')}
-          <span className="ms-1 font-normal text-muted-foreground">({t('common.optional')})</span>
-        </FieldLabel>
-        <Input
-          type="date"
-          dir="ltr"
-          min={start || undefined}
-          disabled={renewalLocked}
-          {...form.register('renewalDate', { setValueAs: (value: string | null) => value || null })}
-        />
-        <FieldDescription>
-          {renewalLocked ? t('retainers.terms.renewalFromTerm') : t('retainers.form.renewalHint')}
-        </FieldDescription>
-        <FieldError match={!!renewalError} role={errorRole(renewalError)}>
-          {fieldError(renewalError, t('projects.form.errors.date'))}
-        </FieldError>
-      </Field>
-    </div>
+    <Field invalid={!!startError}>
+      <FieldLabel>{t('retainers.form.startDate')}</FieldLabel>
+      <Input
+        type="date"
+        dir="ltr"
+        min={addDays(addMonths(businessDate(), -1), 1)}
+        disabled={startLocked}
+        {...form.register('startDate')}
+      />
+      <FieldDescription>
+        {startLocked
+          ? t('retainers.form.startLocked')
+          : valid
+            ? cycleDaysNote(t, start)
+            : t('retainers.form.startHint')}
+      </FieldDescription>
+      <FieldError match={!!startError} role={errorRole(startError)}>
+        {fieldError(startError, t('projects.form.errors.date'))}
+      </FieldError>
+    </Field>
   );
 }
 

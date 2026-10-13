@@ -225,7 +225,7 @@ export const myClientsDashboardSchema = z
     clients: z.array(
       z.object({
         client: namedSchema,
-        /** Active retainers with this month's cycle. */
+        /** Active retainers with an open cycle. */
         retainers: z.array(
           z.object({ retainer: namedSchema, completion: completionSchema, behind: z.boolean() }),
         ),
@@ -617,10 +617,16 @@ export const clientMonthlyReportSchema = z
     summary: z
       .object({ text: z.string(), updatedBy: namedSchema, updatedAt: z.iso.datetime() })
       .nullable(),
-    /** Section 2: non-archived retainers with a cycle in the month, by name. */
+    /**
+     * Section 2, F05C R4: the cycles of non-archived retainers whose period overlaps the month, by
+     * retainer name, then cycle number.
+     */
     retainers: z.array(
       z.object({
         retainer: namedSchema,
+        cycle: z.number().int().min(1),
+        periodStart: calendarDateSchema,
+        periodEnd: calendarDateSchema,
         status: cycleStatusSchema,
         lines: z.array(
           z.object({

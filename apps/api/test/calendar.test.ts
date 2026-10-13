@@ -91,6 +91,7 @@ describe('company calendar (F11 rules 15–16)', () => {
     let cancelledMeetingId: string;
     let projectId: string;
     let retainerId: string;
+    let renewalOn: string;
 
     beforeAll(async () => {
       const shoot = await cast.bookOk(cast.am.cookie, {
@@ -168,7 +169,13 @@ describe('company calendar (F11 rules 15–16)', () => {
         reason: 'ألغي',
       });
       expect(cancel.status, await cancel.clone().text()).toBe(200);
-      retainerId = (await cast.createRetainer(clientId, { renewalDate: cast.inDays(307) })).id;
+      // F05C T3': a one-cycle term from day 279 renews a month later, between days 307 and 310.
+      const renewing = await cast.createRetainer(clientId, {
+        startDate: cast.inDays(279),
+        term: { cycles: 1, agreedTotalMinor: 0, schedule: [0] },
+      });
+      retainerId = renewing.id;
+      renewalOn = renewing.renewalDate ?? '';
     });
 
     it('shows every user the shoots, meetings and key dates of the days', async () => {
@@ -208,7 +215,7 @@ describe('company calendar (F11 rules 15–16)', () => {
         { kind: 'project_due', date: cast.inDays(305), targetId: projectId },
         {
           kind: 'renewal',
-          date: cast.inDays(307),
+          date: renewalOn,
           targetId: retainerId,
           client: { id: clientId, archived: false },
         },
