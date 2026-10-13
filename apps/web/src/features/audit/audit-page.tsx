@@ -776,6 +776,8 @@ function EntityLink({ entry, names }: { entry: AuditEntry; names: EntityNames })
   if (retainerId) {
     const retainerName = names.retainer(retainerId) ?? t('audit.openRetainer');
     const month = entry.after?.month ?? entry.before?.month;
+    // F05C: cycles carry their number; entries written before name their month.
+    const number = entry.after?.number ?? entry.before?.number;
     return (
       <Link
         to="/retainers/$retainerId"
@@ -783,9 +785,14 @@ function EntityLink({ entry, names }: { entry: AuditEntry; names: EntityNames })
         search={{ tab: retainerTabOf(entry) }}
         className={linkClass}
       >
-        {entry.entityType === 'retainer_cycle' && typeof month === 'string'
-          ? t('audit.cycleOfRetainer', { month: formatMonth(month), retainer: retainerName })
-          : withFileName(t, entry, retainerName)}
+        {entry.entityType === 'retainer_cycle' && typeof number === 'number'
+          ? t('audit.numberedCycleOfRetainer', {
+              cycle: t('retainers.cycleNumber', { number: formatNumber(number) }),
+              retainer: retainerName,
+            })
+          : entry.entityType === 'retainer_cycle' && typeof month === 'string'
+            ? t('audit.cycleOfRetainer', { month: formatMonth(month), retainer: retainerName })
+            : withFileName(t, entry, retainerName)}
       </Link>
     );
   }

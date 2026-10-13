@@ -30,6 +30,8 @@ export interface RenewableRetainer {
   name: string;
   status: RetainerStatus;
   currency: Currency;
+  /** The anchor of its cycles (F05C Y1). */
+  startDate: CalendarDate;
   /** F05B Q2, F05C: the cycle after its active term, else the next cycle, and its first day. */
   renewsFromCycle: number;
   renewsFrom: CalendarDate;
@@ -150,7 +152,7 @@ export class EngagementFactory {
       )
       .orderBy(asc(retainers.name));
     const starts = await this.terms.renewalStarts(executor, rows, businessDate());
-    return rows.flatMap(({ startDate: _startDate, ...row }) => {
+    return rows.flatMap((row) => {
       const start = starts.get(row.id);
       return start
         ? [

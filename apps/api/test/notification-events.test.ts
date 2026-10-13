@@ -666,7 +666,7 @@ describe('notification events', () => {
       ]);
     });
 
-    it('sends no renewal reminder for an open-ended retainer (F05C T3\')', async () => {
+    it("sends no renewal reminder for an open-ended retainer (F05C T3')", async () => {
       const { id: clientId } = await cast.createClient();
       const retainer = await cast.createRetainer(clientId);
       reminderSubjects.push(retainer.id);

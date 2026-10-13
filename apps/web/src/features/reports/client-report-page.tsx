@@ -45,7 +45,13 @@ import { useTranslation } from 'react-i18next';
 import { FormAlert } from '../../components/form-alert';
 import { LoadError } from '../../components/load-error';
 import { errorMessage } from '../../lib/errors';
-import { formatCalendarDate, formatDateTime, formatMonth, formatNumber } from '../../lib/format';
+import {
+  formatCalendarDate,
+  formatDateTime,
+  formatMonth,
+  formatNumber,
+  formatRetainerCycle,
+} from '../../lib/format';
 import { monthParam } from '../../lib/search-params';
 import { useFocusAfterChange } from '../../lib/use-focus-after-change';
 import { CostPerResult, PlatformName } from '../campaigns/campaign-badges';
@@ -324,7 +330,8 @@ function RetainersSection({ report }: { report: ClientMonthlyReport }) {
   return (
     <ReportSection title={t('reports.client.sections.retainers')}>
       {report.retainers.map((row) => (
-        <div key={row.retainer.id} className="flex flex-col gap-2">
+        // R4: one row per cycle overlapping the month, so a retainer can appear twice.
+        <div key={`${row.retainer.id}-${row.cycle}`} className="flex flex-col gap-2">
           <div className="flex flex-wrap items-center gap-3">
             <Link
               to="/retainers/$retainerId"
@@ -333,6 +340,9 @@ function RetainersSection({ report }: { report: ClientMonthlyReport }) {
             >
               {row.retainer.name}
             </Link>
+            <span className="text-sm text-muted-foreground">
+              {formatRetainerCycle({ number: row.cycle, ...row })}
+            </span>
             <Badge tone={row.status === 'open' ? 'info' : 'neutral'}>
               {t(`retainers.cycleStatuses.${row.status}`)}
             </Badge>

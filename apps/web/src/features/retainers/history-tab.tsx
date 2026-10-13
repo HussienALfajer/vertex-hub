@@ -16,7 +16,7 @@ import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LoadError } from '../../components/load-error';
 import { TabHeader } from '../../components/tab-header';
-import { formatCalendarDate, formatDateTime, formatMonth, formatNumber } from '../../lib/format';
+import { formatDateTime, formatNumber, formatPeriod } from '../../lib/format';
 import { useShownWhileClosing } from '../../lib/use-shown-while-closing';
 import { AdjustmentsList } from './cycle-tab';
 import { DeliverableIcon, DeliveryRate, lineName } from './retainer-badges';
@@ -102,24 +102,27 @@ function ClosedCycleRow({
   onOpen: (button: HTMLButtonElement) => void;
 }) {
   const { t } = useTranslation();
-  const month = formatMonth(cycle.month);
+  const name = t('retainers.cycleNumber', { number: formatNumber(cycle.number) });
   const after = cycle.lines.reduce((sum, line) => sum + line.deliveredAfterClose, 0);
   return (
     <li>
       <button
         type="button"
         onClick={(event) => onOpen(event.currentTarget)}
-        aria-label={t('retainers.history.open', { month })}
+        aria-label={t('retainers.history.open', { cycle: name })}
         className="group flex w-full flex-col gap-3 rounded-lg border border-border bg-surface p-4 text-start transition-colors duration-150 ease-out outline-offset-4 hover:border-primary md:flex-row md:items-center"
       >
         <span className="flex min-w-0 flex-col gap-1 md:w-44">
-          <span className="font-bold">{month}</span>
+          <span className="font-bold">{name}</span>
           <span className="text-xs text-muted-foreground">
-            {t('projects.dateRange', {
-              start: formatCalendarDate(cycle.periodStart),
-              due: formatCalendarDate(cycle.periodEnd),
-            })}
+            {formatPeriod(cycle.periodStart, cycle.periodEnd)}
           </span>
+          {(cycle.backdated || cycle.untracked) && (
+            <span className="flex flex-wrap gap-1">
+              {cycle.backdated && <Badge tone="outline">{t('retainers.history.backdated')}</Badge>}
+              {cycle.untracked && <Badge tone="outline">{t('retainers.history.untracked')}</Badge>}
+            </span>
+          )}
         </span>
         <span className="flex min-w-0 flex-1 flex-wrap gap-x-4 gap-y-1 text-sm">
           {cycle.lines.length === 0 ? (
@@ -190,14 +193,13 @@ function CycleDialog({
         ) : (
           <div className="grid gap-5">
             <DialogHeader>
-              <DialogTitle>{formatMonth(cycle.data.month)}</DialogTitle>
+              <DialogTitle>
+                {t('retainers.cycleNumber', { number: formatNumber(cycle.data.number) })}
+              </DialogTitle>
               <DialogDescription>
-                {cycle.data.closedAt
-                  ? t('retainers.history.closedOn', { when: formatDateTime(cycle.data.closedAt) })
-                  : t('projects.dateRange', {
-                      start: formatCalendarDate(cycle.data.periodStart),
-                      due: formatCalendarDate(cycle.data.periodEnd),
-                    })}
+                {formatPeriod(cycle.data.periodStart, cycle.data.periodEnd)}
+                {cycle.data.closedAt &&
+                  ` · ${t('retainers.history.closedOn', { when: formatDateTime(cycle.data.closedAt) })}`}
               </DialogDescription>
             </DialogHeader>
             <div className="flex items-center justify-between gap-3 rounded-lg border border-border p-4">

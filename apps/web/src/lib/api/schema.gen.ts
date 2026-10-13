@@ -10518,6 +10518,8 @@ export interface components {
                     id: string;
                     name: string;
                     status: components["schemas"]["RetainerStatus"];
+                    /** Format: date */
+                    startDate: string;
                     renewsFromCycle: number;
                     /** Format: date */
                     renewsFrom: string;

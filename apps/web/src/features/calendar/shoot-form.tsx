@@ -65,7 +65,7 @@ import { useMe } from '../../lib/auth';
 import { errorMessage } from '../../lib/errors';
 import { focusAfterRemoval } from '../../lib/focus-after-removal';
 import { focusFirstInvalid } from '../../lib/focus-first-invalid';
-import { formatMonth } from '../../lib/format';
+import { formatPeriod } from '../../lib/format';
 import { projectListQuery, projectQuery } from '../projects/projects.queries';
 import { lineName } from '../retainers/retainer-badges';
 import { retainerListQuery } from '../retainers/retainers.queries';
@@ -740,7 +740,7 @@ function LinkFields({
       value: `cycle:${cycle.id}`,
       label: t('tasks.form.retainerCycle', {
         retainer: retainer.name,
-        month: formatMonth(cycle.periodStart),
+        period: formatPeriod(cycle.periodStart, cycle.periodEnd),
       }),
     })),
   ];

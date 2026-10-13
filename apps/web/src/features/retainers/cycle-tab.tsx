@@ -77,7 +77,7 @@ import { LoadError } from '../../components/load-error';
 import { TabHeader } from '../../components/tab-header';
 import { ApiError } from '../../lib/api/client';
 import { errorMessage, fieldError, SCREEN_ERROR } from '../../lib/errors';
-import { formatCalendarDate, formatDateTime, formatMonth, formatNumber } from '../../lib/format';
+import { formatCalendarDate, formatDateTime, formatNumber, formatPeriod } from '../../lib/format';
 import { clientQuery } from '../clients/clients.queries';
 import { LineTemplateTasks, RetainerTemplatePanel } from '../templates/retainer-template-panel';
 import { retainerTemplateQuery } from '../templates/templates.queries';
@@ -93,7 +93,7 @@ import {
  * The open cycle: one row per line with its counter, and the month's corrections (R7, R9):
  * committed quantities, lines for this month only and delivered adjustments, each with a reason.
  */
-export function ThisMonthTab({ retainer }: { retainer: RetainerDetail }) {
+export function ThisCycleTab({ retainer }: { retainer: RetainerDetail }) {
   const current = retainer.currentCycle;
   if (!current) {
     return (
@@ -139,7 +139,10 @@ function OpenCycle({ retainer, cycleId }: { retainer: RetainerDetail; cycleId: s
   return (
     <>
       <TabHeader
-        title={t('retainers.cycle.title', { month: formatMonth(cycle.data.month) })}
+        title={t('retainers.cycle.title', {
+          cycle: t('retainers.cycleNumber', { number: formatNumber(cycle.data.number) }),
+          period: formatPeriod(cycle.data.periodStart, cycle.data.periodEnd),
+        })}
         description={t('retainers.cycle.hint')}
         action={
           editable && (
@@ -284,7 +287,7 @@ function CycleLineRow({
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="font-medium">{name}</h3>
             {line.deliverableId === null && (
-              <Badge tone="outline">{t('retainers.cycle.thisMonthOnly')}</Badge>
+              <Badge tone="outline">{t('retainers.cycle.thisCycleOnly')}</Badge>
             )}
             {line.behind && <BehindBadge />}
             {over && <OverDeliveredBadge />}
@@ -765,7 +768,9 @@ function AddLineDialog({
         <form className="grid gap-5" onSubmit={submit} noValidate>
           <DialogHeader>
             <DialogTitle>
-              {t('retainers.cycle.addLineTitle', { month: formatMonth(cycle.month) })}
+              {t('retainers.cycle.addLineTitle', {
+                cycle: t('retainers.cycleNumber', { number: formatNumber(cycle.number) }),
+              })}
             </DialogTitle>
             <DialogDescription>{t('retainers.cycle.addLineHint')}</DialogDescription>
           </DialogHeader>

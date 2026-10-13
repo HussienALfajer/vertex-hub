@@ -214,14 +214,25 @@ export class QuoteAcceptService {
           : null,
         renewable: renewable
           .filter((candidate) => candidate.currency === quote.currency)
-          .map(({ id: retainerId, name, status, renewsFromCycle, renewsFrom, afterTerm }) => ({
-            id: retainerId,
-            name,
-            status,
-            renewsFromCycle,
-            renewsFrom,
-            afterTerm,
-          })),
+          .map(
+            ({
+              id: retainerId,
+              name,
+              status,
+              startDate,
+              renewsFromCycle,
+              renewsFrom,
+              afterTerm,
+            }) => ({
+              id: retainerId,
+              name,
+              status,
+              startDate,
+              renewsFromCycle,
+              renewsFrom,
+              afterTerm,
+            }),
+          ),
       };
     }
 

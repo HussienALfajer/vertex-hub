@@ -4,14 +4,17 @@ import {
   type AcceptPlan,
   type AcceptQuoteInput,
   acceptQuoteSchema,
+  addDays,
   addMonths,
   businessDate,
-  type CalendarDate,
   type Currency,
+  currentCycleNumber,
+  cyclePeriod,
   type DepartmentCode,
-  firstOfMonth,
+  dayAfterTerm,
   type QuoteDetail,
   type RetainerTermInput,
+  termEndDate,
 } from '@vertex-hub/contracts';
 import {
   Badge,
@@ -39,6 +42,7 @@ import {
   ToggleGroupItem,
   toast,
 } from '@vertex-hub/ui';
+import type { TFunction } from 'i18next';
 import { TriangleAlertIcon } from 'lucide-react';
 import {
   type ComponentProps,
@@ -56,7 +60,7 @@ import { LoadError } from '../../components/load-error';
 import { ApiError } from '../../lib/api/client';
 import { errorMessage, fieldError, SCREEN_ERROR } from '../../lib/errors';
 import { focusFirstInvalid } from '../../lib/focus-first-invalid';
-import { formatCalendarDate, formatMonth, formatNumber } from '../../lib/format';
+import { formatCalendarDate, formatNumber } from '../../lib/format';
 import { clientQuery } from '../clients/clients.queries';
 import { departmentListQuery } from '../departments/departments.queries';
 import { type Proof, ProofField } from '../files/proof-field';
@@ -73,10 +77,12 @@ import { conversionRefusal } from '../leads/lead-dialogs';
 import { DepartmentChips } from '../projects/project-badges';
 import { useProjectManagerOptions } from '../projects/project-form';
 import { DeliverableIcon, lineName, RetainerStatusBadge } from '../retainers/retainer-badges';
+import { cycleDaysNote } from '../retainers/retainer-form';
 import {
   EMPTY_TERM,
   isTermProblems,
   parseTerm,
+  type TermCycles,
   type TermDraft,
   TermPlanEditor,
   type TermProblems,
@@ -117,8 +123,6 @@ interface AcceptValues {
     name: string;
     departments: DepartmentCode[];
     startDate: string;
-    /** Empty: no renewal date. */
-    renewalDate: string;
     templateId: string | null;
   };
 }
@@ -147,8 +151,6 @@ function defaultsOf(plan: AcceptPlan, today: string): AcceptValues {
       name: plan.retainer?.name ?? '',
       departments: plan.retainer?.departments ?? [],
       startDate: plan.retainer?.startDate ?? today,
-      // A term sets the renewal date (F05B T11): empty while the quote's term is on.
-      renewalDate: plan.retainer?.term ? '' : (plan.retainer?.renewalDate ?? ''),
       templateId: plan.retainer?.template?.id ?? null,
     },
   };
@@ -160,22 +162,32 @@ function termInput(term: TermDraft | null): RetainerTermInput | null {
   return parsed && !isTermProblems(parsed) ? parsed : null;
 }
 
-/** F05B Q1: the start date's month, or the current month when that is later (owner decision). */
-function newTermStart(startDate: string): CalendarDate {
-  const current = firstOfMonth(businessDate());
-  const month = firstOfMonth(startDate);
-  return month > current ? month : current;
+/**
+ * F05B Q1, Q2, F05C: where the term's cycles fall: a new retainer's current cycle (its first when
+ * it starts today or later), or the cycle a renewal takes effect in.
+ */
+function termPlaceOf(
+  mode: AcceptValues['retainer']['mode'],
+  startDate: string,
+  renewed: NonNullable<AcceptPlan['retainer']>['renewable'][number] | undefined,
+): TermCycles | null {
+  if (mode === 'new') {
+    return isDate(startDate)
+      ? {
+          anchor: startDate,
+          startCycle: Math.max(1, currentCycleNumber(startDate, businessDate())),
+        }
+      : null;
+  }
+  return renewed ? { anchor: renewed.startDate, startCycle: renewed.renewsFromCycle } : null;
 }
 
-/** F05B Q1, Q2: the term's first month: the start date's, or the month the renewal takes effect. */
-function termStartOf(values: AcceptValues, plan: AcceptPlan): CalendarDate | null {
-  if (values.retainer.mode === 'new') {
-    return isDate(values.retainer.startDate) ? newTermStart(values.retainer.startDate) : null;
-  }
-  return (
-    plan.retainer?.renewable.find((item) => item.id === values.retainer.retainerId)?.renewsFrom ??
-    null
-  );
+/** "Cycle 3 (20 Dec 2026)": the cycle a term or a renewal starts at, with its first day. */
+function cycleStartLabel(t: TFunction, place: TermCycles): string {
+  return t('quotes.accept.retainer.cycleFrom', {
+    cycle: t('retainers.cycleNumber', { number: formatNumber(place.startCycle) }),
+    date: formatCalendarDate(cyclePeriod(place.anchor, place.startCycle).periodStart),
+  });
 }
 
 function toRequest(
@@ -218,8 +230,6 @@ function toRequest(
             name: retainer.name,
             departments: retainer.departments,
             startDate: retainer.startDate,
-            // A term sets the renewal date (F05B T11).
-            renewalDate: term ? null : retainer.renewalDate || null,
             templateId: retainer.templateId,
             term: termInput(term),
           }),
@@ -324,7 +334,6 @@ function AcceptSteps({
   // F05B Q1: the quote's term, editable; kept beside the form while it is typed.
   const [term, setTerm] = useState<TermDraft | null>(plan.retainer?.term ?? null);
   const [termProblems, setTermProblems] = useState<TermProblems>({});
-  const termOn = useRef(term !== null);
   const steps: Step[] = [
     ...(plan.conversion ? (['client'] as const) : []),
     'response',
@@ -356,7 +365,6 @@ function AcceptSteps({
   // Dates the user typed stay; the rest follows the plan of the current choices (A2, A3, A5).
   const edited = useRef({
     dueDate: false,
-    renewalDate: false,
     templates: false,
     projectManager: false,
   });
@@ -371,9 +379,6 @@ function AcceptSteps({
         'project.installmentMilestones',
         plan.project.installments.map((installment) => installment.milestone),
       );
-    }
-    if (plan.retainer && !edited.current.renewalDate && !termOn.current) {
-      form.setValue('retainer.renewalDate', plan.retainer.renewalDate ?? '');
     }
   }, [plan, form]);
 
@@ -434,10 +439,11 @@ function AcceptSteps({
         problems.push(['project.installmentMilestones', undefined]);
       }
     }
-    if (current === 'retainer' && values.retainer.mode === 'new' && !term) {
-      const { startDate, renewalDate } = values.retainer;
-      if (renewalDate && renewalDate <= startDate) {
-        problems.push(['retainer.renewalDate', t('retainers.form.errors.renewalAfterStart')]);
+    // F05C B6: a start date in a cycle that already ended needs the new retainer form.
+    if (current === 'retainer' && values.retainer.mode === 'new') {
+      const { startDate } = values.retainer;
+      if (isDate(startDate) && addMonths(startDate, 1) <= businessDate()) {
+        problems.push(['retainer.startDate', t('retainers.form.errors.startInEndedCycle')]);
       }
     }
     let termInvalid = false;
@@ -551,18 +557,8 @@ function AcceptSteps({
         <RetainerStep
           retainer={plan.retainer}
           form={form}
-          onRenewalEdited={() => {
-            edited.current.renewalDate = true;
-          }}
           term={term}
           onTerm={(next) => {
-            if ((next !== null) !== termOn.current) {
-              termOn.current = next !== null;
-              form.setValue(
-                'retainer.renewalDate',
-                next || edited.current.renewalDate ? '' : (plan.retainer?.renewalDate ?? ''),
-              );
-            }
             setTerm(next);
             setTermProblems({});
           }}
@@ -988,14 +984,12 @@ function ArchivedTemplates({ plan }: { plan: AcceptPlan }) {
 function RetainerStep({
   retainer,
   form,
-  onRenewalEdited,
   term,
   onTerm,
   termProblems,
 }: {
   retainer: NonNullable<AcceptPlan['retainer']>;
   form: AcceptForm;
-  onRenewalEdited: () => void;
   term: TermDraft | null;
   onTerm: (next: TermDraft | null) => void;
   termProblems: TermProblems;
@@ -1006,7 +1000,6 @@ function RetainerStep({
     retainer: useId(),
     name: useId(),
     start: useId(),
-    renewal: useId(),
     template: useId(),
     term: useId(),
   };
@@ -1016,12 +1009,7 @@ function RetainerStep({
     name: ['retainer.mode', 'retainer.retainerId', 'retainer.startDate'],
   });
   const renewed = retainer.renewable.find((item) => item.id === retainerId);
-  const termStart =
-    mode === 'renew'
-      ? (renewed?.renewsFrom ?? null)
-      : isDate(startDate)
-        ? newTermStart(startDate)
-        : null;
+  const termPlace = termPlaceOf(mode, startDate, renewed);
   const templates = useQuery(templateListQuery({ kind: 'retainer_cycle', pageSize: 100 }));
   const templateItems = [
     {
@@ -1098,11 +1086,11 @@ function RetainerStep({
               </Field>
             )}
           />
-          {renewed && (
-            // F05B Q2: the lines, fee and term take effect after the active term, else next month.
+          {renewed && termPlace && (
+            // F05B Q2: the lines, fee and term take effect after the active term, else next cycle.
             <Callout
               title={t('quotes.accept.retainer.renewFrom', {
-                month: formatMonth(renewed.renewsFrom),
+                cycle: cycleStartLabel(t, termPlace),
               })}
               description={t(
                 renewed.afterTerm
@@ -1110,7 +1098,7 @@ function RetainerStep({
                     ? 'quotes.accept.retainer.renewAfterTerm'
                     : 'quotes.accept.retainer.renewContinue'
                   : 'quotes.accept.retainer.renewBody',
-                { month: formatMonth(renewed.renewsFrom) },
+                { cycle: cycleStartLabel(t, termPlace) },
               )}
             />
           )}
@@ -1133,35 +1121,24 @@ function RetainerStep({
               />
             )}
           />
-          <div className="grid gap-5 sm:grid-cols-2">
-            <Field invalid={!!errors?.startDate}>
-              <FieldLabel htmlFor={ids.start}>{t('retainers.form.startDate')}</FieldLabel>
-              <Input
-                id={ids.start}
-                type="date"
-                dir="ltr"
-                {...form.register('retainer.startDate')}
-              />
-              <FieldDescription>{t('quotes.accept.retainer.startHint')}</FieldDescription>
-              <FieldError match={!!errors?.startDate}>{t('projects.form.errors.date')}</FieldError>
-            </Field>
-            <Field invalid={!!errors?.renewalDate}>
-              <FieldLabel htmlFor={ids.renewal}>{t('retainers.form.renewalDate')}</FieldLabel>
-              <Input
-                id={ids.renewal}
-                type="date"
-                dir="ltr"
-                disabled={term !== null}
-                {...form.register('retainer.renewalDate', { onChange: onRenewalEdited })}
-              />
-              <FieldDescription>
-                {term ? t('retainers.terms.renewalFromTerm') : t('retainers.form.renewalHint')}
-              </FieldDescription>
-              <FieldError match={!!errors?.renewalDate}>
-                {fieldError(errors?.renewalDate, t('projects.form.errors.date'))}
-              </FieldError>
-            </Field>
-          </div>
+          <Field invalid={!!errors?.startDate}>
+            <FieldLabel htmlFor={ids.start}>{t('retainers.form.startDate')}</FieldLabel>
+            <Input
+              id={ids.start}
+              type="date"
+              dir="ltr"
+              min={addDays(addMonths(businessDate(), -1), 1)}
+              {...form.register('retainer.startDate')}
+            />
+            <FieldDescription>
+              {isDate(startDate)
+                ? cycleDaysNote(t, startDate)
+                : t('quotes.accept.retainer.startHint')}
+            </FieldDescription>
+            <FieldError match={!!errors?.startDate}>
+              {fieldError(errors?.startDate, t('projects.form.errors.date'))}
+            </FieldError>
+          </Field>
         </section>
       )}
 
@@ -1172,8 +1149,8 @@ function RetainerStep({
               {t('retainers.terms.enable')}
             </label>
             <p id={`${ids.term}-hint`} className="text-sm text-muted-foreground">
-              {term && termStart
-                ? t('quotes.accept.retainer.termStarts', { month: formatMonth(termStart) })
+              {term && termPlace
+                ? t('quotes.accept.retainer.termStarts', { cycle: cycleStartLabel(t, termPlace) })
                 : t('retainers.terms.enableHint')}
             </p>
           </div>
@@ -1188,7 +1165,7 @@ function RetainerStep({
           <TermPlanEditor
             value={term}
             onChange={onTerm}
-            startMonth={termStart}
+            cycles={termPlace}
             currency={retainer.currency}
             problems={termProblems}
           />
@@ -1288,7 +1265,6 @@ function Summary({
 }) {
   const { t } = useTranslation();
   const values = form.getValues();
-  const termStart = termStartOf(values, plan);
   const accepted = termInput(term);
   const managers = useProjectManagerOptions();
   const managerName =
@@ -1298,6 +1274,7 @@ function Summary({
     values.project.templateIds.includes(template.id),
   );
   const renewed = plan.retainer?.renewable.find((item) => item.id === values.retainer.retainerId);
+  const termPlace = termPlaceOf(values.retainer.mode, values.retainer.startDate, renewed);
   // The retainer step loaded the monthly templates; the plan's default is among the choices too.
   const monthlyTemplates = useQuery(templateListQuery({ kind: 'retainer_cycle', pageSize: 100 }));
   const retainerTemplate =
@@ -1364,24 +1341,26 @@ function Summary({
               <Fact label={t('retainers.form.startDate')}>
                 {formatCalendarDate(values.retainer.startDate)}
               </Fact>
-              <Fact label={t('retainers.form.renewalDate')}>
-                {accepted && termStart
-                  ? formatCalendarDate(addMonths(termStart, accepted.months))
-                  : values.retainer.renewalDate
-                    ? formatCalendarDate(values.retainer.renewalDate)
-                    : t('common.none')}
+              <Fact label={t('quotes.accept.summary.renewalDate')}>
+                {accepted && termPlace
+                  ? formatCalendarDate(
+                      dayAfterTerm(
+                        termEndDate(termPlace.anchor, termPlace.startCycle, accepted.cycles),
+                      ),
+                    )
+                  : t('common.none')}
               </Fact>
             </>
           )}
           <Fact label={t('retainers.terms.sectionTitle')}>
-            {accepted && termStart ? (
+            {accepted && termPlace ? (
               <>
                 {t('quotes.accept.summary.term', {
-                  months: t('retainers.terms.monthsCount', {
-                    count: accepted.months,
-                    n: formatNumber(accepted.months),
+                  cycles: t('retainers.terms.cyclesCount', {
+                    count: accepted.cycles,
+                    n: formatNumber(accepted.cycles),
                   }),
-                  month: formatMonth(termStart),
+                  cycle: cycleStartLabel(t, termPlace),
                   endAction: t(`retainers.terms.endActions.${accepted.endAction}`),
                 })}{' '}
                 <Money minor={accepted.agreedTotalMinor} currency={plan.retainer.currency} />

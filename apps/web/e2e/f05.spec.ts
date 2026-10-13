@@ -10,6 +10,9 @@ async function onProjectsToday(page: Page) {
   await page.clock.setFixedTime(new Date(`${PROJECTS_TODAY}T09:00:00+03:00`));
 }
 
+const fill = (text: string, values: Record<string, string>) =>
+  Object.entries(values).reduce((out, [key, value]) => out.replaceAll(`{{${key}}}`, value), text);
+
 test('create a project from the client profile, start it and climb its milestones', async ({
   page,
 }) => {
@@ -226,7 +229,7 @@ test('create a retainer starting today: this month opens at once and a counter i
   await expect(designs.getByText('تصاميم سُلّمت قبل ربط المهام')).toBeVisible();
 });
 
-test('a retainer shows its behind lines, renewal badge and closed months', async ({ page }) => {
+test('a retainer shows its behind lines, renewal badge and closed cycles', async ({ page }) => {
   await onProjectsToday(page);
   await mockApi(page, { signedIn: true });
   await page.goto('/retainers');
@@ -247,7 +250,13 @@ test('a retainer shows its behind lines, renewal badge and closed months', async
   await expect(page).toHaveURL(/tab=history/);
   const history = page.getByRole('list', { name: ar.retainers.history.title });
   await expect(history.getByRole('listitem')).toHaveCount(2);
-  await history.getByRole('button', { name: /آب/ }).click();
+  await history
+    .getByRole('button', {
+      name: fill(ar.retainers.history.open, {
+        cycle: fill(ar.retainers.cycleNumber, { number: '6' }),
+      }),
+    })
+    .click();
   const cycle = page.getByRole('dialog');
   await expect(cycle.getByText('تغطية افتتاح الفرع')).toBeVisible();
   await expect(
@@ -312,12 +321,12 @@ test('an ended retainer is read-only until reactivated', async ({ page }) => {
   await expect(page.getByText(ar.retainers.cycle.none.endedTitle)).toBeVisible();
   await expect(page.getByRole('button', { name: ar.common.edit })).toHaveCount(0);
   await page.getByRole('button', { name: ar.retainers.actions.reactivate }).click();
-  await page
-    .getByRole('alertdialog')
-    .getByRole('button', { name: ar.retainers.actions.reactivate })
-    .click();
+  // F05C P4: ended before the current cycle began, it may start a cycle now.
+  const dialog = page.getByRole('dialog');
+  await dialog.getByRole('button', { name: ar.retainers.resume.now }).click();
+  await dialog.getByRole('button', { name: ar.retainers.actions.reactivate }).click();
   await expect(page.getByText(ar.retainers.actions.done.reactivated)).toBeVisible();
-  // Reactivating opens this month's cycle at once (R3).
+  // Started now, the current cycle opens at once with the full quantities.
   await expect(
     page.getByRole('list', { name: ar.retainers.cycle.lines }).getByText('0/1'),
   ).toBeVisible();

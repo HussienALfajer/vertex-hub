@@ -9,7 +9,7 @@ const retainer = (startDate: string) => ({ startDate }) as RetainerDetail;
 const term = (status: RetainerTerm['status'], startCycle: number, cycles: number) =>
   ({ status, startCycle, cycles }) as RetainerTerm;
 
-describe('earliestStart (F05C T2\')', () => {
+describe("earliestStart (F05C T2')", () => {
   beforeAll(() => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2026-10-15T09:00:00Z'));

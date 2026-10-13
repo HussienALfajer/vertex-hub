@@ -511,16 +511,23 @@ function ListItem({
       </Badge>
     );
   }
-  // A month of an amendment's schedule or effects (F05B): the month and its amounts.
+  // A cycle (F05C) or a month (F05B) of an amendment's schedule or effects, and its amounts.
   const month = text(item, 'month');
-  if (month && (typeof item.amountMinor === 'number' || typeof item.afterMinor === 'number')) {
+  const cycle = typeof item.cycle === 'number' ? item.cycle : null;
+  if (
+    (month || cycle !== null) &&
+    (typeof item.amountMinor === 'number' || typeof item.afterMinor === 'number')
+  ) {
     const amounts =
       typeof item.amountMinor === 'number'
         ? formatAmount(item.amountMinor)
         : `${typeof item.beforeMinor === 'number' ? formatAmount(item.beforeMinor) : '—'} → ${formatAmount(item.afterMinor as number)}`;
     return (
       <Badge tone="outline">
-        {formatMonth(month)}:{' '}
+        {cycle !== null
+          ? t('retainers.cycleNumber', { number: formatNumber(cycle) })
+          : formatMonth(month ?? '')}
+        :{' '}
         <span dir="ltr" className="tabular-nums">
           {amounts}
         </span>

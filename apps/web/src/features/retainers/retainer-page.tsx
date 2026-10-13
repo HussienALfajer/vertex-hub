@@ -36,7 +36,7 @@ import { type ReactNode, type RefObject, useMemo, useRef, useState } from 'react
 import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '../../components/confirm-dialog';
 import { isMissing, LoadError } from '../../components/load-error';
-import { formatCalendarDate, formatMonth, formatNumber } from '../../lib/format';
+import { formatCalendarDate, formatNumber } from '../../lib/format';
 import { formatMoney } from '../../lib/money';
 import { useFocusAfterChange } from '../../lib/use-focus-after-change';
 import { useShownWhileClosing } from '../../lib/use-shown-while-closing';
@@ -46,11 +46,13 @@ import { ExtraWorkTab } from '../projects/extra-work-tab';
 import { ArchivedBadge, DepartmentChips, PersonName } from '../projects/project-badges';
 import { SourceQuotes } from '../quotes/source-quotes';
 import { ContractTab } from './contract-tab';
-import { ThisMonthTab } from './cycle-tab';
+import { ThisCycleTab } from './cycle-tab';
 import { HistoryTab } from './history-tab';
 import { focusTarget, RetainerActions, type RetainerFocus } from './retainer-actions';
 import {
   BehindBadge,
+  cycleHeadline,
+  cyclePeriodLine,
   DeliveryRate,
   PendingApprovalBadge,
   RenewalBadge,
@@ -65,7 +67,7 @@ import {
 } from './retainers.queries';
 
 const RETAINER_TABS = [
-  'this-month',
+  'this-cycle',
   'contract',
   'history',
   'extra-work',
@@ -81,7 +83,7 @@ export interface RetainerPageSearch {
 }
 
 export function parseRetainerPageSearch(search: Record<string, unknown>): RetainerPageSearch {
-  return { tab: RETAINER_TABS.find((tab) => tab !== 'this-month' && tab === search.tab) };
+  return { tab: RETAINER_TABS.find((tab) => tab !== 'this-cycle' && tab === search.tab) };
 }
 
 export function RetainerPage({
@@ -113,7 +115,7 @@ export function RetainerPage({
           error={retainer.error}
         />
       ) : (
-        <RetainerView retainer={retainer.data} tab={search.tab ?? 'this-month'} />
+        <RetainerView retainer={retainer.data} tab={search.tab ?? 'this-cycle'} />
       )}
     </>
   );
@@ -146,7 +148,7 @@ function RetainerView({ retainer, tab }: { retainer: RetainerDetail; tab: Retain
 
   const openTab = (next: RetainerTab) =>
     navigate({
-      search: (previous) => ({ ...previous, tab: next === 'this-month' ? undefined : next }),
+      search: (previous) => ({ ...previous, tab: next === 'this-cycle' ? undefined : next }),
       replace: true,
     });
 
@@ -164,9 +166,9 @@ function RetainerView({ retainer, tab }: { retainer: RetainerDetail; tab: Retain
       )}
       <Tabs value={tab} onValueChange={(value: RetainerTab) => openTab(value)}>
         <TabsList aria-label={retainer.name}>
-          <TabsTrigger value="this-month">
+          <TabsTrigger value="this-cycle">
             <CalendarDaysIcon />
-            {t('retainers.page.tabs.thisMonth')}
+            {t('retainers.page.tabs.thisCycle')}
           </TabsTrigger>
           <TabsTrigger value="contract">
             <FileSignatureIcon />
@@ -191,8 +193,8 @@ function RetainerView({ retainer, tab }: { retainer: RetainerDetail; tab: Retain
             {t('files.documents.title')}
           </TabsTrigger>
         </TabsList>
-        <TabsContent value="this-month">
-          <ThisMonthTab retainer={retainer} />
+        <TabsContent value="this-cycle">
+          <ThisCycleTab retainer={retainer} />
         </TabsContent>
         <TabsContent value="contract">
           <ContractTab retainer={retainer} />
@@ -330,14 +332,30 @@ function RetainerHero({
           <RetainerActions retainer={retainer} focus={focus} onArchive={onArchive} />
         </div>
         <div className="grid gap-4 border-t border-border pt-5 sm:grid-cols-2 lg:grid-cols-[repeat(auto-fit,minmax(14rem,1fr))]">
-          <Vital label={t('retainers.page.thisMonth')}>
+          <Vital label={t('retainers.page.thisCycle')}>
             {retainer.currentCycle ? (
               <>
-                <p className="text-xl font-bold">{formatMonth(retainer.currentCycle.month)}</p>
+                <p className="text-xl font-bold">{cycleHeadline(t, retainer.currentCycle)}</p>
+                <p className="text-xs text-muted-foreground" data-testid="cycle-period">
+                  {cyclePeriodLine(t, retainer.currentCycle)}
+                </p>
                 <DeliveryRate rate={retainer.currentCycle.deliveryRate} />
               </>
             ) : (
-              <p className="text-xl font-bold">{t('retainers.noOpenCycle')}</p>
+              <>
+                <p className="text-xl font-bold">
+                  {retainer.status === 'paused'
+                    ? t('retainers.statuses.paused')
+                    : t('retainers.noOpenCycle')}
+                </p>
+                {retainer.nextCycleStart && (
+                  <p className="text-xs text-muted-foreground">
+                    {t('retainers.nextCycleOn', {
+                      date: formatCalendarDate(retainer.nextCycleStart),
+                    })}
+                  </p>
+                )}
+              </>
             )}
           </Vital>
           <TermVital retainer={retainer} />

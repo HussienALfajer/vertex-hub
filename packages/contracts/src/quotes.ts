@@ -817,6 +817,8 @@ export const acceptPlanSchema = z
         renewable: z.array(
           acceptPersonSchema.extend({
             status: retainerStatusSchema,
+            /** The retainer's start date: the anchor of its cycles (F05C Y1). */
+            startDate: calendarDateSchema,
             /**
              * F05B Q2, F05C: the cycle a renewal takes effect in (its lines, fee and term): the
              * cycle after the active term, else the next cycle; `renewsFrom` is its first day.

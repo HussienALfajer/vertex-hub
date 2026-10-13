@@ -12,7 +12,6 @@ import {
   type RetainerChargeListQuery,
   type RetainerChargeStatus,
 } from '@vertex-hub/contracts';
-import { formatRetainerCycle } from '@vertex-hub/messages';
 import {
   type Database,
   extraWorkItems,
@@ -24,6 +23,7 @@ import {
   retainerTerms,
   type Transaction,
 } from '@vertex-hub/db';
+import { formatRetainerCycle } from '@vertex-hub/messages';
 import { and, asc, count, desc, eq, gt, inArray, isNotNull, isNull, type SQL } from 'drizzle-orm';
 import { DATABASE } from '../../core/database/database.module.js';
 import { type AuditActor, recordAudit } from '../audit/index.js';

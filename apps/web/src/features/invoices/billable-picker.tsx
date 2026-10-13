@@ -17,7 +17,7 @@ import { ListPlusIcon } from 'lucide-react';
 import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LoadError } from '../../components/load-error';
-import { formatMonth } from '../../lib/format';
+import { formatNumber, formatRetainerCycle } from '../../lib/format';
 import { Money } from '../quotes/quote-badges';
 import { billableItemsQuery } from './invoices.queries';
 
@@ -48,7 +48,10 @@ interface Option {
   detail: string | null;
 }
 
-function optionsOf(items: BillableItems, t: (key: string) => string): Option[] {
+function optionsOf(
+  items: BillableItems,
+  t: (key: string, options?: Record<string, string>) => string,
+): Option[] {
   return [
     ...items.milestones.map((milestone) => ({
       key: milestone.id,
@@ -71,15 +74,16 @@ function optionsOf(items: BillableItems, t: (key: string) => string): Option[] {
       group: charge.retainer.name,
       detail: t(`retainers.chargeKinds.${charge.kind}`),
       line: {
+        // F05C J3: the cycle and its period, as the drafts name it.
         description:
           charge.kind === 'monthly'
-            ? `${charge.retainer.name} — ${formatMonth(charge.month)}`
-            : `${charge.retainer.name} — ${t(`retainers.chargeKinds.${charge.kind}`)} — ${formatMonth(charge.month)}`,
+            ? `${charge.retainer.name} — ${formatRetainerCycle({ number: charge.cycle, ...charge })}`
+            : `${charge.retainer.name} — ${t(`retainers.chargeKinds.${charge.kind}`)} — ${formatRetainerCycle({ number: charge.cycle, ...charge })}`,
         unitPriceMinor: charge.amountMinor,
         source: {
           type: 'retainer_charge' as const,
           id: charge.id,
-          name: formatMonth(charge.month),
+          name: t('retainers.cycleNumber', { number: formatNumber(charge.cycle) }),
           project: null,
           retainer: charge.retainer,
         },

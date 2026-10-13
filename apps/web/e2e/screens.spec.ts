@@ -374,14 +374,16 @@ for (const colorScheme of ['light', 'dark'] as const) {
         .getByRole('listitem')
         .filter({ hasText: ar.retainers.kinds.design });
       await designs.getByRole('button', { name: ar.retainers.cycle.adjustments_one }).click();
-      await screenshot(page, testInfo, `retainer-this-month-${colorScheme}`);
+      await screenshot(page, testInfo, `retainer-this-cycle-${colorScheme}`);
 
       await page.setViewportSize({ width: 1280, height: 1000 });
       await page.getByRole('tab', { name: ar.retainers.page.tabs.history }).click();
       await expect(page.getByText(ar.retainers.history.title).first()).toBeVisible();
       await screenshot(page, testInfo, `retainer-history-${colorScheme}`);
 
-      await page.getByRole('button', { name: /آب/ }).click();
+      await page
+        .getByRole('button', { name: ar.retainers.history.open.replace('{{cycle}}', 'الدورة 6') })
+        .click();
       await expect(page.getByRole('dialog').getByText('تغطية افتتاح الفرع')).toBeVisible();
       await screenshot(page, testInfo, `retainer-cycle-${colorScheme}`);
       await page.keyboard.press('Escape');
@@ -393,6 +395,13 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await page.goto(`/retainers/${seedIds.adsRetainer}`);
       await expect(page.getByText(ar.retainers.cycle.none.pausedTitle)).toBeVisible();
       await screenshot(page, testInfo, `retainer-paused-${colorScheme}`);
+
+      // F05C screen 4: reactivating outside a cycle asks when work starts again.
+      await page.goto(`/retainers/${seedIds.endedRetainer}`);
+      await page.getByRole('button', { name: ar.retainers.actions.reactivate }).click();
+      await page.getByRole('dialog').getByRole('button', { name: ar.retainers.resume.now }).click();
+      await expect(page.getByRole('dialog').getByText(/دورة كاملة من اليوم/)).toBeVisible();
+      await screenshot(page, testInfo, `retainer-resume-${colorScheme}`);
     });
 
     test('retainer page (employee view)', async ({ page }, testInfo) => {
@@ -455,7 +464,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
 
       await page.setViewportSize({ width: 1280, height: 1200 });
       await page.goto(`/retainers/${seedIds.adsRetainer}?tab=billing`);
-      await expect(page.getByText(ar.invoices.billing.creditNextMonth)).toBeVisible();
+      await expect(page.getByText(ar.invoices.billing.creditNextCycle)).toBeVisible();
       await screenshot(page, testInfo, `retainer-billing-credit-${colorScheme}`);
     });
 

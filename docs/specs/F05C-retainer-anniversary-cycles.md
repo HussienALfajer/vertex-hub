@@ -135,8 +135,9 @@ At most one non-void, non-archived contract per term, and one per retainer and `
 
 ### Migration
 Expand only, as F05B (the dev and test databases are shared with checkouts that run the old code). New columns are added and backfilled so constraints hold; existing rows are not re-cut into anchored periods (owner decision):
-- a cycle's `number` = `cycleAt(start_date, period_end)`; a charge's `cycle_number` = the number of its cycle when the month has one, else `cycleAt(start_date, last day of its month)`, and `cycle_start` from `cyclePeriod`; a term's `start_cycle` = `cycleAt(start_date, last day of start_month)`, `cycles` = `months`; an amendment's `effective_cycle` the same from `effective_month`; schedules mapped the same way.
+- a cycle's `number` = `cycleAt(start_date, last day of its month)` (settled in PR 1: `period_end` would give two cycles the same number when a retainer ended early in a month or started after its first day); a charge's `cycle_number` = the number of its cycle when the month has one, else `cycleAt(start_date, last day of its month)`, and `cycle_start` from `cyclePeriod`; a term's `start_cycle` = `cycleAt(start_date, last day of start_month)`, `cycles` = `months`; an amendment's `effective_cycle` the same from `effective_month`; schedules mapped the same way.
 - a retainer without an active or scheduled term gets `renewal_date` null.
+- the amendment scope enum gains `cycle` and keeps `month` (Drizzle runs pending migrations in one transaction, so a new enum value cannot be used to rewrite rows in the same run): the API reads `month` as `cycle` and writes `cycle` only; the later contract migration rewrites and drops `month`.
 - the job then treats such a retainer like any other (rule J1 closes an open cycle whose number is below the current one). Dev seed data (`db:seed`) is rewritten to anchored cycles.
 - `month`, `start_month`, `months`, `end_month`, `effective_month` are dropped by a later contract migration, together with F05B's `invoice_lines.retainer_cycle_id`.
 
@@ -173,7 +174,7 @@ Expand only, as F05B (the dev and test databases are shared with checkouts that 
 - P4. Reactivating an ended retainer (F05, scope all): it has no term any more (F05B E3), so P2 applies; a cycle that closed when it ended stays closed, and "start now" in that same cycle is refused (`CYCLE_CLOSED`): it starts from the next cycle.
 
 ### Backdated start
-- B1. A new retainer's start date may be up to 12 months before today (`INVALID_DATES` beyond). Past cycles are the cycles from 1 to `cycleAt(start, today) − 1`.
+- B1. A new retainer's start date may be up to 12 months before today (`INVALID_DATES` beyond). Past cycles are the cycles from 1 to `cycleAt(start, today) − 1`. Until PR 2 ships the catch-up, PR 1 accepts a start date in the current cycle or later only (a start date of today − 1 month or earlier is `INVALID_DATES`; owner decision, 2026-10-13).
 - B2. A start date before the current cycle's start needs the **catch-up** in the same request: one entry per past cycle (at most 12), each with a billing choice and a delivery choice (`CATCH_UP_REQUIRED` when missing or incomplete).
 - B3. Billing: `billed_externally` (default): the cycle's `monthly` charge is created `settled_outside` with the note "billed outside the system" and never drafts; `draft_now`: the charge is created due now and drafts its invoice at once (C4), labelled with that cycle (J3). The amount is the term's schedule amount for that cycle, else the monthly fee; a cycle with no amount gets no charge.
 - B4. Delivery: `untracked` (default): a closed, `backdated`, `untracked` cycle with its lines' committed quantities and no delivered counts; `entered`: delivered per line (0–999), frozen as `delivered_at_close`. Backdated cycles get no tasks (A02, F07), no A09 alerts, no cycle report and no notifications.

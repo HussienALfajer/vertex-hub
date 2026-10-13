@@ -29,7 +29,7 @@ import { FormAlert } from '../../components/form-alert';
 import { LoadError } from '../../components/load-error';
 import { can, useMe } from '../../lib/auth';
 import { errorMessage } from '../../lib/errors';
-import { formatMonth, formatNumber } from '../../lib/format';
+import { formatNumber, formatPeriod } from '../../lib/format';
 import { BillingBadge } from '../projects/extra-work-tab';
 import { Money } from '../quotes/quote-badges';
 import { retainerBillingQuery, useSettleCharge } from './invoices.queries';
@@ -71,14 +71,14 @@ function RetainerBillingView({
   const { currency } = billing.retainer;
   const none = <span className="text-muted-foreground">{t('common.none')}</span>;
   const chargesHeading = useRef<HTMLHeadingElement>(null);
-  // C5: a later month's draft takes a pending credit; without one it is owed to the client (C9).
-  const laterMonthTakes = (credit: RetainerCharge) =>
+  // C5: a later cycle's draft takes a pending credit; without one it is owed to the client (C9).
+  const laterCycleTakes = (credit: RetainerCharge) =>
     billing.charges.some(
       (charge) =>
         charge.kind === 'monthly' &&
         charge.status === 'pending' &&
         !charge.invoice &&
-        charge.month > credit.month,
+        charge.cycle > credit.cycle,
     );
 
   return (
@@ -103,7 +103,7 @@ function RetainerBillingView({
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>{t('invoices.billing.month')}</TableHead>
+                <TableHead>{t('invoices.billing.cycle')}</TableHead>
                 <TableHead>{t('invoices.billing.chargeKind')}</TableHead>
                 <TableHead className="text-end">{t('invoices.billing.amount')}</TableHead>
                 <TableHead>{t('invoices.billing.invoice')}</TableHead>
@@ -119,14 +119,19 @@ function RetainerBillingView({
                 <TableRow key={charge.id}>
                   <TableCell>
                     <span className="flex flex-col">
-                      <span className="font-medium">{formatMonth(charge.month)}</span>
+                      <span className="font-medium">
+                        {t('retainers.cycleNumber', { number: formatNumber(charge.cycle) })}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        {formatPeriod(charge.periodStart, charge.periodEnd)}
+                      </span>
                       {charge.term && (
                         <span className="text-xs text-muted-foreground">
                           {t('retainers.terms.name', { number: formatNumber(charge.term.number) })}
                           {' · '}
                           {t('retainers.terms.position', {
                             position: formatNumber(charge.term.position),
-                            months: formatNumber(charge.term.months),
+                            cycles: formatNumber(charge.term.cycles),
                           })}
                         </span>
                       )}
@@ -157,8 +162,8 @@ function RetainerBillingView({
                       </span>
                     ) : charge.kind === 'credit' && charge.due && !charge.invoice ? (
                       <span className="font-medium text-status-gold-foreground">
-                        {laterMonthTakes(charge)
-                          ? t('invoices.billing.creditNextMonth')
+                        {laterCycleTakes(charge)
+                          ? t('invoices.billing.creditNextCycle')
                           : t('invoices.billing.creditOwed')}
                       </span>
                     ) : !charge.due ? (
@@ -177,7 +182,9 @@ function RetainerBillingView({
                               clientId={clientId}
                               currency={currency}
                               source={{ type: 'retainer_charge', id: charge.id }}
-                              name={formatMonth(charge.month)}
+                              name={t('retainers.cycleNumber', {
+                                number: formatNumber(charge.cycle),
+                              })}
                             />
                           )}
                           {charge.kind === 'credit' && billing.canSettleCredits && (

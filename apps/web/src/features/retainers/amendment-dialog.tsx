@@ -4,10 +4,10 @@ import {
   type AmendmentScope,
   businessDate,
   type CalendarDate,
-  currentCycleNumber,
-  cyclePeriod,
   type CreateAmendment,
   type Currency,
+  currentCycleNumber,
+  cyclePeriod,
   DELIVERABLE_KINDS,
   type DeliverableKind,
   type DeliverableLine,
@@ -94,11 +94,7 @@ const currentCycleOf = (retainer: RetainerDetail) =>
   Math.max(1, currentCycleNumber(retainer.startDate, businessDate()));
 
 /** A cycle with its period, as the pickers and effects name it: "الدورة 7 · 20 … – 19 …". */
-export function cycleLabel(
-  t: TFunction,
-  startDate: CalendarDate,
-  number: number,
-): string {
+export function cycleLabel(t: TFunction, startDate: CalendarDate, number: number): string {
   const period = cyclePeriod(startDate, number);
   return t('retainers.terms.cycleOption', {
     cycle: t('retainers.cycleNumber', { number: formatNumber(number) }),

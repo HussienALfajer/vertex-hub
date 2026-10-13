@@ -348,9 +348,7 @@ function Preview({
             <dt className="text-xs text-muted-foreground">{t('retainers.form.term')}</dt>
             <dd className="flex items-center gap-2">
               <CalendarRangeIcon aria-hidden="true" className="size-4 text-muted-foreground" />
-              <span>
-                {t('retainers.startsOn', { date: formatCalendarDate(values.startDate) })}
-              </span>
+              <span>{t('retainers.startsOn', { date: formatCalendarDate(values.startDate) })}</span>
             </dd>
           </div>
         )}

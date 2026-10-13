@@ -46,23 +46,24 @@ Not in PR 1: the catch-up and start dates before the current cycle (PR 2: until 
 - [x] Gate: `web` typecheck (runs with the web layer)
 
 ### 5. web
-- [ ] New retainer: start-date note (cycle day / last day of the month), no renewal date, term section in cycles with each cycle's period
-- [ ] Retainer header and lists: cycle chip (Y6), term chip with end date and "renews on", paused "next cycle starts"
-- [ ] "This cycle" tab (was "This month"), History by cycle number with period and badges
-- [ ] Resume / reactivate dialog (P2, P4)
-- [ ] Contract tab: schedules and amendments by cycle; amendment dialog "this cycle only" / "from cycle N onward"
-- [ ] Billing tab and invoice picker by cycle; quote accept dialog without renewal date; client report retainers section
-- [ ] `ar.json`: texts, errors, audit fields
-- [ ] Gate: `web` typecheck, lint, `web` test
+- [x] New retainer: start-date note (cycle day / last day of the month), no renewal date, term section in cycles with each cycle's period
+- [x] Retainer header and lists: cycle chip (Y6), term chip with end date and "renews on", paused "next cycle starts"
+- [x] "This cycle" tab (was "This month"), History by cycle number with period and badges
+- [x] Resume / reactivate dialog (P2, P4)
+- [x] Contract tab: schedules and amendments by cycle; amendment dialog "this cycle only" / "from cycle N onward"
+- [x] Billing tab and invoice picker by cycle; quote accept dialog without renewal date; client report retainers section
+- [x] `ar.json`: texts, errors, audit fields
+- [x] Gate: `web` typecheck, lint, `web` test
 
 ### 6. e2e
-- [ ] `fixtures.ts` mocks moved to cycles
-- [ ] Flow spec: the header chip and the resume dialog
-- [ ] Screenshots light and dark: header with the cycle chip, resume dialog, History
-- [ ] Gate: `pnpm test:e2e`; screenshots opened and checked
+- [x] `fixtures.ts` mocks moved to cycles
+- [x] Flow spec: the header chip and the resume dialog
+- [x] Screenshots light and dark: header with the cycle chip, resume dialog, History
+- [ ] Gate: `pnpm test:e2e`; screenshots opened and checked (header with the cycle chip, resume dialog, History: checked)
+- [x] Found: task-generation, template and audit texts still said "this month"; now "this cycle" (runs already count on the cycle's period)
 
 ### Close PR 1
-- [ ] Wiring checklist against the diff; docs (spec details settled, `docs/architecture.md` if needed)
+- [ ] Wiring checklist against the diff; docs (spec: backfill by the month's last day, `month` scope kept in the enum, the PR 1 start-date rule: done)
 - [ ] Full checks through `checker` (lint, typecheck, test, build, E2E, migration drift)
 - [ ] `reviewer` with the spec; blocking findings fixed
 - [ ] Owner acceptance (browser steps); then `/ship`
