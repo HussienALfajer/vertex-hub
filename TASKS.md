@@ -105,8 +105,8 @@ PR 1 is merged (#111). No migration: `retainer_cycles.backdated`/`untracked` and
 
 ### Close PR 2
 - [x] Wiring checklist against the diff; spec updated (B1's PR 1 note removed, B2 details)
-- [ ] Full checks through `checker` (lint, typecheck, test, build, OpenAPI fresh; E2E)
-- [ ] `reviewer` with the spec; blocking findings fixed
+- [x] Full checks through `checker` (lint, typecheck, test, build, OpenAPI fresh; E2E 378 passed); run again after the review fix
+- [x] `reviewer` with the spec; blocking finding fixed (an untracked cycle's lines showed 0 delivered and 0 % in History and the client report; now no count: `delivered` and `percent` null in the report, "—" on screen, PDF and Excel; API test added)
 - [ ] Owner acceptance (browser steps 1–2 of the spec); then `/ship`
 
 ## PR 3 — cycle reports

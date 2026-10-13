@@ -145,8 +145,9 @@ export class EngagementReports {
             kind: line.kind,
             label: line.label,
             committed: line.committed,
-            delivered: line.delivered,
-            percent: deliveryRate([line]),
+            // F05C B4: a cycle whose delivery was not recorded has no count, not zero.
+            delivered: cycle.untracked ? null : line.delivered,
+            percent: cycle.untracked ? null : deliveryRate([line]),
           })),
           completion: cycle.deliveryRate,
         })),

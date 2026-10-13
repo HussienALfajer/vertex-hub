@@ -12197,7 +12197,7 @@ export interface components {
                     kind: components["schemas"]["DeliverableKind"];
                     label: string | null;
                     committed: number;
-                    delivered: number;
+                    delivered: number | null;
                     percent: number | null;
                 }[];
                 completion: number | null;

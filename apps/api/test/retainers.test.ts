@@ -4,6 +4,7 @@ import {
   addDays,
   addMonths,
   businessDate,
+  clientMonthlyReportSchema,
   cycleAt,
   cyclePageSchema,
   cyclePeriod,
@@ -365,6 +366,20 @@ describe('retainers', () => {
       ]);
       // B4: no tasks for a backdated cycle.
       expect(cycles[0]?.lines.every((line) => line.tasks.total === 0)).toBe(true);
+      // B4, R4: the client report gives an untracked cycle no delivered count and no percent.
+      const report = await client.get(
+        `/api/clients/${clientId}/monthly-report?month=${start.slice(0, 7)}`,
+        cast.gm.cookie,
+      );
+      expect(report.status).toBe(200);
+      const shown = clientMonthlyReportSchema
+        .parse(await report.json())
+        .retainers.find((row) => row.retainer.id === created.id && row.cycle === 1);
+      expect(shown?.lines.map((line) => [line.committed, line.delivered, line.percent])).toEqual([
+        [12, null, null],
+        [4, null, null],
+      ]);
+      expect(shown?.completion).toBeNull();
 
       const charges = await chargesOf(created.id);
       expect(
