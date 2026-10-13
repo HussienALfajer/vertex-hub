@@ -624,7 +624,9 @@ export class TemplateRunsService implements OnModuleInit {
         cycle: cycle
           ? {
               id: cycle.id,
-              month: cycle.month,
+              number: cycle.number,
+              periodStart: cycle.periodStart,
+              periodEnd: cycle.periodEnd,
               retainer: { id: cycle.retainerId, name: cycle.retainerName },
             }
           : null,

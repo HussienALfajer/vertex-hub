@@ -1,10 +1,12 @@
 import { standardSchemaResolver } from '@hookform/resolvers/standard-schema';
 import {
-  addMonths,
+  addDays,
   businessDate,
   type CreateRetainer,
   type CreateRetainerInput,
   createRetainerSchema,
+  currentCycleNumber,
+  cyclePeriod,
   RETAINER_LIMITS,
   type RetainerDetail,
   type RetainerStatus,
@@ -30,6 +32,8 @@ import {
   FieldLabel,
   IconButton,
   Textarea,
+  ToggleGroup,
+  ToggleGroupItem,
   toast,
 } from '@vertex-hub/ui';
 import {
@@ -45,16 +49,15 @@ import {
 import { type RefObject, useId, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
-import { ConfirmDialog } from '../../components/confirm-dialog';
 import { FormAlert } from '../../components/form-alert';
 import { MoneyInput } from '../../components/money-input';
 import { ApiError } from '../../lib/api/client';
 import { errorMessage } from '../../lib/errors';
-import { formatMonth, formatNumber } from '../../lib/format';
+import { formatCalendarDate, formatNumber } from '../../lib/format';
+import { formatMoney } from '../../lib/money';
 import {
   checkDuplicateLines,
-  checkRenewal,
-  DatesFields,
+  checkStartDate,
   DeliverablesEditor,
   type DeliverablesFormValues,
   DepartmentsField,
@@ -62,6 +65,7 @@ import {
   NameField,
   parseLines,
   retainerFormFailure,
+  StartDateField,
 } from './retainer-form';
 import {
   useChangeRetainerStatus,
@@ -110,7 +114,7 @@ export function RetainerActions({
   const { t } = useTranslation();
   const { permissions, status } = retainer;
   const change = useChangeRetainerStatus(retainer.id);
-  const [dialog, setDialog] = useState<'end' | 'reactivate' | null>(null);
+  const [dialog, setDialog] = useState<'end' | 'resume' | 'reactivate' | null>(null);
 
   if (retainer.archivedAt !== null) return null;
   const manage = permissions.canManage;
@@ -135,7 +139,7 @@ export function RetainerActions({
           disabled={change.isPending}
           // It leaves with the change: the focus then moves to the actions menu.
           focusableWhenDisabled
-          onClick={() => move('active')}
+          onClick={() => (resumeChoice(retainer) ? setDialog('resume') : move('active'))}
         >
           <PlayIcon />
           {t('retainers.actions.resume')}
@@ -193,26 +197,175 @@ export function RetainerActions({
         // Ended: the reactivate button, or the menu (archive) for those who may not reactivate.
         finalFocus={() => focusTarget(focus, 'reactivate', 'menu')}
       />
-      <ConfirmDialog
-        open={dialog === 'reactivate'}
+      <ResumeDialog
+        retainer={retainer}
+        mode={dialog === 'reactivate' ? 'reactivate' : 'resume'}
+        open={dialog === 'resume' || dialog === 'reactivate'}
         onClose={() => setDialog(null)}
-        title={t('retainers.reactivate.title', { name: retainer.name })}
-        body={t('retainers.reactivate.body')}
-        action={t('retainers.actions.reactivate')}
-        pending={change.isPending}
-        finalFocus={() => focusTarget(focus, 'reactivate', 'menu')}
-        onConfirm={async () => {
-          await change.mutateAsync({ status: 'active' });
-          toast.add({ title: t('retainers.actions.done.reactivated'), type: 'success' });
-        }}
+        finalFocus={() =>
+          dialog === 'reactivate'
+            ? focusTarget(focus, 'reactivate', 'menu')
+            : focusTarget(focus, 'resume', 'menu')
+        }
       />
     </div>
   );
 }
 
 /**
- * F05 R5 with F05B E1, E2: ending closes this month's cycle; with a term, later unbilled months
- * are cancelled and an optional termination fee (money access) drafts an invoice.
+ * F05C P2–P4: whether resuming or reactivating asks when the retainer starts again: a started,
+ * open-ended retainer without an open cycle in its current period. With an open cycle it goes on;
+ * a term's cycle opens at once (its charge is due anyway, P3).
+ */
+function resumeChoice(retainer: RetainerDetail): boolean {
+  const current = currentCycleNumber(retainer.startDate, businessDate());
+  if (current === 0 || retainer.currentCycle) return false;
+  const term = retainer.term;
+  const covered =
+    term?.status === 'active' &&
+    term.startCycle <= current &&
+    current < term.startCycle + term.cycles;
+  return !covered;
+}
+
+/**
+ * Spec screen 4: resuming or reactivating an open-ended retainer without a cycle in its current
+ * period: from the next cycle (the default) or a full cycle now with a full fee (P2). A cycle that
+ * closed on ending stays closed (P4): reactivating in it starts from the next cycle. Without the
+ * choice, reactivating only confirms.
+ */
+function ResumeDialog({
+  retainer,
+  mode,
+  open,
+  onClose,
+  finalFocus,
+}: {
+  retainer: RetainerDetail;
+  mode: 'resume' | 'reactivate';
+  open: boolean;
+  onClose: () => void;
+  finalFocus: () => HTMLElement | true;
+}) {
+  const { t } = useTranslation();
+  const id = useId();
+  const change = useChangeRetainerStatus(retainer.id);
+  const [choice, setChoice] = useState<'next' | 'now'>('next');
+  const [failure, setFailure] = useState<string | null>(null);
+  const today = businessDate();
+  const current = currentCycleNumber(retainer.startDate, today);
+  const asks = resumeChoice(retainer);
+  const period = cyclePeriod(retainer.startDate, Math.max(1, current));
+  const next = cyclePeriod(retainer.startDate, current + 1).periodStart;
+  const closedNow =
+    mode === 'reactivate' && retainer.endedOn !== null && retainer.endedOn >= period.periodStart;
+  const fee = retainer.money?.monthlyFeeMinor ?? null;
+  const currency = retainer.money?.currency ?? 'USD';
+
+  async function submit(event: React.FormEvent) {
+    event.preventDefault();
+    setFailure(null);
+    try {
+      await change.mutateAsync({
+        status: 'active',
+        ...(asks && !closedNow && choice === 'now' && { startNow: true }),
+      });
+      toast.add({
+        title: t(
+          mode === 'reactivate'
+            ? 'retainers.actions.done.reactivated'
+            : 'retainers.actions.done.active',
+        ),
+        type: 'success',
+      });
+      onClose();
+    } catch (error) {
+      setFailure(errorMessage(t, error));
+    }
+  }
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => !next && onClose()}
+      onOpenChangeComplete={(next) => {
+        if (next) return;
+        setChoice('next');
+        setFailure(null);
+      }}
+    >
+      <DialogContent closeLabel={t('common.close')} finalFocus={finalFocus}>
+        <form className="grid gap-5" onSubmit={submit} noValidate>
+          <DialogHeader>
+            <DialogTitle>
+              {t(mode === 'reactivate' ? 'retainers.reactivate.title' : 'retainers.resume.title', {
+                name: retainer.name,
+              })}
+            </DialogTitle>
+            <DialogDescription>
+              {asks
+                ? t('retainers.resume.body')
+                : mode === 'reactivate'
+                  ? t('retainers.reactivate.body')
+                  : t('retainers.resume.continues')}
+            </DialogDescription>
+          </DialogHeader>
+          {asks && closedNow && (
+            <p className="text-sm">
+              {t('retainers.resume.closedThisCycle', { date: formatCalendarDate(next) })}
+            </p>
+          )}
+          {asks && !closedNow && (
+            <Field>
+              <FieldLabel id={id} render={<span />}>
+                {t('retainers.resume.when')}
+              </FieldLabel>
+              <ToggleGroup
+                aria-labelledby={id}
+                value={[choice]}
+                onValueChange={(value: ('next' | 'now')[]) => {
+                  if (value[0]) setChoice(value[0]);
+                }}
+              >
+                <ToggleGroupItem value="next">
+                  {t('retainers.resume.next', { date: formatCalendarDate(next) })}
+                </ToggleGroupItem>
+                <ToggleGroupItem value="now">{t('retainers.resume.now')}</ToggleGroupItem>
+              </ToggleGroup>
+              <FieldDescription>
+                {choice === 'next'
+                  ? t('retainers.resume.nextHint')
+                  : fee !== null && retainer.money
+                    ? t('retainers.resume.nowHint', {
+                        date: formatCalendarDate(period.periodEnd),
+                        fee: formatMoney(fee, currency),
+                      })
+                    : t('retainers.resume.nowHintNoFee', {
+                        date: formatCalendarDate(period.periodEnd),
+                      })}
+              </FieldDescription>
+            </Field>
+          )}
+          {failure && <FormAlert>{failure}</FormAlert>}
+          <DialogFooter>
+            <DialogClose render={<Button variant="outline" type="button" />}>
+              {t('common.cancel')}
+            </DialogClose>
+            <Button type="submit" disabled={change.isPending}>
+              {t(
+                mode === 'reactivate' ? 'retainers.actions.reactivate' : 'retainers.actions.resume',
+              )}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/**
+ * F05 R5 with F05B E1, E2: ending closes the open cycle; with a term, later unbilled cycles are
+ * cancelled and an optional termination fee (money access) drafts an invoice.
  */
 function EndDialog({
   retainer,
@@ -235,10 +388,13 @@ function EndDialog({
   const [failure, setFailure] = useState<string | null>(null);
   const withFee = !!retainer.term && retainer.permissions.canEditMoney;
   const currency = retainer.money?.currency ?? 'USD';
-  // The last month of the retainer's terms: the month before the derived renewal date (T11).
-  const lastMonth =
-    retainer.term && retainer.renewalDate ? addMonths(retainer.renewalDate, -1) : null;
-  const laterMonths = lastMonth !== null && lastMonth.slice(0, 7) > businessDate().slice(0, 7);
+  // The last day of the retainer's terms: the day before the derived renewal date (T3').
+  const current = cyclePeriod(
+    retainer.startDate,
+    Math.max(1, currentCycleNumber(retainer.startDate, businessDate())),
+  );
+  const lastDay = retainer.term && retainer.renewalDate ? addDays(retainer.renewalDate, -1) : null;
+  const laterCycles = lastDay !== null && lastDay > current.periodEnd;
 
   // After the exit animation, so the fee and reason do not vanish while the dialog fades.
   function closed() {
@@ -281,9 +437,9 @@ function EndDialog({
             <DialogTitle>{t('retainers.end.title', { name: retainer.name })}</DialogTitle>
             <DialogDescription>{t('retainers.end.body')}</DialogDescription>
           </DialogHeader>
-          {laterMonths && lastMonth && (
+          {laterCycles && lastDay && (
             <p className="text-sm">
-              {t('retainers.end.termMonths', { month: formatMonth(lastMonth) })}
+              {t('retainers.end.termCycles', { date: formatCalendarDate(lastDay) })}
             </p>
           )}
           {withFee && (
@@ -340,10 +496,10 @@ function EndDialog({
 }
 
 /**
- * The retainer's basics as one form: name, departments, dates and, with money access, the
- * currency and monthly fee. The start date is fixed once the first cycle opened (R3); the renewal
- * date while a term sets it (T11); the fee and currency once the retainer has a charge (A9, M2).
- * Only changed fields are sent.
+ * The retainer's basics as one form: name, departments, the start date and, with money access,
+ * the currency and monthly fee. The start date is fixed once a cycle or a charge exists (F05C
+ * edge case 8); the fee and currency once the retainer has a charge (A9, M2). The renewal date
+ * follows the term (T3'). Only changed fields are sent.
  */
 function EditRetainer({ retainer }: { retainer: RetainerDetail }) {
   const { t } = useTranslation();
@@ -366,7 +522,6 @@ function EditRetainer({ retainer }: { retainer: RetainerDetail }) {
       name: retainer.name,
       departments: retainer.departments,
       startDate: retainer.startDate,
-      renewalDate: retainer.renewalDate,
       currency: retainer.money?.currency ?? 'USD',
       monthlyFeeMinor: fee,
       deliverables: [],
@@ -382,13 +537,14 @@ function EditRetainer({ retainer }: { retainer: RetainerDetail }) {
 
   const submit = form.handleSubmit(async (values) => {
     setFailure(null);
-    if (!checkRenewal(form, t, values.startDate, values.renewalDate)) return;
     const dirty = form.formState.dirtyFields;
+    const sendsStart = !started && !charged && !!dirty.startDate;
+    // Only a start date that is sent is checked: a started retainer's stored one is in the past.
+    if (sendsStart && !checkStartDate(form, t, values.startDate)) return;
     const changes: UpdateRetainer = {
       ...(dirty.name && { name: values.name }),
       ...(dirty.departments && { departments: values.departments }),
-      ...(!started && dirty.startDate && { startDate: values.startDate }),
-      ...(!retainer.term && dirty.renewalDate && { renewalDate: values.renewalDate ?? null }),
+      ...(sendsStart && { startDate: values.startDate }),
       ...(canEditMoney && !charged && dirty.currency && { currency: values.currency }),
       ...(canEditMoney &&
         !charged &&
@@ -419,7 +575,7 @@ function EditRetainer({ retainer }: { retainer: RetainerDetail }) {
             </DialogHeader>
             <NameField form={form} />
             <DepartmentsField form={form} />
-            <DatesFields form={form} startLocked={started} renewalLocked={!!retainer.term} />
+            <StartDateField form={form} startLocked={started || charged} />
             {canEditMoney && <MoneyFields form={form} locked={charged} />}
             {failure && <FormAlert>{failure}</FormAlert>}
             <DialogFooter>

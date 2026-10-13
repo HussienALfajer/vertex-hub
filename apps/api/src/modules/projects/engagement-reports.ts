@@ -17,7 +17,7 @@ import { ClientDirectory } from '../clients/index.js';
 import { RetainerCyclesService } from './retainer-cycles.service.js';
 import { NO_TASKS, WorkProgress } from './work-progress.js';
 
-/** This month's cycle of an active retainer (F15 rules 1, 4 and 6). */
+/** The open cycle of an active retainer (F15 rules 1, 4 and 6). */
 export interface RetainerProgress {
   clientId: string;
   retainer: { id: string; name: string };
@@ -114,8 +114,9 @@ export class EngagementReports {
   }
 
   /**
-   * F15 rule 18.2: the client's non-archived retainers with a cycle in the month, by name, each
-   * line with its committed and delivered counts (frozen for a closed cycle).
+   * F15 rule 18.2, F05C R4: the cycles of the client's non-archived retainers whose period
+   * overlaps the report's, by retainer name then cycle number, each line with its committed and
+   * delivered counts (frozen for a closed cycle).
    */
   async clientRetainers(
     clientId: string,
@@ -126,17 +127,19 @@ export class EngagementReports {
       .from(retainers)
       .where(and(eq(retainers.clientId, clientId), isNull(retainers.archivedAt)))
       .orderBy(asc(retainers.name), asc(retainers.id));
-    const cycles = await this.cycles.ofMonth(
+    const cycles = await this.cycles.overlapping(
       new Map(rows.map((row) => [row.id, row.status])),
       period.from,
+      period.to,
     );
-    const byRetainer = new Map(cycles.map((cycle) => [cycle.retainerId, cycle]));
-    return rows.flatMap((row) => {
-      const cycle = byRetainer.get(row.id);
-      if (!cycle) return [];
-      return [
-        {
+    return rows.flatMap((row) =>
+      cycles
+        .filter((cycle) => cycle.retainerId === row.id)
+        .map((cycle) => ({
           retainer: { id: row.id, name: row.name },
+          cycle: cycle.number,
+          periodStart: cycle.periodStart,
+          periodEnd: cycle.periodEnd,
           status: cycle.status,
           lines: cycle.lines.map((line) => ({
             kind: line.kind,
@@ -146,9 +149,8 @@ export class EngagementReports {
             percent: deliveryRate([line]),
           })),
           completion: cycle.deliveryRate,
-        },
-      ];
-    });
+        })),
+    );
   }
 
   /**

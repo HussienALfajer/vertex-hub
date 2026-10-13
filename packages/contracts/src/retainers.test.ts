@@ -11,6 +11,7 @@ import {
   amendmentNeedsApproval,
   approveAmendmentSchema,
   behindAlert,
+  type CycleChargeState,
   canChangeRetainerStatus,
   cancelRetainerTermSchema,
   createAmendmentSchema,
@@ -22,8 +23,7 @@ import {
   deliveryRate,
   duplicateDeliverables,
   isLineBehind,
-  type MonthChargeState,
-  planMonthChange,
+  planCycleChange,
   RETAINER_STATUSES,
   rejectAmendmentSchema,
   renewalState,
@@ -34,8 +34,6 @@ import {
   scheduleMatches,
   splitEvenly,
   takeCredits,
-  termEndMonth,
-  termMonths,
   updateCycleLineSchema,
   updateRetainerSchema,
   updateRetainerTermSchema,
@@ -117,19 +115,22 @@ describe('createRetainerSchema', () => {
     expect(createRetainerSchema.safeParse({ ...retainer, startDate: '2026-02-30' }).success).toBe(
       false,
     );
-    expect(createRetainerSchema.safeParse({ ...retainer, renewalDate: '01/10/2027' }).success).toBe(
+  });
+
+  it("refuses a renewal date: it is derived from the term (F05C T3')", () => {
+    expect(createRetainerSchema.safeParse({ ...retainer, renewalDate: '2027-10-01' }).success).toBe(
       false,
     );
   });
 });
 
 describe('updateRetainerSchema and retainerDeliverablesSchema', () => {
-  it('accepts any subset and a cleared renewal date or fee', () => {
+  it('accepts any subset and a cleared fee, never a renewal date', () => {
     expect(updateRetainerSchema.parse({})).toEqual({});
-    expect(updateRetainerSchema.parse({ renewalDate: null, monthlyFeeMinor: null })).toEqual({
-      renewalDate: null,
+    expect(updateRetainerSchema.parse({ monthlyFeeMinor: null })).toEqual({
       monthlyFeeMinor: null,
     });
+    expect(updateRetainerSchema.safeParse({ renewalDate: null }).success).toBe(false);
   });
 
   it('refuses an existing line listed twice', () => {
@@ -241,7 +242,17 @@ describe('isLineBehind (R11)', () => {
     expect(isLineBehind({ committed: 0, delivered: 0 }, october, '2026-10-31')).toBe(false);
   });
 
-  it('measures a partial first month from its own start (edge case 4)', () => {
+  it('measures an anchored cycle across two months (F05C Y5)', () => {
+    const cycle = { periodStart: '2026-10-20', periodEnd: '2026-11-19' };
+    // 5 Nov: 17/31 elapsed ≈ 0.548; the threshold is ≈ 0.298.
+    expect(isLineBehind({ committed: 10, delivered: 2 }, cycle, '2026-11-05')).toBe(true);
+    expect(isLineBehind({ committed: 10, delivered: 3 }, cycle, '2026-11-05')).toBe(false);
+    expect(isLineBehind({ committed: 10, delivered: 9 }, cycle, '2026-11-13')).toBe(true);
+    expect(behindAlert(cycle, '2026-11-13')).toBe('first');
+    expect(behindAlert(cycle, '2026-11-17')).toBe('final');
+  });
+
+  it('measures a cycle started "now" from its own start (F05C P2)', () => {
     const lastDay = { periodStart: '2026-10-31', periodEnd: '2026-10-31' };
     expect(isLineBehind({ committed: 12, delivered: 0 }, lastDay, '2026-10-31')).toBe(true);
     const rest = { periodStart: '2026-10-20', periodEnd: '2026-10-31' };
@@ -273,7 +284,7 @@ describe('behindAlert (P2A rules 1–3)', () => {
     expect(behindAlert(eightDays, '2026-10-30')).toBe('final');
   });
 
-  it('follows the length of the month', () => {
+  it('follows the length of the period', () => {
     const february = { periodStart: '2027-02-01', periodEnd: '2027-02-28' };
     expect(behindAlert(february, '2027-02-21')).toBeNull();
     expect(behindAlert(february, '2027-02-22')).toBe('first');
@@ -348,7 +359,7 @@ describe('extra work', () => {
 });
 
 describe('terms (F05B T1–T11)', () => {
-  it('splits a total evenly with the remainder on the last month (T3)', () => {
+  it('splits a total evenly with the remainder on the last cycle (T3)', () => {
     expect(splitEvenly(100000, 3)).toEqual([33333, 33333, 33334]);
     expect(splitEvenly(100000, 1)).toEqual([100000]);
     expect(splitEvenly(0, 4)).toEqual([0, 0, 0, 0]);
@@ -360,31 +371,28 @@ describe('terms (F05B T1–T11)', () => {
     expect(splitEvenly(2, 3)).toEqual([0, 0, 2]);
   });
 
-  it('checks the schedule against the months and the total', () => {
-    const term = { months: 3, agreedTotalMinor: 100000, schedule: [30000, 30000, 40000] };
+  it('checks the schedule against the cycles and the total', () => {
+    const term = { cycles: 3, agreedTotalMinor: 100000, schedule: [30000, 30000, 40000] };
     expect(scheduleMatches(term)).toBe(true);
     expect(scheduleMatches({ ...term, schedule: [30000, 30000, 39999] })).toBe(false);
     expect(scheduleMatches({ ...term, schedule: [30000, 70000] })).toBe(false);
-    expect(scheduleMatches({ months: 3, agreedTotalMinor: 100000, schedule: [100000, 0, 0] })).toBe(
+    expect(scheduleMatches({ cycles: 3, agreedTotalMinor: 100000, schedule: [100000, 0, 0] })).toBe(
       true,
     );
   });
 
-  it('places the months of a term across years', () => {
-    expect(termMonths('2026-11-01', 3)).toEqual(['2026-11-01', '2026-12-01', '2027-01-01']);
-    expect(termEndMonth('2026-11-01', 3)).toBe('2027-01-01');
-    expect(termEndMonth('2026-11-01', 1)).toBe('2026-11-01');
-    expect(dayAfterTerm('2027-01-01')).toBe('2027-02-01');
+  it("renews the day after the term ends (T3')", () => {
+    expect(dayAfterTerm('2027-02-19')).toBe('2027-02-20');
+    expect(dayAfterTerm('2026-12-31')).toBe('2027-01-01');
   });
 
-  it('takes a term from the first of a month, 1 to 36 months, renewing by default', () => {
-    const input = { startMonth: '2026-11-01', months: 3, agreedTotalMinor: 0, schedule: [0, 0, 0] };
+  it('takes a term from a cycle number, 1 to 36 cycles, renewing by default', () => {
+    const input = { startCycle: 3, cycles: 3, agreedTotalMinor: 0, schedule: [0, 0, 0] };
     expect(createRetainerTermSchema.parse(input).endAction).toBe('renew');
-    expect(createRetainerTermSchema.safeParse({ ...input, startMonth: '2026-11-02' }).success).toBe(
-      false,
-    );
-    expect(createRetainerTermSchema.safeParse({ ...input, months: 0 }).success).toBe(false);
-    expect(createRetainerTermSchema.safeParse({ ...input, months: 37 }).success).toBe(false);
+    expect(createRetainerTermSchema.safeParse({ ...input, startCycle: 0 }).success).toBe(false);
+    expect(createRetainerTermSchema.safeParse({ ...input, startCycle: 1.5 }).success).toBe(false);
+    expect(createRetainerTermSchema.safeParse({ ...input, cycles: 0 }).success).toBe(false);
+    expect(createRetainerTermSchema.safeParse({ ...input, cycles: 37 }).success).toBe(false);
     expect(createRetainerTermSchema.safeParse({ ...input, schedule: [-1, 0, 1] }).success).toBe(
       false,
     );
@@ -395,20 +403,24 @@ describe('terms (F05B T1–T11)', () => {
   it('takes a term on a new retainer and a fee when it ends (E2)', () => {
     const parsed = createRetainerSchema.parse({
       ...retainer,
-      term: { months: 2, agreedTotalMinor: 1000, schedule: [500, 500] },
+      term: { cycles: 2, agreedTotalMinor: 1000, schedule: [500, 500] },
     });
     expect(parsed.term?.endAction).toBe('renew');
     const ended = { status: 'ended', termination: { feeMinor: 20000, reason: ' early end ' } };
     expect(retainerStatusChangeSchema.parse(ended).termination?.reason).toBe('early end');
     const free = { status: 'ended', termination: { feeMinor: 0, reason: 'x' } };
     expect(retainerStatusChangeSchema.safeParse(free).success).toBe(false);
+    // F05C P2: resuming may start a full cycle now.
+    expect(retainerStatusChangeSchema.parse({ status: 'active', startNow: true }).startNow).toBe(
+      true,
+    );
   });
 });
 
-describe('amendments (F05B A1–A6)', () => {
+describe("amendments (F05B A1–A6, F05C A1')", () => {
   const amendment = {
-    scope: 'month',
-    effectiveMonth: '2026-11-01',
+    scope: 'cycle',
+    effectiveCycle: 3,
     lines: [{ kind: 'reel', quantityDelta: 2 }],
     amountDeltaMinor: 10000,
     reason: ' extra reels ',
@@ -428,10 +440,12 @@ describe('amendments (F05B A1–A6)', () => {
     ).toBe(-8000);
   });
 
-  it('refuses a month that is not a first day, a zero line delta, an other line without label', () => {
+  it('refuses a cycle that is not a number ≥ 1, a zero line delta, an other line without label', () => {
     const bad = (patch: object) =>
       createAmendmentSchema.safeParse({ ...amendment, ...patch }).success;
-    expect(bad({ effectiveMonth: '2026-11-02' })).toBe(false);
+    expect(bad({ effectiveCycle: 0 })).toBe(false);
+    expect(bad({ effectiveCycle: '2026-11-01' })).toBe(false);
+    expect(bad({ scope: 'month' })).toBe(false);
     expect(bad({ lines: [{ kind: 'reel', quantityDelta: 0 }] })).toBe(false);
     expect(bad({ lines: [{ kind: 'reel', quantityDelta: 1000 }] })).toBe(false);
     expect(bad({ lines: [{ kind: 'other', quantityDelta: 1 }] })).toBe(false);
@@ -452,24 +466,24 @@ describe('amendments (F05B A1–A6)', () => {
     expect(rejectAmendmentSchema.parse({ note: ' no ' }).note).toBe('no');
   });
 
-  it('takes a reschedule of first-day months with amounts ≥ 0', () => {
+  it('takes a reschedule of cycles with amounts ≥ 0', () => {
     const schedule = [
-      { month: '2026-11-01', amountMinor: 40000 },
-      { month: '2026-12-01', amountMinor: 40000 },
+      { cycle: 3, amountMinor: 40000 },
+      { cycle: 4, amountMinor: 40000 },
     ];
     expect(rescheduleTermSchema.safeParse({ schedule, reason: 'x' }).success).toBe(true);
     expect(
       rescheduleTermSchema.safeParse({
-        schedule: [{ month: '2026-11-01', amountMinor: -1 }],
+        schedule: [{ cycle: 3, amountMinor: -1 }],
         reason: 'x',
       }).success,
     ).toBe(false);
     expect(rescheduleTermSchema.safeParse({ schedule: [], reason: 'x' }).success).toBe(false);
   });
 
-  describe('planMonthChange (C6, A3)', () => {
-    const month = (patch: Partial<MonthChargeState> = {}): MonthChargeState => ({
-      month: '2026-11-01',
+  describe('planCycleChange (C6, A3)', () => {
+    const cycle = (patch: Partial<CycleChargeState> = {}): CycleChargeState => ({
+      cycle: 3,
       amountMinor: 30000,
       invoice: null,
       extrasMinor: 0,
@@ -483,8 +497,8 @@ describe('amendments (F05B A1–A6)', () => {
     const issued = { ...draft, displayNumber: 'INV-2026-0012', issued: true };
 
     it('changes an amount no invoice bills', () => {
-      expect(planMonthChange(month(), 10000)).toEqual({
-        month: '2026-11-01',
+      expect(planCycleChange(cycle(), 10000)).toEqual({
+        cycle: 3,
         effect: 'charge_changed',
         beforeMinor: 30000,
         afterMinor: 40000,
@@ -493,51 +507,51 @@ describe('amendments (F05B A1–A6)', () => {
     });
 
     it('syncs a draft', () => {
-      expect(planMonthChange(month({ invoice: draft }), -5000)).toMatchObject({
+      expect(planCycleChange(cycle({ invoice: draft }), -5000)).toMatchObject({
         effect: 'draft_synced',
         afterMinor: 25000,
         invoice: { id: draft.id, displayNumber: null },
       });
     });
 
-    it('adds to or credits an issued month, paid or not', () => {
-      expect(planMonthChange(month({ invoice: issued }), 10000)).toMatchObject({
+    it('adds to or credits an issued cycle, paid or not', () => {
+      expect(planCycleChange(cycle({ invoice: issued }), 10000)).toMatchObject({
         effect: 'addition',
         beforeMinor: 30000,
         afterMinor: 40000,
         invoice: { displayNumber: 'INV-2026-0012' },
       });
-      expect(planMonthChange(month({ invoice: issued, extrasMinor: 10000 }), -8000)).toMatchObject({
+      expect(planCycleChange(cycle({ invoice: issued, extrasMinor: 10000 }), -8000)).toMatchObject({
         effect: 'credit',
         beforeMinor: 40000,
         afterMinor: 32000,
       });
     });
 
-    it('refuses a month total or a changed charge below 0', () => {
-      expect(planMonthChange(month({ invoice: issued }), -30001)).toBe('negative');
-      expect(planMonthChange(month({ invoice: issued }), -30000)).toMatchObject({ afterMinor: 0 });
-      // The month's addition keeps the total ≥ 0, but the charge itself cannot go negative.
-      expect(planMonthChange(month({ extrasMinor: 10000 }), -35000)).toBe('negative');
-      expect(planMonthChange(month({ amountMinor: 0 }), -1)).toBe('negative');
+    it('refuses a cycle total or a changed charge below 0', () => {
+      expect(planCycleChange(cycle({ invoice: issued }), -30001)).toBe('negative');
+      expect(planCycleChange(cycle({ invoice: issued }), -30000)).toMatchObject({ afterMinor: 0 });
+      // The cycle's addition keeps the total ≥ 0, but the charge itself cannot go negative.
+      expect(planCycleChange(cycle({ extrasMinor: 10000 }), -35000)).toBe('negative');
+      expect(planCycleChange(cycle({ amountMinor: 0 }), -1)).toBe('negative');
     });
 
     it('does nothing without an amount change', () => {
-      expect(planMonthChange(month(), 0)).toBeNull();
+      expect(planCycleChange(cycle(), 0)).toBeNull();
     });
   });
 
-  it('sums the change over its months; an open-ended fee counts once (A4)', () => {
-    expect(amendmentMoneyDelta({ amountDeltaMinor: 5000, months: 2, changesFee: false })).toBe(
+  it('sums the change over its cycles; an open-ended fee counts once (A4)', () => {
+    expect(amendmentMoneyDelta({ amountDeltaMinor: 5000, cycles: 2, changesFee: false })).toBe(
       10000,
     );
-    expect(amendmentMoneyDelta({ amountDeltaMinor: -8000, months: 1, changesFee: false })).toBe(
+    expect(amendmentMoneyDelta({ amountDeltaMinor: -8000, cycles: 1, changesFee: false })).toBe(
       -8000,
     );
-    expect(amendmentMoneyDelta({ amountDeltaMinor: -1000, months: 0, changesFee: true })).toBe(
+    expect(amendmentMoneyDelta({ amountDeltaMinor: -1000, cycles: 0, changesFee: true })).toBe(
       -1000,
     );
-    expect(amendmentMoneyDelta({ amountDeltaMinor: 0, months: 3, changesFee: true })).toBe(0);
+    expect(amendmentMoneyDelta({ amountDeltaMinor: 0, cycles: 3, changesFee: true })).toBe(0);
   });
 
   it('sends reductions to the General Manager unless the creator may approve (A4)', () => {

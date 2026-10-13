@@ -14,6 +14,8 @@ export {
   formatDateTime,
   formatList,
   formatNumber,
+  formatPeriod,
+  formatRetainerCycle,
   formatTimeOfDay,
 } from '@vertex-hub/messages';
 

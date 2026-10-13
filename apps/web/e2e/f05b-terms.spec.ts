@@ -12,7 +12,10 @@ async function onProjectsToday(page: Page) {
   await page.clock.setFixedTime(new Date(`${PROJECTS_TODAY}T09:00:00+03:00`));
 }
 
-const monthAmount = (month: string) => fill(ar.retainers.terms.monthAmount, { month });
+const cycleAmount = (number: string) =>
+  fill(ar.retainers.terms.cycleAmount, {
+    cycle: fill(ar.retainers.cycleNumber, { number }),
+  });
 
 test('create a retainer with a fixed term and its schedule (T3, screen 1)', async ({ page }) => {
   await onProjectsToday(page);
@@ -25,26 +28,31 @@ test('create a retainer with a fixed term and its schedule (T3, screen 1)', asyn
   await page.getByRole('button', { name: ar.retainers.kinds.design, exact: true }).click();
 
   await page.getByRole('switch', { name: ar.retainers.terms.enable }).click();
-  // A term sets the renewal date (T11).
-  await expect(page.getByLabel(ar.retainers.form.renewalDate)).toBeDisabled();
+  // F05C: no renewal date to enter; the term's end sets it (T3').
+  await expect(page.getByLabel(/تاريخ التجديد/)).toHaveCount(0);
   await page.getByLabel(ar.retainers.terms.agreedTotal).fill('1000');
-  // The default schedule is an even split with the remainder on the last month.
-  await expect(page.getByLabel(monthAmount('تشرين الأول 2026'))).toHaveValue('333.33');
-  await expect(page.getByLabel(monthAmount('كانون الأول 2026'))).toHaveValue('333.34');
+  // The default schedule is an even split with the remainder on the last cycle.
+  await expect(page.getByLabel(cycleAmount('1'))).toHaveValue('333.33');
+  await expect(page.getByLabel(cycleAmount('3'))).toHaveValue('333.34');
   await expect(page.getByText(ar.retainers.terms.balanced)).toBeVisible();
 
-  await page.getByLabel(monthAmount('تشرين الأول 2026')).fill('300');
-  await page.getByLabel(monthAmount('تشرين الثاني 2026')).fill('300');
+  await page.getByLabel(cycleAmount('1')).fill('300');
+  await page.getByLabel(cycleAmount('2')).fill('300');
   await expect(page.getByTestId('term-remaining')).toContainText('66.66');
   await page.getByRole('button', { name: ar.retainers.form.create }).click();
   await expect(page.getByText(ar.retainers.terms.errors.schedule)).toBeVisible();
 
-  await page.getByLabel(monthAmount('كانون الأول 2026')).fill('400');
+  await page.getByLabel(cycleAmount('3')).fill('400');
   await expect(page.getByText(ar.retainers.terms.balanced)).toBeVisible();
   await page.getByRole('button', { name: ar.retainers.form.create }).click();
 
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('عقد ربع سنوي');
-  await expect(page.getByText(/المدة 1 · تشرين الأول 2026 – كانون الأول 2026/)).toBeVisible();
+  // Three cycles from 10 October (Y1): the term ends on 9 January (T1').
+  await expect(
+    page.getByText(
+      /المدة 1 · 10 تشرين الأول 2026 – 9 كانون الثاني 2027 · تتجدد في 10 كانون الثاني 2027/,
+    ),
+  ).toBeVisible();
   await page.getByRole('tab', { name: ar.retainers.page.tabs.contract }).click();
   const card = page.getByRole('region', { name: fill(ar.retainers.terms.name, { number: '1' }) });
   await expect(card.getByText(ar.retainers.terms.statuses.active, { exact: true })).toBeVisible();
@@ -70,9 +78,10 @@ test('change the end action, add a term and cancel it (T5, T10, screen 3)', asyn
 
   await page.getByRole('button', { name: ar.retainers.terms.add }).click();
   const dialog = page.getByRole('dialog');
-  await dialog.getByRole('combobox', { name: ar.retainers.terms.startMonth }).click();
-  await page.getByRole('option', { name: 'كانون الثاني 2027' }).click();
-  await dialog.getByLabel(ar.retainers.terms.months).fill('2');
+  await dialog.getByRole('combobox', { name: ar.retainers.terms.startCycle }).click();
+  // The ads retainer started on 1 May: cycle 9 is January 2027, after term 2 (cycles 6–8).
+  await page.getByRole('option', { name: /^الدورة 9 · / }).click();
+  await dialog.getByLabel(ar.retainers.terms.cycles).fill('2');
   await dialog.getByLabel(ar.retainers.terms.agreedTotal).fill('80000');
   await dialog.getByRole('button', { name: ar.retainers.terms.create }).click();
   await expect(page.getByText(ar.retainers.terms.created)).toBeVisible();
@@ -97,7 +106,7 @@ test('change the end action, add a term and cancel it (T5, T10, screen 3)', asyn
   ).toBeVisible();
 });
 
-test('an employee sees the term months without amounts (G3)', async ({ page }) => {
+test('an employee sees the term cycles without amounts (G3)', async ({ page }) => {
   await onProjectsToday(page);
   await mockApi(page, { signedIn: true, me: employeeMe });
   await page.goto(`/retainers/${seedIds.adsRetainer}?tab=contract`);
@@ -120,7 +129,7 @@ test('ending a retainer with a term takes an optional termination fee (E1, E2)',
   await page.getByRole('menuitem', { name: ar.retainers.actions.end }).click();
   const dialog = page.getByRole('dialog');
   await expect(
-    dialog.getByText(fill(ar.retainers.end.termMonths, { month: 'كانون الأول 2026' })),
+    dialog.getByText(fill(ar.retainers.end.termCycles, { date: '31 كانون الأول 2026' })),
   ).toBeVisible();
   await dialog.getByLabel(ar.retainers.end.fee).fill('500000');
   await dialog.getByRole('button', { name: ar.retainers.actions.end }).click();

@@ -456,7 +456,6 @@ async function seedData(http: Http, people: Record<string, string>) {
       name: string;
       departments: string[];
       startDate: string;
-      renewalDate: string | null;
       template: { id: string } | null;
     } | null;
     return http.post(`/quotes/${quote.id}/accept`, {
@@ -476,7 +475,6 @@ async function seedData(http: Http, people: Record<string, string>) {
         name: retainer.name,
         departments: retainer.departments,
         startDate: retainer.startDate,
-        renewalDate: retainer.renewalDate,
         templateId: retainer.template?.id ?? null,
       },
     });
@@ -533,20 +531,25 @@ async function seedData(http: Http, people: Record<string, string>) {
     name: 'إدارة حسابات العيادة',
     departments: ['design', 'content_management'],
     startDate: day(-5),
-    renewalDate: day(180),
     monthlyFeeMinor: 60_000,
     deliverables: [
       { kind: 'design', monthlyQuantity: 10 },
       { kind: 'post', monthlyQuantity: 10 },
       { kind: 'reel', monthlyQuantity: 2 },
     ],
+    // F05C: six cycles from its start date; the renewal date follows the term.
+    term: {
+      cycles: 6,
+      agreedTotalMinor: 360_000,
+      schedule: [60_000, 60_000, 60_000, 60_000, 60_000, 60_000],
+      endAction: 'renew',
+    },
   });
   const cafeRetainer = await http.post('/retainers', {
     clientId: cafe.id,
     name: 'سوشيال مقهى الزاوية',
     departments: ['design', 'marketing'],
     startDate: day(-20),
-    renewalDate: day(25),
     monthlyFeeMinor: 40_000,
     deliverables: [
       { kind: 'design', monthlyQuantity: 8 },

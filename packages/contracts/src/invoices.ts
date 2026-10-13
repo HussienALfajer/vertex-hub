@@ -39,7 +39,7 @@ export const OPEN_INVOICE_STATUSES = [
 ] as const satisfies InvoiceStatus[];
 
 /**
- * How a draft started (rules 2–6). A retainer's month (`cycle_opened`, the name kept from F13),
+ * How a draft started (rules 2–6). A retainer's cycle (`cycle_opened`, the name kept from F13),
  * amendment addition or termination fee drafts from its charge (spec F05B C4).
  */
 export const INVOICE_ORIGINS = [
@@ -312,14 +312,16 @@ export const billableItemsSchema = z
     ),
     /**
      * Due, `pending` retainer charges not on a live invoice (spec F05B C7), by retainer name and
-     * newest month; the default amount is the charge's.
+     * newest cycle; the default amount is the charge's.
      */
     charges: z.array(
       z.object({
         id: z.uuid(),
         retainer: namedSchema,
-        /** The first day of the month the charge belongs to. */
-        month: calendarDateSchema,
+        /** The retainer cycle the charge belongs to and its period (F05C). */
+        cycle: z.number().int().min(1),
+        periodStart: calendarDateSchema,
+        periodEnd: calendarDateSchema,
         kind: retainerChargeKindSchema,
         amountMinor: signedMinorAmountSchema,
       }),
@@ -769,25 +771,27 @@ export type ProjectBilling = z.infer<typeof projectBillingSchema>;
 export const retainerChargeSchema = z
   .object({
     id: z.uuid(),
-    /** The first day of the month the charge belongs to. */
-    month: calendarDateSchema,
+    /** The retainer cycle the charge belongs to and its period (F05C). */
+    cycle: z.number().int().min(1),
+    periodStart: calendarDateSchema,
+    periodEnd: calendarDateSchema,
     kind: retainerChargeKindSchema,
     /** Negative for a credit. */
     amountMinor: signedMinorAmountSchema,
     status: retainerChargeStatusSchema,
-    /** A term month's `monthly` charge: "2 of 3" of term 1 (F05B C4). */
+    /** A term cycle's `monthly` charge: "2 of 3" of term 1 (F05B C4). */
     term: z
       .object({
         number: z.number().int().min(1),
         position: z.number().int().min(1),
-        months: z.number().int().min(1),
+        cycles: z.number().int().min(1),
       })
       .nullable(),
     /** The amendment an addition or a credit comes from (F05B C6). */
     amendment: z.object({ id: z.uuid(), number: z.number().int().min(1) }).nullable(),
     /** Why a credit was settled outside the system (C9). */
     settleNote: z.string().nullable(),
-    /** Its month began (`monthly`) or it was created (other kinds), and its due hooks ran (C3). */
+    /** Its cycle began (`monthly`) or it was created (other kinds), and its due hooks ran (C3). */
     due: z.boolean(),
     invoice: sourceInvoiceSchema.nullable(),
   })
@@ -802,7 +806,7 @@ export const retainerChargeListQuerySchema = pageQuerySchema.extend({
 
 export type RetainerChargeListQuery = z.infer<typeof retainerChargeListQuerySchema>;
 
-/** Newest month first, then by kind and creation. */
+/** Newest cycle first, then by kind and creation. */
 export const retainerChargePageSchema = pageSchema(retainerChargeSchema).meta({
   id: 'RetainerChargePage',
 });
@@ -816,7 +820,7 @@ export const retainerBillingSchema = z
       monthlyFeeMinor: minorAmountSchema.nullable(),
       archived: z.boolean(),
     }),
-    /** Every charge of the retainer, newest month first (cancelled ones included). */
+    /** Every charge of the retainer, newest cycle first (cancelled ones included). */
     charges: z.array(retainerChargeSchema),
     /** Non-archived extra work, newest first. */
     extraWork: z.array(

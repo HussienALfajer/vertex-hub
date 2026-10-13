@@ -2,11 +2,11 @@ import { randomUUID } from 'node:crypto';
 import type { INestApplication } from '@nestjs/common';
 import {
   addDays,
+  addMonths,
   businessDate,
   type CreateTemplateInput,
   cycleDetailSchema,
   isWorkDay,
-  lastOfMonth,
   nthWorkDay,
   type RetainerDetail,
   retainerTemplateSchema,
@@ -52,7 +52,8 @@ describe('template runs', () => {
   let monthlyTemplate: string;
   const templates: string[] = [];
   const today = businessDate();
-  const nextMonth = addDays(lastOfMonth(today), 1);
+  /** F05C Y1: a retainer started today has its second cycle from the same day next month. */
+  const nextCycle = addMonths(today, 1);
 
   const preview = (id: string, cookie: string | undefined, body: TemplateRunInputBody) =>
     client.post(`/api/templates/${id}/preview`, cookie, body);
@@ -138,7 +139,7 @@ describe('template runs', () => {
   const cycleRuns = (cycleId: string) =>
     db.select().from(templateRuns).where(eq(templateRuns.retainerCycleId, cycleId));
 
-  /** A started retainer (this month's cycle open) of the client, with its current cycle. */
+  /** A started retainer (its first cycle open) of the client, with its current cycle. */
   async function startedRetainer(input: Partial<Parameters<typeof cast.createRetainer>[1]> = {}) {
     const retainer = await cast.createRetainer(clientId, input);
     const state = await retainerTemplate(retainer.id);
@@ -146,7 +147,7 @@ describe('template runs', () => {
     return { retainer, cycle: state.cycle, lines: state.lines };
   }
 
-  /** Removes the retainer's cycles, as if the retainer had been paused across a month end. */
+  /** Removes the retainer's cycles, as if the retainer had been paused across a cycle's end. */
   async function dropCycles(retainer: RetainerDetail) {
     const cycles = await db
       .select({ id: retainerCycles.id })
@@ -889,15 +890,17 @@ describe('template runs', () => {
       expect(state.run).toMatchObject({ trigger: 'cycle_opened', taskCount: 17 });
     });
 
-    it('generates the tasks when a retainer resumes or is reactivated in a new month', async () => {
+    it('generates the tasks when a retainer resumes or is reactivated in a new cycle, starting now', async () => {
       const paused = await startedRetainer();
       await linkTemplate(paused.retainer.id, cast.am.cookie, monthlyTemplate);
       await client.post(`/api/retainers/${paused.retainer.id}/status`, cast.am.cookie, {
         status: 'paused',
       });
       await dropCycles(paused.retainer);
+      // F05C P2: without a cycle in the current period, "start now" opens one.
       await client.post(`/api/retainers/${paused.retainer.id}/status`, cast.am.cookie, {
         status: 'active',
+        startNow: true,
       });
       expect((await retainerTemplate(paused.retainer.id)).run).toMatchObject({
         trigger: 'cycle_opened',
@@ -913,9 +916,7 @@ describe('template runs', () => {
       const reactivated = await client.post(
         `/api/retainers/${ended.retainer.id}/status`,
         cast.gm.cookie,
-        {
-          status: 'active',
-        },
+        { status: 'active', startNow: true },
       );
       expect(reactivated.status).toBe(200);
       expect((await retainerTemplate(ended.retainer.id)).run).toMatchObject({
@@ -924,19 +925,19 @@ describe('template runs', () => {
       });
     });
 
-    it('generates the next month on the daily job without a creator, once', async () => {
+    it('generates the next cycle on the daily job without a creator, once', async () => {
       const { retainer, cycle, lines } = await startedRetainer();
       await linkTemplate(retainer.id, cast.am.cookie, monthlyTemplate);
       const job = app.get(RetainerCyclesService);
-      await job.runDaily(nextMonth);
+      await job.runDaily(nextCycle);
 
       const state = await retainerTemplate(retainer.id);
-      expect(state.cycle).toMatchObject({ month: nextMonth, periodStart: nextMonth });
+      expect(state.cycle).toMatchObject({ number: 2, periodStart: nextCycle });
       expect(state.run).toMatchObject({ trigger: 'cycle_opened', taskCount: 17, createdBy: null });
       const runId = state.run?.id ?? '';
       const created = await runTasks(runId);
       expect(created.every((task) => task.createdById === null)).toBe(true);
-      expect(created.every((task) => task.dueDate >= nextMonth)).toBe(true);
+      expect(created.every((task) => task.dueDate >= nextCycle)).toBe(true);
       expect(await auditOf(runId)).toMatchObject([
         { action: 'template_run.created', actorId: null },
       ]);
@@ -955,7 +956,7 @@ describe('template runs', () => {
       expect(system.every((edge) => edge.createdById === null)).toBe(true);
 
       // Idempotent: another run of the job adds nothing.
-      await job.runDaily(nextMonth);
+      await job.runDaily(nextCycle);
       expect(await cycleRuns(state.cycle?.id ?? '')).toHaveLength(1);
 
       // The closed month takes no more runs.

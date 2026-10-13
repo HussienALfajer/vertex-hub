@@ -48,7 +48,7 @@ import { useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LoadError } from '../../components/load-error';
 import { can, canAll, scopesOf, useMe } from '../../lib/auth';
-import { formatMonth, formatNumber } from '../../lib/format';
+import { formatCalendarDate, formatNumber } from '../../lib/format';
 import {
   ALL,
   flagParam,
@@ -68,7 +68,10 @@ import { userListQuery } from '../users/users.queries';
 import {
   BehindBadge,
   CycleCounters,
+  cycleHeadline,
+  cyclePeriodLine,
   DeliveryRate,
+  noCycleLine,
   PendingApprovalBadge,
   RenewalBadge,
   RetainerStatusBadge,
@@ -556,7 +559,7 @@ function RetainersTable({ retainers, archived }: { retainers: Retainer[]; archiv
           <TableHead>{t('retainers.columns.accountManager')}</TableHead>
           <TableHead>{t('projects.columns.departments')}</TableHead>
           <TableHead>{t('projects.columns.status')}</TableHead>
-          <TableHead>{t('retainers.columns.thisMonth')}</TableHead>
+          <TableHead>{t('retainers.columns.thisCycle')}</TableHead>
           <TableHead>{t('retainers.columns.deliveryRate')}</TableHead>
         </TableRow>
       </TableHeader>
@@ -596,7 +599,9 @@ function RetainersTable({ retainers, archived }: { retainers: Retainer[]; archiv
                 {archived && <ArchivedBadge />}
                 {retainer.term && (
                   <span className="text-xs text-muted-foreground">
-                    {t('retainers.terms.until', { month: formatMonth(retainer.term.endMonth) })}
+                    {t('retainers.terms.until', {
+                      date: formatCalendarDate(retainer.term.endDate),
+                    })}
                     {' · '}
                     {t(`retainers.terms.endActions.${retainer.term.endAction}`)}
                   </span>
@@ -606,13 +611,18 @@ function RetainersTable({ retainers, archived }: { retainers: Retainer[]; archiv
             <TableCell className="min-w-56 whitespace-normal">
               {retainer.currentCycle ? (
                 <span className="flex flex-col items-start gap-1.5">
+                  <span className="text-xs text-muted-foreground">
+                    {cycleHeadline(t, retainer.currentCycle)}
+                    {' · '}
+                    {cyclePeriodLine(t, retainer.currentCycle)}
+                  </span>
                   <CycleCounters lines={retainer.currentCycle.lines} />
                   {retainer.currentCycle.behind && <BehindBadge />}
                 </span>
               ) : (
                 <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
                   <RepeatIcon aria-hidden="true" className="size-4" />
-                  {t('retainers.noOpenCycle')}
+                  {noCycleLine(t, retainer)}
                 </span>
               )}
             </TableCell>

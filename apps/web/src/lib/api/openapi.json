@@ -21637,6 +21637,16 @@
                     "minimum": 1,
                     "maximum": 9007199254740991
                   },
+                  "startDate": {
+                    "type": "string",
+                    "format": "date",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                  },
+                  "endDate": {
+                    "type": "string",
+                    "format": "date",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                  },
                   "startMonth": {
                     "type": "string",
                     "format": "date",
@@ -21651,9 +21661,7 @@
                 "required": [
                   "retainer",
                   "client",
-                  "termNumber",
-                  "startMonth",
-                  "endMonth"
+                  "termNumber"
                 ],
                 "additionalProperties": false
               }
@@ -25956,9 +25964,15 @@
             "nullable": true,
             "allOf": [
               {
-                "$ref": "#/components/schemas/Cycle"
+                "$ref": "#/components/schemas/CurrentCycle"
               }
             ]
+          },
+          "nextCycleStart": {
+            "nullable": true,
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
           }
         },
         "required": [
@@ -25972,7 +25986,8 @@
           "renewal",
           "term",
           "pendingAmendments",
-          "currentCycle"
+          "currentCycle",
+          "nextCycleStart"
         ],
         "additionalProperties": false
       },
@@ -25999,20 +26014,25 @@
           "status": {
             "$ref": "#/components/schemas/TermStatus"
           },
-          "startMonth": {
-            "type": "string",
-            "format": "date",
-            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
-          },
-          "endMonth": {
-            "type": "string",
-            "format": "date",
-            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
-          },
-          "months": {
+          "startCycle": {
             "type": "integer",
             "minimum": 1,
             "maximum": 9007199254740991
+          },
+          "cycles": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "startDate": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+          },
+          "endDate": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
           },
           "endAction": {
             "$ref": "#/components/schemas/TermEndAction"
@@ -26042,9 +26062,10 @@
           "id",
           "number",
           "status",
-          "startMonth",
-          "endMonth",
-          "months",
+          "startCycle",
+          "cycles",
+          "startDate",
+          "endDate",
           "endAction"
         ],
         "additionalProperties": false
@@ -26058,7 +26079,7 @@
           "cancelled"
         ]
       },
-      "Cycle": {
+      "CurrentCycle": {
         "type": "object",
         "properties": {
           "id": {
@@ -26071,10 +26092,10 @@
             "format": "uuid",
             "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
           },
-          "month": {
-            "type": "string",
-            "format": "date",
-            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+          "number": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
           },
           "periodStart": {
             "type": "string",
@@ -26088,6 +26109,12 @@
           },
           "status": {
             "$ref": "#/components/schemas/CycleStatus"
+          },
+          "backdated": {
+            "type": "boolean"
+          },
+          "untracked": {
+            "type": "boolean"
           },
           "closedAt": {
             "nullable": true,
@@ -26109,19 +26136,41 @@
             "items": {
               "$ref": "#/components/schemas/CycleLine"
             }
+          },
+          "daysLeft": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "termPosition": {
+            "nullable": true,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "termCycles": {
+            "nullable": true,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
           }
         },
         "required": [
           "id",
           "retainerId",
-          "month",
+          "number",
           "periodStart",
           "periodEnd",
           "status",
+          "backdated",
+          "untracked",
           "closedAt",
           "deliveryRate",
           "behind",
-          "lines"
+          "lines",
+          "daysLeft",
+          "termPosition",
+          "termCycles"
         ],
         "additionalProperties": false
       },
@@ -26294,9 +26343,15 @@
             "nullable": true,
             "allOf": [
               {
-                "$ref": "#/components/schemas/Cycle"
+                "$ref": "#/components/schemas/CurrentCycle"
               }
             ]
+          },
+          "nextCycleStart": {
+            "nullable": true,
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
           },
           "startDate": {
             "type": "string",
@@ -26362,6 +26417,7 @@
           "term",
           "pendingAmendments",
           "currentCycle",
+          "nextCycleStart",
           "startDate",
           "endedOn",
           "deliverables",
@@ -26464,12 +26520,6 @@
             "format": "date",
             "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
           },
-          "renewalDate": {
-            "nullable": true,
-            "type": "string",
-            "format": "date",
-            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
-          },
           "currency": {
             "allOf": [
               {
@@ -26507,7 +26557,8 @@
           "departments",
           "startDate",
           "clientId"
-        ]
+        ],
+        "additionalProperties": false
       },
       "NewDeliverableLine": {
         "type": "object",
@@ -26540,7 +26591,7 @@
       "RetainerTermInput": {
         "type": "object",
         "properties": {
-          "months": {
+          "cycles": {
             "type": "integer",
             "minimum": 1,
             "maximum": 36
@@ -26570,7 +26621,7 @@
           }
         },
         "required": [
-          "months",
+          "cycles",
           "agreedTotalMinor",
           "schedule"
         ]
@@ -26594,12 +26645,6 @@
             "format": "date",
             "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
           },
-          "renewalDate": {
-            "nullable": true,
-            "type": "string",
-            "format": "date",
-            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
-          },
           "currency": {
             "allOf": [
               {
@@ -26613,7 +26658,8 @@
             "minimum": 0,
             "maximum": 9007199254740991
           }
-        }
+        },
+        "additionalProperties": false
       },
       "RetainerDeliverables": {
         "type": "object",
@@ -26690,6 +26736,9 @@
                 "$ref": "#/components/schemas/RetainerTermination"
               }
             ]
+          },
+          "startNow": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -26747,7 +26796,82 @@
           "pageSize"
         ],
         "additionalProperties": false,
-        "description": "Cycles, newest month first"
+        "description": "Cycles, newest first"
+      },
+      "Cycle": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "retainerId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "number": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "periodStart": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+          },
+          "periodEnd": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+          },
+          "status": {
+            "$ref": "#/components/schemas/CycleStatus"
+          },
+          "backdated": {
+            "type": "boolean"
+          },
+          "untracked": {
+            "type": "boolean"
+          },
+          "closedAt": {
+            "nullable": true,
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "deliveryRate": {
+            "nullable": true,
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "behind": {
+            "type": "boolean"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CycleLine"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "retainerId",
+          "number",
+          "periodStart",
+          "periodEnd",
+          "status",
+          "backdated",
+          "untracked",
+          "closedAt",
+          "deliveryRate",
+          "behind",
+          "lines"
+        ],
+        "additionalProperties": false
       },
       "CycleDetail": {
         "type": "object",
@@ -26762,10 +26886,10 @@
             "format": "uuid",
             "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
           },
-          "month": {
-            "type": "string",
-            "format": "date",
-            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+          "number": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
           },
           "periodStart": {
             "type": "string",
@@ -26779,6 +26903,12 @@
           },
           "status": {
             "$ref": "#/components/schemas/CycleStatus"
+          },
+          "backdated": {
+            "type": "boolean"
+          },
+          "untracked": {
+            "type": "boolean"
           },
           "closedAt": {
             "nullable": true,
@@ -26805,10 +26935,12 @@
         "required": [
           "id",
           "retainerId",
-          "month",
+          "number",
           "periodStart",
           "periodEnd",
           "status",
+          "backdated",
+          "untracked",
           "closedAt",
           "deliveryRate",
           "behind",
@@ -27046,20 +27178,25 @@
           "status": {
             "$ref": "#/components/schemas/TermStatus"
           },
-          "startMonth": {
-            "type": "string",
-            "format": "date",
-            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
-          },
-          "endMonth": {
-            "type": "string",
-            "format": "date",
-            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
-          },
-          "months": {
+          "startCycle": {
             "type": "integer",
             "minimum": 1,
             "maximum": 9007199254740991
+          },
+          "cycles": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "startDate": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+          },
+          "endDate": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
           },
           "endAction": {
             "$ref": "#/components/schemas/TermEndAction"
@@ -27123,7 +27260,7 @@
           "schedule": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/RetainerTermMonth"
+              "$ref": "#/components/schemas/RetainerTermCycle"
             }
           }
         },
@@ -27131,9 +27268,10 @@
           "id",
           "number",
           "status",
-          "startMonth",
-          "endMonth",
-          "months",
+          "startCycle",
+          "cycles",
+          "startDate",
+          "endDate",
           "endAction",
           "renewedFrom",
           "cancelledAt",
@@ -27143,10 +27281,20 @@
         ],
         "additionalProperties": false
       },
-      "RetainerTermMonth": {
+      "RetainerTermCycle": {
         "type": "object",
         "properties": {
-          "month": {
+          "cycle": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "periodStart": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+          },
+          "periodEnd": {
             "type": "string",
             "format": "date",
             "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
@@ -27201,7 +27349,9 @@
           }
         },
         "required": [
-          "month",
+          "cycle",
+          "periodStart",
+          "periodEnd",
           "position",
           "chargeId",
           "status",
@@ -27220,7 +27370,7 @@
       "CreateRetainerTerm": {
         "type": "object",
         "properties": {
-          "months": {
+          "cycles": {
             "type": "integer",
             "minimum": 1,
             "maximum": 36
@@ -27248,23 +27398,23 @@
               }
             ]
           },
-          "startMonth": {
-            "type": "string",
-            "format": "date",
-            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+          "startCycle": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1200
           }
         },
         "required": [
-          "months",
+          "cycles",
           "agreedTotalMinor",
           "schedule",
-          "startMonth"
+          "startCycle"
         ]
       },
       "UpdateRetainerTerm": {
         "type": "object",
         "properties": {
-          "months": {
+          "cycles": {
             "type": "integer",
             "minimum": 1,
             "maximum": 36
@@ -27291,10 +27441,10 @@
               }
             ]
           },
-          "startMonth": {
-            "type": "string",
-            "format": "date",
-            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+          "startCycle": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1200
           }
         }
       },
@@ -27384,7 +27534,12 @@
               }
             ]
           },
-          "effectiveMonth": {
+          "effectiveCycle": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "effectiveDate": {
             "type": "string",
             "format": "date",
             "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
@@ -27499,10 +27654,10 @@
                 "items": {
                   "type": "object",
                   "properties": {
-                    "month": {
-                      "type": "string",
-                      "format": "date",
-                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                    "cycle": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
                     },
                     "amountMinor": {
                       "type": "integer",
@@ -27511,7 +27666,7 @@
                     }
                   },
                   "required": [
-                    "month",
+                    "cycle",
                     "amountMinor"
                   ],
                   "additionalProperties": false
@@ -27532,7 +27687,8 @@
           "number",
           "kind",
           "scope",
-          "effectiveMonth",
+          "effectiveCycle",
+          "effectiveDate",
           "status",
           "reason",
           "lines",
@@ -27555,7 +27711,7 @@
       "AmendmentScope": {
         "type": "string",
         "enum": [
-          "month",
+          "cycle",
           "onward"
         ]
       },
@@ -27606,7 +27762,17 @@
       "AmendmentEffect": {
         "type": "object",
         "properties": {
-          "month": {
+          "cycle": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "periodStart": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+          },
+          "periodEnd": {
             "type": "string",
             "format": "date",
             "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
@@ -27656,7 +27822,9 @@
           }
         },
         "required": [
-          "month",
+          "cycle",
+          "periodStart",
+          "periodEnd",
           "effect",
           "invoice"
         ],
@@ -27679,10 +27847,10 @@
           "scope": {
             "$ref": "#/components/schemas/AmendmentScope"
           },
-          "effectiveMonth": {
-            "type": "string",
-            "format": "date",
-            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+          "effectiveCycle": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1200
           },
           "lines": {
             "maxItems": 20,
@@ -27705,7 +27873,7 @@
         },
         "required": [
           "scope",
-          "effectiveMonth",
+          "effectiveCycle",
           "reason"
         ]
       },
@@ -27740,7 +27908,7 @@
       "AmendmentPreview": {
         "type": "object",
         "properties": {
-          "months": {
+          "cycles": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/AmendmentEffect"
@@ -27756,7 +27924,7 @@
           }
         },
         "required": [
-          "months",
+          "cycles",
           "moneyDeltaMinor",
           "needsApproval"
         ],
@@ -27794,10 +27962,10 @@
             "items": {
               "type": "object",
               "properties": {
-                "month": {
-                  "type": "string",
-                  "format": "date",
-                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                "cycle": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1200
                 },
                 "amountMinor": {
                   "type": "integer",
@@ -27806,7 +27974,7 @@
                 }
               },
               "required": [
-                "month",
+                "cycle",
                 "amountMinor"
               ]
             }
@@ -27884,7 +28052,12 @@
               }
             ]
           },
-          "effectiveMonth": {
+          "effectiveCycle": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "effectiveDate": {
             "type": "string",
             "format": "date",
             "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
@@ -27999,10 +28172,10 @@
                 "items": {
                   "type": "object",
                   "properties": {
-                    "month": {
-                      "type": "string",
-                      "format": "date",
-                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                    "cycle": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
                     },
                     "amountMinor": {
                       "type": "integer",
@@ -28011,7 +28184,7 @@
                     }
                   },
                   "required": [
-                    "month",
+                    "cycle",
                     "amountMinor"
                   ],
                   "additionalProperties": false
@@ -28072,7 +28245,8 @@
           "number",
           "kind",
           "scope",
-          "effectiveMonth",
+          "effectiveCycle",
+          "effectiveDate",
           "status",
           "reason",
           "lines",
@@ -34298,7 +34472,17 @@
                   ],
                   "additionalProperties": false
                 },
-                "month": {
+                "cycle": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "periodStart": {
+                  "type": "string",
+                  "format": "date",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                },
+                "periodEnd": {
                   "type": "string",
                   "format": "date",
                   "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
@@ -34315,7 +34499,9 @@
               "required": [
                 "id",
                 "retainer",
-                "month",
+                "cycle",
+                "periodStart",
+                "periodEnd",
                 "kind",
                 "amountMinor"
               ],
@@ -36105,7 +36291,17 @@
             "format": "uuid",
             "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
           },
-          "month": {
+          "cycle": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "periodStart": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+          },
+          "periodEnd": {
             "type": "string",
             "format": "date",
             "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
@@ -36135,7 +36331,7 @@
                 "minimum": 1,
                 "maximum": 9007199254740991
               },
-              "months": {
+              "cycles": {
                 "type": "integer",
                 "minimum": 1,
                 "maximum": 9007199254740991
@@ -36144,7 +36340,7 @@
             "required": [
               "number",
               "position",
-              "months"
+              "cycles"
             ],
             "additionalProperties": false
           },
@@ -36187,7 +36383,9 @@
         },
         "required": [
           "id",
-          "month",
+          "cycle",
+          "periodStart",
+          "periodEnd",
           "kind",
           "amountMinor",
           "status",
@@ -38014,7 +38212,17 @@
                 "format": "uuid",
                 "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
               },
-              "month": {
+              "number": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "periodStart": {
+                "type": "string",
+                "format": "date",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+              },
+              "periodEnd": {
                 "type": "string",
                 "format": "date",
                 "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
@@ -38040,7 +38248,9 @@
             },
             "required": [
               "id",
-              "month",
+              "number",
+              "periodStart",
+              "periodEnd",
               "retainer"
             ],
             "additionalProperties": false
@@ -38229,10 +38439,10 @@
                 "format": "uuid",
                 "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
               },
-              "month": {
-                "type": "string",
-                "format": "date",
-                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+              "number": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
               },
               "periodStart": {
                 "type": "string",
@@ -38247,7 +38457,7 @@
             },
             "required": [
               "id",
-              "month",
+              "number",
               "periodStart",
               "periodEnd"
             ],
@@ -40103,12 +40313,6 @@
                 "format": "date",
                 "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
               },
-              "renewalDate": {
-                "nullable": true,
-                "type": "string",
-                "format": "date",
-                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
-              },
               "template": {
                 "nullable": true,
                 "type": "object",
@@ -40187,6 +40391,16 @@
                     "status": {
                       "$ref": "#/components/schemas/RetainerStatus"
                     },
+                    "startDate": {
+                      "type": "string",
+                      "format": "date",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                    },
+                    "renewsFromCycle": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    },
                     "renewsFrom": {
                       "type": "string",
                       "format": "date",
@@ -40200,6 +40414,8 @@
                     "id",
                     "name",
                     "status",
+                    "startDate",
+                    "renewsFromCycle",
                     "renewsFrom",
                     "afterTerm"
                   ],
@@ -40211,7 +40427,6 @@
               "name",
               "departments",
               "startDate",
-              "renewalDate",
               "template",
               "currency",
               "monthlyFeeMinor",
@@ -40264,7 +40479,7 @@
         "nullable": true,
         "type": "object",
         "properties": {
-          "months": {
+          "cycles": {
             "type": "integer",
             "minimum": 1,
             "maximum": 36
@@ -40289,7 +40504,7 @@
           }
         },
         "required": [
-          "months",
+          "cycles",
           "agreedTotalMinor",
           "schedule",
           "endAction"
@@ -40597,12 +40812,6 @@
                     "format": "date",
                     "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
                   },
-                  "renewalDate": {
-                    "nullable": true,
-                    "type": "string",
-                    "format": "date",
-                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
-                  },
                   "templateId": {
                     "nullable": true,
                     "type": "string",
@@ -40624,9 +40833,9 @@
                   "name",
                   "departments",
                   "startDate",
-                  "renewalDate",
                   "templateId"
-                ]
+                ],
+                "additionalProperties": false
               },
               {
                 "type": "object",
@@ -47188,6 +47397,21 @@
                   ],
                   "additionalProperties": false
                 },
+                "cycle": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "periodStart": {
+                  "type": "string",
+                  "format": "date",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                },
+                "periodEnd": {
+                  "type": "string",
+                  "format": "date",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                },
                 "status": {
                   "$ref": "#/components/schemas/CycleStatus"
                 },
@@ -47239,6 +47463,9 @@
               },
               "required": [
                 "retainer",
+                "cycle",
+                "periodStart",
+                "periodEnd",
                 "status",
                 "lines",
                 "completion"

@@ -562,7 +562,6 @@ describe('lead conversion and quotes on leads (F03 rules 8, 10, 11, 14–16)', (
         name: `عقد ${cast.run}`,
         departments: ['design'],
         startDate: businessDate(),
-        renewalDate: null,
         templateId: null,
       },
     });

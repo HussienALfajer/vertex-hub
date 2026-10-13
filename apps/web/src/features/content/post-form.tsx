@@ -48,7 +48,7 @@ import { FormAlert } from '../../components/form-alert';
 import { ApiError } from '../../lib/api/client';
 import { useMe } from '../../lib/auth';
 import { errorMessage, fieldError, SCREEN_ERROR } from '../../lib/errors';
-import { formatMonth, formatNumber } from '../../lib/format';
+import { formatNumber } from '../../lib/format';
 import { clientQuery } from '../clients/clients.queries';
 import { lineName } from '../retainers/retainer-badges';
 import { retainerListQuery } from '../retainers/retainers.queries';
@@ -445,7 +445,9 @@ export function useCycleLineOptions(clientId: string) {
           label: t('content.form.cycleLineOption', {
             line: lineName(t, line),
             retainer: retainer.name,
-            month: formatMonth(retainer.currentCycle?.month ?? ''),
+            cycle: t('retainers.cycleNumber', {
+              number: formatNumber(retainer.currentCycle?.number ?? 0),
+            }),
           }),
         }))
       : [],

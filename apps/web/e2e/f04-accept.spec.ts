@@ -1,6 +1,4 @@
-import { addMonths, businessDate, firstOfMonth } from '@vertex-hub/contracts';
 import ar from '../src/i18n/locales/ar.json' with { type: 'json' };
-import { formatMonth } from '../src/lib/format';
 import { accountManagerMe, manager, mockApi, seedIds } from './fixtures';
 import { expect, test } from './test';
 
@@ -8,6 +6,13 @@ import { expect, test } from './test';
 
 const fill = (text: string, values: Record<string, string>) =>
   Object.entries(values).reduce((out, [key, value]) => out.replace(`{{${key}}}`, value), text);
+
+/** F05C: "cycle N (from …)" as the accept dialog names where a renewal starts. */
+const cycleFrom = (number: string, date: string) =>
+  fill(ar.quotes.accept.retainer.cycleFrom, {
+    cycle: fill(ar.retainers.cycleNumber, { number }),
+    date,
+  });
 
 test('a quote with both sections is built, sent and accepted, landing on the new project', async ({
   page,
@@ -101,11 +106,11 @@ test('unticking the template makes the installments the milestones; renew keeps 
   await expect(accept.getByText(ar.quotes.accept.errors.retainer)).toBeVisible();
   await accept.getByRole('combobox', { name: ar.quotes.accept.retainer.renewed }).click();
   await page.getByRole('option', { name: 'إدارة السوشيال ميديا' }).click();
-  // F05B Q2: an open-ended retainer renews next month.
+  // F05B Q2, F05C: an open-ended retainer renews at its next cycle (from 1 March: cycle 9).
   await expect(
     accept.getByText(
       fill(ar.quotes.accept.retainer.renewFrom, {
-        month: formatMonth(addMonths(firstOfMonth(businessDate()), 1)),
+        cycle: cycleFrom('9', '1 تشرين الثاني 2026'),
       }),
     ),
   ).toBeVisible();
@@ -170,7 +175,6 @@ test('renewing a retainer with a running term starts the new term after it (F05B
 }) => {
   await mockApi(page, { signedIn: true, me: manager });
   await page.goto(`/quotes/${seedIds.sentQuote}`);
-  const month = firstOfMonth(businessDate());
   const termCreated = await page.evaluate(
     async ({ retainerId, body }) =>
       (
@@ -182,7 +186,8 @@ test('renewing a retainer with a running term starts the new term after it (F05B
       ).status,
     {
       retainerId: seedIds.socialRetainer,
-      body: { startMonth: month, months: 2, agreedTotalMinor: 100000, schedule: [50000, 50000] },
+      // The current cycle (8) and the next: the renewal starts at cycle 10.
+      body: { startCycle: 8, cycles: 2, agreedTotalMinor: 100000, schedule: [50000, 50000] },
     },
   );
   expect(termCreated).toBe(201);
@@ -196,20 +201,20 @@ test('renewing a retainer with a running term starts the new term after it (F05B
   await accept.getByRole('button', { name: ar.quotes.accept.retainer.modes.renew }).click();
   await accept.getByRole('combobox', { name: ar.quotes.accept.retainer.renewed }).click();
   await page.getByRole('option', { name: 'إدارة السوشيال ميديا' }).click();
-  const after = formatMonth(addMonths(month, 2));
+  const after = cycleFrom('10', '1 كانون الأول 2026');
   await expect(
-    accept.getByText(fill(ar.quotes.accept.retainer.renewFrom, { month: after })),
+    accept.getByText(fill(ar.quotes.accept.retainer.renewFrom, { cycle: after })),
   ).toBeVisible();
   await expect(
-    accept.getByText(fill(ar.quotes.accept.retainer.renewAfterTerm, { month: after })),
+    accept.getByText(fill(ar.quotes.accept.retainer.renewAfterTerm, { cycle: after })),
   ).toBeVisible();
-  // The quote's term (Q1) starts in that month.
+  // The quote's term (Q1) starts in that cycle.
   await expect(
-    accept.getByText(fill(ar.quotes.accept.retainer.termStarts, { month: after })),
+    accept.getByText(fill(ar.quotes.accept.retainer.termStarts, { cycle: after })),
   ).toBeVisible();
-  // Without a term, the running term continues monthly after it ends.
+  // Without a term, the running term continues cycle by cycle after it ends.
   await accept.getByRole('switch', { name: ar.retainers.terms.enable }).click();
   await expect(
-    accept.getByText(fill(ar.quotes.accept.retainer.renewContinue, { month: after })),
+    accept.getByText(fill(ar.quotes.accept.retainer.renewContinue, { cycle: after })),
   ).toBeVisible();
 });

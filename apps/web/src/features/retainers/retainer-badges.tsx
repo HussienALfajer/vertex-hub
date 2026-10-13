@@ -1,8 +1,11 @@
-import type {
-  DeliverableKind,
-  RenewalState,
-  RetainerStatus,
-  RetainerTermSummary,
+import {
+  type CurrentCycle,
+  type DeliverableKind,
+  dayAfterTerm,
+  type RenewalState,
+  type Retainer,
+  type RetainerStatus,
+  type RetainerTermSummary,
 } from '@vertex-hub/contracts';
 import { Badge, cn, Meter } from '@vertex-hub/ui';
 import type { TFunction } from 'i18next';
@@ -24,7 +27,7 @@ import {
   VideoIcon,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { formatMonth, formatNumber } from '../../lib/format';
+import { formatCalendarDate, formatNumber, formatPeriod } from '../../lib/format';
 
 const statusTone = { active: 'info', paused: 'warning', ended: 'neutral' } as const;
 
@@ -38,7 +41,7 @@ export function RetainerStatusBadge({ status }: { status: RetainerStatus }) {
   );
 }
 
-/** R11: a line, or a cycle with a line, behind the pace of the month. */
+/** R11: a line, or a cycle with a line, behind the pace of its cycle. */
 export function BehindBadge() {
   const { t } = useTranslation();
   return (
@@ -71,7 +74,10 @@ export function PendingApprovalBadge({ count }: { count: number }) {
   );
 }
 
-/** F05B screen 2: "Term 2 · Nov 2026 – Jan 2027 · renews automatically". */
+/**
+ * F05B screen 2, F05C screen 2: "Term 2 · 20 Oct 2026 – 19 Apr 2027 · renews on 20 Apr 2027",
+ * or its end action when it does not renew.
+ */
 export function TermChip({ term }: { term: RetainerTermSummary }) {
   const { t } = useTranslation();
   return (
@@ -79,15 +85,49 @@ export function TermChip({ term }: { term: RetainerTermSummary }) {
       <CalendarRangeIcon aria-hidden="true" />
       {t('retainers.terms.chip', {
         number: formatNumber(term.number),
-        start: formatMonth(term.startMonth),
-        end: formatMonth(term.endMonth),
+        start: formatCalendarDate(term.startDate),
+        end: formatCalendarDate(term.endDate),
       })}
       {' · '}
       {term.status === 'scheduled'
         ? t('retainers.terms.statuses.scheduled')
-        : t(`retainers.terms.endActions.${term.endAction}`)}
+        : term.endAction === 'renew'
+          ? t('retainers.terms.renewsOn', {
+              date: formatCalendarDate(dayAfterTerm(term.endDate)),
+            })
+          : t(`retainers.terms.endActions.${term.endAction}`)}
     </Badge>
   );
+}
+
+/** F05C Y6: "Cycle 3 of 6" in a term, "Cycle 7" without one. */
+export function cycleHeadline(t: TFunction, cycle: CurrentCycle): string {
+  return cycle.termPosition !== null && cycle.termCycles !== null
+    ? t('retainers.cycleOf', {
+        position: formatNumber(cycle.termPosition),
+        cycles: formatNumber(cycle.termCycles),
+      })
+    : t('retainers.cycleNumber', { number: formatNumber(cycle.number) });
+}
+
+/** F05C Y6: "20 Oct – 19 Nov · 6 days left". */
+export function cyclePeriodLine(t: TFunction, cycle: CurrentCycle): string {
+  return `${formatPeriod(cycle.periodStart, cycle.periodEnd)} · ${t('retainers.daysLeft', {
+    count: cycle.daysLeft,
+    n: formatNumber(cycle.daysLeft),
+  })}`;
+}
+
+/**
+ * F05C Y6: without an open cycle, when the next one opens: "Paused · next cycle starts …", or
+ * the next cycle's day after a resume "from the next cycle", or none.
+ */
+export function noCycleLine(t: TFunction, retainer: Retainer): string {
+  if (!retainer.nextCycleStart) return t('retainers.noOpenCycle');
+  const date = formatCalendarDate(retainer.nextCycleStart);
+  return retainer.status === 'paused'
+    ? t('retainers.pausedNextCycle', { date })
+    : t('retainers.nextCycleOn', { date });
 }
 
 /** R6: renewal due from 30 days before the date, overdue after it. */

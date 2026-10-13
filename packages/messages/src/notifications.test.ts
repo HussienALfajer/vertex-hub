@@ -103,8 +103,8 @@ const SAMPLES: Record<NotificationType, unknown> = {
     retainer: 'عقد شهري',
     client: 'مطعم الشام',
     termNumber: 2,
-    startMonth: '2026-11-01',
-    endMonth: '2027-01-01',
+    startDate: '2026-11-20',
+    endDate: '2027-02-19',
   },
   retainer_amendment_pending: {
     retainer: 'عقد شهري',
@@ -192,13 +192,29 @@ describe('notification texts', () => {
 
   it('names three behind lines, then how many more', () => {
     const { text, context } = notificationText(sample('retainer_behind'), departmentName);
-    expect(text).toBe('عقد «عقد شهري» متأخر: بقيت 3 أيام على نهاية الشهر');
+    expect(text).toBe('عقد «عقد شهري» متأخر: بقيت 3 أيام على نهاية الدورة');
     expect(context).toBe('مطعم الشام · تصاميم 2/12 (1 جاهزة)، ريلز العروض 0/4، ستوري 1/8، +1');
   });
 
   it('names a renewed term and the end action of a renewal (F05B)', () => {
     const renewed = notificationText(sample('retainer_term_renewed'), departmentName);
     expect(renewed.text).toBe(
+      'جُدّد عقد «عقد شهري» تلقائيًا: المدة 2 من 20 تشرين الثاني 2026 إلى 19 شباط 2027',
+    );
+    // Sent before F05C: the term's first and last months.
+    const older = notificationText(
+      sample('retainer_term_renewed', {
+        data: {
+          retainer: 'عقد شهري',
+          client: 'مطعم الشام',
+          termNumber: 2,
+          startMonth: '2026-11-01',
+          endMonth: '2027-01-01',
+        },
+      } as Partial<Notification>),
+      departmentName,
+    );
+    expect(older.text).toBe(
       'جُدّد عقد «عقد شهري» تلقائيًا: المدة 2 من تشرين الثاني 2026 إلى كانون الثاني 2027',
     );
     const due = notificationText(sample('retainer_renewal_due'), departmentName);

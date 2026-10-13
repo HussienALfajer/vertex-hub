@@ -426,15 +426,19 @@ export const NOTIFICATION_DATA_SCHEMAS = {
     retainer: nameSchema,
     client: nameSchema,
     termNumber: z.number().int().min(1),
-    startMonth: calendarDateSchema,
-    endMonth: calendarDateSchema,
+    /** F05C: the term's first and last day. */
+    startDate: calendarDateSchema.optional(),
+    endDate: calendarDateSchema.optional(),
+    /** Notifications sent before F05C name the term's first and last months instead. */
+    startMonth: calendarDateSchema.optional(),
+    endMonth: calendarDateSchema.optional(),
   }),
   /** F05B A4: an amendment that reduces agreed amounts waits for the General Manager. */
   retainer_amendment_pending: z.object({
     retainer: nameSchema,
     client: nameSchema,
     number: z.number().int().min(1),
-    /** Negative: the reduction over the months it affects. */
+    /** Negative: the reduction over the cycles it affects. */
     moneyDeltaMinor: signedMinorAmountSchema,
     currency: currencySchema,
     creator: nameSchema,

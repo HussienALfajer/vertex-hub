@@ -83,7 +83,7 @@ export interface CycleLink {
   retainerName: string;
   clientId: string;
   status: CycleStatus;
-  month: string;
+  number: number;
   periodStart: string;
   periodEnd: string;
   retainerArchived: boolean;
@@ -229,7 +229,7 @@ export class EngagementDirectory {
         retainerName: retainers.name,
         clientId: retainers.clientId,
         status: retainerCycles.status,
-        month: retainerCycles.month,
+        number: retainerCycles.number,
         periodStart: retainerCycles.periodStart,
         periodEnd: retainerCycles.periodEnd,
         retainerArchivedAt: retainers.archivedAt,
@@ -238,8 +238,9 @@ export class EngagementDirectory {
       .innerJoin(retainers, eq(retainers.id, retainerCycles.retainerId))
       .where(inArray(retainerCycles.id, unique));
     return byId(
-      rows.map(({ retainerArchivedAt, ...row }) => ({
+      rows.map(({ retainerArchivedAt, number, ...row }) => ({
         ...row,
+        number: number ?? 0,
         retainerArchived: !!retainerArchivedAt,
       })),
     );
@@ -294,19 +295,19 @@ export class EngagementDirectory {
   async openCycle(
     retainerId: string,
     executor: Executor = this.db,
-  ): Promise<{ id: string; month: string; periodStart: string; periodEnd: string } | null> {
+  ): Promise<{ id: string; number: number; periodStart: string; periodEnd: string } | null> {
     const [row] = await executor
       .select({
         id: retainerCycles.id,
-        month: retainerCycles.month,
+        number: retainerCycles.number,
         periodStart: retainerCycles.periodStart,
         periodEnd: retainerCycles.periodEnd,
       })
       .from(retainerCycles)
       .where(and(eq(retainerCycles.retainerId, retainerId), eq(retainerCycles.status, 'open')))
-      .orderBy(desc(retainerCycles.month))
+      .orderBy(desc(retainerCycles.number))
       .limit(1);
-    return row ?? null;
+    return row ? { ...row, number: row.number ?? 0 } : null;
   }
 
   /** Locks a cycle row until the transaction ends, so line changes wait (F07 rule 18). */

@@ -16,7 +16,7 @@ import {
   retainerDetailSchema,
 } from '@vertex-hub/contracts';
 import type { Database } from '@vertex-hub/db';
-import { expect } from 'vitest';
+import { expect, vi } from 'vitest';
 import { type api, removeClients, removeUsers, seedUser } from './helpers.js';
 
 /*
@@ -115,6 +115,26 @@ export async function seedClientCast(db: Database, client: Api) {
     return retainerDetailSchema.parse(await response.json());
   }
 
+  /**
+   * Runs `body` with the clock on `day` at noon in Damascus (the API runs in this process),
+   * signed in as an operations manager whose session starts that day: sessions from today would
+   * look expired (F05C tests of later cycles).
+   */
+  async function onDay<T>(day: string, body: (cookie: string) => Promise<T>): Promise<T> {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      vi.setSystemTime(new Date(`${day}T09:00:00.000Z`));
+      const manager = track(
+        await client.signInWithTwoFactor(db, {
+          departments: [{ code: 'internal_operations', manager: true }],
+        }),
+      );
+      return await body(manager.cookie);
+    } finally {
+      vi.useRealTimers();
+    }
+  }
+
   return {
     run,
     gm,
@@ -128,6 +148,7 @@ export async function seedClientCast(db: Database, client: Api) {
     createContact,
     createProject,
     createRetainer,
+    onDay,
     /** Tracks a client created some other way, for cleanup. */
     trackClient: (id: string) => clients.push(id),
     /** The clients cleanup will remove. */

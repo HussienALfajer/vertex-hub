@@ -1,13 +1,14 @@
 import { standardSchemaResolver } from '@hookform/resolvers/standard-schema';
 import { Link, useNavigate } from '@tanstack/react-router';
 import {
-  addMonths,
   businessDate,
   type ClientResponse,
   type CreateRetainer,
   type CreateRetainerInput,
   createRetainerSchema,
-  firstOfMonth,
+  cyclePeriod,
+  dayAfterTerm,
+  termEndDate,
 } from '@vertex-hub/contracts';
 import {
   AscentLines,
@@ -27,9 +28,8 @@ import { FormAlert } from '../../components/form-alert';
 import { FormSection } from '../../components/form-section';
 import { UnsavedChangesGuard } from '../../components/unsaved-changes-guard';
 import { useMe } from '../../lib/auth';
-import { SCREEN_ERROR } from '../../lib/errors';
 import { useFocusFirstError } from '../../lib/focus-first-invalid';
-import { formatCalendarDate, formatMonth, formatNumber } from '../../lib/format';
+import { formatCalendarDate, formatNumber, formatPeriod } from '../../lib/format';
 import { formatMoney } from '../../lib/money';
 import { idParam } from '../../lib/search-params';
 import { hasMoneyAccess } from '../projects/project-access';
@@ -41,8 +41,7 @@ import { DeliverableIcon, lineName, RetainerStatusBadge } from './retainer-badge
 import {
   ClientField,
   checkDuplicateLines,
-  checkRenewal,
-  DatesFields,
+  checkStartDate,
   DeliverablesEditor,
   type DeliverablesFormMethods,
   DepartmentsField,
@@ -50,6 +49,7 @@ import {
   NameField,
   type RetainerFormMethods,
   retainerFormFailure,
+  StartDateField,
 } from './retainer-form';
 import { useCreateRetainer } from './retainers.queries';
 import {
@@ -95,7 +95,6 @@ export function NewRetainerPage({ search }: { search: NewRetainerSearch }) {
       name: '',
       departments: [],
       startDate: businessDate(),
-      renewalDate: null,
       currency: 'USD',
       monthlyFeeMinor: null,
       deliverables: [],
@@ -128,27 +127,14 @@ export function NewRetainerPage({ search }: { search: NewRetainerSearch }) {
 
   const submit = form.handleSubmit(async (values) => {
     setFailure(null);
-    const withTerm = money && term !== null;
-    // T2: a term starts in the start date's month, which is this month or later.
-    if (withTerm && firstOfMonth(values.startDate) < firstOfMonth(businessDate())) {
-      form.setError(
-        'startDate',
-        { type: SCREEN_ERROR, message: t('retainers.terms.errors.pastStart') },
-        { shouldFocus: true },
-      );
-      return;
-    }
-    const renewalOk = withTerm || checkRenewal(form, t, values.startDate, values.renewalDate);
+    const startOk = checkStartDate(form, t, values.startDate);
     const linesOk = checkDuplicateLines(linesForm, t, values.deliverables);
     const parsedTerm = checkTerm();
-    if (!renewalOk || !linesOk || (parsedTerm && isTermProblems(parsedTerm))) return;
+    if (!startOk || !linesOk || (parsedTerm && isTermProblems(parsedTerm))) return;
     // Without money access the API refuses money fields, so none are sent (M1). A term sets the
-    // renewal date (T11).
+    // renewal date (F05C T3').
     const input: CreateRetainer = money
-      ? {
-          ...values,
-          ...(parsedTerm && { term: parsedTerm, renewalDate: undefined }),
-        }
+      ? { ...values, ...(parsedTerm && { term: parsedTerm }) }
       : { ...values, currency: undefined, monthlyFeeMinor: undefined };
     try {
       const retainer = await create.mutateAsync(input);
@@ -190,7 +176,7 @@ export function NewRetainerPage({ search }: { search: NewRetainerSearch }) {
             <DepartmentsField form={form} />
           </FormSection>
           <FormSection title={t('retainers.form.term')} hint={t('retainers.form.termHint')}>
-            <DatesFields form={form} renewalLocked={money && term !== null} />
+            <StartDateField form={form} />
             <FirstCycleNote form={form} />
             {money && <MoneyFields form={form} />}
           </FormSection>
@@ -222,7 +208,7 @@ export function NewRetainerPage({ search }: { search: NewRetainerSearch }) {
   );
 }
 
-/** F05B screen 1: an optional fixed term that starts in the start date's month. */
+/** F05B screen 1, F05C T1': an optional fixed term of cycles from the retainer's first cycle. */
 function FixedTermSection({
   form,
   value,
@@ -238,7 +224,8 @@ function FixedTermSection({
   const id = useId();
   const start = useWatch({ control: form.control, name: 'startDate' });
   const currency = useWatch({ control: form.control, name: 'currency' }) ?? 'USD';
-  const startMonth = start ? firstOfMonth(start) : null;
+  const anchor = isDate(start) ? start : null;
+  const first = anchor ? cyclePeriod(anchor, 1) : null;
   return (
     <FormSection title={t('retainers.terms.sectionTitle')} hint={t('retainers.terms.sectionHint')}>
       <div className="flex items-center justify-between gap-4">
@@ -247,8 +234,10 @@ function FixedTermSection({
             {t('retainers.terms.enable')}
           </label>
           <p id={`${id}-hint`} className="text-sm text-muted-foreground">
-            {value && startMonth
-              ? t('retainers.terms.startsWith', { month: formatMonth(startMonth) })
+            {value && first
+              ? t('retainers.terms.startsWith', {
+                  period: formatPeriod(first.periodStart, first.periodEnd),
+                })
               : t('retainers.terms.enableHint')}
           </p>
         </div>
@@ -256,17 +245,14 @@ function FixedTermSection({
           id={id}
           aria-describedby={`${id}-hint`}
           checked={value !== null}
-          onCheckedChange={(checked) => {
-            onChange(checked ? EMPTY_TERM : null);
-            if (checked) form.setValue('renewalDate', null);
-          }}
+          onCheckedChange={(checked) => onChange(checked ? EMPTY_TERM : null)}
         />
       </div>
       {value && (
         <TermPlanEditor
           value={value}
           onChange={onChange}
-          startMonth={startMonth}
+          cycles={anchor ? { anchor, startCycle: 1 } : null}
           currency={currency}
           problems={problems}
         />
@@ -275,20 +261,29 @@ function FixedTermSection({
   );
 }
 
-/** R3 and R4: a start date today or earlier opens this month's cycle at once, with full quantities. */
+/** A complete `YYYY-MM-DD` date, as the date input gives it. */
+const isDate = (value: string | undefined): value is string =>
+  /^\d{4}-\d{2}-\d{2}$/.test(value ?? '');
+
+/**
+ * R3, R4, F05C Y1: a start date today or earlier opens the first cycle at once, a full month
+ * with full quantities.
+ */
 function FirstCycleNote({ form }: { form: RetainerFormMethods }) {
   const { t } = useTranslation();
   const start = useWatch({ control: form.control, name: 'startDate' });
-  if (!start) return null;
+  if (!isDate(start)) return null;
   const now = start <= businessDate();
+  const first = cyclePeriod(start, 1);
+  const period = formatPeriod(first.periodStart, first.periodEnd);
   return (
     <Callout
       icon={<CalendarPlusIcon />}
       title={now ? t('retainers.form.cycleNow') : t('retainers.form.cycleLater')}
       description={
         now
-          ? t('retainers.form.cycleNowBody')
-          : t('retainers.form.cycleLaterBody', { date: formatCalendarDate(start) })
+          ? t('retainers.form.cycleNowBody', { period })
+          : t('retainers.form.cycleLaterBody', { date: formatCalendarDate(start), period })
       }
     />
   );
@@ -353,26 +348,26 @@ function Preview({
             <dt className="text-xs text-muted-foreground">{t('retainers.form.term')}</dt>
             <dd className="flex items-center gap-2">
               <CalendarRangeIcon aria-hidden="true" className="size-4 text-muted-foreground" />
-              <span>
-                {values.renewalDate
-                  ? t('retainers.startRenewal', {
-                      start: formatCalendarDate(values.startDate),
-                      renewal: formatCalendarDate(values.renewalDate),
-                    })
-                  : t('retainers.startsOn', { date: formatCalendarDate(values.startDate) })}
-              </span>
+              <span>{t('retainers.startsOn', { date: formatCalendarDate(values.startDate) })}</span>
             </dd>
           </div>
         )}
-        {term && values.startDate && (term.months ?? 0) > 0 && (
+        {term && isDate(values.startDate) && (term.cycles ?? 0) > 0 && (
           <div className="flex flex-col gap-1">
             <dt className="text-xs text-muted-foreground">{t('retainers.terms.sectionTitle')}</dt>
             <dd className="flex flex-col gap-0.5">
               <span>
                 {t('retainers.terms.range', {
-                  start: formatMonth(firstOfMonth(values.startDate)),
-                  end: formatMonth(
-                    addMonths(firstOfMonth(values.startDate), (term.months ?? 1) - 1),
+                  start: formatCalendarDate(values.startDate),
+                  end: formatCalendarDate(
+                    termEndDate(values.startDate, 1, Math.min(term.cycles ?? 1, 36)),
+                  ),
+                })}
+              </span>
+              <span className="text-muted-foreground">
+                {t('retainers.terms.renewsOn', {
+                  date: formatCalendarDate(
+                    dayAfterTerm(termEndDate(values.startDate, 1, Math.min(term.cycles ?? 1, 36))),
                   ),
                 })}
               </span>
@@ -385,7 +380,7 @@ function Preview({
           </div>
         )}
         <div className="flex flex-col gap-2">
-          <dt className="text-xs text-muted-foreground">{t('retainers.new.perMonth')}</dt>
+          <dt className="text-xs text-muted-foreground">{t('retainers.new.perCycle')}</dt>
           <dd>
             {lines.length === 0 ? (
               <span className="text-muted-foreground">{t('retainers.noLines')}</span>

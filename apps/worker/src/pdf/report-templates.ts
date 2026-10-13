@@ -4,6 +4,7 @@ import {
   responseTimeText,
   REPORT_VALUE_LABELS as VALUES,
 } from '@vertex-hub/contracts';
+import { formatRetainerCycle } from '@vertex-hub/messages';
 import {
   documentHtml,
   escapeHtml,
@@ -49,7 +50,8 @@ export function clientReportHtml(snapshot: ClientReportSnapshot, assets: Templat
   for (const retainer of snapshot.retainers) {
     parts.push(
       section(
-        `${L.retainers}: ${escapeHtml(retainer.retainer.name)}`,
+        // F05C R4: each cycle overlapping the month, with its period.
+        `${L.retainers}: ${escapeHtml(retainer.retainer.name)} — ${escapeHtml(formatRetainerCycle({ number: retainer.cycle, periodStart: retainer.periodStart, periodEnd: retainer.periodEnd }))}`,
         table(
           [
             { label: L.kind },

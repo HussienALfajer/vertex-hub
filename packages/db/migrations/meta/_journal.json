@@ -379,6 +379,20 @@
       "when": 1791402495196,
       "tag": "0053_client_trade_name_spaces",
       "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "7",
+      "when": 1791910278487,
+      "tag": "0054_minor_exodus",
+      "breakpoints": true
+    },
+    {
+      "idx": 55,
+      "version": "7",
+      "when": 1791910315955,
+      "tag": "0055_f05c_cycles_backfill",
+      "breakpoints": true
     }
   ]
 }

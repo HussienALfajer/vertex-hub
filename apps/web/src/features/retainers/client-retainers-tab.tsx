@@ -12,13 +12,16 @@ import { useTranslation } from 'react-i18next';
 import { LoadError } from '../../components/load-error';
 import { TabHeader } from '../../components/tab-header';
 import { useMe } from '../../lib/auth';
-import { formatMonth, formatNumber } from '../../lib/format';
+import { formatNumber } from '../../lib/format';
 import { clientProjectsQuery } from '../projects/client-projects-tab';
 import { canCreateProjectFor } from '../projects/project-access';
 import {
   BehindBadge,
   CycleCounters,
+  cycleHeadline,
+  cyclePeriodLine,
   DeliveryRate,
+  noCycleLine,
   RenewalBadge,
   RetainerStatusBadge,
 } from './retainer-badges';
@@ -103,13 +106,13 @@ function RetainerCard({ retainer }: { retainer: Retainer }) {
         {cycle ? (
           <div className="flex flex-col gap-2">
             <p className="flex items-center gap-2 text-sm text-muted-foreground">
-              {formatMonth(cycle.month)}
+              {cycleHeadline(t, cycle)} · {cyclePeriodLine(t, cycle)}
               {cycle.behind && <BehindBadge />}
             </p>
             <CycleCounters lines={cycle.lines} />
           </div>
         ) : (
-          <p className="text-sm text-muted-foreground">{t('retainers.noOpenCycle')}</p>
+          <p className="text-sm text-muted-foreground">{noCycleLine(t, retainer)}</p>
         )}
         <div className="mt-auto flex items-center justify-between gap-3 border-t border-border pt-4 text-sm">
           <span className="text-muted-foreground">{t('retainers.columns.deliveryRate')}</span>

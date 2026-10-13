@@ -3,13 +3,12 @@ import type { INestApplication } from '@nestjs/common';
 import {
   type Amendment,
   addDays,
-  addMonths,
   amendmentPageSchema,
   amendmentPreviewSchema,
   amendmentSchema,
   businessDate,
+  cyclePeriod,
   dayAfterTerm,
-  firstOfMonth,
   invoiceDetailSchema,
   type RetainerDetail,
   retainerAmendmentPageSchema,
@@ -38,7 +37,7 @@ import { expectError, seedClientCast } from './client-cast.js';
 import { api } from './helpers.js';
 import { startApp } from './start-app.js';
 
-describe('retainer amendments (F05B A1–A9, C5, C6, C9)', () => {
+describe("retainer amendments (F05B A1–A9, C5, C6, C9, F05C A1'–A2')", () => {
   const connection = createDatabase(testDatabaseUrl());
   const db = connection.db;
   let app: INestApplication;
@@ -47,9 +46,9 @@ describe('retainer amendments (F05B A1–A9, C5, C6, C9)', () => {
   let finance: { id: string; cookie: string };
   let clientId: string;
   const today = businessDate();
-  const thisMonth = firstOfMonth(today);
-  const nextMonth = addMonths(thisMonth, 1);
-  const lastMonth = addMonths(thisMonth, 2);
+  /** The first and last day of cycle `n` of a retainer that starts today (F05C Y1). */
+  const start = (n: number) => cyclePeriod(today, n).periodStart;
+  const end = (n: number) => cyclePeriod(today, n).periodEnd;
 
   async function ok<T>(response: Response, parse: (body: unknown) => T, status = 200) {
     if (response.status !== status) {
@@ -77,7 +76,7 @@ describe('retainer amendments (F05B A1–A9, C5, C6, C9)', () => {
   const reschedule = (
     retainerId: string,
     termId: string,
-    schedule: { month: string; amountMinor: number }[],
+    schedule: { cycle: number; amountMinor: number }[],
     cookie = cast.am.cookie,
   ) =>
     client.post(`/api/retainers/${retainerId}/terms/${termId}/reschedule`, cookie, {
@@ -115,7 +114,7 @@ describe('retainer amendments (F05B A1–A9, C5, C6, C9)', () => {
   }
 
   const term = (schedule: number[], endAction = 'renew') => ({
-    months: schedule.length,
+    cycles: schedule.length,
     agreedTotalMinor: schedule.reduce((sum, amount) => sum + amount, 0),
     schedule,
     endAction,
@@ -126,7 +125,7 @@ describe('retainer amendments (F05B A1–A9, C5, C6, C9)', () => {
       .select()
       .from(retainerCharges)
       .where(eq(retainerCharges.retainerId, retainerId))
-      .orderBy(asc(retainerCharges.month), asc(retainerCharges.createdAt));
+      .orderBy(asc(retainerCharges.cycleNumber), asc(retainerCharges.createdAt));
 
   const liveInvoicesOf = async (retainerId: string) => {
     const rows = await db
@@ -152,10 +151,10 @@ describe('retainer amendments (F05B A1–A9, C5, C6, C9)', () => {
     }));
   };
 
-  /** Finance issues the retainer's draft of `month` (its monthly line). */
-  async function issueMonth(retainerId: string, month: string) {
+  /** Finance issues the retainer's draft of `cycle` (its monthly line). */
+  async function issueCycle(retainerId: string, cycle: number) {
     const charges = await chargesOf(retainerId);
-    const charge = charges.find((row) => row.month === month && row.kind === 'monthly');
+    const charge = charges.find((row) => row.cycleNumber === cycle && row.kind === 'monthly');
     const [line] = await db
       .select({ invoiceId: invoiceLines.invoiceId })
       .from(invoiceLines)
@@ -173,11 +172,11 @@ describe('retainer amendments (F05B A1–A9, C5, C6, C9)', () => {
     );
   }
 
-  const cycleLines = async (retainerId: string, month: string) => {
+  const cycleLines = async (retainerId: string, number: number) => {
     const [cycle] = await db
       .select({ id: retainerCycles.id })
       .from(retainerCycles)
-      .where(and(eq(retainerCycles.retainerId, retainerId), eq(retainerCycles.month, month)));
+      .where(and(eq(retainerCycles.retainerId, retainerId), eq(retainerCycles.number, number)));
     if (!cycle) return [];
     return db
       .select()
@@ -217,7 +216,7 @@ describe('retainer amendments (F05B A1–A9, C5, C6, C9)', () => {
     expect((await client.post(`/api/retainers/${id}/charges/${other}/settle`)).status).toBe(401);
   });
 
-  describe('the acceptance flow on a 3-month term (spec "Acceptance" 1–8)', () => {
+  describe('the acceptance flow on a 3-cycle term (spec "Acceptance" 1–8)', () => {
     let subject: RetainerDetail;
     let termId: string;
     let reduction: Amendment;
@@ -225,12 +224,12 @@ describe('retainer amendments (F05B A1–A9, C5, C6, C9)', () => {
     it('adds reels and an amount to an issued month: a supplementary draft (A2, C6, C4)', async () => {
       subject = await retainer({ term: term([30000, 30000, 40000]) });
       termId = (await termsOf(subject.id))[0]?.id ?? '';
-      await issueMonth(subject.id, thisMonth);
+      await issueCycle(subject.id, 1);
 
       const preview = await ok(
         await client.post(`${path(subject.id)}/preview`, cast.am.cookie, {
-          scope: 'month',
-          effectiveMonth: thisMonth,
+          scope: 'cycle',
+          effectiveCycle: 1,
           lines: [{ kind: 'reel', quantityDelta: 2 }],
           amountDeltaMinor: 10000,
           reason: 'x',
@@ -238,24 +237,24 @@ describe('retainer amendments (F05B A1–A9, C5, C6, C9)', () => {
         (body) => amendmentPreviewSchema.parse(body),
       );
       expect(preview).toMatchObject({ moneyDeltaMinor: 10000, needsApproval: false });
-      expect(preview.months).toEqual([
+      expect(preview.cycles).toEqual([
         expect.objectContaining({
-          month: thisMonth,
+          cycle: 1,
           effect: 'addition',
           money: { beforeMinor: 30000, afterMinor: 40000 },
         }),
       ]);
 
       const amendment = await created(subject.id, {
-        scope: 'month',
-        effectiveMonth: thisMonth,
+        scope: 'cycle',
+        effectiveCycle: 1,
         lines: [{ kind: 'reel', quantityDelta: 2 }],
         amountDeltaMinor: 10000,
       });
       expect(amendment).toMatchObject({ number: 1, status: 'applied', kind: 'change' });
       expect(amendment.effects.map((effect) => effect.effect)).toEqual(['addition']);
 
-      const reels = (await cycleLines(subject.id, thisMonth)).find((line) => line.kind === 'reel');
+      const reels = (await cycleLines(subject.id, 1)).find((line) => line.kind === 'reel');
       expect(reels).toMatchObject({ committedQuantity: 6, amendmentId: amendment.id });
       const addition = (await chargesOf(subject.id)).find((row) => row.kind === 'addition');
       expect(addition).toMatchObject({ amountMinor: 10000, amendmentId: amendment.id });
@@ -277,15 +276,15 @@ describe('retainer amendments (F05B A1–A9, C5, C6, C9)', () => {
     it('schedules a new line and an amount onward from next month (A1–A3, A5)', async () => {
       const amendment = await created(subject.id, {
         scope: 'onward',
-        effectiveMonth: nextMonth,
+        effectiveCycle: 2,
         lines: [{ kind: 'monthly_report', quantityDelta: 1 }],
         amountDeltaMinor: 5000,
       });
       expect(amendment.status).toBe('scheduled');
       expect(amendment.money?.moneyDeltaMinor).toBe(10000);
-      expect(amendment.effects.map((effect) => [effect.month, effect.effect])).toEqual([
-        [nextMonth, 'charge_changed'],
-        [lastMonth, 'charge_changed'],
+      expect(amendment.effects.map((effect) => [effect.cycle, effect.effect])).toEqual([
+        [2, 'charge_changed'],
+        [3, 'charge_changed'],
       ]);
       // Nothing changes before its month.
       const monthly = (await chargesOf(subject.id)).filter((row) => row.kind === 'monthly');
@@ -294,8 +293,8 @@ describe('retainer amendments (F05B A1–A9, C5, C6, C9)', () => {
 
     it('waits for the General Manager on a reduction, then credits the paid month (A4, C6)', async () => {
       reduction = await created(subject.id, {
-        scope: 'month',
-        effectiveMonth: thisMonth,
+        scope: 'cycle',
+        effectiveCycle: 1,
         amountDeltaMinor: -8000,
       });
       expect(reduction).toMatchObject({ status: 'pending_approval' });
@@ -359,7 +358,7 @@ describe('retainer amendments (F05B A1–A9, C5, C6, C9)', () => {
     });
 
     it('applies the scheduled amendment before next month’s draft, which takes the credit (A5, C5)', async () => {
-      await runJob(nextMonth);
+      await runJob(start(2));
       const monthly = (await chargesOf(subject.id)).filter((row) => row.kind === 'monthly');
       expect(monthly.map((row) => [row.amountMinor, row.baseAmountMinor])).toEqual([
         [30000, 30000],
@@ -376,7 +375,7 @@ describe('retainer amendments (F05B A1–A9, C5, C6, C9)', () => {
           ),
         );
       expect(standing).toContainEqual({ kind: 'monthly_report', quantity: 1 });
-      expect((await cycleLines(subject.id, nextMonth)).map((line) => line.kind)).toContain(
+      expect((await cycleLines(subject.id, 2)).map((line) => line.kind)).toContain(
         'monthly_report',
       );
       const draft = (await liveInvoicesOf(subject.id)).find(
@@ -400,21 +399,21 @@ describe('retainer amendments (F05B A1–A9, C5, C6, C9)', () => {
     it('reschedules unbilled months at the same total, syncing the draft (A6, C6)', async () => {
       await expectError(
         await reschedule(subject.id, termId, [
-          { month: nextMonth, amountMinor: 40000 },
-          { month: lastMonth, amountMinor: 30000 },
+          { cycle: 2, amountMinor: 40000 },
+          { cycle: 3, amountMinor: 30000 },
         ]),
         409,
         'SCHEDULE_TOTAL_MISMATCH',
       );
       await expectError(
-        await reschedule(subject.id, termId, [{ month: thisMonth, amountMinor: 30000 }]),
+        await reschedule(subject.id, termId, [{ cycle: 1, amountMinor: 30000 }]),
         409,
-        'MONTH_INVOICED',
+        'CYCLE_INVOICED',
       );
       const done = await ok(
         await reschedule(subject.id, termId, [
-          { month: nextMonth, amountMinor: 40000 },
-          { month: lastMonth, amountMinor: 40000 },
+          { cycle: 2, amountMinor: 40000 },
+          { cycle: 3, amountMinor: 40000 },
         ]),
         (body) => amendmentSchema.parse(body),
       );
@@ -436,7 +435,7 @@ describe('retainer amendments (F05B A1–A9, C5, C6, C9)', () => {
     });
 
     it('renews with the onward amounts and the reschedule, not the one-month ones (T7)', async () => {
-      await runJob(addDays(dayAfterTerm(lastMonth), -30));
+      await runJob(addDays(dayAfterTerm(end(3)), -30));
       const [renewal] = await termsOf(subject.id);
       expect(renewal).toMatchObject({ number: 2, status: 'scheduled' });
       expect(renewal?.schedule.map((month) => month.money?.amountMinor)).toEqual([
@@ -446,13 +445,13 @@ describe('retainer amendments (F05B A1–A9, C5, C6, C9)', () => {
 
     it('cancels pending and scheduled amendments when the retainer ends (A8)', async () => {
       const pending = await created(subject.id, {
-        scope: 'month',
-        effectiveMonth: lastMonth,
+        scope: 'cycle',
+        effectiveCycle: 3,
         amountDeltaMinor: -1000,
       });
       const scheduled = await created(subject.id, {
-        scope: 'month',
-        effectiveMonth: lastMonth,
+        scope: 'cycle',
+        effectiveCycle: 3,
         amountDeltaMinor: 1000,
       });
       expect([pending.status, scheduled.status]).toEqual(['pending_approval', 'scheduled']);
@@ -471,7 +470,7 @@ describe('retainer amendments (F05B A1–A9, C5, C6, C9)', () => {
         'cancelled',
       ]);
       await expectError(
-        await amend(subject.id, { scope: 'month', effectiveMonth: thisMonth, amountDeltaMinor: 1 }),
+        await amend(subject.id, { scope: 'cycle', effectiveCycle: 1, amountDeltaMinor: 1 }),
         409,
         'RETAINER_ENDED',
       );
@@ -491,7 +490,8 @@ describe('retainer amendments (F05B A1–A9, C5, C6, C9)', () => {
         .insert(retainerCharges)
         .values({
           retainerId: subject.id,
-          month: thisMonth,
+          cycleNumber: 1,
+          cycleStart: start(1),
           kind: 'credit',
           amountMinor: -2500,
           dueAt: new Date(),
@@ -519,33 +519,40 @@ describe('retainer amendments (F05B A1–A9, C5, C6, C9)', () => {
     it('refuses empty, misplaced, negative and impossible changes (A1–A3)', async () => {
       const subject = await retainer({ term: term([30000, 30000], 'renew') });
       await expectError(
-        await amend(subject.id, { scope: 'month', effectiveMonth: thisMonth }),
+        await amend(subject.id, { scope: 'cycle', effectiveCycle: 1 }),
         400,
         'EMPTY_AMENDMENT',
       );
+      expect(
+        (await amend(subject.id, { scope: 'cycle', effectiveCycle: 0, amountDeltaMinor: 100 }))
+          .status,
+      ).toBe(400);
+      // A1': in cycle 2, cycle 1 is past.
+      await cast.onDay(addDays(start(2), 1), async (cookie) =>
+        expectError(
+          await amend(
+            subject.id,
+            { scope: 'cycle', effectiveCycle: 1, amountDeltaMinor: 100 },
+            cookie,
+          ),
+          400,
+          'INVALID_EFFECTIVE_CYCLE',
+        ),
+      );
+      // After a term that renews, a cycle is no open-ended cycle.
       await expectError(
         await amend(subject.id, {
-          scope: 'month',
-          effectiveMonth: addMonths(thisMonth, -1),
+          scope: 'cycle',
+          effectiveCycle: 3,
           amountDeltaMinor: 100,
         }),
         400,
-        'INVALID_EFFECTIVE_MONTH',
-      );
-      // After a term that renews, a month is no open-ended month.
-      await expectError(
-        await amend(subject.id, {
-          scope: 'month',
-          effectiveMonth: addMonths(thisMonth, 2),
-          amountDeltaMinor: 100,
-        }),
-        400,
-        'INVALID_EFFECTIVE_MONTH',
+        'INVALID_EFFECTIVE_CYCLE',
       );
       await expectError(
         await amend(subject.id, {
-          scope: 'month',
-          effectiveMonth: thisMonth,
+          scope: 'cycle',
+          effectiveCycle: 1,
           lines: [{ kind: 'reel', quantityDelta: -5 }],
         }),
         400,
@@ -554,7 +561,7 @@ describe('retainer amendments (F05B A1–A9, C5, C6, C9)', () => {
       await expectError(
         await amend(subject.id, {
           scope: 'onward',
-          effectiveMonth: nextMonth,
+          effectiveCycle: 2,
           lines: [{ kind: 'video', quantityDelta: -1 }],
         }),
         400,
@@ -563,7 +570,7 @@ describe('retainer amendments (F05B A1–A9, C5, C6, C9)', () => {
       await expectError(
         await amend(
           subject.id,
-          { scope: 'month', effectiveMonth: nextMonth, amountDeltaMinor: -30001 },
+          { scope: 'cycle', effectiveCycle: 2, amountDeltaMinor: -30001 },
           cast.gm.cookie,
         ),
         409,
@@ -571,8 +578,8 @@ describe('retainer amendments (F05B A1–A9, C5, C6, C9)', () => {
       );
       await expectError(
         await amend(subject.id, {
-          scope: 'month',
-          effectiveMonth: thisMonth,
+          scope: 'cycle',
+          effectiveCycle: 1,
           lines: [
             { kind: 'reel', quantityDelta: 1 },
             { kind: 'reel', quantityDelta: 2 },
@@ -589,7 +596,7 @@ describe('retainer amendments (F05B A1–A9, C5, C6, C9)', () => {
         subject.id,
         {
           scope: 'onward',
-          effectiveMonth: thisMonth,
+          effectiveCycle: 1,
           lines: [{ kind: 'reel', quantityDelta: -4 }],
           amountDeltaMinor: -5000,
         },
@@ -618,8 +625,8 @@ describe('retainer amendments (F05B A1–A9, C5, C6, C9)', () => {
     it('rejects with a note, withdraws, and refuses an approval the state moved past (A4)', async () => {
       const subject = await retainer({ term: term([30000, 30000]) });
       const first = await created(subject.id, {
-        scope: 'month',
-        effectiveMonth: nextMonth,
+        scope: 'cycle',
+        effectiveCycle: 2,
         amountDeltaMinor: -20000,
       });
       expect((await decide(subject.id, first.id, 'reject', {})).status).toBe(400);
@@ -633,8 +640,8 @@ describe('retainer amendments (F05B A1–A9, C5, C6, C9)', () => {
       });
 
       const second = await created(subject.id, {
-        scope: 'month',
-        effectiveMonth: nextMonth,
+        scope: 'cycle',
+        effectiveCycle: 2,
         amountDeltaMinor: -1000,
       });
       expect(
@@ -647,16 +654,16 @@ describe('retainer amendments (F05B A1–A9, C5, C6, C9)', () => {
       expect(withdrawn.status).toBe('withdrawn');
 
       const third = await created(subject.id, {
-        scope: 'month',
-        effectiveMonth: nextMonth,
+        scope: 'cycle',
+        effectiveCycle: 2,
         amountDeltaMinor: -25000,
       });
       // The month drops to 10000 meanwhile: the reduction would make it negative.
       const termId = (await termsOf(subject.id))[0]?.id ?? '';
       await ok(
         await reschedule(subject.id, termId, [
-          { month: thisMonth, amountMinor: 50000 },
-          { month: nextMonth, amountMinor: 10000 },
+          { cycle: 1, amountMinor: 50000 },
+          { cycle: 2, amountMinor: 10000 },
         ]),
         (body) => amendmentSchema.parse(body),
       );
@@ -680,7 +687,7 @@ describe('retainer amendments (F05B A1–A9, C5, C6, C9)', () => {
       );
       const raise = await created(subject.id, {
         scope: 'onward',
-        effectiveMonth: thisMonth,
+        effectiveCycle: 1,
         amountDeltaMinor: 20000,
       });
       expect(raise.status).toBe('applied');
@@ -694,7 +701,7 @@ describe('retainer amendments (F05B A1–A9, C5, C6, C9)', () => {
 
       const cut = await created(subject.id, {
         scope: 'onward',
-        effectiveMonth: nextMonth,
+        effectiveCycle: 2,
         amountDeltaMinor: -10000,
       });
       expect(cut).toMatchObject({ status: 'pending_approval', money: { moneyDeltaMinor: -10000 } });
@@ -703,23 +710,21 @@ describe('retainer amendments (F05B A1–A9, C5, C6, C9)', () => {
     it('takes line changes for a month whose cycle opens later (A2)', async () => {
       const subject = await retainer({ term: term([1000, 1000]) });
       const amendment = await created(subject.id, {
-        scope: 'month',
-        effectiveMonth: nextMonth,
+        scope: 'cycle',
+        effectiveCycle: 2,
         lines: [{ kind: 'design', quantityDelta: 3 }],
       });
       expect(amendment.status).toBe('scheduled');
-      await runJob(nextMonth);
-      const design = (await cycleLines(subject.id, nextMonth)).find(
-        (line) => line.kind === 'design',
-      );
+      await runJob(start(2));
+      const design = (await cycleLines(subject.id, 2)).find((line) => line.kind === 'design');
       expect(design).toMatchObject({ committedQuantity: 15, amendmentId: amendment.id });
     });
 
     it('hides amounts from callers without money access, and refuses other managers (G3)', async () => {
       const subject = await retainer({ term: term([1000, 1000]) });
       await created(subject.id, {
-        scope: 'month',
-        effectiveMonth: nextMonth,
+        scope: 'cycle',
+        effectiveCycle: 2,
         amountDeltaMinor: 500,
       });
       const seen = await ok(await client.get(path(subject.id), cast.employee.cookie), (body) =>
@@ -728,7 +733,7 @@ describe('retainer amendments (F05B A1–A9, C5, C6, C9)', () => {
       expect(seen.items[0]?.money).toBeUndefined();
       expect(seen.items[0]?.effects.every((effect) => effect.money === undefined)).toBe(true);
       expect(seen.items[0]?.effects.every((effect) => effect.invoice === null)).toBe(true);
-      const body = { scope: 'month', effectiveMonth: nextMonth, amountDeltaMinor: 1 };
+      const body = { scope: 'cycle', effectiveCycle: 2, amountDeltaMinor: 1 };
       for (const cookie of [cast.employee.cookie, cast.otherAm.cookie, finance.cookie]) {
         expect((await amend(subject.id, body, cookie)).status).toBe(403);
         expect(
@@ -737,13 +742,12 @@ describe('retainer amendments (F05B A1–A9, C5, C6, C9)', () => {
         ).toBe(403);
         const termId = (await termsOf(subject.id))[0]?.id ?? '';
         expect(
-          (await reschedule(subject.id, termId, [{ month: nextMonth, amountMinor: 1000 }], cookie))
-            .status,
+          (await reschedule(subject.id, termId, [{ cycle: 2, amountMinor: 1000 }], cookie)).status,
         ).toBe(403);
       }
       const reduction = await created(subject.id, {
-        scope: 'month',
-        effectiveMonth: nextMonth,
+        scope: 'cycle',
+        effectiveCycle: 2,
         amountDeltaMinor: -100,
       });
       for (const action of ['approve', 'reject'] as const) {
@@ -763,13 +767,19 @@ describe('retainer amendments (F05B A1–A9, C5, C6, C9)', () => {
       expect((await client.get(path(randomUUID()), cast.am.cookie)).status).toBe(404);
     });
 
-    it('refuses a month before the start, or a month without a charge that is not billed (C2)', async () => {
-      const later = await retainer({ startDate: addDays(lastMonth, 3) });
-      await expectError(
-        await amend(later.id, { scope: 'month', effectiveMonth: thisMonth, amountDeltaMinor: 100 }),
-        400,
-        'INVALID_EFFECTIVE_MONTH',
-      );
+    it('schedules a future retainer’s first cycle, and refuses a cycle without a charge that is not billed (C2)', async () => {
+      // No cycle comes before the start date (F05C Y1): the first one takes the change when it opens.
+      const later = await retainer({ startDate: addDays(start(3), 3) });
+      const first = await created(later.id, {
+        scope: 'cycle',
+        effectiveCycle: 1,
+        amountDeltaMinor: 100,
+      });
+      expect(first).toMatchObject({
+        status: 'scheduled',
+        effectiveCycle: 1,
+        effectiveDate: addDays(start(3), 3),
+      });
       const paused = await retainer();
       await ok(
         await client.post(`/api/retainers/${paused.id}/status`, cast.am.cookie, {
@@ -779,16 +789,16 @@ describe('retainer amendments (F05B A1–A9, C5, C6, C9)', () => {
       );
       await expectError(
         await amend(paused.id, {
-          scope: 'month',
-          effectiveMonth: thisMonth,
+          scope: 'cycle',
+          effectiveCycle: 1,
           amountDeltaMinor: 100,
         }),
         400,
-        'INVALID_EFFECTIVE_MONTH',
+        'INVALID_EFFECTIVE_CYCLE',
       );
     });
 
-    it('keeps the line limits and refuses a closed month (A2, LIMIT_REACHED, CYCLE_CLOSED)', async () => {
+    it("keeps the line limits and refuses a closed cycle (A2, A2', LIMIT_REACHED, CYCLE_CLOSED)", async () => {
       const full = await retainer({
         deliverables: Array.from({ length: 20 }, (_, index) => ({
           kind: 'other',
@@ -799,14 +809,14 @@ describe('retainer amendments (F05B A1–A9, C5, C6, C9)', () => {
       await expectError(
         await amend(full.id, {
           scope: 'onward',
-          effectiveMonth: nextMonth,
+          effectiveCycle: 2,
           lines: [{ kind: 'video', quantityDelta: 1 }],
         }),
         409,
         'LIMIT_REACHED',
       );
 
-      // Ended and reactivated in the same month: the month's cycle stays closed.
+      // Ended and reactivated in the same cycle: that cycle stays closed.
       const reopened = await retainer();
       for (const [status, cookie] of [
         ['ended', cast.am.cookie],
@@ -821,8 +831,8 @@ describe('retainer amendments (F05B A1–A9, C5, C6, C9)', () => {
         await amend(
           reopened.id,
           {
-            scope: 'month',
-            effectiveMonth: thisMonth,
+            scope: 'cycle',
+            effectiveCycle: 1,
             lines: [{ kind: 'design', quantityDelta: 1 }],
           },
           cast.gm.cookie,
@@ -832,19 +842,20 @@ describe('retainer amendments (F05B A1–A9, C5, C6, C9)', () => {
       );
     });
 
-    it('splits a credit larger than the next month, and a reduction gives a taken credit back (C5, C6)', async () => {
+    it('splits a credit larger than the next cycle, and a reduction gives a taken credit back (C5, C6)', async () => {
       const subject = await retainer({ term: term([10000, 10000]) });
       const [credit] = await db
         .insert(retainerCharges)
         .values({
           retainerId: subject.id,
-          month: thisMonth,
+          cycleNumber: 1,
+          cycleStart: start(1),
           kind: 'credit',
           amountMinor: -15000,
           dueAt: new Date(),
         })
         .returning();
-      await runJob(nextMonth);
+      await runJob(start(2));
       const draft = (await liveInvoicesOf(subject.id)).find((invoice) =>
         invoice.lines.some((line) => line.retainerChargeId === credit?.id),
       );
@@ -855,13 +866,13 @@ describe('retainer amendments (F05B A1–A9, C5, C6, C9)', () => {
 
       const cut = await created(
         subject.id,
-        { scope: 'month', effectiveMonth: nextMonth, amountDeltaMinor: -5000 },
+        { scope: 'cycle', effectiveCycle: 2, amountDeltaMinor: -5000 },
         cast.gm.cookie,
       );
       expect(cut).toMatchObject({ status: 'scheduled' });
       expect(cut.effects.map((effect) => effect.effect)).toEqual(['draft_synced']);
-      // The job applies it in its month (A5); the draft gives back the credit it cannot hold.
-      await runJob(nextMonth);
+      // The job applies it in its cycle (A5); the draft gives back the credit it cannot hold.
+      await runJob(start(2));
       const synced = (await liveInvoicesOf(subject.id)).find((invoice) => invoice.id === draft?.id);
       expect(synced?.lines.map((line) => line.unitPriceMinor)).toEqual([5000]);
       expect(synced?.totalMinor).toBe(5000);
@@ -875,7 +886,8 @@ describe('retainer amendments (F05B A1–A9, C5, C6, C9)', () => {
         .insert(retainerCharges)
         .values({
           retainerId: subject.id,
-          month: thisMonth,
+          cycleNumber: 1,
+          cycleStart: start(1),
           kind: 'credit',
           amountMinor: -5000,
           dueAt: new Date(),

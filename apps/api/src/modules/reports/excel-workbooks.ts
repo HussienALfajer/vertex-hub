@@ -9,6 +9,7 @@ import {
   responseTimeText,
   REPORT_VALUE_LABELS as VALUES,
 } from '@vertex-hub/contracts';
+import { formatRetainerCycle } from '@vertex-hub/messages';
 import ExcelJS from 'exceljs';
 
 /*
@@ -317,22 +318,30 @@ export async function clientReportWorkbook(report: ClientMonthlyReport): Promise
       workbook,
       CR.retainers,
       [
-        { header: CR.retainers, width: 26 },
+        { header: CR.retainers, width: 48 },
         { header: CR.kind, width: 22 },
         { header: CR.committed, width: 12 },
         { header: CR.delivered, width: 12 },
         { header: CR.percent, width: 10 },
       ],
-      report.retainers.flatMap((retainer) => [
-        ...retainer.lines.map((line): Cell[] => [
-          retainer.retainer.name,
-          line.label ?? VALUES.deliverableKinds[line.kind],
-          line.committed,
-          line.delivered,
-          line.percent,
-        ]),
-        [retainer.retainer.name, CR.completion, null, null, retainer.completion],
-      ]),
+      report.retainers.flatMap((retainer) => {
+        // F05C R4: each cycle overlapping the month, with its period.
+        const name = `${retainer.retainer.name} — ${formatRetainerCycle({
+          number: retainer.cycle,
+          periodStart: retainer.periodStart,
+          periodEnd: retainer.periodEnd,
+        })}`;
+        return [
+          ...retainer.lines.map((line): Cell[] => [
+            name,
+            line.label ?? VALUES.deliverableKinds[line.kind],
+            line.committed,
+            line.delivered,
+            line.percent,
+          ]),
+          [name, CR.completion, null, null, retainer.completion],
+        ];
+      }),
     );
   }
   if (report.projects.length) {

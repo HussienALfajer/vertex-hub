@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { CalendarDate, RetainerChargeKind } from '@vertex-hub/contracts';
+import type { RetainerChargeKind } from '@vertex-hub/contracts';
 import type { Transaction } from '@vertex-hub/db';
 import type { AuditActor } from '../audit/index.js';
 
@@ -8,8 +8,8 @@ export interface RetainerChargeDue {
   chargeId: string;
   retainerId: string;
   kind: RetainerChargeKind;
-  /** The first day of the charge's month. */
-  month: CalendarDate;
+  /** The retainer cycle the charge belongs to (F05C). */
+  cycle: number;
   amountMinor: number;
   /** Null for the daily job. */
   actor: AuditActor | null;

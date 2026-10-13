@@ -5,6 +5,8 @@ import {
   formatDateTime,
   formatList,
   formatNumber,
+  formatPeriod,
+  formatRetainerCycle,
   formatTimeOfDay,
 } from './format.js';
 import { fill, plural } from './text.js';
@@ -51,6 +53,23 @@ describe('formatting', () => {
   it('formats a bare amount in major units', () => {
     expect(formatAmount(150_000)).toBe('1,500.00');
     expect(formatAmount(7)).toBe('0.07');
+  });
+});
+
+describe('retainer cycles (F05C)', () => {
+  it('formats a period with the year once when both ends share it', () => {
+    expect(formatPeriod('2026-10-20', '2026-11-19')).toBe('20 تشرين الأول – 19 تشرين الثاني 2026');
+    expect(formatPeriod('2026-12-20', '2027-01-19')).toBe(
+      '20 كانون الأول 2026 – 19 كانون الثاني 2027',
+    );
+  });
+
+  it('names a cycle, with its place in a term', () => {
+    const cycle = { number: 7, periodStart: '2026-10-20', periodEnd: '2026-11-19' };
+    expect(formatRetainerCycle(cycle)).toBe('الدورة 7 (20 تشرين الأول – 19 تشرين الثاني 2026)');
+    expect(formatRetainerCycle(cycle, { position: 3, cycles: 6 })).toBe(
+      'الدورة 7 (20 تشرين الأول – 19 تشرين الثاني 2026) (3 من 6)',
+    );
   });
 });
 

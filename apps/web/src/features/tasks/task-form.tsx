@@ -50,7 +50,7 @@ import { ApiError } from '../../lib/api/client';
 import { useMe } from '../../lib/auth';
 import { errorMessage, errorRole, fieldError, SCREEN_ERROR } from '../../lib/errors';
 import { focusAfterRemoval } from '../../lib/focus-after-removal';
-import { formatMonth, formatNumber } from '../../lib/format';
+import { formatCalendarDate, formatNumber, formatPeriod } from '../../lib/format';
 import { useDebouncedValue } from '../../lib/use-search-text';
 import { ClientStatusBadge } from '../clients/client-badges';
 import { clientListQuery, clientQuery } from '../clients/clients.queries';
@@ -510,7 +510,7 @@ export function EngagementFields({
               value: `cycle:${item.currentCycle.id}`,
               label: t('tasks.form.retainerCycle', {
                 retainer: item.name,
-                month: formatMonth(item.currentCycle.periodStart),
+                period: formatPeriod(item.currentCycle.periodStart, item.currentCycle.periodEnd),
               }),
             },
           ]
@@ -531,7 +531,7 @@ export function EngagementFields({
       value: `cycle:${current.cycle.id}`,
       label: t('tasks.form.retainerCycle', {
         retainer: current.retainer.name,
-        month: formatMonth(current.cycle.periodStart),
+        period: formatCalendarDate(current.cycle.periodStart),
       }),
     });
   const value = projectId ? `project:${projectId}` : cycleId ? `cycle:${cycleId}` : 'none';

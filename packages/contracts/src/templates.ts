@@ -681,7 +681,16 @@ export const templateRunSchema = z
     template: personSchema.extend({ archived: z.boolean() }),
     trigger: templateRunTriggerSchema,
     project: personSchema.nullable(),
-    cycle: z.object({ id: z.uuid(), month: calendarDateSchema, retainer: personSchema }).nullable(),
+    cycle: z
+      .object({
+        id: z.uuid(),
+        /** F05C: the cycle's number and period. */
+        number: z.number().int().min(1),
+        periodStart: calendarDateSchema,
+        periodEnd: calendarDateSchema,
+        retainer: personSchema,
+      })
+      .nullable(),
     /** `missing_tasks` runs: the line they filled. */
     cycleLine: z
       .object({ id: z.uuid(), kind: deliverableKindSchema, label: z.string().nullable() })
@@ -746,7 +755,7 @@ export const retainerTemplateSchema = z
     cycle: z
       .object({
         id: z.uuid(),
-        month: calendarDateSchema,
+        number: z.number().int().min(1),
         periodStart: calendarDateSchema,
         periodEnd: calendarDateSchema,
       })

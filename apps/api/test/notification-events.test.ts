@@ -632,22 +632,30 @@ describe('notification events', () => {
       expect(await typesOf(late.id, task.id)).toEqual([]);
     });
 
+    /** F05C T3': a retainer whose renewal date follows its two-cycle term. */
+    const renewing = async (clientId: string) => {
+      const retainer = await cast.createRetainer(clientId, {
+        term: { cycles: 2, agreedTotalMinor: 0, schedule: [0, 0] },
+      });
+      reminderSubjects.push(retainer.id);
+      return { retainer, renewalDate: retainer.renewalDate ?? '' };
+    };
+
     it('reminds the account manager 30 days before a renewal and on the date (rule 12)', async () => {
       const { id: clientId } = await cast.createClient();
-      const renewalDate = addDays(thursday, 30);
-      const retainer = await cast.createRetainer(clientId, { renewalDate });
-      reminderSubjects.push(retainer.id);
+      const { retainer, renewalDate } = await renewing(clientId);
+      const notice = addDays(renewalDate, -30);
       const renewals = app.get(RetainerRenewals);
 
-      await renewals.remind(addDays(thursday, -1));
+      await renewals.remind(addDays(notice, -1));
       expect(await typesOf(cast.am.id, retainer.id)).toEqual([]);
-      await renewals.remind(thursday);
-      await renewals.remind(saturday);
+      await renewals.remind(notice);
+      await renewals.remind(addDays(notice, 2));
       expect(await inbox(cast.am.id, retainer.id)).toMatchObject([
         {
           type: 'retainer_renewal_due',
           actorId: null,
-          data: { retainer: retainer.name, renewalDate, daysLeft: 30 },
+          data: { retainer: retainer.name, renewalDate, daysLeft: 30, endAction: 'renew' },
         },
       ]);
       await renewals.remind(renewalDate);
@@ -658,11 +666,18 @@ describe('notification events', () => {
       ]);
     });
 
+    it("sends no renewal reminder for an open-ended retainer (F05C T3')", async () => {
+      const { id: clientId } = await cast.createClient();
+      const retainer = await cast.createRetainer(clientId);
+      reminderSubjects.push(retainer.id);
+      expect(retainer.renewalDate).toBeNull();
+      await app.get(RetainerRenewals).remind(addDays(businessDate(), 365));
+      expect(await typesOf(cast.am.id, retainer.id)).toEqual([]);
+    });
+
     it('sends no renewal reminder for a retainer of an archived client (F05 G2)', async () => {
       const { id: clientId } = await cast.createClient();
-      const renewalDate = addDays(thursday, 30);
-      const retainer = await cast.createRetainer(clientId, { renewalDate });
-      reminderSubjects.push(retainer.id);
+      const { retainer, renewalDate } = await renewing(clientId);
       expect((await client.post(`/api/clients/${clientId}/archive`, cast.gm.cookie)).status).toBe(
         200,
       );

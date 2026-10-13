@@ -3,11 +3,10 @@ import type { INestApplication } from '@nestjs/common';
 import {
   acceptPlanSchema,
   addDays,
-  addMonths,
   businessDate,
   type CatalogService,
   catalogServiceSchema,
-  firstOfMonth,
+  cyclePeriod,
   invoiceDetailSchema,
   type ProjectDetail,
   quoteDetailSchema,
@@ -189,7 +188,6 @@ describe('automatic invoice drafts and billing locks (F13 PR 2)', () => {
             name: plan.retainer.name,
             departments: plan.retainer.departments,
             startDate: today,
-            renewalDate: null,
             templateId: null,
           },
         }),
@@ -393,9 +391,9 @@ describe('automatic invoice drafts and billing locks (F13 PR 2)', () => {
         .select()
         .from(retainerCharges)
         .where(eq(retainerCharges.retainerId, retainerId))
-        .orderBy(asc(retainerCharges.month));
+        .orderBy(asc(retainerCharges.cycleNumber), asc(retainerCharges.createdAt));
 
-    it('charges and drafts the month in full for a new retainer, and none without a fee', async () => {
+    it('charges and drafts the first cycle in full for a new retainer, and none without a fee', async () => {
       const retainer = await cast.createRetainer(clientId, {
         currency: 'SYP',
         monthlyFeeMinor: 5000000,
@@ -403,7 +401,8 @@ describe('automatic invoice drafts and billing locks (F13 PR 2)', () => {
       const [charge, ...others] = await chargesOf(retainer.id);
       expect(others).toEqual([]);
       expect(charge).toMatchObject({
-        month: firstOfMonth(today),
+        cycleNumber: 1,
+        cycleStart: today,
         kind: 'monthly',
         amountMinor: 5000000,
         status: 'pending',
@@ -418,7 +417,8 @@ describe('automatic invoice drafts and billing locks (F13 PR 2)', () => {
       expect(line).toMatchObject({
         retainerChargeId: charge?.id,
         retainerCycleId: null,
-        description: expect.stringContaining(`${retainer.name} — `),
+        // F05C J3: the line names the cycle and its period.
+        description: expect.stringContaining(`${retainer.name} — الدورة 1 (`),
       });
       const [created] = await db
         .select()
@@ -440,12 +440,18 @@ describe('automatic invoice drafts and billing locks (F13 PR 2)', () => {
       const retainer = await cast.createRetainer(clientId, { monthlyFeeMinor: 20000 });
       const [current] = await cycleDrafts(retainer.id);
       expect((await discard(current?.id ?? '')).status).toBe(204);
-      // A charge that was never marked due, as the daily job may find one after a failure.
+      // A charge that was never marked due, as the daily job may find one after a failure: the
+      // cycle's first charge gives way to it.
+      await db
+        .update(retainerCharges)
+        .set({ status: 'cancelled' })
+        .where(eq(retainerCharges.retainerId, retainer.id));
       const [missed] = await db
         .insert(retainerCharges)
         .values({
           retainerId: retainer.id,
-          month: addMonths(firstOfMonth(today), -1),
+          cycleNumber: 1,
+          cycleStart: today,
           kind: 'monthly',
           amountMinor: 15000,
         })
@@ -454,7 +460,7 @@ describe('automatic invoice drafts and billing locks (F13 PR 2)', () => {
       await jobs.runDaily(today);
       await jobs.runDaily(today);
       const drafts = await cycleDrafts(retainer.id);
-      // The discarded draft is not recreated (rule 8); the missed month drafts once.
+      // The discarded draft is not recreated (rule 8); the missed charge drafts once.
       expect(drafts.map((row) => [row.totalMinor, !!row.archivedAt])).toEqual([
         [20000, true],
         [15000, false],
@@ -475,7 +481,8 @@ describe('automatic invoice drafts and billing locks (F13 PR 2)', () => {
         .insert(retainerCharges)
         .values({
           retainerId: retainer.id,
-          month: addMonths(firstOfMonth(today), 2),
+          cycleNumber: 3,
+          cycleStart: cyclePeriod(today, 3).periodStart,
           kind: 'monthly',
           amountMinor: 12000,
         })
@@ -507,7 +514,7 @@ describe('automatic invoice drafts and billing locks (F13 PR 2)', () => {
           })
         ).status,
       ).toBe(400);
-      // A charge whose month has not begun is not billable yet (C7).
+      // A charge whose cycle has not begun is not billable yet (C7).
       expect(
         (
           await client.post('/api/invoices', finance.cookie, {
@@ -519,15 +526,15 @@ describe('automatic invoice drafts and billing locks (F13 PR 2)', () => {
       ).toBe(400);
     });
 
-    it('charges and drafts the open month when its fee is set later (C2)', async () => {
+    it('charges and drafts the open cycle when its fee is set later (C2)', async () => {
       const retainer = await cast.createRetainer(clientId);
       expect(await chargesOf(retainer.id)).toEqual([]);
       expect(
         (await patch(`/api/retainers/${retainer.id}`, { monthlyFeeMinor: 35000 })).status,
       ).toBe(200);
-      expect((await chargesOf(retainer.id)).map((row) => [row.month, row.amountMinor])).toEqual([
-        [firstOfMonth(today), 35000],
-      ]);
+      expect(
+        (await chargesOf(retainer.id)).map((row) => [row.cycleNumber, row.amountMinor]),
+      ).toEqual([[1, 35000]]);
       expect((await cycleDrafts(retainer.id)).map((row) => row.totalMinor)).toEqual([35000]);
       // Once charged, the fee changes only by amendment (F05B A9).
       await expectError(
@@ -554,24 +561,24 @@ describe('automatic invoice drafts and billing locks (F13 PR 2)', () => {
       );
     });
 
-    it('drafts each month the daily job opens, at the fee of that moment (edge case 5)', async () => {
+    it('drafts each cycle the daily job opens, at the fee of that moment (edge case 5)', async () => {
       const retainer = await cast.createRetainer(clientId, { monthlyFeeMinor: 40000 });
-      // F05B A9: the fee changes from next month by an onward amendment.
+      // F05B A9: the fee changes from the next cycle by an onward amendment.
       expect(
         (
           await client.post(`/api/retainers/${retainer.id}/amendments`, cast.gm.cookie, {
             scope: 'onward',
-            effectiveMonth: addMonths(firstOfMonth(today), 1),
+            effectiveCycle: 2,
             amountDeltaMinor: 5000,
             reason: 'رفع الرسوم',
           })
         ).status,
       ).toBe(201);
-      await app.get(RetainerCyclesService).runDaily(addMonths(firstOfMonth(today), 1));
+      await app.get(RetainerCyclesService).runDaily(cyclePeriod(today, 2).periodStart);
       expect((await cycleDrafts(retainer.id)).map((row) => row.totalMinor)).toEqual([40000, 45000]);
     });
 
-    it('drafts the month a resume or an earlier start opens', async () => {
+    it('drafts the cycle a resume ("start now") or an earlier start opens', async () => {
       const later = addDays(today, 40);
       const resumed = await cast.createRetainer(clientId, {
         monthlyFeeMinor: 10000,
@@ -587,10 +594,12 @@ describe('automatic invoice drafts and billing locks (F13 PR 2)', () => {
       ).toBe(200);
       expect((await patch(`/api/retainers/${resumed.id}`, { startDate: today })).status).toBe(200);
       expect(await cycleDrafts(resumed.id)).toEqual([]);
+      // F05C P2: resuming an open-ended retainer without a cycle starts it now on request.
       expect(
         (
           await client.post(`/api/retainers/${resumed.id}/status`, cast.gm.cookie, {
             status: 'active',
+            startNow: true,
           })
         ).status,
       ).toBe(200);

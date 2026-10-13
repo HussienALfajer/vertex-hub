@@ -13,6 +13,7 @@ import {
 import { sql } from 'drizzle-orm';
 import {
   type AnyPgColumn,
+  boolean,
   check,
   date,
   index,
@@ -34,8 +35,14 @@ import { quotes } from './quotes.js';
 import { workTemplates } from './templates.js';
 
 /*
- * Retainers, their monthly cycles, their terms and charges (F05B) and the extra work log of projects and retainers (F05), owned
- * by the api `projects` module. Dates without a time are calendar days in Asia/Damascus.
+ * Retainers, their cycles anchored on the start date (F05C), their terms and charges (F05B) and
+ * the extra work log of projects and retainers (F05), owned by the api `projects` module. Dates
+ * without a time are calendar days in Asia/Damascus.
+ *
+ * F05C expanded the month columns into cycle columns. The cycle columns stay nullable and the
+ * month columns stay in place until the contract migration of the next release, so code of the
+ * previous release keeps working against this schema; current code writes every cycle column
+ * and no month column.
  */
 
 export const retainerStatusEnum = pgEnum('retainer_status', RETAINER_STATUSES);
@@ -54,7 +61,8 @@ export const termStatusEnum = pgEnum('term_status', TERM_STATUSES);
 
 export const amendmentKindEnum = pgEnum('amendment_kind', AMENDMENT_KINDS);
 
-export const amendmentScopeEnum = pgEnum('amendment_scope', AMENDMENT_SCOPES);
+/** `month`: the F05B name of `cycle`, kept for rows written before F05C (read as `cycle`). */
+export const amendmentScopeEnum = pgEnum('amendment_scope', ['month', ...AMENDMENT_SCOPES]);
 
 export const amendmentStatusEnum = pgEnum('amendment_status', AMENDMENT_STATUSES);
 
@@ -68,10 +76,15 @@ export const retainers = pgTable(
     name: text('name').notNull(),
     departments: departmentCodeEnum('departments').array().notNull(),
     status: retainerStatusEnum('status').notNull().default('active'),
-    /** Editable only while the retainer has no cycle. */
+    /** The anchor of its cycles (F05C Y1); editable only while it has no cycle and no charge. */
     startDate: date('start_date', { mode: 'string' }).notNull(),
-    /** A reminder only (R6). */
+    /** Derived: the day after its last active or scheduled term (F05C T3'); null without one. */
     renewalDate: date('renewal_date', { mode: 'string' }),
+    /**
+     * F05C P2: no cycle opens and no open-ended charge is created for a cycle that starts before
+     * this day (resumed "from the next cycle"); cleared when that cycle opens.
+     */
+    cyclesFrom: date('cycles_from', { mode: 'string' }),
     endedOn: date('ended_on', { mode: 'string' }),
     /** The currency of the fee and of extra work estimates. */
     currency: currencyEnum('currency').notNull().default('USD'),
@@ -125,7 +138,7 @@ export const retainerDeliverables = pgTable(
   ],
 );
 
-/** One calendar month of a retainer; never archived, it goes with its retainer. */
+/** One cycle of a retainer (F05C); never archived, it goes with its retainer. */
 export const retainerCycles = pgTable(
   'retainer_cycles',
   {
@@ -133,19 +146,29 @@ export const retainerCycles = pgTable(
     retainerId: uuid('retainer_id')
       .notNull()
       .references(() => retainers.id),
-    /** The first day of the calendar month. */
-    month: date('month', { mode: 'string' }).notNull(),
+    /** F05B: the first day of the calendar month; no longer written (F05C). */
+    month: date('month', { mode: 'string' }),
+    /** F05C Y1: the cycle number from the retainer's start date (`cycleAt`). */
+    number: integer('number'),
+    /** `cyclePeriod`, except a cycle started "now" (P2) and one ended early (F05 R5). */
     periodStart: date('period_start', { mode: 'string' }).notNull(),
     periodEnd: date('period_end', { mode: 'string' }).notNull(),
     status: cycleStatusEnum('status').notNull().default('open'),
     closedAt: timestamp('closed_at', { withTimezone: true }),
+    /** F05C B3: created by the catch-up of a backdated retainer. */
+    backdated: boolean('backdated').notNull().default(false),
+    /** F05C B4: a backdated cycle whose delivery was not recorded. */
+    untracked: boolean('untracked').notNull().default(false),
     ...timestamps(),
   },
   (table) => [
-    // One cycle per retainer and month keeps the job and the API from creating two (edge case 2).
     uniqueIndex('retainer_cycles_retainer_month_idx').on(table.retainerId, table.month),
+    // One cycle per retainer and number keeps the job and the API from creating two (J2).
+    uniqueIndex('retainer_cycles_retainer_number_idx').on(table.retainerId, table.number),
     index('retainer_cycles_status_idx').on(table.status),
     check('retainer_cycles_period_check', sql`${table.periodEnd} >= ${table.periodStart}`),
+    check('retainer_cycles_number_check', sql`${table.number} >= 1`),
+    check('retainer_cycles_untracked_check', sql`not ${table.untracked} or ${table.backdated}`),
   ],
 );
 
@@ -218,9 +241,9 @@ export const retainerCycleAdjustments = pgTable(
 );
 
 /**
- * A fixed agreement of a retainer (F05B T1–T12): months, the agreed total and an end action; its
- * schedule is its `monthly` charges. Never archived; it goes with its retainer. Terms of a
- * retainer never overlap (checked by the service under the retainer lock).
+ * A fixed agreement of a retainer (F05B T1–T12, F05C T1'): cycles, the agreed total and an end
+ * action; its schedule is its `monthly` charges. Never archived; it goes with its retainer. Terms
+ * of a retainer never overlap (checked by the service under the retainer lock).
  */
 export const retainerTerms = pgTable(
   'retainer_terms',
@@ -231,11 +254,16 @@ export const retainerTerms = pgTable(
       .references(() => retainers.id),
     /** 1, 2, 3… per retainer. */
     number: integer('number').notNull(),
-    /** The first day of its first month. */
-    startMonth: date('start_month', { mode: 'string' }).notNull(),
-    months: integer('months').notNull(),
-    /** The first day of its last month, `start_month` + `months` − 1, set by the service. */
-    endMonth: date('end_month', { mode: 'string' }).notNull(),
+    /** F05B, no longer written (F05C): the first day of its first month. */
+    startMonth: date('start_month', { mode: 'string' }),
+    months: integer('months'),
+    endMonth: date('end_month', { mode: 'string' }),
+    /** F05C T1': its first cycle and its number of cycles (1–36). */
+    startCycle: integer('start_cycle'),
+    cycles: integer('cycles'),
+    /** The first day of its first cycle and the last day of its last cycle, set by the service. */
+    startDate: date('start_date', { mode: 'string' }),
+    endDate: date('end_date', { mode: 'string' }),
     /** Frozen when the term is created, editable while it is scheduled; a money field. */
     agreedTotalMinor: minorAmount('agreed_total_minor').notNull(),
     endAction: termEndActionEnum('end_action').notNull().default('renew'),
@@ -263,6 +291,9 @@ export const retainerTerms = pgTable(
     check('retainer_terms_agreed_total_check', sql`${table.agreedTotalMinor} >= 0`),
     check('retainer_terms_start_month_check', sql`extract(day from ${table.startMonth}) = 1`),
     check('retainer_terms_end_month_check', sql`${table.endMonth} >= ${table.startMonth}`),
+    check('retainer_terms_cycles_check', sql`${table.cycles} between 1 and 36`),
+    check('retainer_terms_start_cycle_check', sql`${table.startCycle} >= 1`),
+    check('retainer_terms_end_date_check', sql`${table.endDate} >= ${table.startDate}`),
   ],
 );
 
@@ -277,17 +308,20 @@ export const retainerCharges = pgTable(
     retainerId: uuid('retainer_id')
       .notNull()
       .references(() => retainers.id),
-    /** The first day of the calendar month the charge belongs to. */
-    month: date('month', { mode: 'string' }).notNull(),
+    /** F05B, no longer written (F05C): the first day of the charge's calendar month. */
+    month: date('month', { mode: 'string' }),
+    /** F05C: the cycle the charge belongs to, and that cycle's `cyclePeriod` start. */
+    cycleNumber: integer('cycle_number'),
+    cycleStart: date('cycle_start', { mode: 'string' }),
     kind: retainerChargeKindEnum('kind').notNull(),
     /** Negative for a credit. */
     amountMinor: minorAmount('amount_minor').notNull(),
     status: retainerChargeStatusEnum('status').notNull().default('pending'),
-    /** A term month's `monthly` charge; null for open-ended months and other kinds. */
+    /** A term cycle's `monthly` charge; null for open-ended cycles and other kinds. */
     termId: uuid('term_id').references(() => retainerTerms.id),
     /**
-     * A term month's `monthly` charge only: the schedule amount plus onward amendments, without
-     * one-month ones (what a renewal copies, T7); a money field.
+     * A term cycle's `monthly` charge only: the schedule amount plus onward amendments, without
+     * one-cycle ones (what a renewal copies, T7); a money field.
      */
     baseAmountMinor: minorAmount('base_amount_minor'),
     /** Set once, when the charge became due and its due hooks ran (C3). */
@@ -302,6 +336,7 @@ export const retainerCharges = pgTable(
   },
   (table) => [
     index('retainer_charges_retainer_month_idx').on(table.retainerId, table.month),
+    index('retainer_charges_retainer_cycle_idx').on(table.retainerId, table.cycleNumber),
     index('retainer_charges_status_idx').on(table.status),
     index('retainer_charges_term_id_idx').on(table.termId),
     index('retainer_charges_amendment_id_idx').on(table.amendmentId),
@@ -310,10 +345,14 @@ export const retainerCharges = pgTable(
       'retainer_charges_settle_note_check',
       sql`(${table.status} = 'settled_outside') = (${table.settleNote} is not null) and coalesce(char_length(${table.settleNote}), 0) <= 300`,
     ),
-    // One live monthly charge per retainer and month keeps the job and the API from creating two.
     uniqueIndex('retainer_charges_monthly_idx')
       .on(table.retainerId, table.month)
       .where(sql`${table.kind} = 'monthly' and ${table.status} <> 'cancelled'`),
+    // One live monthly charge per retainer and cycle keeps the job and the API from creating two.
+    uniqueIndex('retainer_charges_monthly_cycle_idx')
+      .on(table.retainerId, table.cycleNumber)
+      .where(sql`${table.kind} = 'monthly' and ${table.status} <> 'cancelled'`),
+    check('retainer_charges_cycle_check', sql`${table.cycleNumber} >= 1`),
     check(
       'retainer_charges_amount_check',
       sql`case when ${table.kind} = 'credit' then ${table.amountMinor} < 0 else ${table.amountMinor} >= 0 end`,
@@ -327,8 +366,9 @@ export const retainerCharges = pgTable(
 );
 
 /**
- * A numbered change of a retainer's lines and amounts (F05B A1–A9): one month or onward, a
- * reschedule, or a quote renewal. Never archived or edited; a wrong one is corrected by another.
+ * A numbered change of a retainer's lines and amounts (F05B A1–A9, F05C A1'): one cycle or
+ * onward, a reschedule, or a quote renewal. Never archived or edited; a wrong one is corrected by
+ * another.
  */
 export const retainerAmendments = pgTable(
   'retainer_amendments',
@@ -342,13 +382,16 @@ export const retainerAmendments = pgTable(
     kind: amendmentKindEnum('kind').notNull(),
     /** Required for `change`, `onward` for `quote_renewal`, null for `reschedule`. */
     scope: amendmentScopeEnum('scope'),
-    /** The first day of the month it takes effect in. */
-    effectiveMonth: date('effective_month', { mode: 'string' }).notNull(),
-    /** `change`: the change to each affected month; a money field. */
+    /** F05B, no longer written (F05C): the first day of the month it takes effect in. */
+    effectiveMonth: date('effective_month', { mode: 'string' }),
+    /** F05C A1': the cycle it takes effect in, and that cycle's first day. */
+    effectiveCycle: integer('effective_cycle'),
+    effectiveDate: date('effective_date', { mode: 'string' }),
+    /** `change`: the change to each affected cycle; a money field. */
     amountDeltaMinor: minorAmount('amount_delta_minor').notNull().default(0),
-    /** `reschedule` only: `{ month, amountMinor }[]`, the new amounts; a money field. */
-    schedule: jsonb('schedule').$type<{ month: string; amountMinor: number }[]>(),
-    /** Σ of the change over the months it affects when created (A4); a money field. */
+    /** `reschedule` only: `{ cycle, amountMinor }[]`, the new amounts; a money field. */
+    schedule: jsonb('schedule').$type<{ cycle: number; amountMinor: number }[]>(),
+    /** Σ of the change over the cycles it affects when created (A4); a money field. */
     moneyDeltaMinor: minorAmount('money_delta_minor').notNull().default(0),
     reason: text('reason').notNull(),
     status: amendmentStatusEnum('status').notNull(),
@@ -359,18 +402,18 @@ export const retainerAmendments = pgTable(
     decisionNote: text('decision_note'),
     appliedAt: timestamp('applied_at', { withTimezone: true }),
     /**
-     * Per month what it did when applied (while pending or scheduled, its preview): the effect,
+     * Per cycle what it did when applied (while pending or scheduled, its preview): the effect,
      * the invoice and the amounts before and after; money fields.
      */
     effects: jsonb('effects').$type<AmendmentEffectRow[]>().notNull().default([]),
     /** `quote_renewal` only: the accepted quote. */
     quoteId: uuid('quote_id').references((): AnyPgColumn => quotes.id),
     /**
-     * `quote_renewal` only: the monthly fee (the open-ended rate) from its month, the quote's
+     * `quote_renewal` only: the monthly fee (the open-ended rate) from its cycle, the quote's
      * monthly net; a money field.
      */
     feeMinor: minorAmount('fee_minor'),
-    /** `quote_renewal` only: the monthly template the quote renewal links in its month. */
+    /** `quote_renewal` only: the monthly template the quote renewal links in its cycle. */
     templateId: uuid('template_id').references((): AnyPgColumn => workTemplates.id),
     ...timestamps(),
   },
@@ -385,6 +428,7 @@ export const retainerAmendments = pgTable(
       'retainer_amendments_effective_month_check',
       sql`extract(day from ${table.effectiveMonth}) = 1`,
     ),
+    check('retainer_amendments_effective_cycle_check', sql`${table.effectiveCycle} >= 1`),
     check(
       'retainer_amendments_scope_check',
       sql`case ${table.kind} when 'change' then ${table.scope} is not null when 'quote_renewal' then ${table.scope} = 'onward' else ${table.scope} is null end`,
@@ -402,9 +446,9 @@ export const retainerAmendments = pgTable(
   ],
 );
 
-/** A month an amendment changed, as stored in `retainer_amendments.effects`. */
+/** A cycle an amendment changed, as stored in `retainer_amendments.effects`. */
 export interface AmendmentEffectRow {
-  month: string;
+  cycle: number;
   effect: string;
   invoice: { id: string; displayNumber: string | null } | null;
   beforeMinor: number;

@@ -5997,9 +5997,13 @@ export interface components {
                 client: string;
                 termNumber: number;
                 /** Format: date */
-                startMonth: string;
+                startDate?: string;
                 /** Format: date */
-                endMonth: string;
+                endDate?: string;
+                /** Format: date */
+                startMonth?: string;
+                /** Format: date */
+                endMonth?: string;
             };
         } | {
             /** Format: uuid */
@@ -7029,7 +7033,9 @@ export interface components {
             renewal: components["schemas"]["RenewalState"] | null;
             term: components["schemas"]["RetainerTermSummary"] | null;
             pendingAmendments: number;
-            currentCycle: components["schemas"]["Cycle"] | null;
+            currentCycle: components["schemas"]["CurrentCycle"] | null;
+            /** Format: date */
+            nextCycleStart: string | null;
         };
         /** @enum {string} */
         RenewalState: "due" | "overdue";
@@ -7038,11 +7044,12 @@ export interface components {
             id: string;
             number: number;
             status: components["schemas"]["TermStatus"];
+            startCycle: number;
+            cycles: number;
             /** Format: date */
-            startMonth: string;
+            startDate: string;
             /** Format: date */
-            endMonth: string;
-            months: number;
+            endDate: string;
             endAction: components["schemas"]["TermEndAction"];
             money?: {
                 agreedTotalMinor: number;
@@ -7051,23 +7058,27 @@ export interface components {
         };
         /** @enum {string} */
         TermStatus: "scheduled" | "active" | "completed" | "cancelled";
-        Cycle: {
+        CurrentCycle: {
             /** Format: uuid */
             id: string;
             /** Format: uuid */
             retainerId: string;
-            /** Format: date */
-            month: string;
+            number: number;
             /** Format: date */
             periodStart: string;
             /** Format: date */
             periodEnd: string;
             status: components["schemas"]["CycleStatus"];
+            backdated: boolean;
+            untracked: boolean;
             /** Format: date-time */
             closedAt: string | null;
             deliveryRate: number | null;
             behind: boolean;
             lines: components["schemas"]["CycleLine"][];
+            daysLeft: number;
+            termPosition: number | null;
+            termCycles: number | null;
         };
         /** @enum {string} */
         CycleStatus: "open" | "closed";
@@ -7109,7 +7120,9 @@ export interface components {
             renewal: components["schemas"]["RenewalState"] | null;
             term: components["schemas"]["RetainerTermSummary"] | null;
             pendingAmendments: number;
-            currentCycle: components["schemas"]["Cycle"] | null;
+            currentCycle: components["schemas"]["CurrentCycle"] | null;
+            /** Format: date */
+            nextCycleStart: string | null;
             /** Format: date */
             startDate: string;
             /** Format: date */
@@ -7147,8 +7160,6 @@ export interface components {
             departments: components["schemas"]["DepartmentCode"][];
             /** Format: date */
             startDate: string;
-            /** Format: date */
-            renewalDate?: string | null;
             currency?: components["schemas"]["Currency"];
             monthlyFeeMinor?: number | null;
             /** Format: uuid */
@@ -7163,7 +7174,7 @@ export interface components {
             revisionLimit?: number | null;
         };
         RetainerTermInput: {
-            months: number;
+            cycles: number;
             agreedTotalMinor: number;
             schedule: number[];
             /** @default renew */
@@ -7174,8 +7185,6 @@ export interface components {
             departments?: components["schemas"]["DepartmentCode"][];
             /** Format: date */
             startDate?: string;
-            /** Format: date */
-            renewalDate?: string | null;
             currency?: components["schemas"]["Currency"];
             monthlyFeeMinor?: number | null;
         };
@@ -7197,17 +7206,37 @@ export interface components {
         RetainerStatusChange: {
             status: components["schemas"]["RetainerStatus"];
             termination?: components["schemas"]["RetainerTermination"];
+            startNow?: boolean;
         };
         RetainerTermination: {
             feeMinor: number;
             reason: string;
         };
-        /** @description Cycles, newest month first */
+        /** @description Cycles, newest first */
         CyclePage: {
             items: components["schemas"]["Cycle"][];
             total: number;
             page: number;
             pageSize: number;
+        };
+        Cycle: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            retainerId: string;
+            number: number;
+            /** Format: date */
+            periodStart: string;
+            /** Format: date */
+            periodEnd: string;
+            status: components["schemas"]["CycleStatus"];
+            backdated: boolean;
+            untracked: boolean;
+            /** Format: date-time */
+            closedAt: string | null;
+            deliveryRate: number | null;
+            behind: boolean;
+            lines: components["schemas"]["CycleLine"][];
         };
         /** @description A cycle with each line’s adjustments, newest first */
         CycleDetail: {
@@ -7215,13 +7244,14 @@ export interface components {
             id: string;
             /** Format: uuid */
             retainerId: string;
-            /** Format: date */
-            month: string;
+            number: number;
             /** Format: date */
             periodStart: string;
             /** Format: date */
             periodEnd: string;
             status: components["schemas"]["CycleStatus"];
+            backdated: boolean;
+            untracked: boolean;
             /** Format: date-time */
             closedAt: string | null;
             deliveryRate: number | null;
@@ -7282,11 +7312,12 @@ export interface components {
             id: string;
             number: number;
             status: components["schemas"]["TermStatus"];
+            startCycle: number;
+            cycles: number;
             /** Format: date */
-            startMonth: string;
+            startDate: string;
             /** Format: date */
-            endMonth: string;
-            months: number;
+            endDate: string;
             endAction: components["schemas"]["TermEndAction"];
             renewedFrom: {
                 /** Format: uuid */
@@ -7302,11 +7333,14 @@ export interface components {
                 agreedTotalMinor: number;
                 currentTotalMinor: number;
             };
-            schedule: components["schemas"]["RetainerTermMonth"][];
+            schedule: components["schemas"]["RetainerTermCycle"][];
         };
-        RetainerTermMonth: {
+        RetainerTermCycle: {
+            cycle: number;
             /** Format: date */
-            month: string;
+            periodStart: string;
+            /** Format: date */
+            periodEnd: string;
             position: number;
             /** Format: uuid */
             chargeId: string | null;
@@ -7321,21 +7355,19 @@ export interface components {
         /** @enum {string} */
         RetainerChargeStatus: "pending" | "cancelled" | "settled_outside";
         CreateRetainerTerm: {
-            months: number;
+            cycles: number;
             agreedTotalMinor: number;
             schedule: number[];
             /** @default renew */
             endAction: components["schemas"]["TermEndAction"];
-            /** Format: date */
-            startMonth: string;
+            startCycle: number;
         };
         UpdateRetainerTerm: {
-            months?: number;
+            cycles?: number;
             agreedTotalMinor?: number;
             schedule?: number[];
             endAction?: components["schemas"]["TermEndAction"];
-            /** Format: date */
-            startMonth?: string;
+            startCycle?: number;
         };
         CancelRetainerTerm: {
             reason: string;
@@ -7356,8 +7388,9 @@ export interface components {
             number: number;
             kind: components["schemas"]["AmendmentKind"];
             scope: components["schemas"]["AmendmentScope"] | null;
+            effectiveCycle: number;
             /** Format: date */
-            effectiveMonth: string;
+            effectiveDate: string;
             status: components["schemas"]["AmendmentStatus"];
             reason: string;
             lines: components["schemas"]["AmendmentLine"][];
@@ -7386,8 +7419,7 @@ export interface components {
                 amountDeltaMinor: number;
                 moneyDeltaMinor: number;
                 schedule: {
-                    /** Format: date */
-                    month: string;
+                    cycle: number;
                     amountMinor: number;
                 }[] | null;
             };
@@ -7395,7 +7427,7 @@ export interface components {
         /** @enum {string} */
         AmendmentKind: "change" | "reschedule" | "quote_renewal";
         /** @enum {string} */
-        AmendmentScope: "month" | "onward";
+        AmendmentScope: "cycle" | "onward";
         AmendmentLine: {
             kind: components["schemas"]["DeliverableKind"];
             label: string | null;
@@ -7405,8 +7437,11 @@ export interface components {
             position: number;
         };
         AmendmentEffect: {
+            cycle: number;
             /** Format: date */
-            month: string;
+            periodStart: string;
+            /** Format: date */
+            periodEnd: string;
             effect: components["schemas"]["AmendmentEffectKind"];
             invoice: {
                 /** Format: uuid */
@@ -7422,8 +7457,7 @@ export interface components {
         AmendmentEffectKind: "charge_changed" | "draft_synced" | "addition" | "credit" | "fee_changed" | "no_cycle";
         CreateAmendment: {
             scope: components["schemas"]["AmendmentScope"];
-            /** Format: date */
-            effectiveMonth: string;
+            effectiveCycle: number;
             lines?: components["schemas"]["AmendmentLineInput"][];
             /** @default 0 */
             amountDeltaMinor: number;
@@ -7436,7 +7470,7 @@ export interface components {
             revisionLimit?: number | null;
         };
         AmendmentPreview: {
-            months: components["schemas"]["AmendmentEffect"][];
+            cycles: components["schemas"]["AmendmentEffect"][];
             moneyDeltaMinor: number;
             needsApproval: boolean;
         };
@@ -7448,8 +7482,7 @@ export interface components {
         };
         RescheduleTerm: {
             schedule: {
-                /** Format: date */
-                month: string;
+                cycle: number;
                 amountMinor: number;
             }[];
             reason: string;
@@ -7468,8 +7501,9 @@ export interface components {
             number: number;
             kind: components["schemas"]["AmendmentKind"];
             scope: components["schemas"]["AmendmentScope"] | null;
+            effectiveCycle: number;
             /** Format: date */
-            effectiveMonth: string;
+            effectiveDate: string;
             status: components["schemas"]["AmendmentStatus"];
             reason: string;
             lines: components["schemas"]["AmendmentLine"][];
@@ -7498,8 +7532,7 @@ export interface components {
                 amountDeltaMinor: number;
                 moneyDeltaMinor: number;
                 schedule: {
-                    /** Format: date */
-                    month: string;
+                    cycle: number;
                     amountMinor: number;
                 }[] | null;
             };
@@ -9072,8 +9105,11 @@ export interface components {
                     id: string;
                     name: string;
                 };
+                cycle: number;
                 /** Format: date */
-                month: string;
+                periodStart: string;
+                /** Format: date */
+                periodEnd: string;
                 kind: components["schemas"]["RetainerChargeKind"];
                 amountMinor: number;
             }[];
@@ -9511,15 +9547,18 @@ export interface components {
         RetainerCharge: {
             /** Format: uuid */
             id: string;
+            cycle: number;
             /** Format: date */
-            month: string;
+            periodStart: string;
+            /** Format: date */
+            periodEnd: string;
             kind: components["schemas"]["RetainerChargeKind"];
             amountMinor: number;
             status: components["schemas"]["RetainerChargeStatus"];
             term: {
                 number: number;
                 position: number;
-                months: number;
+                cycles: number;
             } | null;
             amendment: {
                 /** Format: uuid */
@@ -9957,8 +9996,11 @@ export interface components {
             cycle: {
                 /** Format: uuid */
                 id: string;
+                number: number;
                 /** Format: date */
-                month: string;
+                periodStart: string;
+                /** Format: date */
+                periodEnd: string;
                 retainer: {
                     /** Format: uuid */
                     id: string;
@@ -10009,8 +10051,7 @@ export interface components {
             cycle: {
                 /** Format: uuid */
                 id: string;
-                /** Format: date */
-                month: string;
+                number: number;
                 /** Format: date */
                 periodStart: string;
                 /** Format: date */
@@ -10458,8 +10499,6 @@ export interface components {
                 departments: components["schemas"]["DepartmentCode"][];
                 /** Format: date */
                 startDate: string;
-                /** Format: date */
-                renewalDate: string | null;
                 template: {
                     /** Format: uuid */
                     id: string;
@@ -10480,6 +10519,9 @@ export interface components {
                     name: string;
                     status: components["schemas"]["RetainerStatus"];
                     /** Format: date */
+                    startDate: string;
+                    renewsFromCycle: number;
+                    /** Format: date */
                     renewsFrom: string;
                     afterTerm: boolean;
                 }[];
@@ -10492,7 +10534,7 @@ export interface components {
             conversion: components["schemas"]["LeadConversionPlan"] | null;
         };
         AcceptTermPlan: {
-            months: number;
+            cycles: number;
             agreedTotalMinor: number;
             schedule: number[];
             endAction: components["schemas"]["TermEndAction"];
@@ -10575,8 +10617,6 @@ export interface components {
                 departments: components["schemas"]["DepartmentCode"][];
                 /** Format: date */
                 startDate: string;
-                /** Format: date */
-                renewalDate: string | null;
                 /** Format: uuid */
                 templateId: string | null;
                 /** @default null */
@@ -12134,6 +12174,11 @@ export interface components {
                     id: string;
                     name: string;
                 };
+                cycle: number;
+                /** Format: date */
+                periodStart: string;
+                /** Format: date */
+                periodEnd: string;
                 status: components["schemas"]["CycleStatus"];
                 lines: {
                     kind: components["schemas"]["DeliverableKind"];
