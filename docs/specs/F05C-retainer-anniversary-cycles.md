@@ -202,12 +202,13 @@ Expand only, as F05B (the dev and test databases are shared with checkouts that 
 - K11. Contract and annex texts outside the editable articles (headings, labels, preamble, end-action clauses, annex wording) live in `packages/messages` (ADR 0028), shared by the API's checks and the worker's template.
 - K12. Settings: every field is plain text; the article template is edited as a list (add, edit, remove, reorder any article). Changes apply to drafts prepared afterwards, never to existing drafts or issued contracts.
 - Settled in PR 5a (implementation):
-  - An open-ended contract starts at the current cycle (cycle 1 before the start date); it is refused (`INVALID_TRANSITION`) while a term covers that cycle: the term's contract covers it.
-  - The contract covering a cycle (K9, K10) is the issued or signed term contract whose term holds the cycle, else the issued or signed open-ended contract with the latest start cycle at or before it.
+  - An open-ended contract starts at the current cycle (cycle 1 before the start date); it is refused (`INVALID_TRANSITION`), when prepared and when issued, while a scheduled or active term holds that cycle: the term's contract covers it.
+  - The contract covering a cycle (K9, K10) is the issued or signed term contract whose term holds the cycle, else the issued or signed contract covering onward with the latest start cycle at or before it: an open-ended contract, or the contract of a term whose end action is `continue` (K1).
   - K9 is computed on read: the term cancelled; its start, cycles, end, end action or agreed total different from the snapshot; or an applied `change` or `reschedule` amendment applied after the issue, in a covered cycle, without a live annex of the contract. The schedule amounts are compared only while there is no such amendment, since amendments move them too and are answered by annexes.
   - The second party's phone, email and title are the signatory contact's; the address is the client's billing address.
   - The fees schedule prints each term cycle's base amount (the schedule plus onward amendments applied before the issue).
   - Contract numbers come from `invoices`' yearly counters (kind `contract`) through `projects`' `ContractSources`, which `quotes` also fills with the accepted quote's monthly services (no module import cycle).
+  - A signed copy (contract or annex) is a PDF or an image; another type is refused (`FILE_TYPE_NOT_ACCEPTED`).
   - An annex PDF that failed is rendered again with `POST …/annexes/:annexId/pdf` (as contracts).
   - Documents of the contract: `<number>.pdf`, `<number> - annex <n>.pdf`, and the signed copies named `<number> signed <file>` and `<number> annex <n> signed <file>`; a new signed upload is the next version of the same document.
 

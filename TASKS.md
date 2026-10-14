@@ -229,8 +229,11 @@ PR 4 is merged (#114). Owner `projects` for `retainer_contracts`, `retainer_cont
 - [x] `pnpm build`, `openapi:export`, `api:generate`
 
 #### Close PR 5a
-- [ ] Wiring checklist; spec and `docs/architecture.md` (the `ContractNumbers` port)
-- [ ] Full checks through `checker`; `reviewer` with the spec; owner acceptance (endpoints at `/api/docs`, the PDFs from the worker screenshots); `/ship`
+- [x] Wiring checklist; spec ("Settled in PR 5a") and `docs/architecture.md` (the `ContractSources` port)
+- [x] Full checks: lint, typecheck, `pnpm test` (11/11, 1058 API tests), build, migration drift, OpenAPI fresh; E2E stopped by the owner at 321 passed, none failed (CI runs it in full)
+- [x] `reviewer` with the spec; blocking findings fixed (a scheduled term blocks an open-ended contract, also at issue; a `continue` term's contract covers onward; 403 and out-of-scope tests on every endpoint, `RETAINER_ENDED`, `RETAINER_ARCHIVED`, yearly numbering; signed copies PDF or image only, `FILE_TYPE_NOT_ACCEPTED`)
+- [x] Owner accepted ("اقبل كل شئ"), the end-action clauses included
+- [ ] `/ship`
 
 ### PR 5b — contract screens (after 5a is merged)
 - [ ] web: Contracts section on the Contract tab (list, actions, annexes, "Issue annex" per applied amendment, "changed since issue"); contract editor `/retainers/$retainerId/contracts/$contractId` (date, signatory, parties with missing fields and links, articles editor with placeholder menu and reorder, Preview PDF, Issue dialog listing empty fields and missing blocks, Discard; read-only when issued, signed copy upload, Void); `ar.json`; gate

@@ -367,6 +367,12 @@ export class RetainerTermsService {
     );
   }
 
+  /** F05C K1: whether a scheduled or active term of the retainer holds the cycle. */
+  async holds(executor: Executor, retainerId: string, cycle: number): Promise<boolean> {
+    const terms = await this.openTerms(executor, retainerId);
+    return terms.some((term) => term.startCycle <= cycle && endCycleOf(term) >= cycle);
+  }
+
   /** T11: whether the retainer has an active or scheduled term (its renewal date is derived). */
   async hasOpenTerm(executor: Executor, retainerId: string): Promise<boolean> {
     const [row] = await executor

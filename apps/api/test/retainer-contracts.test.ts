@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import type { INestApplication } from '@nestjs/common';
 import {
+  addDays,
   businessDate,
   CONTRACTS_PDF_JOB,
   type ContractPdfJob,
@@ -35,6 +36,7 @@ import { asc, eq, notInArray } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { JobQueue } from '../src/core/jobs/index.js';
 import { ContractPdfs } from '../src/modules/projects/index.js';
+import { coveringContract } from '../src/modules/projects/retainer-contracts.service.js';
 import { expectError, seedClientCast } from './client-cast.js';
 import { api, clientIp, ORIGIN } from './helpers.js';
 import { startApp } from './start-app.js';
@@ -687,6 +689,63 @@ describe('retainer contracts (F05C K1–K12)', () => {
       expect(queued.slice(before).some((job) => job.id === second.id)).toBe(true);
     });
 
+    it('lets only contract readers and managers reach every endpoint, 404 outside', async () => {
+      const [item] = await list(held.id);
+      const annexId = item?.annexes.at(-1)?.id ?? '';
+      const path = `${base(held.id)}/${contract.id}`;
+      const annexPath = `${path}/annexes/${annexId}`;
+      const upload = { signedOn: today, uploadId: randomUUID() };
+      for (const cookie of [cast.employee.cookie, cast.otherAm.cookie]) {
+        expect((await client.get(path, cookie)).status).toBe(403);
+        expect((await client.get(`${path}/pdf`, cookie)).status).toBe(403);
+        expect((await client.post(`${path}/pdf`, cookie, {})).status).toBe(403);
+        expect((await client.get(`${annexPath}/pdf`, cookie)).status).toBe(403);
+        expect((await client.post(`${annexPath}/pdf`, cookie, {})).status).toBe(403);
+      }
+      for (const cookie of [cast.employee.cookie, cast.otherAm.cookie, finance.cookie]) {
+        expect((await action(held.id, contract.id, 'discard', {}, cookie)).status).toBe(403);
+        expect((await action(held.id, contract.id, 'void', { reason: 'x' }, cookie)).status).toBe(
+          403,
+        );
+        expect((await action(held.id, contract.id, 'signed', upload, cookie)).status).toBe(403);
+        expect((await client.post(`${annexPath}/void`, cookie, { reason: 'x' })).status).toBe(403);
+        expect((await client.post(`${annexPath}/signed`, cookie, upload)).status).toBe(403);
+        expect((await client.get(`${path}/pdf?draft=true`, cookie)).status).toBe(403);
+      }
+      // Finance reads them all.
+      expect((await detail(held.id, contract.id, finance.cookie)).id).toBe(contract.id);
+      // Out of scope: another retainer's path, an unknown contract or annex.
+      const other = await retainer();
+      expect((await client.get(`${base(other.id)}/${contract.id}`, cast.am.cookie)).status).toBe(
+        404,
+      );
+      expect((await action(other.id, contract.id, 'void', { reason: 'x' })).status).toBe(404);
+      expect((await client.get(`${path}/annexes/${randomUUID()}/pdf`, cast.am.cookie)).status).toBe(
+        404,
+      );
+      expect(
+        (await client.post(`${path}/annexes/${randomUUID()}/void`, cast.am.cookie, { reason: 'x' }))
+          .status,
+      ).toBe(404);
+    });
+
+    it('takes only a PDF or an image as a signed copy (K5)', async () => {
+      const form = new FormData();
+      form.append('file', new Blob(['plain notes'], { type: 'text/plain' }), 'notes.txt');
+      const response = await fetch(`${url}/api/files/uploads`, {
+        method: 'POST',
+        headers: { origin: ORIGIN, 'x-forwarded-for': clientIp(), cookie: cast.am.cookie },
+        body: form,
+      });
+      expect(response.status).toBe(201);
+      const text = fileUploadSchema.parse(await response.json());
+      await expectError(
+        await action(held.id, contract.id, 'signed', { signedOn: today, uploadId: text.uploadId }),
+        400,
+        'FILE_TYPE_NOT_ACCEPTED',
+      );
+    });
+
     it('gives no annex to an amendment that is not applied', async () => {
       const pending = await client.post(`/api/retainers/${held.id}/amendments`, cast.am.cookie, {
         scope: 'onward',
@@ -698,6 +757,72 @@ describe('retainer contracts (F05C K1–K12)', () => {
       const { id, status } = (await pending.json()) as { id: string; status: string };
       expect(status).toBe('scheduled');
       await expectError(await annex(id), 409, 'INVALID_TRANSITION');
+    });
+  });
+  describe('coverage and refusals', () => {
+    it('covers a cycle by its term contract, else the latest onward one (K1, K9, K10)', () => {
+      const open = { id: 'open', kind: 'open_ended' as const, startCycle: 1, endCycle: null };
+      const term = { id: 'term', kind: 'term' as const, startCycle: 3, endCycle: 5 };
+      const continues = { id: 'continues', kind: 'term' as const, startCycle: 7, endCycle: null };
+      const all = [open, term, continues];
+      expect(coveringContract(all, 2)?.id).toBe('open');
+      expect(coveringContract(all, 4)?.id).toBe('term');
+      expect(coveringContract(all, 6)?.id).toBe('open');
+      // A term ending with `continue` keeps covering the cycles after it.
+      expect(coveringContract(all, 12)?.id).toBe('continues');
+      expect(coveringContract([term], 6)).toBeNull();
+    });
+
+    it('refuses an open-ended contract while a scheduled term holds its cycle', async () => {
+      const later = await cast.createRetainer(clientId, { startDate: addDays(today, 20) });
+      const scheduled = await client.post(`/api/retainers/${later.id}/terms`, cast.am.cookie, {
+        startCycle: 1,
+        cycles: 2,
+        agreedTotalMinor: 20_000,
+        schedule: [10_000, 10_000],
+      });
+      expect(scheduled.status).toBe(201);
+      await expectError(await create(later.id, { kind: 'open_ended' }), 409, 'INVALID_TRANSITION');
+    });
+
+    it('refuses a term added after an open-ended draft at issue', async () => {
+      const held = await cast.createRetainer(clientId, { startDate: addDays(today, 20) });
+      const draft = await draftFor(held.id, { kind: 'open_ended' });
+      const added = await client.post(`/api/retainers/${held.id}/terms`, cast.am.cookie, {
+        startCycle: 1,
+        cycles: 2,
+        agreedTotalMinor: 20_000,
+        schedule: [10_000, 10_000],
+      });
+      expect(added.status).toBe(201);
+      await expectError(await action(held.id, draft.id, 'issue'), 409, 'INVALID_TRANSITION');
+    });
+
+    it('refuses contracts on ended and archived retainers', async () => {
+      const ended = await retainer();
+      const end = await client.post(`/api/retainers/${ended.id}/status`, cast.gm.cookie, {
+        status: 'ended',
+      });
+      expect(end.status).toBe(200);
+      await expectError(await create(ended.id, { kind: 'open_ended' }), 409, 'RETAINER_ENDED');
+      const archived = await retainer();
+      expect(
+        (await client.post(`/api/retainers/${archived.id}/archive`, cast.gm.cookie, {})).status,
+      ).toBe(200);
+      await expectError(
+        await create(archived.id, { kind: 'open_ended' }, cast.gm.cookie),
+        409,
+        'RETAINER_ARCHIVED',
+      );
+    });
+
+    it('numbers contracts by the year of the issue (edge case 13)', async () => {
+      const held = await retainer();
+      const draft = await draftFor(held.id, { kind: 'open_ended' });
+      const issued = await cast.onDay('2031-01-05', async (cookie) =>
+        ok(await action(held.id, draft.id, 'issue', {}, cookie), parseDetail),
+      );
+      expect(issued.number).toBe('VM-CCS-2031-001');
     });
   });
 });

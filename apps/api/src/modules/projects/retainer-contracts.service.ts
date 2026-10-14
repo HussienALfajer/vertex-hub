@@ -67,30 +67,30 @@ export interface CoveringContract {
   id: string;
   kind: ContractRow['kind'];
   startCycle: number;
-  /** `term` contracts: the term's last cycle; open-ended ones cover onward. */
+  /**
+   * A term contract's last cycle; null when it covers onward: an open-ended contract, or a term
+   * contract whose term continues cycle by cycle after its end (K1).
+   */
   endCycle: number | null;
 }
 
 /**
  * The issued or signed contract that covers `cycle`: a term contract whose term holds it, else
- * the open-ended contract that starts latest at or before it.
+ * the contract covering onward that starts latest at or before it.
  */
 export function coveringContract(
   contracts: readonly CoveringContract[],
   cycle: number,
 ): CoveringContract | null {
-  const term = contracts.find(
+  const bounded = contracts.find(
     (contract) =>
-      contract.kind === 'term' &&
-      contract.startCycle <= cycle &&
-      contract.endCycle !== null &&
-      cycle <= contract.endCycle,
+      contract.endCycle !== null && contract.startCycle <= cycle && cycle <= contract.endCycle,
   );
-  if (term) return term;
-  const open = contracts
-    .filter((contract) => contract.kind === 'open_ended' && contract.startCycle <= cycle)
+  if (bounded) return bounded;
+  const onward = contracts
+    .filter((contract) => contract.endCycle === null && contract.startCycle <= cycle)
     .sort((a, b) => b.startCycle - a.startCycle);
-  return open[0] ?? null;
+  return onward[0] ?? null;
 }
 
 /**
@@ -168,13 +168,7 @@ export class RetainerContractsService {
         termId = term.id;
       } else {
         startCycle = Math.max(1, currentCycleNumber(retainer.startDate, today));
-        if (await this.terms.covering(tx, retainerId, startCycle)) {
-          throw new CodedException(
-            409,
-            'INVALID_TRANSITION',
-            'The current cycle is covered by a term: prepare the term contract',
-          );
-        }
+        await this.assertNoTermHolds(tx, retainerId, startCycle);
       }
       await this.assertNoLiveContract(tx, retainerId, input.kind, termId, startCycle);
       const [approver] = await this.clients.approvers([retainer.clientId]);
@@ -317,8 +311,12 @@ export class RetainerContractsService {
         if (!term || term.status === 'cancelled') {
           throw new CodedException(409, 'INVALID_TRANSITION', 'The term was cancelled');
         }
-      } else if (retainer.status !== 'active' && retainer.status !== 'paused') {
-        throw new CodedException(409, 'INVALID_TRANSITION', 'The retainer is not running');
+      } else {
+        if (retainer.status !== 'active' && retainer.status !== 'paused') {
+          throw new CodedException(409, 'INVALID_TRANSITION', 'The retainer is not running');
+        }
+        // A term added after the draft was prepared covers the cycle now.
+        await this.assertNoTermHolds(tx, retainerId, row.startCycle);
       }
       if (
         row.signatoryContactId &&
@@ -459,7 +457,13 @@ export class RetainerContractsService {
     },
   ): Promise<{ itemId: string; preview: boolean }> {
     if (copy.itemId) {
-      const { preview } = await this.files.addUploadVersion(tx, actor, copy.itemId, copy.uploadId);
+      const { preview } = await this.files.addUploadVersion(
+        tx,
+        actor,
+        copy.itemId,
+        copy.uploadId,
+        isScan,
+      );
       return { itemId: copy.itemId, preview };
     }
     const attached = await this.files.attachUpload(tx, actor, {
@@ -468,6 +472,7 @@ export class RetainerContractsService {
       clientId: copy.clientId,
       uploadId: copy.uploadId,
       namePrefix: copy.namePrefix,
+      accept: isScan,
     });
     return { itemId: attached.itemId, preview: attached.preview };
   }
@@ -484,6 +489,7 @@ export class RetainerContractsService {
         startCycle: retainerContracts.startCycle,
         termStart: retainerTerms.startCycle,
         termCycles: retainerTerms.cycles,
+        endAction: retainerTerms.endAction,
       })
       .from(retainerContracts)
       .leftJoin(retainerTerms, eq(retainerTerms.id, retainerContracts.termId))
@@ -498,8 +504,9 @@ export class RetainerContractsService {
       id: row.id,
       kind: row.kind,
       startCycle: row.termStart ?? row.startCycle,
+      // K1: a term that continues after its end is covered onward by its contract.
       endCycle:
-        row.kind === 'term' && row.termStart && row.termCycles
+        row.kind === 'term' && row.termStart && row.termCycles && row.endAction !== 'continue'
           ? row.termStart + row.termCycles - 1
           : null,
     }));
@@ -742,6 +749,21 @@ export class RetainerContractsService {
     return { retainer, row };
   }
 
+  /** K1: a scheduled or active term holding the cycle is covered by the term's contract. */
+  private async assertNoTermHolds(
+    tx: Transaction,
+    retainerId: string,
+    cycle: number,
+  ): Promise<void> {
+    if (await this.terms.holds(tx, retainerId, cycle)) {
+      throw new CodedException(
+        409,
+        'INVALID_TRANSITION',
+        'A term covers this cycle: prepare the term contract',
+      );
+    }
+  }
+
   /** K1, edge case 10: one live contract per term, one per open-ended start cycle. */
   private async assertNoLiveContract(
     tx: Transaction,
@@ -810,6 +832,10 @@ export class RetainerContractsService {
     return { before: before.map(({ title }) => title), after: after.map(({ title }) => title) };
   }
 }
+
+/** K5: a signed copy is a scan, PDF or image. */
+const isScan = (mimeType: string) =>
+  mimeType === 'application/pdf' || mimeType.startsWith('image/');
 
 /** K2, K7: at most 40 articles, no unknown `{…}`. */
 function assertArticles(articles: NonNullable<UpdateContract['articles']>): void {

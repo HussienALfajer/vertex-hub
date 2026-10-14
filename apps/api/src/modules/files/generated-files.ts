@@ -75,6 +75,15 @@ export interface AttachedUpload {
   uploadId: string;
   /** Put before the uploaded name, such as the receipt number of a payment's proof. */
   namePrefix?: string;
+  /** The types the owner takes (F05C K5: a scan, PDF or image); others are refused. */
+  accept?: (mimeType: string) => boolean;
+}
+
+/** Refuses an upload of a type the owner does not take (`FILE_TYPE_NOT_ACCEPTED`). */
+function assertAccepted(mimeType: string, accept?: (mimeType: string) => boolean): void {
+  if (accept && !accept(mimeType)) {
+    throw new CodedException(400, 'FILE_TYPE_NOT_ACCEPTED', 'This file type is not accepted here');
+  }
 }
 
 /**
@@ -107,6 +116,7 @@ export class GeneratedFiles {
       .where(and(eq(fileUploads.id, document.uploadId), eq(fileUploads.userId, actor.id)))
       .returning();
     if (!upload) throw new CodedException(400, 'UPLOAD_NOT_FOUND', 'Upload the file again');
+    assertAccepted(upload.mimeType, document.accept);
     const name = documentName(
       document.namePrefix ? `${document.namePrefix} ${upload.originalName}` : upload.originalName,
     );
@@ -172,6 +182,7 @@ export class GeneratedFiles {
     actor: CurrentUserInfo,
     itemId: string,
     uploadId: string,
+    accept?: (mimeType: string) => boolean,
   ): Promise<{ preview: boolean }> {
     const [item] = await tx.select().from(fileItems).where(eq(fileItems.id, itemId)).for('update');
     if (!item) throw new Error('File item not found');
@@ -180,6 +191,7 @@ export class GeneratedFiles {
       .where(and(eq(fileUploads.id, uploadId), eq(fileUploads.userId, actor.id)))
       .returning();
     if (!upload) throw new CodedException(400, 'UPLOAD_NOT_FOUND', 'Upload the file again');
+    assertAccepted(upload.mimeType, accept);
     const [counts] = await tx
       .select({ highest: max(fileVersions.number) })
       .from(fileVersions)
