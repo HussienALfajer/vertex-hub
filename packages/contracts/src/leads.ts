@@ -330,7 +330,9 @@ export type ReopenLead = z.infer<typeof reopenLeadSchema>;
 /** Rule 10: the lead's contact added to the client, or not. */
 const conversionContactSchema = z.discriminatedUnion('add', [
   z.object({ add: z.literal(false) }),
-  createContactSchema.omit({ notes: true }).extend({ add: z.literal(true) }),
+  createContactSchema
+    .omit({ notes: true, fatherName: true, nationalId: true })
+    .extend({ add: z.literal(true) }),
 ]);
 
 /**

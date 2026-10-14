@@ -57,6 +57,8 @@ export const clients = pgTable(
     /** Printed on invoices, receipts and statements (F13); the trade name when null. */
     billingName: text('billing_name'),
     billingAddress: text('billing_address'),
+    /** Commercial registration or licence, printed in contracts (F05C). */
+    registrationNumber: text('registration_number'),
     ...timestamps(),
     archivedAt: archivedAt(),
   },
@@ -84,6 +86,10 @@ export const clientContacts = pgTable(
     email: text('email'),
     hasFinalApproval: boolean('has_final_approval').notNull().default(false),
     notes: text('notes'),
+    /** Printed in the contract's second-party table (F05C). */
+    fatherName: text('father_name'),
+    /** Restricted to `clients.manage` + `invoices.read` on the client (F05C); never audited. */
+    nationalId: text('national_id'),
     ...timestamps(),
     archivedAt: archivedAt(),
   },

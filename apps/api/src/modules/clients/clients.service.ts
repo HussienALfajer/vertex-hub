@@ -45,11 +45,13 @@ import {
 import {
   actorOf,
   covers,
+  coversNationalId,
   holdsAll,
   manageableClient,
   readableClient,
   readableClients,
 } from './client-access.js';
+import { contactFor } from './client-contacts.service.js';
 import { ClientFactory, LIVE_STATUSES } from './client-factory.js';
 import { ClientFlagHooks } from './client-flag-hooks.js';
 
@@ -175,6 +177,7 @@ export class ClientsService implements OnModuleInit {
           brandKit: clients.brandKit,
           billingName: clients.billingName,
           billingAddress: clients.billingAddress,
+          registrationNumber: clients.registrationNumber,
           archivedAt: clients.archivedAt,
         })
         .from(clients)
@@ -189,6 +192,8 @@ export class ClientsService implements OnModuleInit {
           email: clientContacts.email,
           hasFinalApproval: clientContacts.hasFinalApproval,
           notes: clientContacts.notes,
+          fatherName: clientContacts.fatherName,
+          nationalId: clientContacts.nationalId,
         })
         .from(clientContacts)
         .where(and(eq(clientContacts.clientId, id), isNull(clientContacts.archivedAt)))
@@ -211,15 +216,19 @@ export class ClientsService implements OnModuleInit {
     ]);
     if (!row) throw new NotFoundException();
     const managers = await this.users.summaries([row.accountManagerId]);
+    const canManage = !row.archivedAt && covers(actor, 'clients.manage', access);
+    const seesNationalId = canManage && coversNationalId(actor, access);
     return {
       ...toClient(row, managers),
       brandKit: row.brandKit,
-      contacts,
+      contacts: contacts.map((contact) => contactFor(contact, seesNationalId)),
       platformAccounts,
       billingName: row.billingName,
       billingAddress: row.billingAddress,
+      registrationNumber: row.registrationNumber,
       archivedAt: row.archivedAt?.toISOString() ?? null,
-      canManage: !row.archivedAt && covers(actor, 'clients.manage', access),
+      canManage,
+      canManageNationalId: seesNationalId,
     };
   }
 
@@ -250,6 +259,7 @@ export class ClientsService implements OnModuleInit {
           sector: clients.sector,
           billingName: clients.billingName,
           billingAddress: clients.billingAddress,
+          registrationNumber: clients.registrationNumber,
           status: clients.status,
           isHealthcare: clients.isHealthcare,
           accountManagerId: clients.accountManagerId,
@@ -296,12 +306,14 @@ export class ClientsService implements OnModuleInit {
           sector: current.sector,
           billingName: current.billingName,
           billingAddress: current.billingAddress,
+          registrationNumber: current.registrationNumber,
         },
         {
           tradeName: input.tradeName,
           sector: input.sector,
           billingName: input.billingName,
           billingAddress: input.billingAddress,
+          registrationNumber: input.registrationNumber,
         },
       );
       const statusChange = changedFields({ status: current.status }, { status: input.status });

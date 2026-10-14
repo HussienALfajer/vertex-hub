@@ -1,12 +1,12 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { type Contact, type CreateContact, type UpdateContact } from '@vertex-hub/contracts';
 import { clientContacts, type Database, type Transaction } from '@vertex-hub/db';
 import { and, eq, isNull } from 'drizzle-orm';
 import { DATABASE } from '../../core/database/database.module.js';
 import { changedFields, recordAudit } from '../audit/index.js';
 import type { CurrentUserInfo } from '../auth/index.js';
-import { actorOf, manageableClient } from './client-access.js';
-import { ClientFactory } from './client-factory.js';
+import { actorOf, coversNationalId, manageableClient } from './client-access.js';
+import { ClientFactory, maskNationalId } from './client-factory.js';
 
 const contactColumns = {
   id: clientContacts.id,
@@ -17,7 +17,17 @@ const contactColumns = {
   email: clientContacts.email,
   hasFinalApproval: clientContacts.hasFinalApproval,
   notes: clientContacts.notes,
+  fatherName: clientContacts.fatherName,
+  nationalId: clientContacts.nationalId,
 };
+
+type ContactRow = Omit<Contact, 'nationalId'> & { nationalId: string | null };
+
+/** The contact as the actor may see it: the national ID only with its access (F05C). */
+export function contactFor(row: ContactRow, seesNationalId: boolean): Contact {
+  const { nationalId, ...contact } = row;
+  return seesNationalId ? { ...contact, nationalId } : contact;
+}
 
 /** People at the client, some with final-approval authority (rule 9). */
 @Injectable()
@@ -29,14 +39,16 @@ export class ClientContactsService {
 
   async create(actor: CurrentUserInfo, clientId: string, input: CreateContact): Promise<Contact> {
     return this.db.transaction(async (tx) => {
-      await manageableClient(tx, actor, clientId);
+      const client = await manageableClient(tx, actor, clientId);
+      const seesNationalId = coversNationalId(actor, client);
+      if (input.nationalId !== undefined && !seesNationalId) throw new ForbiddenException();
       const id = await this.factory.addContact(tx, actorOf(actor), clientId, input);
       const [contact] = await tx
         .select(contactColumns)
         .from(clientContacts)
         .where(eq(clientContacts.id, id));
       if (!contact) throw new Error('Contact insert returned no row');
-      return contact;
+      return contactFor(contact, seesNationalId);
     });
   }
 
@@ -47,10 +59,12 @@ export class ClientContactsService {
     input: UpdateContact,
   ): Promise<Contact> {
     return this.db.transaction(async (tx) => {
-      await manageableClient(tx, actor, clientId);
+      const client = await manageableClient(tx, actor, clientId);
+      const seesNationalId = coversNationalId(actor, client);
+      if (input.nationalId !== undefined && !seesNationalId) throw new ForbiddenException();
       const current = await this.activeContact(tx, clientId, contactId);
       const change = changedFields(current, input);
-      if (!change) return current;
+      if (!change) return contactFor(current, seesNationalId);
       const [contact] = await tx
         .update(clientContacts)
         .set(change.after)
@@ -62,10 +76,10 @@ export class ClientContactsService {
         action: 'client_contact.updated',
         entityType: 'client_contact',
         entityId: contactId,
-        before: change.before,
-        after: { clientId, ...change.after },
+        before: maskNationalId(change.before),
+        after: { clientId, ...maskNationalId(change.after) },
       });
-      return contact;
+      return contactFor(contact, seesNationalId);
     });
   }
 

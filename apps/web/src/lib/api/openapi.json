@@ -4956,6 +4956,87 @@
         ]
       }
     },
+    "/api/contract-settings": {
+      "get": {
+        "operationId": "ContractSettingsController_get",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The contract settings and the default articles; needs money access too",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContractSettings"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "retainers"
+        ]
+      },
+      "patch": {
+        "operationId": "ContractSettingsController_update",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateContractSettings"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The settings after the change",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContractSettings"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "retainers"
+        ]
+      }
+    },
+    "/api/contract-settings/articles": {
+      "put": {
+        "operationId": "ContractSettingsController_updateArticles",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateContractArticles"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The default articles after the change, in order",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContractArticles"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "retainers"
+        ]
+      }
+    },
     "/api/tasks/board": {
       "get": {
         "operationId": "TaskViewsController_board",
@@ -14757,6 +14838,7 @@
           "catalog_service",
           "catalog_package",
           "quote_settings",
+          "contract_settings",
           "quote",
           "invoice_settings",
           "invoice",
@@ -14937,6 +15019,8 @@
           "catalog_package.archived",
           "catalog_package.restored",
           "quote_settings.updated",
+          "contract_settings.updated",
+          "contract_settings.articles_updated",
           "quote.created",
           "quote.updated",
           "quote.approval_requested",
@@ -24686,6 +24770,10 @@
             "nullable": true,
             "type": "string"
           },
+          "registrationNumber": {
+            "nullable": true,
+            "type": "string"
+          },
           "archivedAt": {
             "nullable": true,
             "type": "string",
@@ -24693,6 +24781,9 @@
             "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
           },
           "canManage": {
+            "type": "boolean"
+          },
+          "canManageNationalId": {
             "type": "boolean"
           }
         },
@@ -24709,8 +24800,10 @@
           "platformAccounts",
           "billingName",
           "billingAddress",
+          "registrationNumber",
           "archivedAt",
-          "canManage"
+          "canManage",
+          "canManageNationalId"
         ],
         "additionalProperties": false
       },
@@ -24855,6 +24948,14 @@
           "notes": {
             "nullable": true,
             "type": "string"
+          },
+          "fatherName": {
+            "nullable": true,
+            "type": "string"
+          },
+          "nationalId": {
+            "nullable": true,
+            "type": "string"
           }
         },
         "required": [
@@ -24865,7 +24966,8 @@
           "phone",
           "email",
           "hasFinalApproval",
-          "notes"
+          "notes",
+          "fatherName"
         ],
         "additionalProperties": false
       },
@@ -25003,6 +25105,11 @@
             "nullable": true,
             "type": "string",
             "maxLength": 500
+          },
+          "registrationNumber": {
+            "nullable": true,
+            "type": "string",
+            "maxLength": 60
           }
         }
       },
@@ -25140,6 +25247,16 @@
             "nullable": true,
             "type": "string",
             "maxLength": 500
+          },
+          "fatherName": {
+            "nullable": true,
+            "type": "string",
+            "maxLength": 60
+          },
+          "nationalId": {
+            "nullable": true,
+            "type": "string",
+            "maxLength": 30
           }
         },
         "required": [
@@ -25174,6 +25291,16 @@
             "nullable": true,
             "type": "string",
             "maxLength": 500
+          },
+          "fatherName": {
+            "nullable": true,
+            "type": "string",
+            "maxLength": 60
+          },
+          "nationalId": {
+            "nullable": true,
+            "type": "string",
+            "maxLength": 30
           }
         }
       },
@@ -28896,6 +29023,238 @@
         "required": [
           "billingStatus"
         ]
+      },
+      "ContractSettings": {
+        "type": "object",
+        "properties": {
+          "legalName": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "tradeName": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "companyType": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "registrationNumber": {
+            "type": "string",
+            "maxLength": 60
+          },
+          "address": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "phone": {
+            "type": "string",
+            "maxLength": 30
+          },
+          "email": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "website": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "representativeName": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "representativeTitle": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "slogan": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "numberPrefix": {
+            "type": "string"
+          },
+          "nextNumber": {
+            "type": "string"
+          },
+          "articles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ContractArticle"
+            }
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "updatedBy": {
+            "nullable": true,
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ],
+            "additionalProperties": false
+          },
+          "canEdit": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "legalName",
+          "tradeName",
+          "companyType",
+          "registrationNumber",
+          "address",
+          "phone",
+          "email",
+          "website",
+          "representativeName",
+          "representativeTitle",
+          "slogan",
+          "numberPrefix",
+          "nextNumber",
+          "articles",
+          "updatedAt",
+          "updatedBy",
+          "canEdit"
+        ],
+        "additionalProperties": false
+      },
+      "ContractArticle": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "title": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "body"
+        ],
+        "additionalProperties": false
+      },
+      "UpdateContractSettings": {
+        "type": "object",
+        "properties": {
+          "legalName": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "tradeName": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "companyType": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "registrationNumber": {
+            "type": "string",
+            "maxLength": 60
+          },
+          "address": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "phone": {
+            "type": "string",
+            "maxLength": 30
+          },
+          "email": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "website": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "representativeName": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "representativeTitle": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "slogan": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "numberPrefix": {
+            "type": "string"
+          }
+        }
+      },
+      "UpdateContractArticles": {
+        "type": "object",
+        "properties": {
+          "articles": {
+            "maxItems": 200,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "title": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 120
+                },
+                "body": {
+                  "type": "string",
+                  "maxLength": 6000
+                }
+              },
+              "required": [
+                "title",
+                "body"
+              ]
+            }
+          }
+        },
+        "required": [
+          "articles"
+        ]
+      },
+      "ContractArticles": {
+        "type": "object",
+        "properties": {
+          "articles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ContractArticle"
+            }
+          }
+        },
+        "required": [
+          "articles"
+        ],
+        "additionalProperties": false
       },
       "TaskBoard": {
         "type": "object",

@@ -126,6 +126,8 @@ export class ClientFactory {
       email: input.email ?? null,
       hasFinalApproval: input.hasFinalApproval ?? false,
       notes: input.notes ?? null,
+      fatherName: input.fatherName ?? null,
+      nationalId: input.nationalId ?? null,
     };
     const [contact] = await tx
       .insert(clientContacts)
@@ -137,7 +139,7 @@ export class ClientFactory {
       action: 'client_contact.created',
       entityType: 'client_contact',
       entityId: contact.id,
-      after: { clientId, ...values },
+      after: { clientId, ...maskNationalId(values) },
     });
     return contact.id;
   }
@@ -249,3 +251,15 @@ export class ClientFactory {
     });
   }
 }
+
+/**
+ * A contact change as the audit log records it: a set or cleared national ID shows as "changed",
+ * never its value (F05C).
+ */
+export function maskNationalId<T extends { nationalId?: string | null }>(fields: T): T {
+  if (fields.nationalId === undefined || fields.nationalId === null) return fields;
+  return { ...fields, nationalId: NATIONAL_ID_MASK };
+}
+
+/** What the audit log stores in place of a national ID. */
+export const NATIONAL_ID_MASK = 'changed';

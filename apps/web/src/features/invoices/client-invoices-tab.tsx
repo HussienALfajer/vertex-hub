@@ -160,11 +160,13 @@ function Line({ label, children }: { label: string; children: ReactNode }) {
 interface BillingValues {
   billingName: string;
   billingAddress: string;
+  registrationNumber: string;
 }
 
 /**
  * The name and address printed on the client's invoices, receipts and statements (F13, F02's
- * `PATCH`); editable with `clients.manage` covering the client, like the client's basics.
+ * `PATCH`), and the registration number its contracts print (F05C); editable with
+ * `clients.manage` covering the client, like the client's basics.
  */
 function BillingDetails({ client }: { client: ClientDetailResponse }) {
   const { t } = useTranslation();
@@ -175,6 +177,7 @@ function BillingDetails({ client }: { client: ClientDetailResponse }) {
   const defaults: BillingValues = {
     billingName: client.billingName ?? '',
     billingAddress: client.billingAddress ?? '',
+    registrationNumber: client.registrationNumber ?? '',
   };
   const form = useForm<BillingValues>({
     values: defaults,
@@ -200,6 +203,7 @@ function BillingDetails({ client }: { client: ClientDetailResponse }) {
     const checked = updateClientSchema.safeParse({
       billingName: values.billingName.trim() || null,
       billingAddress: values.billingAddress.trim() || null,
+      registrationNumber: values.registrationNumber.trim() || null,
     });
     if (!checked.success) {
       for (const issue of checked.error.issues) {
@@ -231,6 +235,14 @@ function BillingDetails({ client }: { client: ClientDetailResponse }) {
         {!client.billingName && (
           <p className="text-xs text-muted-foreground">{t('invoices.client.tradeNameUsed')}</p>
         )}
+        <p className="text-sm">
+          <span className="text-muted-foreground">{t('invoices.client.registrationNumber')}: </span>
+          {client.registrationNumber ?? (
+            <span className="text-muted-foreground">
+              {t('invoices.client.noRegistrationNumber')}
+            </span>
+          )}
+        </p>
       </div>
       {editable && (
         <Button variant="outline" size="sm" onClick={() => setOpen(true)}>
@@ -262,6 +274,14 @@ function BillingDetails({ client }: { client: ClientDetailResponse }) {
           <Textarea rows={3} {...form.register('billingAddress')} />
           <FieldError match={!!errors.billingAddress}>
             {t('invoices.client.errors.billingAddress')}
+          </FieldError>
+        </Field>
+        <Field invalid={!!errors.registrationNumber}>
+          <FieldLabel>{t('invoices.client.registrationNumber')}</FieldLabel>
+          <Input dir="ltr" autoComplete="off" {...form.register('registrationNumber')} />
+          <FieldDescription>{t('invoices.client.registrationNumberHint')}</FieldDescription>
+          <FieldError match={!!errors.registrationNumber}>
+            {t('invoices.client.errors.registrationNumber')}
           </FieldError>
         </Field>
       </FormDialog>

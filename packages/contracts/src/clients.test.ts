@@ -6,6 +6,7 @@ import {
   createNoteSchema,
   createPlatformAccountSchema,
   updateBrandKitSchema,
+  updateClientSchema,
   updateNoteSchema,
   updatePlatformAccountSchema,
 } from './clients.js';
@@ -190,5 +191,28 @@ describe('clients', () => {
       healthcare: true,
     });
     expect(clientListQuerySchema.safeParse({ status: ['active', 'gone'] }).success).toBe(false);
+  });
+});
+
+describe('legal fields (F05C)', () => {
+  it('stores blank father name and national ID as null and limits them', () => {
+    expect(
+      createContactSchema.parse({ name: 'سارة', fatherName: ' ', nationalId: '' }),
+    ).toMatchObject({ fatherName: null, nationalId: null });
+    expect(
+      createContactSchema.safeParse({ name: 'سارة', fatherName: 'ا'.repeat(61) }).success,
+    ).toBe(false);
+    expect(
+      createContactSchema.safeParse({ name: 'سارة', nationalId: '1'.repeat(31) }).success,
+    ).toBe(false);
+  });
+
+  it('limits the registration number', () => {
+    expect(updateClientSchema.parse({ registrationNumber: ' 12345 ' })).toEqual({
+      registrationNumber: '12345',
+    });
+    expect(updateClientSchema.safeParse({ registrationNumber: '1'.repeat(61) }).success).toBe(
+      false,
+    );
   });
 });

@@ -59,6 +59,7 @@ import {
   type CompanyDashboard,
   type Contact,
   type ContentCalendar,
+  type ContractSettings,
   type ConvertLead,
   type CreateAmendmentInput,
   type CreateApprovalRequest,
@@ -132,6 +133,7 @@ import {
   fileTypeOf,
   followUpDateInRange,
   followUpFilterRange,
+  formatContractNumber,
   grantedPermissions,
   type HealthResponse,
   type Invoice,
@@ -343,9 +345,12 @@ import {
   type UpdateTaskInput,
   type UpdateWalletThreshold,
   type UserResponse,
+  unknownPlaceholders,
   updateCatalogPackageSchema,
   updateCatalogServiceSchema,
   updateClientReportSummarySchema,
+  updateContractArticlesSchema,
+  updateContractSettingsSchema,
   updateCycleReportSummarySchema,
   updateInvoiceServicesSchema,
   updateInvoiceSettingsSchema,
@@ -421,6 +426,15 @@ export const manager: MeResponse = {
     departments: [{ code: 'general_management', isManager: false }],
   }),
   twoFactor: { enabled: true, required: true },
+};
+
+/**
+ * The General Manager as if money access were taken away (F05C edge case 12): manages clients
+ * but never sees a contact's national ID. No role has this today; it shows the field's rule.
+ */
+export const managerWithoutMoney: MeResponse = {
+  ...manager,
+  permissions: manager.permissions.filter((granted) => granted.permission !== 'invoices.read'),
 };
 
 /** A finance user who has not set up two-factor sign-in yet (F01 rule 15). */
@@ -799,6 +813,7 @@ interface ClientRecord {
   platformAccounts: (PlatformAccount & { archived: boolean })[];
   billingName?: string | null;
   billingAddress?: string | null;
+  registrationNumber?: string | null;
   notes: {
     id: string;
     occurredAt: string;
@@ -833,6 +848,7 @@ const contact = (
   email: null,
   hasFinalApproval: false,
   notes: null,
+  fatherName: null,
   archived: false,
   ...extra,
 });
@@ -1074,6 +1090,7 @@ export async function mockApi(page: Page, options: MockOptions): Promise<MockedA
   const projectsApi = projectRoutes({ users, clients, projects, me: () => me });
   const retainers = retainersSeed();
   const retainersApi = retainerRoutes({ users, clients, retainers, me: () => me });
+  const contractSettingsApi = contractSettingsRoutes({ users, me: () => me });
   const sent = options.approvals ? approvalsSeed() : { tasks: [], files: [], requests: [] };
   const planned = options.content
     ? contentSeed()
@@ -1446,6 +1463,9 @@ export async function mockApi(page: Page, options: MockOptions): Promise<MockedA
     if (answered) return answered;
     const retained = retainersApi(route, method, url, request);
     if (retained) return retained;
+    // Contract settings (F05C).
+    const contracted = contractSettingsApi(route, method, url, request);
+    if (contracted) return contracted;
 
     // Tasks (F06).
     const tasked = tasksApi(route, method, url, request);
@@ -1513,6 +1533,15 @@ function clientRoutes({ users, clients, me }: ClientState) {
     !c.archived &&
     (holds('clients.manage', 'all') ||
       (holds('clients.manage', 'own_clients') && c.accountManagerId === me().user.id));
+  // F05C: the national ID needs money access covering the client too.
+  const canManageNationalId = (c: ClientRecord) =>
+    canManage(c) &&
+    (holds('invoices.read', 'all') ||
+      (holds('invoices.read', 'own_clients') && c.accountManagerId === me().user.id));
+  const contactFor = (c: ClientRecord, contact: Contact & { archived: boolean }): Contact => {
+    const { archived: _, nationalId, ...rest } = contact;
+    return canManageNationalId(c) ? { ...rest, nationalId: nationalId ?? null } : rest;
+  };
 
   const summary = (c: ClientRecord): ClientResponse => {
     const manager = users.find((u) => u.id === c.accountManagerId);
@@ -1534,12 +1563,14 @@ function clientRoutes({ users, clients, me }: ClientState) {
   const detail = (c: ClientRecord): ClientDetailResponse => ({
     ...summary(c),
     brandKit: c.brandKit,
-    contacts: c.contacts.filter((x) => !x.archived).map(strip),
+    contacts: c.contacts.filter((x) => !x.archived).map((x) => contactFor(c, x)),
     platformAccounts: c.platformAccounts.filter((x) => !x.archived).map(strip),
     billingName: c.billingName ?? null,
     billingAddress: c.billingAddress ?? null,
+    registrationNumber: c.registrationNumber ?? null,
     archivedAt: c.archived ? '2026-09-20T10:00:00.000Z' : null,
     canManage: canManage(c),
+    canManageNationalId: canManageNationalId(c),
   });
   const note = (c: ClientRecord, n: ClientRecord['notes'][number]): Note => {
     const who = c.contacts.find((x) => x.id === n.contactId);
@@ -1639,10 +1670,23 @@ function clientRoutes({ users, clients, me }: ClientState) {
         archived: boolean;
       }[];
       if (!canManage(client)) return fail(route, 403, null);
+      const input = method === 'POST' || method === 'PATCH' ? (body() ?? {}) : {};
+      const contacts = part === 'contacts';
+      if (contacts && 'nationalId' in input && !canManageNationalId(client)) {
+        return fail(route, 403, null);
+      }
+      const shown = (item: { archived: boolean }) =>
+        contacts ? contactFor(client, item as Contact & { archived: boolean }) : strip(item);
       if (!childId) {
-        const created = { id: id(next++), clientId: client.id, archived: false, ...body() };
+        const created = {
+          id: id(next++),
+          clientId: client.id,
+          archived: false,
+          ...(contacts && { fatherName: null }),
+          ...input,
+        };
         list.push(created);
-        return json(route, strip(created), 201);
+        return json(route, shown(created), 201);
       }
       const item = list.find((x) => x.id === childId);
       if (!item) return fail(route, 404, null);
@@ -1650,8 +1694,8 @@ function clientRoutes({ users, clients, me }: ClientState) {
         item.archived = true;
         return route.fulfill({ status: 204 });
       }
-      Object.assign(item, body());
-      return json(route, strip(item));
+      Object.assign(item, input);
+      return json(route, shown(item));
     }
     if (part === 'notes') {
       if (!childId && method === 'GET') {
@@ -2726,6 +2770,77 @@ interface RetainerState {
 }
 
 /** The retainers API (F05) over the in-memory records, with its access, cycle and money rules. */
+/** The contract settings of F05C: agency details, numbering and the default articles. */
+function contractSettingsRoutes({ users, me }: { users: UserResponse[]; me: () => MeResponse }) {
+  const scopes = (permission: string) =>
+    me().permissions.find((g) => g.permission === permission)?.scopes ?? [];
+  const reads = () =>
+    scopes('projects.manage').some((scope) => scope === 'all' || scope === 'own_clients') &&
+    scopes('invoices.read').length > 0;
+  const edits = () => scopes('catalog.manage').length > 0;
+  let next = 9100;
+  const settings = {
+    legalName: 'شركة فيرتكس ميديا للخدمات الإعلامية',
+    tradeName: 'Vertex Media',
+    companyType: 'شركة محدودة المسؤولية',
+    registrationNumber: '',
+    address: 'دمشق، المزة، شارع الجلاء',
+    phone: '+963 11 000 0000',
+    email: 'hello@vertexmedia.test',
+    website: 'vertexmedia.test',
+    representativeName: 'محمد الفجر',
+    representativeTitle: 'المدير العام',
+    slogan: 'نبدأ بفكرة، ونبني كياناً، ونصنع أثراً.',
+    numberPrefix: 'VM-CCS',
+    updatedAt: '2026-10-01T08:00:00.000Z',
+    updatedBy: null as { id: string; name: string } | null,
+  };
+  let articles = [
+    {
+      id: id(next++),
+      title: 'موضوع العقد',
+      body: 'تلتزم الوكالة بتقديم الخدمات الإعلامية والتسويقية المتفق عليها مع العميل، وفق عرض السعر ونطاق العمل المعتمدين.',
+    },
+    {
+      id: id(next++),
+      title: 'نطاق الخدمات',
+      body: 'تشمل الخدمات المتفق عليها ما يلي، بالكميات المحددة لكل دورة.\n{services}',
+    },
+    {
+      id: id(next++),
+      title: 'الأتعاب وطريقة الدفع',
+      body: 'تُستحق أتعاب كل دورة مقدماً، وتُسدَّد خلال {payment_terms_days} أيام من تاريخ الفاتورة.\n{fees}',
+    },
+  ];
+  const response = (): ContractSettings => ({
+    ...settings,
+    nextNumber: formatContractNumber(settings.numberPrefix, 2026, 1),
+    articles,
+    canEdit: edits(),
+  });
+  return (route: Route, method: string, url: URL, request: Request): Promise<void> | undefined => {
+    if (url.pathname === '/api/contract-settings') {
+      if (method === 'GET') return reads() ? json(route, response()) : fail(route, 403, null);
+      if (!edits()) return fail(route, 403, null);
+      Object.assign(settings, updateContractSettingsSchema.parse(request.postDataJSON()), {
+        updatedAt: '2026-10-14T09:00:00.000Z',
+        updatedBy: { id: me().user.id, name: users.find((u) => u.id === me().user.id)?.name ?? '' },
+      });
+      return json(route, response());
+    }
+    if (url.pathname === '/api/contract-settings/articles' && method === 'PUT') {
+      if (!edits()) return fail(route, 403, null);
+      const input = updateContractArticlesSchema.parse(request.postDataJSON());
+      if (input.articles.some((article) => unknownPlaceholders(article.body).length > 0)) {
+        return fail(route, 400, 'UNKNOWN_PLACEHOLDER');
+      }
+      articles = input.articles.map((article) => ({ ...article, id: article.id ?? id(next++) }));
+      return json(route, { articles });
+    }
+    return undefined;
+  };
+}
+
 function retainerRoutes({ users, clients, retainers, me }: RetainerState) {
   const today = PROJECTS_TODAY;
   const holds = (permission: string, scope: string) =>

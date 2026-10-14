@@ -177,4 +177,105 @@ describe('client contacts', () => {
     expect((await create(id, cast.gm.cookie, { name: 'A', email: 'nope' })).status).toBe(400);
     expect((await create(id, cast.gm.cookie, { name: '' })).status).toBe(400);
   });
+
+  describe('legal fields (F05C)', () => {
+    let finance: { id: string; cookie: string };
+
+    beforeAll(async () => {
+      finance = await client.signInWithTwoFactor(db, { roles: ['finance'] });
+      cast.trackUser(finance.id);
+    });
+
+    const detailAs = async (clientId: string, cookie: string) =>
+      clientDetailResponseSchema.parse(
+        await (await client.get(`/api/clients/${clientId}`, cookie)).json(),
+      );
+
+    it('keeps the father name for every reader and the national ID for its holders', async () => {
+      const { id } = await cast.createClient();
+      const response = await create(id, cast.am.cookie, {
+        name: 'سارة',
+        fatherName: ' أحمد ',
+        nationalId: ' 01020304050 ',
+      });
+      expect(response.status).toBe(201);
+      const contact = contactSchema.parse(await response.json());
+      expect(contact).toMatchObject({ fatherName: 'أحمد', nationalId: '01020304050' });
+
+      const manager = await detailAs(id, cast.am.cookie);
+      expect(manager.canManageNationalId).toBe(true);
+      expect(manager.contacts[0]).toMatchObject({ fatherName: 'أحمد', nationalId: '01020304050' });
+      expect((await detailAs(id, cast.gm.cookie)).contacts[0]?.nationalId).toBe('01020304050');
+
+      // An employee reads the client without managing it; Finance has money access only.
+      for (const cookie of [cast.employee.cookie, finance.cookie, cast.otherAm.cookie]) {
+        const detail = await detailAs(id, cookie);
+        expect(detail.canManageNationalId).toBe(false);
+        expect(detail.contacts[0]).toMatchObject({ fatherName: 'أحمد' });
+        expect(detail.contacts[0]).not.toHaveProperty('nationalId');
+      }
+    });
+
+    it('records that the national ID changed, never its value', async () => {
+      const { id } = await cast.createClient();
+      const contact = contactSchema.parse(
+        await (await create(id, cast.gm.cookie, { name: 'ليلى', nationalId: '111' })).json(),
+      );
+      const updated = await client.request('PATCH', path(id, contact.id), {
+        cookie: cast.am.cookie,
+        body: { nationalId: '222', fatherName: 'خالد' },
+      });
+      expect(updated.status).toBe(200);
+      expect(contactSchema.parse(await updated.json())).toMatchObject({
+        nationalId: '222',
+        fatherName: 'خالد',
+      });
+      const audit = await db
+        .select({ before: auditEntries.before, after: auditEntries.after })
+        .from(auditEntries)
+        .where(eq(auditEntries.entityId, contact.id))
+        .orderBy(auditEntries.id);
+      expect(audit[0]?.after).toMatchObject({ nationalId: 'changed' });
+      expect(audit[1]).toEqual({
+        before: { nationalId: 'changed', fatherName: null },
+        after: { clientId: id, nationalId: 'changed', fatherName: 'خالد' },
+      });
+      expect(JSON.stringify(audit)).not.toMatch(/111|222/);
+    });
+
+    it('keeps the stored national ID when a contact is edited without it (edge case 12)', async () => {
+      const { id } = await cast.createClient();
+      const contact = contactSchema.parse(
+        await (await create(id, cast.gm.cookie, { name: 'ريم', nationalId: '333' })).json(),
+      );
+      const updated = await client.request('PATCH', path(id, contact.id), {
+        cookie: cast.am.cookie,
+        body: { jobTitle: 'المديرة' },
+      });
+      expect(updated.status).toBe(200);
+      const [row] = await db
+        .select({ nationalId: clientContacts.nationalId })
+        .from(clientContacts)
+        .where(eq(clientContacts.id, contact.id));
+      expect(row?.nationalId).toBe('333');
+    });
+
+    it('refuses the national ID to callers without its access (403)', async () => {
+      const { id } = await cast.createClient();
+      const contact = contactSchema.parse(
+        await (await create(id, cast.gm.cookie, { name: 'هند' })).json(),
+      );
+      for (const cookie of [finance.cookie, cast.otherAm.cookie, cast.employee.cookie]) {
+        expect((await create(id, cookie, { name: 'x', nationalId: '1' })).status).toBe(403);
+        const response = await client.request('PATCH', path(id, contact.id), {
+          cookie,
+          body: { nationalId: '1' },
+        });
+        expect(response.status).toBe(403);
+      }
+      expect(
+        (await create(id, cast.gm.cookie, { name: 'x', nationalId: '1'.repeat(31) })).status,
+      ).toBe(400);
+    });
+  });
 });

@@ -151,10 +151,22 @@ const contactFieldsSchema = z.object({
   email: optionalEmailSchema,
   hasFinalApproval: z.boolean(),
   notes: optionalText(500),
+  /** Printed in the contract's second-party table (F05C). */
+  fatherName: optionalText(60),
+  /** Restricted: `clients.manage` and `invoices.read` covering the client (F05C); 403 otherwise. */
+  nationalId: optionalText(30),
 });
 
 export const createContactSchema = contactFieldsSchema
-  .partial({ jobTitle: true, phone: true, email: true, hasFinalApproval: true, notes: true })
+  .partial({
+    jobTitle: true,
+    phone: true,
+    email: true,
+    hasFinalApproval: true,
+    notes: true,
+    fatherName: true,
+    nationalId: true,
+  })
   .meta({ id: 'CreateContact' });
 
 export type CreateContact = z.infer<typeof createContactSchema>;
@@ -175,6 +187,9 @@ export const contactSchema = z
     email: z.string().nullable(),
     hasFinalApproval: z.boolean(),
     notes: z.string().nullable(),
+    fatherName: z.string().nullable(),
+    /** Present only for callers with national ID access (F05C). */
+    nationalId: z.string().nullable().optional(),
   })
   .meta({ id: 'Contact' });
 
@@ -267,6 +282,8 @@ export const updateClientSchema = clientFieldsSchema
     /** Printed on invoices, receipts and statements; the trade name when empty (F13). */
     billingName: optionalText(160),
     billingAddress: optionalText(500),
+    /** Commercial registration or licence, printed in contracts (F05C). */
+    registrationNumber: optionalText(60),
   })
   .partial()
   .meta({ id: 'UpdateClient' });
@@ -299,9 +316,12 @@ export const clientDetailResponseSchema = clientResponseSchema
     platformAccounts: z.array(platformAccountSchema),
     billingName: z.string().nullable(),
     billingAddress: z.string().nullable(),
+    registrationNumber: z.string().nullable(),
     archivedAt: z.iso.datetime().nullable(),
     /** The caller may edit this client (basics, contacts, brand kit, platform accounts). */
     canManage: z.boolean(),
+    /** The caller reads and edits contacts' national IDs (F05C: manage and money access). */
+    canManageNationalId: z.boolean(),
   })
   .meta({ id: 'ClientDetail' });
 

@@ -35,6 +35,13 @@ export function covers(
   );
 }
 
+/**
+ * Whether the actor reads and edits the client's contacts' national IDs (F05C Roles):
+ * `clients.manage` and money access (`invoices.read`), both covering the client.
+ */
+export const coversNationalId = (actor: CurrentUserInfo, client: ClientAccessRow) =>
+  covers(actor, 'clients.manage', client) && covers(actor, 'invoices.read', client);
+
 /** SQL filter on `clients` for the clients the actor may read, archived ones excluded. */
 export function readableClients(actor: CurrentUserInfo): SQL | undefined {
   const scopes = permissionScopes(actor.access, 'clients.read');

@@ -8,6 +8,7 @@ import {
   financeMe,
   financeWithoutTwoFactor,
   manager,
+  managerWithoutMoney,
   medicalReviewerMe,
   mockApi,
   notificationFor,
@@ -1642,6 +1643,31 @@ for (const colorScheme of ['light', 'dark'] as const) {
         page.getByRole('heading', { name: ar.reports.cycle.deliverables }),
       ).toBeVisible();
       await screenshot(page, testInfo, `cycle-report-${colorScheme}`);
+    });
+
+    test('contract settings (F05C)', async ({ page }, testInfo) => {
+      await page.setViewportSize({ width: 1280, height: 2200 });
+      await mockApi(page, { signedIn: true, me: manager });
+      await page.goto('/settings/contracts');
+      await expect(
+        page.getByRole('heading', { name: ar.retainers.contractSettings.articles.title }),
+      ).toBeVisible();
+      await screenshot(page, testInfo, `contract-settings-${colorScheme}`);
+    });
+
+    test('contact dialog with and without the national ID (F05C)', async ({ page }, testInfo) => {
+      await page.setViewportSize({ width: 1280, height: 1000 });
+      await mockApi(page, { signedIn: true, me: manager });
+      await page.goto(`/clients/${seedIds.jasmine}`);
+      await page.getByRole('button', { name: ar.clients.contacts.add }).first().click();
+      await expect(page.getByLabel(ar.clients.contacts.form.nationalId)).toBeVisible();
+      await screenshot(page, testInfo, `contact-dialog-national-id-${colorScheme}`);
+
+      await mockApi(page, { signedIn: true, me: managerWithoutMoney });
+      await page.goto(`/clients/${seedIds.jasmine}`);
+      await page.getByRole('button', { name: ar.clients.contacts.add }).first().click();
+      await expect(page.getByLabel(ar.clients.contacts.form.fatherName)).toBeVisible();
+      await screenshot(page, testInfo, `contact-dialog-${colorScheme}`);
     });
 
     test('invoice services dialog', async ({ page }, testInfo) => {
