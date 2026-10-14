@@ -1,5 +1,7 @@
 import {
+  CYCLE_REPORT_LABELS as C,
   type ClientReportSnapshot,
+  type CycleReportSnapshot,
   CLIENT_REPORT_LABELS as L,
   responseTimeText,
   REPORT_VALUE_LABELS as VALUES,
@@ -14,8 +16,9 @@ import {
 } from './document.js';
 
 /*
- * The monthly client report (spec F15 rules 18 and 20), in the shell of `document.ts`. It prints
- * its payload only: each section with data, in the order of rule 18.
+ * The monthly client report (spec F15 rules 18 and 20) and the retainer cycle report (F05C R2),
+ * in the shell of `document.ts`. Each prints its payload only: each section with data, in the
+ * order of rule 18.
  */
 
 const monthName = new Intl.DateTimeFormat('ar-SY-u-nu-latn', {
@@ -52,21 +55,7 @@ export function clientReportHtml(snapshot: ClientReportSnapshot, assets: Templat
       section(
         // F05C R4: each cycle overlapping the month, with its period.
         `${L.retainers}: ${escapeHtml(retainer.retainer.name)} — ${escapeHtml(formatRetainerCycle({ number: retainer.cycle, periodStart: retainer.periodStart, periodEnd: retainer.periodEnd }))}`,
-        table(
-          [
-            { label: L.kind },
-            { label: L.committed, num: true },
-            { label: L.delivered, num: true },
-            { label: L.percent, num: true },
-          ],
-          [
-            ...retainer.lines.map(
-              (line) =>
-                `<tr>${cell(line.label ?? VALUES.deliverableKinds[line.kind])}${cell(count(line.committed), { num: true })}${cell(line.delivered === null ? null : count(line.delivered), { num: true })}${cell(line.percent === null ? null : `${line.percent}%`, { num: true })}</tr>`,
-            ),
-            `<tr class="total">${cell(L.completion)}<td></td><td></td>${cell(retainer.completion === null ? null : `${retainer.completion}%`, { num: true })}</tr>`,
-          ],
-        ),
+        linesTable(retainer.lines, L.completion, retainer.completion),
       ),
     );
   }
@@ -89,13 +78,99 @@ export function clientReportHtml(snapshot: ClientReportSnapshot, assets: Templat
       ),
     );
   }
-  if (snapshot.deliveredWork.length) {
+  parts.push(
+    ...activitySections(snapshot, snapshot.nextMonth, {
+      opening: L.opening,
+      closing: L.closing,
+      next: L.nextMonth,
+    }),
+  );
+  return reportDocument(snapshot, assets, {
+    title: L.title,
+    subtitle: month,
+    name: snapshot.client.name,
+    documentTitle: `${L.title} ${snapshot.client.name} ${snapshot.month}`,
+    preliminary: L.preliminary,
+    noActivity: L.noActivity,
+    parts,
+  });
+}
+
+/** F05C R2: the cycle report, as the monthly one with this cycle's lines and no projects. */
+export function cycleReportHtml(snapshot: CycleReportSnapshot, assets: TemplateAssets): string {
+  const parts: string[] = [];
+  if (snapshot.summary) parts.push(textBlock(C.summary, snapshot.summary.text));
+  if (snapshot.lines.length) {
+    parts.push(
+      section(C.deliverables, linesTable(snapshot.lines, C.deliveryRate, snapshot.deliveryRate)),
+    );
+  }
+  parts.push(
+    ...activitySections(snapshot, snapshot.nextPeriod, {
+      opening: C.opening,
+      closing: C.closing,
+      next: C.nextPeriod,
+    }),
+  );
+  const cycle = formatRetainerCycle({
+    number: snapshot.cycle.number,
+    periodStart: snapshot.period.from,
+    periodEnd: snapshot.period.to,
+  });
+  return reportDocument(snapshot, assets, {
+    title: C.title,
+    subtitle: cycle,
+    name: `${snapshot.client.name} — ${snapshot.retainer.name}`,
+    documentTitle: `${C.title} ${snapshot.client.name} ${snapshot.retainer.name} ${snapshot.cycle.number}`,
+    preliminary: C.preliminary,
+    noActivity: C.noActivity,
+    parts,
+  });
+}
+
+type ReportLines = ClientReportSnapshot['retainers'][number]['lines'];
+
+/** A cycle's lines with their counts and percents, then the total rate. */
+function linesTable(lines: ReportLines, totalLabel: string, total: number | null): string {
+  return table(
+    [
+      { label: L.kind },
+      { label: L.committed, num: true },
+      { label: L.delivered, num: true },
+      { label: L.percent, num: true },
+    ],
+    [
+      ...lines.map(
+        (line) =>
+          `<tr>${cell(line.label ?? VALUES.deliverableKinds[line.kind])}${cell(count(line.committed), { num: true })}${cell(line.delivered === null ? null : count(line.delivered), { num: true })}${cell(line.percent === null ? null : `${line.percent}%`, { num: true })}</tr>`,
+      ),
+      `<tr class="total">${cell(totalLabel)}<td></td><td></td>${cell(total === null ? null : `${total}%`, { num: true })}</tr>`,
+    ],
+  );
+}
+
+type Activity = Pick<
+  ClientReportSnapshot,
+  'deliveredWork' | 'posts' | 'shoots' | 'approvals' | 'campaigns' | 'adBudget'
+>;
+
+/**
+ * The sections both client reports share (F15 rule 18.4–18.10, F05C R2), each with data;
+ * `labels` name the period they cover.
+ */
+function activitySections(
+  sections: Activity,
+  next: ClientReportSnapshot['nextMonth'],
+  labels: { opening: string; closing: string; next: string },
+): string[] {
+  const parts: string[] = [];
+  if (sections.deliveredWork.length) {
     parts.push(
       section(
         L.deliveredWork,
         table(
           [{ label: L.date, num: true }, { label: L.work }, { label: L.department }],
-          snapshot.deliveredWork.map(
+          sections.deliveredWork.map(
             (work) =>
               `<tr>${cell(work.deliveredOn, { num: true })}${cell(work.title)}${cell(work.departmentName)}</tr>`,
           ),
@@ -103,13 +178,13 @@ export function clientReportHtml(snapshot: ClientReportSnapshot, assets: Templat
       ),
     );
   }
-  if (snapshot.posts.length) {
+  if (sections.posts.length) {
     parts.push(
       section(
         L.posts,
         table(
           [{ label: L.date, num: true }, { label: L.postTitle }, { label: L.platforms }],
-          snapshot.posts.map((post) => {
+          sections.posts.map((post) => {
             const links = post.links
               .map((link) => `<div class="description num">${escapeHtml(link.url)}</div>`)
               .join('');
@@ -119,13 +194,13 @@ export function clientReportHtml(snapshot: ClientReportSnapshot, assets: Templat
       ),
     );
   }
-  if (snapshot.shoots.length) {
+  if (sections.shoots.length) {
     parts.push(
       section(
         L.shoots,
         table(
           [{ label: L.date, num: true }, { label: L.shoot }, { label: L.location }],
-          snapshot.shoots.map(
+          sections.shoots.map(
             (shoot) =>
               `<tr>${cell(shoot.date, { num: true })}${cell(shoot.title)}${cell(shoot.location)}</tr>`,
           ),
@@ -133,7 +208,7 @@ export function clientReportHtml(snapshot: ClientReportSnapshot, assets: Templat
       ),
     );
   }
-  const approvals = snapshot.approvals;
+  const approvals = sections.approvals;
   if (approvals.approved + approvals.changesRequested > 0) {
     parts.push(
       section(
@@ -146,8 +221,8 @@ export function clientReportHtml(snapshot: ClientReportSnapshot, assets: Templat
       ),
     );
   }
-  if (snapshot.campaigns?.rows.length) {
-    const metrics = (row: NonNullable<ClientReportSnapshot['campaigns']>['totals']) =>
+  if (sections.campaigns?.rows.length) {
+    const metrics = (row: NonNullable<Activity['campaigns']>['totals']) =>
       `${cell(usd(row.spendMinor), { num: true })}${cell(count(row.reach), { num: true })}${cell(count(row.clicks), { num: true })}${cell(count(row.results), { num: true })}${cell(row.costPerResultMinor === null ? null : usd(row.costPerResultMinor), { num: true })}`;
     parts.push(
       section(
@@ -162,32 +237,31 @@ export function clientReportHtml(snapshot: ClientReportSnapshot, assets: Templat
             { label: L.costPerResult, num: true },
           ],
           [
-            ...snapshot.campaigns.rows.map(
+            ...sections.campaigns.rows.map(
               (row) =>
                 `<tr><td><div class="line-name">${escapeHtml(row.name)}</div><div class="description">${VALUES.adPlatforms[row.platform]} · ${VALUES.adObjectives[row.objective]}</div></td>${metrics(row)}</tr>`,
             ),
-            `<tr class="total">${cell(L.total)}${metrics(snapshot.campaigns.totals)}</tr>`,
+            `<tr class="total">${cell(L.total)}${metrics(sections.campaigns.totals)}</tr>`,
           ],
         ),
       ),
     );
   }
-  if (snapshot.adBudget) {
-    const budget = snapshot.adBudget;
+  if (sections.adBudget) {
+    const budget = sections.adBudget;
     parts.push(
       section(
         L.adBudget,
         `<table class="sums wide">
-  <tr><th>${L.opening}</th><td class="num">${usd(budget.openingMinor)}</td></tr>
+  <tr><th>${labels.opening}</th><td class="num">${usd(budget.openingMinor)}</td></tr>
   <tr><th>${L.deposits}</th><td class="num">${usd(budget.depositsMinor)}</td></tr>
   <tr><th>${L.refunds}</th><td class="num">${usd(budget.refundsMinor)}</td></tr>
   <tr><th>${L.walletSpend}</th><td class="num">${usd(budget.spendMinor)}</td></tr>
-  <tr class="net"><th>${L.closing}</th><td class="num">${usd(budget.closingMinor)}</td></tr>
+  <tr class="net"><th>${labels.closing}</th><td class="num">${usd(budget.closingMinor)}</td></tr>
 </table>`,
       ),
     );
   }
-  const next = snapshot.nextMonth;
   if (next.posts.length || next.shoots.length) {
     const rows = [
       ...next.posts.map(
@@ -201,19 +275,36 @@ export function clientReportHtml(snapshot: ClientReportSnapshot, assets: Templat
     ];
     parts.push(
       section(
-        L.nextMonth,
+        labels.next,
         table([{ label: L.date, num: true }, { label: L.work }, { label: '' }], rows),
       ),
     );
   }
-  const preliminary = snapshot.preliminary ? `<p class="badge">${L.preliminary}</p>` : '';
-  const empty = snapshot.empty ? `<p class="empty">${L.noActivity}</p>` : '';
-  const body = `<div class="title"><h1>${L.title} <span class="version">${escapeHtml(month)}</span></h1></div>
-<p class="client">${escapeHtml(snapshot.client.name)}</p>
+  return parts;
+}
+
+/** The report's page: its title, the client, the preliminary and empty notes, the sections. */
+function reportDocument(
+  snapshot: { preliminary: boolean; empty: boolean; companyDetails: string },
+  assets: TemplateAssets,
+  page: {
+    title: string;
+    subtitle: string;
+    name: string;
+    documentTitle: string;
+    preliminary: string;
+    noActivity: string;
+    parts: string[];
+  },
+): string {
+  const preliminary = snapshot.preliminary ? `<p class="badge">${page.preliminary}</p>` : '';
+  const empty = snapshot.empty ? `<p class="empty">${page.noActivity}</p>` : '';
+  const body = `<div class="title"><h1>${page.title} <span class="version">${escapeHtml(page.subtitle)}</span></h1></div>
+<p class="client">${escapeHtml(page.name)}</p>
 ${preliminary}${empty}
-${parts.join('\n')}`;
+${page.parts.join('\n')}`;
   return documentHtml({
-    title: `${L.title} ${snapshot.client.name} ${snapshot.month}`,
+    title: page.documentTitle,
     companyDetails: snapshot.companyDetails,
     body,
     assets,

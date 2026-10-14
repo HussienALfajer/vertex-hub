@@ -16,7 +16,7 @@ import {
   statementSnapshotSchema,
 } from './invoices.js';
 import { quoteSnapshotSchema } from './quotes.js';
-import { clientReportSnapshotSchema } from './reports.js';
+import { clientReportSnapshotSchema, cycleReportSnapshotSchema } from './reports.js';
 
 /** F05 R2: closes past retainer cycles and opens the current month's, once a day. */
 export const RETAINER_CYCLES_JOB = {
@@ -221,31 +221,61 @@ export type CampaignPdfReadyJob = z.infer<typeof campaignPdfReadyJobSchema>;
 
 /**
  * F15 rule 20: renders the monthly client report PDF, as `invoices.pdf` renders a statement. `id`
- * is the `client_report_pdfs` row the result goes back to.
+ * is the `client_report_pdfs` row the result goes back to. F05C R1: also the cycle report PDF,
+ * whose `id` is the cycle (its `retainer_cycle_reports` row).
  */
 export const REPORTS_PDF_JOB = { queue: 'reports.pdf', retryLimit: 3 } as const;
 
-export const reportPdfJobSchema = z.object({
-  kind: z.literal('client_report'),
-  id: z.uuid(),
-  hash: renderHashSchema,
-  snapshot: clientReportSnapshotSchema,
-});
+export const REPORT_PDF_KINDS = ['client_report', 'cycle_report'] as const;
+
+export const reportPdfJobSchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('client_report'),
+    id: z.uuid(),
+    hash: renderHashSchema,
+    snapshot: clientReportSnapshotSchema,
+  }),
+  z.object({
+    kind: z.literal('cycle_report'),
+    id: z.uuid(),
+    hash: renderHashSchema,
+    snapshot: cycleReportSnapshotSchema,
+  }),
+]);
 
 export type ReportPdfJob = z.infer<typeof reportPdfJobSchema>;
 
+const REPORT_PDF_FOLDERS: Record<ReportPdfJob['kind'], string> = {
+  client_report: 'client-reports',
+  cycle_report: 'cycle-reports',
+};
+
 /** Where the worker writes the PDF of a `reports.pdf` render, under `FILES_ROOT`. */
-export const reportPdfStorageKey = (job: Pick<ReportPdfJob, 'id' | 'hash'>) =>
-  `objects/client-reports/${job.id}/${job.hash}.pdf`;
+export const reportPdfStorageKey = (job: Pick<ReportPdfJob, 'kind' | 'id' | 'hash'>) =>
+  `objects/${REPORT_PDF_FOLDERS[job.kind]}/${job.id}/${job.hash}.pdf`;
 
 /** The result of a `reports.pdf` render, worked by the API: recorded on its row, or failed. */
 export const REPORTS_PDF_READY_JOB = { queue: 'reports.pdf-ready' } as const;
 
-export const reportPdfReadyJobSchema = reportPdfJobSchema
-  .pick({ kind: true, id: true, hash: true })
-  .extend({ file: renderedFileSchema });
+export const reportPdfReadyJobSchema = z.object({
+  kind: z.enum(REPORT_PDF_KINDS),
+  id: z.uuid(),
+  hash: renderHashSchema,
+  file: renderedFileSchema,
+});
 
 export type ReportPdfReadyJob = z.infer<typeof reportPdfReadyJobSchema>;
+
+/**
+ * F05C R1: a cycle closed; the API prepares its report PDF once the closing transaction
+ * committed (the snapshot reads the frozen counts). Queued in that transaction; a missed nudge is
+ * caught by the next request of the PDF, which renders whatever is not current.
+ */
+export const REPORTS_CYCLE_REPORT_JOB = { queue: 'reports.cycle-report' } as const;
+
+export const cycleReportJobSchema = z.object({ retainerId: z.uuid(), cycleId: z.uuid() });
+
+export type CycleReportJob = z.infer<typeof cycleReportJobSchema>;
 
 /**
  * F14 email (ADR 0028): sends one email of the outbox. Queued by `Mailer.queue` in the

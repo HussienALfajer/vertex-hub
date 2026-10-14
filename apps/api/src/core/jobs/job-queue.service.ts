@@ -22,6 +22,8 @@ export class JobQueue implements OnApplicationBootstrap, OnApplicationShutdown {
   /** Queues this process sends to but another one works, created on first send. */
   private readonly created = new Set<string>();
   private boss: PgBoss | undefined;
+  /** pg-boss works this process's queues (and created them on bootstrap). */
+  private working = false;
 
   constructor(@Inject(ENV) private readonly env: Env) {}
 
@@ -72,8 +74,9 @@ export class JobQueue implements OnApplicationBootstrap, OnApplicationShutdown {
   }
 
   private async ensureQueue(boss: PgBoss, queue: string): Promise<void> {
-    if (this.handlers.has(queue) || this.created.has(queue)) return;
-    // A queue the worker works (F04 `quotes.pdf`) may not exist yet when the worker is down.
+    if ((this.working && this.handlers.has(queue)) || this.created.has(queue)) return;
+    // A queue the worker works (F04 `quotes.pdf`) may not exist yet when the worker is down, nor
+    // one this process works when a script only sends (`retainers:run-daily`: `reports.cycle-report`).
     await boss.createQueue(queue);
     this.created.add(queue);
   }
@@ -98,6 +101,7 @@ export class JobQueue implements OnApplicationBootstrap, OnApplicationShutdown {
     if (!this.env.JOBS_ENABLED || this.handlers.size === 0) return;
     const boss = await this.startBoss();
     this.boss = boss;
+    this.working = true;
     for (const [queue, handler] of this.handlers) {
       await boss.createQueue(queue);
       await boss.work(queue, async ([job]) => handler(job?.data));

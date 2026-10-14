@@ -82,6 +82,7 @@ import {
   type CurrentCycle,
   type Cycle,
   type CycleDetail,
+  type CycleReport,
   type CycleStatus,
   calendarDay,
   canChangeCampaignStatus,
@@ -113,6 +114,7 @@ import {
   daysOverdue,
   daysWithoutUpdate,
   defaultInstallmentMilestones,
+  deliveryRate,
   type EmailLogItem,
   type EmailRecordType,
   type EmailSummary,
@@ -344,6 +346,7 @@ import {
   updateCatalogPackageSchema,
   updateCatalogServiceSchema,
   updateClientReportSummarySchema,
+  updateCycleReportSummarySchema,
   updateInvoiceServicesSchema,
   updateInvoiceSettingsSchema,
   updateLeadNoteSchema,
@@ -14016,6 +14019,12 @@ function reportRoutes({ users, clients, projects, retainers, tasks, tasksApi, me
       retainers: [
         {
           retainer: named({ id: id(901), name: 'إدارة السوشيال ميديا' }),
+          cycleId:
+            retainers
+              .find((r) => r.id === id(901))
+              ?.cycles.find((c) => c.number === (cycleAt('2026-03-01', `${month}-01`) ?? 1))?.id ??
+            id(921),
+          backdated: false,
           // From 1 March, each calendar month is one cycle (R4).
           cycle: cycleAt('2026-03-01', `${month}-01`) ?? 1,
           ...cyclePeriod('2026-03-01', cycleAt('2026-03-01', `${month}-01`) ?? 1),
@@ -14105,6 +14114,51 @@ function reportRoutes({ users, clients, projects, retainers, tasks, tasksApi, me
     };
   };
 
+  /** F05C screen 9: a cycle of a retainer with the client's activity of the matching month. */
+  const cycleSummaries = new Map<string, NonNullable<CycleReport['summary']>>();
+  const cycleReport = (
+    retainer: (typeof retainers)[number],
+    cycle: (typeof retainers)[number]['cycles'][number],
+  ): CycleReport => {
+    const month = clientReport(retainer.clientId, cycle.periodEnd.slice(0, 7));
+    const lines = cycle.lines.map((line) => {
+      const delivered = cycle.untracked
+        ? null
+        : (line.deliveredAtClose ?? line.adjustments.reduce((sum, a) => sum + a.delta, 0));
+      return {
+        kind: line.kind,
+        label: line.label,
+        committed: line.committed,
+        delivered,
+        percent:
+          delivered === null ? null : deliveryRate([{ committed: line.committed, delivered }]),
+      };
+    });
+    const next = cyclePeriod(retainer.startDate, cycle.number + 1);
+    const summary = cycleSummaries.get(cycle.id) ?? null;
+    return {
+      client: month.client,
+      retainer: named(retainer),
+      cycle: { id: cycle.id, number: cycle.number, status: cycle.status },
+      period: { from: cycle.periodStart, to: cycle.periodEnd },
+      preliminary: cycle.status === 'open',
+      summary: summary?.text ? summary : null,
+      lines,
+      deliveryRate: cycle.untracked
+        ? null
+        : deliveryRate(lines.map((l) => ({ committed: l.committed, delivered: l.delivered ?? 0 }))),
+      deliveredWork: month.deliveredWork,
+      posts: month.posts,
+      shoots: month.shoots,
+      approvals: month.approvals,
+      campaigns: month.campaigns,
+      adBudget: month.adBudget,
+      nextPeriod: { ...month.nextMonth, period: { from: next.periodStart, to: next.periodEnd } },
+      empty: month.empty && !summary?.text,
+    };
+  };
+  const cyclePdfs = new Set<string>();
+
   return (route: Route, method: string, url: URL, request: Request) => {
     const path = url.pathname;
     if (path === '/api/dashboard/company') {
@@ -14143,6 +14197,36 @@ function reportRoutes({ users, clients, projects, retainers, tasks, tasksApi, me
       if (report[1] === 'productivity') return json(route, productivity(url));
       if (report[1] === 'revenue') return json(route, revenue(url));
       return json(route, overdueInvoices(url));
+    }
+    const cycled = path.match(/^\/api\/retainers\/([^/]+)\/cycles\/([^/]+)\/report(?:\/(.+))?$/);
+    if (cycled) {
+      const [, retainerId, cycleId = '', action] = cycled;
+      if (!holds('reports.read')) return fail(route, 403, null);
+      const retainer = retainers.find((r) => r.id === retainerId);
+      const cycle = retainer?.cycles.find((c) => c.id === cycleId);
+      if (!retainer || !cycle || cycle.backdated || !readsClient(retainer.clientId)) {
+        return fail(route, 404, null);
+      }
+      if (!action) return json(route, cycleReport(retainer, cycle));
+      if (action === 'export') return workbook();
+      if (action === 'summary' && method === 'PUT') {
+        const input = updateCycleReportSummarySchema.parse(request.postDataJSON());
+        cycleSummaries.set(cycle.id, {
+          text: input.summary,
+          updatedBy: userNamed(me().user.id),
+          updatedAt: new Date().toISOString(),
+        });
+        cyclePdfs.delete(cycle.id);
+        return json(route, cycleReport(retainer, cycle));
+      }
+      if (action === 'pdf' && method === 'POST') {
+        cyclePdfs.add(cycle.id);
+        return json(route, { state: 'ready' });
+      }
+      if (action === 'pdf') {
+        if (!cyclePdfs.has(cycle.id)) return fail(route, 404, null);
+        return route.fulfill({ status: 200, contentType: 'application/pdf', body: MOCK_PDF });
+      }
     }
     const monthly = path.match(/^\/api\/clients\/([^/]+)\/monthly-report(?:\/(.+))?$/);
     if (monthly) {

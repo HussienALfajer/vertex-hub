@@ -68,6 +68,7 @@ export const NOTIFICATION_TYPES = [
   'retainer_renewal_due',
   'retainer_behind',
   'retainer_term_renewed',
+  'retainer_cycle_report_ready',
   'retainer_amendment_pending',
   'retainer_amendment_decided',
   'quote_approval_requested',
@@ -191,6 +192,11 @@ const CATALOG: Record<
   retainer_renewal_due: { category: 'reminders', subject: 'retainer', mutable: true },
   retainer_behind: { category: 'reminders', subject: 'retainer', mutable: false },
   retainer_term_renewed: { category: 'reminders', subject: 'retainer', mutable: true },
+  retainer_cycle_report_ready: {
+    category: 'clients_projects',
+    subject: 'retainer',
+    mutable: true,
+  },
   retainer_amendment_pending: {
     category: 'clients_projects',
     subject: 'retainer',
@@ -420,6 +426,17 @@ export const NOTIFICATION_DATA_SCHEMAS = {
     daysLeft: z.number().int().min(0),
     /** The end action of the retainer's last term; null without a term (F05B T11). */
     endAction: termEndActionSchema.nullable().optional(),
+  }),
+  /** F05C R1: a cycle closed and its report is ready for the account manager. */
+  retainer_cycle_report_ready: z.object({
+    retainer: nameSchema,
+    client: nameSchema,
+    cycleId: z.uuid(),
+    cycle: z.number().int().min(1),
+    periodStart: calendarDateSchema,
+    periodEnd: calendarDateSchema,
+    /** The cycle's final delivery rate, whole percent; null with nothing committed. */
+    deliveryRate: z.number().int().min(0).max(100).nullable(),
   }),
   /** F05B T7: the job scheduled the next term of a term that renews. */
   retainer_term_renewed: z.object({

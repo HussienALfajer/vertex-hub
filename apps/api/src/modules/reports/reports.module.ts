@@ -9,11 +9,14 @@ import { ContentModule } from '../content/index.js';
 import { FilesModule } from '../files/index.js';
 import { InvoicesModule } from '../invoices/index.js';
 import { LeadsModule } from '../leads/index.js';
+import { NotificationsModule } from '../notifications/index.js';
 import { ProjectsModule } from '../projects/index.js';
 import { QuotesModule } from '../quotes/index.js';
 import { TasksModule } from '../tasks/index.js';
 import { ClientReportController } from './client-report.controller.js';
 import { ClientReportService } from './client-report.service.js';
+import { CycleReportController } from './cycle-report.controller.js';
+import { CycleReportService } from './cycle-report.service.js';
 import { DashboardController } from './dashboard.controller.js';
 import { DashboardService } from './dashboard.service.js';
 import { ReportsController } from './reports.controller.js';
@@ -27,7 +30,9 @@ import { ReportsService } from './reports.service.js';
  * `UserDirectory` and `catalog`'s `CatalogDirectory`. Owns `client_report_notes` and
  * `client_report_pdfs`: renders the monthly client report PDF through the worker (`reports.pdf`),
  * serves it through `files`' `GeneratedFiles` and purges it through `FilePurges`, with the
- * company details from `quotes`' `QuoteDirectory`. Owns no business rules of other modules;
+ * company details from `quotes`' `QuoteDirectory`. Owns `retainer_cycle_reports` (F05C R1–R3):
+ * prepares a cycle's report when `projects` closes it (`CycleClosedHooks`) and tells the account
+ * manager through `notifications`' `NotificationCenter`. Owns no business rules of other modules;
  * nothing imports it.
  */
 @Module({
@@ -42,11 +47,17 @@ import { ReportsService } from './reports.service.js';
     FilesModule,
     InvoicesModule,
     LeadsModule,
+    NotificationsModule,
     ProjectsModule,
     QuotesModule,
     TasksModule,
   ],
-  controllers: [DashboardController, ReportsController, ClientReportController],
-  providers: [DashboardService, ReportsService, ClientReportService],
+  controllers: [
+    DashboardController,
+    ReportsController,
+    ClientReportController,
+    CycleReportController,
+  ],
+  providers: [DashboardService, ReportsService, ClientReportService, CycleReportService],
 })
 export class ReportsModule {}

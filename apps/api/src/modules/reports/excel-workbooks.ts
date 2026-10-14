@@ -2,6 +2,8 @@ import {
   type ClientMonthlyReport,
   CLIENT_REPORT_LABELS as CR,
   type Currency,
+  CYCLE_REPORT_LABELS as CY,
+  type CycleReport,
   type OverdueInvoicesReport,
   type ProductivityMeasures,
   type ProductivityReport,
@@ -362,7 +364,30 @@ export async function clientReportWorkbook(report: ClientMonthlyReport): Promise
       ]),
     );
   }
-  if (report.deliveredWork.length) {
+  activitySheets(workbook, report, report.nextMonth, {
+    opening: CR.opening,
+    closing: CR.closing,
+    next: CR.nextMonth,
+  });
+  return toBuffer(workbook);
+}
+
+type ActivitySections = Pick<
+  ClientMonthlyReport,
+  'deliveredWork' | 'posts' | 'shoots' | 'approvals' | 'campaigns' | 'adBudget'
+>;
+
+/**
+ * The sections both client reports share (F15 rule 18.4–18.10, F05C R2), one sheet each with
+ * data; `labels` name the period they cover.
+ */
+function activitySheets(
+  workbook: ExcelJS.Workbook,
+  sections: ActivitySections,
+  next: ClientMonthlyReport['nextMonth'],
+  labels: { opening: string; closing: string; next: string },
+) {
+  if (sections.deliveredWork.length) {
     addSheet(
       workbook,
       CR.deliveredWork,
@@ -371,10 +396,14 @@ export async function clientReportWorkbook(report: ClientMonthlyReport): Promise
         { header: CR.work, width: 40 },
         { header: CR.department, width: 22 },
       ],
-      report.deliveredWork.map((work) => [day(work.deliveredOn), work.title, work.departmentName]),
+      sections.deliveredWork.map((work) => [
+        day(work.deliveredOn),
+        work.title,
+        work.departmentName,
+      ]),
     );
   }
-  if (report.posts.length) {
+  if (sections.posts.length) {
     addSheet(
       workbook,
       CR.posts,
@@ -384,7 +413,7 @@ export async function clientReportWorkbook(report: ClientMonthlyReport): Promise
         { header: CR.platforms, width: 26 },
         { header: CR.links, width: 50 },
       ],
-      report.posts.map((post) => [
+      sections.posts.map((post) => [
         day(post.publishedOn),
         post.title,
         post.platforms.map((platform) => VALUES.postPlatforms[platform]).join('، '),
@@ -392,7 +421,7 @@ export async function clientReportWorkbook(report: ClientMonthlyReport): Promise
       ]),
     );
   }
-  if (report.shoots.length) {
+  if (sections.shoots.length) {
     addSheet(
       workbook,
       CR.shoots,
@@ -401,10 +430,10 @@ export async function clientReportWorkbook(report: ClientMonthlyReport): Promise
         { header: CR.shoot, width: 32 },
         { header: CR.location, width: 32 },
       ],
-      report.shoots.map((shoot) => [day(shoot.date), shoot.title, shoot.location]),
+      sections.shoots.map((shoot) => [day(shoot.date), shoot.title, shoot.location]),
     );
   }
-  const approvals = report.approvals;
+  const approvals = sections.approvals;
   if (approvals.approved + approvals.changesRequested > 0) {
     addSheet(
       workbook,
@@ -425,8 +454,8 @@ export async function clientReportWorkbook(report: ClientMonthlyReport): Promise
       ],
     );
   }
-  if (report.campaigns?.rows.length) {
-    const metrics = (row: NonNullable<ClientMonthlyReport['campaigns']>['totals']): Cell[] => [
+  if (sections.campaigns?.rows.length) {
+    const metrics = (row: NonNullable<ActivitySections['campaigns']>['totals']): Cell[] => [
       money(row.spendMinor),
       row.reach,
       row.clicks,
@@ -447,18 +476,18 @@ export async function clientReportWorkbook(report: ClientMonthlyReport): Promise
         { header: CR.costPerResult, width: 20, format: 'money' },
       ],
       [
-        ...report.campaigns.rows.map((row): Cell[] => [
+        ...sections.campaigns.rows.map((row): Cell[] => [
           VALUES.adPlatforms[row.platform],
           row.name,
           VALUES.adObjectives[row.objective],
           ...metrics(row),
         ]),
-        [CR.total, null, null, ...metrics(report.campaigns.totals)],
+        [CR.total, null, null, ...metrics(sections.campaigns.totals)],
       ],
     );
   }
-  if (report.adBudget) {
-    const budget = report.adBudget;
+  if (sections.adBudget) {
+    const budget = sections.adBudget;
     addSheet(
       workbook,
       CR.adBudget,
@@ -467,22 +496,21 @@ export async function clientReportWorkbook(report: ClientMonthlyReport): Promise
         { header: '', format: 'money' },
       ],
       [
-        [CR.opening, money(budget.openingMinor)],
+        [labels.opening, money(budget.openingMinor)],
         [CR.deposits, money(budget.depositsMinor)],
         [CR.refunds, money(budget.refundsMinor)],
         [CR.walletSpend, money(budget.spendMinor)],
-        [CR.closing, money(budget.closingMinor)],
+        [labels.closing, money(budget.closingMinor)],
       ],
     );
   }
-  const next = report.nextMonth;
   if (next.posts.length || next.shoots.length) {
     addSheet(
       workbook,
-      CR.nextMonth,
+      labels.next,
       [
         { header: CR.date, format: 'date' },
-        { header: CR.nextMonth, width: 40 },
+        { header: labels.next, width: 40 },
         { header: '', width: 22 },
       ],
       [
@@ -491,5 +519,53 @@ export async function clientReportWorkbook(report: ClientMonthlyReport): Promise
       ],
     );
   }
+}
+
+/** F05C R2: the cycle report, as the monthly one with this cycle's lines and no projects. */
+export async function cycleReportWorkbook(report: CycleReport): Promise<Buffer> {
+  const workbook = newWorkbook();
+  const cycle = formatRetainerCycle({
+    number: report.cycle.number,
+    periodStart: report.period.from,
+    periodEnd: report.period.to,
+  });
+  const heading = [
+    [`${CY.title} — ${report.client.name} — ${report.retainer.name}`, cycle],
+    ...(report.preliminary ? [[CY.preliminary]] : []),
+    ...(report.empty ? [[CY.noActivity]] : []),
+    ...(report.summary ? [[], [CY.summary], [report.summary.text]] : []),
+  ];
+  const first = workbook.addWorksheet(CY.summary, { views: [{ rightToLeft: true }] });
+  first.getColumn(1).width = 80;
+  for (const row of heading) first.addRow(row);
+  first.getRow(1).font = { bold: true };
+  first.getColumn(1).alignment = { wrapText: true, vertical: 'top' };
+
+  if (report.lines.length) {
+    addSheet(
+      workbook,
+      CY.deliverables,
+      [
+        { header: CR.kind, width: 22 },
+        { header: CR.committed, width: 12 },
+        { header: CR.delivered, width: 12 },
+        { header: CR.percent, width: 10 },
+      ],
+      [
+        ...report.lines.map((line): Cell[] => [
+          line.label ?? VALUES.deliverableKinds[line.kind],
+          line.committed,
+          line.delivered,
+          line.percent,
+        ]),
+        [CY.deliveryRate, null, null, report.deliveryRate],
+      ],
+    );
+  }
+  activitySheets(workbook, report, report.nextPeriod, {
+    opening: CY.opening,
+    closing: CY.closing,
+    next: CY.nextPeriod,
+  });
   return toBuffer(workbook);
 }

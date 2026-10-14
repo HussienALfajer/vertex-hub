@@ -109,8 +109,46 @@ PR 1 is merged (#111). No migration: `retainer_cycles.backdated`/`untracked` and
 - [x] `reviewer` with the spec; blocking finding fixed (an untracked cycle's lines showed 0 delivered and 0 % in History and the client report; now no count: `delivered` and `percent` null in the report, "—" on screen, PDF and Excel; API test added)
 - [x] Owner acceptance (accepted 2026-10-13); PR opened with auto-merge
 
-## PR 3 — cycle reports
-- [ ] Planned when PR 2 is merged
+## PR 3 — cycle reports (branch `claude/charming-hopper-85pv60`)
+
+PR 2 is merged (#112). Ownership: ADR 0027 lets no module import `reports`, so `retainer_cycle_reports`, the cycle report service and its routes belong to `reports` (spec updated: it said `projects` owns every new table); `projects` tells it a cycle closed through a new `CycleClosedHooks` (as `CycleOpenedHooks`). Not in PR 3: legal details and contracts (PR 4, PR 5).
+
+### 1. contracts
+- [x] `reports.ts`: `cycleReportSchema` (R2: client, retainer, cycle number and period, `preliminary`, summary, this cycle's lines with committed, frozen delivered, percent and delivery rate; delivered work, published content, shoots, approvals, campaigns and ad budget with `campaigns.read`, next period; no projects), `updateCycleReportSummarySchema`, `cycleReportSnapshotSchema`, `CYCLE_REPORT_LABELS`; monthly report retainers carry `cycleId`; `reportPdfJobSchema` gains kind `cycle_report`; `reports.cycle-report` nudge queue (`jobs.ts`)
+- [x] Notification type `retainer_cycle_report_ready` (`clients_projects`, subject `retainer`, mutable) with its data; text and link in `packages/messages`; audit action `retainer_cycle_report.summary_changed` and entity type; `ar.json` keys
+- [x] Unit tests (schemas, notification data); gate: `contracts` test, root `typecheck`
+
+### 2. db (`/db-migration`, expand only)
+- [x] `retainer_cycle_reports` (`cycle_id` PK → `retainer_cycles.id`, `summary` ≤ 4,000 default empty, `pdf_status`, `storage_key`, `hash`, `size_bytes`, `rendered_at`, `updated_at`, `updated_by_id`); owner `reports` in `TABLE_OWNERS`; natural key in `conventions.test.ts`; `notification_type` enum value
+- [x] Gate: `db` test, migration drift
+
+### 3. api
+- [x] `projects`: `CycleClosedHooks` run in the closing transaction by the job (J1 step 3, with `backdated` skipped) and by ending (Y4); `EngagementReports` read of one cycle with its retainer and client
+- [x] `reports`: `CycleReportService`: R1 (row, queued PDF, one `retainer_cycle_report_ready` to the account manager), R2 (sections over the cycle period), R3 (summary saves audit and mark the PDF outdated; render again on download), `reports.pdf-ready` for kind `cycle_report`
+- [x] Controller: `GET …/report`, `/export` (xlsx), `PUT …/report/summary`, `POST` · `GET …/report/pdf`; `reports.read` covering the client, 404 outside
+- [x] Tests `retainer-cycle-reports.test.ts`: each endpoint success, 401, 403, out of scope; R1–R3, backdated none, edge cases 3, 5 and 15, idempotent job; gate: api test files, `architecture.test.ts`, `api` typecheck
+
+### 4. worker
+- [x] `reports.pdf` kind `cycle_report`: template (Arabic RTL, preliminary mark), worker test with screenshot; gate: `worker` test, typecheck
+
+### 5. bridge
+- [x] `pnpm build`, `openapi:export`, `api:generate`
+
+### 6. web
+- [x] Cycle report page `/retainers/$retainerId/cycles/$cycleId/report` (sections, preliminary badge, summary editor, Download PDF, Export to Excel); "Report" link per closed cycle in History; link from the client's report page; notification link
+- [x] `ar.json` texts; gate: `web` typecheck, lint, `web` test
+
+### 7. e2e
+- [x] `fixtures.ts` mocks; flow spec: the report from History, summary saved; screenshots light and dark of the cycle report
+- [x] Gate: f05c (7/7), f05, f15 and the retainer and report screens (70) pass; screenshots opened and checked (cycle report light and dark, History with the Report links, monthly report with the cycle link); full `pnpm test:e2e` at close
+
+- [x] Found while building: `timestamps()` bumps `updated_at` on every update, so a render changed the report's hash (the summary shows its time); `retainer_cycle_reports.updated_at` is set by summary saves only (no SQL change). `retainers:run-daily` now starts sending jobs, so the report nudge reaches the running dev API. The report sections the two reports share moved to `report-sections.tsx` (web) and shared helpers in the PDF template and Excel builder. `$retainerId.tsx` became `$retainerId/index.tsx` for the nested report route.
+
+### Close PR 3
+- [x] Wiring checklist; spec updated (table ownership, `updated_at`, PDF currency by hash, the nudge job); `docs/architecture.md` (`reports`, `CycleClosedHooks`)
+- [x] Full checks: lint, typecheck, build, OpenAPI fresh, migration drift, E2E (382 passed); after the last fix lint, typecheck and `pnpm test` (11/11 tasks) pass
+- [x] `reviewer` with the spec; blocking findings fixed (no report link for backdated cycles in the monthly report, 403 tests on every endpoint, ADR 0027 amendment; also a send-only script now creates the `reports.cycle-report` queue); tests that delete cycles or read a retainer's inbox adjusted for the report row and notice
+- [x] Owner waived acceptance in this session (asked for the PR with auto-merge); PR opened with auto-merge
 
 ## PR 4 — legal details
 - [ ] Planned when PR 3 is merged

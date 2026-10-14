@@ -615,6 +615,7 @@ function fileOwnerOf(entry: AuditEntry, type: FileOwnerType): string | undefined
 
 const RETAINER_PARTS: AuditEntityType[] = [
   'retainer_cycle',
+  'retainer_cycle_report',
   'retainer_charge',
   'retainer_term',
   'retainer_amendment',
@@ -641,6 +642,7 @@ function retainerTabOf(
   if (entry.entityType === 'retainer_charge') return 'billing';
   if (entry.entityType === 'file_item') return 'documents';
   if (entry.action === 'retainer_cycle.closed') return 'history';
+  if (entry.entityType === 'retainer_cycle_report') return 'history';
   return undefined;
 }
 

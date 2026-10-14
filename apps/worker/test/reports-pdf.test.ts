@@ -4,6 +4,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   type ClientReportSnapshot,
+  type CycleReportSnapshot,
   type ReportPdfJob,
   reportPdfStorageKey,
 } from '@vertex-hub/contracts';
@@ -14,7 +15,7 @@ import { parseEnv } from '../src/core/config/env.js';
 import type { PgBossService } from '../src/jobs/pg-boss.service.js';
 import { ReportsPdfJob } from '../src/jobs/reports-pdf.job.js';
 import { loadAssets, PdfRenderer } from '../src/pdf/pdf-renderer.js';
-import { clientReportHtml } from '../src/pdf/report-templates.js';
+import { clientReportHtml, cycleReportHtml } from '../src/pdf/report-templates.js';
 
 const id = '0190a3c2-0000-7000-8000-0000000000cd';
 const uuid = (n: number) => `0190a3c2-0000-7000-8000-${String(n).padStart(12, '0')}`;
@@ -33,6 +34,8 @@ const report: ClientReportSnapshot = {
   retainers: [
     {
       retainer: { id: uuid(3), name: 'باقة السوشيال' },
+      cycleId: uuid(9),
+      backdated: false,
       cycle: 2,
       periodStart: '2026-08-20',
       periodEnd: '2026-09-19',
@@ -108,6 +111,46 @@ const report: ClientReportSnapshot = {
   },
   empty: false,
 };
+
+/** F05C R2: cycle 2 of the same retainer, with this cycle's lines and no projects. */
+const cycleReport: CycleReportSnapshot = {
+  companyDetails: report.companyDetails,
+  client: report.client,
+  retainer: { id: uuid(3), name: 'باقة السوشيال' },
+  cycle: { id: uuid(9), number: 2, status: 'closed' },
+  period: { from: '2026-08-20', to: '2026-09-19' },
+  preliminary: false,
+  summary: {
+    ...report.summary,
+    text: 'دورة جيدة: سُلّمت الريلز كاملة.',
+  } as CycleReportSnapshot['summary'],
+  lines: report.retainers[0]?.lines ?? [],
+  deliveryRate: 87,
+  deliveredWork: report.deliveredWork,
+  posts: report.posts,
+  shoots: report.shoots,
+  approvals: report.approvals,
+  campaigns: report.campaigns,
+  adBudget: report.adBudget,
+  nextPeriod: { ...report.nextMonth, period: { from: '2026-09-20', to: '2026-10-19' } },
+  empty: false,
+};
+
+async function screenshot(html: string, name: string) {
+  const browser = await chromium.launch();
+  try {
+    // An A4 page at 96 dpi; headless Chromium has no PDF viewer, so the print layout is shot.
+    const page = await browser.newPage({ viewport: { width: 794, height: 1123 } });
+    await page.emulateMedia({ media: 'print' });
+    await page.setContent(html, { waitUntil: 'load' });
+    await page.evaluate('document.fonts.ready.then(() => true)');
+    const path = join(dirname(fileURLToPath(import.meta.url)), `../test-results/${name}.png`);
+    await page.screenshot({ path, fullPage: true });
+    expect((await stat(path)).size).toBeGreaterThan(10_000);
+  } finally {
+    await browser.close();
+  }
+}
 
 /** The extracted text: Arabic comes back in visual order with split words, so only counted. */
 async function pdfText(path: string): Promise<string> {
@@ -206,22 +249,36 @@ describe('reports.pdf', () => {
   });
 
   it('lays out the report in print media (the RTL screenshot)', async () => {
-    const html = clientReportHtml(report, await loadAssets());
-    const browser = await chromium.launch();
-    try {
-      // An A4 page at 96 dpi; headless Chromium has no PDF viewer, so the print layout is shot.
-      const page = await browser.newPage({ viewport: { width: 794, height: 1123 } });
-      await page.emulateMedia({ media: 'print' });
-      await page.setContent(html, { waitUntil: 'load' });
-      await page.evaluate('document.fonts.ready.then(() => true)');
-      const path = join(
-        dirname(fileURLToPath(import.meta.url)),
-        '../test-results/client-report-pdf-page.png',
-      );
-      await page.screenshot({ path, fullPage: true });
-      expect((await stat(path)).size).toBeGreaterThan(10_000);
-    } finally {
-      await browser.close();
-    }
+    await screenshot(clientReportHtml(report, await loadAssets()), 'client-report-pdf-page');
+  });
+
+  describe('cycle reports (F05C R1, R2)', () => {
+    it('renders the cycle with its lines, its rate and the shared sections', async () => {
+      const text = await render({
+        kind: 'cycle_report',
+        id: uuid(9),
+        hash: 'e'.repeat(64),
+        snapshot: cycleReport,
+      });
+      expect(text).toContain('87%');
+      expect(text).toContain('2026-09-10');
+      expect(text).toContain('350.00');
+      expect(text).toContain('2026-10-08');
+      expect(arabicLetters(text)).toBeGreaterThan(300);
+      expect(
+        reportPdfStorageKey({ kind: 'cycle_report', id: uuid(9), hash: 'e'.repeat(64) }),
+      ).toContain('cycle-reports/');
+    });
+
+    it('marks an open cycle preliminary', async () => {
+      const html = cycleReportHtml({ ...cycleReport, preliminary: true }, await loadAssets());
+      expect(html).toContain('تقرير أولي: الدورة لم تنتهِ بعد');
+      expect(html).toContain('نسبة التسليم');
+      expect(html).not.toContain('المشاريع');
+    });
+
+    it('lays out the cycle report in print media (the RTL screenshot)', async () => {
+      await screenshot(cycleReportHtml(cycleReport, await loadAssets()), 'cycle-report-pdf-page');
+    });
   });
 });

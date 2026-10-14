@@ -106,6 +106,15 @@ const SAMPLES: Record<NotificationType, unknown> = {
     startDate: '2026-11-20',
     endDate: '2027-02-19',
   },
+  retainer_cycle_report_ready: {
+    retainer: 'عقد شهري',
+    client: 'مطعم الشام',
+    cycleId: '0190a3c2-0000-7000-8000-0000000000c1',
+    cycle: 3,
+    periodStart: '2026-10-20',
+    periodEnd: '2026-11-19',
+    deliveryRate: 87,
+  },
   retainer_amendment_pending: {
     retainer: 'عقد شهري',
     client: 'مطعم الشام',
@@ -219,6 +228,16 @@ describe('notification texts', () => {
     );
     const due = notificationText(sample('retainer_renewal_due'), departmentName);
     expect(due.context).toBe('مطعم الشام · 10 تشرين الأول 2026 · يتجدد تلقائيًا');
+  });
+
+  it('names a ready cycle report and opens it (F05C R1)', () => {
+    const ready = sample('retainer_cycle_report_ready');
+    const { text, context } = notificationText(ready, departmentName);
+    expect(text).toBe('تقرير الدورة 3 من عقد «عقد شهري» جاهز');
+    expect(context).toBe('مطعم الشام · 20 تشرين الأول – 19 تشرين الثاني 2026 · التسليم 87٪');
+    expect(linkPath(notificationLink(ready))).toBe(
+      `/retainers/${SUBJECT_ID}/cycles/0190a3c2-0000-7000-8000-0000000000c1/report`,
+    );
   });
 
   it('names an amendment waiting for approval and its decision (F05B A4)', () => {

@@ -76,6 +76,7 @@ const NOT_BUSINESS_RECORDS: Record<string, string> = {
   client_report_notes:
     'One summary per client and month, replaced on save and cleared, not archived (F15 rule 19)',
   client_report_pdfs: 'Temporary monthly report renders, deleted after 24 hours (F15 rule 20)',
+  retainer_cycle_reports: 'Part of its retainer cycle, kept as long as the cycle (F05C R1)',
   email_digests: 'Idempotency keys of the morning digest, insert-only (F14 email rule 10)',
   user_devices: 'Sign-in devices of a user, upserted on each session (F14 email rule 15)',
   email_messages:
@@ -91,6 +92,7 @@ const NATURAL_KEYS: Record<string, string> = {
   quote_numbers: 'One row per year, keyed by the year (F04 rule 2)',
   invoice_settings: 'A single row, keyed by a constant (F13)',
   ad_wallets: 'One row per client, keyed by the client (F12)',
+  retainer_cycle_reports: 'One row per retainer cycle, keyed by the cycle (F05C)',
 };
 
 describe('database conventions', () => {

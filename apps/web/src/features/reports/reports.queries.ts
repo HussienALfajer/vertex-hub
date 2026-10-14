@@ -1,11 +1,13 @@
 import { keepPreviousData, queryOptions, useMutation, useQueryClient } from '@tanstack/react-query';
 import type {
   ClientMonthlyReport,
+  CycleReport,
   DepartmentCode,
   OverdueInvoicesQuery,
   ProductivityQuery,
   RevenueQuery,
   UpdateClientReportSummary,
+  UpdateCycleReportSummary,
 } from '@vertex-hub/contracts';
 import { ApiError, api, call } from '../../lib/api/client';
 
@@ -29,6 +31,10 @@ export const reportsKeys = {
     ['reports', 'client-report', clientId, month] as const,
   clientReportPdf: (clientId: string, month: string) =>
     ['reports', 'client-report-pdf', clientId, month] as const,
+  cycleReport: (retainerId: string, cycleId: string) =>
+    ['reports', 'cycle-report', retainerId, cycleId] as const,
+  cycleReportPdf: (retainerId: string, cycleId: string) =>
+    ['reports', 'cycle-report-pdf', retainerId, cycleId] as const,
 };
 
 export const companyDashboardQuery = queryOptions({
@@ -86,6 +92,18 @@ export const clientReportQuery = (clientId: string, month: string) =>
       ),
   });
 
+/** F05C screen 9: a retainer cycle's report. */
+export const cycleReportQuery = (retainerId: string, cycleId: string) =>
+  queryOptions({
+    queryKey: reportsKeys.cycleReport(retainerId, cycleId),
+    queryFn: () =>
+      call(
+        api.GET('/api/retainers/{id}/cycles/{cycleId}/report', {
+          params: { path: { id: retainerId, cycleId } },
+        }),
+      ),
+  });
+
 /** A query string from the set values only (`department` repeats, as the API reads lists). */
 function queryString(values: Record<string, string | readonly string[] | undefined>): string {
   const params = new URLSearchParams();
@@ -106,11 +124,17 @@ export const reportExportUrls = {
     `/api/reports/overdue-invoices/export${queryString(query)}`,
   clientReport: (clientId: string, month: string) =>
     `/api/clients/${clientId}/monthly-report/export${queryString({ month })}`,
+  cycleReport: (retainerId: string, cycleId: string) =>
+    `/api/retainers/${retainerId}/cycles/${cycleId}/report/export`,
 };
 
 /** The monthly report's PDF (rule 20), downloadable for 24 hours once it is ready. */
 export const clientReportPdfUrl = (clientId: string, month: string) =>
   `/api/clients/${clientId}/monthly-report/pdf${queryString({ month })}`;
+
+/** F05C R3: the cycle report's PDF, downloadable while it is the report as it is now. */
+export const cycleReportPdfUrl = (retainerId: string, cycleId: string) =>
+  `/api/retainers/${retainerId}/cycles/${cycleId}/report/pdf`;
 
 /** How often, and how many times, a PDF being rendered is looked for (2 minutes in all). */
 const PDF_POLL_MS = 3000;
@@ -121,11 +145,11 @@ const PDF_TRIES = 40;
  * has rendered it, so a `HEAD` request tells without fetching the file. Only that 404 is retried;
  * any other failure is an `ApiError` the app's error handling sees at once (as F13 statements).
  */
-export const clientReportPdfReadyQuery = (clientId: string, month: string) =>
-  queryOptions({
-    queryKey: reportsKeys.clientReportPdf(clientId, month),
+function pdfReadyQuery(queryKey: readonly unknown[], url: string) {
+  return queryOptions({
+    queryKey,
     queryFn: async () => {
-      const response = await fetch(clientReportPdfUrl(clientId, month), { method: 'HEAD' });
+      const response = await fetch(url, { method: 'HEAD' });
       if (!response.ok) {
         throw new ApiError(response.status, undefined, undefined, response.statusText);
       }
@@ -136,6 +160,16 @@ export const clientReportPdfReadyQuery = (clientId: string, month: string) =>
     retryDelay: PDF_POLL_MS,
     gcTime: 0,
   });
+}
+
+export const clientReportPdfReadyQuery = (clientId: string, month: string) =>
+  pdfReadyQuery(reportsKeys.clientReportPdf(clientId, month), clientReportPdfUrl(clientId, month));
+
+export const cycleReportPdfReadyQuery = (retainerId: string, cycleId: string) =>
+  pdfReadyQuery(
+    reportsKeys.cycleReportPdf(retainerId, cycleId),
+    cycleReportPdfUrl(retainerId, cycleId),
+  );
 
 /** Asks for the report's PDF as it is now; `pending` until the worker has rendered it. */
 export function useRenderClientReport(clientId: string) {
@@ -162,5 +196,33 @@ export function useSaveClientReportSummary(clientId: string) {
       ),
     onSuccess: (report: ClientMonthlyReport) =>
       queryClient.setQueryData(reportsKeys.clientReport(clientId, report.month), report),
+  });
+}
+
+/** F05C R3: the stored PDF when it is the report as it is now, else a new render (`pending`). */
+export function useRenderCycleReport(retainerId: string, cycleId: string) {
+  return useMutation({
+    mutationFn: () =>
+      call(
+        api.POST('/api/retainers/{id}/cycles/{cycleId}/report/pdf', {
+          params: { path: { id: retainerId, cycleId } },
+        }),
+      ),
+  });
+}
+
+/** F05C R3: the answer is the whole report with the new summary. */
+export function useSaveCycleReportSummary(retainerId: string, cycleId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: UpdateCycleReportSummary) =>
+      call(
+        api.PUT('/api/retainers/{id}/cycles/{cycleId}/report/summary', {
+          params: { path: { id: retainerId, cycleId } },
+          body: input,
+        }),
+      ),
+    onSuccess: (report: CycleReport) =>
+      queryClient.setQueryData(reportsKeys.cycleReport(retainerId, cycleId), report),
   });
 }

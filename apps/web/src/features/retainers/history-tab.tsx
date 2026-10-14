@@ -1,4 +1,5 @@
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
+import { Link } from '@tanstack/react-router';
 import type { Cycle, RetainerDetail } from '@vertex-hub/contracts';
 import {
   Badge,
@@ -11,13 +12,15 @@ import {
   EmptyState,
   Skeleton,
 } from '@vertex-hub/ui';
-import { ChevronLeftIcon, HistoryIcon, PackageCheckIcon } from 'lucide-react';
+import { ChevronLeftIcon, FileTextIcon, HistoryIcon, PackageCheckIcon } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LoadError } from '../../components/load-error';
 import { TabHeader } from '../../components/tab-header';
+import { useMe } from '../../lib/auth';
 import { formatDateTime, formatNumber, formatPeriod } from '../../lib/format';
 import { useShownWhileClosing } from '../../lib/use-shown-while-closing';
+import { reportsFor } from '../reports/reports-page';
 import { AdjustmentsList } from './cycle-tab';
 import { DeliverableIcon, DeliveryRate, lineName } from './retainer-badges';
 import { retainerCycleQuery, retainerCyclesQuery } from './retainers.queries';
@@ -28,6 +31,8 @@ import { retainerCycleQuery, retainerCyclesQuery } from './retainers.queries';
  */
 export function HistoryTab({ retainer }: { retainer: RetainerDetail }) {
   const { t } = useTranslation();
+  // F05C screen 9: readers of client reports open each cycle's report (cosmetic; the API checks).
+  const canReport = reportsFor(useMe()).clientReport;
   const cycles = useInfiniteQuery(retainerCyclesQuery(retainer.id));
   const [openId, setOpenId] = useState<string | null>(null);
   // The dialog stays mounted, with its last cycle, so it fades out and gives the focus back.
@@ -60,6 +65,7 @@ export function HistoryTab({ retainer }: { retainer: RetainerDetail }) {
               <ClosedCycleRow
                 key={cycle.id}
                 cycle={cycle}
+                reportOf={canReport ? retainer.id : null}
                 onOpen={(button) => {
                   opener.current = button;
                   setOpenId(cycle.id);
@@ -95,9 +101,12 @@ export function HistoryTab({ retainer }: { retainer: RetainerDetail }) {
 
 function ClosedCycleRow({
   cycle,
+  reportOf,
   onOpen,
 }: {
   cycle: Cycle;
+  /** The retainer whose cycle reports the user reads; null hides the link. */
+  reportOf: string | null;
   /** Receives the row's button, which takes the focus back when the dialog closes. */
   onOpen: (button: HTMLButtonElement) => void;
 }) {
@@ -105,12 +114,12 @@ function ClosedCycleRow({
   const name = t('retainers.cycleNumber', { number: formatNumber(cycle.number) });
   const after = cycle.lines.reduce((sum, line) => sum + line.deliveredAfterClose, 0);
   return (
-    <li>
+    <li className="flex flex-col gap-2 md:flex-row md:items-stretch">
       <button
         type="button"
         onClick={(event) => onOpen(event.currentTarget)}
         aria-label={t('retainers.history.open', { cycle: name })}
-        className="group flex w-full flex-col gap-3 rounded-lg border border-border bg-surface p-4 text-start transition-colors duration-150 ease-out outline-offset-4 hover:border-primary md:flex-row md:items-center"
+        className="group flex w-full min-w-0 flex-1 flex-col gap-3 rounded-lg border border-border bg-surface p-4 text-start transition-colors duration-150 ease-out outline-offset-4 hover:border-primary md:flex-row md:items-center"
       >
         <span className="flex min-w-0 flex-col gap-1 md:w-44">
           <span className="font-bold">{name}</span>
@@ -160,6 +169,23 @@ function ClosedCycleRow({
           />
         </span>
       </button>
+      {/* B4: backdated cycles have no report. */}
+      {reportOf && !cycle.backdated && (
+        <Button
+          variant="outline"
+          className="md:h-auto"
+          aria-label={t('reports.cycle.openOf', { cycle: name })}
+          render={
+            <Link
+              to="/retainers/$retainerId/cycles/$cycleId/report"
+              params={{ retainerId: reportOf, cycleId: cycle.id }}
+            />
+          }
+        >
+          <FileTextIcon />
+          {t('reports.cycle.open')}
+        </Button>
+      )}
     </li>
   );
 }

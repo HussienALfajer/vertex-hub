@@ -16,3 +16,7 @@ F15 (`docs/specs/F15-dashboards-reports.md`) adds role dashboards and exportable
 - Past reports change when a past record is corrected (a void, an archived mistake); this is intended: reports show the corrected truth.
 - A future need for heavy or historical analytics would add snapshot tables or a read replica; nothing in V1 depends on that.
 - The home page replaces the redirect to My tasks (UX-24).
+
+## Amendment (2026-10-14, F05C cycle reports)
+- `reports` also owns `retainer_cycle_reports`: each retainer cycle's summary and its stored PDF (kept as long as the cycle, not purged after 24 hours). The PDF is current while the report hashes the same as its render; otherwise the next download renders it again.
+- `projects` reaches it only through `CycleClosedHooks`, run in the closing transaction: `reports` records the row, notifies the account manager through `NotificationCenter` and queues `reports.cycle-report`, which it works itself to render the report once the close committed. No module imports `reports`.

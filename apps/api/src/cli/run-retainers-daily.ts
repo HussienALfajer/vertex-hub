@@ -2,7 +2,8 @@
  * Runs the `retainers.cycles` job once, as if on the given business date (default: today):
  * starts, completes and renews terms, ends retainers whose term ends them, closes and opens
  * cycles and drafts the charges that became due, for trying F05B locally (acceptance steps 5 and
- * 7). Refused in production, where the worker schedules the job.
+ * 7). Queues the jobs the run causes (the cycle report renders of F05C R1), which the running dev
+ * API and worker take. Refused in production, where the worker schedules the job.
  *
  *   pnpm --filter @vertex-hub/api retainers:run-daily [--date YYYY-MM-DD]
  */
@@ -11,6 +12,7 @@ import { NestFactory } from '@nestjs/core';
 import { calendarDateSchema } from '@vertex-hub/contracts';
 import { loadRootEnv } from '@vertex-hub/db';
 import { AppModule } from '../app.module.js';
+import { JobQueue } from '../core/jobs/index.js';
 import { RetainerCyclesService } from '../modules/projects/index.js';
 
 loadRootEnv();
@@ -31,6 +33,7 @@ if (!date.success) {
 process.env.JOBS_ENABLED = 'false';
 const app = await NestFactory.createApplicationContext(AppModule, { logger: ['error', 'warn'] });
 try {
+  await app.get(JobQueue).startSending();
   const result = await app.get(RetainerCyclesService).runDaily(date.data);
   process.stdout.write(
     `Daily retainers: ${result.closed} cycles closed, ${result.opened} opened, ` +

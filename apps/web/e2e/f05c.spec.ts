@@ -1,9 +1,9 @@
 import type { Page } from '@playwright/test';
 import ar from '../src/i18n/locales/ar.json' with { type: 'json' };
-import { mockApi, PROJECTS_TODAY, seedIds } from './fixtures';
+import { employeeMe, mockApi, PROJECTS_TODAY, seedIds } from './fixtures';
 import { expect, test } from './test';
 
-// F05C PR 1 anniversary cycles against the mocked API (the real rules are covered by apps/api/test).
+// F05C anniversary cycles and cycle reports against the mocked API (the real rules are covered by apps/api/test).
 
 async function onProjectsToday(page: Page) {
   await page.clock.setFixedTime(new Date(`${PROJECTS_TODAY}T09:00:00+03:00`));
@@ -145,4 +145,63 @@ test('a backdated retainer records its past cycles with the catch-up (B2–B4)',
   const history = page.getByRole('list', { name: ar.retainers.history.title });
   await expect(history.getByText(ar.retainers.history.backdated)).toBeVisible();
   await expect(history).toContainText('87');
+});
+
+test('a closed cycle opens its report from History, with a summary and a PDF (R2, R3)', async ({
+  page,
+}) => {
+  await onProjectsToday(page);
+  await mockApi(page, { signedIn: true });
+  await page.goto(`/retainers/${seedIds.socialRetainer}?tab=history`);
+  const cycle7 = fill(ar.retainers.cycleNumber, { number: '7' });
+  await page.getByRole('link', { name: fill(ar.reports.cycle.openOf, { cycle: cycle7 }) }).click();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(
+    fill(ar.reports.cycle.pageTitle, { cycle: cycle7, name: 'إدارة السوشيال ميديا' }),
+  );
+  await expect(page.getByText('1 أيلول – 30 أيلول 2026', { exact: false })).toBeVisible();
+  await expect(page.getByText(ar.reports.cycle.preliminary, { exact: true })).toHaveCount(0);
+  const lines = page.getByRole('heading', { name: ar.reports.cycle.deliverables }).locator('..');
+  await expect(lines).toContainText(ar.reports.cycle.deliveryRate);
+  await expect(lines.getByRole('row')).toHaveCount(5);
+
+  const summary = page.getByLabel(ar.reports.cycle.summary);
+  await summary.fill('سُلّمت كل التصاميم والريلز في موعدها.');
+  const saved = page.waitForRequest(
+    (r) => r.url().endsWith('/report/summary') && r.method() === 'PUT',
+  );
+  await page.getByRole('button', { name: ar.reports.client.saveSummary }).click();
+  expect((await saved).postDataJSON()).toEqual({ summary: 'سُلّمت كل التصاميم والريلز في موعدها.' });
+  await expect(page.getByText(ar.reports.client.summarySaved)).toBeVisible();
+
+  await page.getByRole('button', { name: ar.reports.client.preparePdf }).click();
+  await expect(page.getByRole('link', { name: ar.reports.client.downloadPdf })).toHaveAttribute(
+    'href',
+    /\/report\/pdf$/,
+  );
+
+  await page
+    .getByRole('link', { name: fill(ar.reports.cycle.backTo, { name: 'إدارة السوشيال ميديا' }) })
+    .click();
+  await expect(page.getByRole('tab', { name: ar.retainers.page.tabs.history })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
+});
+
+test('the open cycle report is preliminary; readers without client reports get no link', async ({
+  page,
+}) => {
+  await onProjectsToday(page);
+  await mockApi(page, { signedIn: true });
+  await page.goto(`/clients/${seedIds.jasmine}/report?month=2026-10`);
+  // R4: each cycle in the monthly report opens its own report; October's is cycle 8, still open.
+  await page.getByRole('link', { name: ar.reports.cycle.open }).first().click();
+  await expect(page.getByText(ar.reports.cycle.preliminary, { exact: true })).toBeVisible();
+
+  await mockApi(page, { signedIn: true, me: employeeMe });
+  await page.goto(`/retainers/${seedIds.socialRetainer}?tab=history`);
+  await expect(
+    page.getByRole('list', { name: ar.retainers.history.title }).getByRole('listitem').first(),
+  ).toBeVisible();
+  await expect(page.getByRole('link', { name: ar.reports.cycle.open })).toHaveCount(0);
 });

@@ -10,7 +10,7 @@ import {
   users,
 } from '@vertex-hub/db';
 import { testDatabaseUrl } from '@vertex-hub/db/testing';
-import { and, asc, eq, inArray } from 'drizzle-orm';
+import { and, asc, eq, inArray, ne } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { RetainerBehindAlerts } from '../src/modules/projects/retainer-behind.js';
 import { OverLimitReminders } from '../src/modules/tasks/over-limit-reminders.js';
@@ -40,7 +40,12 @@ describe('Phase 2 automations (spec P2A)', () => {
       })
       .from(notifications)
       .where(
-        and(eq(notifications.recipientId, recipientId), eq(notifications.subjectId, subjectId)),
+        and(
+          eq(notifications.recipientId, recipientId),
+          eq(notifications.subjectId, subjectId),
+          // Ending a retainer also reports its closed cycle (F05C R1), which is not under test.
+          ne(notifications.type, 'retainer_cycle_report_ready'),
+        ),
       )
       .orderBy(asc(notifications.createdAt));
 

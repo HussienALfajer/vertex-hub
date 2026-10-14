@@ -15,6 +15,7 @@ export {
   type ChargeInvoiceSource,
   ChargeInvoices,
 } from './charge-invoices.js';
+export { type CycleClosed, CycleClosedHooks } from './cycle-closed-hooks.js';
 export { type CycleOpened, CycleOpenedHooks } from './cycle-opened-hooks.js';
 export {
   type CycleLineLink,
@@ -33,6 +34,7 @@ export {
 } from './engagement-factory.js';
 export {
   EngagementReports,
+  type ReportCycle,
   type RetainerProgress,
 } from './engagement-reports.js';
 export { type MilestoneDone, MilestoneDoneHooks } from './milestone-done-hooks.js';

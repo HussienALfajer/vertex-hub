@@ -3,6 +3,9 @@ import {
   businessDate,
   type CalendarDate,
   type ClientMonthlyReport,
+  type Cycle,
+  type CycleReport,
+  cyclePeriod,
   deliveryRate,
   OPEN_PROJECT_STATUSES,
   type ProjectStatus,
@@ -25,6 +28,24 @@ export interface RetainerProgress {
   /** R13, whole percent; null when nothing is committed. */
   completion: number | null;
   linesBehind: number;
+}
+
+/** F05C R2: a retainer cycle for its report. */
+export interface ReportCycle {
+  retainer: { id: string; name: string; clientId: string };
+  cycle: {
+    id: string;
+    number: number;
+    status: CycleReport['cycle']['status'];
+    /** Backdated cycles get no report (F05C B4). */
+    backdated: boolean;
+    periodStart: CalendarDate;
+    periodEnd: CalendarDate;
+  };
+  lines: CycleReport['lines'];
+  deliveryRate: number | null;
+  /** The next cycle's period (F15 section 10). */
+  next: ReportPeriod;
 }
 
 /**
@@ -137,21 +158,38 @@ export class EngagementReports {
         .filter((cycle) => cycle.retainerId === row.id)
         .map((cycle) => ({
           retainer: { id: row.id, name: row.name },
+          cycleId: cycle.id,
+          backdated: cycle.backdated,
           cycle: cycle.number,
           periodStart: cycle.periodStart,
           periodEnd: cycle.periodEnd,
           status: cycle.status,
-          lines: cycle.lines.map((line) => ({
-            kind: line.kind,
-            label: line.label,
-            committed: line.committed,
-            // F05C B4: a cycle whose delivery was not recorded has no count, not zero.
-            delivered: cycle.untracked ? null : line.delivered,
-            percent: cycle.untracked ? null : deliveryRate([line]),
-          })),
+          lines: reportLines(cycle),
           completion: cycle.deliveryRate,
         })),
     );
+  }
+
+  /** F05C R2: a cycle of a non-archived client's retainer with its lines; else null. */
+  async cycleReport(retainerId: string, cycleId: string): Promise<ReportCycle | null> {
+    const found = await this.cycles.reportCycle(retainerId, cycleId);
+    if (!found) return null;
+    const { retainer, cycle } = found;
+    const nextPeriod = cyclePeriod(retainer.startDate, cycle.number + 1);
+    return {
+      retainer: { id: retainer.id, name: retainer.name, clientId: retainer.clientId },
+      cycle: {
+        id: cycle.id,
+        number: cycle.number,
+        status: cycle.status,
+        backdated: cycle.backdated,
+        periodStart: cycle.periodStart,
+        periodEnd: cycle.periodEnd,
+      },
+      lines: reportLines(cycle),
+      deliveryRate: cycle.deliveryRate,
+      next: { from: nextPeriod.periodStart, to: nextPeriod.periodEnd },
+    };
   }
 
   /**
@@ -225,4 +263,16 @@ export class EngagementReports {
           : inArray(retainers.clientId, [...clients]),
     );
   }
+}
+
+/** A cycle's lines as reports show them, each with its own rate. */
+function reportLines(cycle: Cycle): CycleReport['lines'] {
+  return cycle.lines.map((line) => ({
+    kind: line.kind,
+    label: line.label,
+    committed: line.committed,
+    // F05C B4: a cycle whose delivery was not recorded has no count, not zero.
+    delivered: cycle.untracked ? null : line.delivered,
+    percent: cycle.untracked ? null : deliveryRate([line]),
+  }));
 }

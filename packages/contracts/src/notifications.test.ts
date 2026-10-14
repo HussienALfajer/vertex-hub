@@ -29,6 +29,7 @@ describe('notification catalog', () => {
         'lead_won',
         'quote_accepted',
         'request_finished',
+        'retainer_cycle_report_ready',
         'retainer_renewal_due',
         'retainer_term_renewed',
         'shoot_booked',

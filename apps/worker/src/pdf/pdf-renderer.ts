@@ -7,6 +7,7 @@ import { Injectable } from '@nestjs/common';
 import type {
   AdDepositReceiptSnapshot,
   ClientReportSnapshot,
+  CycleReportSnapshot,
   InvoiceDraftSnapshot,
   InvoiceSnapshot,
   QuoteSnapshot,
@@ -18,7 +19,7 @@ import { adDepositReceiptHtml } from './campaign-templates.js';
 import type { TemplateAssets } from './document.js';
 import { invoiceHtml, receiptHtml, statementHtml } from './invoice-templates.js';
 import { quoteHtml } from './quote-template.js';
-import { clientReportHtml } from './report-templates.js';
+import { clientReportHtml, cycleReportHtml } from './report-templates.js';
 
 const require = createRequire(import.meta.url);
 
@@ -101,6 +102,11 @@ export class PdfRenderer {
   /** The monthly client report (F15 rule 20). */
   clientReport(snapshot: ClientReportSnapshot): Promise<Buffer> {
     return this.render((assets) => clientReportHtml(snapshot, assets));
+  }
+
+  /** The retainer cycle report (F05C R1, R3). */
+  cycleReport(snapshot: CycleReportSnapshot): Promise<Buffer> {
+    return this.render((assets) => cycleReportHtml(snapshot, assets));
   }
 
   private async render(html: (assets: TemplateAssets) => string): Promise<Buffer> {

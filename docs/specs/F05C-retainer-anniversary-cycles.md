@@ -45,7 +45,7 @@ None. Money access stays F05's: `invoices.read` covering the client.
 
 ## Data
 
-Dates without a time are calendar days in Asia/Damascus. The `projects` module owns every new table except the client columns (`clients` module). Money is integer minor units in the retainer's currency (ADR 0006).
+Dates without a time are calendar days in Asia/Damascus. The `projects` module owns every new table except the client columns (`clients` module) and `retainer_cycle_reports` (`reports` module: ADR 0027 lets no module import `reports`, so `projects` tells it a cycle closed through `CycleClosedHooks`, in the closing transaction). Money is integer minor units in the retainer's currency (ADR 0006).
 
 ### Cycle arithmetic (`packages/contracts/src/retainer-cycles.ts`, pure)
 - `cyclePeriod(startDate, n)`: cycle `n` (1, 2, 3…) runs from `addMonths(startDate, n − 1)` to the day before `addMonths(startDate, n)`. `addMonths` clamps a missing day to the month's end and is always computed from the start date, so the anchor day returns: start 31 Jan → 31 Jan–27 Feb, 28 Feb–30 Mar, 31 Mar–29 Apr.
@@ -126,7 +126,7 @@ At most one non-void, non-archived contract per term, and one per retainer and `
 `id`, `contract_id` (indexed), `amendment_id` (→ `retainer_amendments.id`, unique among non-void annexes), `annex_number` (1, 2, 3… per contract), `status` (`issued`, `signed`, `void`), `annex_date`, `snapshot`, `pdf_status`, `pdf_file_item_id`, `signed_on`, `signed_file_item_id`, `void_reason`, `voided_at`, `issued_by_id`, timestamps.
 
 ### `retainer_cycle_reports` (one row per cycle; listed in `conventions.test.ts` as a natural key: `cycle_id`)
-`cycle_id` (primary key → `retainer_cycles.id`), `summary` (text ≤ 4,000, default empty), `pdf_status`, `storage_key`, `hash`, `size_bytes`, `rendered_at`, `updated_at`, `updated_by_id`. Kept as long as the cycle; a new render replaces the object.
+`cycle_id` (primary key → `retainer_cycles.id`), `summary` (text ≤ 4,000, default empty), `pdf_status`, `storage_key`, `hash`, `size_bytes`, `rendered_at`, `created_at`, `updated_at` (the summary's last save only: the report shows it, so a render never touches it), `updated_by_id`. Created when the cycle closes or its summary is first saved. Kept as long as the cycle; a new render replaces the object.
 
 ### Other changes
 - `document_number_kind` gains `contract`.
@@ -185,7 +185,7 @@ Expand only, as F05B (the dev and test databases are shared with checkouts that 
 ### Cycle reports
 - R1. When the job closes a cycle (J1 step 3), or ending closes one (Y4), the API queues the PDF of its **cycle report** with the stored summary (empty at first) and notifies the client's account manager once (`retainer_cycle_report_ready`). Backdated cycles get none. Reports are never sent to the client automatically (F14: the account manager sends them by hand).
 - R2. Content: the sections of F15 rule 18 over the cycle's period instead of a calendar month, except that the retainers section shows this retainer's cycle only (lines, committed, frozen delivered, percent, delivery rate) and the projects section is left out. Other sections (delivered work, published content, shoots, approvals, ad campaigns and budget with `campaigns.read`, next period) cover the client over the period, as F15 does for a month. An open cycle's report is marked **preliminary**.
-- R3. The summary is edited by any reader of the report (F15 rule 19); saving it marks the stored PDF outdated, and "Download PDF" renders it again. Rendering follows F15's pipeline (worker `reports.pdf`), stored in `retainer_cycle_reports` instead of the 24-hour table.
+- R3. The summary is edited by any reader of the report (F15 rule 19); saving it marks the stored PDF outdated, and "Download PDF" renders it again. Rendering follows F15's pipeline (worker `reports.pdf`), stored in `retainer_cycle_reports` instead of the 24-hour table. The stored PDF is current while the report as the reader sees it hashes the same as its render (a summary save, or any later change to the cycle's period, makes it outdated); the render prepared at close is the account manager's view, with the campaign sections. A backdated cycle's report answers 404.
 - R4. F15's calendar-month client report keeps working; its retainers section lists each cycle whose period overlaps the month, with its period.
 
 ### Contracts
@@ -259,7 +259,7 @@ All Arabic RTL through i18next, dates in Asia/Damascus with Latin digits, period
   |---|---|---|---|---|---|
   | `retainer_cycle_report_ready` | `clients_projects` | `retainer` | yes | the client's account manager | retainer, client, cycle number, period, delivery rate |
   `retainer_renewal_due` is sent for terms only (T3'). A09 texts name the cycle (Y5).
-- Jobs: no new job. `retainers.cycles` follows J1. The worker's `reports.pdf` gains the kind `cycle_report`; a new `contracts.pdf` (worker, kinds `contract`, `contract_draft`, `annex`; retry 3) and `contracts.pdf-ready` (API: attaches the PDF as a document of the contract) follow F04 rule 12's hashing and idempotency; `invoices.daily` also queues contract and annex PDFs still `pending`. `retainers:run-daily --date` exercises the whole day-one sequence.
+- Jobs: no new scheduled job. `retainers.cycles` follows J1. The closing transaction queues `reports.cycle-report` (API, `{ retainerId, cycleId }`), which renders the report once the frozen counts are committed; a missed nudge is caught by the next PDF request. The worker's `reports.pdf` gains the kind `cycle_report`; a new `contracts.pdf` (worker, kinds `contract`, `contract_draft`, `annex`; retry 3) and `contracts.pdf-ready` (API: attaches the PDF as a document of the contract) follow F04 rule 12's hashing and idempotency; `invoices.daily` also queues contract and annex PDFs still `pending`. `retainers:run-daily --date` exercises the whole day-one sequence.
 
 ## Edge cases
 1. Start date on the 31st: cycles 31 Jan–27 Feb, 28 Feb–30 Mar, 31 Mar–29 Apr; the header note says "from the last day of the month" for months without the day.

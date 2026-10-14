@@ -52,6 +52,7 @@ import { JobQueue, runEach } from '../../core/jobs/index.js';
 import { type AuditActor, recordAudit } from '../audit/index.js';
 import { type CurrentUserInfo, lockAccessChanges, UserDirectory } from '../auth/index.js';
 import { ClientDirectory } from '../clients/index.js';
+import { CycleClosedHooks } from './cycle-closed-hooks.js';
 import { CycleOpenedHooks } from './cycle-opened-hooks.js';
 import { actorOf } from './project-access.js';
 import { readableRetainer, workableRetainer } from './retainer-access.js';
@@ -129,6 +130,7 @@ export class RetainerCyclesService implements OnModuleInit {
     private readonly progress: WorkProgress,
     private readonly jobs: JobQueue,
     private readonly openedHooks: CycleOpenedHooks,
+    private readonly closedHooks: CycleClosedHooks,
     private readonly charges: RetainerCharges,
     private readonly terms: RetainerTermsService,
     private readonly amendments: RetainerAmendmentsService,
@@ -463,6 +465,51 @@ export class RetainerCyclesService implements OnModuleInit {
         retainerId: cycle.retainerId,
       },
     });
+    const [retainer] = await tx
+      .select({ id: retainers.id, name: retainers.name, clientId: retainers.clientId })
+      .from(retainers)
+      .where(eq(retainers.id, cycle.retainerId));
+    if (!retainer) throw new Error('The closed cycle has no retainer');
+    // F05C R1: its report is prepared and the account manager told.
+    await this.closedHooks.run(tx, {
+      cycleId: cycle.id,
+      retainer,
+      number: cycle.number ?? 0,
+      periodStart: cycle.periodStart,
+      periodEnd,
+      deliveryRate: deliveryRate(
+        lines.map((line) => ({
+          committed: line.committedQuantity,
+          delivered: delivered.get(line.id) ?? 0,
+        })),
+      ),
+      actor,
+    });
+  }
+
+  /**
+   * F05C R2: one cycle of a retainer as its page shows it, with the retainer, for the cycle
+   * report; null when the retainer has no such cycle. Callers check the scope.
+   */
+  async reportCycle(retainerId: string, cycleId: string) {
+    const [retainer] = await this.db
+      .select({
+        id: retainers.id,
+        name: retainers.name,
+        clientId: retainers.clientId,
+        status: retainers.status,
+        startDate: retainers.startDate,
+      })
+      .from(retainers)
+      .where(eq(retainers.id, retainerId));
+    if (!retainer) return null;
+    const [row] = await this.db
+      .select(cycleColumns)
+      .from(retainerCycles)
+      .where(and(eq(retainerCycles.id, cycleId), eq(retainerCycles.retainerId, retainerId)));
+    if (!row) return null;
+    const [cycle] = await this.present([row], new Map([[retainerId, retainer.status]]));
+    return cycle ? { retainer, cycle } : null;
   }
 
   /** The newest open cycle of each retainer, as the API returns it. */

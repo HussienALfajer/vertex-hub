@@ -129,6 +129,20 @@ export const CLIENT_REPORT_LABELS = {
   bookedShoots: 'جلسات تصوير محجوزة',
 } as const;
 
+/** F05C R2: the cycle report's own labels; its other sections use `CLIENT_REPORT_LABELS`. */
+export const CYCLE_REPORT_LABELS = {
+  title: 'تقرير الدورة',
+  cycle: 'الدورة',
+  preliminary: 'تقرير أولي: الدورة لم تنتهِ بعد',
+  noActivity: 'لا نشاط مسجّل لهذه الدورة.',
+  summary: 'ملخص الدورة',
+  deliverables: 'بنود العقد',
+  deliveryRate: 'نسبة التسليم',
+  opening: 'الرصيد في بداية الدورة',
+  closing: 'الرصيد في نهاية الدورة',
+  nextPeriod: 'الدورة القادمة',
+} as const;
+
 const pluralRules = new Intl.PluralRules('ar');
 
 /** Arabic forms by plural category; `{n}` is the number. Matches `reports.client.hours_*`. */

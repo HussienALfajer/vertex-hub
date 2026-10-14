@@ -34,6 +34,7 @@ import { FilePurges, GeneratedFiles } from '../files/index.js';
 import { EngagementReports } from '../projects/index.js';
 import { QuoteDirectory } from '../quotes/index.js';
 import { TaskReports } from '../tasks/index.js';
+import { CycleReportService } from './cycle-report.service.js';
 import { coversClient } from './report-access.js';
 
 const PDF_MIME_TYPE = 'application/pdf';
@@ -67,12 +68,15 @@ export class ClientReportService implements OnModuleInit {
     private readonly files: GeneratedFiles,
     private readonly purges: FilePurges,
     private readonly jobs: JobQueue,
+    private readonly cycleReports: CycleReportService,
   ) {}
 
   onModuleInit(): void {
-    this.jobs.work(REPORTS_PDF_READY_JOB.queue, (data) =>
-      this.ready(reportPdfReadyJobSchema.parse(data)),
-    );
+    // One queue for both report PDFs: a cycle report's render goes to its service (F05C R1).
+    this.jobs.work(REPORTS_PDF_READY_JOB.queue, (data) => {
+      const result = reportPdfReadyJobSchema.parse(data);
+      return result.kind === 'cycle_report' ? this.cycleReports.ready(result) : this.ready(result);
+    });
     this.purges.register('client report PDFs', (now) => this.purge(now));
   }
 
