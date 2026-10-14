@@ -6,6 +6,7 @@ import {
 } from '@vertex-hub/contracts';
 import {
   Button,
+  cn,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuGroup,
@@ -22,10 +23,11 @@ import {
   ArrowUpIcon,
   BracesIcon,
   FileTextIcon,
+  GripVerticalIcon,
   PlusIcon,
   Trash2Icon,
 } from 'lucide-react';
-import { useId, useRef } from 'react';
+import { type DragEvent, useId, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { type Control, type UseFormReturn, useFieldArray } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
@@ -68,6 +70,40 @@ export function ContractArticlesEditor({
   const addButton = useRef<HTMLButtonElement>(null);
   const bodies = useRef(new Map<string, HTMLTextAreaElement>());
   const full = fields.length >= CONTRACT_LIMITS.articles;
+  // Drag starts from a row's grip only, so selecting text in its fields never moves it; the
+  // up/down buttons are the keyboard way.
+  const [armed, setArmed] = useState<string | null>(null);
+  const [dragged, setDragged] = useState<number | null>(null);
+  const [target, setTarget] = useState<number | null>(null);
+  const draggable = !readOnly && fields.length > 1;
+
+  const dragProps = (rowId: string, index: number) =>
+    draggable
+      ? {
+          draggable: armed === rowId,
+          onDragStart: (event: DragEvent) => {
+            event.dataTransfer.effectAllowed = 'move';
+            setDragged(index);
+          },
+          onDragOver: (event: DragEvent) => {
+            if (dragged === null) return;
+            event.preventDefault();
+            setTarget(index);
+          },
+          onDrop: (event: DragEvent) => {
+            event.preventDefault();
+            if (dragged !== null && dragged !== index) move(dragged, index);
+            endDrag();
+          },
+          onDragEnd: endDrag,
+        }
+      : {};
+
+  function endDrag() {
+    setArmed(null);
+    setDragged(null);
+    setTarget(null);
+  }
 
   function removeRow(index: number) {
     flushSync(() => remove(index));
@@ -130,9 +166,23 @@ export function ContractArticlesEditor({
             return (
               <li
                 key={row.id}
-                className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-4"
+                className={cn(
+                  'flex flex-col gap-3 rounded-lg border border-border bg-surface p-4',
+                  target === index && dragged !== index && 'border-primary bg-muted/50',
+                  dragged === index && 'opacity-50',
+                )}
+                {...dragProps(row.id, index)}
               >
                 <div className="flex flex-wrap items-center gap-2">
+                  {draggable && (
+                    <GripVerticalIcon
+                      aria-hidden="true"
+                      data-testid="article-grip"
+                      className="size-4 shrink-0 cursor-grab text-muted-foreground"
+                      onPointerDown={() => setArmed(row.id)}
+                      onPointerUp={() => dragged === null && setArmed(null)}
+                    />
+                  )}
                   <span className="shrink-0 text-sm font-bold text-muted-foreground">
                     {t('retainers.contractSettings.articles.number', { position })}
                   </span>

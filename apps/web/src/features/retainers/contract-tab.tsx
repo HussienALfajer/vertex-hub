@@ -4,6 +4,7 @@ import {
   currentCycleNumber,
   cyclePeriod,
   dayAfterTerm,
+  type RetainerContract,
   type RetainerDetail,
   type RetainerTerm,
   type RetainerTermCycle,
@@ -56,7 +57,9 @@ import { retainerBillingQuery } from '../invoices/invoices.queries';
 import { SourceInvoiceCell } from '../invoices/source-invoice';
 import { Money } from '../quotes/quote-badges';
 import { AmendmentsSection, RescheduleDialog } from './amendments-section';
+import { ContractsSection, PrepareContractButton, termNeedsContract } from './contracts-section';
 import {
+  retainerContractsQuery,
   retainerTermsQuery,
   useCancelTerm,
   useCreateTerm,
@@ -89,6 +92,8 @@ export function ContractTab({ retainer }: { retainer: RetainerDetail }) {
   const { canSeeMoney, canEditMoney } = retainer.permissions;
   const terms = useQuery(retainerTermsQuery(retainer.id));
   const billing = useQuery({ ...retainerBillingQuery(retainer.id), enabled: canSeeMoney });
+  // Contracts need money access (G3); others see no contract actions.
+  const contracts = useQuery({ ...retainerContractsQuery(retainer.id), enabled: canSeeMoney });
   const container = useRef<HTMLDivElement>(null);
   // When the button that opened a term dialog is gone, an open term's heading takes the focus:
   // the newest after adding one (the empty state or "add" leaves), else the first.
@@ -161,13 +166,15 @@ export function ContractTab({ retainer }: { retainer: RetainerDetail }) {
               others={items.filter((other) => other.id !== term.id)}
               invoices={invoices}
               editable={canEditMoney}
+              contracts={contracts.data?.items}
               fallback={firstHeading}
             />
           ))}
           {add && <div>{add}</div>}
         </>
       )}
-      <AmendmentsSection retainer={retainer} />
+      <AmendmentsSection retainer={retainer} terms={items} contracts={contracts.data?.items} />
+      {canSeeMoney && <ContractsSection retainer={retainer} terms={items} />}
       {past.length > 0 && (
         <section className="flex flex-col gap-3">
           <h2 className="text-lg font-bold">{t('retainers.terms.past')}</h2>
@@ -196,6 +203,7 @@ function TermCard({
   others = [],
   invoices,
   editable,
+  contracts,
   fallback,
 }: {
   retainer: RetainerDetail;
@@ -204,6 +212,8 @@ function TermCard({
   others?: RetainerTerm[];
   invoices: Map<string, SourceInvoice | null>;
   editable: boolean;
+  /** The retainer's contracts, once loaded (money access): "Prepare contract" (K2). */
+  contracts?: RetainerContract[];
   fallback: Fallback;
 }) {
   const { t } = useTranslation();
@@ -261,6 +271,9 @@ function TermCard({
         </div>
         {editable && open && (
           <div className="flex flex-wrap gap-2">
+            {contracts && termNeedsContract(term, contracts) && (
+              <PrepareContractButton retainerId={retainer.id} termId={term.id} />
+            )}
             <RescheduleDialog
               retainerId={retainer.id}
               term={term}

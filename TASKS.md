@@ -235,7 +235,13 @@ PR 4 is merged (#114). Owner `projects` for `retainer_contracts`, `retainer_cont
 - [x] Owner accepted ("اقبل كل شئ"), the end-action clauses included
 - [x] `/ship`: PR opened with auto-merge
 
-### PR 5b — contract screens (after 5a is merged)
-- [ ] web: Contracts section on the Contract tab (list, actions, annexes, "Issue annex" per applied amendment, "changed since issue"); contract editor `/retainers/$retainerId/contracts/$contractId` (date, signatory, parties with missing fields and links, articles editor with placeholder menu and reorder, Preview PDF, Issue dialog listing empty fields and missing blocks, Discard; read-only when issued, signed copy upload, Void); `ar.json`; gate
-- [ ] e2e: mocks, flow spec (prepare, edit, issue a contract; issue an annex; signed copy), screenshots light and dark (contract editor with missing fields, issued contract with annexes); gate
-- [ ] Close: wiring, full checks, `reviewer`, owner acceptance steps 7–9 and 11, `/ship`; ROADMAP marks F05C done
+### PR 5b — contract screens (branch `ccr-ac3d4856-0hg08e`)
+
+PR 5a is merged (#115). No API, db or bridge change.
+
+- [x] web: queries and mutations (`retainers.queries.ts`); `contract-coverage.ts` (covering contract, annex state, as the API's `coveringContract`) with unit tests; Contracts section on the Contract tab (`contracts-section.tsx`: list, Open, PDF, Issue, signed copy, Void, annexes; "Prepare contract" on term cards and for an open-ended retainer; "changed since issue"); "Issue annex" and "in annex n" on applied amendments; dialogs (`contract-dialogs.tsx`: issue with required and empty fields and absent blocks, void, signed copy, annex); contract editor `/retainers/$retainerId/contracts/$contractId` (`contract-page.tsx`: date, signatory, articles editor reused from the settings, parties with missing fields and links, generated blocks from `@vertex-hub/messages`, Preview PDF, Issue, Discard; issued: read-only articles with blocks, annexes, documents, signed copy, Void); `ar.json`; gate: `web` typecheck, lint, `web` test
+- [x] e2e: contract and annex mocks in `fixtures.ts` (settings state shared with drafts; `retainer_contract` file owner); `f05c-contracts.spec.ts` (prepare, edit, issue, signed copy; annex; Finance read-only, employee none); screenshots light and dark (contract editor with missing fields, issue dialog, issued contract with an annex); gate: specs pass, screenshots opened and checked
+- [x] Wiring checklist (web only: no contracts, db, api or bridge change; OpenAPI files untouched since `main`)
+- [x] Full checks through `checker`: lint, typecheck, `pnpm test` (11/11), build, E2E (382 passed); after the review fixes: web lint, typecheck, test (87) and the F05B/F05C E2E specs (22) pass
+- [x] `reviewer` with the spec; blocking findings fixed (open-ended "Prepare contract" hidden only while a term holds the current cycle, as the API; articles reorder by drag from a grip as well as up/down, in the contract editor and the settings)
+- [x] Owner asked for the PR directly (acceptance in the browser left to the owner); ROADMAP marks F05C done; PR opened with auto-merge

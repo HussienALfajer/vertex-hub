@@ -71,6 +71,7 @@ import { Route as AppContentPostsPostIdRouteImport } from './routes/_app/content
 import { Route as AppRetainersRetainerIdIndexRouteImport } from './routes/_app/retainers/$retainerId/index'
 import { Route as AppShootsShootIdIndexRouteImport } from './routes/_app/shoots/$shootId/index'
 import { Route as AppShootsShootIdEditRouteImport } from './routes/_app/shoots/$shootId/edit'
+import { Route as AppRetainersRetainerIdContractsContractIdRouteImport } from './routes/_app/retainers/$retainerId/contracts/$contractId'
 import { Route as AppRetainersRetainerIdCyclesCycleIdReportRouteImport } from './routes/_app/retainers/$retainerId/cycles/$cycleId/report'
 
 const AppRoute = AppRouteImport.update({
@@ -388,6 +389,12 @@ const AppShootsShootIdEditRoute = AppShootsShootIdEditRouteImport.update({
   path: '/shoots/$shootId/edit',
   getParentRoute: () => AppRoute,
 } as any)
+const AppRetainersRetainerIdContractsContractIdRoute =
+  AppRetainersRetainerIdContractsContractIdRouteImport.update({
+    id: '/retainers/$retainerId/contracts/$contractId',
+    path: '/retainers/$retainerId/contracts/$contractId',
+    getParentRoute: () => AppRoute,
+  } as any)
 const AppRetainersRetainerIdCyclesCycleIdReportRoute =
   AppRetainersRetainerIdCyclesCycleIdReportRouteImport.update({
     id: '/retainers/$retainerId/cycles/$cycleId/report',
@@ -457,6 +464,7 @@ export interface FileRoutesByFullPath {
   '/clients/$clientId/': typeof AppClientsClientIdIndexRoute
   '/retainers/$retainerId/': typeof AppRetainersRetainerIdIndexRoute
   '/shoots/$shootId/': typeof AppShootsShootIdIndexRoute
+  '/retainers/$retainerId/contracts/$contractId': typeof AppRetainersRetainerIdContractsContractIdRoute
   '/retainers/$retainerId/cycles/$cycleId/report': typeof AppRetainersRetainerIdCyclesCycleIdReportRoute
 }
 export interface FileRoutesByTo {
@@ -521,6 +529,7 @@ export interface FileRoutesByTo {
   '/clients/$clientId': typeof AppClientsClientIdIndexRoute
   '/retainers/$retainerId': typeof AppRetainersRetainerIdIndexRoute
   '/shoots/$shootId': typeof AppShootsShootIdIndexRoute
+  '/retainers/$retainerId/contracts/$contractId': typeof AppRetainersRetainerIdContractsContractIdRoute
   '/retainers/$retainerId/cycles/$cycleId/report': typeof AppRetainersRetainerIdCyclesCycleIdReportRoute
 }
 export interface FileRoutesById {
@@ -587,6 +596,7 @@ export interface FileRoutesById {
   '/_app/clients/$clientId/': typeof AppClientsClientIdIndexRoute
   '/_app/retainers/$retainerId/': typeof AppRetainersRetainerIdIndexRoute
   '/_app/shoots/$shootId/': typeof AppShootsShootIdIndexRoute
+  '/_app/retainers/$retainerId/contracts/$contractId': typeof AppRetainersRetainerIdContractsContractIdRoute
   '/_app/retainers/$retainerId/cycles/$cycleId/report': typeof AppRetainersRetainerIdCyclesCycleIdReportRoute
 }
 export interface FileRouteTypes {
@@ -653,6 +663,7 @@ export interface FileRouteTypes {
     | '/clients/$clientId/'
     | '/retainers/$retainerId/'
     | '/shoots/$shootId/'
+    | '/retainers/$retainerId/contracts/$contractId'
     | '/retainers/$retainerId/cycles/$cycleId/report'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -717,6 +728,7 @@ export interface FileRouteTypes {
     | '/clients/$clientId'
     | '/retainers/$retainerId'
     | '/shoots/$shootId'
+    | '/retainers/$retainerId/contracts/$contractId'
     | '/retainers/$retainerId/cycles/$cycleId/report'
   id:
     | '__root__'
@@ -782,6 +794,7 @@ export interface FileRouteTypes {
     | '/_app/clients/$clientId/'
     | '/_app/retainers/$retainerId/'
     | '/_app/shoots/$shootId/'
+    | '/_app/retainers/$retainerId/contracts/$contractId'
     | '/_app/retainers/$retainerId/cycles/$cycleId/report'
   fileRoutesById: FileRoutesById
 }
@@ -1230,6 +1243,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppShootsShootIdEditRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/retainers/$retainerId/contracts/$contractId': {
+      id: '/_app/retainers/$retainerId/contracts/$contractId'
+      path: '/retainers/$retainerId/contracts/$contractId'
+      fullPath: '/retainers/$retainerId/contracts/$contractId'
+      preLoaderRoute: typeof AppRetainersRetainerIdContractsContractIdRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/retainers/$retainerId/cycles/$cycleId/report': {
       id: '/_app/retainers/$retainerId/cycles/$cycleId/report'
       path: '/retainers/$retainerId/cycles/$cycleId/report'
@@ -1297,6 +1317,7 @@ interface AppRouteChildren {
   AppClientsClientIdIndexRoute: typeof AppClientsClientIdIndexRoute
   AppRetainersRetainerIdIndexRoute: typeof AppRetainersRetainerIdIndexRoute
   AppShootsShootIdIndexRoute: typeof AppShootsShootIdIndexRoute
+  AppRetainersRetainerIdContractsContractIdRoute: typeof AppRetainersRetainerIdContractsContractIdRoute
   AppRetainersRetainerIdCyclesCycleIdReportRoute: typeof AppRetainersRetainerIdCyclesCycleIdReportRoute
 }
 
@@ -1357,6 +1378,8 @@ const AppRouteChildren: AppRouteChildren = {
   AppClientsClientIdIndexRoute: AppClientsClientIdIndexRoute,
   AppRetainersRetainerIdIndexRoute: AppRetainersRetainerIdIndexRoute,
   AppShootsShootIdIndexRoute: AppShootsShootIdIndexRoute,
+  AppRetainersRetainerIdContractsContractIdRoute:
+    AppRetainersRetainerIdContractsContractIdRoute,
   AppRetainersRetainerIdCyclesCycleIdReportRoute:
     AppRetainersRetainerIdCyclesCycleIdReportRoute,
 }

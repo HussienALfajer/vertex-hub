@@ -9,19 +9,25 @@ import type {
   ApproveAmendment,
   CancelRetainerTerm,
   CreateAmendment,
+  CreateContract,
   CreateCycleAdjustment,
   CreateCycleLine,
   CreateRetainer,
   CreateRetainerTerm,
+  IssueAnnex,
   RejectAmendment,
   RescheduleTerm,
+  RetainerContractDetail,
   RetainerDeliverables,
   RetainerStatusChange,
+  SignedContract,
+  UpdateContract,
   UpdateContractArticles,
   UpdateContractSettings,
   UpdateCycleLine,
   UpdateRetainer,
   UpdateRetainerTerm,
+  VoidContract,
 } from '@vertex-hub/contracts';
 import { api, call } from '../../lib/api/client';
 import type { paths } from '../../lib/api/schema.gen';
@@ -41,6 +47,8 @@ export const retainersKeys = {
   terms: (id: string) => ['retainers', 'terms', id] as const,
   amendments: (id: string) => ['retainers', 'amendments', id] as const,
   contractSettings: ['retainers', 'contract-settings'] as const,
+  contracts: (id: string) => ['retainers', 'contracts', id] as const,
+  contract: (id: string, contractId: string) => ['retainers', 'contract', id, contractId] as const,
 };
 
 export const retainerListQuery = (filters: RetainerListFilters) =>
@@ -309,3 +317,200 @@ export function useUpdateContractArticles() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: retainersKeys.contractSettings }),
   });
 }
+
+// Contracts and annexes (F05C K1–K11)
+
+const PDF_POLL_MS = 3000;
+
+const contractPath = (retainerId: string, contractId: string) => ({
+  params: { path: { retainerId, contractId } },
+});
+
+const annexPath = (retainerId: string, contractId: string, annexId: string) => ({
+  params: { path: { retainerId, contractId, annexId } },
+});
+
+/** Whether a PDF of the contract or one of its annexes is still being rendered. */
+const rendering = (contract: {
+  pdf: { state: string } | null;
+  annexes: { pdf: { state: string } | null }[];
+}) =>
+  contract.pdf?.state === 'pending' ||
+  contract.annexes.some((annex) => annex.pdf?.state === 'pending');
+
+/** The retainer's contracts with their annexes, newest first; money access only (G3). */
+export const retainerContractsQuery = (retainerId: string) =>
+  queryOptions({
+    queryKey: retainersKeys.contracts(retainerId),
+    queryFn: () => call(api.GET('/api/retainers/{retainerId}/contracts', retainerPath(retainerId))),
+    refetchInterval: (query) => (query.state.data?.items.some(rendering) ? PDF_POLL_MS : false),
+  });
+
+/** One contract as it prints: live for a draft (K3), the snapshot once issued. */
+export const retainerContractQuery = (retainerId: string, contractId: string) =>
+  queryOptions({
+    queryKey: retainersKeys.contract(retainerId, contractId),
+    queryFn: () =>
+      call(
+        api.GET(
+          '/api/retainers/{retainerId}/contracts/{contractId}',
+          contractPath(retainerId, contractId),
+        ),
+      ),
+    refetchInterval: (query) => {
+      const contract = query.state.data;
+      if (!contract) return false;
+      return rendering(contract) || contract.draftPdf?.state === 'pending' ? PDF_POLL_MS : false;
+    },
+  });
+
+/** The issued PDF, or the draft's preview; served inline, never cached. */
+export const contractPdfUrl = (retainerId: string, contractId: string, draft = false) =>
+  `/api/retainers/${retainerId}/contracts/${contractId}/pdf${draft ? '?draft=true' : ''}`;
+
+export const annexPdfUrl = (retainerId: string, contractId: string, annexId: string) =>
+  `/api/retainers/${retainerId}/contracts/${contractId}/annexes/${annexId}/pdf`;
+
+/**
+ * A change to a contract or an annex: the detail answered is kept, and every contract view of the
+ * retainer refreshes (the list, the "Issue annex" buttons, the contract's documents).
+ */
+function useContractMutation<Input, Output>(
+  retainerId: string,
+  mutationFn: (input: Input) => Promise<Output>,
+) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn,
+    onSuccess: (result) => {
+      const detail = result as Partial<RetainerContractDetail>;
+      if (detail.content && detail.id) {
+        queryClient.setQueryData(retainersKeys.contract(retainerId, detail.id), detail);
+      }
+    },
+    onSettled: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: retainersKeys.contracts(retainerId) }),
+        queryClient.invalidateQueries({ queryKey: ['retainers', 'contract', retainerId] }),
+        queryClient.invalidateQueries({ queryKey: ['files'] }),
+      ]),
+  });
+}
+
+/** K2: "Prepare contract" for a term or the open-ended retainer. */
+export const usePrepareContract = (retainerId: string) =>
+  useContractMutation(retainerId, (input: CreateContract) =>
+    call(
+      api.POST('/api/retainers/{retainerId}/contracts', {
+        ...retainerPath(retainerId),
+        body: input,
+      }),
+    ),
+  );
+
+export const useUpdateContract = (retainerId: string, contractId: string) =>
+  useContractMutation(retainerId, (input: UpdateContract) =>
+    call(
+      api.PATCH('/api/retainers/{retainerId}/contracts/{contractId}', {
+        ...contractPath(retainerId, contractId),
+        body: input,
+      }),
+    ),
+  );
+
+/** K8: a draft is archived; it holds no number. */
+export const useDiscardContract = (retainerId: string, contractId: string) =>
+  useContractMutation(retainerId, () =>
+    call(
+      api.POST(
+        '/api/retainers/{retainerId}/contracts/{contractId}/discard',
+        contractPath(retainerId, contractId),
+      ),
+    ),
+  );
+
+/** K4: the year's next number, the frozen snapshot and the PDF queued. */
+export const useIssueContract = (retainerId: string, contractId: string) =>
+  useContractMutation(retainerId, () =>
+    call(
+      api.POST(
+        '/api/retainers/{retainerId}/contracts/{contractId}/issue',
+        contractPath(retainerId, contractId),
+      ),
+    ),
+  );
+
+export const useVoidContract = (retainerId: string, contractId: string) =>
+  useContractMutation(retainerId, (input: VoidContract) =>
+    call(
+      api.POST('/api/retainers/{retainerId}/contracts/{contractId}/void', {
+        ...contractPath(retainerId, contractId),
+        body: input,
+      }),
+    ),
+  );
+
+/** K5: the signed scan with its signing date. */
+export const useSignContract = (retainerId: string, contractId: string) =>
+  useContractMutation(retainerId, (input: SignedContract) =>
+    call(
+      api.POST('/api/retainers/{retainerId}/contracts/{contractId}/signed', {
+        ...contractPath(retainerId, contractId),
+        body: input,
+      }),
+    ),
+  );
+
+/** "Preview PDF" of a draft, or the issued PDF rendered again after a failure. */
+export const useRenderContractPdf = (retainerId: string, contractId: string) =>
+  useContractMutation(retainerId, () =>
+    call(
+      api.POST(
+        '/api/retainers/{retainerId}/contracts/{contractId}/pdf',
+        contractPath(retainerId, contractId),
+      ),
+    ),
+  );
+
+/** K10: the next annex of the contract covering the amendment's cycle. */
+export const useIssueAnnex = (retainerId: string) =>
+  useContractMutation(
+    retainerId,
+    ({ amendmentId, ...input }: IssueAnnex & { amendmentId: string }) =>
+      call(
+        api.POST('/api/retainers/{retainerId}/amendments/{amendmentId}/annex', {
+          ...amendmentPath(retainerId, amendmentId),
+          body: input,
+        }),
+      ),
+  );
+
+export const useVoidAnnex = (retainerId: string, contractId: string) =>
+  useContractMutation(retainerId, ({ annexId, ...input }: VoidContract & { annexId: string }) =>
+    call(
+      api.POST('/api/retainers/{retainerId}/contracts/{contractId}/annexes/{annexId}/void', {
+        ...annexPath(retainerId, contractId, annexId),
+        body: input,
+      }),
+    ),
+  );
+
+export const useSignAnnex = (retainerId: string, contractId: string) =>
+  useContractMutation(retainerId, ({ annexId, ...input }: SignedContract & { annexId: string }) =>
+    call(
+      api.POST('/api/retainers/{retainerId}/contracts/{contractId}/annexes/{annexId}/signed', {
+        ...annexPath(retainerId, contractId, annexId),
+        body: input,
+      }),
+    ),
+  );
+
+export const useRenderAnnexPdf = (retainerId: string, contractId: string) =>
+  useContractMutation(retainerId, (annexId: string) =>
+    call(
+      api.POST(
+        '/api/retainers/{retainerId}/contracts/{contractId}/annexes/{annexId}/pdf',
+        annexPath(retainerId, contractId, annexId),
+      ),
+    ),
+  );
