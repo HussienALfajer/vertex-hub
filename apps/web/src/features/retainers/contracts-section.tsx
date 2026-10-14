@@ -1,12 +1,14 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link, useNavigate } from '@tanstack/react-router';
-import type {
-  ContractAnnex,
-  ContractAnnexStatus,
-  ContractStatus,
-  RetainerContract,
-  RetainerDetail,
-  RetainerTerm,
+import {
+  businessDate,
+  type ContractAnnex,
+  type ContractAnnexStatus,
+  type ContractStatus,
+  currentCycleNumber,
+  type RetainerContract,
+  type RetainerDetail,
+  type RetainerTerm,
 } from '@vertex-hub/contracts';
 import {
   Badge,
@@ -152,10 +154,17 @@ export function ContractsSection({
   const contracts = useQuery(retainerContractsQuery(retainer.id));
   const { canBill: canManage, canEditMoney: canPrepare } = retainer.permissions;
   const items = contracts.data?.items ?? [];
-  // An open-ended contract covers the retainer while no term does (K1).
+  // An open-ended contract starts at the current cycle (cycle 1 before the start); a term holding
+  // that cycle covers it with its own contract (K1, as the API refuses it).
+  const current = Math.max(1, currentCycleNumber(retainer.startDate, businessDate()));
   const openEnded =
     canPrepare &&
-    !terms.some((term) => term.status === 'active' || term.status === 'scheduled') &&
+    !terms.some(
+      (term) =>
+        (term.status === 'active' || term.status === 'scheduled') &&
+        term.startCycle <= current &&
+        current < term.startCycle + term.cycles,
+    ) &&
     !items.some((contract) => contract.kind === 'open_ended' && liveContract(contract));
   const prepare = openEnded && <PrepareContractButton retainerId={retainer.id} variant="primary" />;
 

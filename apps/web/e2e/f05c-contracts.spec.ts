@@ -44,6 +44,12 @@ test('a manager prepares, edits and issues a term contract, then uploads the sig
   await page.getByRole('option', { name: /د. رامي حسن/ }).click();
   const articles = ar.retainers.contractSettings.articles;
   await page.getByLabel(fill(articles.titleLabel, { position: '1' })).fill('موضوع العقد ونطاقه');
+  // Drag article 3 onto article 2 by its grip (the up/down buttons are the keyboard way).
+  const rows = page.getByRole('listitem').filter({ has: page.getByTestId('article-grip') });
+  await rows.nth(2).getByTestId('article-grip').dragTo(rows.nth(1));
+  await expect(page.getByLabel(fill(articles.titleLabel, { position: '2' }))).toHaveValue(
+    'الأتعاب وطريقة الدفع',
+  );
   await page.getByRole('button', { name: articles.add }).click();
   await page.getByLabel(fill(articles.titleLabel, { position: '4' })).fill('مدة العقد');
   await page.getByLabel(fill(articles.bodyLabel, { position: '4' })).fill('{term}');
