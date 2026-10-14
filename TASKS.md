@@ -146,9 +146,9 @@ PR 2 is merged (#112). Ownership: ADR 0027 lets no module import `reports`, so `
 
 ### Close PR 3
 - [x] Wiring checklist; spec updated (table ownership, `updated_at`, PDF currency by hash, the nudge job); `docs/architecture.md` (`reports`, `CycleClosedHooks`)
-- [ ] Full checks through `checker`
-- [ ] `reviewer` with the spec; blocking findings fixed
-- [ ] Owner acceptance; then `/ship`
+- [x] Full checks: lint, typecheck, build, OpenAPI fresh, migration drift, E2E (382 passed); after the last fix lint, typecheck and `pnpm test` (11/11 tasks) pass
+- [x] `reviewer` with the spec; blocking findings fixed (no report link for backdated cycles in the monthly report, 403 tests on every endpoint, ADR 0027 amendment; also a send-only script now creates the `reports.cycle-report` queue); tests that delete cycles or read a retainer's inbox adjusted for the report row and notice
+- [x] Owner waived acceptance in this session (asked for the PR with auto-merge); PR opened with auto-merge
 
 ## PR 4 — legal details
 - [ ] Planned when PR 3 is merged
