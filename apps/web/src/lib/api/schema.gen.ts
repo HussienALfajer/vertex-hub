@@ -12286,6 +12286,7 @@ export interface components {
                 };
                 /** Format: uuid */
                 cycleId: string;
+                backdated: boolean;
                 cycle: number;
                 /** Format: date */
                 periodStart: string;

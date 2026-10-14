@@ -24,6 +24,7 @@ import {
   projectMilestones,
   projects,
   retainerCycleLines,
+  retainerCycleReports,
   retainerCycles,
   taskChecklistItems,
   taskDependencies,
@@ -156,6 +157,8 @@ describe('template runs', () => {
     const ids = cycles.map((cycle) => cycle.id);
     if (ids.length === 0) return;
     await db.delete(auditEntries).where(inArray(auditEntries.entityId, ids));
+    // F05C R1: a cycle closed by pausing or ending has a report.
+    await db.delete(retainerCycleReports).where(inArray(retainerCycleReports.cycleId, ids));
     await db.delete(retainerCycleLines).where(inArray(retainerCycleLines.cycleId, ids));
     await db.delete(retainerCycles).where(inArray(retainerCycles.id, ids));
   }
