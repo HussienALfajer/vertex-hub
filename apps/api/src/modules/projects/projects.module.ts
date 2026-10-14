@@ -6,6 +6,7 @@ import { NotificationsModule } from '../notifications/index.js';
 import { BillingLocks } from './billing-locks.js';
 import { BillingSources } from './billing-sources.js';
 import { ChargeInvoices } from './charge-invoices.js';
+import { CycleClosedHooks } from './cycle-closed-hooks.js';
 import { CycleOpenedHooks } from './cycle-opened-hooks.js';
 import { EngagementDirectory } from './engagement-directory.js';
 import { EngagementFactory } from './engagement-factory.js';
@@ -40,7 +41,7 @@ import { WorkProgress } from './work-progress.js';
  * (rule 4), takes task counts from whatever registers in `WorkProgress` (F06), and works the
  * `retainers.cycles` job that `apps/worker` schedules (R2). Notifies new project managers and
  * registers the renewal reminder and the behind alert (A09) in `notifications`' daily job (F14). Exports `EngagementDirectory` for
- * the `tasks` and `templates` modules, `CycleOpenedHooks` for `templates` (F07 rule 16), `QuoteRenewalHooks` for `templates` (F05B Q2) and
+ * the `tasks` and `templates` modules, `CycleOpenedHooks` for `templates` (F07 rule 16), `CycleClosedHooks` for `reports` (F05C R1), `QuoteRenewalHooks` for `templates` (F05B Q2) and
  * `EngagementFactory` for `quotes` (F04 A01), and `BillingSources`, `BillingLocks`,
  * `MilestoneDoneHooks`, `RetainerChargeDueHooks`, `ChargeInvoices` and `RetainerCharges` (credits)
  * for `invoices` (F13, F05B).
@@ -74,6 +75,7 @@ import { WorkProgress } from './work-progress.js';
     BillingLocks,
     ChargeInvoices,
     CycleOpenedHooks,
+    CycleClosedHooks,
     MilestoneDoneHooks,
     QuoteRenewalHooks,
     RetainerCharges,
@@ -91,6 +93,7 @@ import { WorkProgress } from './work-progress.js';
     BillingLocks,
     ChargeInvoices,
     CycleOpenedHooks,
+    CycleClosedHooks,
     MilestoneDoneHooks,
     QuoteRenewalHooks,
     RetainerChargeDueHooks,

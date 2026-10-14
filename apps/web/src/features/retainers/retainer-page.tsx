@@ -123,7 +123,7 @@ export function RetainerPage({
 
 function RetainerView({ retainer, tab }: { retainer: RetainerDetail; tab: RetainerTab }) {
   const { t } = useTranslation();
-  const navigate = useNavigate({ from: '/retainers/$retainerId' });
+  const navigate = useNavigate({ from: '/retainers/$retainerId/' });
   const archived = retainer.archivedAt !== null;
   const { permissions } = retainer;
 

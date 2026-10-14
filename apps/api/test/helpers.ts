@@ -55,6 +55,7 @@ import {
   retainerCharges,
   retainerCycleAdjustments,
   retainerCycleLines,
+  retainerCycleReports,
   retainerCycles,
   retainerDeliverables,
   retainers,
@@ -682,6 +683,9 @@ export async function removeRetainers(db: Database, ids: string[]): Promise<void
     );
   }
   await db.delete(retainerTemplates).where(inArray(retainerTemplates.retainerId, ids));
+  if (cycles.length) {
+    await db.delete(retainerCycleReports).where(inArray(retainerCycleReports.cycleId, cycles));
+  }
   const lines = cycles.length
     ? (
         await db

@@ -1630,6 +1630,20 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await screenshot(page, testInfo, `client-report-${colorScheme}`);
     });
 
+    test('cycle report (F05C)', async ({ page }, testInfo) => {
+      await page.setViewportSize({ width: 1280, height: 2400 });
+      await page.clock.setFixedTime(new Date(`${PROJECTS_TODAY}T09:00:00+03:00`));
+      await mockApi(page, { signedIn: true, me: accountManagerMe });
+      await page.goto(`/retainers/${seedIds.socialRetainer}?tab=history`);
+      await page
+        .getByRole('link', { name: ar.reports.cycle.openOf.replace('{{cycle}}', 'الدورة 7') })
+        .click();
+      await expect(
+        page.getByRole('heading', { name: ar.reports.cycle.deliverables }),
+      ).toBeVisible();
+      await screenshot(page, testInfo, `cycle-report-${colorScheme}`);
+    });
+
     test('invoice services dialog', async ({ page }, testInfo) => {
       await mockApi(page, { signedIn: true, me: manager });
       await page.goto(`/invoices/${seedIds.overdueInvoice}`);

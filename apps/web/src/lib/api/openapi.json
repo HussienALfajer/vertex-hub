@@ -14485,6 +14485,205 @@
         ]
       }
     },
+    "/api/retainers/{id}/cycles/{cycleId}/report": {
+      "get": {
+        "operationId": "CycleReportController_report",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cycleId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The cycle's report (R2)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CycleReport"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such retainer cycle, a backdated one, or its client is outside your `reports.read` scope"
+          }
+        },
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/retainers/{id}/cycles/{cycleId}/report/export": {
+      "get": {
+        "operationId": "CycleReportController_export",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cycleId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The report as an Excel file"
+          },
+          "404": {
+            "description": "No such retainer cycle, a backdated one, or its client is outside your `reports.read` scope"
+          }
+        },
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/retainers/{id}/cycles/{cycleId}/report/summary": {
+      "put": {
+        "operationId": "CycleReportController_saveSummary",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cycleId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCycleReportSummary"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Replaces the cycle's summary; an empty text clears it (R3)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CycleReport"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such retainer cycle, a backdated one, or its client is outside your `reports.read` scope"
+          }
+        },
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/retainers/{id}/cycles/{cycleId}/report/pdf": {
+      "post": {
+        "operationId": "CycleReportController_renderPdf",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cycleId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Finds the stored PDF of the report as it is now, or queues a new render (R3)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuotePdfRender"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such retainer cycle, a backdated one, or its client is outside your `reports.read` scope"
+          }
+        },
+        "tags": [
+          "reports"
+        ]
+      },
+      "get": {
+        "operationId": "CycleReportController_downloadPdf",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cycleId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The report PDF, while it is the report as it is now"
+          },
+          "404": {
+            "description": "No such retainer cycle, a backdated one, or its client is outside your `reports.read` scope; or no current PDF"
+          }
+        },
+        "tags": [
+          "reports"
+        ]
+      }
+    },
     "/api/health": {
       "get": {
         "operationId": "HealthController_check",
@@ -14569,7 +14768,8 @@
           "ad_wallet_entry",
           "lead",
           "lead_note",
-          "client_report"
+          "client_report",
+          "retainer_cycle_report"
         ]
       },
       "AuditAction": {
@@ -14795,7 +14995,8 @@
           "lead_note.created",
           "lead_note.updated",
           "lead_note.archived",
-          "client_report.summary_changed"
+          "client_report.summary_changed",
+          "retainer_cycle_report.summary_changed"
         ]
       },
       "AuditPage": {
@@ -21746,6 +21947,136 @@
               "type": {
                 "type": "string",
                 "enum": [
+                  "retainer_cycle_report_ready"
+                ]
+              },
+              "data": {
+                "type": "object",
+                "properties": {
+                  "retainer": {
+                    "type": "string"
+                  },
+                  "client": {
+                    "type": "string"
+                  },
+                  "cycleId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "cycle": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  },
+                  "periodStart": {
+                    "type": "string",
+                    "format": "date",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                  },
+                  "periodEnd": {
+                    "type": "string",
+                    "format": "date",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                  },
+                  "deliveryRate": {
+                    "nullable": true,
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 100
+                  }
+                },
+                "required": [
+                  "retainer",
+                  "client",
+                  "cycleId",
+                  "cycle",
+                  "periodStart",
+                  "periodEnd",
+                  "deliveryRate"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "id",
+              "actor",
+              "subject",
+              "count",
+              "read",
+              "createdAt",
+              "updatedAt",
+              "type",
+              "data"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "actor": {
+                "nullable": true,
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "name"
+                ],
+                "additionalProperties": false
+              },
+              "subject": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "$ref": "#/components/schemas/NotificationSubjectType"
+                  },
+                  "id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  }
+                },
+                "required": [
+                  "type",
+                  "id"
+                ],
+                "additionalProperties": false
+              },
+              "count": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "read": {
+                "type": "boolean"
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+              },
+              "updatedAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
                   "retainer_amendment_pending"
                 ]
               },
@@ -23298,6 +23629,7 @@
           "retainer_renewal_due",
           "retainer_behind",
           "retainer_term_renewed",
+          "retainer_cycle_report_ready",
           "retainer_amendment_pending",
           "retainer_amendment_decided",
           "quote_approval_requested",
@@ -23317,14 +23649,14 @@
         "type": "object",
         "properties": {
           "mutedTypes": {
-            "maxItems": 59,
+            "maxItems": 60,
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/NotificationType"
             }
           },
           "emailTypes": {
-            "maxItems": 59,
+            "maxItems": 60,
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/NotificationType"
@@ -47457,6 +47789,11 @@
                   ],
                   "additionalProperties": false
                 },
+                "cycleId": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
                 "cycle": {
                   "type": "integer",
                   "minimum": 1,
@@ -47524,6 +47861,7 @@
               },
               "required": [
                 "retainer",
+                "cycleId",
                 "cycle",
                 "periodStart",
                 "periodEnd",
@@ -48017,6 +48355,533 @@
           "subject",
           "message",
           "month"
+        ]
+      },
+      "CycleReport": {
+        "type": "object",
+        "properties": {
+          "client": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ],
+            "additionalProperties": false
+          },
+          "summary": {
+            "nullable": true,
+            "type": "object",
+            "properties": {
+              "text": {
+                "type": "string"
+              },
+              "updatedBy": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "name"
+                ],
+                "additionalProperties": false
+              },
+              "updatedAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+              }
+            },
+            "required": [
+              "text",
+              "updatedBy",
+              "updatedAt"
+            ],
+            "additionalProperties": false
+          },
+          "deliveredWork": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "taskId": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "department": {
+                  "$ref": "#/components/schemas/DepartmentCode"
+                },
+                "departmentName": {
+                  "type": "string"
+                },
+                "deliveredOn": {
+                  "type": "string",
+                  "format": "date",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                }
+              },
+              "required": [
+                "taskId",
+                "title",
+                "department",
+                "departmentName",
+                "deliveredOn"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "posts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "publishedOn": {
+                  "type": "string",
+                  "format": "date",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                },
+                "platforms": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PostPlatform"
+                  }
+                },
+                "title": {
+                  "type": "string"
+                },
+                "links": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PublishedLink"
+                  }
+                }
+              },
+              "required": [
+                "id",
+                "publishedOn",
+                "platforms",
+                "title",
+                "links"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "shoots": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "date": {
+                  "type": "string",
+                  "format": "date",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "location": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "date",
+                "title",
+                "location"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "approvals": {
+            "type": "object",
+            "properties": {
+              "approved": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "changesRequested": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "averageResponseHours": {
+                "nullable": true,
+                "type": "number",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "approved",
+              "changesRequested",
+              "averageResponseHours"
+            ],
+            "additionalProperties": false
+          },
+          "campaigns": {
+            "nullable": true,
+            "type": "object",
+            "properties": {
+              "rows": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "spendMinor": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "reach": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "clicks": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "results": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "costPerResultMinor": {
+                      "nullable": true,
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "platform": {
+                      "$ref": "#/components/schemas/AdPlatform"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "objective": {
+                      "$ref": "#/components/schemas/AdObjective"
+                    }
+                  },
+                  "required": [
+                    "spendMinor",
+                    "reach",
+                    "clicks",
+                    "results",
+                    "costPerResultMinor",
+                    "id",
+                    "platform",
+                    "name",
+                    "objective"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "totals": {
+                "type": "object",
+                "properties": {
+                  "spendMinor": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "reach": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "clicks": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "results": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "costPerResultMinor": {
+                    "nullable": true,
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "spendMinor",
+                  "reach",
+                  "clicks",
+                  "results",
+                  "costPerResultMinor"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "rows",
+              "totals"
+            ],
+            "additionalProperties": false
+          },
+          "adBudget": {
+            "nullable": true,
+            "type": "object",
+            "properties": {
+              "openingMinor": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "depositsMinor": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "refundsMinor": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "spendMinor": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "closingMinor": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "openingMinor",
+              "depositsMinor",
+              "refundsMinor",
+              "spendMinor",
+              "closingMinor"
+            ],
+            "additionalProperties": false
+          },
+          "retainer": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ],
+            "additionalProperties": false
+          },
+          "cycle": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "number": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "status": {
+                "$ref": "#/components/schemas/CycleStatus"
+              }
+            },
+            "required": [
+              "id",
+              "number",
+              "status"
+            ],
+            "additionalProperties": false
+          },
+          "period": {
+            "$ref": "#/components/schemas/ReportPeriod"
+          },
+          "preliminary": {
+            "type": "boolean"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "$ref": "#/components/schemas/DeliverableKind"
+                },
+                "label": {
+                  "nullable": true,
+                  "type": "string"
+                },
+                "committed": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "delivered": {
+                  "nullable": true,
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "percent": {
+                  "nullable": true,
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 100
+                }
+              },
+              "required": [
+                "kind",
+                "label",
+                "committed",
+                "delivered",
+                "percent"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "deliveryRate": {
+            "nullable": true,
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "nextPeriod": {
+            "type": "object",
+            "properties": {
+              "posts": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "date": {
+                      "type": "string",
+                      "format": "date",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                    },
+                    "title": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "date",
+                    "title"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "shoots": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "date": {
+                      "type": "string",
+                      "format": "date",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                    },
+                    "title": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "date",
+                    "title"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "period": {
+                "$ref": "#/components/schemas/ReportPeriod"
+              }
+            },
+            "required": [
+              "posts",
+              "shoots",
+              "period"
+            ],
+            "additionalProperties": false
+          },
+          "empty": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "client",
+          "summary",
+          "deliveredWork",
+          "posts",
+          "shoots",
+          "approvals",
+          "campaigns",
+          "adBudget",
+          "retainer",
+          "cycle",
+          "period",
+          "preliminary",
+          "lines",
+          "deliveryRate",
+          "nextPeriod",
+          "empty"
+        ],
+        "additionalProperties": false
+      },
+      "UpdateCycleReportSummary": {
+        "type": "object",
+        "properties": {
+          "summary": {
+            "type": "string",
+            "maxLength": 4000
+          }
+        },
+        "required": [
+          "summary"
         ]
       },
       "HealthResponse": {

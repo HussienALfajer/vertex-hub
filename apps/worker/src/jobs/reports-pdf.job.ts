@@ -14,7 +14,8 @@ import { PdfRenderer } from '../pdf/pdf-renderer.js';
 import { PgBossService } from './pg-boss.service.js';
 
 /**
- * Renders monthly client reports (F15 rule 20) and hands the result to the API
+ * Renders monthly client reports (F15 rule 20) and retainer cycle reports (F05C R1) and hands the
+ * result to the API
  * (`reports.pdf-ready`). As `invoices.pdf`: the job carries its payload and the output is named by
  * its hash, so a retry or a second run renders nothing new.
  */
@@ -62,7 +63,9 @@ export class ReportsPdfJob implements OnApplicationBootstrap {
   async render(data: unknown): Promise<ReportPdfReadyJob> {
     const job = reportPdfJobSchema.parse(data);
     const file = await storeOnce(this.root, reportPdfStorageKey(job), () =>
-      this.renderer.clientReport(job.snapshot),
+      job.kind === 'cycle_report'
+        ? this.renderer.cycleReport(job.snapshot)
+        : this.renderer.clientReport(job.snapshot),
     );
     return { kind: job.kind, id: job.id, hash: job.hash, file };
   }

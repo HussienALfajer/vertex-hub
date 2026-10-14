@@ -1,22 +1,11 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from '@tanstack/react-router';
-import {
-  addMonths,
-  businessDate,
-  CLIENT_REPORT_SUMMARY_MAX,
-  type ClientMonthlyReport,
-  responseTime,
-} from '@vertex-hub/contracts';
+import { addMonths, businessDate, type ClientMonthlyReport } from '@vertex-hub/contracts';
 import {
   Badge,
   Button,
   Callout,
-  Card,
   EmptyState,
-  Field,
-  FieldDescription,
-  FieldError,
-  FieldLabel,
   IconButton,
   PageHeader,
   Skeleton,
@@ -26,7 +15,6 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-  Textarea,
   toast,
 } from '@vertex-hub/ui';
 import {
@@ -40,28 +28,35 @@ import {
   LoaderCircleIcon,
   MailIcon,
 } from 'lucide-react';
-import { type FormEvent, type ReactNode, useId, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FormAlert } from '../../components/form-alert';
 import { LoadError } from '../../components/load-error';
 import { errorMessage } from '../../lib/errors';
 import {
   formatCalendarDate,
-  formatDateTime,
   formatMonth,
   formatNumber,
   formatRetainerCycle,
 } from '../../lib/format';
 import { monthParam } from '../../lib/search-params';
 import { useFocusAfterChange } from '../../lib/use-focus-after-change';
-import { CostPerResult, PlatformName } from '../campaigns/campaign-badges';
-import { PostPlatforms } from '../content/post-parts';
 import { EmailHistory } from '../email/email-history';
 import { SendEmailDialog } from '../email/send-email-dialog';
 import { ProjectStatusBadge } from '../projects/project-badges';
-import { Money } from '../quotes/quote-badges';
-import { DeliveryRate, lineName } from '../retainers/retainer-badges';
+import { DeliveryRate } from '../retainers/retainer-badges';
 import { ExportButton, MonthSelect } from './report-parts';
+import {
+  AdBudgetSection,
+  ApprovalsSection,
+  CampaignsSection,
+  CycleLinesTable,
+  DeliveredSection,
+  PlansSection,
+  PostsSection,
+  ReportSection,
+  ShootsSection,
+  SummaryEditor,
+} from './report-sections';
 import {
   clientReportPdfReadyQuery,
   clientReportPdfUrl,
@@ -222,7 +217,7 @@ function ReportBody({ report, clientId }: { report: ClientMonthlyReport; clientI
           description={t('reports.client.preliminaryHint')}
         />
       )}
-      <SummaryEditor key={report.month} report={report} clientId={clientId} />
+      <MonthSummary key={report.month} report={report} clientId={clientId} />
       {report.empty ? (
         <EmptyState icon={<CalendarOffIcon />} title={t('reports.client.noActivity')} />
       ) : (
@@ -234,8 +229,11 @@ function ReportBody({ report, clientId }: { report: ClientMonthlyReport; clientI
           <ShootsSection report={report} />
           <ApprovalsSection report={report} />
           <CampaignsSection report={report} />
-          <AdBudgetSection report={report} />
-          <NextMonthSection report={report} />
+          <AdBudgetSection
+            report={report}
+            labels={{ opening: t('reports.client.opening'), closing: t('reports.client.closing') }}
+          />
+          <PlansSection title={t('reports.client.sections.nextMonth')} plans={report.nextMonth} />
         </>
       )}
       <EmailHistory target={{ type: 'report', clientId, month: report.month }} />
@@ -243,84 +241,18 @@ function ReportBody({ report, clientId }: { report: ClientMonthlyReport; clientI
   );
 }
 
-/** Rule 19: any reader of the report writes the month's summary; the last save wins. */
-function SummaryEditor({ report, clientId }: { report: ClientMonthlyReport; clientId: string }) {
+/** Rule 19: the month's summary. */
+function MonthSummary({ report, clientId }: { report: ClientMonthlyReport; clientId: string }) {
   const { t } = useTranslation();
-  const id = useId();
   const save = useSaveClientReportSummary(clientId);
-  const stored = report.summary?.text ?? '';
-  const [text, setText] = useState(stored);
-  const [failure, setFailure] = useState<string | null>(null);
-  const tooLong = text.trim().length > CLIENT_REPORT_SUMMARY_MAX;
-  const changed = text.trim() !== stored;
-
-  async function submit(event: FormEvent) {
-    event.preventDefault();
-    if (tooLong || !changed) return;
-    setFailure(null);
-    try {
-      const saved = await save.mutateAsync({ month: report.month, summary: text });
-      // The text as stored: trimmed, or empty once cleared.
-      setText(saved.summary?.text ?? '');
-      toast.add({ title: t('reports.client.summarySaved'), type: 'success' });
-    } catch (error) {
-      setFailure(errorMessage(t, error));
-    }
-  }
-
   return (
-    <Card className="gap-3">
-      <form className="flex flex-col gap-3" onSubmit={submit} noValidate>
-        <Field invalid={tooLong}>
-          <FieldLabel htmlFor={id} className="text-lg font-bold">
-            {t('reports.client.sections.summary')}
-          </FieldLabel>
-          <Textarea
-            id={id}
-            rows={5}
-            value={text}
-            onChange={(event) => setText(event.target.value)}
-            placeholder={t('reports.client.summaryPlaceholder')}
-          />
-          <FieldDescription>
-            {t('reports.client.summaryCount', {
-              n: formatNumber(text.length),
-              max: formatNumber(CLIENT_REPORT_SUMMARY_MAX),
-            })}
-            {report.summary &&
-              ` · ${t('reports.client.summaryBy', {
-                name: report.summary.updatedBy.name,
-                when: formatDateTime(report.summary.updatedAt),
-              })}`}
-          </FieldDescription>
-          <FieldError match={tooLong}>
-            {t('reports.client.summaryTooLong', {
-              max: formatNumber(CLIENT_REPORT_SUMMARY_MAX),
-            })}
-          </FieldError>
-        </Field>
-        {failure && <FormAlert>{failure}</FormAlert>}
-        <div>
-          {/* Stays focusable once saved (nothing left to save), so the focus stays here. */}
-          <Button
-            type="submit"
-            disabled={save.isPending || tooLong || !changed}
-            focusableWhenDisabled
-          >
-            {save.isPending ? t('common.saving') : t('reports.client.saveSummary')}
-          </Button>
-        </div>
-      </form>
-    </Card>
-  );
-}
-
-function ReportSection({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <Card className="gap-4">
-      <h2 className="text-lg font-bold">{title}</h2>
-      {children}
-    </Card>
+    <SummaryEditor
+      label={t('reports.client.sections.summary')}
+      placeholder={t('reports.client.summaryPlaceholder')}
+      summary={report.summary}
+      saving={save.isPending}
+      save={async (summary) => (await save.mutateAsync({ month: report.month, summary })).summary}
+    />
   );
 }
 
@@ -350,35 +282,22 @@ function RetainersSection({ report }: { report: ClientMonthlyReport }) {
               {t('reports.client.completion')}
               <DeliveryRate rate={row.completion} />
             </span>
+            {/* F05C screen 9: each cycle has its own report. */}
+            <Button
+              variant="outline"
+              size="sm"
+              render={
+                <Link
+                  to="/retainers/$retainerId/cycles/$cycleId/report"
+                  params={{ retainerId: row.retainer.id, cycleId: row.cycleId }}
+                />
+              }
+            >
+              <FileTextIcon />
+              {t('reports.cycle.open')}
+            </Button>
           </div>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{t('reports.client.kind')}</TableHead>
-                <TableHead className="text-end">{t('reports.client.committed')}</TableHead>
-                <TableHead className="text-end">{t('reports.client.delivered')}</TableHead>
-                <TableHead className="text-end">{t('reports.client.percent')}</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {row.lines.map((line, index) => (
-                <TableRow key={`${line.kind}-${line.label ?? index}`}>
-                  <TableCell>{lineName(t, line)}</TableCell>
-                  <TableCell className="text-end tabular-nums">
-                    {formatNumber(line.committed)}
-                  </TableCell>
-                  <TableCell className="text-end tabular-nums">
-                    {line.delivered === null ? t('common.none') : formatNumber(line.delivered)}
-                  </TableCell>
-                  <TableCell className="text-end tabular-nums">
-                    {line.percent === null
-                      ? t('common.none')
-                      : formatNumber(line.percent / 100, { style: 'percent' })}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          <CycleLinesTable lines={row.lines} />
         </div>
       ))}
     </ReportSection>
@@ -441,304 +360,6 @@ function ProjectsSection({ report }: { report: ClientMonthlyReport }) {
           ))}
         </TableBody>
       </Table>
-    </ReportSection>
-  );
-}
-
-function DeliveredSection({ report }: { report: ClientMonthlyReport }) {
-  const { t } = useTranslation();
-  if (report.deliveredWork.length === 0) return null;
-  return (
-    <ReportSection title={t('reports.client.sections.deliveredWork')}>
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>{t('reports.client.work')}</TableHead>
-            <TableHead>{t('reports.client.department')}</TableHead>
-            <TableHead>{t('reports.client.date')}</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {report.deliveredWork.map((row) => (
-            <TableRow key={row.taskId}>
-              <TableCell className="whitespace-normal">
-                <Link
-                  to="/tasks/$taskId"
-                  params={{ taskId: row.taskId }}
-                  className="font-medium hover:underline"
-                >
-                  {row.title}
-                </Link>
-              </TableCell>
-              <TableCell>{row.departmentName}</TableCell>
-              <TableCell>{formatCalendarDate(row.deliveredOn)}</TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </ReportSection>
-  );
-}
-
-function PostsSection({ report }: { report: ClientMonthlyReport }) {
-  const { t } = useTranslation();
-  if (report.posts.length === 0) return null;
-  return (
-    <ReportSection title={t('reports.client.sections.posts')}>
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>{t('reports.client.date')}</TableHead>
-            <TableHead>{t('reports.client.platforms')}</TableHead>
-            <TableHead>{t('reports.client.postTitle')}</TableHead>
-            <TableHead>{t('reports.client.links')}</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {report.posts.map((row) => (
-            <TableRow key={row.id}>
-              <TableCell>{formatCalendarDate(row.publishedOn)}</TableCell>
-              <TableCell>
-                <PostPlatforms platforms={row.platforms} />
-              </TableCell>
-              <TableCell className="whitespace-normal">
-                <Link
-                  to="/content/posts/$postId"
-                  params={{ postId: row.id }}
-                  className="font-medium hover:underline"
-                >
-                  {row.title}
-                </Link>
-              </TableCell>
-              <TableCell className="whitespace-normal">
-                {row.links.length === 0 ? (
-                  <span className="text-muted-foreground">{t('common.none')}</span>
-                ) : (
-                  <ul className="flex flex-col gap-0.5 text-sm">
-                    {row.links.map((link) => (
-                      <li key={link.url}>
-                        <a
-                          href={link.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="hover:underline"
-                        >
-                          {t(`clients.platforms.names.${link.platform}`)}
-                        </a>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </ReportSection>
-  );
-}
-
-function ShootsSection({ report }: { report: ClientMonthlyReport }) {
-  const { t } = useTranslation();
-  if (report.shoots.length === 0) return null;
-  return (
-    <ReportSection title={t('reports.client.sections.shoots')}>
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>{t('reports.client.date')}</TableHead>
-            <TableHead>{t('reports.client.shoot')}</TableHead>
-            <TableHead>{t('reports.client.location')}</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {report.shoots.map((row) => (
-            <TableRow key={row.id}>
-              <TableCell>{formatCalendarDate(row.date)}</TableCell>
-              <TableCell className="whitespace-normal">
-                <Link
-                  to="/shoots/$shootId"
-                  params={{ shootId: row.id }}
-                  className="font-medium hover:underline"
-                >
-                  {row.title}
-                </Link>
-              </TableCell>
-              <TableCell className="whitespace-normal">{row.location}</TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </ReportSection>
-  );
-}
-
-function ApprovalsSection({ report }: { report: ClientMonthlyReport }) {
-  const { t } = useTranslation();
-  const { approved, changesRequested, averageResponseHours } = report.approvals;
-  if (approved + changesRequested === 0) return null;
-  const average = averageResponseHours === null ? null : responseTime(averageResponseHours);
-  const facts = [
-    { label: t('reports.client.approved'), value: formatNumber(approved) },
-    { label: t('reports.client.changesRequested'), value: formatNumber(changesRequested) },
-    {
-      label: t('reports.client.averageResponse'),
-      value: average
-        ? t(`reports.client.${average.unit}`, {
-            count: average.value,
-            n: formatNumber(average.value, { maximumFractionDigits: 1 }),
-          })
-        : t('common.none'),
-    },
-  ];
-  return (
-    <ReportSection title={t('reports.client.sections.approvals')}>
-      <dl className="grid gap-3 sm:grid-cols-3">
-        {facts.map((fact) => (
-          <div key={fact.label} className="flex flex-col gap-1 rounded-lg border border-border p-4">
-            <dt className="text-sm text-muted-foreground">{fact.label}</dt>
-            <dd className="text-xl font-bold tabular-nums">{fact.value}</dd>
-          </div>
-        ))}
-      </dl>
-    </ReportSection>
-  );
-}
-
-function CampaignsSection({ report }: { report: ClientMonthlyReport }) {
-  const { t } = useTranslation();
-  const campaigns = report.campaigns;
-  if (!campaigns || campaigns.rows.length === 0) return null;
-  const { totals } = campaigns;
-  return (
-    <ReportSection title={t('reports.client.sections.campaigns')}>
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>{t('reports.client.campaign')}</TableHead>
-            <TableHead>{t('reports.client.objective')}</TableHead>
-            <TableHead className="text-end">{t('reports.client.spend')}</TableHead>
-            <TableHead className="text-end">{t('reports.client.reach')}</TableHead>
-            <TableHead className="text-end">{t('reports.client.clicks')}</TableHead>
-            <TableHead className="text-end">{t('reports.client.results')}</TableHead>
-            <TableHead className="text-end">{t('reports.client.costPerResult')}</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {campaigns.rows.map((row) => (
-            <TableRow key={row.id}>
-              <TableCell className="whitespace-normal">
-                <span className="flex flex-col gap-1">
-                  <Link
-                    to="/campaigns/$campaignId"
-                    params={{ campaignId: row.id }}
-                    className="font-medium hover:underline"
-                  >
-                    {row.name}
-                  </Link>
-                  <span className="text-xs text-muted-foreground">
-                    <PlatformName platform={row.platform} />
-                  </span>
-                </span>
-              </TableCell>
-              <TableCell>{t(`campaigns.objectives.${row.objective}`)}</TableCell>
-              <MetricCells metrics={row} />
-            </TableRow>
-          ))}
-          <TableRow className="font-bold">
-            <TableCell colSpan={2}>{t('reports.client.total')}</TableCell>
-            <MetricCells metrics={totals} />
-          </TableRow>
-        </TableBody>
-      </Table>
-    </ReportSection>
-  );
-}
-
-function MetricCells({
-  metrics,
-}: {
-  metrics: NonNullable<ClientMonthlyReport['campaigns']>['totals'];
-}) {
-  return (
-    <>
-      <TableCell className="text-end">
-        <Money minor={metrics.spendMinor} currency="USD" />
-      </TableCell>
-      <TableCell className="text-end tabular-nums">{formatNumber(metrics.reach)}</TableCell>
-      <TableCell className="text-end tabular-nums">{formatNumber(metrics.clicks)}</TableCell>
-      <TableCell className="text-end tabular-nums">{formatNumber(metrics.results)}</TableCell>
-      <TableCell className="text-end">
-        <CostPerResult minor={metrics.costPerResultMinor} />
-      </TableCell>
-    </>
-  );
-}
-
-function AdBudgetSection({ report }: { report: ClientMonthlyReport }) {
-  const { t } = useTranslation();
-  const budget = report.adBudget;
-  if (!budget) return null;
-  const rows = [
-    { label: t('reports.client.opening'), minor: budget.openingMinor },
-    { label: t('reports.client.deposits'), minor: budget.depositsMinor },
-    { label: t('reports.client.refunds'), minor: budget.refundsMinor },
-    { label: t('reports.client.walletSpend'), minor: budget.spendMinor },
-    { label: t('reports.client.closing'), minor: budget.closingMinor, strong: true },
-  ];
-  return (
-    <ReportSection title={t('reports.client.sections.adBudget')}>
-      <dl className="flex flex-col divide-y divide-border">
-        {rows.map((row) => (
-          <div key={row.label} className="flex items-baseline justify-between gap-4 py-2">
-            <dt className={row.strong ? 'font-bold' : 'text-muted-foreground'}>{row.label}</dt>
-            <dd className={row.strong ? 'font-bold' : undefined}>
-              <Money
-                minor={row.minor}
-                currency="USD"
-                className={row.minor < 0 ? 'text-destructive-text' : undefined}
-              />
-            </dd>
-          </div>
-        ))}
-      </dl>
-    </ReportSection>
-  );
-}
-
-function NextMonthSection({ report }: { report: ClientMonthlyReport }) {
-  const { t } = useTranslation();
-  const { posts, shoots } = report.nextMonth;
-  if (posts.length + shoots.length === 0) return null;
-  const groups = [
-    { key: 'plannedPosts', rows: posts },
-    { key: 'bookedShoots', rows: shoots },
-  ] as const;
-  return (
-    <ReportSection title={t('reports.client.sections.nextMonth')}>
-      <div className="grid gap-4 md:grid-cols-2">
-        {groups
-          .filter((group) => group.rows.length > 0)
-          .map((group) => (
-            <div key={group.key} className="flex flex-col gap-2">
-              <h3 className="font-bold">{t(`reports.client.${group.key}`)}</h3>
-              <ul className="flex flex-col divide-y divide-border text-sm">
-                {group.rows.map((row, index) => (
-                  <li
-                    // biome-ignore lint/suspicious/noArrayIndexKey: two plans can share a date and title
-                    key={index}
-                    className="flex gap-3 py-1.5"
-                  >
-                    <span className="w-28 shrink-0 text-muted-foreground">
-                      {formatCalendarDate(row.date)}
-                    </span>
-                    {row.title}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
-      </div>
     </ReportSection>
   );
 }

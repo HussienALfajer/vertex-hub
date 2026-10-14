@@ -624,6 +624,8 @@ export const clientMonthlyReportSchema = z
     retainers: z.array(
       z.object({
         retainer: namedSchema,
+        /** The cycle's report (F05C screen 9). */
+        cycleId: z.uuid(),
         cycle: z.number().int().min(1),
         periodStart: calendarDateSchema,
         periodEnd: calendarDateSchema,
@@ -733,3 +735,59 @@ export const clientReportSnapshotSchema = clientMonthlyReportSchema.extend({
 });
 
 export type ClientReportSnapshot = z.infer<typeof clientReportSnapshotSchema>;
+
+// Cycle report (spec F05C, R1–R3)
+
+const monthlyRetainer = clientMonthlyReportSchema.shape.retainers.element;
+
+/**
+ * R2: F15 rule 18's sections over one retainer cycle's period: this cycle's lines and delivery
+ * rate instead of the retainers section, no projects section, the next period's plans. Backdated
+ * cycles have none (B4).
+ */
+export const cycleReportSchema = clientMonthlyReportSchema
+  .pick({
+    client: true,
+    summary: true,
+    deliveredWork: true,
+    posts: true,
+    shoots: true,
+    approvals: true,
+    campaigns: true,
+    adBudget: true,
+  })
+  .extend({
+    retainer: namedSchema,
+    cycle: z.object({
+      id: z.uuid(),
+      number: z.number().int().min(1),
+      status: cycleStatusSchema,
+    }),
+    /** The cycle's period; shortened to the end day when the retainer ended in it (edge case 15). */
+    period: reportPeriodSchema,
+    /** The cycle is still open (R2). */
+    preliminary: z.boolean(),
+    /** Section 2: this cycle's lines, frozen at close, live while open. */
+    lines: monthlyRetainer.shape.lines,
+    /** R13 over the cycle: whole percent; null with nothing committed or no delivered counts. */
+    deliveryRate: monthlyRetainer.shape.completion,
+    /** The plans of the next cycle's period (F15 section 10). */
+    nextPeriod: clientMonthlyReportSchema.shape.nextMonth.extend({ period: reportPeriodSchema }),
+    /** Every section is empty: the report says there was no activity. */
+    empty: z.boolean(),
+  })
+  .meta({ id: 'CycleReport' });
+
+export type CycleReport = z.infer<typeof cycleReportSchema>;
+
+/** R3: replaces the cycle's summary; an empty text clears it. */
+export const updateCycleReportSummarySchema = z
+  .object({ summary: z.string().trim().max(CLIENT_REPORT_SUMMARY_MAX) })
+  .meta({ id: 'UpdateCycleReportSummary' });
+
+export type UpdateCycleReportSummary = z.infer<typeof updateCycleReportSummarySchema>;
+
+/** The render payload of the cycle report PDF (R1, R3): the report with the company details. */
+export const cycleReportSnapshotSchema = cycleReportSchema.extend({ companyDetails: z.string() });
+
+export type CycleReportSnapshot = z.infer<typeof cycleReportSnapshotSchema>;

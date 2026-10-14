@@ -128,12 +128,20 @@ describe('client report PDF jobs', () => {
   const id = '0190a3c2-0000-7000-8000-000000000004';
 
   it('names the output by render row and payload hash', () => {
-    expect(reportPdfStorageKey({ id, hash })).toBe(`objects/client-reports/${id}/${hash}.pdf`);
+    expect(reportPdfStorageKey({ kind: 'client_report', id, hash })).toBe(
+      `objects/client-reports/${id}/${hash}.pdf`,
+    );
+    expect(reportPdfStorageKey({ kind: 'cycle_report', id, hash })).toBe(
+      `objects/cycle-reports/${id}/${hash}.pdf`,
+    );
   });
 
   it('reports a stored file or a failure', () => {
     const ready = { kind: 'client_report', id, hash, file: null };
     expect(reportPdfReadyJobSchema.safeParse(ready).success).toBe(true);
+    expect(reportPdfReadyJobSchema.safeParse({ ...ready, kind: 'cycle_report' }).success).toBe(
+      true,
+    );
     expect(reportPdfReadyJobSchema.safeParse({ ...ready, kind: 'statement' }).success).toBe(false);
   });
 });

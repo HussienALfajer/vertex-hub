@@ -8,6 +8,7 @@ import {
   formatMoney,
   formatMonth,
   formatNumber,
+  formatPeriod,
   formatTimeOfDay,
 } from './format.js';
 import { fill, type PluralForms, plural } from './text.js';
@@ -129,6 +130,7 @@ export const NOTIFICATION_TEXT = {
     end: 'ينتهي العقد',
     continue: 'يستمر شهريًا',
   },
+  retainer_cycle_report_ready: 'تقرير الدورة {{cycle}} من عقد «{{retainer}}» جاهز',
   retainer_amendment_pending:
     'طلب {{actor}} اعتماد التعديل {{number}} على عقد «{{retainer}}»: تخفيض {{amount}}',
   retainer_amendment_decided: {
@@ -271,6 +273,13 @@ export function notificationLink(notification: Notification): NotificationLink {
     }
     const tab = kind === 'client_statement' ? 'invoices' : 'ads';
     return { to: '/clients/$clientId', params: { clientId: subject.id }, search: { tab } };
+  }
+  if (notification.type === 'retainer_cycle_report_ready') {
+    // F05C screen 9: the cycle's report.
+    return {
+      to: '/retainers/$retainerId/cycles/$cycleId/report',
+      params: { retainerId: subject.id, cycleId: notification.data.cycleId },
+    };
   }
   if (notification.type === 'tasks_generated') {
     // No run filter on the task list (owner decision): the assignee's newest tasks, or the
@@ -472,6 +481,20 @@ export function notificationText(
         ),
       };
     }
+    case 'retainer_cycle_report_ready': {
+      const { data } = notification;
+      return {
+        text: fill(text.retainer_cycle_report_ready, {
+          cycle: formatNumber(data.cycle),
+          retainer: data.retainer,
+        }),
+        context: context(
+          data.client,
+          formatPeriod(data.periodStart, data.periodEnd),
+          data.deliveryRate === null ? undefined : `التسليم ${formatNumber(data.deliveryRate)}٪`,
+        ),
+      };
+    }
     case 'retainer_amendment_pending': {
       const { data } = notification;
       return {
@@ -665,6 +688,7 @@ type TaskNotification = Exclude<
       | 'project_manager_assigned'
       | 'retainer_renewal_due'
       | 'retainer_term_renewed'
+      | 'retainer_cycle_report_ready'
       | `retainer_amendment_${string}`
       | 'retainer_behind'
       | 'quote_approval_requested'

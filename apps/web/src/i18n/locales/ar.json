@@ -811,7 +811,8 @@
       "ad_wallet_entry": "إيداع أو استرداد إعلاني",
       "lead": "عميل محتمل",
       "lead_note": "نشاط على عميل محتمل",
-      "client_report": "تقرير شهري لعميل"
+      "client_report": "تقرير شهري لعميل",
+      "retainer_cycle_report": "تقرير دورة عقد شهري"
     },
     "actions": {
       "user": {
@@ -1118,6 +1119,9 @@
       },
       "client_report": {
         "summary_changed": "عدّل ملخص تقرير شهري لعميل"
+      },
+      "retainer_cycle_report": {
+        "summary_changed": "عدّل ملخص تقرير دورة عقد شهري"
       }
     },
     "fields": {
@@ -4001,6 +4005,7 @@
       "retainer_renewal_due": "موعد تجديد عقد شهري",
       "retainer_behind": "عقد شهري متأخر قرب نهاية الشهر",
       "retainer_term_renewed": "تجديد مدة عقد شهري تلقائيًا",
+      "retainer_cycle_report_ready": "جاهزية تقرير دورة عقد شهري",
       "retainer_amendment_pending": "تعديل عقد ينتظر الاعتماد",
       "retainer_amendment_decided": "قرار في تعديل عقد طلبته",
       "task_medical_review_requested": "طلب مراجعة طبية",
@@ -6619,6 +6624,25 @@
     }
   },
   "reports": {
+    "cycle": {
+      "title": "تقرير الدورة",
+      "pageTitle": "تقرير {{cycle}} — {{name}}",
+      "backTo": "العودة إلى {{name}}",
+      "backToRetainer": "العودة إلى العقد",
+      "loadError": "تعذّر تحميل تقرير الدورة.",
+      "open": "التقرير",
+      "openOf": "افتح تقرير {{cycle}}",
+      "preliminary": "تقرير أولي",
+      "preliminaryHint": "الدورة لم تنتهِ بعد، فالأرقام تتغير حتى إغلاقها.",
+      "summary": "ملخص الدورة",
+      "summaryPlaceholder": "اكتب للعميل ما أنجزناه في هذه الدورة وما نخطط له في التالية.",
+      "deliverables": "بنود العقد",
+      "deliveryRate": "نسبة التسليم",
+      "noActivity": "لا نشاط آخر مسجّل لهذه الدورة.",
+      "opening": "الرصيد في بداية الدورة",
+      "closing": "الرصيد في نهاية الدورة",
+      "nextPeriod": "الدورة القادمة ({{period}})"
+    },
     "title": "التقارير",
     "subtitle": "تقارير تُحسب من سجلات النظام لحظة فتحها، وتُصدَّر إلى Excel.",
     "open": "افتح التقرير",

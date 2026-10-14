@@ -49,7 +49,6 @@ import { Route as AppReportsOverdueInvoicesRouteImport } from './routes/_app/rep
 import { Route as AppReportsProductivityRouteImport } from './routes/_app/reports/productivity'
 import { Route as AppReportsRevenueRouteImport } from './routes/_app/reports/revenue'
 import { Route as AppRetainersIndexRouteImport } from './routes/_app/retainers/index'
-import { Route as AppRetainersRetainerIdRouteImport } from './routes/_app/retainers/$retainerId'
 import { Route as AppRetainersNewRouteImport } from './routes/_app/retainers/new'
 import { Route as AppShootsNewRouteImport } from './routes/_app/shoots/new'
 import { Route as AppTasksIndexRouteImport } from './routes/_app/tasks/index'
@@ -68,8 +67,10 @@ import { Route as AppApprovalsRequestsRequestIdRouteImport } from './routes/_app
 import { Route as AppClientsClientIdIndexRouteImport } from './routes/_app/clients/$clientId/index'
 import { Route as AppClientsClientIdReportRouteImport } from './routes/_app/clients/$clientId/report'
 import { Route as AppContentPostsPostIdRouteImport } from './routes/_app/content/posts/$postId'
+import { Route as AppRetainersRetainerIdIndexRouteImport } from './routes/_app/retainers/$retainerId/index'
 import { Route as AppShootsShootIdIndexRouteImport } from './routes/_app/shoots/$shootId/index'
 import { Route as AppShootsShootIdEditRouteImport } from './routes/_app/shoots/$shootId/edit'
+import { Route as AppRetainersRetainerIdCyclesCycleIdReportRouteImport } from './routes/_app/retainers/$retainerId/cycles/$cycleId/report'
 
 const AppRoute = AppRouteImport.update({
   id: '/_app',
@@ -273,11 +274,6 @@ const AppRetainersIndexRoute = AppRetainersIndexRouteImport.update({
   path: '/retainers/',
   getParentRoute: () => AppRoute,
 } as any)
-const AppRetainersRetainerIdRoute = AppRetainersRetainerIdRouteImport.update({
-  id: '/retainers/$retainerId',
-  path: '/retainers/$retainerId',
-  getParentRoute: () => AppRoute,
-} as any)
 const AppRetainersNewRoute = AppRetainersNewRouteImport.update({
   id: '/retainers/new',
   path: '/retainers/new',
@@ -370,6 +366,12 @@ const AppContentPostsPostIdRoute = AppContentPostsPostIdRouteImport.update({
   path: '/content/posts/$postId',
   getParentRoute: () => AppRoute,
 } as any)
+const AppRetainersRetainerIdIndexRoute =
+  AppRetainersRetainerIdIndexRouteImport.update({
+    id: '/retainers/$retainerId/',
+    path: '/retainers/$retainerId/',
+    getParentRoute: () => AppRoute,
+  } as any)
 const AppShootsShootIdIndexRoute = AppShootsShootIdIndexRouteImport.update({
   id: '/shoots/$shootId/',
   path: '/shoots/$shootId/',
@@ -380,6 +382,12 @@ const AppShootsShootIdEditRoute = AppShootsShootIdEditRouteImport.update({
   path: '/shoots/$shootId/edit',
   getParentRoute: () => AppRoute,
 } as any)
+const AppRetainersRetainerIdCyclesCycleIdReportRoute =
+  AppRetainersRetainerIdCyclesCycleIdReportRouteImport.update({
+    id: '/retainers/$retainerId/cycles/$cycleId/report',
+    path: '/retainers/$retainerId/cycles/$cycleId/report',
+    getParentRoute: () => AppRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
@@ -407,7 +415,6 @@ export interface FileRoutesByFullPath {
   '/reports/overdue-invoices': typeof AppReportsOverdueInvoicesRoute
   '/reports/productivity': typeof AppReportsProductivityRoute
   '/reports/revenue': typeof AppReportsRevenueRoute
-  '/retainers/$retainerId': typeof AppRetainersRetainerIdRoute
   '/retainers/new': typeof AppRetainersNewRoute
   '/shoots/new': typeof AppShootsNewRoute
   '/tasks/$taskId': typeof AppTasksTaskIdRoute
@@ -441,7 +448,9 @@ export interface FileRoutesByFullPath {
   '/content/posts/$postId': typeof AppContentPostsPostIdRoute
   '/shoots/$shootId/edit': typeof AppShootsShootIdEditRoute
   '/clients/$clientId/': typeof AppClientsClientIdIndexRoute
+  '/retainers/$retainerId/': typeof AppRetainersRetainerIdIndexRoute
   '/shoots/$shootId/': typeof AppShootsShootIdIndexRoute
+  '/retainers/$retainerId/cycles/$cycleId/report': typeof AppRetainersRetainerIdCyclesCycleIdReportRoute
 }
 export interface FileRoutesByTo {
   '/activate': typeof ActivateRoute
@@ -469,7 +478,6 @@ export interface FileRoutesByTo {
   '/reports/overdue-invoices': typeof AppReportsOverdueInvoicesRoute
   '/reports/productivity': typeof AppReportsProductivityRoute
   '/reports/revenue': typeof AppReportsRevenueRoute
-  '/retainers/$retainerId': typeof AppRetainersRetainerIdRoute
   '/retainers/new': typeof AppRetainersNewRoute
   '/shoots/new': typeof AppShootsNewRoute
   '/tasks/$taskId': typeof AppTasksTaskIdRoute
@@ -503,7 +511,9 @@ export interface FileRoutesByTo {
   '/content/posts/$postId': typeof AppContentPostsPostIdRoute
   '/shoots/$shootId/edit': typeof AppShootsShootIdEditRoute
   '/clients/$clientId': typeof AppClientsClientIdIndexRoute
+  '/retainers/$retainerId': typeof AppRetainersRetainerIdIndexRoute
   '/shoots/$shootId': typeof AppShootsShootIdIndexRoute
+  '/retainers/$retainerId/cycles/$cycleId/report': typeof AppRetainersRetainerIdCyclesCycleIdReportRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -533,7 +543,6 @@ export interface FileRoutesById {
   '/_app/reports/overdue-invoices': typeof AppReportsOverdueInvoicesRoute
   '/_app/reports/productivity': typeof AppReportsProductivityRoute
   '/_app/reports/revenue': typeof AppReportsRevenueRoute
-  '/_app/retainers/$retainerId': typeof AppRetainersRetainerIdRoute
   '/_app/retainers/new': typeof AppRetainersNewRoute
   '/_app/shoots/new': typeof AppShootsNewRoute
   '/_app/tasks/$taskId': typeof AppTasksTaskIdRoute
@@ -567,7 +576,9 @@ export interface FileRoutesById {
   '/_app/content/posts/$postId': typeof AppContentPostsPostIdRoute
   '/_app/shoots/$shootId/edit': typeof AppShootsShootIdEditRoute
   '/_app/clients/$clientId/': typeof AppClientsClientIdIndexRoute
+  '/_app/retainers/$retainerId/': typeof AppRetainersRetainerIdIndexRoute
   '/_app/shoots/$shootId/': typeof AppShootsShootIdIndexRoute
+  '/_app/retainers/$retainerId/cycles/$cycleId/report': typeof AppRetainersRetainerIdCyclesCycleIdReportRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -597,7 +608,6 @@ export interface FileRouteTypes {
     | '/reports/overdue-invoices'
     | '/reports/productivity'
     | '/reports/revenue'
-    | '/retainers/$retainerId'
     | '/retainers/new'
     | '/shoots/new'
     | '/tasks/$taskId'
@@ -631,7 +641,9 @@ export interface FileRouteTypes {
     | '/content/posts/$postId'
     | '/shoots/$shootId/edit'
     | '/clients/$clientId/'
+    | '/retainers/$retainerId/'
     | '/shoots/$shootId/'
+    | '/retainers/$retainerId/cycles/$cycleId/report'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/activate'
@@ -659,7 +671,6 @@ export interface FileRouteTypes {
     | '/reports/overdue-invoices'
     | '/reports/productivity'
     | '/reports/revenue'
-    | '/retainers/$retainerId'
     | '/retainers/new'
     | '/shoots/new'
     | '/tasks/$taskId'
@@ -693,7 +704,9 @@ export interface FileRouteTypes {
     | '/content/posts/$postId'
     | '/shoots/$shootId/edit'
     | '/clients/$clientId'
+    | '/retainers/$retainerId'
     | '/shoots/$shootId'
+    | '/retainers/$retainerId/cycles/$cycleId/report'
   id:
     | '__root__'
     | '/_app'
@@ -722,7 +735,6 @@ export interface FileRouteTypes {
     | '/_app/reports/overdue-invoices'
     | '/_app/reports/productivity'
     | '/_app/reports/revenue'
-    | '/_app/retainers/$retainerId'
     | '/_app/retainers/new'
     | '/_app/shoots/new'
     | '/_app/tasks/$taskId'
@@ -756,7 +768,9 @@ export interface FileRouteTypes {
     | '/_app/content/posts/$postId'
     | '/_app/shoots/$shootId/edit'
     | '/_app/clients/$clientId/'
+    | '/_app/retainers/$retainerId/'
     | '/_app/shoots/$shootId/'
+    | '/_app/retainers/$retainerId/cycles/$cycleId/report'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -1050,13 +1064,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppRetainersIndexRouteImport
       parentRoute: typeof AppRoute
     }
-    '/_app/retainers/$retainerId': {
-      id: '/_app/retainers/$retainerId'
-      path: '/retainers/$retainerId'
-      fullPath: '/retainers/$retainerId'
-      preLoaderRoute: typeof AppRetainersRetainerIdRouteImport
-      parentRoute: typeof AppRoute
-    }
     '/_app/retainers/new': {
       id: '/_app/retainers/new'
       path: '/retainers/new'
@@ -1183,6 +1190,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppContentPostsPostIdRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/retainers/$retainerId/': {
+      id: '/_app/retainers/$retainerId/'
+      path: '/retainers/$retainerId'
+      fullPath: '/retainers/$retainerId/'
+      preLoaderRoute: typeof AppRetainersRetainerIdIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/shoots/$shootId/': {
       id: '/_app/shoots/$shootId/'
       path: '/shoots/$shootId'
@@ -1195,6 +1209,13 @@ declare module '@tanstack/react-router' {
       path: '/shoots/$shootId/edit'
       fullPath: '/shoots/$shootId/edit'
       preLoaderRoute: typeof AppShootsShootIdEditRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/retainers/$retainerId/cycles/$cycleId/report': {
+      id: '/_app/retainers/$retainerId/cycles/$cycleId/report'
+      path: '/retainers/$retainerId/cycles/$cycleId/report'
+      fullPath: '/retainers/$retainerId/cycles/$cycleId/report'
+      preLoaderRoute: typeof AppRetainersRetainerIdCyclesCycleIdReportRouteImport
       parentRoute: typeof AppRoute
     }
   }
@@ -1221,7 +1242,6 @@ interface AppRouteChildren {
   AppReportsOverdueInvoicesRoute: typeof AppReportsOverdueInvoicesRoute
   AppReportsProductivityRoute: typeof AppReportsProductivityRoute
   AppReportsRevenueRoute: typeof AppReportsRevenueRoute
-  AppRetainersRetainerIdRoute: typeof AppRetainersRetainerIdRoute
   AppRetainersNewRoute: typeof AppRetainersNewRoute
   AppShootsNewRoute: typeof AppShootsNewRoute
   AppTasksTaskIdRoute: typeof AppTasksTaskIdRoute
@@ -1255,7 +1275,9 @@ interface AppRouteChildren {
   AppContentPostsPostIdRoute: typeof AppContentPostsPostIdRoute
   AppShootsShootIdEditRoute: typeof AppShootsShootIdEditRoute
   AppClientsClientIdIndexRoute: typeof AppClientsClientIdIndexRoute
+  AppRetainersRetainerIdIndexRoute: typeof AppRetainersRetainerIdIndexRoute
   AppShootsShootIdIndexRoute: typeof AppShootsShootIdIndexRoute
+  AppRetainersRetainerIdCyclesCycleIdReportRoute: typeof AppRetainersRetainerIdCyclesCycleIdReportRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
@@ -1279,7 +1301,6 @@ const AppRouteChildren: AppRouteChildren = {
   AppReportsOverdueInvoicesRoute: AppReportsOverdueInvoicesRoute,
   AppReportsProductivityRoute: AppReportsProductivityRoute,
   AppReportsRevenueRoute: AppReportsRevenueRoute,
-  AppRetainersRetainerIdRoute: AppRetainersRetainerIdRoute,
   AppRetainersNewRoute: AppRetainersNewRoute,
   AppShootsNewRoute: AppShootsNewRoute,
   AppTasksTaskIdRoute: AppTasksTaskIdRoute,
@@ -1313,7 +1334,10 @@ const AppRouteChildren: AppRouteChildren = {
   AppContentPostsPostIdRoute: AppContentPostsPostIdRoute,
   AppShootsShootIdEditRoute: AppShootsShootIdEditRoute,
   AppClientsClientIdIndexRoute: AppClientsClientIdIndexRoute,
+  AppRetainersRetainerIdIndexRoute: AppRetainersRetainerIdIndexRoute,
   AppShootsShootIdIndexRoute: AppShootsShootIdIndexRoute,
+  AppRetainersRetainerIdCyclesCycleIdReportRoute:
+    AppRetainersRetainerIdCyclesCycleIdReportRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
