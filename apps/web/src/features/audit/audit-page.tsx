@@ -619,6 +619,8 @@ const RETAINER_PARTS: AuditEntityType[] = [
   'retainer_charge',
   'retainer_term',
   'retainer_amendment',
+  'retainer_contract',
+  'retainer_contract_annex',
   'extra_work',
 ];
 
@@ -636,7 +638,12 @@ function retainerTabOf(
   entry: AuditEntry,
 ): 'contract' | 'history' | 'extra-work' | 'billing' | 'documents' | undefined {
   if (entry.entityType === 'extra_work') return 'extra-work';
-  if (entry.entityType === 'retainer_term' || entry.entityType === 'retainer_amendment') {
+  if (
+    entry.entityType === 'retainer_term' ||
+    entry.entityType === 'retainer_amendment' ||
+    entry.entityType === 'retainer_contract' ||
+    entry.entityType === 'retainer_contract_annex'
+  ) {
     return 'contract';
   }
   if (entry.entityType === 'retainer_charge') return 'billing';

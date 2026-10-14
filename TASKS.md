@@ -200,16 +200,16 @@ PR 4 is merged (#114). Owner `projects` for `retainer_contracts`, `retainer_cont
 ### PR 5a — contracts, annexes and their PDFs (API and worker; branch `ccr-ff8a3197-xvm14a`)
 
 #### 1. contracts
-- [ ] `retainer-contracts.ts`: `contractKind`/`contractStatus`/`annexStatus` lists, `retainerContractSchema` (number or null, kind, term, status, dates, signed, void, `changedSinceIssue`, annexes), `retainerContractDetailSchema` (articles, signatory, parties as they print, `missing[]`, blocks absent), `createContractSchema` (`kind`, `termId?`), `updateContractSchema` (`contractDate`, `signatoryContactId`, `articles[]` ≤ 40), `voidContractSchema` (reason ≤ 500), `signedCopySchema` (`signedOn`, `uploadId`), `issueAnnexSchema` (`annexDate`), `contractAnnexSchema`, `contractSnapshotSchema` and `annexSnapshotSchema` (the frozen render payloads)
-- [ ] `jobs.ts`: `contracts.pdf` (kinds `contract`, `contract_draft`, `annex`; retry 3), `contracts.pdf-ready`, object paths
-- [ ] Error codes `CONTRACT_EXISTS`, `CONTRACT_INCOMPLETE`, `NO_CONTRACT` (others exist); audit actions `retainer_contract.created/.updated/.discarded/.issued/.signed/.voided`, `retainer_contract_annex.issued/.signed/.voided` and entity types; `file_owner_type` value; `ar.json` keys
-- [ ] K11 texts in `packages/messages` (headings, party labels, preamble, end-action clauses, block captions, annex wording)
-- [ ] Unit tests (schemas, snapshot shapes, `missing` rule helper if pure); gate: `contracts` test, root `typecheck`
+- [x] `retainer-contracts.ts`: `contractKind`/`contractStatus`/`annexStatus` lists, `retainerContractSchema` (number or null, kind, term, status, dates, signed, void, `changedSinceIssue`, annexes), `retainerContractDetailSchema` (articles, signatory, parties as they print, `missing[]`, blocks absent), `createContractSchema` (`kind`, `termId?`), `updateContractSchema` (`contractDate`, `signatoryContactId`, `articles[]` ≤ 40), `voidContractSchema` (reason ≤ 500), `signedCopySchema` (`signedOn`, `uploadId`), `issueAnnexSchema` (`annexDate`), `contractAnnexSchema`, `contractSnapshotSchema` and `annexSnapshotSchema` (the frozen render payloads)
+- [x] `jobs.ts`: `contracts.pdf` (kinds `contract`, `contract_draft`, `annex`; retry 3), `contracts.pdf-ready`, object paths
+- [x] Error codes `CONTRACT_EXISTS`, `CONTRACT_INCOMPLETE`, `NO_CONTRACT` (others exist); audit actions `retainer_contract.created/.updated/.discarded/.issued/.signed/.voided`, `retainer_contract_annex.issued/.signed/.voided` and entity types; `file_owner_type` value; `ar.json` keys
+- [x] K11 texts in `packages/messages` (headings, party labels, preamble, end-action clauses, block captions, annex wording)
+- [x] Unit tests (schemas, snapshot shapes, `missing` rule helper if pure); gate: `contracts` test, root `typecheck`
 
 #### 2. db (`/db-migration`, expand only)
-- [ ] Enums `contract_kind`, `contract_status`, `contract_annex_status`; `document_number_kind` + `contract`; `file_owner_type` + `retainer_contract`
-- [ ] `retainer_contracts` (partial unique indexes: one live per term, one live per retainer and `start_cycle` for `open_ended`; unique `number`), `retainer_contract_articles`, `retainer_contract_annexes` (unique live annex per amendment, unique `(contract_id, annex_number)`); `TABLE_OWNERS`
-- [ ] Gate: `db` test, migration drift
+- [x] Enums `contract_kind`, `contract_status`, `contract_annex_status`; `document_number_kind` + `contract`; `file_owner_type` + `retainer_contract`
+- [x] `retainer_contracts` (partial unique indexes: one live per term, one live per retainer and `start_cycle` for `open_ended`; unique `number`), `retainer_contract_articles`, `retainer_contract_annexes` (unique live annex per amendment, unique `(contract_id, annex_number)`); `TABLE_OWNERS`
+- [x] Gate: `db` test, migration drift
 
 #### 3. api
 - [ ] `projects`: `ContractNumbers` port; `invoices` registers it (`nextDocumentNumber(tx, 'contract', year)`, and the preview's next number); settings preview switched to it

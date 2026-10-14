@@ -47,6 +47,7 @@ export const documentNumberKindEnum = pgEnum('document_number_kind', [
   'invoice',
   'receipt',
   'ad_deposit',
+  'contract',
 ]);
 
 /** The state of a rendered PDF (rules 15, 20 and 29), as a quote's (F04 rule 12). */

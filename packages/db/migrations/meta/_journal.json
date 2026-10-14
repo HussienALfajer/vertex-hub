@@ -414,6 +414,13 @@
       "when": 1791966992566,
       "tag": "0058_f05c_contract_settings_seed",
       "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "7",
+      "when": 1791974688060,
+      "tag": "0059_sweet_power_pack",
+      "breakpoints": true
     }
   ]
 }
