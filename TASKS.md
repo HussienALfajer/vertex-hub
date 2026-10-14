@@ -193,5 +193,45 @@ PR 3 is merged (#113). Owner `projects` for the contract settings (new schema fi
 
 - [x] Found while building: Finance and employees hold `projects.manage` with scope `assigned` (derived employee role), so "any scope" let Finance read the settings, against the Roles column; reading needs client scope (`all` or `own_clients`), spec updated. The lead conversion contact omits the legal fields (out of its scope).
 
-## PR 5 — contracts and annexes
-- [ ] Planned when PR 4 is merged
+## PR 5 — contracts and annexes (split in two, as the skill's default: 5a API and PDFs, 5b screens)
+
+PR 4 is merged (#114). Owner `projects` for `retainer_contracts`, `retainer_contract_articles`, `retainer_contract_annexes` (schema file `retainer-contracts.ts`). Contract numbers: `document_numbers` belongs to `invoices`, which imports `projects`, so `projects` declares a `ContractNumbers` port (as the hooks: `projects` defines it, `invoices` registers the implementation on start-up) and the spec's `document_number_kind` `contract` stays in `invoices`; the settings' next number preview reads it the same way.
+
+### PR 5a — contracts, annexes and their PDFs (API and worker; branch `ccr-ff8a3197-xvm14a`)
+
+#### 1. contracts
+- [ ] `retainer-contracts.ts`: `contractKind`/`contractStatus`/`annexStatus` lists, `retainerContractSchema` (number or null, kind, term, status, dates, signed, void, `changedSinceIssue`, annexes), `retainerContractDetailSchema` (articles, signatory, parties as they print, `missing[]`, blocks absent), `createContractSchema` (`kind`, `termId?`), `updateContractSchema` (`contractDate`, `signatoryContactId`, `articles[]` ≤ 40), `voidContractSchema` (reason ≤ 500), `signedCopySchema` (`signedOn`, `uploadId`), `issueAnnexSchema` (`annexDate`), `contractAnnexSchema`, `contractSnapshotSchema` and `annexSnapshotSchema` (the frozen render payloads)
+- [ ] `jobs.ts`: `contracts.pdf` (kinds `contract`, `contract_draft`, `annex`; retry 3), `contracts.pdf-ready`, object paths
+- [ ] Error codes `CONTRACT_EXISTS`, `CONTRACT_INCOMPLETE`, `NO_CONTRACT` (others exist); audit actions `retainer_contract.created/.updated/.discarded/.issued/.signed/.voided`, `retainer_contract_annex.issued/.signed/.voided` and entity types; `file_owner_type` value; `ar.json` keys
+- [ ] K11 texts in `packages/messages` (headings, party labels, preamble, end-action clauses, block captions, annex wording)
+- [ ] Unit tests (schemas, snapshot shapes, `missing` rule helper if pure); gate: `contracts` test, root `typecheck`
+
+#### 2. db (`/db-migration`, expand only)
+- [ ] Enums `contract_kind`, `contract_status`, `contract_annex_status`; `document_number_kind` + `contract`; `file_owner_type` + `retainer_contract`
+- [ ] `retainer_contracts` (partial unique indexes: one live per term, one live per retainer and `start_cycle` for `open_ended`; unique `number`), `retainer_contract_articles`, `retainer_contract_annexes` (unique live annex per amendment, unique `(contract_id, annex_number)`); `TABLE_OWNERS`
+- [ ] Gate: `db` test, migration drift
+
+#### 3. api
+- [ ] `projects`: `ContractNumbers` port; `invoices` registers it (`nextDocumentNumber(tx, 'contract', year)`, and the preview's next number); settings preview switched to it
+- [ ] `RetainerContractsService` + controller: list, create (K1, K2), detail with live parties/blocks and `missing[]` (K3, K6, K7), patch draft (articles, date, signatory; `UNKNOWN_PLACEHOLDER`, `UNKNOWN_CONTACT`, `LIMIT_REACHED`), discard (K8), issue (K4: number, snapshot, PDF queued), void (K8), signed copy upload (K5, F10 version of the "signed copy" item), `changedSinceIssue` (K9); money access and client scope, national ID per Roles in the live preview; retainer lock (G2); audit (G1)
+- [ ] Annexes: `POST …/amendments/:amendmentId/annex` (K10, `NO_CONTRACT`, `INVALID_TRANSITION`), void, signed, PDF
+- [ ] PDFs: `POST`/`GET …/pdf` (`?draft=true` preview for managers), `contracts.pdf-ready` attaches the PDF as a document of the contract (F04 rule 12 hashing and idempotency); `invoices.daily` re-queues pending contract and annex PDFs
+- [ ] `files`: owner policy for `retainer_contract` (contract readers; read-only through file endpoints)
+- [ ] Tests `retainer-contracts.test.ts`: every endpoint success, 401, 403 (employee, Finance on manage, AM of another client), out of scope 404; K1–K12, edge cases 9–14, every error code, audit entries
+- [ ] Gate: api test file, `architecture.test.ts`, `api` typecheck
+
+#### 4. worker
+- [ ] `contracts.pdf` job and templates for contract and annex (K6: page badge, logo, party tables, slogan, preamble, numbered articles with blocks, signatures, footer, "page x of y"; empty lines for missing fields; no split tables or signature block); worker test with screenshots
+- [ ] Gate: `worker` test, typecheck
+
+#### 5. bridge
+- [ ] `pnpm build`, `openapi:export`, `api:generate`
+
+#### Close PR 5a
+- [ ] Wiring checklist; spec and `docs/architecture.md` (the `ContractNumbers` port)
+- [ ] Full checks through `checker`; `reviewer` with the spec; owner acceptance (endpoints at `/api/docs`, the PDFs from the worker screenshots); `/ship`
+
+### PR 5b — contract screens (after 5a is merged)
+- [ ] web: Contracts section on the Contract tab (list, actions, annexes, "Issue annex" per applied amendment, "changed since issue"); contract editor `/retainers/$retainerId/contracts/$contractId` (date, signatory, parties with missing fields and links, articles editor with placeholder menu and reorder, Preview PDF, Issue dialog listing empty fields and missing blocks, Discard; read-only when issued, signed copy upload, Void); `ar.json`; gate
+- [ ] e2e: mocks, flow spec (prepare, edit, issue a contract; issue an annex; signed copy), screenshots light and dark (contract editor with missing fields, issued contract with annexes); gate
+- [ ] Close: wiring, full checks, `reviewer`, owner acceptance steps 7–9 and 11, `/ship`; ROADMAP marks F05C done
