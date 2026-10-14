@@ -6,8 +6,10 @@ import { NotificationsModule } from '../notifications/index.js';
 import { BillingLocks } from './billing-locks.js';
 import { BillingSources } from './billing-sources.js';
 import { ChargeInvoices } from './charge-invoices.js';
+import { ContractContent } from './contract-content.js';
 import { ContractSettingsController } from './contract-settings.controller.js';
 import { ContractSettingsService } from './contract-settings.service.js';
+import { ContractSources } from './contract-sources.js';
 import { CycleClosedHooks } from './cycle-closed-hooks.js';
 import { CycleOpenedHooks } from './cycle-opened-hooks.js';
 import { EngagementDirectory } from './engagement-directory.js';
@@ -28,6 +30,10 @@ import { RetainerAmendmentsService } from './retainer-amendments.service.js';
 import { RetainerBehindAlerts } from './retainer-behind.js';
 import { RetainerChargeDueHooks } from './retainer-charge-due-hooks.js';
 import { RetainerCharges } from './retainer-charges.js';
+import { RetainerContractAnnexesService } from './retainer-contract-annexes.service.js';
+import { ContractPdfs } from './retainer-contract-pdfs.js';
+import { RetainerContractsController } from './retainer-contracts.controller.js';
+import { RetainerContractsService } from './retainer-contracts.service.js';
 import { RetainerCyclesController } from './retainer-cycles.controller.js';
 import { RetainerCyclesService } from './retainer-cycles.service.js';
 import { RetainerRenewals } from './retainer-renewals.js';
@@ -48,8 +54,10 @@ import { WorkProgress } from './work-progress.js';
  * `MilestoneDoneHooks`, `RetainerChargeDueHooks`, `ChargeInvoices` and `RetainerCharges` (credits)
  * for `invoices` (F13, F05B).
  * Registers the `project` and `retainer` owner policies in `files` (F10). Exports
- * `EngagementReports` for `reports` (F15). Holds the contract settings and default articles
- * (F05C).
+ * `EngagementReports` for `reports` (F15). Holds the contract settings and default articles,
+ * and the retainer contracts and annexes with their PDFs (F05C): `ContractSources` takes contract
+ * numbers and payment terms from `invoices` and quote services from `quotes`; the contract owner
+ * policy is registered in `files`.
  */
 @Module({
   imports: [AuthModule, ClientsModule, NotificationsModule, FilesModule],
@@ -63,6 +71,7 @@ import { WorkProgress } from './work-progress.js';
     PendingAmendmentsController,
     ExtraWorkController,
     ContractSettingsController,
+    RetainerContractsController,
   ],
   providers: [
     ProjectsService,
@@ -73,6 +82,11 @@ import { WorkProgress } from './work-progress.js';
     RetainerAmendmentsService,
     ExtraWorkService,
     ContractSettingsService,
+    ContractSources,
+    ContractContent,
+    ContractPdfs,
+    RetainerContractsService,
+    RetainerContractAnnexesService,
     WorkProgress,
     EngagementDirectory,
     EngagementFactory,
@@ -104,6 +118,8 @@ import { WorkProgress } from './work-progress.js';
     RetainerChargeDueHooks,
     RetainerCharges,
     EngagementReports,
+    ContractSources,
+    ContractPdfs,
   ],
 })
 export class ProjectsModule {}

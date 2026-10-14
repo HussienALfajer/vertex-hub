@@ -6,7 +6,9 @@ import { fileURLToPath } from 'node:url';
 import { Injectable } from '@nestjs/common';
 import type {
   AdDepositReceiptSnapshot,
+  AnnexSnapshot,
   ClientReportSnapshot,
+  ContractSnapshot,
   CycleReportSnapshot,
   InvoiceDraftSnapshot,
   InvoiceSnapshot,
@@ -16,6 +18,7 @@ import type {
 } from '@vertex-hub/contracts';
 import { chromium } from 'playwright';
 import { adDepositReceiptHtml } from './campaign-templates.js';
+import { annexHtml, contractHtml } from './contract-templates.js';
 import type { TemplateAssets } from './document.js';
 import { invoiceHtml, receiptHtml, statementHtml } from './invoice-templates.js';
 import { quoteHtml } from './quote-template.js';
@@ -107,6 +110,16 @@ export class PdfRenderer {
   /** The retainer cycle report (F05C R1, R3). */
   cycleReport(snapshot: CycleReportSnapshot): Promise<Buffer> {
     return this.render((assets) => cycleReportHtml(snapshot, assets));
+  }
+
+  /** A retainer contract, or a draft preview when it has no number (F05C K6). */
+  contract(snapshot: ContractSnapshot): Promise<Buffer> {
+    return this.render((assets) => contractHtml(snapshot, assets));
+  }
+
+  /** An annex of a retainer contract (F05C K10). */
+  annex(snapshot: AnnexSnapshot): Promise<Buffer> {
+    return this.render((assets) => annexHtml(snapshot, assets));
   }
 
   private async render(html: (assets: TemplateAssets) => string): Promise<Buffer> {

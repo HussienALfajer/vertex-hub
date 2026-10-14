@@ -6,6 +6,7 @@ import { FilesModule } from '../files/index.js';
 import { NotificationsModule } from '../notifications/index.js';
 import { ProjectsModule } from '../projects/index.js';
 import { QuotesModule } from '../quotes/index.js';
+import { ContractNumbering } from './contract-numbering.js';
 import { DocumentNumbers } from './document-numbers.js';
 import { InvoiceBillingController } from './invoice-billing.controller.js';
 import { InvoiceBillingService } from './invoice-billing.service.js';
@@ -40,7 +41,8 @@ import { ProjectExpensesService } from './project-expenses.service.js';
  * `notifications.daily`. Owns `project_expenses` and serves client balances and statements, and the
  * billing summaries of projects (with their margin) and retainers; exports `InvoiceDueDates` for
  * the company calendar, and `DocumentNumbers` (ad deposit receipt numbers and the current rate)
- * for `campaigns` (F12), and `InvoiceReports` for `reports` (F15). Invoice lines may name a catalog
+ * for `campaigns` (F12), and `InvoiceReports` for `reports` (F15). Numbers contracts and gives
+ * them the payment terms through `projects`' `ContractSources` (F05C). Invoice lines may name a catalog
  * service, checked through `catalog`'s `CatalogDirectory` (F15).
  */
 @Module({
@@ -75,6 +77,7 @@ import { ProjectExpensesService } from './project-expenses.service.js';
     InvoiceBillingService,
     ProjectExpensesService,
     DocumentNumbers,
+    ContractNumbering,
     InvoiceReports,
   ],
   exports: [InvoiceDueDates, DocumentNumbers, InvoiceReports],

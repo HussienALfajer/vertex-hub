@@ -27,8 +27,11 @@ import { auditRefs, ownerFilter } from './file-access.js';
 import { FileContentService } from './file-content.service.js';
 import { FileStorage } from './file-storage.js';
 
-/** The owners whose documents only their module adds (F04 quotes, F13 invoices, F12 entries). */
-type DocumentOwnerType = 'quote' | 'invoice' | 'ad_wallet_entry';
+/**
+ * The owners whose documents only their module adds (F04 quotes, F13 invoices, F12 entries, F05C
+ * contracts).
+ */
+type DocumentOwnerType = 'quote' | 'invoice' | 'ad_wallet_entry' | 'retainer_contract';
 
 /** The owner columns of a document of `type`. */
 const documentOwner = (type: DocumentOwnerType, id: string) => ({
@@ -36,6 +39,7 @@ const documentOwner = (type: DocumentOwnerType, id: string) => ({
   quoteId: type === 'quote' ? id : null,
   invoiceId: type === 'invoice' ? id : null,
   adWalletEntryId: type === 'ad_wallet_entry' ? id : null,
+  retainerContractId: type === 'retainer_contract' ? id : null,
 });
 
 /** A stored object with what an email attachment records of it (F14 email). */
@@ -71,6 +75,15 @@ export interface AttachedUpload {
   uploadId: string;
   /** Put before the uploaded name, such as the receipt number of a payment's proof. */
   namePrefix?: string;
+  /** The types the owner takes (F05C K5: a scan, PDF or image); others are refused. */
+  accept?: (mimeType: string) => boolean;
+}
+
+/** Refuses an upload of a type the owner does not take (`FILE_TYPE_NOT_ACCEPTED`). */
+function assertAccepted(mimeType: string, accept?: (mimeType: string) => boolean): void {
+  if (accept && !accept(mimeType)) {
+    throw new CodedException(400, 'FILE_TYPE_NOT_ACCEPTED', 'This file type is not accepted here');
+  }
 }
 
 /**
@@ -103,6 +116,7 @@ export class GeneratedFiles {
       .where(and(eq(fileUploads.id, document.uploadId), eq(fileUploads.userId, actor.id)))
       .returning();
     if (!upload) throw new CodedException(400, 'UPLOAD_NOT_FOUND', 'Upload the file again');
+    assertAccepted(upload.mimeType, document.accept);
     const name = documentName(
       document.namePrefix ? `${document.namePrefix} ${upload.originalName}` : upload.originalName,
     );
@@ -156,6 +170,58 @@ export class GeneratedFiles {
       after: { ...auditRefs(item), name, number: 1, kind: 'upload', sizeBytes: upload.sizeBytes },
     });
     return { itemId: item.id, name, preview };
+  }
+
+  /**
+   * The actor's upload, used once (`UPLOAD_NOT_FOUND`), becomes the next version of a document
+   * the owner module attached (F05C K5: a signed copy uploaded again). Returns whether a preview
+   * waits: call `queuePreviews` once the transaction committed.
+   */
+  async addUploadVersion(
+    tx: Transaction,
+    actor: CurrentUserInfo,
+    itemId: string,
+    uploadId: string,
+    accept?: (mimeType: string) => boolean,
+  ): Promise<{ preview: boolean }> {
+    const [item] = await tx.select().from(fileItems).where(eq(fileItems.id, itemId)).for('update');
+    if (!item) throw new Error('File item not found');
+    const [upload] = await tx
+      .delete(fileUploads)
+      .where(and(eq(fileUploads.id, uploadId), eq(fileUploads.userId, actor.id)))
+      .returning();
+    if (!upload) throw new CodedException(400, 'UPLOAD_NOT_FOUND', 'Upload the file again');
+    assertAccepted(upload.mimeType, accept);
+    const [counts] = await tx
+      .select({ highest: max(fileVersions.number) })
+      .from(fileVersions)
+      .where(eq(fileVersions.fileItemId, itemId));
+    const number = (counts?.highest ?? 0) + 1;
+    const preview =
+      isPreviewableMimeType(upload.mimeType) && upload.sizeBytes <= FILE_PREVIEW_MAX_BYTES;
+    await tx.insert(fileVersions).values({
+      fileItemId: itemId,
+      number,
+      kind: 'upload',
+      storageKey: upload.storageKey,
+      originalName: upload.originalName,
+      mimeType: upload.mimeType,
+      sizeBytes: upload.sizeBytes,
+      sha256: upload.sha256,
+      width: upload.width,
+      height: upload.height,
+      previewStatus: preview ? 'pending' : 'none',
+      uploadedById: actor.id,
+    });
+    await tx.update(fileItems).set({ updatedAt: new Date() }).where(eq(fileItems.id, itemId));
+    await recordAudit(tx, {
+      actor: { id: actor.id, name: actor.name },
+      action: 'file_version.created',
+      entityType: 'file_item',
+      entityId: itemId,
+      after: { ...auditRefs(item), number, kind: 'upload', sizeBytes: upload.sizeBytes },
+    });
+    return { preview };
   }
 
   /** Nudges the preview job after a commit that left previews pending. */

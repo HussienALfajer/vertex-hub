@@ -53,6 +53,9 @@ import {
   retainerAmendmentLines,
   retainerAmendments,
   retainerCharges,
+  retainerContractAnnexes,
+  retainerContractArticles,
+  retainerContracts,
   retainerCycleAdjustments,
   retainerCycleLines,
   retainerCycleReports,
@@ -375,6 +378,13 @@ export async function removeLeftoverUsers(db: Database): Promise<number> {
  */
 export async function removeClients(db: Database, ids: string[]): Promise<void> {
   if (ids.length === 0) return;
+  // Retainer contracts point at their PDFs and signed copies (F05C): they go before file items.
+  await removeRetainerContracts(
+    db,
+    (
+      await db.select({ id: retainers.id }).from(retainers).where(inArray(retainers.clientId, ids))
+    ).map((row) => row.id),
+  );
   // Client emails (F14 email) point at the client.
   await db.delete(emailMessages).where(inArray(emailMessages.clientId, ids));
   // Quotes point at their PDF document (F04): unlink them before the file items go.
@@ -661,8 +671,43 @@ export async function removeProjects(db: Database, ids: string[]): Promise<void>
  * Removes seeded retainers, their lines, cycles, charges, template link and runs, extra work and
  * audit entries (test cleanup only; their invoices go first, with `removeInvoices`).
  */
+/**
+ * Removes the contracts of seeded retainers with their articles, annexes, documents and audit
+ * entries (F05C; test cleanup only).
+ */
+export async function removeRetainerContracts(db: Database, retainerIds: string[]): Promise<void> {
+  if (retainerIds.length === 0) return;
+  const contracts = (
+    await db
+      .select({ id: retainerContracts.id })
+      .from(retainerContracts)
+      .where(inArray(retainerContracts.retainerId, retainerIds))
+  ).map((row) => row.id);
+  if (contracts.length === 0) return;
+  const annexes = (
+    await db
+      .select({ id: retainerContractAnnexes.id })
+      .from(retainerContractAnnexes)
+      .where(inArray(retainerContractAnnexes.contractId, contracts))
+  ).map((row) => row.id);
+  await db.delete(auditEntries).where(inArray(auditEntries.entityId, [...contracts, ...annexes]));
+  await db
+    .delete(retainerContractAnnexes)
+    .where(inArray(retainerContractAnnexes.contractId, contracts));
+  await db
+    .delete(retainerContractArticles)
+    .where(inArray(retainerContractArticles.contractId, contracts));
+  await db
+    .update(retainerContracts)
+    .set({ pdfFileItemId: null, signedFileItemId: null })
+    .where(inArray(retainerContracts.id, contracts));
+  await removeFileItems(db, inArray(fileItems.retainerContractId, contracts));
+  await db.delete(retainerContracts).where(inArray(retainerContracts.id, contracts));
+}
+
 export async function removeRetainers(db: Database, ids: string[]): Promise<void> {
   if (ids.length === 0) return;
+  await removeRetainerContracts(db, ids);
   await removeFileItems(db, inArray(fileItems.retainerId, ids));
   await db.delete(notificationReminders).where(inArray(notificationReminders.subjectId, ids));
   const cycles = (

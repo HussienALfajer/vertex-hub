@@ -5,6 +5,7 @@ export {
   type ClientSummary,
   type ContactDetail,
   type ContactSummary,
+  type ContractParty,
 } from './client-directory.js';
 export {
   type ClientEmailRecipients,

@@ -62,6 +62,9 @@ const termRow = (row: StoredTerm): TermRow => ({
   endDate: row.endDate ?? '',
 });
 
+/** A term with its base amount per cycle, for its contract (F05C K6). */
+export type ContractTerm = TermRow & { schedule: number[] };
+
 /** The last cycle of a term. */
 const endCycleOf = (term: { startCycle: number; cycles: number }) =>
   term.startCycle + term.cycles - 1;
@@ -362,6 +365,12 @@ export class RetainerTermsService {
     return terms.some(
       (term) => term.status === 'active' && term.startCycle <= cycle && endCycleOf(term) >= cycle,
     );
+  }
+
+  /** F05C K1: whether a scheduled or active term of the retainer holds the cycle. */
+  async holds(executor: Executor, retainerId: string, cycle: number): Promise<boolean> {
+    const terms = await this.openTerms(executor, retainerId);
+    return terms.some((term) => term.startCycle <= cycle && endCycleOf(term) >= cycle);
   }
 
   /** T11: whether the retainer has an active or scheduled term (its renewal date is derived). */
@@ -955,6 +964,24 @@ export class RetainerTermsService {
       before: { renewalDate: row.renewalDate },
       after: { renewalDate },
     });
+  }
+
+  /**
+   * F05C K6, K9: a term as its contract prints it, with its base amount per cycle (the schedule
+   * plus onward amendments); null when the retainer has no such term.
+   */
+  async forContract(
+    executor: Executor,
+    retainerId: string,
+    termId: string,
+  ): Promise<ContractTerm | null> {
+    const [row] = await executor
+      .select()
+      .from(retainerTerms)
+      .where(and(eq(retainerTerms.id, termId), eq(retainerTerms.retainerId, retainerId)));
+    if (!row) return null;
+    const term = termRow(row);
+    return { ...term, schedule: await this.schedule(executor, term) };
   }
 
   /** The term's base amount per cycle, by position (what a renewal copies, T7). */

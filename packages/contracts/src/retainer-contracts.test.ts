@@ -1,9 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import {
+  absentContractBlocks,
+  contractBodyParts,
+  createContractSchema,
+  fillContractValues,
   formatContractNumber,
+  issueAnnexSchema,
+  signedContractSchema,
   unknownPlaceholders,
   updateContractArticlesSchema,
+  updateContractSchema,
   updateContractSettingsSchema,
+  voidContractSchema,
 } from './retainer-contracts.js';
 
 describe('unknownPlaceholders (K7)', () => {
@@ -79,5 +87,97 @@ describe('updateContractArticlesSchema', () => {
 
   it('accepts an empty template (no article is required)', () => {
     expect(updateContractArticlesSchema.safeParse({ articles: [] }).success).toBe(true);
+  });
+});
+
+describe('fillContractValues (K7)', () => {
+  const values = {
+    agency_name: 'فيرتكس ميديا',
+    client_name: 'مطعم الياسمين',
+    retainer_name: 'إدارة الحسابات',
+    payment_terms_days: '7',
+  };
+
+  it('fills value placeholders and keeps the blocks', () => {
+    expect(
+      fillContractValues(
+        'تلتزم {agency_name} تجاه {client_name} خلال {payment_terms_days} أيام.\n{fees}',
+        values,
+      ),
+    ).toBe('تلتزم فيرتكس ميديا تجاه مطعم الياسمين خلال 7 أيام.\n{fees}');
+  });
+
+  it('fills every occurrence', () => {
+    expect(fillContractValues('{client_name} و{client_name}', values)).toBe(
+      'مطعم الياسمين ومطعم الياسمين',
+    );
+  });
+});
+
+describe('contractBodyParts (K7)', () => {
+  it('splits paragraphs by line and skips empty lines', () => {
+    expect(contractBodyParts('أولاً\n\n  ثانياً  ')).toEqual([{ text: 'أولاً' }, { text: 'ثانياً' }]);
+  });
+
+  it('puts each block on its own, wherever it stands', () => {
+    expect(contractBodyParts('الخدمات:\n{services}\nقبل {fees} بعد\n{term}{term}')).toEqual([
+      { text: 'الخدمات:' },
+      { block: 'services' },
+      { text: 'قبل' },
+      { block: 'fees' },
+      { text: 'بعد' },
+      { block: 'term' },
+      { block: 'term' },
+    ]);
+  });
+});
+
+describe('absentContractBlocks (K7)', () => {
+  it('names the blocks no article prints', () => {
+    expect(absentContractBlocks(['{services}', 'نص {fees}'])).toEqual(['term']);
+    expect(absentContractBlocks([])).toEqual(['services', 'term', 'fees']);
+    expect(absentContractBlocks(['{services}{term}', '{fees}'])).toEqual([]);
+  });
+});
+
+describe('contract inputs', () => {
+  const id = '0190a000-0000-7000-8000-000000000001';
+
+  it('needs a term for a term contract and none for an open-ended one (K1)', () => {
+    expect(createContractSchema.safeParse({ kind: 'term', termId: id }).success).toBe(true);
+    expect(createContractSchema.safeParse({ kind: 'term' }).success).toBe(false);
+    expect(createContractSchema.parse({ kind: 'open_ended', termId: id })).toEqual({
+      kind: 'open_ended',
+    });
+  });
+
+  it('edits a draft partially, articles within their limits (K2)', () => {
+    expect(updateContractSchema.parse({ contractDate: '2026-10-14' })).toEqual({
+      contractDate: '2026-10-14',
+    });
+    expect(updateContractSchema.safeParse({ signatoryContactId: null }).success).toBe(true);
+    expect(updateContractSchema.safeParse({ articles: [{ title: ' ', body: 'نص' }] }).success).toBe(
+      false,
+    );
+    expect(
+      updateContractSchema.safeParse({ articles: [{ title: 'م', body: 'x'.repeat(6001) }] })
+        .success,
+    ).toBe(false);
+  });
+
+  it('voids with a reason of at most 500 characters (K8)', () => {
+    expect(voidContractSchema.safeParse({ reason: '  ' }).success).toBe(false);
+    expect(voidContractSchema.safeParse({ reason: 'x'.repeat(501) }).success).toBe(false);
+    expect(voidContractSchema.parse({ reason: ' خطأ ' })).toEqual({ reason: 'خطأ' });
+  });
+
+  it('takes the signed copy with its date (K5) and an annex date (K10)', () => {
+    expect(signedContractSchema.safeParse({ signedOn: '2026-10-14', uploadId: id }).success).toBe(
+      true,
+    );
+    expect(signedContractSchema.safeParse({ signedOn: '14/10/2026', uploadId: id }).success).toBe(
+      false,
+    );
+    expect(issueAnnexSchema.safeParse({}).success).toBe(false);
   });
 });

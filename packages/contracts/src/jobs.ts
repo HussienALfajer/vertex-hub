@@ -17,6 +17,7 @@ import {
 } from './invoices.js';
 import { quoteSnapshotSchema } from './quotes.js';
 import { clientReportSnapshotSchema, cycleReportSnapshotSchema } from './reports.js';
+import { annexSnapshotSchema, contractSnapshotSchema } from './retainer-contracts.js';
 
 /** F05 R2: closes past retainer cycles and opens the current month's, once a day. */
 export const RETAINER_CYCLES_JOB = {
@@ -265,6 +266,62 @@ export const reportPdfReadyJobSchema = z.object({
 });
 
 export type ReportPdfReadyJob = z.infer<typeof reportPdfReadyJobSchema>;
+
+/**
+ * F05C K4, K10: renders the PDF of an issued contract, a draft preview or an annex, as
+ * `invoices.pdf` does. `id` is the contract (`contract`, `contract_draft`) or the annex.
+ */
+export const CONTRACTS_PDF_JOB = { queue: 'contracts.pdf', retryLimit: 3 } as const;
+
+export const CONTRACT_PDF_KINDS = ['contract', 'contract_draft', 'annex'] as const;
+
+export const contractPdfJobSchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('contract'),
+    id: z.uuid(),
+    hash: renderHashSchema,
+    snapshot: contractSnapshotSchema,
+  }),
+  z.object({
+    kind: z.literal('contract_draft'),
+    id: z.uuid(),
+    hash: renderHashSchema,
+    snapshot: contractSnapshotSchema,
+  }),
+  z.object({
+    kind: z.literal('annex'),
+    id: z.uuid(),
+    hash: renderHashSchema,
+    snapshot: annexSnapshotSchema,
+  }),
+]);
+
+export type ContractPdfJob = z.infer<typeof contractPdfJobSchema>;
+
+const CONTRACT_PDF_FOLDERS: Record<ContractPdfJob['kind'], string> = {
+  contract: 'contracts',
+  contract_draft: 'contracts',
+  annex: 'contract-annexes',
+};
+
+/** Where the worker writes the PDF of a `contracts.pdf` render, under `FILES_ROOT`. */
+export const contractPdfStorageKey = (job: Pick<ContractPdfJob, 'kind' | 'id' | 'hash'>) =>
+  `objects/${CONTRACT_PDF_FOLDERS[job.kind]}/${job.id}/${job.hash}.pdf`;
+
+/**
+ * The result of a `contracts.pdf` render, worked by the API: attached as a document of the
+ * contract, kept as the draft preview, or marked failed after the last retry.
+ */
+export const CONTRACTS_PDF_READY_JOB = { queue: 'contracts.pdf-ready' } as const;
+
+export const contractPdfReadyJobSchema = z.object({
+  kind: z.enum(CONTRACT_PDF_KINDS),
+  id: z.uuid(),
+  hash: renderHashSchema,
+  file: renderedFileSchema,
+});
+
+export type ContractPdfReadyJob = z.infer<typeof contractPdfReadyJobSchema>;
 
 /**
  * F05C R1: a cycle closed; the API prepares its report PDF once the closing transaction
