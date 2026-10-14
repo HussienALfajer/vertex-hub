@@ -282,20 +282,22 @@ function RetainersSection({ report }: { report: ClientMonthlyReport }) {
               {t('reports.client.completion')}
               <DeliveryRate rate={row.completion} />
             </span>
-            {/* F05C screen 9: each cycle has its own report. */}
-            <Button
-              variant="outline"
-              size="sm"
-              render={
-                <Link
-                  to="/retainers/$retainerId/cycles/$cycleId/report"
-                  params={{ retainerId: row.retainer.id, cycleId: row.cycleId }}
-                />
-              }
-            >
-              <FileTextIcon />
-              {t('reports.cycle.open')}
-            </Button>
+            {/* F05C screen 9: each cycle has its own report; backdated cycles have none (B4). */}
+            {!row.backdated && (
+              <Button
+                variant="outline"
+                size="sm"
+                render={
+                  <Link
+                    to="/retainers/$retainerId/cycles/$cycleId/report"
+                    params={{ retainerId: row.retainer.id, cycleId: row.cycleId }}
+                  />
+                }
+              >
+                <FileTextIcon />
+                {t('reports.cycle.open')}
+              </Button>
+            )}
           </div>
           <CycleLinesTable lines={row.lines} />
         </div>

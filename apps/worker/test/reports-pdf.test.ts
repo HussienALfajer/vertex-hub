@@ -35,6 +35,7 @@ const report: ClientReportSnapshot = {
     {
       retainer: { id: uuid(3), name: 'باقة السوشيال' },
       cycleId: uuid(9),
+      backdated: false,
       cycle: 2,
       periodStart: '2026-08-20',
       periodEnd: '2026-09-19',

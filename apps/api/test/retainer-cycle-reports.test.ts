@@ -7,6 +7,7 @@ import {
   addDays,
   addMonths,
   businessDate,
+  clientMonthlyReportSchema,
   cyclePeriod,
   cycleReportJobSchema,
   cycleReportSchema,
@@ -319,12 +320,18 @@ describe('retainer cycle reports (F05C R1–R3)', () => {
     });
 
     it('is read only by readers whose reports scope covers the client', async () => {
-      // No `reports.read`: the guard refuses.
-      expect((await client.get(path(retainerId, cycleId), cast.employee.cookie)).status).toBe(403);
-      expect((await client.get(path(retainerId, cycleId), finance.cookie)).status).toBe(403);
-      expect(
-        (await client.post(`${path(retainerId, cycleId)}/pdf`, cast.employee.cookie)).status,
-      ).toBe(403);
+      // No `reports.read`: the guard refuses every endpoint.
+      const base = path(retainerId, cycleId);
+      for (const cookie of [cast.employee.cookie, finance.cookie]) {
+        expect((await client.get(base, cookie)).status).toBe(403);
+        expect((await client.get(`${base}/export`, cookie)).status).toBe(403);
+        expect(
+          (await client.request('PUT', `${base}/summary`, { cookie, body: { summary: 'x' } }))
+            .status,
+        ).toBe(403);
+        expect((await client.post(`${base}/pdf`, cookie)).status).toBe(403);
+        expect((await client.get(`${base}/pdf`, cookie)).status).toBe(403);
+      }
       // Another manager's client, an unknown cycle, a cycle of another retainer: 404.
       for (const [cookie, id, cycle] of [
         [cast.otherAm.cookie, retainerId, cycleId],
@@ -415,6 +422,13 @@ describe('retainer cycle reports (F05C R1–R3)', () => {
     if (!past) throw new Error('No backdated cycle');
     expect(past.backdated).toBe(true);
     expect((await client.get(path(retainer.id, past.id), cast.gm.cookie)).status).toBe(404);
+    // The monthly report marks it, so the page offers no report link (R4).
+    const monthly = await client.get(
+      `/api/clients/${clientId}/monthly-report?month=${start.slice(0, 7)}`,
+      cast.gm.cookie,
+    );
+    const rows = clientMonthlyReportSchema.parse(await monthly.json()).retainers;
+    expect(rows.find((row) => row.cycleId === past.id)).toMatchObject({ backdated: true });
     expect(await notificationsOf(past.id)).toEqual([]);
     expect(
       await db.select().from(retainerCycleReports).where(eq(retainerCycleReports.cycleId, past.id)),

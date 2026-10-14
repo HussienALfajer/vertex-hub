@@ -159,6 +159,7 @@ export class EngagementReports {
         .map((cycle) => ({
           retainer: { id: row.id, name: row.name },
           cycleId: cycle.id,
+          backdated: cycle.backdated,
           cycle: cycle.number,
           periodStart: cycle.periodStart,
           periodEnd: cycle.periodEnd,

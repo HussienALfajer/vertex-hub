@@ -624,8 +624,9 @@ export const clientMonthlyReportSchema = z
     retainers: z.array(
       z.object({
         retainer: namedSchema,
-        /** The cycle's report (F05C screen 9). */
+        /** The cycle's report (F05C screen 9); backdated cycles have none (B4). */
         cycleId: z.uuid(),
+        backdated: z.boolean(),
         cycle: z.number().int().min(1),
         periodStart: calendarDateSchema,
         periodEnd: calendarDateSchema,
