@@ -17,6 +17,8 @@ import type {
   RescheduleTerm,
   RetainerDeliverables,
   RetainerStatusChange,
+  UpdateContractArticles,
+  UpdateContractSettings,
   UpdateCycleLine,
   UpdateRetainer,
   UpdateRetainerTerm,
@@ -38,6 +40,7 @@ export const retainersKeys = {
   extraWork: (id: string) => ['retainers', 'extra-work', id] as const,
   terms: (id: string) => ['retainers', 'terms', id] as const,
   amendments: (id: string) => ['retainers', 'amendments', id] as const,
+  contractSettings: ['retainers', 'contract-settings'] as const,
 };
 
 export const retainerListQuery = (filters: RetainerListFilters) =>
@@ -282,3 +285,27 @@ export const useAdjustCycleLine = (id: string, cycleId: string) =>
       }),
     ),
   );
+
+/** The agency's contract details and default articles (F05C). */
+export const contractSettingsQuery = queryOptions({
+  queryKey: retainersKeys.contractSettings,
+  queryFn: () => call(api.GET('/api/contract-settings')),
+});
+
+export function useUpdateContractSettings() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: UpdateContractSettings) =>
+      call(api.PATCH('/api/contract-settings', { body: input })),
+    onSuccess: (settings) => queryClient.setQueryData(retainersKeys.contractSettings, settings),
+  });
+}
+
+export function useUpdateContractArticles() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: UpdateContractArticles) =>
+      call(api.PUT('/api/contract-settings/articles', { body: input })),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: retainersKeys.contractSettings }),
+  });
+}

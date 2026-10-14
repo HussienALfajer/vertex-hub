@@ -142,6 +142,7 @@ export function ContactsTab({
       {editable && (
         <ContactDialog
           clientId={client.id}
+          canManageNationalId={client.canManageNationalId}
           editing={dialog}
           onClose={() => {
             setEditing(null);
@@ -285,34 +286,30 @@ function ContactCard({
   );
 }
 
-const emptyContact: CreateContactInput = {
-  name: '',
-  jobTitle: '',
-  phone: '',
-  email: '',
-  hasFinalApproval: false,
-  notes: '',
-};
-
-const contactValues = (contact: Contact | null): CreateContactInput =>
-  contact
-    ? {
-        name: contact.name,
-        jobTitle: contact.jobTitle ?? '',
-        phone: contact.phone ?? '',
-        email: contact.email ?? '',
-        hasFinalApproval: contact.hasFinalApproval,
-        notes: contact.notes ?? '',
-      }
-    : emptyContact;
+/**
+ * The form's values. The national ID is a field only for callers who may read and edit it
+ * (F05C): for others it is never sent, so the stored value is kept (edge case 12).
+ */
+const contactValues = (contact: Contact | null, withNationalId: boolean): CreateContactInput => ({
+  name: contact?.name ?? '',
+  jobTitle: contact?.jobTitle ?? '',
+  phone: contact?.phone ?? '',
+  email: contact?.email ?? '',
+  hasFinalApproval: contact?.hasFinalApproval ?? false,
+  notes: contact?.notes ?? '',
+  fatherName: contact?.fatherName ?? '',
+  ...(withNationalId && { nationalId: contact?.nationalId ?? '' }),
+});
 
 function ContactDialog({
   clientId,
+  canManageNationalId,
   editing,
   onClose,
   finalFocus,
 }: {
   clientId: string;
+  canManageNationalId: boolean;
   editing: Editing;
   onClose: () => void;
   /** Where the focus goes when it closes: the button that opened it, or a fallback. */
@@ -330,7 +327,7 @@ function ContactDialog({
     resolver: standardSchemaResolver(createContactSchema),
     // A refetch keeps what the user already changed.
     resetOptions: { keepDirtyValues: true },
-    values: contactValues(contact),
+    values: contactValues(contact, canManageNationalId),
   });
   // Read while rendering: React Hook Form updates only the state a component reads.
   const { errors, isDirty } = form.formState;
@@ -339,7 +336,7 @@ function ContactDialog({
   // `keepDirtyValues` and keep what was typed.
   function closed() {
     setFailure(null);
-    form.reset(contactValues(contact), { keepDirtyValues: false });
+    form.reset(contactValues(contact, canManageNationalId), { keepDirtyValues: false });
   }
 
   const submit = form.handleSubmit(async (values) => {
@@ -438,6 +435,29 @@ function ContactDialog({
               </label>
             )}
           />
+          <fieldset className="grid gap-3 rounded-lg border border-border p-4">
+            <legend className="px-1 font-medium">{t('clients.contacts.form.legal')}</legend>
+            <p className="text-sm text-muted-foreground">{t('clients.contacts.form.legalHint')}</p>
+            <div className="grid gap-5 sm:grid-cols-2">
+              <Field invalid={!!errors.fatherName}>
+                <FieldLabel>{t('clients.contacts.form.fatherName')}</FieldLabel>
+                <Input autoComplete="off" {...form.register('fatherName')} />
+                <FieldError match={!!errors.fatherName}>
+                  {t('clients.contacts.form.errors.fatherName')}
+                </FieldError>
+              </Field>
+              {canManageNationalId && (
+                <Field invalid={!!errors.nationalId}>
+                  <FieldLabel>{t('clients.contacts.form.nationalId')}</FieldLabel>
+                  <Input dir="ltr" autoComplete="off" {...form.register('nationalId')} />
+                  <FieldDescription>{t('clients.contacts.form.nationalIdHint')}</FieldDescription>
+                  <FieldError match={!!errors.nationalId}>
+                    {t('clients.contacts.form.errors.nationalId')}
+                  </FieldError>
+                </Field>
+              )}
+            </div>
+          </fieldset>
           <Field invalid={!!errors.notes}>
             <FieldLabel>{t('clients.contacts.form.notes')}</FieldLabel>
             <Textarea

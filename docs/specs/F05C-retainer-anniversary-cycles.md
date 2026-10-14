@@ -35,7 +35,7 @@ None. Money access stays F05's: `invoices.read` covering the client.
 | Create a backdated retainer and its catch-up | `projects.manage` (client scope) + money access | General Manager, Operations manager · the client's account manager |
 | Resume or reactivate with "start now" | as F05 status changes | as F05 |
 | Read a cycle report, edit its summary, download its PDF | `reports.read` covering the client | General Manager, Operations manager: all · Account Manager: own_clients |
-| Read contract settings | `projects.manage` (any scope) + `invoices.read` (any scope) | General Manager, Operations manager, account managers |
+| Read contract settings | `projects.manage` with client scope (`all` or `own_clients`; the `assigned` scope every user holds does not count) + `invoices.read` (any scope) | General Manager, Operations manager, account managers |
 | Edit contract settings (agency details, prefix, slogan, articles) | `catalog.manage` | General Manager, Operations manager (as quote company details, F04) |
 | Read and edit a client's registration number | `clients.read` / `clients.manage` covering the client | F02 unchanged |
 | Read and edit a contact's father's name | `clients.read` / `clients.manage` covering the client | F02 unchanged |

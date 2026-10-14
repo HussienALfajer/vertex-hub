@@ -40,6 +40,7 @@ import {
   PlusIcon,
   RepeatIcon,
   SearchIcon,
+  SettingsIcon,
   ShieldAlertIcon,
   TrendingDownIcon,
   UserRoundCheckIcon,
@@ -65,6 +66,7 @@ import { departmentListQuery } from '../departments/departments.queries';
 import { projectCreateScope } from '../projects/project-access';
 import { ArchivedBadge, DepartmentChips, PersonName } from '../projects/project-badges';
 import { userListQuery } from '../users/users.queries';
+import { canReadContractSettings } from './contract-access';
 import {
   BehindBadge,
   CycleCounters,
@@ -166,12 +168,20 @@ export function RetainersPage({ search }: { search: RetainersSearch }) {
         title={t('retainers.title')}
         description={t('retainers.subtitle')}
         actions={
-          canCreate && (
-            <Button render={<Link to="/retainers/new" />}>
-              <PlusIcon />
-              {t('retainers.newRetainer')}
-            </Button>
-          )
+          <>
+            {canReadContractSettings(me) && (
+              <Button variant="outline" render={<Link to="/settings/contracts" />}>
+                <SettingsIcon />
+                {t('retainers.contractSettings.link')}
+              </Button>
+            )}
+            {canCreate && (
+              <Button render={<Link to="/retainers/new" />}>
+                <PlusIcon />
+                {t('retainers.newRetainer')}
+              </Button>
+            )}
+          </>
         }
       />
 

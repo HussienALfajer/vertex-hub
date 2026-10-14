@@ -50,6 +50,7 @@ import { Route as AppReportsProductivityRouteImport } from './routes/_app/report
 import { Route as AppReportsRevenueRouteImport } from './routes/_app/reports/revenue'
 import { Route as AppRetainersIndexRouteImport } from './routes/_app/retainers/index'
 import { Route as AppRetainersNewRouteImport } from './routes/_app/retainers/new'
+import { Route as AppSettingsContractsRouteImport } from './routes/_app/settings/contracts'
 import { Route as AppShootsNewRouteImport } from './routes/_app/shoots/new'
 import { Route as AppTasksIndexRouteImport } from './routes/_app/tasks/index'
 import { Route as AppTasksTaskIdRouteImport } from './routes/_app/tasks/$taskId'
@@ -279,6 +280,11 @@ const AppRetainersNewRoute = AppRetainersNewRouteImport.update({
   path: '/retainers/new',
   getParentRoute: () => AppRoute,
 } as any)
+const AppSettingsContractsRoute = AppSettingsContractsRouteImport.update({
+  id: '/settings/contracts',
+  path: '/settings/contracts',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppShootsNewRoute = AppShootsNewRouteImport.update({
   id: '/shoots/new',
   path: '/shoots/new',
@@ -416,6 +422,7 @@ export interface FileRoutesByFullPath {
   '/reports/productivity': typeof AppReportsProductivityRoute
   '/reports/revenue': typeof AppReportsRevenueRoute
   '/retainers/new': typeof AppRetainersNewRoute
+  '/settings/contracts': typeof AppSettingsContractsRoute
   '/shoots/new': typeof AppShootsNewRoute
   '/tasks/$taskId': typeof AppTasksTaskIdRoute
   '/tasks/board': typeof AppTasksBoardRoute
@@ -479,6 +486,7 @@ export interface FileRoutesByTo {
   '/reports/productivity': typeof AppReportsProductivityRoute
   '/reports/revenue': typeof AppReportsRevenueRoute
   '/retainers/new': typeof AppRetainersNewRoute
+  '/settings/contracts': typeof AppSettingsContractsRoute
   '/shoots/new': typeof AppShootsNewRoute
   '/tasks/$taskId': typeof AppTasksTaskIdRoute
   '/tasks/board': typeof AppTasksBoardRoute
@@ -544,6 +552,7 @@ export interface FileRoutesById {
   '/_app/reports/productivity': typeof AppReportsProductivityRoute
   '/_app/reports/revenue': typeof AppReportsRevenueRoute
   '/_app/retainers/new': typeof AppRetainersNewRoute
+  '/_app/settings/contracts': typeof AppSettingsContractsRoute
   '/_app/shoots/new': typeof AppShootsNewRoute
   '/_app/tasks/$taskId': typeof AppTasksTaskIdRoute
   '/_app/tasks/board': typeof AppTasksBoardRoute
@@ -609,6 +618,7 @@ export interface FileRouteTypes {
     | '/reports/productivity'
     | '/reports/revenue'
     | '/retainers/new'
+    | '/settings/contracts'
     | '/shoots/new'
     | '/tasks/$taskId'
     | '/tasks/board'
@@ -672,6 +682,7 @@ export interface FileRouteTypes {
     | '/reports/productivity'
     | '/reports/revenue'
     | '/retainers/new'
+    | '/settings/contracts'
     | '/shoots/new'
     | '/tasks/$taskId'
     | '/tasks/board'
@@ -736,6 +747,7 @@ export interface FileRouteTypes {
     | '/_app/reports/productivity'
     | '/_app/reports/revenue'
     | '/_app/retainers/new'
+    | '/_app/settings/contracts'
     | '/_app/shoots/new'
     | '/_app/tasks/$taskId'
     | '/_app/tasks/board'
@@ -1071,6 +1083,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppRetainersNewRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/settings/contracts': {
+      id: '/_app/settings/contracts'
+      path: '/settings/contracts'
+      fullPath: '/settings/contracts'
+      preLoaderRoute: typeof AppSettingsContractsRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/shoots/new': {
       id: '/_app/shoots/new'
       path: '/shoots/new'
@@ -1243,6 +1262,7 @@ interface AppRouteChildren {
   AppReportsProductivityRoute: typeof AppReportsProductivityRoute
   AppReportsRevenueRoute: typeof AppReportsRevenueRoute
   AppRetainersNewRoute: typeof AppRetainersNewRoute
+  AppSettingsContractsRoute: typeof AppSettingsContractsRoute
   AppShootsNewRoute: typeof AppShootsNewRoute
   AppTasksTaskIdRoute: typeof AppTasksTaskIdRoute
   AppTasksBoardRoute: typeof AppTasksBoardRoute
@@ -1302,6 +1322,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppReportsProductivityRoute: AppReportsProductivityRoute,
   AppReportsRevenueRoute: AppReportsRevenueRoute,
   AppRetainersNewRoute: AppRetainersNewRoute,
+  AppSettingsContractsRoute: AppSettingsContractsRoute,
   AppShootsNewRoute: AppShootsNewRoute,
   AppTasksTaskIdRoute: AppTasksTaskIdRoute,
   AppTasksBoardRoute: AppTasksBoardRoute,

@@ -319,6 +319,7 @@ describe('module boundaries', () => {
     projects: 'projects',
     quotes: 'quotes',
     reports: 'reports',
+    'retainer-contracts': 'projects',
     retainers: 'projects',
     reviews: 'tasks',
     system: null,

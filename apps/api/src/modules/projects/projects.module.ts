@@ -6,6 +6,8 @@ import { NotificationsModule } from '../notifications/index.js';
 import { BillingLocks } from './billing-locks.js';
 import { BillingSources } from './billing-sources.js';
 import { ChargeInvoices } from './charge-invoices.js';
+import { ContractSettingsController } from './contract-settings.controller.js';
+import { ContractSettingsService } from './contract-settings.service.js';
 import { CycleClosedHooks } from './cycle-closed-hooks.js';
 import { CycleOpenedHooks } from './cycle-opened-hooks.js';
 import { EngagementDirectory } from './engagement-directory.js';
@@ -46,7 +48,8 @@ import { WorkProgress } from './work-progress.js';
  * `MilestoneDoneHooks`, `RetainerChargeDueHooks`, `ChargeInvoices` and `RetainerCharges` (credits)
  * for `invoices` (F13, F05B).
  * Registers the `project` and `retainer` owner policies in `files` (F10). Exports
- * `EngagementReports` for `reports` (F15).
+ * `EngagementReports` for `reports` (F15). Holds the contract settings and default articles
+ * (F05C).
  */
 @Module({
   imports: [AuthModule, ClientsModule, NotificationsModule, FilesModule],
@@ -59,6 +62,7 @@ import { WorkProgress } from './work-progress.js';
     RetainerAmendmentsController,
     PendingAmendmentsController,
     ExtraWorkController,
+    ContractSettingsController,
   ],
   providers: [
     ProjectsService,
@@ -68,6 +72,7 @@ import { WorkProgress } from './work-progress.js';
     RetainerTermsService,
     RetainerAmendmentsService,
     ExtraWorkService,
+    ContractSettingsService,
     WorkProgress,
     EngagementDirectory,
     EngagementFactory,

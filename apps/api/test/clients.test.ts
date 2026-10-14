@@ -261,6 +261,31 @@ describe('clients', () => {
       expect((await patch(own.id, cast.employee.cookie, { status: 'active' })).status).toBe(403);
     });
 
+    it('stores the registration number, read by every client reader (F05C)', async () => {
+      const own = await cast.createClient();
+      const response = await patch(own.id, cast.am.cookie, { registrationNumber: ' CR-12345 ' });
+      expect(response.status).toBe(200);
+      expect(clientDetailResponseSchema.parse(await response.json()).registrationNumber).toBe(
+        'CR-12345',
+      );
+      const read = await client.get(`/api/clients/${own.id}`, cast.employee.cookie);
+      expect(clientDetailResponseSchema.parse(await read.json()).registrationNumber).toBe(
+        'CR-12345',
+      );
+      const [entry] = (await auditOf(own.id)).slice(1);
+      expect(entry).toMatchObject({
+        action: 'client.updated',
+        before: { registrationNumber: null },
+        after: { registrationNumber: 'CR-12345' },
+      });
+      expect((await patch(own.id, cast.otherAm.cookie, { registrationNumber: 'x' })).status).toBe(
+        403,
+      );
+      expect(
+        (await patch(own.id, cast.am.cookie, { registrationNumber: '1'.repeat(61) })).status,
+      ).toBe(400);
+    });
+
     it('keeps the account manager and healthcare flag to scope all (rule 5)', async () => {
       const own = await cast.createClient();
       expect(

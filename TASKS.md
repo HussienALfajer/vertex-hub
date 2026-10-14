@@ -150,8 +150,48 @@ PR 2 is merged (#112). Ownership: ADR 0027 lets no module import `reports`, so `
 - [x] `reviewer` with the spec; blocking findings fixed (no report link for backdated cycles in the monthly report, 403 tests on every endpoint, ADR 0027 amendment; also a send-only script now creates the `reports.cycle-report` queue); tests that delete cycles or read a retainer's inbox adjusted for the report row and notice
 - [x] Owner waived acceptance in this session (asked for the PR with auto-merge); PR opened with auto-merge
 
-## PR 4 — legal details
-- [ ] Planned when PR 3 is merged
+## PR 4 — legal details (branch `claude/clever-gauss-ele680`)
+
+PR 3 is merged (#113). Owner `projects` for the contract settings (new schema file `retainer-contracts.ts`, which PR 5 extends with the contract tables); `clients` for the legal fields. Not in PR 4: contracts, annexes, their PDFs, `file_owner_type` `retainer_contract`, K11 texts in `packages/messages` (PR 5). The contract number counter stays for PR 5: `invoices` imports `projects`, so `projects` cannot take `document_numbers` through `invoices`; PR 5 decides where the year's counter lives. Until then no contract is issued and the settings preview shows `<prefix>-<year>-001`.
+
+### 1. contracts
+- [x] `retainer-contracts.ts`: `contractSettingsSchema` (+ `articles`, `nextNumber`, `canEdit`), `updateContractSettingsSchema` (field limits, prefix `A–Z`, digits, `-`, 2–20), `contractArticleSchema`, `updateContractArticlesSchema` (≤ 40, title 1–120, body ≤ 6,000), `CONTRACT_PLACEHOLDERS` and `unknownPlaceholders()` (K7), `formatContractNumber()`; re-exported from `index.ts`
+- [x] `clients.ts`: `registrationNumber` (≤ 60) on client inputs and responses; `fatherName` (≤ 60), `nationalId` (≤ 30, optional in responses) on contacts
+- [x] Error code `UNKNOWN_PLACEHOLDER`; audit actions `contract_settings.updated`, `contract_settings.articles_updated`, entity type `contract_settings`; `ar.json` keys (error, audit action, entity type, fields)
+- [x] Unit tests: placeholder check, number format, settings and articles schemas, legal fields
+- [x] Gate: `contracts` test, root `typecheck`
+
+### 2. db (`/db-migration`, expand only)
+- [x] `clients.registration_number`, `client_contacts.father_name`, `client_contacts.national_id` (nullable, limits checked by the contracts, as the billing columns)
+- [x] `contract_settings` (singleton row seeded, defaults: slogan, prefix `VM-CCS`); `contract_article_templates` seeded with the 17 appendix articles; `TABLE_OWNERS` entry
+- [x] Gate: `db` test, migration drift
+
+### 3. api
+- [x] `projects`: `ContractSettingsService` and controller: `GET /api/contract-settings` (`projects.manage` any + `invoices.read` any, else 403), `PATCH` (`catalog.manage`), `PUT /articles` (order, archive left out, `UNKNOWN_PLACEHOLDER`, `LIMIT_REACHED`); audit in the transaction; next number preview from `document_numbers`
+- [x] `clients`: registration number on create/update/detail; contacts' father's name; national ID only with `clients.manage` + `invoices.read` covering the client (omitted from responses otherwise, 403 when sent, stored value kept); audit records the national ID as changed, never the value
+- [x] Tests `contract-settings.test.ts` (success, 401, 403 per endpoint, errors, audit) and `clients.test.ts` additions (national ID visibility and 403, audit without the value)
+- [x] Gate: api test files, `architecture.test.ts`, `api` typecheck
+
+### 4. bridge
+- [x] `pnpm build`, `openapi:export`, `api:generate`
+
+### 5. web
+- [x] Contract settings page `/settings/contracts` (agency details, prefix with next number preview, slogan; article template editor: add, edit, remove, reorder with up/down, insert placeholder menu; read-only for readers); link from the retainers list for readers
+- [x] Client: registration number in the billing details (Invoices tab and edit form); contact dialog: father's name, national ID for allowed roles only
+- [x] `ar.json` texts; gate: `web` typecheck, lint, `web` test
+
+### 6. e2e
+- [x] `fixtures.ts` mocks; flow spec: save settings and articles, contact national ID shown and hidden by role
+- [x] Screenshots light and dark: contract settings with the article editor, contact dialog with and without the national ID
+- [x] Gate: specs pass; screenshots opened and checked
+
+### Close PR 4
+- [x] Wiring checklist; spec and `docs/architecture.md` updated where settled
+- [x] Full checks through `checker`: lint, typecheck, build, migration drift, OpenAPI fresh, E2E (390 passed; `f04-accept.spec.ts:85` and `f07.spec.ts:31` failed once under the timed run and passed alone); after the review fixes lint, typecheck, `pnpm test` (11/11) and the F05C PR 4 E2E specs pass
+- [x] `reviewer` with the spec; blocking finding fixed (the audit log showed the national ID marker as the English word "changed": now a shared constant translated on the audit page); saved articles reset the form from the response, so new ones keep their ids
+- [x] Owner waived acceptance (asked for the PR directly); PR opened with auto-merge
+
+- [x] Found while building: Finance and employees hold `projects.manage` with scope `assigned` (derived employee role), so "any scope" let Finance read the settings, against the Roles column; reading needs client scope (`all` or `own_clients`), spec updated. The lead conversion contact omits the legal fields (out of its scope).
 
 ## PR 5 — contracts and annexes
 - [ ] Planned when PR 4 is merged
