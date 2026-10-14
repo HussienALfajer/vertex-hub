@@ -4,6 +4,8 @@ import { clientContacts, clients, type Database, type Transaction } from '@verte
 import { and, asc, eq, getTableName, inArray, isNull, or, type SQL, sql } from 'drizzle-orm';
 import type { PgColumn } from 'drizzle-orm/pg-core';
 import { DATABASE } from '../../core/database/database.module.js';
+import type { CurrentUserInfo } from '../auth/index.js';
+import { coversNationalId } from './client-access.js';
 
 export interface ContactSummary {
   id: string;
@@ -17,6 +19,23 @@ export interface ContactDetail extends ContactSummary {
   phone: string | null;
   email: string | null;
   hasFinalApproval: boolean;
+}
+
+/** What a retainer contract prints for the client and its signatory (F05C K6). */
+export interface ContractParty {
+  tradeName: string;
+  registrationNumber: string | null;
+  billingAddress: string | null;
+  signatory: {
+    id: string;
+    name: string;
+    fatherName: string | null;
+    nationalId: string | null;
+    jobTitle: string | null;
+    phone: string | null;
+    email: string | null;
+    archived: boolean;
+  } | null;
 }
 
 export interface ClientSummary {
@@ -91,6 +110,54 @@ export class ClientDirectory {
       .from(clients)
       .where(eq(clients.id, id));
     return row ? { name: row.billingName || row.tradeName, address: row.billingAddress } : null;
+  }
+
+  /**
+   * F05C K6: the client's legal details and the signatory contact (of this client), national ID
+   * included: the caller decides who sees it (`coversNationalId`).
+   */
+  async contractParty(
+    clientId: string,
+    signatoryId: string | null,
+    executor: Database | Transaction = this.db,
+  ): Promise<ContractParty | null> {
+    const [client] = await executor
+      .select({
+        tradeName: clients.tradeName,
+        registrationNumber: clients.registrationNumber,
+        billingAddress: clients.billingAddress,
+      })
+      .from(clients)
+      .where(eq(clients.id, clientId));
+    if (!client) return null;
+    const [contact] = signatoryId
+      ? await executor
+          .select({
+            id: clientContacts.id,
+            name: clientContacts.name,
+            fatherName: clientContacts.fatherName,
+            nationalId: clientContacts.nationalId,
+            jobTitle: clientContacts.jobTitle,
+            phone: clientContacts.phone,
+            email: clientContacts.email,
+            archivedAt: clientContacts.archivedAt,
+          })
+          .from(clientContacts)
+          .where(and(eq(clientContacts.id, signatoryId), eq(clientContacts.clientId, clientId)))
+      : [];
+    const signatory = contact
+      ? (({ archivedAt, ...rest }) => ({ ...rest, archived: !!archivedAt }))(contact)
+      : null;
+    return { ...client, signatory };
+  }
+
+  /** F05C Roles: whether the actor reads the client's contacts' national IDs. */
+  coversNationalId(actor: CurrentUserInfo, client: ClientSummary): boolean {
+    return coversNationalId(actor, {
+      id: client.id,
+      accountManagerId: client.accountManagerId,
+      archivedAt: client.archived ? new Date(0) : null,
+    });
   }
 
   /** Whether `contactId` is a non-archived contact of the client. */

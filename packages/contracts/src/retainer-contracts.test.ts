@@ -7,11 +7,11 @@ import {
   formatContractNumber,
   issueAnnexSchema,
   signedContractSchema,
-  updateContractSchema,
-  voidContractSchema,
   unknownPlaceholders,
   updateContractArticlesSchema,
+  updateContractSchema,
   updateContractSettingsSchema,
+  voidContractSchema,
 } from './retainer-contracts.js';
 
 describe('unknownPlaceholders (K7)', () => {
@@ -100,7 +100,10 @@ describe('fillContractValues (K7)', () => {
 
   it('fills value placeholders and keeps the blocks', () => {
     expect(
-      fillContractValues('تلتزم {agency_name} تجاه {client_name} خلال {payment_terms_days} أيام.\n{fees}', values),
+      fillContractValues(
+        'تلتزم {agency_name} تجاه {client_name} خلال {payment_terms_days} أيام.\n{fees}',
+        values,
+      ),
     ).toBe('تلتزم فيرتكس ميديا تجاه مطعم الياسمين خلال 7 أيام.\n{fees}');
   });
 
@@ -153,9 +156,9 @@ describe('contract inputs', () => {
       contractDate: '2026-10-14',
     });
     expect(updateContractSchema.safeParse({ signatoryContactId: null }).success).toBe(true);
-    expect(
-      updateContractSchema.safeParse({ articles: [{ title: ' ', body: 'نص' }] }).success,
-    ).toBe(false);
+    expect(updateContractSchema.safeParse({ articles: [{ title: ' ', body: 'نص' }] }).success).toBe(
+      false,
+    );
     expect(
       updateContractSchema.safeParse({ articles: [{ title: 'م', body: 'x'.repeat(6001) }] })
         .success,

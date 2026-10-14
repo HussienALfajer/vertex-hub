@@ -6,6 +6,7 @@ import { DatabaseModule } from './core/database/database.module.js';
 import { EmailSender } from './email/email-sender.js';
 import { ApprovalsRemindersJob } from './jobs/approvals-reminders.job.js';
 import { CampaignsPdfJob } from './jobs/campaigns-pdf.job.js';
+import { ContractsPdfJob } from './jobs/contracts-pdf.job.js';
 import { EmailDigestJob } from './jobs/email-digest.job.js';
 import { EmailNotificationsJob } from './jobs/email-notifications.job.js';
 import { EmailPurgeJob } from './jobs/email-purge.job.js';
@@ -48,6 +49,7 @@ import { PdfRenderer } from './pdf/pdf-renderer.js';
     PdfRenderer,
     QuotesPdfJob,
     InvoicesPdfJob,
+    ContractsPdfJob,
     CampaignsPdfJob,
     ReportsPdfJob,
     EmailSender,

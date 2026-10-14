@@ -23,6 +23,7 @@ import { DATABASE } from '../../core/database/database.module.js';
 import { CodedException } from '../../core/errors/index.js';
 import { changedFields, recordAudit } from '../audit/index.js';
 import { type CurrentUserInfo, UserDirectory } from '../auth/index.js';
+import { ContractSources } from './contract-sources.js';
 import { actorOf } from './project-access.js';
 
 type SettingsRow = typeof contractSettings.$inferSelect;
@@ -55,6 +56,7 @@ export class ContractSettingsService {
   constructor(
     @Inject(DATABASE) private readonly db: Database,
     private readonly users: UserDirectory,
+    private readonly sources: ContractSources,
   ) {}
 
   /** The settings row, seeded by its migration; `forUpdate` locks it. */
@@ -197,10 +199,14 @@ export class ContractSettingsService {
   ): Promise<ContractSettings> {
     const users = await this.users.summaries(row.updatedById ? [row.updatedById] : []);
     const updatedBy = row.updatedById ? users.get(row.updatedById) : undefined;
+    const year = Number(businessDate().slice(0, 4));
     return {
       ...auditFields(row),
-      // No contract is issued before PR 5, which takes the year's counter.
-      nextNumber: formatContractNumber(row.numberPrefix, Number(businessDate().slice(0, 4)), 1),
+      nextNumber: formatContractNumber(
+        row.numberPrefix,
+        year,
+        await this.sources.numbering.peek(this.db, year),
+      ),
       articles,
       updatedAt: row.updatedAt.toISOString(),
       updatedBy: updatedBy ? { id: updatedBy.id, name: updatedBy.name } : null,

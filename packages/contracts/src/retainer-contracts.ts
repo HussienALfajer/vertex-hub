@@ -283,7 +283,9 @@ export const contractSnapshotSchema = z
     agency: contractAgencyPartySchema,
     client: contractClientPartySchema,
     slogan: z.string(),
-    articles: z.array(z.object({ number: z.number().int().min(1), title: z.string(), body: z.string() })),
+    articles: z.array(
+      z.object({ number: z.number().int().min(1), title: z.string(), body: z.string() }),
+    ),
     services: z.object({
       /** The accepted quote's number and its monthly services and packages, when there is one. */
       quote: z
@@ -303,7 +305,7 @@ export const contractSnapshotSchema = z
           kind: deliverableKindSchema,
           label: z.string().nullable(),
           quantity: z.number().int().min(0),
-          revisionLimit: z.number().int().min(0),
+          revisionLimit: z.number().int().min(0).nullable(),
         }),
       ),
     }),
@@ -394,9 +396,7 @@ const contractPersonSchema = z.object({ id: z.uuid(), name: z.string() });
 
 const contractPdfSchema = z.object({ state: quotePdfStateSchema }).nullable();
 
-const voidedSchema = z
-  .object({ at: z.iso.datetime(), reason: z.string() })
-  .nullable();
+const voidedSchema = z.object({ at: z.iso.datetime(), reason: z.string() }).nullable();
 
 /** A signed copy: the contract's document (F10) holding the scan, downloaded from the file endpoints. */
 const signedCopySchema = z

@@ -195,7 +195,7 @@ PR 3 is merged (#113). Owner `projects` for the contract settings (new schema fi
 
 ## PR 5 — contracts and annexes (split in two, as the skill's default: 5a API and PDFs, 5b screens)
 
-PR 4 is merged (#114). Owner `projects` for `retainer_contracts`, `retainer_contract_articles`, `retainer_contract_annexes` (schema file `retainer-contracts.ts`). Contract numbers: `document_numbers` belongs to `invoices`, which imports `projects`, so `projects` declares a `ContractNumbers` port (as the hooks: `projects` defines it, `invoices` registers the implementation on start-up) and the spec's `document_number_kind` `contract` stays in `invoices`; the settings' next number preview reads it the same way.
+PR 4 is merged (#114). Owner `projects` for `retainer_contracts`, `retainer_contract_articles`, `retainer_contract_annexes` (schema file `retainer-contracts.ts`). Contract numbers: `document_numbers` belongs to `invoices`, which imports `projects`, so `projects` declares a port, `ContractSources` (as the hooks: `projects` defines it, `invoices` registers the numbering and payment terms on start-up, `quotes` the accepted quote's monthly services); `document_number_kind` `contract` stays in `invoices`; the settings' next number preview reads it the same way.
 
 ### PR 5a — contracts, annexes and their PDFs (API and worker; branch `ccr-ff8a3197-xvm14a`)
 
@@ -212,20 +212,21 @@ PR 4 is merged (#114). Owner `projects` for `retainer_contracts`, `retainer_cont
 - [x] Gate: `db` test, migration drift
 
 #### 3. api
-- [ ] `projects`: `ContractNumbers` port; `invoices` registers it (`nextDocumentNumber(tx, 'contract', year)`, and the preview's next number); settings preview switched to it
-- [ ] `RetainerContractsService` + controller: list, create (K1, K2), detail with live parties/blocks and `missing[]` (K3, K6, K7), patch draft (articles, date, signatory; `UNKNOWN_PLACEHOLDER`, `UNKNOWN_CONTACT`, `LIMIT_REACHED`), discard (K8), issue (K4: number, snapshot, PDF queued), void (K8), signed copy upload (K5, F10 version of the "signed copy" item), `changedSinceIssue` (K9); money access and client scope, national ID per Roles in the live preview; retainer lock (G2); audit (G1)
-- [ ] Annexes: `POST …/amendments/:amendmentId/annex` (K10, `NO_CONTRACT`, `INVALID_TRANSITION`), void, signed, PDF
-- [ ] PDFs: `POST`/`GET …/pdf` (`?draft=true` preview for managers), `contracts.pdf-ready` attaches the PDF as a document of the contract (F04 rule 12 hashing and idempotency); `invoices.daily` re-queues pending contract and annex PDFs
-- [ ] `files`: owner policy for `retainer_contract` (contract readers; read-only through file endpoints)
-- [ ] Tests `retainer-contracts.test.ts`: every endpoint success, 401, 403 (employee, Finance on manage, AM of another client), out of scope 404; K1–K12, edge cases 9–14, every error code, audit entries
-- [ ] Gate: api test file, `architecture.test.ts`, `api` typecheck
+- [x] `projects`: `ContractSources` port (numbering and payment terms registered by `invoices`, quote services by `quotes`); settings preview of the next number reads it
+- [x] `RetainerContractsService` + controller: list, create (K1, K2), detail with live parties/blocks and `missing[]` (K3, K6, K7), patch draft (articles, date, signatory; `UNKNOWN_PLACEHOLDER`, `UNKNOWN_CONTACT`, `LIMIT_REACHED`), discard (K8), issue (K4: number, snapshot, PDF queued), void (K8), signed copy upload (K5, F10 version of the "signed copy" item), `changedSinceIssue` (K9); money access and client scope, national ID per Roles in the live preview; retainer lock (G2); audit (G1)
+- [x] Annexes: `POST …/amendments/:amendmentId/annex` (K10, `NO_CONTRACT`, `INVALID_TRANSITION`), void, signed, PDF
+- [x] PDFs: `POST`/`GET …/pdf` (`?draft=true` preview for managers), `contracts.pdf-ready` attaches the PDF as a document of the contract (F04 rule 12 hashing and idempotency); `invoices.daily` re-queues pending contract and annex PDFs
+- [x] `files`: owner policy for `retainer_contract` (contract readers; read-only through file endpoints)
+- [x] `files`: `GeneratedFiles.addUploadVersion` (a signed copy uploaded again); test cleanup removes contracts before file items (`removeRetainerContracts`)
+- [x] Tests `retainer-contracts.test.ts`: every endpoint success, 401, 403 (employee, Finance on manage, AM of another client), out of scope 404; K1–K12, edge cases 9–14, every error code, audit entries
+- [x] Gate: api test file, `architecture.test.ts`, `api` typecheck
 
 #### 4. worker
-- [ ] `contracts.pdf` job and templates for contract and annex (K6: page badge, logo, party tables, slogan, preamble, numbered articles with blocks, signatures, footer, "page x of y"; empty lines for missing fields; no split tables or signature block); worker test with screenshots
-- [ ] Gate: `worker` test, typecheck
+- [x] `contracts.pdf` job and templates for contract and annex (K6: page badge, logo, party tables, slogan, preamble, numbered articles with blocks, signatures, footer, "page x of y"; empty lines for missing fields; no split tables or signature block); worker test with screenshots
+- [x] Gate: `worker` test, typecheck
 
 #### 5. bridge
-- [ ] `pnpm build`, `openapi:export`, `api:generate`
+- [x] `pnpm build`, `openapi:export`, `api:generate`
 
 #### Close PR 5a
 - [ ] Wiring checklist; spec and `docs/architecture.md` (the `ContractNumbers` port)

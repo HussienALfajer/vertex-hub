@@ -15,6 +15,11 @@ export {
   type ChargeInvoiceSource,
   ChargeInvoices,
 } from './charge-invoices.js';
+export {
+  type ContractNumbering,
+  type ContractQuotes,
+  ContractSources,
+} from './contract-sources.js';
 export { type CycleClosed, CycleClosedHooks } from './cycle-closed-hooks.js';
 export { type CycleOpened, CycleOpenedHooks } from './cycle-opened-hooks.js';
 export {
@@ -43,6 +48,8 @@ export { type QuoteRenewalApplied, QuoteRenewalHooks } from './quote-renewal-hoo
 export { type RetainerChargeDue, RetainerChargeDueHooks } from './retainer-charge-due-hooks.js';
 /** F05B C5, C9: credits taken off drafts and settled outside, for `invoices`. */
 export { RetainerCharges } from './retainer-charges.js';
+/** F05C: contract and annex PDFs still pending are queued again by `invoices.daily`. */
+export { ContractPdfs } from './retainer-contract-pdfs.js';
 /** For the `retainers:run-daily` development script. */
 export { RetainerCyclesService } from './retainer-cycles.service.js';
 export { type CycleLineCounts, WorkProgress, type WorkProgressSource } from './work-progress.js';

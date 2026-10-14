@@ -1540,6 +1540,182 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/retainers/{retainerId}/contracts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["RetainerContractsController_list"];
+        put?: never;
+        post: operations["RetainerContractsController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/retainers/{retainerId}/contracts/{contractId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["RetainerContractsController_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["RetainerContractsController_update"];
+        trace?: never;
+    };
+    "/api/retainers/{retainerId}/contracts/{contractId}/discard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["RetainerContractsController_discard"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/retainers/{retainerId}/contracts/{contractId}/issue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["RetainerContractsController_issue"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/retainers/{retainerId}/contracts/{contractId}/void": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["RetainerContractsController_void"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/retainers/{retainerId}/contracts/{contractId}/signed": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["RetainerContractsController_signed"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/retainers/{retainerId}/contracts/{contractId}/pdf": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["RetainerContractsController_downloadPdf"];
+        put?: never;
+        post: operations["RetainerContractsController_renderPdf"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/retainers/{retainerId}/amendments/{amendmentId}/annex": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["RetainerContractsController_issueAnnex"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/retainers/{retainerId}/contracts/{contractId}/annexes/{annexId}/void": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["RetainerContractsController_voidAnnex"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/retainers/{retainerId}/contracts/{contractId}/annexes/{annexId}/signed": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["RetainerContractsController_signedAnnex"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/retainers/{retainerId}/contracts/{contractId}/annexes/{annexId}/pdf": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["RetainerContractsController_downloadAnnexPdf"];
+        put?: never;
+        post: operations["RetainerContractsController_renderAnnexPdf"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/tasks/board": {
         parameters: {
             query?: never;
@@ -4409,9 +4585,9 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         /** @enum {string} */
-        AuditEntityType: "user" | "department" | "client" | "client_contact" | "client_platform_account" | "client_note" | "project" | "project_milestone" | "retainer" | "retainer_cycle" | "retainer_charge" | "retainer_term" | "retainer_amendment" | "extra_work" | "task" | "task_checklist_item" | "task_link" | "task_comment" | "template" | "template_run" | "file_item" | "approval_request" | "post" | "shoot" | "meeting" | "catalog_service" | "catalog_package" | "quote_settings" | "contract_settings" | "quote" | "invoice_settings" | "invoice" | "payment" | "project_expense" | "ad_campaign" | "ad_campaign_update" | "ad_wallet" | "ad_wallet_entry" | "lead" | "lead_note" | "client_report" | "retainer_cycle_report";
+        AuditEntityType: "user" | "department" | "client" | "client_contact" | "client_platform_account" | "client_note" | "project" | "project_milestone" | "retainer" | "retainer_cycle" | "retainer_charge" | "retainer_term" | "retainer_amendment" | "extra_work" | "task" | "task_checklist_item" | "task_link" | "task_comment" | "template" | "template_run" | "file_item" | "approval_request" | "post" | "shoot" | "meeting" | "catalog_service" | "catalog_package" | "quote_settings" | "contract_settings" | "quote" | "invoice_settings" | "invoice" | "payment" | "project_expense" | "ad_campaign" | "ad_campaign_update" | "ad_wallet" | "ad_wallet_entry" | "lead" | "lead_note" | "client_report" | "retainer_cycle_report" | "retainer_contract" | "retainer_contract_annex";
         /** @enum {string} */
-        AuditAction: "user.created" | "user.updated" | "user.roles_changed" | "user.departments_changed" | "user.archived" | "user.restored" | "user.link_issued" | "user.password_set" | "user.password_changed" | "user.two_factor_enabled" | "user.two_factor_disabled" | "user.two_factor_reset" | "user.backup_codes_regenerated" | "user.profile_updated" | "department.updated" | "client.created" | "client.updated" | "client.status_changed" | "client.account_manager_changed" | "client.healthcare_changed" | "client.archived" | "client.restored" | "client.brand_kit_updated" | "client.emailed" | "client_contact.created" | "client_contact.updated" | "client_contact.archived" | "client_platform_account.created" | "client_platform_account.updated" | "client_platform_account.archived" | "client_note.created" | "client_note.updated" | "client_note.archived" | "project.created" | "project.updated" | "project.project_manager_changed" | "project.status_changed" | "project.money_updated" | "project.archived" | "project.restored" | "project_milestone.created" | "project_milestone.updated" | "project_milestone.reordered" | "project_milestone.completed" | "project_milestone.reopened" | "project_milestone.archived" | "retainer.created" | "retainer.updated" | "retainer.backdated" | "retainer.status_changed" | "retainer.deliverables_updated" | "retainer.money_updated" | "retainer.archived" | "retainer.restored" | "retainer_cycle.created" | "retainer_cycle.closed" | "retainer_cycle.line_updated" | "retainer_cycle.line_added" | "retainer_cycle.adjusted" | "retainer_charge.created" | "retainer_charge.amount_changed" | "retainer_charge.cancelled" | "retainer_charge.split" | "retainer_charge.settled_outside" | "retainer_term.created" | "retainer_term.updated" | "retainer_term.end_action_changed" | "retainer_term.cancelled" | "retainer_term.started" | "retainer_term.completed" | "retainer_term.renewed" | "retainer_amendment.created" | "retainer_amendment.approved" | "retainer_amendment.rejected" | "retainer_amendment.withdrawn" | "retainer_amendment.applied" | "retainer_amendment.cancelled" | "extra_work.created" | "extra_work.updated" | "extra_work.billing_changed" | "extra_work.archived" | "task.created" | "task.updated" | "task.assigned" | "task.department_changed" | "task.status_changed" | "task.dependencies_updated" | "task.archived" | "task.restored" | "task.revision_decided" | "task.request_scope_changed" | "task.extra_work_moved" | "task.reviewed" | "task.client_text_updated" | "task.client_response_recorded" | "task_checklist_item.created" | "task_checklist_item.updated" | "task_checklist_item.reordered" | "task_checklist_item.archived" | "task_link.created" | "task_link.archived" | "task_comment.created" | "task_comment.updated" | "task_comment.archived" | "template.created" | "template.updated" | "template.assignees_updated" | "template.archived" | "template.restored" | "template_run.created" | "retainer.template_changed" | "file_item.created" | "file_item.renamed" | "file_item.confidential_changed" | "file_item.archived" | "file_item.restored" | "file_version.created" | "file_version.archived" | "file_version.restored" | "file_version.final_set" | "file_version.final_cleared" | "approval_request.created" | "approval_request.link_reissued" | "approval_request.revoked" | "approval_request.emailed" | "approval_item.responded" | "approval_item.withdrawn" | "post.created" | "post.updated" | "post.status_changed" | "post.reviewed" | "post.client_response_recorded" | "post.task_linked" | "post.task_unlinked" | "post.task_returned" | "post.duplicated" | "post.archived" | "post.restored" | "shoot.created" | "shoot.updated" | "shoot.shots_changed" | "shoot.shot_ticked" | "shoot.shot_unticked" | "shoot.completed" | "shoot.cancelled" | "shoot.reopened" | "shoot.archived" | "shoot.restored" | "meeting.created" | "meeting.updated" | "meeting.cancelled" | "meeting.archived" | "meeting.restored" | "catalog_service.created" | "catalog_service.updated" | "catalog_service.archived" | "catalog_service.restored" | "catalog_package.created" | "catalog_package.updated" | "catalog_package.archived" | "catalog_package.restored" | "quote_settings.updated" | "contract_settings.updated" | "contract_settings.articles_updated" | "quote.created" | "quote.updated" | "quote.approval_requested" | "quote.approval_withdrawn" | "quote.approval_approved" | "quote.approval_returned" | "quote.sent" | "quote.extended" | "quote.expired" | "quote.rejected" | "quote.accepted" | "quote.version_created" | "quote.superseded" | "quote.archived" | "quote.emailed" | "invoice_settings.updated" | "invoice.created" | "invoice.updated" | "invoice.archived" | "invoice.issued" | "invoice.due_date_changed" | "invoice.voided" | "invoice.overdue" | "invoice.services_changed" | "invoice.emailed" | "payment.recorded" | "payment.voided" | "payment.emailed" | "project_expense.created" | "project_expense.updated" | "project_expense.archived" | "ad_campaign.created" | "ad_campaign.updated" | "ad_campaign.status_changed" | "ad_campaign.archived" | "ad_campaign.restored" | "ad_campaign_update.created" | "ad_campaign_update.updated" | "ad_campaign_update.archived" | "ad_wallet.threshold_changed" | "ad_wallet.low_balance" | "ad_wallet.low_balance_cleared" | "ad_wallet_entry.recorded" | "ad_wallet_entry.voided" | "ad_wallet_entry.emailed" | "lead.created" | "lead.updated" | "lead.stage_changed" | "lead.owner_changed" | "lead.follow_up_changed" | "lead.lost" | "lead.reopened" | "lead.converted" | "lead.archived" | "lead.restored" | "lead_note.created" | "lead_note.updated" | "lead_note.archived" | "client_report.summary_changed" | "retainer_cycle_report.summary_changed";
+        AuditAction: "user.created" | "user.updated" | "user.roles_changed" | "user.departments_changed" | "user.archived" | "user.restored" | "user.link_issued" | "user.password_set" | "user.password_changed" | "user.two_factor_enabled" | "user.two_factor_disabled" | "user.two_factor_reset" | "user.backup_codes_regenerated" | "user.profile_updated" | "department.updated" | "client.created" | "client.updated" | "client.status_changed" | "client.account_manager_changed" | "client.healthcare_changed" | "client.archived" | "client.restored" | "client.brand_kit_updated" | "client.emailed" | "client_contact.created" | "client_contact.updated" | "client_contact.archived" | "client_platform_account.created" | "client_platform_account.updated" | "client_platform_account.archived" | "client_note.created" | "client_note.updated" | "client_note.archived" | "project.created" | "project.updated" | "project.project_manager_changed" | "project.status_changed" | "project.money_updated" | "project.archived" | "project.restored" | "project_milestone.created" | "project_milestone.updated" | "project_milestone.reordered" | "project_milestone.completed" | "project_milestone.reopened" | "project_milestone.archived" | "retainer.created" | "retainer.updated" | "retainer.backdated" | "retainer.status_changed" | "retainer.deliverables_updated" | "retainer.money_updated" | "retainer.archived" | "retainer.restored" | "retainer_cycle.created" | "retainer_cycle.closed" | "retainer_cycle.line_updated" | "retainer_cycle.line_added" | "retainer_cycle.adjusted" | "retainer_charge.created" | "retainer_charge.amount_changed" | "retainer_charge.cancelled" | "retainer_charge.split" | "retainer_charge.settled_outside" | "retainer_term.created" | "retainer_term.updated" | "retainer_term.end_action_changed" | "retainer_term.cancelled" | "retainer_term.started" | "retainer_term.completed" | "retainer_term.renewed" | "retainer_amendment.created" | "retainer_amendment.approved" | "retainer_amendment.rejected" | "retainer_amendment.withdrawn" | "retainer_amendment.applied" | "retainer_amendment.cancelled" | "extra_work.created" | "extra_work.updated" | "extra_work.billing_changed" | "extra_work.archived" | "task.created" | "task.updated" | "task.assigned" | "task.department_changed" | "task.status_changed" | "task.dependencies_updated" | "task.archived" | "task.restored" | "task.revision_decided" | "task.request_scope_changed" | "task.extra_work_moved" | "task.reviewed" | "task.client_text_updated" | "task.client_response_recorded" | "task_checklist_item.created" | "task_checklist_item.updated" | "task_checklist_item.reordered" | "task_checklist_item.archived" | "task_link.created" | "task_link.archived" | "task_comment.created" | "task_comment.updated" | "task_comment.archived" | "template.created" | "template.updated" | "template.assignees_updated" | "template.archived" | "template.restored" | "template_run.created" | "retainer.template_changed" | "file_item.created" | "file_item.renamed" | "file_item.confidential_changed" | "file_item.archived" | "file_item.restored" | "file_version.created" | "file_version.archived" | "file_version.restored" | "file_version.final_set" | "file_version.final_cleared" | "approval_request.created" | "approval_request.link_reissued" | "approval_request.revoked" | "approval_request.emailed" | "approval_item.responded" | "approval_item.withdrawn" | "post.created" | "post.updated" | "post.status_changed" | "post.reviewed" | "post.client_response_recorded" | "post.task_linked" | "post.task_unlinked" | "post.task_returned" | "post.duplicated" | "post.archived" | "post.restored" | "shoot.created" | "shoot.updated" | "shoot.shots_changed" | "shoot.shot_ticked" | "shoot.shot_unticked" | "shoot.completed" | "shoot.cancelled" | "shoot.reopened" | "shoot.archived" | "shoot.restored" | "meeting.created" | "meeting.updated" | "meeting.cancelled" | "meeting.archived" | "meeting.restored" | "catalog_service.created" | "catalog_service.updated" | "catalog_service.archived" | "catalog_service.restored" | "catalog_package.created" | "catalog_package.updated" | "catalog_package.archived" | "catalog_package.restored" | "quote_settings.updated" | "contract_settings.updated" | "contract_settings.articles_updated" | "quote.created" | "quote.updated" | "quote.approval_requested" | "quote.approval_withdrawn" | "quote.approval_approved" | "quote.approval_returned" | "quote.sent" | "quote.extended" | "quote.expired" | "quote.rejected" | "quote.accepted" | "quote.version_created" | "quote.superseded" | "quote.archived" | "quote.emailed" | "invoice_settings.updated" | "invoice.created" | "invoice.updated" | "invoice.archived" | "invoice.issued" | "invoice.due_date_changed" | "invoice.voided" | "invoice.overdue" | "invoice.services_changed" | "invoice.emailed" | "payment.recorded" | "payment.voided" | "payment.emailed" | "project_expense.created" | "project_expense.updated" | "project_expense.archived" | "ad_campaign.created" | "ad_campaign.updated" | "ad_campaign.status_changed" | "ad_campaign.archived" | "ad_campaign.restored" | "ad_campaign_update.created" | "ad_campaign_update.updated" | "ad_campaign_update.archived" | "ad_wallet.threshold_changed" | "ad_wallet.low_balance" | "ad_wallet.low_balance_cleared" | "ad_wallet_entry.recorded" | "ad_wallet_entry.voided" | "ad_wallet_entry.emailed" | "lead.created" | "lead.updated" | "lead.stage_changed" | "lead.owner_changed" | "lead.follow_up_changed" | "lead.lost" | "lead.reopened" | "lead.converted" | "lead.archived" | "lead.restored" | "lead_note.created" | "lead_note.updated" | "lead_note.archived" | "client_report.summary_changed" | "retainer_cycle_report.summary_changed" | "retainer_contract.created" | "retainer_contract.updated" | "retainer_contract.discarded" | "retainer_contract.issued" | "retainer_contract.signed" | "retainer_contract.voided" | "retainer_contract_annex.issued" | "retainer_contract_annex.signed" | "retainer_contract_annex.voided";
         /** @description Audit entries, newest first */
         AuditPage: {
             items: components["schemas"]["AuditEntry"][];
@@ -6533,7 +6709,7 @@ export interface components {
             mimeType: string;
         };
         /** @enum {string} */
-        FileOwnerType: "task" | "client" | "project" | "retainer" | "post" | "quote" | "invoice" | "ad_wallet_entry";
+        FileOwnerType: "task" | "client" | "project" | "retainer" | "post" | "quote" | "invoice" | "ad_wallet_entry" | "retainer_contract";
         /** @enum {string} */
         FileRole: "deliverable" | "reference" | "brand" | "document";
         /** @description Newest first */
@@ -7815,6 +7991,292 @@ export interface components {
         };
         ContractArticles: {
             articles: components["schemas"]["ContractArticle"][];
+        };
+        /** @description Contracts, newest first */
+        RetainerContractList: {
+            items: components["schemas"]["RetainerContract"][];
+        };
+        RetainerContract: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            retainerId: string;
+            kind: components["schemas"]["ContractKind"];
+            term: {
+                /** Format: uuid */
+                id: string;
+                number: number;
+                startCycle: number;
+                cycles: number;
+                /** Format: date */
+                startDate: string;
+                /** Format: date */
+                endDate: string;
+            } | null;
+            startCycle: number;
+            status: components["schemas"]["ContractStatus"];
+            number: string | null;
+            /** Format: date */
+            contractDate: string;
+            pdf: {
+                state: components["schemas"]["QuotePdfState"];
+            } | null;
+            signed: {
+                /** Format: date */
+                signedOn: string;
+                /** Format: uuid */
+                fileItemId: string;
+            } | null;
+            voided: {
+                /** Format: date-time */
+                at: string;
+                reason: string;
+            } | null;
+            /** Format: date-time */
+            issuedAt: string | null;
+            issuedBy: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            changedSinceIssue: boolean;
+            annexes: components["schemas"]["ContractAnnex"][];
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        /** @enum {string} */
+        ContractKind: "term" | "open_ended";
+        /** @enum {string} */
+        ContractStatus: "draft" | "issued" | "signed" | "void";
+        /** @enum {string} */
+        QuotePdfState: "pending" | "ready" | "failed";
+        ContractAnnex: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            contractId: string;
+            annexNumber: number;
+            amendment: {
+                /** Format: uuid */
+                id: string;
+                number: number;
+            };
+            status: components["schemas"]["ContractAnnexStatus"];
+            /** Format: date */
+            annexDate: string;
+            pdf: {
+                state: components["schemas"]["QuotePdfState"];
+            } | null;
+            signed: {
+                /** Format: date */
+                signedOn: string;
+                /** Format: uuid */
+                fileItemId: string;
+            } | null;
+            voided: {
+                /** Format: date-time */
+                at: string;
+                reason: string;
+            } | null;
+            issuedBy: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        /** @enum {string} */
+        ContractAnnexStatus: "issued" | "signed" | "void";
+        CreateContract: {
+            /** @enum {string} */
+            kind: "term";
+            /** Format: uuid */
+            termId: string;
+        } | {
+            /** @enum {string} */
+            kind: "open_ended";
+        };
+        RetainerContractDetail: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            retainerId: string;
+            kind: components["schemas"]["ContractKind"];
+            term: {
+                /** Format: uuid */
+                id: string;
+                number: number;
+                startCycle: number;
+                cycles: number;
+                /** Format: date */
+                startDate: string;
+                /** Format: date */
+                endDate: string;
+            } | null;
+            startCycle: number;
+            status: components["schemas"]["ContractStatus"];
+            number: string | null;
+            /** Format: date */
+            contractDate: string;
+            pdf: {
+                state: components["schemas"]["QuotePdfState"];
+            } | null;
+            signed: {
+                /** Format: date */
+                signedOn: string;
+                /** Format: uuid */
+                fileItemId: string;
+            } | null;
+            voided: {
+                /** Format: date-time */
+                at: string;
+                reason: string;
+            } | null;
+            /** Format: date-time */
+            issuedAt: string | null;
+            issuedBy: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            changedSinceIssue: boolean;
+            annexes: components["schemas"]["ContractAnnex"][];
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            signatoryContact: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            articles: components["schemas"]["ContractArticle"][];
+            content: components["schemas"]["ContractSnapshot"];
+            missing: components["schemas"]["ContractMissingField"][];
+            absentBlocks: ("services" | "term" | "fees")[];
+            draftPdf: {
+                state: components["schemas"]["QuotePdfState"];
+                /** Format: date-time */
+                renderedAt: string | null;
+                outdated: boolean;
+            } | null;
+            canManage: boolean;
+        };
+        ContractSnapshot: {
+            displayNumber: string | null;
+            /** Format: date */
+            contractDate: string;
+            agency: {
+                legalName: string;
+                tradeName: string;
+                companyType: string;
+                registrationNumber: string;
+                address: string;
+                phone: string;
+                email: string;
+                website: string;
+                representativeName: string;
+                representativeTitle: string;
+            };
+            client: {
+                signatoryName: string;
+                fatherName: string;
+                tradeName: string;
+                registrationNumber: string;
+                phone: string;
+                email: string;
+                address: string;
+                title: string;
+                nationalId?: string;
+            };
+            slogan: string;
+            articles: {
+                number: number;
+                title: string;
+                body: string;
+            }[];
+            services: {
+                quote: {
+                    displayNumber: string;
+                    lines: {
+                        name: string;
+                        quantity: number;
+                        items: {
+                            name: string;
+                            quantity: number;
+                        }[];
+                    }[];
+                } | null;
+                deliverables: {
+                    kind: components["schemas"]["DeliverableKind"];
+                    label: string | null;
+                    quantity: number;
+                    revisionLimit: number | null;
+                }[];
+            };
+            term: {
+                kind: components["schemas"]["ContractKind"];
+                retainerName: string;
+                /** Format: date */
+                startDate: string;
+                cycleDay: number;
+                cycles: number | null;
+                /** Format: date */
+                endDate: string | null;
+                endAction: components["schemas"]["TermEndAction"] | null;
+            };
+            fees: {
+                currency: components["schemas"]["Currency"];
+                agreedTotalMinor: number | null;
+                schedule: {
+                    cycle: number;
+                    /** Format: date */
+                    periodStart: string;
+                    /** Format: date */
+                    periodEnd: string;
+                    amountMinor: number;
+                }[];
+                feeMinor: number | null;
+            };
+        };
+        ContractMissingField: {
+            /** @enum {string} */
+            party: "agency" | "client";
+            /** @enum {string} */
+            field: "legalName" | "tradeName" | "companyType" | "registrationNumber" | "address" | "phone" | "email" | "website" | "representativeName" | "representativeTitle" | "signatoryName" | "fatherName" | "nationalId" | "title";
+            required: boolean;
+        };
+        UpdateContract: {
+            /** Format: date */
+            contractDate?: string;
+            /** Format: uuid */
+            signatoryContactId?: string | null;
+            articles?: {
+                /** Format: uuid */
+                id?: string;
+                title: string;
+                body: string;
+            }[];
+        };
+        VoidContract: {
+            reason: string;
+        };
+        SignedContract: {
+            /** Format: date */
+            signedOn: string;
+            /** Format: uuid */
+            uploadId: string;
+        };
+        /** @description The PDF state after asking for a render */
+        QuotePdfRender: {
+            state: components["schemas"]["QuotePdfState"];
+        };
+        IssueAnnex: {
+            /** Format: date */
+            annexDate: string;
         };
         TaskBoard: {
             departments: components["schemas"]["DepartmentCode"][];
@@ -9493,8 +9955,6 @@ export interface components {
         };
         /** @enum {string} */
         PaymentMethod: "cash" | "bank_transfer" | "e_wallet";
-        /** @enum {string} */
-        QuotePdfState: "pending" | "ready" | "failed";
         /** @description What the caller may do, for the UI */
         InvoicePermissions: {
             canEdit: boolean;
@@ -9579,10 +10039,6 @@ export interface components {
                 /** Format: uuid */
                 serviceId: string | null;
             }[];
-        };
-        /** @description The PDF state after asking for a render */
-        QuotePdfRender: {
-            state: components["schemas"]["QuotePdfState"];
         };
         RecordPayment: {
             /** Format: date */
@@ -15850,6 +16306,393 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ContractArticles"];
+                };
+            };
+        };
+    };
+    RetainerContractsController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                retainerId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The retainer’s contracts with their annexes, newest first; discarded drafts left out */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RetainerContractList"];
+                };
+            };
+        };
+    };
+    RetainerContractsController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                retainerId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateContract"];
+            };
+        };
+        responses: {
+            /** @description A new draft for a term or the open-ended retainer, with the template’s articles */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RetainerContractDetail"];
+                };
+            };
+        };
+    };
+    RetainerContractsController_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                retainerId: string;
+                contractId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The contract with what it prints: live for a draft, frozen once issued */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RetainerContractDetail"];
+                };
+            };
+        };
+    };
+    RetainerContractsController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                retainerId: string;
+                contractId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateContract"];
+            };
+        };
+        responses: {
+            /** @description The draft after the change of its date, signatory or articles */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RetainerContractDetail"];
+                };
+            };
+        };
+    };
+    RetainerContractsController_discard: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                retainerId: string;
+                contractId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The discarded draft */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RetainerContractDetail"];
+                };
+            };
+        };
+    };
+    RetainerContractsController_issue: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                retainerId: string;
+                contractId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The issued contract, numbered and frozen; its PDF is queued */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RetainerContractDetail"];
+                };
+            };
+        };
+    };
+    RetainerContractsController_void: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                retainerId: string;
+                contractId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VoidContract"];
+            };
+        };
+        responses: {
+            /** @description The voided contract */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RetainerContractDetail"];
+                };
+            };
+        };
+    };
+    RetainerContractsController_signed: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                retainerId: string;
+                contractId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SignedContract"];
+            };
+        };
+        responses: {
+            /** @description The signed contract with its signed copy */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RetainerContractDetail"];
+                };
+            };
+        };
+    };
+    RetainerContractsController_downloadPdf: {
+        parameters: {
+            query?: {
+                draft?: "true";
+            };
+            header?: never;
+            path: {
+                retainerId: string;
+                contractId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The PDF of the contract, or the draft preview with draft=true */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such contract, or its PDF is not ready */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    RetainerContractsController_renderPdf: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                retainerId: string;
+                contractId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Queues the draft preview (managers) or renders an issued contract again when its PDF is not ready */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuotePdfRender"];
+                };
+            };
+        };
+    };
+    RetainerContractsController_issueAnnex: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                retainerId: string;
+                amendmentId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IssueAnnex"];
+            };
+        };
+        responses: {
+            /** @description The next annex of the contract covering the amendment’s cycle; its PDF is queued */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContractAnnex"];
+                };
+            };
+        };
+    };
+    RetainerContractsController_voidAnnex: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                retainerId: string;
+                contractId: string;
+                annexId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VoidContract"];
+            };
+        };
+        responses: {
+            /** @description The voided annex */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContractAnnex"];
+                };
+            };
+        };
+    };
+    RetainerContractsController_signedAnnex: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                retainerId: string;
+                contractId: string;
+                annexId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SignedContract"];
+            };
+        };
+        responses: {
+            /** @description The signed annex with its signed copy */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContractAnnex"];
+                };
+            };
+        };
+    };
+    RetainerContractsController_downloadAnnexPdf: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                retainerId: string;
+                contractId: string;
+                annexId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The PDF of the annex */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such annex, or its PDF is not ready */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    RetainerContractsController_renderAnnexPdf: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                retainerId: string;
+                contractId: string;
+                annexId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Renders the annex again when its PDF is not ready */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuotePdfRender"];
                 };
             };
         };

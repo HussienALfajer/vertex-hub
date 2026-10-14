@@ -10,6 +10,7 @@ import { TemplatesModule } from '../templates/index.js';
 import { LeadQuotes } from './lead-quotes.js';
 import { QuoteAcceptService } from './quote-accept.service.js';
 import { QuoteAcceptedHooks } from './quote-accepted-hooks.js';
+import { QuoteContractServices } from './quote-contract-services.js';
 import { QuoteDirectory } from './quote-directory.js';
 import { QuoteEmailsController } from './quote-emails.controller.js';
 import { QuoteEmailsService } from './quote-emails.service.js';
@@ -30,7 +31,8 @@ import { QuotesService } from './quotes.service.js';
  * `NotificationCenter`. Recording an acceptance runs A01's engagement part through `projects`'
  * `EngagementFactory` and `templates`' `TemplateRunner`, and keeps the proof through `files`'
  * `GeneratedFiles`. Exports `QuoteDirectory` (company details, quote numbers) and `QuoteAcceptedHooks` (the
- * A01 deposit draft, F13) to `invoices`.
+ * A01 deposit draft, F13) to `invoices`, and gives retainer contracts their accepted quote's
+ * monthly services through `projects`' `ContractSources` (F05C K7).
  */
 @Module({
   imports: [
@@ -54,6 +56,7 @@ import { QuotesService } from './quotes.service.js';
     QuoteAcceptService,
     QuoteDirectory,
     QuoteAcceptedHooks,
+    QuoteContractServices,
     QuoteRecipients,
     LeadQuotes,
   ],
