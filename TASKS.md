@@ -244,4 +244,4 @@ PR 5a is merged (#115). No API, db or bridge change.
 - [x] Wiring checklist (web only: no contracts, db, api or bridge change; OpenAPI files untouched since `main`)
 - [x] Full checks through `checker`: lint, typecheck, `pnpm test` (11/11), build, E2E (382 passed); after the review fixes: web lint, typecheck, test (87) and the F05B/F05C E2E specs (22) pass
 - [x] `reviewer` with the spec; blocking findings fixed (open-ended "Prepare contract" hidden only while a term holds the current cycle, as the API; articles reorder by drag from a grip as well as up/down, in the contract editor and the settings)
-- [ ] Owner acceptance steps 7–9 and 11; then `/ship`; ROADMAP marks F05C done
+- [x] Owner asked for the PR directly (acceptance in the browser left to the owner); ROADMAP marks F05C done; PR opened with auto-merge
