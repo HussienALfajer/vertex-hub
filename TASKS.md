@@ -187,7 +187,9 @@ PR 3 is merged (#113). Owner `projects` for the contract settings (new schema fi
 
 ### Close PR 4
 - [x] Wiring checklist; spec and `docs/architecture.md` updated where settled
-- [ ] Full checks through `checker`; `reviewer` with the spec; owner waived acceptance (asked for the PR directly); PR with auto-merge
+- [x] Full checks through `checker`: lint, typecheck, build, migration drift, OpenAPI fresh, E2E (390 passed; `f04-accept.spec.ts:85` and `f07.spec.ts:31` failed once under the timed run and passed alone); after the review fixes lint, typecheck, `pnpm test` (11/11) and the F05C PR 4 E2E specs pass
+- [x] `reviewer` with the spec; blocking finding fixed (the audit log showed the national ID marker as the English word "changed": now a shared constant translated on the audit page); saved articles reset the form from the response, so new ones keep their ids
+- [x] Owner waived acceptance (asked for the PR directly); PR opened with auto-merge
 
 - [x] Found while building: Finance and employees hold `projects.manage` with scope `assigned` (derived employee role), so "any scope" let Finance read the settings, against the Roles column; reading needs client scope (`all` or `own_clients`), spec updated. The lead conversion contact omits the legal fields (out of its scope).
 
