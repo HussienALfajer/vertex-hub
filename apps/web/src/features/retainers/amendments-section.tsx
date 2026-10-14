@@ -3,6 +3,7 @@ import type {
   Amendment,
   AmendmentStatus,
   Currency,
+  RetainerContract,
   RetainerDetail,
   RetainerTerm,
   SourceInvoice,
@@ -38,6 +39,8 @@ import { formatDateTime, formatNumber, formatPeriod, isolateLtr } from '../../li
 import { formatMoney } from '../../lib/money';
 import { useFocusAfterChange } from '../../lib/use-focus-after-change';
 import { AmendmentDialog, EffectText } from './amendment-dialog';
+import { type AnnexState, annexState } from './contract-coverage';
+import { IssueAnnexDialog } from './contract-dialogs';
 import { lineName } from './retainer-badges';
 import {
   retainerAmendmentsQuery,
@@ -58,13 +61,22 @@ const STATUS_TONES: Record<AmendmentStatus, NonNullable<BadgeProps['tone']>> = {
  * F05B screen 3, the amendments list: lines, amount, status, creator and decision; the General
  * Manager approves or rejects pending ones, their creator or a manager withdraws them.
  */
-export function AmendmentsSection({ retainer }: { retainer: RetainerDetail }) {
+export function AmendmentsSection({
+  retainer,
+  terms,
+  contracts,
+}: {
+  retainer: RetainerDetail;
+  terms: RetainerTerm[];
+  /** The retainer's contracts (money access): each applied amendment's annex (K10). */
+  contracts?: RetainerContract[];
+}) {
   const { t } = useTranslation();
   const me = useMe();
   const amendments = useQuery(retainerAmendmentsQuery(retainer.id));
   const currency = retainer.money?.currency ?? 'USD';
   const canApprove = can(me, 'retainers.approve_reduction');
-  const { canManage, canEditMoney } = retainer.permissions;
+  const { canManage, canEditMoney, canBill } = retainer.permissions;
   const titleId = useId();
 
   return (
@@ -97,6 +109,8 @@ export function AmendmentsSection({ retainer }: { retainer: RetainerDetail }) {
               retainerId={retainer.id}
               amendment={amendment}
               currency={currency}
+              annex={contracts ? annexState(amendment, contracts, terms) : null}
+              canIssueAnnex={canBill}
               canApprove={canApprove && amendment.status === 'pending_approval'}
               canWithdraw={
                 amendment.status === 'pending_approval' &&
@@ -114,12 +128,17 @@ function AmendmentCard({
   retainerId,
   amendment,
   currency,
+  annex,
+  canIssueAnnex,
   canApprove,
   canWithdraw,
 }: {
   retainerId: string;
   amendment: Amendment;
   currency: Currency;
+  annex: AnnexState;
+  /** Contract managers: client scope with money access. */
+  canIssueAnnex: boolean;
   canApprove: boolean;
   canWithdraw: boolean;
 }) {
@@ -251,6 +270,24 @@ function AmendmentCard({
           )}
           {amendment.decision.note && ` — ${amendment.decision.note}`}
         </p>
+      )}
+      {annex?.kind === 'annex' && (
+        <p className="text-sm text-muted-foreground">
+          {t('retainers.contracts.annexedIn', {
+            annex: formatNumber(annex.annex.annexNumber),
+            number: annex.contract.number ?? '',
+          })}
+        </p>
+      )}
+      {annex?.kind === 'available' && canIssueAnnex && (
+        <div>
+          <IssueAnnexDialog
+            retainerId={retainerId}
+            amendment={amendment}
+            contract={annex.contract}
+            fallback={() => heading.current}
+          />
+        </div>
       )}
       {(canApprove || canWithdraw) && (
         <div className="flex flex-wrap gap-2">

@@ -17,6 +17,7 @@ import {
   type ApprovalRequestDetail,
   type ApprovalWithdrawnReason,
   type AuditEntry,
+  absentContractBlocks,
   acceptQuoteSchema,
   acceptsUpdates,
   adDepositDisplayNumber,
@@ -56,10 +57,16 @@ import {
   type ClientStatement,
   type ClientStatus,
   type CloseShoot,
+  CONTRACT_AGENCY_FIELDS,
+  CONTRACT_CLIENT_FIELDS,
+  CONTRACT_REQUIRED_FIELDS,
   type CompanyDashboard,
   type Contact,
   type ContentCalendar,
+  type ContractAnnex,
+  type ContractArticle,
   type ContractSettings,
+  type ContractSnapshot,
   type ConvertLead,
   type CreateAmendmentInput,
   type CreateApprovalRequest,
@@ -131,6 +138,7 @@ import {
   type FileVersion,
   type FinanceDashboard,
   fileTypeOf,
+  fillContractValues,
   followUpDateInRange,
   followUpFilterRange,
   formatContractNumber,
@@ -269,6 +277,8 @@ import {
   type RescheduleTerm,
   type Retainer,
   type RetainerBilling,
+  type RetainerContract,
+  type RetainerContractDetail,
   type RetainerDeliverables,
   type RetainerDetail,
   type RetainerStatus,
@@ -1089,8 +1099,19 @@ export async function mockApi(page: Page, options: MockOptions): Promise<MockedA
   const projects = projectsSeed();
   const projectsApi = projectRoutes({ users, clients, projects, me: () => me });
   const retainers = retainersSeed();
-  const retainersApi = retainerRoutes({ users, clients, retainers, me: () => me });
-  const contractSettingsApi = contractSettingsRoutes({ users, me: () => me });
+  const contractSettings = contractSettingsSeed();
+  const retainersApi = retainerRoutes({
+    users,
+    clients,
+    retainers,
+    me: () => me,
+    contractSettings,
+  });
+  const contractSettingsApi = contractSettingsRoutes({
+    users,
+    me: () => me,
+    state: contractSettings,
+  });
   const sent = options.approvals ? approvalsSeed() : { tasks: [], files: [], requests: [] };
   const planned = options.content
     ? contentSeed()
@@ -2456,6 +2477,31 @@ interface RetainerRecord {
   /** F05B: amendments, oldest first. */
   amendments?: Amendment[];
   amendmentCharges?: AmendmentChargeRecord[];
+  /** F05C: contracts and their annexes, oldest first; discarded drafts are archived. */
+  contracts?: ContractRecord[];
+}
+
+interface ContractRecord {
+  id: string;
+  kind: RetainerContract['kind'];
+  termId: string | null;
+  startCycle: number;
+  status: RetainerContract['status'];
+  number: string | null;
+  contractDate: string;
+  signatoryContactId: string | null;
+  articles: ContractArticle[];
+  /** Frozen at issue (K3). */
+  snapshot: ContractSnapshot | null;
+  signed: RetainerContract['signed'];
+  voided: RetainerContract['voided'];
+  issuedAt: string | null;
+  issuedBy: { id: string; name: string } | null;
+  draftPdf: RetainerContractDetail['draftPdf'];
+  annexes: ContractAnnex[];
+  archived: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
 const deliverable = (
@@ -2767,17 +2813,15 @@ interface RetainerState {
   clients: ClientRecord[];
   retainers: RetainerRecord[];
   me: () => MeResponse;
+  /** The contract settings drafts copy their articles from (F05C K2). */
+  contractSettings: ContractSettingsState;
 }
 
 /** The retainers API (F05) over the in-memory records, with its access, cycle and money rules. */
 /** The contract settings of F05C: agency details, numbering and the default articles. */
-function contractSettingsRoutes({ users, me }: { users: UserResponse[]; me: () => MeResponse }) {
-  const scopes = (permission: string) =>
-    me().permissions.find((g) => g.permission === permission)?.scopes ?? [];
-  const reads = () =>
-    scopes('projects.manage').some((scope) => scope === 'all' || scope === 'own_clients') &&
-    scopes('invoices.read').length > 0;
-  const edits = () => scopes('catalog.manage').length > 0;
+type ContractSettingsState = ReturnType<typeof contractSettingsSeed>;
+
+function contractSettingsSeed() {
   let next = 9100;
   const settings = {
     legalName: 'شركة فيرتكس ميديا للخدمات الإعلامية',
@@ -2795,7 +2839,7 @@ function contractSettingsRoutes({ users, me }: { users: UserResponse[]; me: () =
     updatedAt: '2026-10-01T08:00:00.000Z',
     updatedBy: null as { id: string; name: string } | null,
   };
-  let articles = [
+  const articles = [
     {
       id: id(next++),
       title: 'موضوع العقد',
@@ -2812,10 +2856,29 @@ function contractSettingsRoutes({ users, me }: { users: UserResponse[]; me: () =
       body: 'تُستحق أتعاب كل دورة مقدماً، وتُسدَّد خلال {payment_terms_days} أيام من تاريخ الفاتورة.\n{fees}',
     },
   ];
+  return { settings, articles, next: () => id(next++), issued: 0 };
+}
+
+function contractSettingsRoutes({
+  users,
+  me,
+  state,
+}: {
+  users: UserResponse[];
+  me: () => MeResponse;
+  state: ContractSettingsState;
+}) {
+  const scopes = (permission: string) =>
+    me().permissions.find((g) => g.permission === permission)?.scopes ?? [];
+  const reads = () =>
+    scopes('projects.manage').some((scope) => scope === 'all' || scope === 'own_clients') &&
+    scopes('invoices.read').length > 0;
+  const edits = () => scopes('catalog.manage').length > 0;
+  const { settings } = state;
   const response = (): ContractSettings => ({
     ...settings,
-    nextNumber: formatContractNumber(settings.numberPrefix, 2026, 1),
-    articles,
+    nextNumber: formatContractNumber(settings.numberPrefix, 2026, state.issued + 1),
+    articles: state.articles,
     canEdit: edits(),
   });
   return (route: Route, method: string, url: URL, request: Request): Promise<void> | undefined => {
@@ -2834,14 +2897,18 @@ function contractSettingsRoutes({ users, me }: { users: UserResponse[]; me: () =
       if (input.articles.some((article) => unknownPlaceholders(article.body).length > 0)) {
         return fail(route, 400, 'UNKNOWN_PLACEHOLDER');
       }
-      articles = input.articles.map((article) => ({ ...article, id: article.id ?? id(next++) }));
-      return json(route, { articles });
+      state.articles.splice(
+        0,
+        state.articles.length,
+        ...input.articles.map((article) => ({ ...article, id: article.id ?? state.next() })),
+      );
+      return json(route, { articles: state.articles });
     }
     return undefined;
   };
 }
 
-function retainerRoutes({ users, clients, retainers, me }: RetainerState) {
+function retainerRoutes({ users, clients, retainers, me, contractSettings }: RetainerState) {
   const today = PROJECTS_TODAY;
   const holds = (permission: string, scope: string) =>
     me().permissions.some((g) => g.permission === permission && g.scopes.includes(scope as never));
@@ -3038,6 +3105,317 @@ function retainerRoutes({ users, clients, retainers, me }: RetainerState) {
   };
 
   // Answers a retainers request, or returns undefined to let the other mocks try.
+  // F05C contracts and annexes (K1–K11), with the API's access: money access to read, client
+  // scope with money access to change (G3).
+  const contractContent = (r: RetainerRecord, c: ContractRecord): ContractSnapshot => {
+    const { settings } = contractSettings;
+    const client = clientOf(r);
+    const contact = client?.contacts.find((x) => x.id === c.signatoryContactId && !x.archived);
+    const term = (r.terms ?? []).find((t) => t.id === c.termId);
+    const startCycle = term?.startCycle ?? c.startCycle;
+    const { legalName, tradeName, companyType, registrationNumber, address, phone, email } =
+      settings;
+    return {
+      displayNumber: c.number,
+      contractDate: c.contractDate,
+      agency: {
+        legalName,
+        tradeName,
+        companyType,
+        registrationNumber,
+        address,
+        phone,
+        email,
+        website: settings.website,
+        representativeName: settings.representativeName,
+        representativeTitle: settings.representativeTitle,
+      },
+      client: {
+        signatoryName: contact?.name ?? '',
+        fatherName: contact?.fatherName ?? '',
+        tradeName: client?.tradeName ?? '',
+        nationalId: contact?.nationalId ?? '',
+        registrationNumber: client?.registrationNumber ?? '',
+        phone: contact?.phone ?? '',
+        email: contact?.email ?? '',
+        address: client?.billingAddress ?? '',
+        title: contact?.jobTitle ?? '',
+      },
+      slogan: settings.slogan,
+      articles: c.articles.map((article, index) => ({
+        number: index + 1,
+        title: article.title,
+        body: fillContractValues(article.body, {
+          agency_name: settings.tradeName,
+          client_name: client?.tradeName ?? '',
+          retainer_name: r.name,
+          payment_terms_days: '15',
+        }),
+      })),
+      services: {
+        quote: null,
+        deliverables: live(r).map((d) => ({
+          kind: d.kind,
+          label: d.label,
+          quantity: d.monthlyQuantity,
+          revisionLimit: d.revisionLimit,
+        })),
+      },
+      term: {
+        kind: c.kind,
+        retainerName: r.name,
+        startDate: cyclePeriod(r.startDate, startCycle).periodStart,
+        cycleDay: Number(r.startDate.slice(8)),
+        cycles: term?.cycles ?? null,
+        endDate: term ? termEndDate(r.startDate, term.startCycle, term.cycles) : null,
+        endAction: term?.endAction ?? null,
+      },
+      fees: {
+        currency: r.currency,
+        agreedTotalMinor: term ? term.schedule.reduce((sum, amount) => sum + amount, 0) : null,
+        schedule: (term?.schedule ?? []).map((amountMinor, index) => ({
+          cycle: startCycle + index,
+          ...cyclePeriod(r.startDate, startCycle + index),
+          amountMinor,
+        })),
+        feeMinor: term ? null : r.monthlyFeeMinor,
+      },
+    };
+  };
+  const contractOf = (r: RetainerRecord, c: ContractRecord): RetainerContract => {
+    const term = (r.terms ?? []).find((t) => t.id === c.termId);
+    return {
+      id: c.id,
+      retainerId: r.id,
+      kind: c.kind,
+      term: term
+        ? {
+            id: term.id,
+            number: term.number,
+            startCycle: term.startCycle,
+            cycles: term.cycles,
+            startDate: cyclePeriod(r.startDate, term.startCycle).periodStart,
+            endDate: termEndDate(r.startDate, term.startCycle, term.cycles),
+          }
+        : null,
+      startCycle: c.startCycle,
+      status: c.status,
+      number: c.number,
+      contractDate: c.contractDate,
+      pdf: c.status === 'draft' ? null : { state: 'ready' },
+      signed: c.signed,
+      voided: c.voided,
+      issuedAt: c.issuedAt,
+      issuedBy: c.issuedBy,
+      changedSinceIssue: false,
+      annexes: c.annexes,
+      createdAt: c.createdAt,
+      updatedAt: c.updatedAt,
+    };
+  };
+  const contractDetail = (r: RetainerRecord, c: ContractRecord): RetainerContractDetail => {
+    const content = c.snapshot ?? contractContent(r, c);
+    const missing = [
+      ...CONTRACT_AGENCY_FIELDS.filter((field) => !content.agency[field]).map((field) => ({
+        party: 'agency' as const,
+        field,
+        required: (CONTRACT_REQUIRED_FIELDS.agency as readonly string[]).includes(field),
+      })),
+      ...CONTRACT_CLIENT_FIELDS.filter((field) => !content.client[field]).map((field) => ({
+        party: 'client' as const,
+        field,
+        required: (CONTRACT_REQUIRED_FIELDS.client as readonly string[]).includes(field),
+      })),
+    ];
+    const contact = clientOf(r)?.contacts.find((x) => x.id === c.signatoryContactId);
+    return {
+      ...contractOf(r, c),
+      signatoryContact: contact ? { id: contact.id, name: contact.name } : null,
+      articles: c.articles,
+      content,
+      missing: c.status === 'draft' ? missing : [],
+      absentBlocks: absentContractBlocks(c.articles.map((article) => article.body)),
+      draftPdf: c.status === 'draft' ? c.draftPdf : null,
+      canManage: !r.archived && clientScope(r) && seesMoney(r),
+    };
+  };
+  const contractRoutes = (
+    route: Route,
+    method: string,
+    request: Request,
+    r: RetainerRecord,
+    [childId, childPart, annexPart, annexId]: (string | undefined)[],
+    part: string,
+  ): Promise<void> => {
+    if (!seesMoney(r)) return fail(route, 403, null);
+    r.contracts ??= [];
+    const list = r.contracts;
+    const manages = clientScope(r) && !r.archived;
+    const body = <T>() => request.postDataJSON() as T;
+    const stamp = () => new Date().toISOString();
+    if (part === 'amendments') {
+      // POST /amendments/:id/annex (K10)
+      if (!manages) return fail(route, 403, null);
+      const amendment = (r.amendments ?? []).find((a) => a.id === childId);
+      if (!amendment) return fail(route, 404, null);
+      if (amendment.status !== 'applied' || amendment.kind === 'quote_renewal') {
+        return fail(route, 409, 'INVALID_TRANSITION');
+      }
+      const contract = list.find((c) => c.status === 'issued' || c.status === 'signed');
+      if (!contract) return fail(route, 409, 'NO_CONTRACT');
+      const annex: ContractAnnex = {
+        id: contractSettings.next(),
+        contractId: contract.id,
+        annexNumber: contract.annexes.length + 1,
+        amendment: { id: amendment.id, number: amendment.number },
+        status: 'issued',
+        annexDate: body<{ annexDate: string }>().annexDate,
+        pdf: { state: 'ready' },
+        signed: null,
+        voided: null,
+        issuedBy: { id: me().user.id, name: me().user.name },
+        createdAt: stamp(),
+      };
+      contract.annexes.push(annex);
+      return json(route, annex, 201);
+    }
+    if (!childId) {
+      if (method === 'GET') {
+        return json(route, {
+          items: list
+            .filter((c) => !c.archived)
+            .reverse()
+            .map((c) => contractOf(r, c)),
+        });
+      }
+      if (!manages) return fail(route, 403, null);
+      if (r.status === 'ended') return fail(route, 409, 'RETAINER_ENDED');
+      const input = body<{ kind: 'term' | 'open_ended'; termId?: string }>();
+      const term = (r.terms ?? []).find((t) => t.id === input.termId);
+      const exists = list.some(
+        (c) =>
+          !c.archived &&
+          c.status !== 'void' &&
+          (input.kind === 'term' ? c.termId === input.termId : c.kind === 'open_ended'),
+      );
+      if (exists) return fail(route, 409, 'CONTRACT_EXISTS');
+      const contact = clientOf(r)?.contacts.find((x) => x.hasFinalApproval && !x.archived);
+      const created: ContractRecord = {
+        id: contractSettings.next(),
+        kind: input.kind,
+        termId: term?.id ?? null,
+        startCycle: term?.startCycle ?? Math.max(1, currentCycleNumber(r.startDate, today)),
+        status: 'draft',
+        number: null,
+        contractDate: today,
+        signatoryContactId: contact?.id ?? null,
+        articles: contractSettings.articles.map((article) => ({
+          ...article,
+          id: contractSettings.next(),
+        })),
+        snapshot: null,
+        signed: null,
+        voided: null,
+        issuedAt: null,
+        issuedBy: null,
+        draftPdf: null,
+        annexes: [],
+        archived: false,
+        createdAt: stamp(),
+        updatedAt: stamp(),
+      };
+      list.push(created);
+      return json(route, contractDetail(r, created), 201);
+    }
+    const contract = list.find((c) => c.id === childId);
+    if (!contract) return fail(route, 404, null);
+    if (!childPart && method === 'GET') return json(route, contractDetail(r, contract));
+    if (childPart === 'pdf' && method === 'GET') {
+      return route.fulfill({ status: 200, contentType: 'application/pdf', body: '%PDF-1.4' });
+    }
+    if (!manages) return fail(route, 403, null);
+    contract.updatedAt = stamp();
+    if (childPart === 'annexes' && annexId) {
+      const annex = contract.annexes.find((a) => a.id === annexPart);
+      if (!annex) return fail(route, 404, null);
+      if (annexId === 'void') {
+        annex.status = 'void';
+        annex.voided = { at: stamp(), reason: body<{ reason: string }>().reason };
+      } else if (annexId === 'signed') {
+        annex.status = 'signed';
+        annex.signed = {
+          signedOn: body<{ signedOn: string }>().signedOn,
+          fileItemId: contractSettings.next(),
+        };
+      }
+      return json(route, annex);
+    }
+    const draft = contract.status === 'draft';
+    if (!childPart) {
+      if (!draft) return fail(route, 409, 'INVALID_TRANSITION');
+      const input = body<{
+        contractDate?: string;
+        signatoryContactId?: string | null;
+        articles?: { id?: string; title: string; body: string }[];
+      }>();
+      if (input.articles?.some((article) => unknownPlaceholders(article.body).length > 0)) {
+        return fail(route, 400, 'UNKNOWN_PLACEHOLDER');
+      }
+      if (input.contractDate) contract.contractDate = input.contractDate;
+      if (input.signatoryContactId !== undefined) {
+        contract.signatoryContactId = input.signatoryContactId;
+      }
+      if (input.articles) {
+        contract.articles = input.articles.map((article) => ({
+          ...article,
+          id: article.id ?? contractSettings.next(),
+        }));
+      }
+      if (contract.draftPdf) contract.draftPdf.outdated = true;
+      return json(route, contractDetail(r, contract));
+    }
+    if (childPart === 'pdf') {
+      if (draft) {
+        contract.draftPdf = { state: 'ready', renderedAt: stamp(), outdated: false };
+      }
+      return json(route, { state: 'ready' });
+    }
+    if (childPart === 'discard') {
+      if (!draft) return fail(route, 409, 'INVALID_TRANSITION');
+      contract.archived = true;
+      return json(route, contractDetail(r, contract));
+    }
+    if (childPart === 'issue') {
+      if (!draft) return fail(route, 409, 'INVALID_TRANSITION');
+      if (contractDetail(r, contract).missing.some((field) => field.required)) {
+        return fail(route, 409, 'CONTRACT_INCOMPLETE');
+      }
+      contractSettings.issued += 1;
+      contract.number = formatContractNumber(
+        contractSettings.settings.numberPrefix,
+        2026,
+        contractSettings.issued,
+      );
+      contract.status = 'issued';
+      contract.issuedAt = stamp();
+      contract.issuedBy = { id: me().user.id, name: me().user.name };
+      contract.snapshot = contractContent(r, contract);
+      return json(route, contractDetail(r, contract));
+    }
+    if (draft) return fail(route, 409, 'INVALID_TRANSITION');
+    if (childPart === 'void') {
+      contract.status = 'void';
+      contract.voided = { at: stamp(), reason: body<{ reason: string }>().reason };
+    } else if (childPart === 'signed') {
+      contract.status = 'signed';
+      contract.signed = {
+        signedOn: body<{ signedOn: string }>().signedOn,
+        fileItemId: contractSettings.next(),
+      };
+    }
+    return json(route, contractDetail(r, contract));
+  };
+
   return (route: Route, method: string, url: URL, request: Request): Promise<void> | undefined => {
     const path = url.pathname;
     const body = <T>() => request.postDataJSON() as T;
@@ -3222,6 +3600,16 @@ function retainerRoutes({ users, clients, retainers, me }: RetainerState) {
     if (part === 'archive' || part === 'restore') {
       retainer.archived = part === 'archive';
       return json(route, detail(retainer));
+    }
+    if (part === 'contracts' || (part === 'amendments' && childPart === 'annex')) {
+      return contractRoutes(
+        route,
+        method,
+        request,
+        retainer,
+        [childId, childPart, lineId, lineAction],
+        part,
+      );
     }
     if (part === 'amendments') {
       retainer.amendments ??= [];
@@ -7016,6 +7404,21 @@ function fileRoutes({
         confidentialReader: reader(client.id),
         scopeAll: holds('clients.manage', 'all'),
         writable: !client.archived,
+      };
+    }
+    if (type === 'retainer_contract') {
+      // F05C: a contract's PDF and signed copies are read-only through the file endpoints.
+      const retainer = retainers.find((r) => r.contracts?.some((c) => c.id === ownerId));
+      if (!retainer) return undefined;
+      return {
+        clientId: retainer.clientId,
+        label: retainer.name,
+        addDeliverable: false,
+        manage: false,
+        manageDocuments: false,
+        confidentialReader: reader(retainer.clientId),
+        scopeAll: false,
+        writable: false,
       };
     }
     const project = type === 'project' ? projects.find((p) => p.id === ownerId) : undefined;

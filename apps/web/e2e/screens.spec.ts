@@ -1655,6 +1655,47 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await screenshot(page, testInfo, `contract-settings-${colorScheme}`);
     });
 
+    test('contract editor and issued contract with annexes (F05C)', async ({ page }, testInfo) => {
+      const contracts = ar.retainers.contracts;
+      await page.setViewportSize({ width: 1280, height: 2400 });
+      await page.clock.setFixedTime(new Date(`${PROJECTS_TODAY}T09:00:00+03:00`));
+      await mockApi(page, { signedIn: true, me: manager });
+      await page.goto(`/retainers/${seedIds.adsRetainer}?tab=contract`);
+      await page
+        .getByRole('region', { name: ar.retainers.terms.name.replace('{{number}}', '2') })
+        .getByRole('button', { name: contracts.prepare })
+        .click();
+      // The draft before a signatory is chosen: missing fields flagged, issuing blocked.
+      await expect(page.getByTestId('party-signatoryName')).toContainText(contracts.requiredField);
+      await screenshot(page, testInfo, `contract-editor-${colorScheme}`);
+
+      await page.getByLabel(contracts.signatory).click();
+      await page.getByRole('option', { name: /د. رامي حسن/ }).click();
+      await page.getByRole('button', { name: contracts.save }).click();
+      await expect(page.getByText(contracts.saved)).toBeVisible();
+      await page.getByRole('button', { name: contracts.issue }).click();
+      await expect(page.getByText(contracts.issueEmpty)).toBeVisible();
+      await page.setViewportSize({ width: 1280, height: 1000 });
+      await screenshot(page, testInfo, `contract-issue-dialog-${colorScheme}`);
+      await page.getByRole('button', { name: contracts.issueAction }).click();
+
+      await page.goto(`/retainers/${seedIds.adsRetainer}?tab=contract`);
+      const amendment = page
+        .getByTestId('amendment')
+        .filter({ hasText: ar.retainers.amendments.name.replace('{{number}}', '2') });
+      await amendment.getByRole('button', { name: ar.retainers.amendments.approve }).click();
+      await amendment.getByRole('button', { name: contracts.issueAnnex }).click();
+      await page.getByRole('button', { name: contracts.issueAnnexAction }).click();
+      await expect(page.getByTestId('annex')).toBeVisible();
+      await page.setViewportSize({ width: 1280, height: 2400 });
+      await page
+        .getByRole('region', { name: contracts.title })
+        .getByRole('link', { name: contracts.open })
+        .click();
+      await expect(page.getByTestId('annex')).toBeVisible();
+      await screenshot(page, testInfo, `contract-issued-${colorScheme}`);
+    });
+
     test('contact dialog with and without the national ID (F05C)', async ({ page }, testInfo) => {
       await page.setViewportSize({ width: 1280, height: 1000 });
       await mockApi(page, { signedIn: true, me: manager });
