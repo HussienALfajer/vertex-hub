@@ -256,8 +256,9 @@ function ArticlesForm({
     setUnknown(flagged);
     if (flagged.size > 0) return;
     try {
-      await update.mutateAsync(values);
-      form.reset(values, { keepDirtyValues: false });
+      // The saved articles, with the ids of the new ones, become the form's clean state.
+      const saved = await update.mutateAsync(values);
+      form.reset({ articles: saved.articles }, { keepDirtyValues: false });
       toast.add({ title: t('retainers.contractSettings.articles.saved'), type: 'success' });
     } catch (error) {
       setFailure(errorMessage(t, error));

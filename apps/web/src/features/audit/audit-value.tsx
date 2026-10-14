@@ -30,6 +30,7 @@ import {
   LEAD_STAGES,
   MEETING_STATUSES,
   MILESTONE_STATUSES,
+  NATIONAL_ID_AUDIT_MASK,
   NOTE_CHANNELS,
   PAYMENT_METHODS,
   PLATFORM_ACCESS_STATES,
@@ -158,6 +159,14 @@ function enumLabel(
   value: unknown,
 ): string | undefined {
   const find = <T extends string>(list: readonly T[]) => list.find((known) => known === value);
+  // F05C: the log records that a national ID changed, never the value.
+  if (
+    entityType === 'client_contact' &&
+    field === 'nationalId' &&
+    value === NATIONAL_ID_AUDIT_MASK
+  ) {
+    return t('audit.nationalIdChanged');
+  }
   if (field === 'status') {
     const client = entityType === 'client' ? find(CLIENT_STATUSES) : undefined;
     if (client) return t(`clients.statuses.${client}`);

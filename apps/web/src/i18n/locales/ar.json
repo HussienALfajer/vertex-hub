@@ -1473,7 +1473,8 @@
     "receiptOfClient": "{{receipt}} لدى {{client}}",
     "invoiceNoun": "فاتورة",
     "quoteNoun": "عرض سعر",
-    "numberedCycleOfRetainer": "{{cycle}} من {{retainer}}"
+    "numberedCycleOfRetainer": "{{cycle}} من {{retainer}}",
+    "nationalIdChanged": "تغيّر (لا تُسجَّل القيمة)"
   },
   "tasks": {
     "internal": "مهمة داخلية",

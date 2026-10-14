@@ -1,6 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import type { INestApplication } from '@nestjs/common';
-import { CLIENT_LIMITS, clientDetailResponseSchema, contactSchema } from '@vertex-hub/contracts';
+import {
+  CLIENT_LIMITS,
+  clientDetailResponseSchema,
+  contactSchema,
+  NATIONAL_ID_AUDIT_MASK,
+} from '@vertex-hub/contracts';
 import { auditEntries, clientContacts, createDatabase } from '@vertex-hub/db';
 import { testDatabaseUrl } from '@vertex-hub/db/testing';
 import { eq } from 'drizzle-orm';
@@ -235,10 +240,10 @@ describe('client contacts', () => {
         .from(auditEntries)
         .where(eq(auditEntries.entityId, contact.id))
         .orderBy(auditEntries.id);
-      expect(audit[0]?.after).toMatchObject({ nationalId: 'changed' });
+      expect(audit[0]?.after).toMatchObject({ nationalId: NATIONAL_ID_AUDIT_MASK });
       expect(audit[1]).toEqual({
-        before: { nationalId: 'changed', fatherName: null },
-        after: { clientId: id, nationalId: 'changed', fatherName: 'خالد' },
+        before: { nationalId: NATIONAL_ID_AUDIT_MASK, fatherName: null },
+        after: { clientId: id, nationalId: NATIONAL_ID_AUDIT_MASK, fatherName: 'خالد' },
       });
       expect(JSON.stringify(audit)).not.toMatch(/111|222/);
     });

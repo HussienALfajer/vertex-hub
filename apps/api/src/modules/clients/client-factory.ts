@@ -3,6 +3,7 @@ import {
   CLIENT_LIMITS,
   type ClientStatus,
   type CreateContact,
+  NATIONAL_ID_AUDIT_MASK,
   type NoteChannel,
 } from '@vertex-hub/contracts';
 import {
@@ -258,8 +259,5 @@ export class ClientFactory {
  */
 export function maskNationalId<T extends { nationalId?: string | null }>(fields: T): T {
   if (fields.nationalId === undefined || fields.nationalId === null) return fields;
-  return { ...fields, nationalId: NATIONAL_ID_MASK };
+  return { ...fields, nationalId: NATIONAL_ID_AUDIT_MASK };
 }
-
-/** What the audit log stores in place of a national ID. */
-export const NATIONAL_ID_MASK = 'changed';

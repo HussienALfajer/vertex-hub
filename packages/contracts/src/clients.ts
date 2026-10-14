@@ -177,6 +177,9 @@ export const updateContactSchema = contactFieldsSchema.partial().meta({ id: 'Upd
 
 export type UpdateContact = z.infer<typeof updateContactSchema>;
 
+/** What the audit log stores in place of a set or cleared national ID: never the value (F05C). */
+export const NATIONAL_ID_AUDIT_MASK = 'changed';
+
 export const contactSchema = z
   .object({
     id: z.uuid(),

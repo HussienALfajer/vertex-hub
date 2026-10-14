@@ -162,7 +162,7 @@ PR 3 is merged (#113). Owner `projects` for the contract settings (new schema fi
 - [x] Gate: `contracts` test, root `typecheck`
 
 ### 2. db (`/db-migration`, expand only)
-- [x] `clients.registration_number`, `client_contacts.father_name`, `client_contacts.national_id` (nullable, length checks)
+- [x] `clients.registration_number`, `client_contacts.father_name`, `client_contacts.national_id` (nullable, limits checked by the contracts, as the billing columns)
 - [x] `contract_settings` (singleton row seeded, defaults: slogan, prefix `VM-CCS`); `contract_article_templates` seeded with the 17 appendix articles; `TABLE_OWNERS` entry
 - [x] Gate: `db` test, migration drift
 
