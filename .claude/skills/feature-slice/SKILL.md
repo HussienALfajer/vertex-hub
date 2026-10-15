@@ -1,6 +1,6 @@
 ---
 name: feature-slice
-description: Implement an approved feature spec end to end, layer by layer (contracts → db → api → OpenAPI → web → E2E), with a check gate after each layer, the reviewer, and the owner's acceptance steps. The implement step of the feature cycle, between /spec and /ship.
+description: Implement an approved feature spec end to end, layer by layer (contracts → db → api → OpenAPI → web → E2E), with a check gate after each layer, the reviewer, and the owner's acceptance steps. Then opens the PR with auto-merge. The implement step of the feature cycle, after /spec.
 argument-hint: <feature id or spec path, e.g. F02>
 disable-model-invocation: true
 effort: medium
@@ -17,7 +17,7 @@ Implement **$ARGUMENTS**. This skill orders the work and names the gates; the ru
 - Read only: the spec, the ADRs it lists, `wiring.md`, and the `CLAUDE.md` of each folder you will touch. Open reference files by range, when you write the layer that needs them.
 - If `TASKS.md` already holds this feature, continue from its first open PR instead of planning again. Check that the earlier PRs are merged into `main`.
 - Split the feature into PRs. Default: PR 1 is contracts, db and api with their tests; PR 2 is web and E2E. Use a single PR when the whole feature is small (about one table and one screen). A PR never leaves `main` broken or half-wired.
-- Write `TASKS.md` for this feature (replace the previous feature's file): a heading per PR, one item per layer below, the wiring items from `wiring.md` that apply, and "checks, reviewer, acceptance, /ship" at the end of each PR.
+- Write `TASKS.md` for this feature (replace the previous feature's file): a heading per PR, one item per layer below, the wiring items from `wiring.md` that apply, and "checks, reviewer, acceptance, PR with auto-merge" at the end of each PR.
 - Show the owner the PR split and the task list in a few lines, in Arabic, then **stop and wait for approval**.
 
 ## 2. Build, one layer at a time
@@ -36,13 +36,13 @@ Layers a PR does not include are skipped. Helpers that ADR 0013 says arrive with
 
 ## 3. Close each PR
 1. Walk the wiring checklist in `wiring.md` against the diff (`git diff main...HEAD --stat`).
-2. Full checks once, through `checker`: lint, typecheck, test, build; add E2E when web changed and migration drift when db changed. `checker` records the passes against the exact working tree, and `/ship` reuses them while no file changes; any later fix (reviewer, owner) invalidates the record, so the last full run after the last fix is the one `/ship` reuses.
+2. Start the full checks through `checker` in the background: lint, typecheck, test, build; add the changed E2E specs when web changed and migration drift when db changed. While they run, run the `reviewer` (next step). After any fix (checks, reviewer, owner), run the checks again: Turbo's cache replays what the fix did not touch, so the re-run costs only the changed packages.
 3. Run the `reviewer` subagent with the spec path. Fix every blocking finding, then re-run the affected gates.
 4. Owner acceptance, in Arabic:
    - PR with screens: turn the spec's "Acceptance" section into numbered browser steps for the owner (`pnpm dev`, which roles to sign in as, what to click, what they should see). Ask before `pnpm db:migrate` on the dev database.
    - PR without screens: summarize the endpoints and their rules; the owner may try them at `http://127.0.0.1:3000/api/docs`.
    Fix what the owner reports in the same session, then repeat steps 2–3 for what changed.
-5. Tick the PR's items in `TASKS.md` and hand over to `/ship`. Do not commit, push or open the PR from this skill.
+5. Tick the PR's items in `TASKS.md`, then, as soon as the owner accepts, finish the PR in the same turn: follow "Finishing a task" in `AGENTS.md` (docs and `docs/ROADMAP.md`, secrets check, checks, commit, push, `gh pr create`, `gh pr merge <number> --auto --merge`, report with the cleanup line and the next session's first message).
 
 ## Stop and ask when
 - The spec is ambiguous in a way that changes the result, or the work needs an answer from `docs/open-questions.md`.

@@ -1,4 +1,4 @@
-import { testDatabaseUrl } from '@vertex-hub/db/testing';
+import { TEST_WORKERS } from '@vertex-hub/db/testing';
 import swc from 'unplugin-swc';
 import { defineConfig } from 'vitest/config';
 
@@ -13,13 +13,17 @@ export default defineConfig({
     }),
   ],
   test: {
-    // Files share one test database, and some rows are global (one manager per department).
-    fileParallelism: false,
+    // Each worker has its own test database (packages/db testing.ts): files run in parallel, and
+    // files in one worker run one after another on it, since some rows are global (one manager
+    // per department).
+    maxWorkers: TEST_WORKERS,
     globalSetup: ['./test/global-setup.ts'],
+    setupFiles: ['./test/worker-env.ts'],
     env: {
       NODE_ENV: 'test',
       LOG_LEVEL: 'silent',
-      DATABASE_URL: testDatabaseUrl(),
+      // test/worker-env.ts sets DATABASE_URL to the worker's database.
+      TEST_DATABASE_SUITE: 'api',
       // Tests call job handlers directly; pg-boss stays off.
       JOBS_ENABLED: 'false',
     },
