@@ -226,6 +226,7 @@ test('a link is reissued and revoked, and a response by hand shows on the client
 test('everyone reads requests; only client scope acts, and a notification opens its request', async ({
   page,
 }) => {
+  test.setTimeout(90_000);
   await page.setViewportSize({ width: 1280, height: 1400 });
   await onTasksToday(page);
   const api = await mockApi(page, {

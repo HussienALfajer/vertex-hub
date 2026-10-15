@@ -4,6 +4,10 @@ const baseURL = 'http://127.0.0.1:4173';
 
 export default defineConfig({
   testDir: './e2e',
+  // Every test builds its own mocked API (`mockApi(page)`), so tests run in any order. Running
+  // them in parallel lets `--shard` split by test rather than by file: `screens.spec.ts` alone
+  // holds half the suite.
+  fullyParallel: true,
   forbidOnly: !!process.env.CI,
   // One retry keeps a runner hiccup from failing CI, but a test that only passes on retry fails
   // the run: flaky tests hide real intermittent bugs.

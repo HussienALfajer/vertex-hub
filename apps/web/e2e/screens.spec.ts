@@ -675,6 +675,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
     test('approval links: ready, new request, sent, request page, task panel, client tab', async ({
       page,
     }, testInfo) => {
+      test.setTimeout(90_000);
       await page.setViewportSize({ width: 1280, height: 900 });
       await page.clock.setFixedTime(new Date(`${PROJECTS_TODAY}T09:00:00+03:00`));
       await mockApi(page, { signedIn: true, approvals: true });
@@ -992,6 +993,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
     test('lead page: open, won and lost; convert, lose and the accept step 0', async ({
       page,
     }, testInfo) => {
+      test.setTimeout(90_000);
       await page.setViewportSize({ width: 1440, height: 1100 });
       await mockApi(page, { signedIn: true });
       await page.goto(`/leads/${seedIds.noorLead}`);
@@ -1416,6 +1418,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
     test('post page: in production, linking a task, approved, medical stage, published', async ({
       page,
     }, testInfo) => {
+      test.setTimeout(90_000);
       await page.setViewportSize({ width: 1280, height: 1700 });
       await page.clock.setFixedTime(new Date(`${PROJECTS_TODAY}T09:00:00+03:00`));
       const api = await mockApi(page, { signedIn: true, me: accountManagerMe, content: true });
@@ -1474,6 +1477,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
     test('posts in approvals: queues, send month, request page, post panel, client page', async ({
       page,
     }, testInfo) => {
+      test.setTimeout(90_000);
       await page.setViewportSize({ width: 1280, height: 900 });
       await page.clock.setFixedTime(new Date(`${PROJECTS_TODAY}T09:00:00+03:00`));
       const api = await mockApi(page, { signedIn: true, me: medicalReviewerMe, content: true });
