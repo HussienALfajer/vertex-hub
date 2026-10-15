@@ -10,16 +10,16 @@
 
 ## Delegation
 
-- `checker` subagent (Haiku): runs typecheck, lint and tests and returns only the failures. Use it instead of reading long check output in the main session.
+- `checker` subagent (Haiku): runs typecheck, lint and tests and returns only the failures. Use it instead of reading long check output in the main session, in the background while you keep working.
 - `reviewer` subagent (Opus, fresh context): reviews the branch against its spec and the conventions, blocking issues only. Use it at the review step of every feature.
 - Built-in `Explore` subagent: broad searches across many files, when only the conclusion is needed.
 
 ## Skills
 
 - `/spec <feature>`: interview the owner, then write `docs/specs/<feature>.md`.
-- `/feature-slice <feature>`: implement an approved spec layer by layer (contracts → db → api → web → E2E) with a check gate per layer, the reviewer and the owner's acceptance steps; stops before `/ship`.
+- `/feature-slice <feature>`: implement an approved spec layer by layer (contracts → db → api → web → E2E) with a check gate per layer, the reviewer and the owner's acceptance steps, then opens the PR with auto-merge ("Finishing a task" in `AGENTS.md`).
 - `/db-migration`: change the schema, generate and review the migration, test it.
-- `/ship`: final checks, commit, PR with auto-merge, final report.
+- There is no shipping skill: every task ends by opening its PR with auto-merge right away, following "Finishing a task" in `AGENTS.md`.
 
 ## Context hygiene
 
@@ -29,7 +29,7 @@
 
 ## Feature workflow
 
-`/spec` (own session, `high`) → `/feature-slice` (one session per PR: plan, implement, `reviewer`, owner acceptance) → `/ship` (updates `docs/ROADMAP.md`). Production deploys happen once per phase, in their own session. Sessions, effort and first messages: `docs/workflow.md`.
+`/spec` (own session, `high`, ends with the spec PR) → `/feature-slice` (one session per PR: plan, implement, `reviewer`, owner acceptance, then the PR with auto-merge and `docs/ROADMAP.md` updated). Production deploys happen once per phase, in their own session. Sessions, effort and first messages: `docs/workflow.md`.
 
 ## Compaction
 

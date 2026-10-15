@@ -14,7 +14,7 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done. Feature IDs
 - [x] Authentication (Better Auth), login page, permission map and guards (map provisional until the F01 spec, Q13)
 - [x] CI: typecheck, lint, test, build, e2e smoke, gitleaks
 - [x] Engineering conventions (ADR 0013): `core/` + `modules/` layout, architecture tests for route access, module boundaries and data rules
-- [x] Claude Code setup: settings (model, effort, permissions, guarded reads, Biome hook), folder `AGENTS.md` rules, skills (`spec`, `db-migration`, `ship`), subagents (`checker`, `reviewer`), spec template
+- [x] Claude Code setup: settings (model, effort, permissions, guarded reads, Biome hook), folder `AGENTS.md` rules, skills (`spec`, `db-migration`; `ship` folded into "Finishing a task" in `AGENTS.md`, 2026-10-15), subagents (`checker`, `reviewer`), spec template
 - [x] Deployment on the VPS: https://hub.vertexmedia.pro, atomic releases, health checks, daily local backups (`docs/deployment.md`)
 
 ## Phase 1 — Core

@@ -115,5 +115,5 @@ Deployment follows the server's existing conventions (ADR 0009): a dedicated sys
 ## Environments
 
 - **Local (Windows):** PostgreSQL 17 installed natively; `pnpm db:setup-local` creates the role and the `vertex_hub` and `vertex_hub_test` databases. `pnpm dev` runs api (:3000), worker and web (:5173, proxies `/api`).
-- **CI:** GitHub Actions with a PostgreSQL service container.
+- **CI:** GitHub Actions with a PostgreSQL service container. Lint/typecheck/build, the tests and four Playwright shards run as parallel jobs behind two gate jobs (the checks the `main` ruleset requires); Turborepo's cache is kept between runs, and a PR that changes only Markdown outside `brand/` skips the checks.
 - **Production:** https://hub.vertexmedia.pro on the owner's VPS, atomic releases with automatic rollback (runbook: `docs/deployment.md`). No staging in V1.

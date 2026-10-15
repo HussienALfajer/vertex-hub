@@ -16,10 +16,38 @@ concurrency:
 # Third-party actions are pinned to full commit SHAs (the tag in the comment); Dependabot
 # proposes updates (.github/dependabot.yml).
 jobs:
-  checks:
-    name: Typecheck, lint, test, build
+  # Pull requests that change only Markdown no check reads (everything outside brand/) skip the
+  # checks; the gate jobs below still report, so the ruleset and auto-merge work.
+  changes:
+    name: Changes
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 5
+    outputs:
+      code: ${{ steps.diff.outputs.code }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - id: diff
+        env:
+          BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          code=true
+          if git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+            changed=$(git diff --name-only "$BASE" HEAD)
+            if [ -n "$changed" ] && ! echo "$changed" | grep -qvE '\.md$' && ! echo "$changed" | grep -q '^brand/'; then
+              code=false
+            fi
+          fi
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          echo "Checks needed: $code"
+
+  static:
+    name: Lint, typecheck, build
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
     services:
       postgres:
         image: postgres:17
@@ -45,13 +73,17 @@ jobs:
           node-version-file: .node-version
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # Turborepo's cache across runs: tasks whose inputs did not change are replayed, not rerun
+      # (a merge to main replays its pull request's tasks).
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .turbo/cache
+          key: turbo-${{ github.job }}-${{ github.sha }}
+          restore-keys: turbo-${{ github.job }}-
       - name: No known high-severity advisory in production dependencies
         run: pnpm audit --prod --audit-level=high
       - run: pnpm lint
       - run: pnpm typecheck
-      # The worker's quote PDF test renders with Chromium (F04).
-      - run: pnpm --filter @vertex-hub/worker exec playwright install --with-deps chromium
-      - run: pnpm test
       - run: pnpm build
       - name: Migrations match the schema
         run: |
@@ -84,11 +116,35 @@ jobs:
             sleep 2
           done
           echo "The worker did not start"; cat api.log worker.log; exit 1
+      # The cache only grows (each run adds its new task results): start over past 1.5 GB.
+      - name: Keep the Turborepo cache small
+        if: always()
+        run: |
+          if [ -d .turbo/cache ] && [ "$(du -sm .turbo/cache | cut -f1)" -gt 1500 ]; then rm -rf .turbo/cache; fi
 
-  e2e:
-    name: Playwright smoke
+  test:
+    name: Tests
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: vertex_hub
+          POSTGRES_PASSWORD: ci-only-password
+          POSTGRES_DB: vertex_hub_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U vertex_hub"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://vertex_hub:ci-only-password@localhost:5432/vertex_hub_test
+      TEST_DATABASE_URL: postgres://vertex_hub:ci-only-password@localhost:5432/vertex_hub_test
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
@@ -97,17 +153,95 @@ jobs:
           node-version-file: .node-version
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # Turborepo's cache across runs: tasks whose inputs did not change are replayed, not rerun
+      # (a merge to main replays its pull request's tasks).
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .turbo/cache
+          key: turbo-${{ github.job }}-${{ github.sha }}
+          restore-keys: turbo-${{ github.job }}-
+      # One test database per parallel worker of the api suite (TEST_WORKERS, packages/db testing.ts).
+      - name: The api suite's worker databases
+        run: for n in 1 2 3 4; do psql "$DATABASE_URL" -c "create database vertex_hub_test_api_$n"; done
+      # The worker's quote PDF test renders with Chromium (F04).
+      - run: pnpm --filter @vertex-hub/worker exec playwright install --with-deps chromium
+      - run: pnpm test
+      # The cache only grows (each run adds its new task results): start over past 1.5 GB.
+      - name: Keep the Turborepo cache small
+        if: always()
+        run: |
+          if [ -d .turbo/cache ] && [ "$(du -sm .turbo/cache | cut -f1)" -gt 1500 ]; then rm -rf .turbo/cache; fi
+
+  e2e:
+    name: Playwright shard ${{ matrix.shard }}
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # The tests split over four runners (Playwright --shard).
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # Turborepo's cache across runs: tasks whose inputs did not change are replayed, not rerun
+      # (a merge to main replays its pull request's tasks).
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .turbo/cache
+          key: turbo-${{ github.job }}-${{ matrix.shard }}-${{ github.sha }}
+          restore-keys: turbo-${{ github.job }}-${{ matrix.shard }}-
       - run: pnpm --filter @vertex-hub/web exec playwright install --with-deps chromium
-      - run: pnpm test:e2e
+      - run: pnpm turbo run test:e2e -- --shard=${{ matrix.shard }}/4
       # The report and the RTL screenshots (light and dark) are the review evidence of each run.
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
-          name: playwright-report
+          name: playwright-report-${{ matrix.shard }}
           path: |
             apps/web/playwright-report
             apps/web/test-results
           retention-days: 14
+      # The cache only grows (each run adds its new task results): start over past 1.5 GB.
+      - name: Keep the Turborepo cache small
+        if: always()
+        run: |
+          if [ -d .turbo/cache ] && [ "$(du -sm .turbo/cache | cut -f1)" -gt 1500 ]; then rm -rf .turbo/cache; fi
+
+  # The checks the main ruleset requires: they pass when every job behind them passed or was
+  # skipped (documentation only), and fail otherwise.
+  checks:
+    name: Typecheck, lint, test, build
+    needs: [changes, static, test]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          echo "$NEEDS"
+          ! echo "$NEEDS" | grep -qE '"result": "(failure|cancelled)"'
+
+  e2e-gate:
+    name: Playwright smoke
+    needs: [changes, e2e]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          echo "$NEEDS"
+          ! echo "$NEEDS" | grep -qE '"result": "(failure|cancelled)"'
 
   gitleaks:
     name: Secret scan

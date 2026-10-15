@@ -32,7 +32,15 @@ if (app.username !== test.username || app.host !== test.host) {
 
 const role = decodeURIComponent(app.username);
 const password = decodeURIComponent(app.password);
-const databases = [app, test].map((url) => decodeURIComponent(url.pathname.slice(1)));
+// One test database per parallel Vitest worker of the api suite: `<test database>_api_<n>`.
+// Keep in step with TEST_WORKERS in packages/db/src/testing.ts.
+const TEST_WORKERS = 4;
+const testDatabase = decodeURIComponent(test.pathname.slice(1));
+const databases = [
+  decodeURIComponent(app.pathname.slice(1)),
+  testDatabase,
+  ...Array.from({ length: TEST_WORKERS }, (_, index) => `${testDatabase}_api_${index + 1}`),
+];
 
 const literal = (value) => `'${value.replaceAll("'", "''")}'`;
 const sql = [

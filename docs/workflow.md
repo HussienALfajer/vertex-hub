@@ -16,13 +16,13 @@ A feature runs through separate sessions. Each session ends with a merged PR (or
 
 | # | Session | Model and effort | First message | The owner | Ends with |
 |---|---|---|---|---|---|
-| 1 | Spec | Opus 5.5, `high` | `/spec <id>` | Answers the interview; approves the spec | `/ship` of the spec as a `docs/<id>-spec` PR |
-| 2 | Backend PR | Opus 5.5, `high` when it adds or changes core tables, else `medium` | `/feature-slice <id>` | Approves the PR split and `TASKS.md`; may try the endpoints at `/api/docs` | `/ship` of PR 1 (contracts, db, api) |
-| 3 | Web PR | Opus 5.5, `medium` | `/feature-slice <id>` | Runs the acceptance steps in the browser, in each role the spec names | `/ship` of PR 2 (web, E2E); `docs/ROADMAP.md` marks the feature done |
+| 1 | Spec | Opus 5.5, `high` | `/spec <id>` | Answers the interview; approves the spec | The spec's `docs/<id>-spec` PR with auto-merge |
+| 2 | Backend PR | Opus 5.5, `high` when it adds or changes core tables, else `medium` | `/feature-slice <id>` | Approves the PR split and `TASKS.md`; may try the endpoints at `/api/docs` | PR 1 (contracts, db, api) with auto-merge |
+| 3 | Web PR | Opus 5.5, `medium` | `/feature-slice <id>` | Runs the acceptance steps in the browser, in each role the spec names | PR 2 (web, E2E) with auto-merge; `docs/ROADMAP.md` marks the feature done |
 | 4 | Phase deploy (once per phase) | Opus 5.5, `low` | `Deploy phase <n> to production` | Approves the deploy; checks the live site | Deploy done, the phase's deploy item ticked in `docs/ROADMAP.md` |
 
 - A small feature (about one table and one screen) does sessions 2 and 3 in one session and one PR.
-- `/feature-slice` reads `TASKS.md` and continues from the first open PR, so a session can stop between PRs and a new one picks up. `TASKS.md` is committed with each PR (`/ship` stages it), so a new session, local or cloud, finds the plan in the checkout.
+- `/feature-slice` reads `TASKS.md` and continues from the first open PR, so a session can stop between PRs and a new one picks up. `TASKS.md` is committed with each PR (the finishing steps stage it), so a new session, local or cloud, finds the plan in the checkout.
 - After each merge the owner runs the cleanup line from the report, then `/clear`.
 - **Deploys happen at the end of a phase, not after each feature.** Merging to `main` does not deploy; the phase-deploy session runs `vertexhub-deploy` on the server after the owner approves it (`docs/deployment.md`). A hotfix for a bug in production is the exception, deployed when the owner asks.
 - Inside session 2 or 3, use `/compact` between layers if the context grows, never in the middle of one.
@@ -34,7 +34,7 @@ Steps inside a session:
 2. **Plan** (`/feature-slice`, first step): the agent splits the feature into PRs and writes `TASKS.md`; the owner approves before any code.
 3. **Implement** (`/feature-slice`): one layer at a time, contracts → db → api → OpenAPI → web → E2E, each followed by a check gate through the `checker` subagent. The new-module wiring checklist and the F01 files to copy from are in `.claude/skills/feature-slice/wiring.md`.
 4. **Review:** the `reviewer` subagent (fresh context) checks the branch against the spec and the rules and reports blocking issues only.
-5. **Accept and close:** the owner tries it in the browser, `/ship` runs the checks that have not already passed on the same files (the `checker` subagent records each pass in `scripts/check-record.mjs`; documentation-only changes skip local checks), opens the PR with auto-merge and updates `docs/ROADMAP.md`. CI runs every check on every PR before the merge.
+5. **Accept and open the PR at once:** the owner tries it in the browser; in the same turn the agent follows "Finishing a task" in `AGENTS.md`: updates `docs/ROADMAP.md`, runs the checks through the `checker` (Turbo's cache replays every task whose inputs did not change, so only what changed since the last run runs again), commits, pushes, opens the PR and enables auto-merge. There is no separate shipping command (owner, 2026-10-15). CI runs every check on every PR before the merge (the full E2E suite over four shards); a PR that changes only Markdown outside `brand/` skips them.
 
 ## How the instructions are layered
 
@@ -45,7 +45,7 @@ Each rule lives in one place and loads only when it is needed, so every turn car
 | Project rules | `AGENTS.md` (shared with Codex), `CLAUDE.md` (Claude-specific, imports `AGENTS.md`) | Every session |
 | Folder rules | `<app or package>/CLAUDE.md`; the root `AGENTS.md` points other agents to them | When the agent reads a file in that folder |
 | Decisions and specs | `docs/decisions/`, `docs/specs/`, `docs/product/v1-scope.md` | On demand, the parts the task needs |
-| Workflows | `.claude/skills/`: `spec`, `feature-slice`, `db-migration`, `ship` | When invoked (`db-migration` also when a schema change is detected) |
+| Workflows | `.claude/skills/`: `spec`, `feature-slice`, `db-migration` | When invoked (`db-migration` also when a schema change is detected) |
 | Subagents | `.claude/agents/`: `checker` (Haiku, runs checks and returns failures only), `reviewer` (Opus, fresh-context review) | In their own context; only their summary returns |
 | Enforcement | Biome hook on every edit (`.claude/hooks/`), architecture and conventions tests, CI | Always, without costing context |
 | Guard rails | `.claude/settings.json`: model and effort, permissions, reads of generated files denied | Always |
