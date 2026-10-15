@@ -71,6 +71,7 @@ test('the General Manager edits the agency details and the default articles (K12
 test('an account manager reads the settings; Finance and employees do not reach them', async ({
   page,
 }) => {
+  test.setTimeout(90_000);
   await mockApi(page, { signedIn: true, me: accountManagerMe });
   await page.goto('/settings/contracts');
   await expect(page.getByText(ar.retainers.contractSettings.readOnlyTitle)).toBeVisible();

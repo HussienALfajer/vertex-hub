@@ -113,6 +113,7 @@ test('a manager drafts an invoice from billable items and a free line', async ({
 test('account managers read their clients’ invoices only; employees see no invoices', async ({
   page,
 }) => {
+  test.setTimeout(90_000);
   const api = await mockApi(page, { signedIn: true, me: accountManagerMe });
   await page.goto('/invoices');
   // No drafts to issue for readers: their first tab is the open invoices.

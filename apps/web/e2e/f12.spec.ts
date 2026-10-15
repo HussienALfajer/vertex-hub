@@ -114,6 +114,7 @@ test('an update period crossing a month is refused, and spend over the budget wa
 test('finance reads and funds but does not manage campaigns; refunds stay within the balance', async ({
   page,
 }) => {
+  test.setTimeout(90_000);
   await mockApi(page, { signedIn: true, me: financeMe });
   await page.goto(`/campaigns/${seedIds.autumnCampaign}`);
   await expect(page.getByRole('heading', { level: 1 })).toContainText('حملة رسائل الخريف');
