@@ -51,10 +51,7 @@
       "Bash(pnpm remove *)",
       "Bash(pnpm db:migrate*)",
       "Bash(pnpm db:setup-local*)",
-      "Bash(git push*)",
-      "Bash(ssh *)",
-      "Bash(scp *)",
-      "Bash(rsync *)"
+      "Bash(git push*)"
     ],
     "deny": [
       "Read(./.env)",
