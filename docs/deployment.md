@@ -14,6 +14,7 @@ Server work needs the owner's explicit approval in the current conversation (AGE
 | Repository mirror | `/srv/hub.vertexmedia.pro/repo.git` (public repo over HTTPS, no credentials) |
 | Environment | `/srv/hub.vertexmedia.pro/shared/.env` (600), linked into each release as `.env` |
 | Uploaded files (F10) | `/srv/hub.vertexmedia.pro/shared/files/` (`FILES_ROOT`; 2750 `vertexhub:www-data`, outside the releases). nginx serves them only through its internal `/_files/` location after the API answers `X-Accel-Redirect`; `shared/` is 710 so nginx can pass through it without listing it |
+| GeoIP database (F01B) | `/srv/hub.vertexmedia.pro/shared/geoip/dbip-city-lite.mmdb` (`GEOIP_DB_PATH`; DB-IP City Lite, CC BY 4.0), refreshed on the 3rd of each month at 04:20 by `vertexhub-geoip-update` from the `vertexhub` crontab (log tag `vertexhub-geoip`); the API reloads it within an hour |
 | Pre-migration DB snapshots | `/srv/hub.vertexmedia.pro/shared/db-snapshots/` (last 10) |
 | Madani font files | `/srv/hub.vertexmedia.pro/fonts/madani/` (ADR 0011; empty until Q11). The web build loads them only when they are there, so copy them in, then deploy again |
 | App logs | `/var/log/hub.vertexmedia.pro/{api,worker}.{out,err}.log` (14 days) |
@@ -28,6 +29,7 @@ Server work needs the owner's explicit approval in the current conversation (AGE
 | `deploy/provision.sh` | run once (idempotent) to set up everything below |
 | `deploy/deploy.sh` | run by `/usr/local/bin/vertexhub-deploy`, always the copy on `origin/main` |
 | `deploy/ecosystem.config.cjs` | PM2 process file, read from the current release |
+| `deploy/geoip-update.sh` | `/usr/local/bin/vertexhub-geoip-update` |
 | `deploy/bin/*` | `/usr/local/bin/vertexhub-{deploy,healthcheck}`, `/usr/local/sbin/vertexhub-backup` |
 | `deploy/systemd/*` | `/etc/systemd/system/` |
 | `deploy/nginx/*`, `deploy/logrotate/*` | `/etc/nginx/…`, `/etc/logrotate.d/hub.vertexmedia.pro` |
@@ -88,6 +90,8 @@ ssh vertex "sudo -u vertexhub PM2_HOME=/home/vertexhub/.pm2 pm2 logs vertexhub-a
 ssh vertex "journalctl -t vertexhub-health -n 50"
 ssh vertex "journalctl -t vertexhub-backup -n 20"
 ssh vertex "cat /srv/hub.vertexmedia.pro/current/REVISION"      # deployed commit
+ssh vertex "journalctl -t vertexhub-geoip -n 20"                  # GeoIP refreshes
+ssh vertex "sudo -u vertexhub vertexhub-geoip-update"            # refresh GeoIP now
 ```
 
 ## Backups and restore
@@ -128,3 +132,4 @@ ssh vertex "systemctl enable --now vertexhub-health.timer"
 - UI walkthrough (`fix/ui-walkthrough`): re-run `provision.sh` for the `vhsignin` limit on `/api/password-links/check`, which the activation page calls when it opens.
 - The inline theme script in `apps/web/index.html`: its hash is in the CSP in `deploy/nginx/vertexhub-csp.conf`, and `apps/web/src/csp.test.ts` fails until both match.
 - Secrets: edit `shared/.env` on the server as `vertexhub`, then `pm2 reload all --update-env`. Rotating `BETTER_AUTH_SECRET` signs everyone out.
+- F01B (signed-in devices): the first deploy that contains it needs `provision.sh` re-run after it, for `GEOIP_DB_PATH` in `shared/.env`, the `geoip/` directory, the `vertexhub` crontab and the first download (it checks the file with the release's MMDB reader). Then restart the API (`vertexhub-deploy` again) so it reads `GEOIP_DB_PATH`. Until the file is there, locations show as unknown and nothing else fails.

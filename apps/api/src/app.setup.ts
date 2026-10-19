@@ -3,6 +3,7 @@ import { DocumentBuilder, type OpenAPIObject, SwaggerModule } from '@nestjs/swag
 import { Logger } from 'nestjs-pino';
 import { ENV, type Env } from './core/config/env.js';
 import { sameOriginOnly } from './core/http/same-origin.js';
+import { deviceCookie } from './modules/auth/index.js';
 
 export const API_PREFIX = 'api';
 
@@ -15,6 +16,8 @@ export function configureApp(app: INestApplication): void {
   app.getHttpAdapter().getInstance().disable('x-powered-by');
   // Refuses cross-origin state changes on every route (CSRF), Better Auth's included.
   app.use(sameOriginOnly(env.APP_URL));
+  // F01B: the `vh_device` cookie that names each browser, before Better Auth reads the request.
+  app.use(deviceCookie(env.BETTER_AUTH_SECRET, env.NODE_ENV !== 'development'));
 
   if (env.NODE_ENV !== 'production') {
     SwaggerModule.setup(`${API_PREFIX}/docs`, app, createOpenApiDocument(app));

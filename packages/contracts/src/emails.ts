@@ -114,6 +114,8 @@ export const SECURITY_CHANGES = [
   'backup_codes_regenerated',
   'roles_changed',
   'archived',
+  'device_signed_out',
+  'all_devices_signed_out',
 ] as const;
 
 export type SecurityChange = (typeof SECURITY_CHANGES)[number];

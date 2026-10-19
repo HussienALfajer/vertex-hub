@@ -307,6 +307,111 @@
         ]
       }
     },
+    "/api/me/sessions": {
+      "get": {
+        "operationId": "SignedInDevicesController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Open sessions: the current one first, then by last activity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignedInDeviceList"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/me/sessions/current/hardware": {
+      "put": {
+        "operationId": "SignedInDevicesController_reportHardware",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HardwareSignals"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Stored on the current session, unless already reported"
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/me/sessions/sign-out-all": {
+      "post": {
+        "operationId": "SignedInDevicesController_signOutAll",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SignOutAllDevices"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Sessions signed out; clears the session cookie when this one is included",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignOutAllDevicesResponse"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/me/sessions/{id}": {
+      "delete": {
+        "operationId": "SignedInDevicesController_signOut",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "The device is signed out"
+          },
+          "400": {
+            "description": "`CURRENT_SESSION`: this device signs out on its own"
+          },
+          "404": {
+            "description": "Not one of your open sessions"
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
     "/api/users": {
       "get": {
         "operationId": "UsersController_list",
@@ -15524,6 +15629,8 @@
           "user.two_factor_reset",
           "user.backup_codes_regenerated",
           "user.profile_updated",
+          "user.session_signed_out",
+          "user.sessions_signed_out",
           "department.updated",
           "client.created",
           "client.updated",
@@ -16445,6 +16552,294 @@
           "account_manager",
           "finance"
         ]
+      },
+      "SignedInDeviceList": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SignedInDevice"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "additionalProperties": false
+      },
+      "SignedInDevice": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "current": {
+            "type": "boolean"
+          },
+          "device": {
+            "type": "object",
+            "properties": {
+              "browser": {
+                "type": "string"
+              },
+              "system": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "browser",
+              "system",
+              "label"
+            ],
+            "additionalProperties": false
+          },
+          "signIn": {
+            "type": "object",
+            "properties": {
+              "at": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+              },
+              "ip": {
+                "nullable": true,
+                "type": "string"
+              },
+              "location": {
+                "$ref": "#/components/schemas/IpLocation"
+              }
+            },
+            "required": [
+              "at",
+              "ip",
+              "location"
+            ],
+            "additionalProperties": false
+          },
+          "lastActive": {
+            "type": "object",
+            "properties": {
+              "at": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+              },
+              "ip": {
+                "nullable": true,
+                "type": "string"
+              },
+              "location": {
+                "$ref": "#/components/schemas/IpLocation"
+              }
+            },
+            "required": [
+              "at",
+              "ip",
+              "location"
+            ],
+            "additionalProperties": false
+          },
+          "sharedWith": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SharedDeviceUser"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "current",
+          "device",
+          "signIn",
+          "lastActive",
+          "sharedWith"
+        ],
+        "additionalProperties": false
+      },
+      "IpLocation": {
+        "nullable": true,
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "countryCode": {
+                "type": "string",
+                "minLength": 2,
+                "maxLength": 2
+              },
+              "city": {
+                "nullable": true,
+                "type": "string"
+              }
+            },
+            "required": [
+              "countryCode",
+              "city"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "local": {
+                "type": "boolean",
+                "enum": [
+                  true
+                ]
+              }
+            },
+            "required": [
+              "local"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      },
+      "SharedDeviceUser": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "name": {
+                "type": "string"
+              },
+              "image": {
+                "nullable": true,
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "image"
+            ],
+            "additionalProperties": false
+          },
+          "department": {
+            "nullable": true,
+            "type": "object",
+            "properties": {
+              "code": {
+                "$ref": "#/components/schemas/DepartmentCode"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "code",
+              "name"
+            ],
+            "additionalProperties": false
+          },
+          "match": {
+            "$ref": "#/components/schemas/DeviceMatch"
+          },
+          "lastActiveAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          }
+        },
+        "required": [
+          "user",
+          "department",
+          "match",
+          "lastActiveAt"
+        ],
+        "additionalProperties": false
+      },
+      "DeviceMatch": {
+        "type": "string",
+        "enum": [
+          "same_browser",
+          "same_device"
+        ]
+      },
+      "HardwareSignals": {
+        "type": "object",
+        "properties": {
+          "cores": {
+            "nullable": true,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 512
+          },
+          "timeZone": {
+            "nullable": true,
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "screen": {
+            "nullable": true,
+            "type": "object",
+            "properties": {
+              "long": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 20000
+              },
+              "short": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 20000
+              }
+            },
+            "required": [
+              "long",
+              "short"
+            ]
+          },
+          "gpu": {
+            "nullable": true,
+            "type": "string",
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "cores",
+          "timeZone",
+          "screen",
+          "gpu"
+        ]
+      },
+      "SignOutAllDevices": {
+        "type": "object",
+        "properties": {
+          "includeCurrent": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "includeCurrent"
+        ]
+      },
+      "SignOutAllDevicesResponse": {
+        "type": "object",
+        "properties": {
+          "signedOut": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "signedOut"
+        ],
+        "additionalProperties": false
       },
       "UserPage": {
         "type": "object",

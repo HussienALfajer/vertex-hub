@@ -84,6 +84,70 @@ export interface paths {
         patch: operations["MeController_updateProfile"];
         trace?: never;
     };
+    "/api/me/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SignedInDevicesController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/me/sessions/current/hardware": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["SignedInDevicesController_reportHardware"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/me/sessions/sign-out-all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["SignedInDevicesController_signOutAll"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/me/sessions/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["SignedInDevicesController_signOut"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/users": {
         parameters: {
             query?: never;
@@ -4587,7 +4651,7 @@ export interface components {
         /** @enum {string} */
         AuditEntityType: "user" | "department" | "client" | "client_contact" | "client_platform_account" | "client_note" | "project" | "project_milestone" | "retainer" | "retainer_cycle" | "retainer_charge" | "retainer_term" | "retainer_amendment" | "extra_work" | "task" | "task_checklist_item" | "task_link" | "task_comment" | "template" | "template_run" | "file_item" | "approval_request" | "post" | "shoot" | "meeting" | "catalog_service" | "catalog_package" | "quote_settings" | "contract_settings" | "quote" | "invoice_settings" | "invoice" | "payment" | "project_expense" | "ad_campaign" | "ad_campaign_update" | "ad_wallet" | "ad_wallet_entry" | "lead" | "lead_note" | "client_report" | "retainer_cycle_report" | "retainer_contract" | "retainer_contract_annex";
         /** @enum {string} */
-        AuditAction: "user.created" | "user.updated" | "user.roles_changed" | "user.departments_changed" | "user.archived" | "user.restored" | "user.link_issued" | "user.password_set" | "user.password_changed" | "user.two_factor_enabled" | "user.two_factor_disabled" | "user.two_factor_reset" | "user.backup_codes_regenerated" | "user.profile_updated" | "department.updated" | "client.created" | "client.updated" | "client.status_changed" | "client.account_manager_changed" | "client.healthcare_changed" | "client.archived" | "client.restored" | "client.brand_kit_updated" | "client.emailed" | "client_contact.created" | "client_contact.updated" | "client_contact.archived" | "client_platform_account.created" | "client_platform_account.updated" | "client_platform_account.archived" | "client_note.created" | "client_note.updated" | "client_note.archived" | "project.created" | "project.updated" | "project.project_manager_changed" | "project.status_changed" | "project.money_updated" | "project.archived" | "project.restored" | "project_milestone.created" | "project_milestone.updated" | "project_milestone.reordered" | "project_milestone.completed" | "project_milestone.reopened" | "project_milestone.archived" | "retainer.created" | "retainer.updated" | "retainer.backdated" | "retainer.status_changed" | "retainer.deliverables_updated" | "retainer.money_updated" | "retainer.archived" | "retainer.restored" | "retainer_cycle.created" | "retainer_cycle.closed" | "retainer_cycle.line_updated" | "retainer_cycle.line_added" | "retainer_cycle.adjusted" | "retainer_charge.created" | "retainer_charge.amount_changed" | "retainer_charge.cancelled" | "retainer_charge.split" | "retainer_charge.settled_outside" | "retainer_term.created" | "retainer_term.updated" | "retainer_term.end_action_changed" | "retainer_term.cancelled" | "retainer_term.started" | "retainer_term.completed" | "retainer_term.renewed" | "retainer_amendment.created" | "retainer_amendment.approved" | "retainer_amendment.rejected" | "retainer_amendment.withdrawn" | "retainer_amendment.applied" | "retainer_amendment.cancelled" | "extra_work.created" | "extra_work.updated" | "extra_work.billing_changed" | "extra_work.archived" | "task.created" | "task.updated" | "task.assigned" | "task.department_changed" | "task.status_changed" | "task.dependencies_updated" | "task.archived" | "task.restored" | "task.revision_decided" | "task.request_scope_changed" | "task.extra_work_moved" | "task.reviewed" | "task.client_text_updated" | "task.client_response_recorded" | "task_checklist_item.created" | "task_checklist_item.updated" | "task_checklist_item.reordered" | "task_checklist_item.archived" | "task_link.created" | "task_link.archived" | "task_comment.created" | "task_comment.updated" | "task_comment.archived" | "template.created" | "template.updated" | "template.assignees_updated" | "template.archived" | "template.restored" | "template_run.created" | "retainer.template_changed" | "file_item.created" | "file_item.renamed" | "file_item.confidential_changed" | "file_item.archived" | "file_item.restored" | "file_version.created" | "file_version.archived" | "file_version.restored" | "file_version.final_set" | "file_version.final_cleared" | "approval_request.created" | "approval_request.link_reissued" | "approval_request.revoked" | "approval_request.emailed" | "approval_item.responded" | "approval_item.withdrawn" | "post.created" | "post.updated" | "post.status_changed" | "post.reviewed" | "post.client_response_recorded" | "post.task_linked" | "post.task_unlinked" | "post.task_returned" | "post.duplicated" | "post.archived" | "post.restored" | "shoot.created" | "shoot.updated" | "shoot.shots_changed" | "shoot.shot_ticked" | "shoot.shot_unticked" | "shoot.completed" | "shoot.cancelled" | "shoot.reopened" | "shoot.archived" | "shoot.restored" | "meeting.created" | "meeting.updated" | "meeting.cancelled" | "meeting.archived" | "meeting.restored" | "catalog_service.created" | "catalog_service.updated" | "catalog_service.archived" | "catalog_service.restored" | "catalog_package.created" | "catalog_package.updated" | "catalog_package.archived" | "catalog_package.restored" | "quote_settings.updated" | "contract_settings.updated" | "contract_settings.articles_updated" | "quote.created" | "quote.updated" | "quote.approval_requested" | "quote.approval_withdrawn" | "quote.approval_approved" | "quote.approval_returned" | "quote.sent" | "quote.extended" | "quote.expired" | "quote.rejected" | "quote.accepted" | "quote.version_created" | "quote.superseded" | "quote.archived" | "quote.emailed" | "invoice_settings.updated" | "invoice.created" | "invoice.updated" | "invoice.archived" | "invoice.issued" | "invoice.due_date_changed" | "invoice.voided" | "invoice.overdue" | "invoice.services_changed" | "invoice.emailed" | "payment.recorded" | "payment.voided" | "payment.emailed" | "project_expense.created" | "project_expense.updated" | "project_expense.archived" | "ad_campaign.created" | "ad_campaign.updated" | "ad_campaign.status_changed" | "ad_campaign.archived" | "ad_campaign.restored" | "ad_campaign_update.created" | "ad_campaign_update.updated" | "ad_campaign_update.archived" | "ad_wallet.threshold_changed" | "ad_wallet.low_balance" | "ad_wallet.low_balance_cleared" | "ad_wallet_entry.recorded" | "ad_wallet_entry.voided" | "ad_wallet_entry.emailed" | "lead.created" | "lead.updated" | "lead.stage_changed" | "lead.owner_changed" | "lead.follow_up_changed" | "lead.lost" | "lead.reopened" | "lead.converted" | "lead.archived" | "lead.restored" | "lead_note.created" | "lead_note.updated" | "lead_note.archived" | "client_report.summary_changed" | "retainer_cycle_report.summary_changed" | "retainer_contract.created" | "retainer_contract.updated" | "retainer_contract.discarded" | "retainer_contract.issued" | "retainer_contract.signed" | "retainer_contract.voided" | "retainer_contract_annex.issued" | "retainer_contract_annex.signed" | "retainer_contract_annex.voided";
+        AuditAction: "user.created" | "user.updated" | "user.roles_changed" | "user.departments_changed" | "user.archived" | "user.restored" | "user.link_issued" | "user.password_set" | "user.password_changed" | "user.two_factor_enabled" | "user.two_factor_disabled" | "user.two_factor_reset" | "user.backup_codes_regenerated" | "user.profile_updated" | "user.session_signed_out" | "user.sessions_signed_out" | "department.updated" | "client.created" | "client.updated" | "client.status_changed" | "client.account_manager_changed" | "client.healthcare_changed" | "client.archived" | "client.restored" | "client.brand_kit_updated" | "client.emailed" | "client_contact.created" | "client_contact.updated" | "client_contact.archived" | "client_platform_account.created" | "client_platform_account.updated" | "client_platform_account.archived" | "client_note.created" | "client_note.updated" | "client_note.archived" | "project.created" | "project.updated" | "project.project_manager_changed" | "project.status_changed" | "project.money_updated" | "project.archived" | "project.restored" | "project_milestone.created" | "project_milestone.updated" | "project_milestone.reordered" | "project_milestone.completed" | "project_milestone.reopened" | "project_milestone.archived" | "retainer.created" | "retainer.updated" | "retainer.backdated" | "retainer.status_changed" | "retainer.deliverables_updated" | "retainer.money_updated" | "retainer.archived" | "retainer.restored" | "retainer_cycle.created" | "retainer_cycle.closed" | "retainer_cycle.line_updated" | "retainer_cycle.line_added" | "retainer_cycle.adjusted" | "retainer_charge.created" | "retainer_charge.amount_changed" | "retainer_charge.cancelled" | "retainer_charge.split" | "retainer_charge.settled_outside" | "retainer_term.created" | "retainer_term.updated" | "retainer_term.end_action_changed" | "retainer_term.cancelled" | "retainer_term.started" | "retainer_term.completed" | "retainer_term.renewed" | "retainer_amendment.created" | "retainer_amendment.approved" | "retainer_amendment.rejected" | "retainer_amendment.withdrawn" | "retainer_amendment.applied" | "retainer_amendment.cancelled" | "extra_work.created" | "extra_work.updated" | "extra_work.billing_changed" | "extra_work.archived" | "task.created" | "task.updated" | "task.assigned" | "task.department_changed" | "task.status_changed" | "task.dependencies_updated" | "task.archived" | "task.restored" | "task.revision_decided" | "task.request_scope_changed" | "task.extra_work_moved" | "task.reviewed" | "task.client_text_updated" | "task.client_response_recorded" | "task_checklist_item.created" | "task_checklist_item.updated" | "task_checklist_item.reordered" | "task_checklist_item.archived" | "task_link.created" | "task_link.archived" | "task_comment.created" | "task_comment.updated" | "task_comment.archived" | "template.created" | "template.updated" | "template.assignees_updated" | "template.archived" | "template.restored" | "template_run.created" | "retainer.template_changed" | "file_item.created" | "file_item.renamed" | "file_item.confidential_changed" | "file_item.archived" | "file_item.restored" | "file_version.created" | "file_version.archived" | "file_version.restored" | "file_version.final_set" | "file_version.final_cleared" | "approval_request.created" | "approval_request.link_reissued" | "approval_request.revoked" | "approval_request.emailed" | "approval_item.responded" | "approval_item.withdrawn" | "post.created" | "post.updated" | "post.status_changed" | "post.reviewed" | "post.client_response_recorded" | "post.task_linked" | "post.task_unlinked" | "post.task_returned" | "post.duplicated" | "post.archived" | "post.restored" | "shoot.created" | "shoot.updated" | "shoot.shots_changed" | "shoot.shot_ticked" | "shoot.shot_unticked" | "shoot.completed" | "shoot.cancelled" | "shoot.reopened" | "shoot.archived" | "shoot.restored" | "meeting.created" | "meeting.updated" | "meeting.cancelled" | "meeting.archived" | "meeting.restored" | "catalog_service.created" | "catalog_service.updated" | "catalog_service.archived" | "catalog_service.restored" | "catalog_package.created" | "catalog_package.updated" | "catalog_package.archived" | "catalog_package.restored" | "quote_settings.updated" | "contract_settings.updated" | "contract_settings.articles_updated" | "quote.created" | "quote.updated" | "quote.approval_requested" | "quote.approval_withdrawn" | "quote.approval_approved" | "quote.approval_returned" | "quote.sent" | "quote.extended" | "quote.expired" | "quote.rejected" | "quote.accepted" | "quote.version_created" | "quote.superseded" | "quote.archived" | "quote.emailed" | "invoice_settings.updated" | "invoice.created" | "invoice.updated" | "invoice.archived" | "invoice.issued" | "invoice.due_date_changed" | "invoice.voided" | "invoice.overdue" | "invoice.services_changed" | "invoice.emailed" | "payment.recorded" | "payment.voided" | "payment.emailed" | "project_expense.created" | "project_expense.updated" | "project_expense.archived" | "ad_campaign.created" | "ad_campaign.updated" | "ad_campaign.status_changed" | "ad_campaign.archived" | "ad_campaign.restored" | "ad_campaign_update.created" | "ad_campaign_update.updated" | "ad_campaign_update.archived" | "ad_wallet.threshold_changed" | "ad_wallet.low_balance" | "ad_wallet.low_balance_cleared" | "ad_wallet_entry.recorded" | "ad_wallet_entry.voided" | "ad_wallet_entry.emailed" | "lead.created" | "lead.updated" | "lead.stage_changed" | "lead.owner_changed" | "lead.follow_up_changed" | "lead.lost" | "lead.reopened" | "lead.converted" | "lead.archived" | "lead.restored" | "lead_note.created" | "lead_note.updated" | "lead_note.archived" | "client_report.summary_changed" | "retainer_cycle_report.summary_changed" | "retainer_contract.created" | "retainer_contract.updated" | "retainer_contract.discarded" | "retainer_contract.issued" | "retainer_contract.signed" | "retainer_contract.voided" | "retainer_contract_annex.issued" | "retainer_contract_annex.signed" | "retainer_contract_annex.voided";
         /** @description Audit entries, newest first */
         AuditPage: {
             items: components["schemas"]["AuditEntry"][];
@@ -4747,6 +4811,71 @@ export interface components {
         UserStatus: "invited" | "active" | "archived";
         /** @enum {string} */
         AssignableRole: "general_manager" | "account_manager" | "finance";
+        SignedInDeviceList: {
+            items: components["schemas"]["SignedInDevice"][];
+        };
+        SignedInDevice: {
+            /** Format: uuid */
+            id: string;
+            current: boolean;
+            device: {
+                browser: string;
+                system: string;
+                label: string;
+            };
+            signIn: {
+                /** Format: date-time */
+                at: string;
+                ip: string | null;
+                location: components["schemas"]["IpLocation"];
+            };
+            lastActive: {
+                /** Format: date-time */
+                at: string;
+                ip: string | null;
+                location: components["schemas"]["IpLocation"];
+            };
+            sharedWith: components["schemas"]["SharedDeviceUser"][];
+        };
+        IpLocation: ({
+            countryCode: string;
+            city: string | null;
+        } | {
+            /** @enum {boolean} */
+            local: true;
+        }) | null;
+        SharedDeviceUser: {
+            user: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                image: string | null;
+            };
+            department: {
+                code: components["schemas"]["DepartmentCode"];
+                name: string;
+            } | null;
+            match: components["schemas"]["DeviceMatch"];
+            /** Format: date-time */
+            lastActiveAt: string;
+        };
+        /** @enum {string} */
+        DeviceMatch: "same_browser" | "same_device";
+        HardwareSignals: {
+            cores: number | null;
+            timeZone: string | null;
+            screen: {
+                long: number;
+                short: number;
+            } | null;
+            gpu: string | null;
+        };
+        SignOutAllDevices: {
+            includeCurrent: boolean;
+        };
+        SignOutAllDevicesResponse: {
+            signedOut: number;
+        };
         /** @description Users sorted by name */
         UserPage: {
             items: components["schemas"]["User"][];
@@ -13216,6 +13345,106 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["User"];
                 };
+            };
+        };
+    };
+    SignedInDevicesController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Open sessions: the current one first, then by last activity */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SignedInDeviceList"];
+                };
+            };
+        };
+    };
+    SignedInDevicesController_reportHardware: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HardwareSignals"];
+            };
+        };
+        responses: {
+            /** @description Stored on the current session, unless already reported */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    SignedInDevicesController_signOutAll: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SignOutAllDevices"];
+            };
+        };
+        responses: {
+            /** @description Sessions signed out; clears the session cookie when this one is included */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SignOutAllDevicesResponse"];
+                };
+            };
+        };
+    };
+    SignedInDevicesController_signOut: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The device is signed out */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `CURRENT_SESSION`: this device signs out on its own */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not one of your open sessions */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

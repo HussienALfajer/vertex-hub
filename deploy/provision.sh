@@ -71,6 +71,7 @@ step "Scripts, systemd units, logrotate"
 install -m 755 "$src/deploy/bin/vertexhub-deploy" /usr/local/bin/vertexhub-deploy
 install -m 755 "$src/deploy/bin/vertexhub-healthcheck" /usr/local/bin/vertexhub-healthcheck
 install -m 700 "$src/deploy/bin/vertexhub-backup" /usr/local/sbin/vertexhub-backup
+install -m 755 "$src/deploy/geoip-update.sh" /usr/local/bin/vertexhub-geoip-update
 for unit in pm2-vertexhub.service vertexhub-health.service vertexhub-health.timer \
   vertexhub-backup.service vertexhub-backup.timer; do
   install -m 644 "$src/deploy/systemd/$unit" "/etc/systemd/system/$unit"
@@ -103,6 +104,7 @@ BETTER_AUTH_SECRET=$(openssl rand -hex 32)
 DATABASE_URL=postgres://$DB:$db_password@127.0.0.1:5432/$DB
 WORKER_NAME=production
 FILES_ROOT=$SITE_DIR/shared/files
+GEOIP_DB_PATH=$SITE_DIR/shared/geoip/dbip-city-lite.mmdb
 EOF
   )
   chown "$APP_USER:$APP_USER" "$env_file"
@@ -114,6 +116,9 @@ else
 fi
 # Files (F10) arrived after the first provisioning: add their root to an existing .env once.
 grep -q '^FILES_ROOT=' "$env_file" || echo "FILES_ROOT=$SITE_DIR/shared/files" >>"$env_file"
+# The GeoIP database (F01B) arrived later still.
+grep -q '^GEOIP_DB_PATH=' "$env_file" ||
+  echo "GEOIP_DB_PATH=$SITE_DIR/shared/geoip/dbip-city-lite.mmdb" >>"$env_file"
 chmod 600 "$env_file"
 
 step "nginx"
@@ -169,6 +174,22 @@ systemctl is-active pm2-vertexhub.service
 
 step "Backup timer"
 systemctl enable --now vertexhub-backup.timer
+
+step "GeoIP database"
+# F01B (ADR 0032): DB-IP City Lite, refreshed monthly by the site user's crontab, which holds
+# only this job, with a PATH that finds node. The first download needs a release with the API's
+# MMDB reader to check the file.
+install -d -m 750 -o "$APP_USER" -g "$APP_USER" "$SITE_DIR/shared/geoip"
+printf '%s\n' 'PATH=/usr/local/bin:/usr/bin:/bin' \
+  '20 4 3 * * /usr/local/bin/vertexhub-geoip-update 2>&1 | logger -t vertexhub-geoip' |
+  crontab -u "$APP_USER" -
+if [ -f "$SITE_DIR/shared/geoip/dbip-city-lite.mmdb" ]; then
+  echo "installed"
+elif runuser -u "$APP_USER" -- /usr/local/bin/vertexhub-geoip-update; then
+  echo "downloaded"
+else
+  echo "first download failed: re-run provision.sh after the first deploy that contains F01B"
+fi
 
 step "Chromium libraries"
 # The worker renders quote PDFs with Playwright's Chromium (F04, ADR 0008). The browser itself
