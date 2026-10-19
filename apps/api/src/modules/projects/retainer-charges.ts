@@ -34,11 +34,11 @@ export interface CycleCharge {
   dueAt: Date | null;
 }
 
-/** A charge row's cycle; every row has one once F05C's backfill ran. */
+/** A charge row's cycle. */
 export const chargeCycleOf = (row: {
-  cycleNumber: number | null;
-  cycleStart: CalendarDate | null;
-}): ChargeCycle => ({ number: row.cycleNumber ?? 0, start: row.cycleStart ?? '' });
+  cycleNumber: number;
+  cycleStart: CalendarDate;
+}): ChargeCycle => ({ number: row.cycleNumber, start: row.cycleStart });
 
 /**
  * The charges of retainers (spec F05B, ADR 0029): every billable amount of a retainer is a charge
@@ -588,7 +588,6 @@ export class RetainerCharges {
         chargeId: charge.id,
         retainerId,
         ...charge,
-        cycle: charge.cycle ?? 0,
         actor,
       });
     }

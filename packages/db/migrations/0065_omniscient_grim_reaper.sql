@@ -1,0 +1,1 @@
+ALTER TABLE "retainer_amendments" ADD CONSTRAINT "retainer_amendments_scope_check" CHECK (case "retainer_amendments"."kind" when 'change' then "retainer_amendments"."scope" is not null when 'quote_renewal' then "retainer_amendments"."scope" = 'onward' else "retainer_amendments"."scope" is null end);

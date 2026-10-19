@@ -423,6 +423,8 @@ describe('reports (F15 rules 8–16)', () => {
         .insert(retainerCharges)
         .values({
           retainerId: retainer.id,
+          cycleNumber: 1,
+          cycleStart: retainer.startDate,
           kind: 'monthly',
           amountMinor: 40_000,
         })

@@ -44,23 +44,7 @@ import { RetainerCharges } from './retainer-charges.js';
 
 type Executor = Database | Transaction;
 
-type StoredTerm = typeof retainerTerms.$inferSelect;
-
-/** A term row with its cycle columns, which every row has once F05C's backfill ran. */
-type TermRow = Omit<StoredTerm, 'startCycle' | 'cycles' | 'startDate' | 'endDate'> & {
-  startCycle: number;
-  cycles: number;
-  startDate: CalendarDate;
-  endDate: CalendarDate;
-};
-
-const termRow = (row: StoredTerm): TermRow => ({
-  ...row,
-  startCycle: row.startCycle ?? 1,
-  cycles: row.cycles ?? 1,
-  startDate: row.startDate ?? '',
-  endDate: row.endDate ?? '',
-});
+type TermRow = typeof retainerTerms.$inferSelect;
 
 /** A term with its base amount per cycle, for its contract (F05C K6). */
 export type ContractTerm = TermRow & { schedule: number[] };
@@ -83,7 +67,7 @@ interface TermPlan {
 
 interface ChargeRow {
   id: string;
-  cycle: number | null;
+  cycle: number;
   kind: RetainerChargeKind;
   amountMinor: number;
   baseAmountMinor: number | null;
@@ -192,7 +176,7 @@ export class RetainerTermsService {
       })
       .returning();
     if (!inserted) throw new Error('Term insert returned no row');
-    const term = termRow(inserted);
+    const term = inserted;
     await this.charges.createTermCycles(
       tx,
       retainer.id,
@@ -300,17 +284,15 @@ export class RetainerTermsService {
     const active =
       retainerIds.length === 0
         ? []
-        : (
-            await executor
-              .select()
-              .from(retainerTerms)
-              .where(
-                and(
-                  inArray(retainerTerms.retainerId, [...retainerIds]),
-                  eq(retainerTerms.status, 'active'),
-                ),
-              )
-          ).map(termRow);
+        : await executor
+            .select()
+            .from(retainerTerms)
+            .where(
+              and(
+                inArray(retainerTerms.retainerId, [...retainerIds]),
+                eq(retainerTerms.status, 'active'),
+              ),
+            );
     return new Map(
       retainers.map(({ id, startDate }) => {
         const term = active.find((row) => row.retainerId === id);
@@ -431,7 +413,7 @@ export class RetainerTermsService {
         ),
       )
       .orderBy(asc(retainerCharges.cycleNumber));
-    await this.charges.cancel(tx, later.map(cycleCharge), retainer.id, actor);
+    await this.charges.cancel(tx, later, retainer.id, actor);
   }
 
   /**
@@ -545,17 +527,15 @@ export class RetainerTermsService {
     retainerIds: readonly string[],
   ): Promise<Map<string, RetainerTermSummary>> {
     if (retainerIds.length === 0) return new Map();
-    const rows = (
-      await executor
-        .select()
-        .from(retainerTerms)
-        .where(
-          and(
-            inArray(retainerTerms.retainerId, [...retainerIds]),
-            inArray(retainerTerms.status, [...OPEN_STATUSES]),
-          ),
-        )
-    ).map(termRow);
+    const rows = await executor
+      .select()
+      .from(retainerTerms)
+      .where(
+        and(
+          inArray(retainerTerms.retainerId, [...retainerIds]),
+          inArray(retainerTerms.status, [...OPEN_STATUSES]),
+        ),
+      );
     const chosen = new Map<string, TermRow>();
     for (const row of rows) {
       const current = chosen.get(row.retainerId);
@@ -582,7 +562,7 @@ export class RetainerTermsService {
       ...summary,
       money: {
         agreedTotalMinor: term.agreedTotalMinor,
-        currentTotalMinor: cyclesOf(termRow(term), charges, retainer.startDate).reduce(
+        currentTotalMinor: cyclesOf(term, charges, retainer.startDate).reduce(
           (total, cycle) => total + (cycle.money?.totalMinor ?? 0),
           0,
         ),
@@ -606,13 +586,11 @@ export class RetainerTermsService {
     retainer: TermRetainer,
     withMoney: boolean,
   ): Promise<RetainerTerm[]> {
-    const terms = (
-      await executor
-        .select()
-        .from(retainerTerms)
-        .where(eq(retainerTerms.retainerId, retainer.id))
-        .orderBy(desc(retainerTerms.number))
-    ).map(termRow);
+    const terms = await executor
+      .select()
+      .from(retainerTerms)
+      .where(eq(retainerTerms.retainerId, retainer.id))
+      .orderBy(desc(retainerTerms.number));
     const charges = await this.chargeRows(executor, retainer.id);
     const numbers = new Map(terms.map((term) => [term.id, term.number]));
     return terms.map((term) => {
@@ -669,7 +647,7 @@ export class RetainerTermsService {
           inArray(retainerTerms.status, [...OPEN_STATUSES]),
         ),
       );
-    return rows.map(termRow);
+    return rows;
   }
 
   /** T5 on a scheduled term: new fields, its charges rebuilt cycle by cycle. */
@@ -709,9 +687,7 @@ export class RetainerTermsService {
         .select(chargeColumns)
         .from(retainerCharges)
         .where(and(eq(retainerCharges.termId, term.id), eq(retainerCharges.status, 'pending')))
-    )
-      .filter((charge) => charge.kind === 'monthly')
-      .map(cycleCharge);
+    ).filter((charge) => charge.kind === 'monthly');
     // Cycles leaving the term free the unique monthly index before new cycles take theirs.
     await this.charges.cancel(
       tx,
@@ -781,7 +757,7 @@ export class RetainerTermsService {
       .from(retainerTerms)
       .where(and(eq(retainerTerms.renewedFromId, term.id), eq(retainerTerms.status, 'scheduled')));
     if (renewal) {
-      await this.cancelTerm(tx, termRow(renewal), actor, { cause: 'end_action_changed' });
+      await this.cancelTerm(tx, renewal, actor, { cause: 'end_action_changed' });
       await this.syncRenewalDate(tx, term.retainerId, actor);
     }
   }
@@ -821,7 +797,7 @@ export class RetainerTermsService {
       .from(retainerCharges)
       .where(and(eq(retainerCharges.termId, term.id), eq(retainerCharges.status, 'pending')))
       .orderBy(asc(retainerCharges.cycleNumber));
-    await this.charges.cancel(tx, pending.map(cycleCharge), term.retainerId, actor);
+    await this.charges.cancel(tx, pending, term.retainerId, actor);
   }
 
   /** Active terms whose last day is before `today` become `completed`. */
@@ -876,18 +852,16 @@ export class RetainerTermsService {
         'A term starts at the current cycle or later, and not before the retainer',
       );
     }
-    const others = (
-      await tx
-        .select()
-        .from(retainerTerms)
-        .where(
-          and(
-            eq(retainerTerms.retainerId, retainer.id),
-            ne(retainerTerms.status, 'cancelled'),
-            exceptId ? ne(retainerTerms.id, exceptId) : undefined,
-          ),
-        )
-    ).map(termRow);
+    const others = await tx
+      .select()
+      .from(retainerTerms)
+      .where(
+        and(
+          eq(retainerTerms.retainerId, retainer.id),
+          ne(retainerTerms.status, 'cancelled'),
+          exceptId ? ne(retainerTerms.id, exceptId) : undefined,
+        ),
+      );
     if (others.some((term) => term.status === 'scheduled' || endCycleOf(term) >= startCycle)) {
       throw new CodedException(409, 'TERM_OVERLAP', 'The term overlaps another term');
     }
@@ -924,7 +898,7 @@ export class RetainerTermsService {
         );
       }
     }
-    await this.charges.cancel(tx, charged.map(cycleCharge), retainerId, actor);
+    await this.charges.cancel(tx, charged, retainerId, actor);
   }
 
   /**
@@ -980,7 +954,7 @@ export class RetainerTermsService {
       .from(retainerTerms)
       .where(and(eq(retainerTerms.id, termId), eq(retainerTerms.retainerId, retainerId)));
     if (!row) return null;
-    const term = termRow(row);
+    const term = row;
     return { ...term, schedule: await this.schedule(executor, term) };
   }
 
@@ -1004,13 +978,8 @@ export class RetainerTermsService {
       .from(retainerTerms)
       .where(and(eq(retainerTerms.id, termId), eq(retainerTerms.retainerId, retainerId)));
     if (!row) throw new NotFoundException();
-    return termRow(row);
+    return row;
   }
-}
-
-/** A charge row with its cycle number (set on every row once F05C's backfill ran). */
-function cycleCharge<T extends { cycle: number | null }>(row: T): T & { cycle: number } {
-  return { ...row, cycle: row.cycle ?? 0 };
 }
 
 /** T3: one amount per cycle, summing to the agreed total. */

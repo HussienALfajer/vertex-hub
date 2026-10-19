@@ -78,8 +78,7 @@ const cycleColumns = {
 export interface CycleRow {
   id: string;
   retainerId: string;
-  /** Set on every row once F05C's backfill ran. */
-  number: number | null;
+  number: number;
   periodStart: string;
   periodEnd: string;
   status: CycleStatus;
@@ -474,7 +473,7 @@ export class RetainerCyclesService implements OnModuleInit {
     await this.closedHooks.run(tx, {
       cycleId: cycle.id,
       retainer,
-      number: cycle.number ?? 0,
+      number: cycle.number,
       periodStart: cycle.periodStart,
       periodEnd,
       deliveryRate: deliveryRate(
@@ -832,7 +831,7 @@ export class RetainerCyclesService implements OnModuleInit {
       return {
         id: cycle.id,
         retainerId: cycle.retainerId,
-        number: cycle.number ?? 0,
+        number: cycle.number,
         periodStart: cycle.periodStart,
         periodEnd: cycle.periodEnd,
         status: cycle.status,
