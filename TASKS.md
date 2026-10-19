@@ -37,7 +37,8 @@ PR split (from the spec, "Delivery"): PR 1 contracts, db, API, GeoIP reader and 
 - [x] Wiring checklist, full checks, owner acceptance (endpoints at `/api/docs`), PR with auto-merge
 
 ## PR 2 — devices screen (branch `feat/f01b-devices-web`)
-- [ ] audit log: show the `location` object of `user.session_signed_out` as a place (country in Arabic, city), not raw JSON
-- [ ] web: card on `/account`, the two dialogs, hardware report after sign-in and on app load, `/login` messages, refetch every 60 s and on focus, `ar.json`, DB-IP attribution
-- [ ] e2e: mocks in `fixtures.ts`, `f01b.spec.ts` (two browser contexts: list, shared-device line, sign out one, sign out all with and without this device), RTL screenshots of the card and both dialogs at desktop and phone width, both themes
-- [ ] Close: checks, reviewer, owner acceptance, ROADMAP, PR with auto-merge
+- [x] audit log: show the `location` object of `user.session_signed_out` as a place (country in Arabic, city), not raw JSON; IP left to right
+- [x] ui: `RadioGroup` and `RadioCard` in `packages/ui` (the sign-out-all choice), on the design-system page
+- [x] web: card on `/account`, the two dialogs, hardware report after sign-in and on app load, `/login` messages, refetch every 60 s and on focus, `ar.json`, DB-IP attribution; unit tests for the place text and screen edges
+- [x] e2e: mocks in `fixtures.ts` (a shared session list across pages), `f01b.spec.ts` (two browser contexts: list, shared-device line, sign out one, sign out all with and without this device), RTL screenshots of the card and both dialogs at desktop and phone width, both themes
+- [x] Close: reviewer (2 blocking findings fixed: sign-out-all choice reset on each opening, focus after a row leaves), owner acceptance, full checks, ROADMAP, PR with auto-merge

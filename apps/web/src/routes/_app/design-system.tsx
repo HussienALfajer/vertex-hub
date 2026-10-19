@@ -65,6 +65,8 @@ import {
   PopoverTitle,
   PopoverTrigger,
   Progress,
+  RadioCard,
+  RadioGroup,
   Select,
   SelectContent,
   SelectItem,
@@ -482,6 +484,7 @@ function PeopleSection() {
   const skillItems = sampleSkills.map((key) => t(`designSystem.sampleSkills.${key}`));
   const [skills, setSkills] = useState<string[]>(() => skillItems.slice(0, 2));
   const [agree, setAgree] = useState(true);
+  const [digest, setDigest] = useState<'daily' | 'weekly'>('weekly');
   const [code, setCode] = useState('482');
   const [page, setPage] = useState(2);
   return (
@@ -515,6 +518,22 @@ function PeopleSection() {
             <Checkbox id={ids.agree} checked={agree} onCheckedChange={setAgree} />
             {t('designSystem.agree')}
           </label>
+          <RadioGroup<'daily' | 'weekly'>
+            aria-label={t('designSystem.digest')}
+            value={digest}
+            onValueChange={setDigest}
+          >
+            <RadioCard
+              value="daily"
+              title={t('designSystem.digestDaily')}
+              description={t('designSystem.digestDailyHint')}
+            />
+            <RadioCard
+              value="weekly"
+              title={t('designSystem.digestWeekly')}
+              description={t('designSystem.digestWeeklyHint')}
+            />
+          </RadioGroup>
           <div className="flex flex-col gap-2">
             <label htmlFor={ids.otp} className="text-sm font-medium">
               {t('designSystem.otp')}

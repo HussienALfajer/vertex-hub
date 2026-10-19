@@ -2,8 +2,16 @@ import { standardSchemaResolver } from '@hookform/resolvers/standard-schema';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link, useRouter } from '@tanstack/react-router';
 import { backupCodeSchema, type SignIn, signInSchema } from '@vertex-hub/contracts';
-import { Button, Field, FieldError, FieldLabel, Input, PasswordInput } from '@vertex-hub/ui';
-import { ArrowRightIcon, KeyRoundIcon, SmartphoneIcon } from 'lucide-react';
+import {
+  Button,
+  Callout,
+  Field,
+  FieldError,
+  FieldLabel,
+  Input,
+  PasswordInput,
+} from '@vertex-hub/ui';
+import { ArrowRightIcon, KeyRoundIcon, LogOutIcon, SmartphoneIcon } from 'lucide-react';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
@@ -15,8 +23,17 @@ import { TotpForm } from './totp-form';
 
 type Step = 'password' | 'totp' | 'backup';
 
+/** Why the app sent the user here (F01B): they signed out every device, or another one did. */
+export type SignedOutReason = 'all' | 'elsewhere';
+
 /** Sign-in with the password, then the authenticator or a backup code (F01 rules 15, 16). */
-export function LoginPage({ redirect }: { redirect?: string }) {
+export function LoginPage({
+  redirect,
+  signedOut,
+}: {
+  redirect?: string;
+  signedOut?: SignedOutReason;
+}) {
   const { t } = useTranslation();
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -38,6 +55,14 @@ export function LoginPage({ redirect }: { redirect?: string }) {
       {step === 'password' && (
         <>
           <AuthHeading title={t('login.title')} subtitle={t('login.subtitle')} />
+          {signedOut && (
+            <Callout
+              tone="info"
+              role="status"
+              icon={<LogOutIcon />}
+              title={t(`login.signedOut.${signedOut}`)}
+            />
+          )}
           <SignInForm onSignedIn={enter} onTwoFactor={() => setStep('totp')} />
         </>
       )}

@@ -54,6 +54,7 @@ import { DepartmentChips } from '../users/user-badges';
 import { SkillsInput } from '../users/user-form';
 import { skillsQuery, userQuery, useUpdateOwnProfile } from '../users/users.queries';
 import { BackupCodes } from './backup-codes';
+import { SignedInDevicesCard } from './signed-in-devices-card';
 
 export function AccountPage() {
   const { t } = useTranslation();
@@ -71,13 +72,17 @@ export function AccountPage() {
       ) : user.isError ? (
         <LoadError message={t('users.profile.loadError')} onRetry={() => user.refetch()} />
       ) : (
-        <div className="grid items-start gap-6 lg:grid-cols-3">
-          <div className="flex flex-col gap-6 lg:col-span-2">
-            <ProfileCard user={user.data} />
-            <ContactForm user={user.data} />
-            <PasswordForm />
+        <div className="flex flex-col gap-6">
+          {/* The two-factor card sticks within its own row, above the devices card. */}
+          <div className="grid items-start gap-6 lg:grid-cols-3">
+            <div className="flex flex-col gap-6 lg:col-span-2">
+              <ProfileCard user={user.data} />
+              <ContactForm user={user.data} />
+              <PasswordForm />
+            </div>
+            <TwoFactorCard />
           </div>
-          <TwoFactorCard />
+          <SignedInDevicesCard />
         </div>
       )}
     </>

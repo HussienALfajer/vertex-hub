@@ -2,6 +2,7 @@ import ar from '../src/i18n/locales/ar.json' with { type: 'json' };
 import {
   accountManagerMe,
   CONTENT_LINK_TOKEN,
+  DEVICES_NOW,
   departmentManagerMe,
   EXPIRED_LINK_TOKEN,
   employeeMe,
@@ -169,6 +170,44 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await page.goto('/account');
       await expect(page.getByRole('heading', { name: ar.account.twoFactor.title })).toBeVisible();
       await screenshot(page, testInfo, `account-${colorScheme}`);
+    });
+
+    for (const [width, height, size] of [
+      [1280, 900, 'desktop'],
+      [390, 844, 'phone'],
+    ] as const) {
+      test(`signed-in devices (${size})`, async ({ page }, testInfo) => {
+        await page.setViewportSize({ width, height });
+        await page.clock.setFixedTime(new Date(DEVICES_NOW));
+        await mockApi(page, { signedIn: true });
+        await page.goto('/account');
+        const card = page.getByRole('heading', { name: ar.devices.title });
+        await card.scrollIntoViewIfNeeded();
+        await expect(page.getByText(ar.devices.thisDevice, { exact: true })).toBeVisible();
+        await screenshot(page, testInfo, `devices-${size}-${colorScheme}`);
+
+        await page
+          .getByRole('listitem')
+          .filter({ hasText: 'Edge · Windows' })
+          .first()
+          .getByRole('button', { name: ar.devices.signOut })
+          .click();
+        await expect(page.getByRole('alertdialog')).toBeVisible();
+        await screenshot(page, testInfo, `devices-sign-out-${size}-${colorScheme}`);
+        await page.getByRole('button', { name: ar.common.cancel }).click();
+        await expect(page.getByRole('alertdialog')).toHaveCount(0);
+
+        await page.getByRole('button', { name: ar.devices.signOutAll }).click();
+        await expect(page.getByRole('alertdialog')).toBeVisible();
+        await screenshot(page, testInfo, `devices-sign-out-all-${size}-${colorScheme}`);
+      });
+    }
+
+    test('signed out of all devices', async ({ page }, testInfo) => {
+      await mockApi(page, { signedIn: false });
+      await page.goto('/login?signedOut=all');
+      await expect(page.getByText(ar.login.signedOut.all)).toBeVisible();
+      await screenshot(page, testInfo, `login-signed-out-${colorScheme}`);
     });
 
     test('activation', async ({ page }, testInfo) => {
