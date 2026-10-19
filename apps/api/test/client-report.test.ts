@@ -159,7 +159,6 @@ describe('monthly client report (F15 rules 17–20)', () => {
     await db
       .update(retainerCycles)
       .set({
-        month: period.from,
         periodStart: period.from,
         periodEnd: period.to,
         status: 'closed',
