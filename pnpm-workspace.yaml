@@ -10,3 +10,10 @@ allowBuilds:
   '@scarf/scarf': false # install telemetry from swagger-ui-dist
   '@swc/core': false # the native binary arrives as an optional dependency
   esbuild: true
+
+# Security overrides for transitive dependencies (pnpm audit).
+overrides:
+  # exceljs 4.4.0 (latest) pins uuid ^8; it only calls v4(), which uuid 11 keeps in CommonJS. GHSA-w5hq-g745-h8pq.
+  exceljs>uuid: ^11.1.1
+  # drizzle-kit's legacy loader pins esbuild ~0.18; drizzle-kit itself already uses ^0.25. GHSA-67mh-4wv8-2f99.
+  '@esbuild-kit/core-utils>esbuild': ^0.25.0
