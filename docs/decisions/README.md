@@ -35,6 +35,7 @@ Short records of decisions that shape the system. Each has a status: **Accepted*
 | [0029](0029-retainer-terms-charges-and-amendments.md) | Retainer terms, charges as the billing source, and amendments with approval of reductions | Accepted (months read as cycles, 0030) |
 | [0030](0030-retainer-anniversary-cycles.md) | Retainer cycles anchored on the start date | Accepted |
 | [0031](0031-retainer-contracts.md) | Retainer contracts and annexes as numbered documents | Accepted |
+| [0032](0032-signed-in-devices.md) | Signed-in devices: a browser cookie, a hardware key and a local GeoIP database | Accepted |
 
 Template:
 
