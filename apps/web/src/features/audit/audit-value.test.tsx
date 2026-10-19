@@ -38,6 +38,14 @@ describe('AuditValue', () => {
     expect(shown('user', 'roles', ['finance'])).toBe(i18n.t('roles.finance'));
   });
 
+  it('shows a signed-out device’s location as a place', () => {
+    expect(shown('user', 'location', { countryCode: 'SY', city: 'Damascus' })).toBe(
+      'Damascus، سوريا',
+    );
+    expect(shown('user', 'location', { local: true })).toBe(i18n.t('devices.localNetwork'));
+    expect(shown('user', 'location', null)).toBe(i18n.t('common.none'));
+  });
+
   it('names users from their ids', () => {
     expect(shown('task', 'assigneeId', USER)).toBe('سلمى عيسى');
     expect(shown('meeting', 'attendeeIds', [USER])).toBe('سلمى عيسى');

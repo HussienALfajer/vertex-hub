@@ -28,6 +28,7 @@ export * from './components/password-input';
 export * from './components/platform-mark';
 export * from './components/popover';
 export * from './components/progress';
+export * from './components/radio-card';
 export * from './components/select';
 export * from './components/sheet';
 export * from './components/skeleton';

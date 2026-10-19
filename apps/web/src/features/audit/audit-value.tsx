@@ -71,6 +71,7 @@ import {
   formatNumber,
 } from '../../lib/format';
 import { formatAmount, rateText } from '../../lib/money';
+import { isIpLocation, placeText } from '../account/device-place';
 import { useDepartmentNames } from '../projects/project-badges';
 import { lineName } from '../retainers/retainer-badges';
 import { splitMentions } from '../tasks/mentions';
@@ -99,6 +100,7 @@ const LTR_FIELDS = new Set([
   'mapUrl',
   'onlineUrl',
   'rawFilesSite',
+  'ipAddress',
 ]);
 
 /** Fields that hold an instant. */
@@ -396,6 +398,8 @@ export function AuditValue({
     );
   }
   if (isItem(value) && text(value, 'name')) return <span>{text(value, 'name')}</span>;
+  // Where a signed-out device signed in from (F01B): a country and city, or the local network.
+  if (field === 'location' && isIpLocation(value)) return <span>{placeText(t, value)}</span>;
   // An approval link's email (F14): its recipients.
   if (field === 'email' && isItem(value) && Array.isArray(value.to)) {
     return (

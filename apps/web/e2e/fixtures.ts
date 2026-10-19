@@ -117,12 +117,15 @@ import {
   type DepartmentDashboard,
   type DepartmentDetailResponse,
   type DepartmentResponse,
+  type DeviceMatch,
   type DuplicatePost,
   daysInStage,
   daysOverdue,
   daysWithoutUpdate,
   defaultInstallmentMilestones,
   deliveryRate,
+  deviceMatch,
+  deviceOf,
   type EmailLogItem,
   type EmailRecordType,
   type EmailSummary,
@@ -143,6 +146,7 @@ import {
   followUpFilterRange,
   formatContractNumber,
   grantedPermissions,
+  type HardwareSignals,
   type HealthResponse,
   type Invoice,
   type InvoiceDetail,
@@ -151,6 +155,7 @@ import {
   type InvoiceSettings,
   type InvoiceSource,
   type InvoiceStatus,
+  type IpLocation,
   type IssuedApprovalRequest,
   installmentsValid,
   intervalsOverlap,
@@ -302,11 +307,13 @@ import {
   reportMonths,
   revisionSourceOf,
   type ScheduleConflict,
+  type SharedDeviceUser,
   type Shoot,
   type ShootDetail,
   type ShootStatus,
   type ShootType,
   type ShotListInput,
+  type SignedInDevice,
   type SourceInvoice,
   sendQuoteSchema,
   serviceIssues,
@@ -1047,8 +1054,160 @@ export const BACKUP_CODES = [
 ];
 export const VALID_LINK_TOKEN = 'valid-activation-token';
 
+/** The instant the F01B device specs and screenshots freeze the browser's clock on. */
+export const DEVICES_NOW = '2026-10-19T09:00:00+03:00';
+
+const minutesBefore = (minutes: number) =>
+  new Date(new Date(DEVICES_NOW).getTime() - minutes * 60_000).toISOString();
+
+const sessionId = (n: number) => `01920000-0000-7000-9000-${n.toString().padStart(12, '0')}`;
+
+const CHROME_WINDOWS =
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36';
+const EDGE_WINDOWS = `${CHROME_WINDOWS} Edg/141.0.0.0`;
+const FIREFOX_WINDOWS =
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:144.0) Gecko/20100101 Firefox/144.0';
+const SAFARI_IPHONE =
+  'Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.6 Mobile/15E148 Safari/604.1';
+
+const OFFICE_IP = '185.12.34.56';
+const DAMASCUS: IpLocation = { countryCode: 'SY', city: 'Damascus' };
+
+/** An open session the mocked API holds (F01B); pages of several users may share one list. */
+export interface SessionRecord {
+  id: string;
+  userId: string;
+  userAgent: string;
+  browserKey: string | null;
+  hardwareKey: string | null;
+  ip: string | null;
+  location: IpLocation;
+  lastIp: string | null;
+  lastLocation: IpLocation;
+  signedInAt: string;
+  lastActiveAt: string;
+}
+
+/**
+ * Sara on the office PC in Chrome and Edge and on her phone; Karim signed in later in the same
+ * Chrome; Layan in Firefox on the same PC (another browser on this device, probably).
+ */
+export function sessionsSeed(): SessionRecord[] {
+  const office = {
+    hardwareKey: 'hw-office-pc',
+    ip: OFFICE_IP,
+    location: DAMASCUS,
+    lastIp: OFFICE_IP,
+    lastLocation: DAMASCUS,
+  };
+  return [
+    {
+      ...office,
+      id: sessionId(1),
+      userId: manager.user.id,
+      userAgent: CHROME_WINDOWS,
+      browserKey: 'office-chrome',
+      signedInAt: '2026-10-18T06:12:00.000Z',
+      lastActiveAt: minutesBefore(1),
+    },
+    {
+      ...office,
+      id: sessionId(2),
+      userId: manager.user.id,
+      userAgent: EDGE_WINDOWS,
+      browserKey: 'office-edge',
+      signedInAt: '2026-10-17T07:40:00.000Z',
+      lastActiveAt: minutesBefore(95),
+    },
+    {
+      id: sessionId(3),
+      userId: manager.user.id,
+      userAgent: SAFARI_IPHONE,
+      browserKey: 'sara-phone',
+      hardwareKey: null,
+      ip: '5.134.200.17',
+      location: { countryCode: 'SY', city: 'Aleppo' },
+      lastIp: '2001:db8:85a3::8a2e:370:7334',
+      lastLocation: { countryCode: 'TR', city: 'Gaziantep' },
+      signedInAt: '2026-10-14T16:05:00.000Z',
+      lastActiveAt: minutesBefore(26 * 60),
+    },
+    {
+      ...office,
+      id: sessionId(4),
+      userId: employeeMe.user.id,
+      userAgent: CHROME_WINDOWS,
+      browserKey: 'office-chrome',
+      signedInAt: '2026-10-19T05:30:00.000Z',
+      lastActiveAt: minutesBefore(3),
+    },
+    {
+      ...office,
+      id: sessionId(5),
+      userId: seedIds.layan,
+      userAgent: FIREFOX_WINDOWS,
+      browserKey: 'office-firefox',
+      signedInAt: '2026-10-18T10:00:00.000Z',
+      lastActiveAt: minutesBefore(40),
+    },
+  ];
+}
+
+const MATCH_STRENGTH: Record<DeviceMatch, number> = { same_browser: 2, same_device: 1 };
+
+/** GET /api/me/sessions as the API answers it (rules 6, 14, 15). */
+function signedInDevices(
+  sessions: SessionRecord[],
+  users: UserResponse[],
+  userId: string,
+  currentId: string,
+): SignedInDevice[] {
+  const keys = (s: SessionRecord) => ({
+    browserKey: s.browserKey,
+    hardwareKey: s.hardwareKey,
+    ipAddress: s.ip,
+    lastIpAddress: s.lastIp,
+  });
+  return sessions
+    .filter((s) => s.userId === userId)
+    .map((s) => {
+      const shared = new Map<string, SharedDeviceUser>();
+      for (const other of sessions) {
+        if (other.userId === userId) continue;
+        const match = deviceMatch(keys(s), keys(other));
+        const user = users.find((u) => u.id === other.userId);
+        if (!match || !user) continue;
+        const known = shared.get(user.id);
+        if (known && MATCH_STRENGTH[known.match] >= MATCH_STRENGTH[match]) continue;
+        const primary = user.departments.find((d) => d.isPrimary);
+        shared.set(user.id, {
+          user: { id: user.id, name: user.name, image: null },
+          department: primary ? { code: primary.code, name: primary.name } : null,
+          match,
+          lastActiveAt: other.lastActiveAt,
+        });
+      }
+      return {
+        id: s.id,
+        current: s.id === currentId,
+        device: deviceOf(s.userAgent),
+        signIn: { at: s.signedInAt, ip: s.ip, location: s.location },
+        lastActive: { at: s.lastActiveAt, ip: s.lastIp, location: s.lastLocation },
+        sharedWith: [...shared.values()],
+      };
+    })
+    .sort(
+      (a, b) =>
+        Number(b.current) - Number(a.current) || b.lastActive.at.localeCompare(a.lastActive.at),
+    );
+}
+
 interface MockOptions {
   signedIn: boolean;
+  /** Open sessions (F01B), shared between the pages of a test; `sessionsSeed()` by default. */
+  sessions?: SessionRecord[];
+  /** This page's session among `sessions`; the user's first one by default. */
+  session?: string;
   acceptPassword?: string;
   me?: MeResponse;
   /** Sign-in answers with the two-factor step. */
@@ -1087,6 +1246,8 @@ function activationLink(kind: 'activation' | 'reset') {
 /** Switches the signed-in user mid-test, keeping the in-memory data; reload the page after. */
 export interface MockedApi {
   signInAs: (next: MeResponse) => void;
+  /** The hardware the page reported for its session (F01B rule 5). */
+  hardwareReports: HardwareSignals[];
 }
 
 /** Mocks the API with an in-memory team. `signedIn` decides whether /api/me finds a session. */
@@ -1094,6 +1255,32 @@ export async function mockApi(page: Page, options: MockOptions): Promise<MockedA
   let signedIn = options.signedIn;
   let me = options.me ?? manager;
   const users = teamSeed();
+  const sessions = options.sessions ?? sessionsSeed();
+  const hardwareReports: HardwareSignals[] = [];
+  /** This page's session, opened for the user when the list has none (or it was signed out). */
+  const openSession = (preferred?: string) => {
+    const found =
+      sessions.find((s) => s.id === preferred) ?? sessions.find((s) => s.userId === me.user.id);
+    if (found) return found.id;
+    const opened: SessionRecord = {
+      id: sessionId(100 + sessions.length),
+      userId: me.user.id,
+      userAgent: CHROME_WINDOWS,
+      browserKey: `browser-${me.user.id}`,
+      hardwareKey: null,
+      ip: '127.0.0.1',
+      location: { local: true },
+      lastIp: '127.0.0.1',
+      lastLocation: { local: true },
+      signedInAt: minutesBefore(10),
+      lastActiveAt: minutesBefore(0),
+    };
+    sessions.push(opened);
+    return opened.id;
+  };
+  let currentSession = openSession(options.session);
+  /** Rule 9: a session signed out from another device is refused at its next request. */
+  const sessionOpen = () => sessions.some((s) => s.id === currentSession);
   const clients = clientsSeed();
   const clientsApi = clientRoutes({ users, clients, me: () => me });
   const projects = projectsSeed();
@@ -1254,7 +1441,7 @@ export async function mockApi(page: Page, options: MockOptions): Promise<MockedA
 
     if (path === '/api/health') return json(route, healthy);
     if (path === '/api/me' && method === 'GET') {
-      return signedIn ? json(route, me) : fail(route, 401, null);
+      return signedIn && sessionOpen() ? json(route, me) : fail(route, 401, null);
     }
 
     // Better Auth.
@@ -1269,6 +1456,7 @@ export async function mockApi(page: Page, options: MockOptions): Promise<MockedA
       }
       if (options.twoFactorOnSignIn) return json(route, { twoFactorRedirect: true });
       signedIn = true;
+      currentSession = openSession();
       return json(route, { redirect: false, token: 'test-token', user: me.user });
     }
     if (path === '/api/auth/two-factor/verify-totp') {
@@ -1277,11 +1465,13 @@ export async function mockApi(page: Page, options: MockOptions): Promise<MockedA
         return json(route, { code: 'INVALID_CODE', message: 'Invalid code' }, 401);
       }
       signedIn = true;
+      currentSession = openSession();
       me = { ...me, twoFactor: { ...me.twoFactor, enabled: true } };
       return json(route, { token: 'test-token', user: me.user });
     }
     if (path === '/api/auth/two-factor/verify-backup-code') {
       signedIn = true;
+      currentSession = openSession();
       return json(route, { token: 'test-token', user: me.user });
     }
     if (path === '/api/auth/two-factor/enable') {
@@ -1318,7 +1508,33 @@ export async function mockApi(page: Page, options: MockOptions): Promise<MockedA
       const shown = tasksApi(route, method, url, request);
       if (shown) return shown;
     }
-    if (!signedIn) return fail(route, 401, null);
+    if (!signedIn || !sessionOpen()) return fail(route, 401, null);
+
+    // Signed-in devices (F01B).
+    if (path === '/api/me/sessions' && method === 'GET') {
+      return json(route, { items: signedInDevices(sessions, users, me.user.id, currentSession) });
+    }
+    if (path === '/api/me/sessions/current/hardware' && method === 'PUT') {
+      hardwareReports.push(request.postDataJSON() as HardwareSignals);
+      return route.fulfill({ status: 204 });
+    }
+    if (path === '/api/me/sessions/sign-out-all' && method === 'POST') {
+      const { includeCurrent } = request.postDataJSON() as { includeCurrent: boolean };
+      const removed = sessions.filter(
+        (s) => s.userId === me.user.id && (includeCurrent || s.id !== currentSession),
+      );
+      for (const s of removed) sessions.splice(sessions.indexOf(s), 1);
+      if (includeCurrent) signedIn = false;
+      return json(route, { signedOut: removed.length });
+    }
+    const signOutMatch = path.match(/^\/api\/me\/sessions\/([^/]+)$/);
+    if (signOutMatch && method === 'DELETE') {
+      const target = sessions.find((s) => s.id === signOutMatch[1] && s.userId === me.user.id);
+      if (!target) return fail(route, 404, null);
+      if (target.id === currentSession) return fail(route, 400, 'CURRENT_SESSION');
+      sessions.splice(sessions.indexOf(target), 1);
+      return route.fulfill({ status: 204 });
+    }
 
     // Users.
     if (path === '/api/users' && method === 'GET') {
@@ -1533,7 +1749,9 @@ export async function mockApi(page: Page, options: MockOptions): Promise<MockedA
   return {
     signInAs: (next) => {
       me = next;
+      currentSession = openSession();
     },
+    hardwareReports,
   };
 }
 

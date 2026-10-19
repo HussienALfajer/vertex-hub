@@ -27,8 +27,12 @@ function onApiError(error: Error) {
     sessionEnding = true;
     const location = router.state.location;
     const redirect = location.pathname === '/login' ? undefined : location.href;
+    // F01B: a session refused while the app was open was signed out from another device.
     void leaveSession(queryClient, () =>
-      router.navigate({ to: '/login', search: redirect ? { redirect } : {} }),
+      router.navigate({
+        to: '/login',
+        search: redirect ? { redirect, signedOut: 'elsewhere' } : {},
+      }),
     ).finally(() => {
       sessionEnding = false;
     });
