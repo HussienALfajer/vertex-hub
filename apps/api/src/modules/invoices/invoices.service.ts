@@ -75,11 +75,7 @@ export type InvoiceRow = typeof invoices.$inferSelect;
 
 export type InvoiceLineRow = typeof invoiceLines.$inferSelect;
 
-// `retainerCycleId` is deprecated by F05B: new lines never set it.
-type NewLine = Omit<
-  InvoiceLineRow,
-  'id' | 'invoiceId' | 'holdsSource' | 'position' | 'retainerCycleId'
->;
+type NewLine = Omit<InvoiceLineRow, 'id' | 'invoiceId' | 'holdsSource' | 'position'>;
 
 /** `INV-2026-0012`, `2026-12` or `12`. */
 function numberSearch(search: string): SQL | undefined {

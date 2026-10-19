@@ -428,6 +428,13 @@
       "when": 1792421418553,
       "tag": "0060_cheerful_menace",
       "breakpoints": true
+    },
+    {
+      "idx": 61,
+      "version": "7",
+      "when": 1792444017293,
+      "tag": "0061_aberrant_katie_power",
+      "breakpoints": true
     }
   ]
 }

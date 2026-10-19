@@ -416,7 +416,6 @@ describe('automatic invoice drafts and billing locks (F13 PR 2)', () => {
         .where(eq(invoiceLines.invoiceId, month?.id ?? ''));
       expect(line).toMatchObject({
         retainerChargeId: charge?.id,
-        retainerCycleId: null,
         // F05C J3: the line names the cycle and its period.
         description: expect.stringContaining(`${retainer.name} — الدورة 1 (`),
       });
