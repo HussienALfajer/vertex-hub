@@ -70,6 +70,7 @@ Business decisions are recorded in `docs/decisions/` (see ADR 0007 and ADR 0006)
 - Employee profile: name, department, title, skills (used when assigning tasks).
 - Audit log of important actions (status changes, invoice edits, file deletion/archival).
 - Security basics: secure login, optional 2FA for management and finance, daily automatic backups.
+- Signed-in devices on My account: each open session with its browser, location and IP, colleagues signed in on the same device, and signing out one device or all devices (F01B, owner, 2026-10-19).
 - **Not in V1:** field-level custom permissions, attendance, payroll.
 
 ### F02 — Clients (unified client profile)
