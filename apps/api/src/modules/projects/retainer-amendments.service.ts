@@ -759,7 +759,7 @@ export class RetainerAmendmentsService {
           eq(retainerAmendments.retainerId, retainerId),
           eq(retainerAmendments.status, 'applied'),
           eq(retainerAmendments.kind, 'change'),
-          inArray(retainerAmendments.scope, ['month', 'cycle']),
+          eq(retainerAmendments.scope, 'cycle'),
           eq(retainerAmendments.effectiveCycle, cycle),
         ),
       )
@@ -1530,7 +1530,7 @@ function canApprove(actor: CurrentUserInfo): boolean {
   return hasPermission(actor.access, 'retainers.approve_reduction');
 }
 
-/** The stored scope: rows written before F05C say `month` for `cycle`. */
+/** The stored scope; its enum still lists F05B's `month`, rewritten to `cycle` by 0063. */
 function scopeOf(row: AmendmentRow): Amendment['scope'] {
   return row.scope === 'month' ? 'cycle' : row.scope;
 }
