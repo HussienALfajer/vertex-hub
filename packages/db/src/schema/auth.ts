@@ -47,9 +47,20 @@ export const sessions = pgTable(
     expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
     ipAddress: text('ip_address'),
     userAgent: text('user_agent'),
+    /** F01B rule 1: SHA-256 of the browser's `vh_device` cookie; null until its next request. */
+    browserKey: text('browser_key'),
+    /** F01B rule 5: HMAC of the reported hardware signals; null until the web app reports them. */
+    hardwareKey: text('hardware_key'),
+    /** F01B rule 4: the last request made with the session, written at most every 5 minutes. */
+    lastActiveAt: timestamp('last_active_at', { withTimezone: true }).notNull().defaultNow(),
+    lastIpAddress: text('last_ip_address'),
     ...timestamps(),
   },
-  (table) => [index('sessions_user_id_idx').on(table.userId)],
+  (table) => [
+    index('sessions_user_id_idx').on(table.userId),
+    index('sessions_browser_key_idx').on(table.browserKey),
+    index('sessions_hardware_key_idx').on(table.hardwareKey),
+  ],
 );
 
 /** Sign-in methods of a user. Email and password sign-in is the `credential` provider. */

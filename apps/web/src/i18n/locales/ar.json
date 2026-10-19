@@ -251,6 +251,7 @@
     "MANAGER_MEMBERSHIP_REQUIRED": "لا يمكن إخراج المستخدم من قسم يديره. غيّر مدير القسم أولًا.",
     "DEPARTMENT_NAME_TAKEN": "يوجد قسم آخر بهذا الاسم.",
     "LINK_INVALID": "الرابط غير صالح أو انتهت صلاحيته.",
+    "CURRENT_SESSION": "لا يمكن تسجيل الخروج من هذا الجهاز من هنا.",
     "CLIENT_NAME_TAKEN": "يوجد عميل آخر بهذا الاسم التجاري.",
     "INVALID_ACCOUNT_MANAGER": "اختر مستخدمًا غير مؤرشف يحمل دور مدير الحساب.",
     "CLIENT_ARCHIVED": "هذا العميل مؤرشف ولا يمكن تعديله.",
@@ -837,7 +838,9 @@
         "two_factor_disabled": "أوقف التحقق بخطوتين",
         "two_factor_reset": "أعاد ضبط التحقق بخطوتين",
         "backup_codes_regenerated": "أنشأ رموزًا احتياطية جديدة",
-        "profile_updated": "عدّل هاتفه أو مهاراته"
+        "profile_updated": "عدّل هاتفه أو مهاراته",
+        "session_signed_out": "سجّل الخروج من جهاز",
+        "sessions_signed_out": "سجّل الخروج من كل الأجهزة"
       },
       "department": {
         "updated": "عدّل قسمًا"
@@ -1354,6 +1357,10 @@
       "startsAt": "البداية",
       "endsAt": "النهاية",
       "location": "المكان",
+      "device": "الجهاز",
+      "ipAddress": "عنوان IP",
+      "count": "العدد",
+      "includedCurrent": "شمل هذا الجهاز",
       "mapUrl": "رابط الخريطة",
       "crew": "طاقم الفريق",
       "externalCrew": "الطاقم الخارجي",

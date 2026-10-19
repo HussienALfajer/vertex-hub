@@ -19,7 +19,9 @@ import { eq } from 'drizzle-orm';
 import type { Env } from '../../core/config/env.js';
 import { recordAudit } from '../audit/index.js';
 import type { AccountEmails } from './account-emails.js';
+import { browserKeyOf } from './device-cookie.js';
 import { resolveAccess } from './resolve-access.js';
+import { clientIpOf } from './session-activity.js';
 
 export const AUTH_BASE_PATH = '/api/auth';
 
@@ -46,6 +48,11 @@ const DISABLED_PATHS = [
   '/account-info',
   '/two-factor/send-otp',
   '/two-factor/verify-otp',
+  // F01B rule 13: devices are listed and signed out through `/api/me/sessions` only.
+  '/list-sessions',
+  '/revoke-session',
+  '/revoke-sessions',
+  '/revoke-other-sessions',
 ];
 
 /**
@@ -199,8 +206,21 @@ export function createAuth(db: Database, env: Env, emails: AccountEmails) {
             }
           },
           // F14 email rule 15. A failure to record the device must not refuse the sign-in.
-          after: async (session) => {
+          after: async (session, context) => {
             try {
+              // F01B rule 2: the browser key of the request that created the session, and the
+              // sign-in address in full (Better Auth stored the /64 prefix of an IPv6 address).
+              const browserKey = browserKeyOf(context?.headers?.get('cookie') ?? undefined);
+              const ipAddress = clientIpOf(context?.headers?.get('x-forwarded-for'));
+              if (browserKey || ipAddress) {
+                await db
+                  .update(sessions)
+                  .set({
+                    ...(browserKey && { browserKey }),
+                    ...(ipAddress && { ipAddress }),
+                  })
+                  .where(eq(sessions.id, session.id));
+              }
               await emails.signedIn(session);
             } catch (error) {
               logger.error(error, `Could not record the device of user ${session.userId}`);

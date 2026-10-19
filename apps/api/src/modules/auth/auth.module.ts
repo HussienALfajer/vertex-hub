@@ -10,10 +10,14 @@ import { AccountEmails } from './account-emails.js';
 import { createAuth } from './auth.config.js';
 import { DepartmentsController } from './departments.controller.js';
 import { DepartmentsService } from './departments.service.js';
+import { IpLocations } from './ip-locations.js';
 import { MeController } from './me.controller.js';
 import { PasswordLinksController } from './password-links.controller.js';
 import { PermissionsGuard } from './permissions.guard.js';
 import { ResponsibilityRegistry } from './responsibility-registry.js';
+import { SessionActivity } from './session-activity.js';
+import { SignedInDevicesController } from './signed-in-devices.controller.js';
+import { SignedInDevicesService } from './signed-in-devices.service.js';
 import { UserDirectory } from './user-directory.js';
 import { UserLinksService } from './user-links.service.js';
 import { UsersController } from './users.controller.js';
@@ -37,7 +41,13 @@ import { UsersService } from './users.service.js';
       }),
     }),
   ],
-  controllers: [MeController, UsersController, DepartmentsController, PasswordLinksController],
+  controllers: [
+    MeController,
+    SignedInDevicesController,
+    UsersController,
+    DepartmentsController,
+    PasswordLinksController,
+  ],
   providers: [
     AccessService,
     UsersService,
@@ -46,6 +56,9 @@ import { UsersService } from './users.service.js';
     DepartmentsService,
     ResponsibilityRegistry,
     UserDirectory,
+    IpLocations,
+    SessionActivity,
+    SignedInDevicesService,
     { provide: APP_GUARD, useClass: PermissionsGuard },
   ],
   exports: [ResponsibilityRegistry, UserDirectory],

@@ -18,17 +18,20 @@ import {
 import { CodedException } from '../../core/errors/index.js';
 import { AccessService } from './access.service.js';
 import type { RequestWithUser } from './current-user.decorator.js';
+import { SessionActivity } from './session-activity.js';
 
 interface AuthenticatedRequest extends RequestWithUser {
   headers: IncomingHttpHeaders;
   session?: UserSession | null;
+  socket?: { remoteAddress?: string };
 }
 
 /**
  * Global guard for `@RequirePermissions` and `@RequireSession` routes. It resolves the user's
  * access on every request (ADR 0014), refuses archived users, holds back users who must set up
- * two-factor sign-in (F01 rule 15), and checks the required permissions. Better Auth's global
- * AuthGuard handles authentication; this guard does not rely on running after it.
+ * two-factor sign-in (F01 rule 15), records the session's activity (F01B rule 4), and checks the
+ * required permissions. Better Auth's global AuthGuard handles authentication; this guard does not
+ * rely on running after it.
  */
 @Injectable()
 export class PermissionsGuard implements CanActivate {
@@ -36,6 +39,7 @@ export class PermissionsGuard implements CanActivate {
     private readonly reflector: Reflector,
     private readonly auth: AuthService,
     private readonly access: AccessService,
+    private readonly activity: SessionActivity,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -58,6 +62,8 @@ export class PermissionsGuard implements CanActivate {
 
     const resolved = await this.access.resolve(session.user.id);
     if (!resolved) throw new UnauthorizedException();
+    // F01B rules 3 and 4: last activity and the browser key; never fails the request.
+    await this.activity.touch(session.session.id, request.headers, request.socket?.remoteAddress);
 
     const pendingAllowed = this.reflector.getAllAndOverride<boolean | undefined>(
       ALLOW_PENDING_TWO_FACTOR,

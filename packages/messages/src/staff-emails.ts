@@ -240,6 +240,14 @@ const SECURITY_CHANGE_TEXT: Record<SecurityChange, { subject: string; what: stri
   },
   roles_changed: { subject: 'تغيّرت أدوارك', what: 'تغيّرت الأدوار المسندة إليك' },
   archived: { subject: 'أُرشف حسابك', what: 'أُرشف حسابك ولم يعد بإمكانك الدخول' },
+  device_signed_out: {
+    subject: 'سُجّل الخروج من أحد أجهزتك',
+    what: 'سُجّل خروج حسابك من أحد الأجهزة',
+  },
+  all_devices_signed_out: {
+    subject: 'سُجّل الخروج من أجهزتك',
+    what: 'سُجّل خروج حسابك من كل أجهزتك',
+  },
 };
 
 /** Rule 14: a change on the account; these cannot be switched off. */

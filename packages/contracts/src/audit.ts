@@ -18,6 +18,8 @@ export const AUDIT_ACTIONS = [
   'user.two_factor_reset',
   'user.backup_codes_regenerated',
   'user.profile_updated',
+  'user.session_signed_out',
+  'user.sessions_signed_out',
   'department.updated',
   'client.created',
   'client.updated',

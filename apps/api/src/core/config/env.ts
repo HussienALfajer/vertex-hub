@@ -28,6 +28,11 @@ export const envSchema = z
       .enum(['true', 'false'])
       .optional()
       .transform((value) => (value === undefined ? undefined : value === 'true')),
+    /**
+     * F01B (ADR 0032): the DB-IP "IP to City Lite" MMDB that locates sign-in addresses. Optional:
+     * without it, locations are unknown and nothing fails.
+     */
+    GEOIP_DB_PATH: z.string().min(1).optional(),
     /** Signs session cookies. Required in production; derived locally when unset. */
     BETTER_AUTH_SECRET: z.string().min(32).optional(),
     /**
