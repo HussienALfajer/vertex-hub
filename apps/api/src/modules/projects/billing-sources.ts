@@ -121,23 +121,22 @@ const chargeTermColumns = {
 /** "2 of 3" of the charge's term, read from the joined term columns. */
 function chargeTerm(
   cycle: number,
-  term: { number: number; startCycle: number | null; cycles: number | null } | null,
+  term: { number: number; startCycle: number; cycles: number } | null,
 ): ChargeTerm | null {
   if (!term) return null;
   return {
     number: term.number,
-    position: cycle - (term.startCycle ?? cycle) + 1,
-    cycles: term.cycles ?? 1,
+    position: cycle - term.startCycle + 1,
+    cycles: term.cycles,
   };
 }
 
 /** A charge row's cycle and its anchored period (F05C). */
 function chargeCycle(
-  row: { cycleNumber: number | null },
+  row: { cycleNumber: number },
   startDate: CalendarDate,
 ): { cycle: number } & CyclePeriod {
-  const cycle = row.cycleNumber ?? 1;
-  return { cycle, ...cyclePeriod(startDate, cycle) };
+  return { cycle: row.cycleNumber, ...cyclePeriod(startDate, row.cycleNumber) };
 }
 
 /** What a retainer's billing summary lists (F13). */

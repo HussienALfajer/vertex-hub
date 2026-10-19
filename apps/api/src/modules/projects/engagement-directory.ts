@@ -238,9 +238,8 @@ export class EngagementDirectory {
       .innerJoin(retainers, eq(retainers.id, retainerCycles.retainerId))
       .where(inArray(retainerCycles.id, unique));
     return byId(
-      rows.map(({ retainerArchivedAt, number, ...row }) => ({
+      rows.map(({ retainerArchivedAt, ...row }) => ({
         ...row,
-        number: number ?? 0,
         retainerArchived: !!retainerArchivedAt,
       })),
     );
@@ -307,7 +306,7 @@ export class EngagementDirectory {
       .where(and(eq(retainerCycles.retainerId, retainerId), eq(retainerCycles.status, 'open')))
       .orderBy(desc(retainerCycles.number))
       .limit(1);
-    return row ? { ...row, number: row.number ?? 0 } : null;
+    return row ?? null;
   }
 
   /** Locks a cycle row until the transaction ends, so line changes wait (F07 rule 18). */

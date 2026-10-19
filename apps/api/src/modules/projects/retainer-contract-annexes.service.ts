@@ -139,8 +139,7 @@ export class RetainerContractAnnexesService {
         amendment: {
           number: amendment.number,
           kind: amendment.kind,
-          // The scope enum still lists F05B's `month`, which migration 0063 rewrote to `cycle`.
-          scope: amendment.scope === 'month' ? 'cycle' : amendment.scope,
+          scope: amendment.scope,
           effectiveCycle: amendment.effectiveCycle,
           ...cyclePeriod(retainer.startDate, amendment.effectiveCycle),
           lines: lines.map((line) => ({

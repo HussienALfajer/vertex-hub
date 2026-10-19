@@ -39,8 +39,8 @@ import { workTemplates } from './templates.js';
  * the extra work log of projects and retainers (F05), owned by the api `projects` module. Dates
  * without a time are calendar days in Asia/Damascus.
  *
- * F05C replaced the F05B month columns with cycle columns; its contract migration dropped the
- * month columns. The cycle columns stay nullable, as the expand migration added them.
+ * F05C replaced the F05B month columns with cycle columns; its contract migrations dropped the
+ * month columns and made the cycle columns NOT NULL.
  */
 
 export const retainerStatusEnum = pgEnum('retainer_status', RETAINER_STATUSES);
@@ -59,11 +59,7 @@ export const termStatusEnum = pgEnum('term_status', TERM_STATUSES);
 
 export const amendmentKindEnum = pgEnum('amendment_kind', AMENDMENT_KINDS);
 
-/**
- * `month`: the F05B name of `cycle`. F05C's contract migration rewrote every row to `cycle`; the
- * value is removed once no deployed release names it.
- */
-export const amendmentScopeEnum = pgEnum('amendment_scope', ['month', ...AMENDMENT_SCOPES]);
+export const amendmentScopeEnum = pgEnum('amendment_scope', AMENDMENT_SCOPES);
 
 export const amendmentStatusEnum = pgEnum('amendment_status', AMENDMENT_STATUSES);
 
@@ -148,7 +144,7 @@ export const retainerCycles = pgTable(
       .notNull()
       .references(() => retainers.id),
     /** F05C Y1: the cycle number from the retainer's start date (`cycleAt`). */
-    number: integer('number'),
+    number: integer('number').notNull(),
     /** `cyclePeriod`, except a cycle started "now" (P2) and one ended early (F05 R5). */
     periodStart: date('period_start', { mode: 'string' }).notNull(),
     periodEnd: date('period_end', { mode: 'string' }).notNull(),
@@ -253,11 +249,11 @@ export const retainerTerms = pgTable(
     /** 1, 2, 3… per retainer. */
     number: integer('number').notNull(),
     /** F05C T1': its first cycle and its number of cycles (1–36). */
-    startCycle: integer('start_cycle'),
-    cycles: integer('cycles'),
+    startCycle: integer('start_cycle').notNull(),
+    cycles: integer('cycles').notNull(),
     /** The first day of its first cycle and the last day of its last cycle, set by the service. */
-    startDate: date('start_date', { mode: 'string' }),
-    endDate: date('end_date', { mode: 'string' }),
+    startDate: date('start_date', { mode: 'string' }).notNull(),
+    endDate: date('end_date', { mode: 'string' }).notNull(),
     /** Frozen when the term is created, editable while it is scheduled; a money field. */
     agreedTotalMinor: minorAmount('agreed_total_minor').notNull(),
     endAction: termEndActionEnum('end_action').notNull().default('renew'),
@@ -300,8 +296,8 @@ export const retainerCharges = pgTable(
       .notNull()
       .references(() => retainers.id),
     /** F05C: the cycle the charge belongs to, and that cycle's `cyclePeriod` start. */
-    cycleNumber: integer('cycle_number'),
-    cycleStart: date('cycle_start', { mode: 'string' }),
+    cycleNumber: integer('cycle_number').notNull(),
+    cycleStart: date('cycle_start', { mode: 'string' }).notNull(),
     kind: retainerChargeKindEnum('kind').notNull(),
     /** Negative for a credit. */
     amountMinor: minorAmount('amount_minor').notNull(),
@@ -367,8 +363,8 @@ export const retainerAmendments = pgTable(
     /** Required for `change`, `onward` for `quote_renewal`, null for `reschedule`. */
     scope: amendmentScopeEnum('scope'),
     /** F05C A1': the cycle it takes effect in, and that cycle's first day. */
-    effectiveCycle: integer('effective_cycle'),
-    effectiveDate: date('effective_date', { mode: 'string' }),
+    effectiveCycle: integer('effective_cycle').notNull(),
+    effectiveDate: date('effective_date', { mode: 'string' }).notNull(),
     /** `change`: the change to each affected cycle; a money field. */
     amountDeltaMinor: minorAmount('amount_delta_minor').notNull().default(0),
     /** `reschedule` only: `{ cycle, amountMinor }[]`, the new amounts; a money field. */

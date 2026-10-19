@@ -330,7 +330,7 @@ export class RetainerAmendmentsService {
         }
         throw error;
       }
-      const applies = effectiveCycleOf(row) <= currentCycleNumber(retainer.startDate, today);
+      const applies = row.effectiveCycle <= currentCycleNumber(retainer.startDate, today);
       const note = input.note || null;
       await tx
         .update(retainerAmendments)
@@ -437,7 +437,7 @@ export class RetainerAmendmentsService {
       if (term.status !== 'active' && term.status !== 'scheduled') {
         throw new CodedException(409, 'TERM_STARTED', 'Only an active or scheduled term changes');
       }
-      const cycles = termCycles(term.startCycle ?? 1, term.cycles ?? 0);
+      const cycles = termCycles(term.startCycle, term.cycles);
       const chosen = input.schedule.map((entry) => entry.cycle);
       if (
         new Set(chosen).size !== chosen.length ||
@@ -695,7 +695,7 @@ export class RetainerAmendmentsService {
         after: { monthlyFeeMinor: row.feeMinor, amendmentId: row.id },
       });
       effects.push({
-        cycle: effectiveCycleOf(row),
+        cycle: row.effectiveCycle,
         effect: 'fee_changed',
         invoice: null,
         beforeMinor: beforeMinor ?? 0,
@@ -818,8 +818,8 @@ export class RetainerAmendmentsService {
         )
     )
       .map((term) => ({
-        startCycle: term.startCycle ?? 1,
-        cycles: term.cycles ?? 0,
+        startCycle: term.startCycle,
+        cycles: term.cycles,
         endAction: term.endAction,
       }))
       .sort((a, b) => a.startCycle - b.startCycle);
@@ -1454,8 +1454,7 @@ export class RetainerAmendmentsService {
       );
     const totals = new Map<number, number>();
     for (const row of rows) {
-      const cycle = row.cycle ?? 0;
-      totals.set(cycle, (totals.get(cycle) ?? 0) + row.amountMinor);
+      totals.set(row.cycle, (totals.get(row.cycle) ?? 0) + row.amountMinor);
     }
     return totals;
   }
@@ -1480,9 +1479,9 @@ export class RetainerAmendmentsService {
       retainerId: row.retainerId,
       number: row.number,
       kind: row.kind,
-      scope: scopeOf(row),
-      effectiveCycle: effectiveCycleOf(row),
-      effectiveDate: row.effectiveDate ?? '',
+      scope: row.scope,
+      effectiveCycle: row.effectiveCycle,
+      effectiveDate: row.effectiveDate,
       status: row.status,
       reason: row.reason,
       lines: lines
@@ -1530,16 +1529,6 @@ function canApprove(actor: CurrentUserInfo): boolean {
   return hasPermission(actor.access, 'retainers.approve_reduction');
 }
 
-/** The stored scope; its enum still lists F05B's `month`, rewritten to `cycle` by 0063. */
-function scopeOf(row: AmendmentRow): Amendment['scope'] {
-  return row.scope === 'month' ? 'cycle' : row.scope;
-}
-
-/** The effective cycle, set on every row once F05C's backfill ran. */
-function effectiveCycleOf(row: AmendmentRow): number {
-  return row.effectiveCycle ?? 0;
-}
-
 /** The start date of the one retainer an amendment list belongs to. */
 function startOf(retainer: { startDate: CalendarDate }): () => CalendarDate {
   return () => retainer.startDate;
@@ -1548,8 +1537,8 @@ function startOf(retainer: { startDate: CalendarDate }): () => CalendarDate {
 /** A stored amendment as the planner's input. */
 function changeOf(row: AmendmentRow, lines: LineRow[]): ChangeInput {
   return {
-    scope: scopeOf(row) ?? 'cycle',
-    effectiveCycle: effectiveCycleOf(row),
+    scope: row.scope ?? 'cycle',
+    effectiveCycle: row.effectiveCycle,
     amountDeltaMinor: row.amountDeltaMinor,
     lines: lines.map((line) => ({
       kind: line.kind,
