@@ -36,6 +36,22 @@ resolved=$(getent ahostsv4 "$DOMAIN" | awk 'NR==1{print $1}' || true)
 [ "$resolved" = "$SERVER_IP" ] || { echo "$DOMAIN resolves to '${resolved:-nothing}', expected $SERVER_IP" >&2; exit 1; }
 echo "DNS ok, port $API_PORT free"
 
+step "Swap"
+# A 4 GB swap file (owner, 2026-10-19): headroom for the worker's Chromium PDF renders, used only
+# under memory pressure (swappiness 10). Left alone when the server already has swap.
+if [ -z "$(swapon --noheadings --show=NAME)" ]; then
+  fallocate -l 4G /swapfile
+  chmod 600 /swapfile
+  mkswap /swapfile >/dev/null
+  swapon /swapfile
+fi
+if [ -f /swapfile ] && ! grep -q '^/swapfile ' /etc/fstab; then
+  echo '/swapfile none swap sw 0 0' >> /etc/fstab
+fi
+echo 'vm.swappiness=10' > /etc/sysctl.d/90-vertexhub-swap.conf
+sysctl -q -p /etc/sysctl.d/90-vertexhub-swap.conf
+swapon --show
+
 step "System user $APP_USER"
 if ! id "$APP_USER" >/dev/null 2>&1; then
   useradd --system --user-group --create-home --home-dir "/home/$APP_USER" --shell /bin/bash "$APP_USER"

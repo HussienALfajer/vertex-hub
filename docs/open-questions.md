@@ -4,7 +4,6 @@ Decisions that belong to the owner. Agents must not guess answers to these. When
 
 | ID | Question | Needed before | Recommendation |
 |---|---|---|---|
-| Q7 | Add swap on the server (none today) as a safety margin for Chromium PDF rendering? | Launch | 2–4 GB |
 
 ## Resolved
 
@@ -31,3 +30,4 @@ Decisions that belong to the owner. Agents must not guess answers to these. When
 | License for the public repository (was Q10) | None: the repository stays without a license (all rights reserved) | 2026-10-19 |
 | Madani Arabic license and files (was Q11) | Dropped: Noto Kufi Arabic is the Arabic typeface (ADR 0033) | 2026-10-19 |
 | Original vector logo files (was Q12) | Not needed: the traced SVGs in `brand/logo/` are the logo, and the wordmark stays as traced | 2026-10-19 |
+| Swap on the server (was Q7) | Yes: a 4 GB swap file with `vm.swappiness=10`, added on 2026-10-19 and kept by `provision.sh` (`docs/deployment.md`) | 2026-10-19 |
