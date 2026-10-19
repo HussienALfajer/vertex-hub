@@ -120,8 +120,7 @@ ln -s "$SHARED/.env" "$release/.env"
   # The worker's Chromium for quote PDFs (F04), in ~/.cache/ms-playwright; a no-op when this
   # Playwright version's browser is already there. Its libraries come from provision.sh.
   corepack pnpm --filter @vertex-hub/worker exec playwright install chromium
-  # The web build loads the Madani Arabic faces only when their files are on the server.
-  MADANI_FONTS_DIR="$SITE_DIR/fonts/madani" corepack pnpm build
+  corepack pnpm build
 )
 
 # A snapshot right before migrating, restorable with pg_restore if a migration goes wrong.

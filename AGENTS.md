@@ -74,7 +74,7 @@ API docs (non-production): `http://127.0.0.1:3000/api/docs`. Health: `GET /api/h
 - **Module boundaries:** an api module reaches another module only through its `index.ts` and exported services, never its tables. `apps/api/test/architecture.test.ts` enforces it, with explicit access on every route.
 - **Design system only:** the UI uses `packages/ui` components and tokens; no ad-hoc colors, fonts, or spacing.
 - **No secrets in the repo** (it is public). Use git-ignored `.env` files and keep `.env.example` with fake values.
-- **No licensed fonts in the repo.** Madani Arabic files stay in git-ignored `brand/fonts/private/`; builds must work with the fallback font.
+- **No licensed fonts in the repo.** The fonts are OFL (Noto Kufi Arabic, Montserrat; ADR 0033); commercial font files are never committed.
 - **Archive, don't delete:** business records are archived, not hard-deleted.
 
 ## How to work

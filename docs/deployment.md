@@ -16,7 +16,6 @@ Server work needs the owner's explicit approval in the current conversation (AGE
 | Uploaded files (F10) | `/srv/hub.vertexmedia.pro/shared/files/` (`FILES_ROOT`; 2750 `vertexhub:www-data`, outside the releases). nginx serves them only through its internal `/_files/` location after the API answers `X-Accel-Redirect`; `shared/` is 710 so nginx can pass through it without listing it |
 | GeoIP database (F01B) | `/srv/hub.vertexmedia.pro/shared/geoip/dbip-city-lite.mmdb` (`GEOIP_DB_PATH`; DB-IP City Lite, CC BY 4.0), refreshed on the 3rd of each month at 04:20 by `vertexhub-geoip-update` from the `vertexhub` crontab (log tag `vertexhub-geoip`); the API reloads it within an hour |
 | Pre-migration DB snapshots | `/srv/hub.vertexmedia.pro/shared/db-snapshots/` (last 10) |
-| Madani font files | `/srv/hub.vertexmedia.pro/fonts/madani/` (ADR 0011; empty until Q11). The web build loads them only when they are there, so copy them in, then deploy again |
 | App logs | `/var/log/hub.vertexmedia.pro/{api,worker}.{out,err}.log` (14 days) |
 | nginx logs | `/var/log/nginx/hub.vertexmedia.pro.{access,error}.log` |
 | nginx site | `/etc/nginx/sites-available/hub.vertexmedia.pro` + `snippets/vertexhub-*.conf` (headers, CSP, proxy) + `conf.d/vertexhub-limits.conf` |
@@ -108,7 +107,7 @@ Restore the files the same way (they belong to the same moment as the dump):
 ssh vertex "rsync -a /var/backups/hub.vertexmedia.pro/<time>/files/ /srv/hub.vertexmedia.pro/shared/files/ && chown -R vertexhub:www-data /srv/hub.vertexmedia.pro/shared/files"
 ```
 
-Backups stay on the server until an off-server destination is chosen (Q4). That is required before launch, and more pressing since files are stored (F10).
+Backups stay on the server only (owner, ADR 0034): a loss of the server loses them too. When the owner subscribes to a storage service, the off-server copy is added to `vertexhub-backup` with a tested restore.
 
 ## First-time setup
 
@@ -133,3 +132,4 @@ ssh vertex "systemctl enable --now vertexhub-health.timer"
 - The inline theme script in `apps/web/index.html`: its hash is in the CSP in `deploy/nginx/vertexhub-csp.conf`, and `apps/web/src/csp.test.ts` fails until both match.
 - Secrets: edit `shared/.env` on the server as `vertexhub`, then `pm2 reload all --update-env`. Rotating `BETTER_AUTH_SECRET` signs everyone out.
 - F01B (signed-in devices): the first deploy that contains it needs `provision.sh` re-run after it, for `GEOIP_DB_PATH` in `shared/.env`, the `geoip/` directory, the `vertexhub` crontab and the first download (it checks the file with the release's MMDB reader). Then restart the API (`vertexhub-deploy` again) so it reads `GEOIP_DB_PATH`. Until the file is there, locations show as unknown and nothing else fails.
+- ADR 0033 (Noto Kufi Arabic only): the nginx site no longer has the `/fonts/madani/` location. After the first deploy that contains it, re-run `provision.sh` to install the site, then remove the empty `/srv/hub.vertexmedia.pro/fonts/` directory.

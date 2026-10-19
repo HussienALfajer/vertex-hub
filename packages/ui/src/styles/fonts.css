@@ -1,8 +1,8 @@
 /*
- * Typefaces (brand/identity.md §3, ADR 0011).
+ * Typefaces (brand/identity.md §3, ADR 0033).
  *
- * Montserrat (OFL) renders Latin letters and digits. Noto Kufi Arabic (OFL) is the Arabic
- * fallback until the Madani Arabic files are provisioned.
+ * Montserrat (OFL) renders Latin letters and digits; Noto Kufi Arabic (OFL) renders Arabic. Both
+ * ship with the build from @fontsource.
  */
 @import "@fontsource/montserrat/latin-400.css";
 @import "@fontsource/montserrat/latin-500.css";
@@ -13,9 +13,3 @@
 @import "@fontsource/noto-kufi-arabic/arabic-400.css";
 @import "@fontsource/noto-kufi-arabic/arabic-500.css";
 @import "@fontsource/noto-kufi-arabic/arabic-700.css";
-
-/*
- * Madani Arabic is commercial and never committed: its faces are in madani.css, which the app
- * loads only when the files exist at build time (apps/web/vite.config.ts), so a build without
- * them requests nothing and Arabic renders in Noto Kufi Arabic.
- */

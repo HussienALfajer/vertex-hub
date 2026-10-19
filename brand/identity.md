@@ -109,13 +109,12 @@ About 60% neutral surfaces, 30% green, 10% sand. Sand is precious: if everything
 
 | Script | Typeface | Source and license |
 |---|---|---|
-| Arabic | **Madani Arabic** (Namela) | Commercial. Needs a web license (and coverage for server-side PDF embedding). Font files are private: never committed to this public repository. |
+| Arabic | **Noto Kufi Arabic** | SIL OFL. Chosen by the owner in place of Madani Arabic (ADR 0033). Used in the web app and the PDFs. |
 | Latin and digits | **Montserrat** | SIL OFL. Matches the geometric wordmark in the logo. |
-| Arabic fallback | Noto Kufi Arabic | SIL OFL. Used until the Madani files and license are in place, and as a runtime fallback. |
 
 Implementation rules:
-- Madani's `@font-face` uses an Arabic `unicode-range`, so Latin letters and digits render in Montserrat.
-- Stack: `"Madani Arabic", "Montserrat", "Noto Kufi Arabic", system-ui, sans-serif`.
+- Both faces ship with the build (`@fontsource`); Montserrat's faces cover Latin only and Noto Kufi's Arabic only, so Latin letters and digits render in Montserrat.
+- Stack: `"Montserrat", "Noto Kufi Arabic", system-ui, sans-serif`.
 - Weights: 400 body, 500 labels and table headers, 700 headings.
 - Never letter-space Arabic, never italicize Arabic, never justify Arabic UI text.
 - Tabular figures (`font-variant-numeric: tabular-nums`) in tables, money and counters.

@@ -4,11 +4,7 @@ Decisions that belong to the owner. Agents must not guess answers to these. When
 
 | ID | Question | Needed before | Recommendation |
 |---|---|---|---|
-| Q4 | Off-server backup destination (none exists on the server today) | Launch | Required before launch: the system holds invoices and client data |
 | Q7 | Add swap on the server (none today) as a safety margin for Chromium PDF rendering? | Launch | 2–4 GB |
-| Q10 | License for the public repository (none means all rights reserved) | Anytime | — |
-| Q11 | Madani Arabic: is a license owned that covers web embedding and server-side PDF embedding? Which weights are available (need at least 400, 500, 700)? Provide the font files (WOFF2 preferred) privately | Design system (fallback works until then); required before launch | Buy/confirm a web license covering the number of users and PDF embedding |
-| Q12 | Original vector logo files (AI/EPS/SVG) from the designer, and confirmation of the wordmark typeface (appears to be Montserrat) | Before print materials; nice to have for UI | — |
 
 ## Resolved
 
@@ -31,3 +27,7 @@ Decisions that belong to the owner. Agents must not guess answers to these. When
 | Work week (was Q9) | Saturday to Thursday, Friday off; weeks start on Saturday (`docs/specs/F06-tasks.md`, ADR 0016) | 2026-09-29 |
 | Email provider (was Q5) | Hostinger Email SMTP, sending as `info@vertexmedia.pro` (`docs/specs/F14-email-digest.md`, ADR 0028) | 2026-10-04 |
 | Operations manager across departments (was Q14) | Yes: reads and manages tasks in every department (`tasks.manage` `all`) and `reports.read` `all` (`docs/specs/F06-tasks.md`, ADR 0016) | 2026-09-29 |
+| Off-server backup destination (was Q4) | Backups stay on the server for now; the owner reports when a storage service is subscribed, and the off-server copy is added then (ADR 0034) | 2026-10-19 |
+| License for the public repository (was Q10) | None: the repository stays without a license (all rights reserved) | 2026-10-19 |
+| Madani Arabic license and files (was Q11) | Dropped: Noto Kufi Arabic is the Arabic typeface (ADR 0033) | 2026-10-19 |
+| Original vector logo files (was Q12) | Not needed: the traced SVGs in `brand/logo/` are the logo, and the wordmark stays as traced | 2026-10-19 |

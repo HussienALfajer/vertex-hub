@@ -19,10 +19,9 @@ Visual identity rules: [identity.md](identity.md).
 
 ## Provenance
 
-The SVGs were traced from `logo/source/vertex-logo-green-on-white.jpg` and match it at 99.3% pixel overlap. They are production-ready for UI sizes. When the designer's original vector files (AI/EPS/SVG) are available, replace the traced SVGs with them and regenerate the PNGs.
+The SVGs were traced from `logo/source/vertex-logo-green-on-white.jpg` and match it at 99.3% pixel overlap. They are production-ready for UI sizes. They are the logo of record (owner, 2026-10-19): no designer vectors are expected.
 
 ## Fonts
 
-- Madani Arabic is a commercial font: its files are **never committed** (this repository is public). Keep them in `brand/fonts/private/` (git-ignored) locally and provision them on the server outside the repository.
-- Expected file names (WOFF2): `MadaniArabic-Regular.woff2` (400), `MadaniArabic-Medium.woff2` (500), `MadaniArabic-Bold.woff2` (700). The web app serves them at `/fonts/madani/` in dev and preview; production serves that path from outside the repository. Without them, Arabic falls back to Noto Kufi Arabic.
-- Montserrat and Noto Kufi Arabic (SIL OFL) come from `@fontsource` packages in `packages/ui`.
+- Noto Kufi Arabic (Arabic) and Montserrat (Latin and digits), both SIL OFL, come from `@fontsource` packages in `packages/ui` (ADR 0033).
+- Commercial font files are never committed: this repository is public. `brand/fonts/private/` stays git-ignored for that reason.

@@ -1,6 +1,6 @@
 # 0011 — Brand identity and fonts
 
-Status: Accepted · Date: 2026-09-28
+Status: Accepted; the Arabic typeface is superseded by [0033](0033-noto-kufi-arabic-typeface.md) · Date: 2026-09-28
 
 ## Context
 The owner provided the Vertex Media logo (green on white, sand on green, sand on white) and chose the **Madani Arabic** typeface. The repository is public.

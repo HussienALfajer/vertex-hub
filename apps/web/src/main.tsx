@@ -8,8 +8,6 @@ import { ApiError } from './lib/api/client';
 import { leaveSession } from './lib/auth';
 import { routeTree } from './routeTree.gen';
 import './styles.css';
-// The Madani Arabic faces, when the licensed files exist at build time (vite.config.ts).
-import 'virtual:madani-fonts';
 
 /**
  * Reacts to access changes found by any request (F01 edge cases 2-4): a user who must set up 2FA

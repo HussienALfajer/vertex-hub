@@ -117,7 +117,6 @@ The dev database in a cloud session is disposable, so the hook migrates it witho
 ### What stays local
 - **Production deploys** (`ssh vertex`): the server's SSH key never goes into a cloud environment, where every process in the session could read it.
 - **The owner's acceptance test in the browser:** the app in a cloud VM is not reachable from the owner's browser. Pull the branch into the local checkout (`git fetch; git switch <branch>`), run `pnpm db:migrate` and `pnpm dev`, then return to the cloud session to report findings.
-- Madani font files (not in the repository; builds use the fallback font, as in CI).
 
 ### Differences in use
 - `/clear` does not exist: start a new session from the sidebar instead.
