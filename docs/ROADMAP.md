@@ -2,6 +2,8 @@
 
 Status legend: `[ ]` not started · `[~]` in progress · `[x]` done. Feature IDs refer to `docs/product/v1-scope.md`. Production is deployed once at the end of each phase (`docs/workflow.md`).
 
+**V1 complete (owner, 2026-10-20):** every feature and automation of `docs/product/v1-scope.md` (Phases 0 to 4) is delivered and runs in production (`3a914f5`). One launch item stays open by the owner's choice: off-server backups and a tested restore wait until a storage service is subscribed (ADR 0034); until then backups exist on the server only. V2 starts with its scope document (`docs/product/v2-scope.md`), written with the owner before any V2 feature. The V1 success metrics (`v1-scope.md` §8) are measured around 2026-12-19, two months after all users were onboarded.
+
 ## Phase 0 — Foundation
 - [x] Product scope, decisions and working method documented
 - [x] Monorepo scaffold (pnpm, Turborepo, TypeScript, Biome, shared config)
