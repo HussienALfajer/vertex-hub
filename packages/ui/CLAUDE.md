@@ -18,6 +18,6 @@ The Vertex design system: shadcn/ui patterns on Base UI, Tailwind CSS v4 tokens,
 - Variants through `cva` with semantic names (`tone`, `variant`, `size`), mapped to semantic tokens (`bg-primary`, `text-muted-foreground`), never to raw palette steps in app code.
 - No user-facing text inside components: labels come in as props, so the app translates them.
 - New components appear on the design-system page (`apps/web/src/routes/_app/design-system.tsx`) and in its screenshots.
-- Fonts: Madani Arabic files are never committed (git-ignored `brand/fonts/private/`). The build must work with the Noto Kufi Arabic fallback.
+- Fonts: Noto Kufi Arabic and Montserrat from `@fontsource` (OFL, ADR 0033). Never commit commercial font files: the repository is public.
 
 Run: `pnpm --filter @vertex-hub/ui test` · `pnpm --filter @vertex-hub/ui typecheck`.

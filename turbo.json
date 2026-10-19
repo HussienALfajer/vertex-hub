@@ -6,7 +6,6 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "env": ["MADANI_FONTS_DIR"],
       "outputs": ["dist/**"]
     },
     "typecheck": {

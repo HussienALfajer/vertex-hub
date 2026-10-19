@@ -14,7 +14,7 @@ Short records of decisions that shape the system. Each has a status: **Accepted*
 | [0008](0008-background-jobs-and-pdf.md) | pg-boss jobs and Chromium PDF in a worker app | Accepted |
 | [0009](0009-deployment-existing-vps.md) | Deploy to the existing VPS with PM2 and nginx | Accepted |
 | [0010](0010-ai-assisted-development.md) | Claude Code (Opus 5.5) as the primary developer; AGENTS.md shared with Codex | Accepted |
-| [0011](0011-brand-identity-and-fonts.md) | Brand identity from the logo; Madani Arabic + Montserrat | Accepted |
+| [0011](0011-brand-identity-and-fonts.md) | Brand identity from the logo; Madani Arabic + Montserrat | Accepted; fonts superseded by 0033 |
 | [0012](0012-nestjs-12-native-standard-schema.md) | NestJS 12 with native Standard Schema validation instead of nestjs-zod | Accepted |
 | [0013](0013-engineering-conventions.md) | Engineering conventions: layout, module anatomy, data, errors, tests | Accepted |
 | [0014](0014-permissions-roles-and-departments.md) | Permissions from roles and department capabilities | Accepted |
@@ -36,6 +36,8 @@ Short records of decisions that shape the system. Each has a status: **Accepted*
 | [0030](0030-retainer-anniversary-cycles.md) | Retainer cycles anchored on the start date | Accepted |
 | [0031](0031-retainer-contracts.md) | Retainer contracts and annexes as numbered documents | Accepted |
 | [0032](0032-signed-in-devices.md) | Signed-in devices: a browser cookie, a hardware key and a local GeoIP database | Accepted |
+| [0033](0033-noto-kufi-arabic-typeface.md) | Noto Kufi Arabic is the Arabic typeface (replaces Madani Arabic) | Accepted |
+| [0034](0034-backups-on-the-server-for-now.md) | Backups stay on the server until an off-server storage is subscribed | Accepted |
 
 Template:
 

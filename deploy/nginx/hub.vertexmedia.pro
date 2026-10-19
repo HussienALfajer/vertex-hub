@@ -2,8 +2,7 @@
 # /etc/nginx/sites-available/hub.vertexmedia.pro; edit it in the repository, never on the server.
 #
 # nginx is the only public gateway: the SPA build is served from the current release, /api is
-# proxied to the API on loopback, and the licensed Madani font files come from outside the
-# repository.
+# proxied to the API on loopback.
 
 server {
     listen 80;
@@ -172,15 +171,6 @@ server {
         try_files $uri =404;
         include snippets/vertexhub-headers.conf;
         add_header Cache-Control "public, max-age=31536000, immutable" always;
-        access_log off;
-    }
-
-    # Licensed Madani Arabic files (ADR 0011): 404 until provisioned, then Noto Kufi is replaced.
-    location /fonts/madani/ {
-        alias /srv/hub.vertexmedia.pro/fonts/madani/;
-        try_files $uri =404;
-        include snippets/vertexhub-headers.conf;
-        add_header Cache-Control "public, max-age=2592000" always;
         access_log off;
     }
 

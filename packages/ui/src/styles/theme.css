@@ -75,7 +75,7 @@
 
   /* Typography (§3). */
   --font-*: initial;
-  --font-sans: "Madani Arabic", "Montserrat", "Noto Kufi Arabic", system-ui, sans-serif;
+  --font-sans: "Montserrat", "Noto Kufi Arabic", system-ui, sans-serif;
 
   --text-*: initial;
   --text-xs: 0.75rem;

@@ -44,7 +44,7 @@ fi
 chmod 750 "/home/$APP_USER"
 
 step "Directories"
-install -d -o "$APP_USER" -g "$APP_USER" -m 755 "$SITE_DIR" "$SITE_DIR/releases" "$SITE_DIR/fonts" "$SITE_DIR/fonts/madani"
+install -d -o "$APP_USER" -g "$APP_USER" -m 755 "$SITE_DIR" "$SITE_DIR/releases"
 # nginx (group www-data) may only pass through shared/ to reach the files it serves for
 # X-Accel-Redirect (F10, ADR 0019); .env stays 600, and files/ is setgid so new folders keep
 # the group.
