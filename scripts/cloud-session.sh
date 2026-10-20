@@ -32,6 +32,12 @@ status+=("node $(node --version 2>/dev/null)")
 # PostgreSQL 17 in Docker, as in CI; the image's PostgreSQL 16 service is the fallback.
 start_docker_postgres() {
   if ! $SUDO docker info >/dev/null 2>&1; then
+    # A resumed VM keeps dockerd's pid file for its managed containerd; when that pid now belongs to
+    # another process, dockerd waits for it and gives up, so drop the file unless containerd owns it.
+    local pidfile=/var/run/docker/containerd/containerd.pid
+    if [ -f "$pidfile" ] && ! ps -p "$(cat "$pidfile")" -o comm= 2>/dev/null | grep -q containerd; then
+      $SUDO rm -f "$pidfile"
+    fi
     ($SUDO dockerd >/tmp/dockerd.log 2>&1 &)
     for _ in $(seq 1 30); do $SUDO docker info >/dev/null 2>&1 && break; sleep 1; done
   fi

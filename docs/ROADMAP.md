@@ -2,7 +2,7 @@
 
 Status legend: `[ ]` not started · `[~]` in progress · `[x]` done. Feature IDs refer to `docs/product/v1-scope.md`. Production is deployed once at the end of each phase (`docs/workflow.md`).
 
-**V1 complete (owner, 2026-10-20):** every feature and automation of `docs/product/v1-scope.md` (Phases 0 to 4) is delivered and runs in production (`3a914f5`). One launch item stays open by the owner's choice: off-server backups and a tested restore wait until a storage service is subscribed (ADR 0034); until then backups exist on the server only. V2 starts with its scope document (`docs/product/v2-scope.md`), written with the owner before any V2 feature. The V1 success metrics (`v1-scope.md` §8) are measured around 2026-12-19, two months after all users were onboarded.
+**V1 complete (owner, 2026-10-20):** every feature and automation of `docs/product/v1-scope.md` (Phases 0 to 4) is delivered and runs in production (`3a914f5`). One launch item stays open by the owner's choice: off-server backups and a tested restore wait until a storage service is subscribed (ADR 0034); until then backups exist on the server only. V2's direction is approved (`docs/product/v2-scope.md`, 2026-10-20): the Hub track below, and accounting built in parallel as Vertex Mizan in its own repository (ADR 0035). The V1 success metrics (`v1-scope.md` §8) are measured around 2026-12-19, two months after all users were onboarded.
 
 ## Phase 0 — Foundation
 - [x] Product scope, decisions and working method documented
@@ -62,3 +62,20 @@ Build order (owner, 2026-09-30): F10 → F09 → F08 → F11. F09 approves exact
 - [x] Domain and TLS
 - [x] Production secrets set on the server only (`shared/.env`, mode 600)
 - [x] All users onboarded; data from the pilot clients verified (owner, 2026-10-19)
+
+## V2 — Hub track
+Order and directions: `docs/product/v2-scope.md` §3–4. Each feature starts with a `/spec` session: full analysis, every possible feature, the owner's questions, then the spec.
+- [ ] F16 Notifications 2.0, installable app and announcements
+- [ ] F17 HR: employee files, attendance and leave
+- [ ] F18 Accounting through Vertex Mizan: integration, purchases for clients, profitability (starts when Mizan phase 1 is stable; Q17)
+- [ ] F19 HR: payroll, commissions and profit shares (Q15, Q16)
+- [ ] F20 Client portal (with client conversations)
+- [ ] F21 Chat
+- [ ] F22 Interactive board (last; discussed in full when reached)
+
+## V2 — Vertex Mizan track
+Built in its own repository, `vertex-mizan`, and tracked in its own roadmap (ADR 0035). Listed here for the Hub's dependencies.
+- [ ] Phase 1: the ledger core and the posting API (F18 depends on it)
+- [ ] Phase 2: cash boxes and banks, expenses, suppliers, financial statements, period close
+- [ ] Phase 3: sales, purchases, inventory with serial numbers, installment sales (first standalone sales)
+- [ ] Phase 4: the commercial product (sign-up, subscriptions, onboarding, support)

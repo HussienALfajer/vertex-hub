@@ -38,6 +38,7 @@ Short records of decisions that shape the system. Each has a status: **Accepted*
 | [0032](0032-signed-in-devices.md) | Signed-in devices: a browser cookie, a hardware key and a local GeoIP database | Accepted |
 | [0033](0033-noto-kufi-arabic-typeface.md) | Noto Kufi Arabic is the Arabic typeface (replaces Madani Arabic) | Accepted |
 | [0034](0034-backups-on-the-server-for-now.md) | Backups stay on the server until an off-server storage is subscribed | Accepted |
+| [0035](0035-accounting-in-vertex-mizan.md) | Accounting in Vertex Mizan, a separate product integrated with the Hub through an API | Accepted |
 
 Template:
 
