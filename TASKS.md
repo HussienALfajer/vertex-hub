@@ -30,7 +30,7 @@ PR order fixed by the spec's "Delivery" (owner, 2026-10-20). F16 is deployed to 
 - [x] db (`/db-migration`): `notifications` box, resolution columns, `snoozed_until` and indexes; `notification_settings.morning_push`; `notification_policies`, `record_followers`; backfill of `box` and `resolution_type`
 - [x] api: `NotificationCenter.resolve`, box and resolution type on insert, grouping (`merges`, unresolved rows), "opened" types resolve on read; inbox list and counts (critical first); snooze and unsnooze; policy API with audit, settings and `notify` read the policy; followers API on tasks and posts; escalation chain in the daily job; `notifications.timed` (snooze wake-ups) worked by the API, scheduled by the worker; morning push with the digest; critical email at any hour; purge of resolved rows; `test/` cases
 - [x] bridge: `ar.json` keys (types, errors, audit), `openapi:export`, `api:generate`, fixtures; web typecheck
-- [ ] checks, reviewer, acceptance (API at `/api/docs`), PR with auto-merge
+- [x] checks, reviewer, acceptance (API at `/api/docs`), PR with auto-merge
 
 ## PR B2 — engine: web
 - [ ] bell inboxes and snooze, notifications page tabs, settings (policy locks, morning push, "turn all on or off" per category and channel), policy page + delivery log tab, follow button, SW action buttons "Open" and "Remind me in an hour" (rule A11)
