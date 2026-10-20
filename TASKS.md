@@ -75,8 +75,12 @@ Split from C1c because the remaining catalog still spans eight modules: C1b hold
 - [x] bridge: `openapi:export`, `api:generate`, fixtures; web typecheck
 - [x] checks, reviewer, acceptance (owner, 2026-10-20), PR with auto-merge
 
-## PR C2 — catalog: web texts and links
-- [ ] `ar.json` / `packages/messages` texts and links; E2E; checks, reviewer, acceptance (owner step C7), PR with auto-merge
+## PR C2 — catalog: web texts and links (branch `claude/brave-sagan-9nen5d`)
+The texts, type labels and most links arrived with C1–C1c (`packages/messages` tests every type); C2 closes what the web still lacked.
+- [x] messages links: `contract_signed`, `contract_voided` open the retainer's Contract tab; `extra_work_created` opens the Extra work tab of its project or retainer; unit tests
+- [x] web: "Join" on a `meeting_starting` row with a link (bell and page, spec "with a Join link"); `ar.json` key
+- [x] E2E: `f16-catalog.spec.ts` (acceptance C7's types and the other new records render their text and open their record, one test per type; the Join link); rows in `catalogNotificationsSeed()`; RTL screenshots of the catalog rows in both themes
+- [ ] checks, reviewer, acceptance (owner step C7), PR with auto-merge
 
 ## PR D1 — announcements and audiences: contracts, db, api
 - [ ] `announcements*` tables, polls, templates, F10 owner type; `AudienceResolver`; announcement API; reminders in the daily job, scheduling in the minute job

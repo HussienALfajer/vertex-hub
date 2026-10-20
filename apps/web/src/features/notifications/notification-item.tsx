@@ -3,6 +3,7 @@ import { type Notification, SNOOZE_OPTIONS } from '@vertex-hub/contracts';
 import {
   Avatar,
   Badge,
+  Button,
   cn,
   DropdownMenu,
   DropdownMenuContent,
@@ -11,7 +12,7 @@ import {
   IconButton,
 } from '@vertex-hub/ui';
 import type { TFunction } from 'i18next';
-import { AlarmClockIcon, BellRingIcon, OctagonAlertIcon } from 'lucide-react';
+import { AlarmClockIcon, BellRingIcon, OctagonAlertIcon, VideoIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { formatDateTime, formatRelativeTime } from '../../lib/format';
@@ -22,8 +23,8 @@ import { useMarkRead, useSnooze, useUnsnooze } from './notifications.queries';
 /**
  * One notification: who (or the system), the rendered text, its client and project, when, and an
  * unread dot. Opening it opens its subject and marks it read (F14 rule 15). F16: critical rows
- * carry the red mark (screen 3), closed rows say who handled them (rule B5), and open rows can be
- * snoozed (rule B8).
+ * carry the red mark (screen 3), closed rows say who handled them (rule B5), open rows can be
+ * snoozed (rule B8), and a meeting about to start offers its link (part C, `meeting_starting`).
  */
 export function NotificationItem({
   notification,
@@ -79,6 +80,19 @@ export function NotificationItem({
         </Link>
         {context && <span className="truncate text-xs text-muted-foreground">{context}</span>}
         {state && <span className="text-xs font-medium text-muted-foreground">{state}</span>}
+        {notification.type === 'meeting_starting' && notification.data.joinUrl && (
+          // Above the row's link, which covers the row.
+          <span className="relative mt-1 self-start">
+            <Button
+              variant="outline"
+              size="sm"
+              render={<a href={notification.data.joinUrl} target="_blank" rel="noreferrer" />}
+            >
+              <VideoIcon />
+              {t('notifications.join')}
+            </Button>
+          </span>
+        )}
         <span className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
           <time dateTime={notification.updatedAt} title={formatDateTime(notification.updatedAt)}>
             {formatRelativeTime(notification.updatedAt)}

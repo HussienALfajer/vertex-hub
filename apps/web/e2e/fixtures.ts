@@ -9163,6 +9163,100 @@ export function notificationsSeed(): NotificationRecord[] {
   ];
 }
 
+/**
+ * F16 part C: Sara's rows of the catalog's new types, one per kind of record they open
+ * (acceptance step C7), and a meeting about to start with its link.
+ */
+export function catalogNotificationsSeed(): NotificationRecord[] {
+  const omar = { id: id(2), name: 'عمر حداد' };
+  const client = 'مطعم الياسمين';
+  return [
+    notificationFor(manager, 5801, {
+      type: 'payment_recorded',
+      actor: omar,
+      subject: { type: 'invoice', id: id(9403) },
+      data: {
+        invoice: { displayNumber: 'INV-2026-0001', client },
+        amountMinor: 50_000,
+        currency: 'USD',
+      },
+    }),
+    notificationFor(manager, 5802, {
+      type: 'quote_expiring',
+      actor: null,
+      subject: { type: 'quote', id: id(9201) },
+      data: {
+        quote: { displayNumber: 'Q-2026-0001', title: 'هوية بصرية', client },
+        validUntil: '2026-10-03',
+      },
+    }),
+    notificationFor(manager, 5803, {
+      type: 'milestone_completed',
+      actor: omar,
+      subject: { type: 'project', id: id(801) },
+      data: { project: 'الهوية البصرية الجديدة', client, milestone: 'الاستكشاف' },
+    }),
+    notificationFor(manager, 5804, {
+      type: 'post_published',
+      actor: omar,
+      subject: { type: 'post', id: id(1601) },
+      data: {
+        post: {
+          title: 'منشور افتتاح الفرع الجديد',
+          client,
+          publishDate: '2026-10-01',
+          publishTime: '18:00',
+        },
+      },
+    }),
+    notificationFor(manager, 5805, {
+      type: 'approval_opened',
+      actor: null,
+      subject: { type: 'approval_request', id: id(1481) },
+      data: { client, contact: 'سامر' },
+    }),
+    notificationFor(manager, 5806, {
+      type: 'contract_signed',
+      actor: omar,
+      subject: { type: 'retainer', id: id(901) },
+      data: { retainer: 'إدارة السوشيال ميديا', client, contract: 'C-2026-0001', annex: null },
+    }),
+    notificationFor(manager, 5807, {
+      type: 'extra_work_created',
+      actor: omar,
+      subject: { type: 'project', id: id(801) },
+      data: { title: 'منشور إضافي', engagement: 'الهوية البصرية الجديدة', client },
+    }),
+    notificationFor(manager, 5808, {
+      type: 'campaign_status_changed',
+      actor: omar,
+      subject: { type: 'campaign', id: id(9601) },
+      data: { campaign: { name: 'حملة منيو الخريف', client }, status: 'paused' },
+    }),
+    notificationFor(manager, 5809, {
+      type: 'department_manager_assigned',
+      actor: omar,
+      subject: { type: 'department', id: design.id },
+      data: { department: 'design' },
+    }),
+    notificationFor(manager, 5810, {
+      type: 'meeting_starting',
+      actor: null,
+      subject: { type: 'meeting', id: id(1761) },
+      data: {
+        meeting: {
+          title: 'اجتماع خطة المحتوى',
+          client,
+          startsAt: '2026-09-30T09:15:00.000Z',
+          endsAt: '2026-09-30T10:00:00.000Z',
+        },
+        joinUrl: 'https://meet.example.com/content-plan',
+      },
+      updatedAt: '2026-09-30T09:00:00.000Z',
+    }),
+  ];
+}
+
 /** F16 rule A15: a delivered and opened push, one to a device that is gone, and a test. */
 function pushDeliveriesSeed(notifications: NotificationRecord[]): PushDelivery[] {
   const strip = ({ recipientId: _, ...rest }: NotificationRecord) => rest as Notification;

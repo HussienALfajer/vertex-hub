@@ -389,7 +389,11 @@ describe('sales and engagement notices (F16 part C)', () => {
       notificationLink(
         sample('extra_work_created', { subject: { type: 'retainer', id: SUBJECT_ID } }),
       ),
-    ).toEqual({ to: '/retainers/$retainerId', params: { retainerId: SUBJECT_ID } });
+    ).toEqual({
+      to: '/retainers/$retainerId',
+      params: { retainerId: SUBJECT_ID },
+      search: { tab: 'extra-work' },
+    });
   });
 });
 
@@ -446,6 +450,17 @@ describe('finance, campaigns and people notices (F16 part C)', () => {
     expect(link('member_moved', 'user')).toBe(`/team/${SUBJECT_ID}`);
     expect(link('ad_deposit_recorded', 'client')).toBe(`/clients/${SUBJECT_ID}?tab=ads`);
     expect(link('security_new_device', 'user')).toBe('/account');
+  });
+
+  it('opens the Contract tab and the Extra work tab', () => {
+    const link = (type: NotificationType, subjectType: string) =>
+      linkPath(
+        notificationLink(sample(type, { subject: { type: subjectType, id: SUBJECT_ID } } as never)),
+      );
+    expect(link('contract_signed', 'retainer')).toBe(`/retainers/${SUBJECT_ID}?tab=contract`);
+    expect(link('contract_voided', 'retainer')).toBe(`/retainers/${SUBJECT_ID}?tab=contract`);
+    expect(link('extra_work_created', 'project')).toBe(`/projects/${SUBJECT_ID}?tab=extra-work`);
+    expect(link('extra_work_created', 'retainer')).toBe(`/retainers/${SUBJECT_ID}?tab=extra-work`);
   });
 });
 
