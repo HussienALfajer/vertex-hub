@@ -6,14 +6,15 @@ import {
   calendarDay,
   isWorkDay,
   nextWorkDay,
+  timedReminderWindow,
 } from '@vertex-hub/contracts';
 import { type Database, meetings, shoots, type Transaction } from '@vertex-hub/db';
-import { and, asc, eq, gte, isNull, lt, type SQL } from 'drizzle-orm';
+import { and, asc, eq, gt, gte, isNull, lt, lte, type SQL } from 'drizzle-orm';
 import { DATABASE } from '../../core/database/database.module.js';
 import { runEach } from '../../core/jobs/index.js';
 import { UserDirectory } from '../auth/index.js';
 import { ClientDirectory } from '../clients/index.js';
-import { DailyReminders } from '../notifications/index.js';
+import { DailyReminders, TimedNotifications } from '../notifications/index.js';
 import { MeetingNotices } from './meeting-notices.js';
 import { MeetingsService, noticeMeeting } from './meetings.service.js';
 import { crewOf } from './shoot-access.js';
@@ -39,12 +40,118 @@ export class CalendarReminders implements OnModuleInit {
     private readonly shootNotices: ShootNotices,
     private readonly meetingNotices: MeetingNotices,
     private readonly reminders: DailyReminders,
+    private readonly timed: TimedNotifications,
   ) {}
 
   onModuleInit(): void {
     this.reminders.register('shoots-upcoming', (today) => this.upcomingShoots(today));
     this.reminders.register('meetings-upcoming', (today) => this.upcomingMeetings(today));
     this.reminders.register('shoots-not-closed', (today) => this.notClosed(today));
+    this.timed.register('shoots-starting', (now) => this.shootsStarting(now));
+    this.timed.register('meetings-starting', (now) => this.meetingsStarting(now));
+  }
+
+  /** F16 rule B13: `shoot_starting` to the crew two hours before a scheduled shoot starts. */
+  async shootsStarting(now: Date): Promise<number> {
+    const { from, to } = timedReminderWindow('shoot_starting', now);
+    const live = and(
+      eq(shoots.status, 'scheduled'),
+      isNull(shoots.archivedAt),
+      gt(shoots.startsAt, from),
+      lte(shoots.startsAt, to),
+    ) as SQL;
+    const candidates = await this.db
+      .select({ id: shoots.id })
+      .from(shoots)
+      .where(live)
+      .orderBy(asc(shoots.id));
+    let sent = 0;
+    await runEach(
+      candidates,
+      this.logger,
+      ({ id }) => `Shoot starting reminder ${id}`,
+      async ({ id }) => {
+        const recorded = await this.db.transaction(async (tx) => {
+          const [shoot] = await tx
+            .select()
+            .from(shoots)
+            .where(and(eq(shoots.id, id), live))
+            .for('update');
+          if (!shoot) return false;
+          const crew = (await crewOf(tx, [id])).get(id) ?? [];
+          const recipients = await this.active(
+            tx,
+            crew.map((member) => member.userId),
+          );
+          if (recipients.length === 0) return false;
+          const client = shoot.clientId ? await this.clients.summary(shoot.clientId, tx) : null;
+          return this.timed.remindOnce(
+            tx,
+            { kind: 'shoot_starting', subjectId: id, occursAt: shoot.startsAt },
+            this.shootNotices.notice(
+              noticeShoot(shoot, client),
+              'shoot_starting',
+              recipients,
+              null,
+            ),
+          );
+        });
+        if (recorded) sent += 1;
+      },
+    );
+    return sent;
+  }
+
+  /**
+   * F16 rule B13: `meeting_starting` to the organizer and the attendees 15 minutes before a
+   * scheduled meeting starts, with its online link when it has one.
+   */
+  async meetingsStarting(now: Date): Promise<number> {
+    const { from, to } = timedReminderWindow('meeting_starting', now);
+    const live = and(
+      eq(meetings.status, 'scheduled'),
+      isNull(meetings.archivedAt),
+      gt(meetings.startsAt, from),
+      lte(meetings.startsAt, to),
+    ) as SQL;
+    const candidates = await this.db
+      .select({ id: meetings.id })
+      .from(meetings)
+      .where(live)
+      .orderBy(asc(meetings.id));
+    let sent = 0;
+    await runEach(
+      candidates,
+      this.logger,
+      ({ id }) => `Meeting starting reminder ${id}`,
+      async ({ id }) => {
+        const recorded = await this.db.transaction(async (tx) => {
+          const [meeting] = await tx
+            .select()
+            .from(meetings)
+            .where(and(eq(meetings.id, id), live))
+            .for('update');
+          if (!meeting) return false;
+          const attendeeIds = (await this.meetingsService.attendeesOf(tx, [id])).get(id) ?? [];
+          const recipients = await this.active(tx, [meeting.organizerId, ...attendeeIds]);
+          if (recipients.length === 0) return false;
+          const client = meeting.clientId ? await this.clients.summary(meeting.clientId, tx) : null;
+          return this.timed.remindOnce(
+            tx,
+            { kind: 'meeting_starting', subjectId: id, occursAt: meeting.startsAt },
+            this.meetingNotices.notice(
+              noticeMeeting(meeting, client),
+              'meeting_starting',
+              recipients,
+              null,
+              { joinUrl: meeting.onlineUrl },
+            ),
+          );
+        });
+        if (recorded) sent += 1;
+      },
+    );
+    return sent;
   }
 
   /**

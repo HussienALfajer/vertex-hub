@@ -118,6 +118,28 @@ export class ShootWorkflowService {
           ...(unticked?.value && { untickedShots: unticked.value }),
         },
       });
+      // F16 part C: the account manager and the creator hear that it closed.
+      await this.notices.send(
+        tx,
+        [
+          this.notices.notice(
+            noticeShoot(shoot, client),
+            'shoot_completed',
+            [client?.accountManagerId, shoot.createdById].filter((userId): userId is string =>
+              Boolean(userId),
+            ),
+            actor.id,
+          ),
+        ],
+        [
+          {
+            subject: { type: 'shoot', id },
+            types: ['shoot_not_closed'],
+            outcome: 'done',
+            actorId: actor.id,
+          },
+        ],
+      );
     });
     return this.shoots.detail(actor, id);
   }
@@ -153,15 +175,26 @@ export class ShootWorkflowService {
         },
       });
       const crew = (await crewOf(tx, [id])).get(id) ?? [];
-      await this.notices.send(tx, [
-        this.notices.notice(
-          noticeShoot(shoot, client),
-          'shoot_dropped',
-          crew.map((member) => member.userId),
-          actor.id,
-          { cause: 'cancelled' },
-        ),
-      ]);
+      await this.notices.send(
+        tx,
+        [
+          this.notices.notice(
+            noticeShoot(shoot, client),
+            'shoot_dropped',
+            crew.map((member) => member.userId),
+            actor.id,
+            { cause: 'cancelled' },
+          ),
+        ],
+        [
+          {
+            subject: { type: 'shoot', id },
+            types: ['shoot_not_closed'],
+            outcome: 'void',
+            actorId: actor.id,
+          },
+        ],
+      );
     });
     return this.shoots.detail(actor, id);
   }
