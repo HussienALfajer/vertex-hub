@@ -249,7 +249,8 @@ test('offline, the app opens with the kept data and nothing financial', async ({
       name: ar.nav.invoices,
     })
     .click();
-  await expect(page.getByText(ar.pwa.offline.notAvailable)).toBeVisible();
+  // Each section of the screen that needed the data says so; one is enough here.
+  await expect(page.getByText(ar.pwa.offline.notAvailable).first()).toBeVisible();
 
   await page.unroute('**/api/**', offline);
   await context.setOffline(false);

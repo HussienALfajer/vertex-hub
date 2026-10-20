@@ -17982,15 +17982,31 @@
                 "type": "boolean"
               },
               "priority": {
-                "$ref": "#/components/schemas/NotificationPriority"
+                "default": "normal",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationPriority"
+                  }
+                ]
               },
               "box": {
-                "$ref": "#/components/schemas/NotificationBox"
+                "default": "info",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationBox"
+                  }
+                ]
               },
               "inbox": {
-                "$ref": "#/components/schemas/NotificationInbox"
+                "default": "fyi",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationInbox"
+                  }
+                ]
               },
               "resolution": {
+                "default": null,
                 "nullable": true,
                 "type": "object",
                 "properties": {
@@ -18030,6 +18046,7 @@
                 "additionalProperties": false
               },
               "snoozedUntil": {
+                "default": null,
                 "nullable": true,
                 "type": "string",
                 "format": "date-time",
@@ -18159,15 +18176,31 @@
                 "type": "boolean"
               },
               "priority": {
-                "$ref": "#/components/schemas/NotificationPriority"
+                "default": "normal",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationPriority"
+                  }
+                ]
               },
               "box": {
-                "$ref": "#/components/schemas/NotificationBox"
+                "default": "info",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationBox"
+                  }
+                ]
               },
               "inbox": {
-                "$ref": "#/components/schemas/NotificationInbox"
+                "default": "fyi",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationInbox"
+                  }
+                ]
               },
               "resolution": {
+                "default": null,
                 "nullable": true,
                 "type": "object",
                 "properties": {
@@ -18207,6 +18240,7 @@
                 "additionalProperties": false
               },
               "snoozedUntil": {
+                "default": null,
                 "nullable": true,
                 "type": "string",
                 "format": "date-time",
@@ -18341,15 +18375,31 @@
                 "type": "boolean"
               },
               "priority": {
-                "$ref": "#/components/schemas/NotificationPriority"
+                "default": "normal",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationPriority"
+                  }
+                ]
               },
               "box": {
-                "$ref": "#/components/schemas/NotificationBox"
+                "default": "info",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationBox"
+                  }
+                ]
               },
               "inbox": {
-                "$ref": "#/components/schemas/NotificationInbox"
+                "default": "fyi",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationInbox"
+                  }
+                ]
               },
               "resolution": {
+                "default": null,
                 "nullable": true,
                 "type": "object",
                 "properties": {
@@ -18389,6 +18439,7 @@
                 "additionalProperties": false
               },
               "snoozedUntil": {
+                "default": null,
                 "nullable": true,
                 "type": "string",
                 "format": "date-time",
@@ -18527,15 +18578,31 @@
                 "type": "boolean"
               },
               "priority": {
-                "$ref": "#/components/schemas/NotificationPriority"
+                "default": "normal",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationPriority"
+                  }
+                ]
               },
               "box": {
-                "$ref": "#/components/schemas/NotificationBox"
+                "default": "info",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationBox"
+                  }
+                ]
               },
               "inbox": {
-                "$ref": "#/components/schemas/NotificationInbox"
+                "default": "fyi",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationInbox"
+                  }
+                ]
               },
               "resolution": {
+                "default": null,
                 "nullable": true,
                 "type": "object",
                 "properties": {
@@ -18575,6 +18642,7 @@
                 "additionalProperties": false
               },
               "snoozedUntil": {
+                "default": null,
                 "nullable": true,
                 "type": "string",
                 "format": "date-time",
@@ -18704,15 +18772,31 @@
                 "type": "boolean"
               },
               "priority": {
-                "$ref": "#/components/schemas/NotificationPriority"
+                "default": "normal",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationPriority"
+                  }
+                ]
               },
               "box": {
-                "$ref": "#/components/schemas/NotificationBox"
+                "default": "info",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationBox"
+                  }
+                ]
               },
               "inbox": {
-                "$ref": "#/components/schemas/NotificationInbox"
+                "default": "fyi",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationInbox"
+                  }
+                ]
               },
               "resolution": {
+                "default": null,
                 "nullable": true,
                 "type": "object",
                 "properties": {
@@ -18752,6 +18836,7 @@
                 "additionalProperties": false
               },
               "snoozedUntil": {
+                "default": null,
                 "nullable": true,
                 "type": "string",
                 "format": "date-time",
@@ -18881,15 +18966,31 @@
                 "type": "boolean"
               },
               "priority": {
-                "$ref": "#/components/schemas/NotificationPriority"
+                "default": "normal",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationPriority"
+                  }
+                ]
               },
               "box": {
-                "$ref": "#/components/schemas/NotificationBox"
+                "default": "info",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationBox"
+                  }
+                ]
               },
               "inbox": {
-                "$ref": "#/components/schemas/NotificationInbox"
+                "default": "fyi",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationInbox"
+                  }
+                ]
               },
               "resolution": {
+                "default": null,
                 "nullable": true,
                 "type": "object",
                 "properties": {
@@ -18929,6 +19030,7 @@
                 "additionalProperties": false
               },
               "snoozedUntil": {
+                "default": null,
                 "nullable": true,
                 "type": "string",
                 "format": "date-time",
@@ -19058,15 +19160,31 @@
                 "type": "boolean"
               },
               "priority": {
-                "$ref": "#/components/schemas/NotificationPriority"
+                "default": "normal",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationPriority"
+                  }
+                ]
               },
               "box": {
-                "$ref": "#/components/schemas/NotificationBox"
+                "default": "info",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationBox"
+                  }
+                ]
               },
               "inbox": {
-                "$ref": "#/components/schemas/NotificationInbox"
+                "default": "fyi",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationInbox"
+                  }
+                ]
               },
               "resolution": {
+                "default": null,
                 "nullable": true,
                 "type": "object",
                 "properties": {
@@ -19106,6 +19224,7 @@
                 "additionalProperties": false
               },
               "snoozedUntil": {
+                "default": null,
                 "nullable": true,
                 "type": "string",
                 "format": "date-time",
@@ -19235,15 +19354,31 @@
                 "type": "boolean"
               },
               "priority": {
-                "$ref": "#/components/schemas/NotificationPriority"
+                "default": "normal",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationPriority"
+                  }
+                ]
               },
               "box": {
-                "$ref": "#/components/schemas/NotificationBox"
+                "default": "info",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationBox"
+                  }
+                ]
               },
               "inbox": {
-                "$ref": "#/components/schemas/NotificationInbox"
+                "default": "fyi",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationInbox"
+                  }
+                ]
               },
               "resolution": {
+                "default": null,
                 "nullable": true,
                 "type": "object",
                 "properties": {
@@ -19283,6 +19418,7 @@
                 "additionalProperties": false
               },
               "snoozedUntil": {
+                "default": null,
                 "nullable": true,
                 "type": "string",
                 "format": "date-time",
@@ -19401,15 +19537,31 @@
                 "type": "boolean"
               },
               "priority": {
-                "$ref": "#/components/schemas/NotificationPriority"
+                "default": "normal",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationPriority"
+                  }
+                ]
               },
               "box": {
-                "$ref": "#/components/schemas/NotificationBox"
+                "default": "info",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationBox"
+                  }
+                ]
               },
               "inbox": {
-                "$ref": "#/components/schemas/NotificationInbox"
+                "default": "fyi",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationInbox"
+                  }
+                ]
               },
               "resolution": {
+                "default": null,
                 "nullable": true,
                 "type": "object",
                 "properties": {
@@ -19449,6 +19601,7 @@
                 "additionalProperties": false
               },
               "snoozedUntil": {
+                "default": null,
                 "nullable": true,
                 "type": "string",
                 "format": "date-time",
@@ -19559,15 +19712,31 @@
                 "type": "boolean"
               },
               "priority": {
-                "$ref": "#/components/schemas/NotificationPriority"
+                "default": "normal",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationPriority"
+                  }
+                ]
               },
               "box": {
-                "$ref": "#/components/schemas/NotificationBox"
+                "default": "info",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationBox"
+                  }
+                ]
               },
               "inbox": {
-                "$ref": "#/components/schemas/NotificationInbox"
+                "default": "fyi",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationInbox"
+                  }
+                ]
               },
               "resolution": {
+                "default": null,
                 "nullable": true,
                 "type": "object",
                 "properties": {
@@ -19607,6 +19776,7 @@
                 "additionalProperties": false
               },
               "snoozedUntil": {
+                "default": null,
                 "nullable": true,
                 "type": "string",
                 "format": "date-time",
@@ -19717,15 +19887,31 @@
                 "type": "boolean"
               },
               "priority": {
-                "$ref": "#/components/schemas/NotificationPriority"
+                "default": "normal",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationPriority"
+                  }
+                ]
               },
               "box": {
-                "$ref": "#/components/schemas/NotificationBox"
+                "default": "info",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationBox"
+                  }
+                ]
               },
               "inbox": {
-                "$ref": "#/components/schemas/NotificationInbox"
+                "default": "fyi",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationInbox"
+                  }
+                ]
               },
               "resolution": {
+                "default": null,
                 "nullable": true,
                 "type": "object",
                 "properties": {
@@ -19765,6 +19951,7 @@
                 "additionalProperties": false
               },
               "snoozedUntil": {
+                "default": null,
                 "nullable": true,
                 "type": "string",
                 "format": "date-time",
@@ -19948,15 +20135,31 @@
                 "type": "boolean"
               },
               "priority": {
-                "$ref": "#/components/schemas/NotificationPriority"
+                "default": "normal",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationPriority"
+                  }
+                ]
               },
               "box": {
-                "$ref": "#/components/schemas/NotificationBox"
+                "default": "info",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationBox"
+                  }
+                ]
               },
               "inbox": {
-                "$ref": "#/components/schemas/NotificationInbox"
+                "default": "fyi",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationInbox"
+                  }
+                ]
               },
               "resolution": {
+                "default": null,
                 "nullable": true,
                 "type": "object",
                 "properties": {
@@ -19996,6 +20199,7 @@
                 "additionalProperties": false
               },
               "snoozedUntil": {
+                "default": null,
                 "nullable": true,
                 "type": "string",
                 "format": "date-time",
@@ -20130,15 +20334,31 @@
                 "type": "boolean"
               },
               "priority": {
-                "$ref": "#/components/schemas/NotificationPriority"
+                "default": "normal",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationPriority"
+                  }
+                ]
               },
               "box": {
-                "$ref": "#/components/schemas/NotificationBox"
+                "default": "info",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationBox"
+                  }
+                ]
               },
               "inbox": {
-                "$ref": "#/components/schemas/NotificationInbox"
+                "default": "fyi",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationInbox"
+                  }
+                ]
               },
               "resolution": {
+                "default": null,
                 "nullable": true,
                 "type": "object",
                 "properties": {
@@ -20178,6 +20398,7 @@
                 "additionalProperties": false
               },
               "snoozedUntil": {
+                "default": null,
                 "nullable": true,
                 "type": "string",
                 "format": "date-time",
@@ -20311,15 +20532,31 @@
                 "type": "boolean"
               },
               "priority": {
-                "$ref": "#/components/schemas/NotificationPriority"
+                "default": "normal",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationPriority"
+                  }
+                ]
               },
               "box": {
-                "$ref": "#/components/schemas/NotificationBox"
+                "default": "info",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationBox"
+                  }
+                ]
               },
               "inbox": {
-                "$ref": "#/components/schemas/NotificationInbox"
+                "default": "fyi",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationInbox"
+                  }
+                ]
               },
               "resolution": {
+                "default": null,
                 "nullable": true,
                 "type": "object",
                 "properties": {
@@ -20359,6 +20596,7 @@
                 "additionalProperties": false
               },
               "snoozedUntil": {
+                "default": null,
                 "nullable": true,
                 "type": "string",
                 "format": "date-time",
@@ -20488,15 +20726,31 @@
                 "type": "boolean"
               },
               "priority": {
-                "$ref": "#/components/schemas/NotificationPriority"
+                "default": "normal",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationPriority"
+                  }
+                ]
               },
               "box": {
-                "$ref": "#/components/schemas/NotificationBox"
+                "default": "info",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationBox"
+                  }
+                ]
               },
               "inbox": {
-                "$ref": "#/components/schemas/NotificationInbox"
+                "default": "fyi",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationInbox"
+                  }
+                ]
               },
               "resolution": {
+                "default": null,
                 "nullable": true,
                 "type": "object",
                 "properties": {
@@ -20536,6 +20790,7 @@
                 "additionalProperties": false
               },
               "snoozedUntil": {
+                "default": null,
                 "nullable": true,
                 "type": "string",
                 "format": "date-time",
@@ -20671,15 +20926,31 @@
                 "type": "boolean"
               },
               "priority": {
-                "$ref": "#/components/schemas/NotificationPriority"
+                "default": "normal",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationPriority"
+                  }
+                ]
               },
               "box": {
-                "$ref": "#/components/schemas/NotificationBox"
+                "default": "info",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationBox"
+                  }
+                ]
               },
               "inbox": {
-                "$ref": "#/components/schemas/NotificationInbox"
+                "default": "fyi",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationInbox"
+                  }
+                ]
               },
               "resolution": {
+                "default": null,
                 "nullable": true,
                 "type": "object",
                 "properties": {
@@ -20719,6 +20990,7 @@
                 "additionalProperties": false
               },
               "snoozedUntil": {
+                "default": null,
                 "nullable": true,
                 "type": "string",
                 "format": "date-time",
@@ -20857,15 +21129,31 @@
                 "type": "boolean"
               },
               "priority": {
-                "$ref": "#/components/schemas/NotificationPriority"
+                "default": "normal",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationPriority"
+                  }
+                ]
               },
               "box": {
-                "$ref": "#/components/schemas/NotificationBox"
+                "default": "info",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationBox"
+                  }
+                ]
               },
               "inbox": {
-                "$ref": "#/components/schemas/NotificationInbox"
+                "default": "fyi",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationInbox"
+                  }
+                ]
               },
               "resolution": {
+                "default": null,
                 "nullable": true,
                 "type": "object",
                 "properties": {
@@ -20905,6 +21193,7 @@
                 "additionalProperties": false
               },
               "snoozedUntil": {
+                "default": null,
                 "nullable": true,
                 "type": "string",
                 "format": "date-time",
@@ -21034,15 +21323,31 @@
                 "type": "boolean"
               },
               "priority": {
-                "$ref": "#/components/schemas/NotificationPriority"
+                "default": "normal",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationPriority"
+                  }
+                ]
               },
               "box": {
-                "$ref": "#/components/schemas/NotificationBox"
+                "default": "info",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationBox"
+                  }
+                ]
               },
               "inbox": {
-                "$ref": "#/components/schemas/NotificationInbox"
+                "default": "fyi",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationInbox"
+                  }
+                ]
               },
               "resolution": {
+                "default": null,
                 "nullable": true,
                 "type": "object",
                 "properties": {
@@ -21082,6 +21387,7 @@
                 "additionalProperties": false
               },
               "snoozedUntil": {
+                "default": null,
                 "nullable": true,
                 "type": "string",
                 "format": "date-time",
@@ -21219,15 +21525,31 @@
                 "type": "boolean"
               },
               "priority": {
-                "$ref": "#/components/schemas/NotificationPriority"
+                "default": "normal",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationPriority"
+                  }
+                ]
               },
               "box": {
-                "$ref": "#/components/schemas/NotificationBox"
+                "default": "info",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationBox"
+                  }
+                ]
               },
               "inbox": {
-                "$ref": "#/components/schemas/NotificationInbox"
+                "default": "fyi",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationInbox"
+                  }
+                ]
               },
               "resolution": {
+                "default": null,
                 "nullable": true,
                 "type": "object",
                 "properties": {
@@ -21267,6 +21589,7 @@
                 "additionalProperties": false
               },
               "snoozedUntil": {
+                "default": null,
                 "nullable": true,
                 "type": "string",
                 "format": "date-time",
@@ -21407,15 +21730,31 @@
                 "type": "boolean"
               },
               "priority": {
-                "$ref": "#/components/schemas/NotificationPriority"
+                "default": "normal",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationPriority"
+                  }
+                ]
               },
               "box": {
-                "$ref": "#/components/schemas/NotificationBox"
+                "default": "info",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationBox"
+                  }
+                ]
               },
               "inbox": {
-                "$ref": "#/components/schemas/NotificationInbox"
+                "default": "fyi",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationInbox"
+                  }
+                ]
               },
               "resolution": {
+                "default": null,
                 "nullable": true,
                 "type": "object",
                 "properties": {
@@ -21455,6 +21794,7 @@
                 "additionalProperties": false
               },
               "snoozedUntil": {
+                "default": null,
                 "nullable": true,
                 "type": "string",
                 "format": "date-time",
@@ -21586,15 +21926,31 @@
                 "type": "boolean"
               },
               "priority": {
-                "$ref": "#/components/schemas/NotificationPriority"
+                "default": "normal",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationPriority"
+                  }
+                ]
               },
               "box": {
-                "$ref": "#/components/schemas/NotificationBox"
+                "default": "info",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationBox"
+                  }
+                ]
               },
               "inbox": {
-                "$ref": "#/components/schemas/NotificationInbox"
+                "default": "fyi",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationInbox"
+                  }
+                ]
               },
               "resolution": {
+                "default": null,
                 "nullable": true,
                 "type": "object",
                 "properties": {
@@ -21634,6 +21990,7 @@
                 "additionalProperties": false
               },
               "snoozedUntil": {
+                "default": null,
                 "nullable": true,
                 "type": "string",
                 "format": "date-time",
@@ -21765,15 +22122,31 @@
                 "type": "boolean"
               },
               "priority": {
-                "$ref": "#/components/schemas/NotificationPriority"
+                "default": "normal",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationPriority"
+                  }
+                ]
               },
               "box": {
-                "$ref": "#/components/schemas/NotificationBox"
+                "default": "info",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationBox"
+                  }
+                ]
               },
               "inbox": {
-                "$ref": "#/components/schemas/NotificationInbox"
+                "default": "fyi",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationInbox"
+                  }
+                ]
               },
               "resolution": {
+                "default": null,
                 "nullable": true,
                 "type": "object",
                 "properties": {
@@ -21813,6 +22186,7 @@
                 "additionalProperties": false
               },
               "snoozedUntil": {
+                "default": null,
                 "nullable": true,
                 "type": "string",
                 "format": "date-time",
@@ -21944,15 +22318,31 @@
                 "type": "boolean"
               },
               "priority": {
-                "$ref": "#/components/schemas/NotificationPriority"
+                "default": "normal",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationPriority"
+                  }
+                ]
               },
               "box": {
-                "$ref": "#/components/schemas/NotificationBox"
+                "default": "info",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationBox"
+                  }
+                ]
               },
               "inbox": {
-                "$ref": "#/components/schemas/NotificationInbox"
+                "default": "fyi",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationInbox"
+                  }
+                ]
               },
               "resolution": {
+                "default": null,
                 "nullable": true,
                 "type": "object",
                 "properties": {
@@ -21992,6 +22382,7 @@
                 "additionalProperties": false
               },
               "snoozedUntil": {
+                "default": null,
                 "nullable": true,
                 "type": "string",
                 "format": "date-time",
@@ -22123,15 +22514,31 @@
                 "type": "boolean"
               },
               "priority": {
-                "$ref": "#/components/schemas/NotificationPriority"
+                "default": "normal",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationPriority"
+                  }
+                ]
               },
               "box": {
-                "$ref": "#/components/schemas/NotificationBox"
+                "default": "info",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationBox"
+                  }
+                ]
               },
               "inbox": {
-                "$ref": "#/components/schemas/NotificationInbox"
+                "default": "fyi",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationInbox"
+                  }
+                ]
               },
               "resolution": {
+                "default": null,
                 "nullable": true,
                 "type": "object",
                 "properties": {
@@ -22171,6 +22578,7 @@
                 "additionalProperties": false
               },
               "snoozedUntil": {
+                "default": null,
                 "nullable": true,
                 "type": "string",
                 "format": "date-time",
@@ -22311,15 +22719,31 @@
                 "type": "boolean"
               },
               "priority": {
-                "$ref": "#/components/schemas/NotificationPriority"
+                "default": "normal",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationPriority"
+                  }
+                ]
               },
               "box": {
-                "$ref": "#/components/schemas/NotificationBox"
+                "default": "info",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationBox"
+                  }
+                ]
               },
               "inbox": {
-                "$ref": "#/components/schemas/NotificationInbox"
+                "default": "fyi",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationInbox"
+                  }
+                ]
               },
               "resolution": {
+                "default": null,
                 "nullable": true,
                 "type": "object",
                 "properties": {
@@ -22359,6 +22783,7 @@
                 "additionalProperties": false
               },
               "snoozedUntil": {
+                "default": null,
                 "nullable": true,
                 "type": "string",
                 "format": "date-time",
@@ -22494,15 +22919,31 @@
                 "type": "boolean"
               },
               "priority": {
-                "$ref": "#/components/schemas/NotificationPriority"
+                "default": "normal",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationPriority"
+                  }
+                ]
               },
               "box": {
-                "$ref": "#/components/schemas/NotificationBox"
+                "default": "info",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationBox"
+                  }
+                ]
               },
               "inbox": {
-                "$ref": "#/components/schemas/NotificationInbox"
+                "default": "fyi",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationInbox"
+                  }
+                ]
               },
               "resolution": {
+                "default": null,
                 "nullable": true,
                 "type": "object",
                 "properties": {
@@ -22542,6 +22983,7 @@
                 "additionalProperties": false
               },
               "snoozedUntil": {
+                "default": null,
                 "nullable": true,
                 "type": "string",
                 "format": "date-time",
@@ -22686,15 +23128,31 @@
                 "type": "boolean"
               },
               "priority": {
-                "$ref": "#/components/schemas/NotificationPriority"
+                "default": "normal",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationPriority"
+                  }
+                ]
               },
               "box": {
-                "$ref": "#/components/schemas/NotificationBox"
+                "default": "info",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationBox"
+                  }
+                ]
               },
               "inbox": {
-                "$ref": "#/components/schemas/NotificationInbox"
+                "default": "fyi",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationInbox"
+                  }
+                ]
               },
               "resolution": {
+                "default": null,
                 "nullable": true,
                 "type": "object",
                 "properties": {
@@ -22734,6 +23192,7 @@
                 "additionalProperties": false
               },
               "snoozedUntil": {
+                "default": null,
                 "nullable": true,
                 "type": "string",
                 "format": "date-time",
@@ -22870,15 +23329,31 @@
                 "type": "boolean"
               },
               "priority": {
-                "$ref": "#/components/schemas/NotificationPriority"
+                "default": "normal",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationPriority"
+                  }
+                ]
               },
               "box": {
-                "$ref": "#/components/schemas/NotificationBox"
+                "default": "info",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationBox"
+                  }
+                ]
               },
               "inbox": {
-                "$ref": "#/components/schemas/NotificationInbox"
+                "default": "fyi",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationInbox"
+                  }
+                ]
               },
               "resolution": {
+                "default": null,
                 "nullable": true,
                 "type": "object",
                 "properties": {
@@ -22918,6 +23393,7 @@
                 "additionalProperties": false
               },
               "snoozedUntil": {
+                "default": null,
                 "nullable": true,
                 "type": "string",
                 "format": "date-time",
@@ -23062,15 +23538,31 @@
                 "type": "boolean"
               },
               "priority": {
-                "$ref": "#/components/schemas/NotificationPriority"
+                "default": "normal",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationPriority"
+                  }
+                ]
               },
               "box": {
-                "$ref": "#/components/schemas/NotificationBox"
+                "default": "info",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationBox"
+                  }
+                ]
               },
               "inbox": {
-                "$ref": "#/components/schemas/NotificationInbox"
+                "default": "fyi",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationInbox"
+                  }
+                ]
               },
               "resolution": {
+                "default": null,
                 "nullable": true,
                 "type": "object",
                 "properties": {
@@ -23110,6 +23602,7 @@
                 "additionalProperties": false
               },
               "snoozedUntil": {
+                "default": null,
                 "nullable": true,
                 "type": "string",
                 "format": "date-time",
@@ -23259,15 +23752,31 @@
                 "type": "boolean"
               },
               "priority": {
-                "$ref": "#/components/schemas/NotificationPriority"
+                "default": "normal",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationPriority"
+                  }
+                ]
               },
               "box": {
-                "$ref": "#/components/schemas/NotificationBox"
+                "default": "info",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationBox"
+                  }
+                ]
               },
               "inbox": {
-                "$ref": "#/components/schemas/NotificationInbox"
+                "default": "fyi",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationInbox"
+                  }
+                ]
               },
               "resolution": {
+                "default": null,
                 "nullable": true,
                 "type": "object",
                 "properties": {
@@ -23307,6 +23816,7 @@
                 "additionalProperties": false
               },
               "snoozedUntil": {
+                "default": null,
                 "nullable": true,
                 "type": "string",
                 "format": "date-time",
@@ -23439,15 +23949,31 @@
                 "type": "boolean"
               },
               "priority": {
-                "$ref": "#/components/schemas/NotificationPriority"
+                "default": "normal",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationPriority"
+                  }
+                ]
               },
               "box": {
-                "$ref": "#/components/schemas/NotificationBox"
+                "default": "info",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationBox"
+                  }
+                ]
               },
               "inbox": {
-                "$ref": "#/components/schemas/NotificationInbox"
+                "default": "fyi",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationInbox"
+                  }
+                ]
               },
               "resolution": {
+                "default": null,
                 "nullable": true,
                 "type": "object",
                 "properties": {
@@ -23487,6 +24013,7 @@
                 "additionalProperties": false
               },
               "snoozedUntil": {
+                "default": null,
                 "nullable": true,
                 "type": "string",
                 "format": "date-time",
@@ -23627,15 +24154,31 @@
                 "type": "boolean"
               },
               "priority": {
-                "$ref": "#/components/schemas/NotificationPriority"
+                "default": "normal",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationPriority"
+                  }
+                ]
               },
               "box": {
-                "$ref": "#/components/schemas/NotificationBox"
+                "default": "info",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationBox"
+                  }
+                ]
               },
               "inbox": {
-                "$ref": "#/components/schemas/NotificationInbox"
+                "default": "fyi",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationInbox"
+                  }
+                ]
               },
               "resolution": {
+                "default": null,
                 "nullable": true,
                 "type": "object",
                 "properties": {
@@ -23675,6 +24218,7 @@
                 "additionalProperties": false
               },
               "snoozedUntil": {
+                "default": null,
                 "nullable": true,
                 "type": "string",
                 "format": "date-time",
@@ -23820,15 +24364,31 @@
                 "type": "boolean"
               },
               "priority": {
-                "$ref": "#/components/schemas/NotificationPriority"
+                "default": "normal",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationPriority"
+                  }
+                ]
               },
               "box": {
-                "$ref": "#/components/schemas/NotificationBox"
+                "default": "info",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationBox"
+                  }
+                ]
               },
               "inbox": {
-                "$ref": "#/components/schemas/NotificationInbox"
+                "default": "fyi",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationInbox"
+                  }
+                ]
               },
               "resolution": {
+                "default": null,
                 "nullable": true,
                 "type": "object",
                 "properties": {
@@ -23868,6 +24428,7 @@
                 "additionalProperties": false
               },
               "snoozedUntil": {
+                "default": null,
                 "nullable": true,
                 "type": "string",
                 "format": "date-time",
@@ -24009,15 +24570,31 @@
                 "type": "boolean"
               },
               "priority": {
-                "$ref": "#/components/schemas/NotificationPriority"
+                "default": "normal",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationPriority"
+                  }
+                ]
               },
               "box": {
-                "$ref": "#/components/schemas/NotificationBox"
+                "default": "info",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationBox"
+                  }
+                ]
               },
               "inbox": {
-                "$ref": "#/components/schemas/NotificationInbox"
+                "default": "fyi",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationInbox"
+                  }
+                ]
               },
               "resolution": {
+                "default": null,
                 "nullable": true,
                 "type": "object",
                 "properties": {
@@ -24057,6 +24634,7 @@
                 "additionalProperties": false
               },
               "snoozedUntil": {
+                "default": null,
                 "nullable": true,
                 "type": "string",
                 "format": "date-time",
@@ -24198,15 +24776,31 @@
                 "type": "boolean"
               },
               "priority": {
-                "$ref": "#/components/schemas/NotificationPriority"
+                "default": "normal",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationPriority"
+                  }
+                ]
               },
               "box": {
-                "$ref": "#/components/schemas/NotificationBox"
+                "default": "info",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationBox"
+                  }
+                ]
               },
               "inbox": {
-                "$ref": "#/components/schemas/NotificationInbox"
+                "default": "fyi",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationInbox"
+                  }
+                ]
               },
               "resolution": {
+                "default": null,
                 "nullable": true,
                 "type": "object",
                 "properties": {
@@ -24246,6 +24840,7 @@
                 "additionalProperties": false
               },
               "snoozedUntil": {
+                "default": null,
                 "nullable": true,
                 "type": "string",
                 "format": "date-time",
@@ -24392,15 +24987,31 @@
                 "type": "boolean"
               },
               "priority": {
-                "$ref": "#/components/schemas/NotificationPriority"
+                "default": "normal",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationPriority"
+                  }
+                ]
               },
               "box": {
-                "$ref": "#/components/schemas/NotificationBox"
+                "default": "info",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationBox"
+                  }
+                ]
               },
               "inbox": {
-                "$ref": "#/components/schemas/NotificationInbox"
+                "default": "fyi",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationInbox"
+                  }
+                ]
               },
               "resolution": {
+                "default": null,
                 "nullable": true,
                 "type": "object",
                 "properties": {
@@ -24440,6 +25051,7 @@
                 "additionalProperties": false
               },
               "snoozedUntil": {
+                "default": null,
                 "nullable": true,
                 "type": "string",
                 "format": "date-time",
@@ -24581,15 +25193,31 @@
                 "type": "boolean"
               },
               "priority": {
-                "$ref": "#/components/schemas/NotificationPriority"
+                "default": "normal",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationPriority"
+                  }
+                ]
               },
               "box": {
-                "$ref": "#/components/schemas/NotificationBox"
+                "default": "info",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationBox"
+                  }
+                ]
               },
               "inbox": {
-                "$ref": "#/components/schemas/NotificationInbox"
+                "default": "fyi",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationInbox"
+                  }
+                ]
               },
               "resolution": {
+                "default": null,
                 "nullable": true,
                 "type": "object",
                 "properties": {
@@ -24629,6 +25257,7 @@
                 "additionalProperties": false
               },
               "snoozedUntil": {
+                "default": null,
                 "nullable": true,
                 "type": "string",
                 "format": "date-time",
@@ -24760,15 +25389,31 @@
                 "type": "boolean"
               },
               "priority": {
-                "$ref": "#/components/schemas/NotificationPriority"
+                "default": "normal",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationPriority"
+                  }
+                ]
               },
               "box": {
-                "$ref": "#/components/schemas/NotificationBox"
+                "default": "info",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationBox"
+                  }
+                ]
               },
               "inbox": {
-                "$ref": "#/components/schemas/NotificationInbox"
+                "default": "fyi",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationInbox"
+                  }
+                ]
               },
               "resolution": {
+                "default": null,
                 "nullable": true,
                 "type": "object",
                 "properties": {
@@ -24808,6 +25453,7 @@
                 "additionalProperties": false
               },
               "snoozedUntil": {
+                "default": null,
                 "nullable": true,
                 "type": "string",
                 "format": "date-time",
@@ -24939,15 +25585,31 @@
                 "type": "boolean"
               },
               "priority": {
-                "$ref": "#/components/schemas/NotificationPriority"
+                "default": "normal",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationPriority"
+                  }
+                ]
               },
               "box": {
-                "$ref": "#/components/schemas/NotificationBox"
+                "default": "info",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationBox"
+                  }
+                ]
               },
               "inbox": {
-                "$ref": "#/components/schemas/NotificationInbox"
+                "default": "fyi",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationInbox"
+                  }
+                ]
               },
               "resolution": {
+                "default": null,
                 "nullable": true,
                 "type": "object",
                 "properties": {
@@ -24987,6 +25649,7 @@
                 "additionalProperties": false
               },
               "snoozedUntil": {
+                "default": null,
                 "nullable": true,
                 "type": "string",
                 "format": "date-time",
@@ -25123,15 +25786,31 @@
                 "type": "boolean"
               },
               "priority": {
-                "$ref": "#/components/schemas/NotificationPriority"
+                "default": "normal",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationPriority"
+                  }
+                ]
               },
               "box": {
-                "$ref": "#/components/schemas/NotificationBox"
+                "default": "info",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationBox"
+                  }
+                ]
               },
               "inbox": {
-                "$ref": "#/components/schemas/NotificationInbox"
+                "default": "fyi",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationInbox"
+                  }
+                ]
               },
               "resolution": {
+                "default": null,
                 "nullable": true,
                 "type": "object",
                 "properties": {
@@ -25171,6 +25850,7 @@
                 "additionalProperties": false
               },
               "snoozedUntil": {
+                "default": null,
                 "nullable": true,
                 "type": "string",
                 "format": "date-time",
@@ -25307,15 +25987,31 @@
                 "type": "boolean"
               },
               "priority": {
-                "$ref": "#/components/schemas/NotificationPriority"
+                "default": "normal",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationPriority"
+                  }
+                ]
               },
               "box": {
-                "$ref": "#/components/schemas/NotificationBox"
+                "default": "info",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationBox"
+                  }
+                ]
               },
               "inbox": {
-                "$ref": "#/components/schemas/NotificationInbox"
+                "default": "fyi",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationInbox"
+                  }
+                ]
               },
               "resolution": {
+                "default": null,
                 "nullable": true,
                 "type": "object",
                 "properties": {
@@ -25355,6 +26051,7 @@
                 "additionalProperties": false
               },
               "snoozedUntil": {
+                "default": null,
                 "nullable": true,
                 "type": "string",
                 "format": "date-time",
@@ -25487,15 +26184,31 @@
                 "type": "boolean"
               },
               "priority": {
-                "$ref": "#/components/schemas/NotificationPriority"
+                "default": "normal",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationPriority"
+                  }
+                ]
               },
               "box": {
-                "$ref": "#/components/schemas/NotificationBox"
+                "default": "info",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationBox"
+                  }
+                ]
               },
               "inbox": {
-                "$ref": "#/components/schemas/NotificationInbox"
+                "default": "fyi",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationInbox"
+                  }
+                ]
               },
               "resolution": {
+                "default": null,
                 "nullable": true,
                 "type": "object",
                 "properties": {
@@ -25535,6 +26248,7 @@
                 "additionalProperties": false
               },
               "snoozedUntil": {
+                "default": null,
                 "nullable": true,
                 "type": "string",
                 "format": "date-time",
@@ -25641,15 +26355,31 @@
                 "type": "boolean"
               },
               "priority": {
-                "$ref": "#/components/schemas/NotificationPriority"
+                "default": "normal",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationPriority"
+                  }
+                ]
               },
               "box": {
-                "$ref": "#/components/schemas/NotificationBox"
+                "default": "info",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationBox"
+                  }
+                ]
               },
               "inbox": {
-                "$ref": "#/components/schemas/NotificationInbox"
+                "default": "fyi",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationInbox"
+                  }
+                ]
               },
               "resolution": {
+                "default": null,
                 "nullable": true,
                 "type": "object",
                 "properties": {
@@ -25689,6 +26419,7 @@
                 "additionalProperties": false
               },
               "snoozedUntil": {
+                "default": null,
                 "nullable": true,
                 "type": "string",
                 "format": "date-time",
@@ -25799,15 +26530,31 @@
                 "type": "boolean"
               },
               "priority": {
-                "$ref": "#/components/schemas/NotificationPriority"
+                "default": "normal",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationPriority"
+                  }
+                ]
               },
               "box": {
-                "$ref": "#/components/schemas/NotificationBox"
+                "default": "info",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationBox"
+                  }
+                ]
               },
               "inbox": {
-                "$ref": "#/components/schemas/NotificationInbox"
+                "default": "fyi",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationInbox"
+                  }
+                ]
               },
               "resolution": {
+                "default": null,
                 "nullable": true,
                 "type": "object",
                 "properties": {
@@ -25847,6 +26594,7 @@
                 "additionalProperties": false
               },
               "snoozedUntil": {
+                "default": null,
                 "nullable": true,
                 "type": "string",
                 "format": "date-time",
@@ -25977,15 +26725,31 @@
                 "type": "boolean"
               },
               "priority": {
-                "$ref": "#/components/schemas/NotificationPriority"
+                "default": "normal",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationPriority"
+                  }
+                ]
               },
               "box": {
-                "$ref": "#/components/schemas/NotificationBox"
+                "default": "info",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationBox"
+                  }
+                ]
               },
               "inbox": {
-                "$ref": "#/components/schemas/NotificationInbox"
+                "default": "fyi",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationInbox"
+                  }
+                ]
               },
               "resolution": {
+                "default": null,
                 "nullable": true,
                 "type": "object",
                 "properties": {
@@ -26025,6 +26789,7 @@
                 "additionalProperties": false
               },
               "snoozedUntil": {
+                "default": null,
                 "nullable": true,
                 "type": "string",
                 "format": "date-time",
@@ -26192,15 +26957,31 @@
                 "type": "boolean"
               },
               "priority": {
-                "$ref": "#/components/schemas/NotificationPriority"
+                "default": "normal",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationPriority"
+                  }
+                ]
               },
               "box": {
-                "$ref": "#/components/schemas/NotificationBox"
+                "default": "info",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationBox"
+                  }
+                ]
               },
               "inbox": {
-                "$ref": "#/components/schemas/NotificationInbox"
+                "default": "fyi",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationInbox"
+                  }
+                ]
               },
               "resolution": {
+                "default": null,
                 "nullable": true,
                 "type": "object",
                 "properties": {
@@ -26240,6 +27021,7 @@
                 "additionalProperties": false
               },
               "snoozedUntil": {
+                "default": null,
                 "nullable": true,
                 "type": "string",
                 "format": "date-time",
@@ -26376,15 +27158,31 @@
                 "type": "boolean"
               },
               "priority": {
-                "$ref": "#/components/schemas/NotificationPriority"
+                "default": "normal",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationPriority"
+                  }
+                ]
               },
               "box": {
-                "$ref": "#/components/schemas/NotificationBox"
+                "default": "info",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationBox"
+                  }
+                ]
               },
               "inbox": {
-                "$ref": "#/components/schemas/NotificationInbox"
+                "default": "fyi",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationInbox"
+                  }
+                ]
               },
               "resolution": {
+                "default": null,
                 "nullable": true,
                 "type": "object",
                 "properties": {
@@ -26424,6 +27222,7 @@
                 "additionalProperties": false
               },
               "snoozedUntil": {
+                "default": null,
                 "nullable": true,
                 "type": "string",
                 "format": "date-time",
@@ -26565,15 +27364,31 @@
                 "type": "boolean"
               },
               "priority": {
-                "$ref": "#/components/schemas/NotificationPriority"
+                "default": "normal",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationPriority"
+                  }
+                ]
               },
               "box": {
-                "$ref": "#/components/schemas/NotificationBox"
+                "default": "info",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationBox"
+                  }
+                ]
               },
               "inbox": {
-                "$ref": "#/components/schemas/NotificationInbox"
+                "default": "fyi",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationInbox"
+                  }
+                ]
               },
               "resolution": {
+                "default": null,
                 "nullable": true,
                 "type": "object",
                 "properties": {
@@ -26613,6 +27428,7 @@
                 "additionalProperties": false
               },
               "snoozedUntil": {
+                "default": null,
                 "nullable": true,
                 "type": "string",
                 "format": "date-time",
@@ -26743,15 +27559,31 @@
                 "type": "boolean"
               },
               "priority": {
-                "$ref": "#/components/schemas/NotificationPriority"
+                "default": "normal",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationPriority"
+                  }
+                ]
               },
               "box": {
-                "$ref": "#/components/schemas/NotificationBox"
+                "default": "info",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationBox"
+                  }
+                ]
               },
               "inbox": {
-                "$ref": "#/components/schemas/NotificationInbox"
+                "default": "fyi",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationInbox"
+                  }
+                ]
               },
               "resolution": {
+                "default": null,
                 "nullable": true,
                 "type": "object",
                 "properties": {
@@ -26791,6 +27623,7 @@
                 "additionalProperties": false
               },
               "snoozedUntil": {
+                "default": null,
                 "nullable": true,
                 "type": "string",
                 "format": "date-time",
@@ -26912,15 +27745,31 @@
                 "type": "boolean"
               },
               "priority": {
-                "$ref": "#/components/schemas/NotificationPriority"
+                "default": "normal",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationPriority"
+                  }
+                ]
               },
               "box": {
-                "$ref": "#/components/schemas/NotificationBox"
+                "default": "info",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationBox"
+                  }
+                ]
               },
               "inbox": {
-                "$ref": "#/components/schemas/NotificationInbox"
+                "default": "fyi",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationInbox"
+                  }
+                ]
               },
               "resolution": {
+                "default": null,
                 "nullable": true,
                 "type": "object",
                 "properties": {
@@ -26960,6 +27809,7 @@
                 "additionalProperties": false
               },
               "snoozedUntil": {
+                "default": null,
                 "nullable": true,
                 "type": "string",
                 "format": "date-time",
@@ -27083,15 +27933,31 @@
                 "type": "boolean"
               },
               "priority": {
-                "$ref": "#/components/schemas/NotificationPriority"
+                "default": "normal",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationPriority"
+                  }
+                ]
               },
               "box": {
-                "$ref": "#/components/schemas/NotificationBox"
+                "default": "info",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationBox"
+                  }
+                ]
               },
               "inbox": {
-                "$ref": "#/components/schemas/NotificationInbox"
+                "default": "fyi",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationInbox"
+                  }
+                ]
               },
               "resolution": {
+                "default": null,
                 "nullable": true,
                 "type": "object",
                 "properties": {
@@ -27131,6 +27997,7 @@
                 "additionalProperties": false
               },
               "snoozedUntil": {
+                "default": null,
                 "nullable": true,
                 "type": "string",
                 "format": "date-time",
@@ -27267,15 +28134,31 @@
                 "type": "boolean"
               },
               "priority": {
-                "$ref": "#/components/schemas/NotificationPriority"
+                "default": "normal",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationPriority"
+                  }
+                ]
               },
               "box": {
-                "$ref": "#/components/schemas/NotificationBox"
+                "default": "info",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationBox"
+                  }
+                ]
               },
               "inbox": {
-                "$ref": "#/components/schemas/NotificationInbox"
+                "default": "fyi",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationInbox"
+                  }
+                ]
               },
               "resolution": {
+                "default": null,
                 "nullable": true,
                 "type": "object",
                 "properties": {
@@ -27315,6 +28198,7 @@
                 "additionalProperties": false
               },
               "snoozedUntil": {
+                "default": null,
                 "nullable": true,
                 "type": "string",
                 "format": "date-time",
@@ -27448,15 +28332,31 @@
                 "type": "boolean"
               },
               "priority": {
-                "$ref": "#/components/schemas/NotificationPriority"
+                "default": "normal",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationPriority"
+                  }
+                ]
               },
               "box": {
-                "$ref": "#/components/schemas/NotificationBox"
+                "default": "info",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationBox"
+                  }
+                ]
               },
               "inbox": {
-                "$ref": "#/components/schemas/NotificationInbox"
+                "default": "fyi",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationInbox"
+                  }
+                ]
               },
               "resolution": {
+                "default": null,
                 "nullable": true,
                 "type": "object",
                 "properties": {
@@ -27496,6 +28396,7 @@
                 "additionalProperties": false
               },
               "snoozedUntil": {
+                "default": null,
                 "nullable": true,
                 "type": "string",
                 "format": "date-time",
@@ -27621,15 +28522,31 @@
                 "type": "boolean"
               },
               "priority": {
-                "$ref": "#/components/schemas/NotificationPriority"
+                "default": "normal",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationPriority"
+                  }
+                ]
               },
               "box": {
-                "$ref": "#/components/schemas/NotificationBox"
+                "default": "info",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationBox"
+                  }
+                ]
               },
               "inbox": {
-                "$ref": "#/components/schemas/NotificationInbox"
+                "default": "fyi",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationInbox"
+                  }
+                ]
               },
               "resolution": {
+                "default": null,
                 "nullable": true,
                 "type": "object",
                 "properties": {
@@ -27669,6 +28586,7 @@
                 "additionalProperties": false
               },
               "snoozedUntil": {
+                "default": null,
                 "nullable": true,
                 "type": "string",
                 "format": "date-time",
@@ -27788,15 +28706,31 @@
                 "type": "boolean"
               },
               "priority": {
-                "$ref": "#/components/schemas/NotificationPriority"
+                "default": "normal",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationPriority"
+                  }
+                ]
               },
               "box": {
-                "$ref": "#/components/schemas/NotificationBox"
+                "default": "info",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationBox"
+                  }
+                ]
               },
               "inbox": {
-                "$ref": "#/components/schemas/NotificationInbox"
+                "default": "fyi",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationInbox"
+                  }
+                ]
               },
               "resolution": {
+                "default": null,
                 "nullable": true,
                 "type": "object",
                 "properties": {
@@ -27836,6 +28770,7 @@
                 "additionalProperties": false
               },
               "snoozedUntil": {
+                "default": null,
                 "nullable": true,
                 "type": "string",
                 "format": "date-time",
@@ -27954,15 +28889,31 @@
                 "type": "boolean"
               },
               "priority": {
-                "$ref": "#/components/schemas/NotificationPriority"
+                "default": "normal",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationPriority"
+                  }
+                ]
               },
               "box": {
-                "$ref": "#/components/schemas/NotificationBox"
+                "default": "info",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationBox"
+                  }
+                ]
               },
               "inbox": {
-                "$ref": "#/components/schemas/NotificationInbox"
+                "default": "fyi",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationInbox"
+                  }
+                ]
               },
               "resolution": {
+                "default": null,
                 "nullable": true,
                 "type": "object",
                 "properties": {
@@ -28002,6 +28953,7 @@
                 "additionalProperties": false
               },
               "snoozedUntil": {
+                "default": null,
                 "nullable": true,
                 "type": "string",
                 "format": "date-time",
@@ -28125,15 +29077,31 @@
                 "type": "boolean"
               },
               "priority": {
-                "$ref": "#/components/schemas/NotificationPriority"
+                "default": "normal",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationPriority"
+                  }
+                ]
               },
               "box": {
-                "$ref": "#/components/schemas/NotificationBox"
+                "default": "info",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationBox"
+                  }
+                ]
               },
               "inbox": {
-                "$ref": "#/components/schemas/NotificationInbox"
+                "default": "fyi",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationInbox"
+                  }
+                ]
               },
               "resolution": {
+                "default": null,
                 "nullable": true,
                 "type": "object",
                 "properties": {
@@ -28173,6 +29141,7 @@
                 "additionalProperties": false
               },
               "snoozedUntil": {
+                "default": null,
                 "nullable": true,
                 "type": "string",
                 "format": "date-time",
@@ -28279,15 +29248,31 @@
                 "type": "boolean"
               },
               "priority": {
-                "$ref": "#/components/schemas/NotificationPriority"
+                "default": "normal",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationPriority"
+                  }
+                ]
               },
               "box": {
-                "$ref": "#/components/schemas/NotificationBox"
+                "default": "info",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationBox"
+                  }
+                ]
               },
               "inbox": {
-                "$ref": "#/components/schemas/NotificationInbox"
+                "default": "fyi",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationInbox"
+                  }
+                ]
               },
               "resolution": {
+                "default": null,
                 "nullable": true,
                 "type": "object",
                 "properties": {
@@ -28327,6 +29312,7 @@
                 "additionalProperties": false
               },
               "snoozedUntil": {
+                "default": null,
                 "nullable": true,
                 "type": "string",
                 "format": "date-time",
@@ -28437,15 +29423,31 @@
                 "type": "boolean"
               },
               "priority": {
-                "$ref": "#/components/schemas/NotificationPriority"
+                "default": "normal",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationPriority"
+                  }
+                ]
               },
               "box": {
-                "$ref": "#/components/schemas/NotificationBox"
+                "default": "info",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationBox"
+                  }
+                ]
               },
               "inbox": {
-                "$ref": "#/components/schemas/NotificationInbox"
+                "default": "fyi",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationInbox"
+                  }
+                ]
               },
               "resolution": {
+                "default": null,
                 "nullable": true,
                 "type": "object",
                 "properties": {
@@ -28485,6 +29487,7 @@
                 "additionalProperties": false
               },
               "snoozedUntil": {
+                "default": null,
                 "nullable": true,
                 "type": "string",
                 "format": "date-time",
@@ -28601,15 +29604,31 @@
                 "type": "boolean"
               },
               "priority": {
-                "$ref": "#/components/schemas/NotificationPriority"
+                "default": "normal",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationPriority"
+                  }
+                ]
               },
               "box": {
-                "$ref": "#/components/schemas/NotificationBox"
+                "default": "info",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationBox"
+                  }
+                ]
               },
               "inbox": {
-                "$ref": "#/components/schemas/NotificationInbox"
+                "default": "fyi",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationInbox"
+                  }
+                ]
               },
               "resolution": {
+                "default": null,
                 "nullable": true,
                 "type": "object",
                 "properties": {
@@ -28649,6 +29668,7 @@
                 "additionalProperties": false
               },
               "snoozedUntil": {
+                "default": null,
                 "nullable": true,
                 "type": "string",
                 "format": "date-time",
@@ -28761,15 +29781,31 @@
                 "type": "boolean"
               },
               "priority": {
-                "$ref": "#/components/schemas/NotificationPriority"
+                "default": "normal",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationPriority"
+                  }
+                ]
               },
               "box": {
-                "$ref": "#/components/schemas/NotificationBox"
+                "default": "info",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationBox"
+                  }
+                ]
               },
               "inbox": {
-                "$ref": "#/components/schemas/NotificationInbox"
+                "default": "fyi",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationInbox"
+                  }
+                ]
               },
               "resolution": {
+                "default": null,
                 "nullable": true,
                 "type": "object",
                 "properties": {
@@ -28809,6 +29845,7 @@
                 "additionalProperties": false
               },
               "snoozedUntil": {
+                "default": null,
                 "nullable": true,
                 "type": "string",
                 "format": "date-time",
@@ -28915,15 +29952,31 @@
                 "type": "boolean"
               },
               "priority": {
-                "$ref": "#/components/schemas/NotificationPriority"
+                "default": "normal",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationPriority"
+                  }
+                ]
               },
               "box": {
-                "$ref": "#/components/schemas/NotificationBox"
+                "default": "info",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationBox"
+                  }
+                ]
               },
               "inbox": {
-                "$ref": "#/components/schemas/NotificationInbox"
+                "default": "fyi",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationInbox"
+                  }
+                ]
               },
               "resolution": {
+                "default": null,
                 "nullable": true,
                 "type": "object",
                 "properties": {
@@ -28963,6 +30016,7 @@
                 "additionalProperties": false
               },
               "snoozedUntil": {
+                "default": null,
                 "nullable": true,
                 "type": "string",
                 "format": "date-time",
@@ -29095,15 +30149,31 @@
                 "type": "boolean"
               },
               "priority": {
-                "$ref": "#/components/schemas/NotificationPriority"
+                "default": "normal",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationPriority"
+                  }
+                ]
               },
               "box": {
-                "$ref": "#/components/schemas/NotificationBox"
+                "default": "info",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationBox"
+                  }
+                ]
               },
               "inbox": {
-                "$ref": "#/components/schemas/NotificationInbox"
+                "default": "fyi",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationInbox"
+                  }
+                ]
               },
               "resolution": {
+                "default": null,
                 "nullable": true,
                 "type": "object",
                 "properties": {
@@ -29143,6 +30213,7 @@
                 "additionalProperties": false
               },
               "snoozedUntil": {
+                "default": null,
                 "nullable": true,
                 "type": "string",
                 "format": "date-time",
@@ -29275,15 +30346,31 @@
                 "type": "boolean"
               },
               "priority": {
-                "$ref": "#/components/schemas/NotificationPriority"
+                "default": "normal",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationPriority"
+                  }
+                ]
               },
               "box": {
-                "$ref": "#/components/schemas/NotificationBox"
+                "default": "info",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationBox"
+                  }
+                ]
               },
               "inbox": {
-                "$ref": "#/components/schemas/NotificationInbox"
+                "default": "fyi",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationInbox"
+                  }
+                ]
               },
               "resolution": {
+                "default": null,
                 "nullable": true,
                 "type": "object",
                 "properties": {
@@ -29323,6 +30410,7 @@
                 "additionalProperties": false
               },
               "snoozedUntil": {
+                "default": null,
                 "nullable": true,
                 "type": "string",
                 "format": "date-time",

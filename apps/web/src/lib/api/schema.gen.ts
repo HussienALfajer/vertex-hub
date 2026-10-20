@@ -5197,9 +5197,13 @@ export interface components {
             };
             count: number;
             read: boolean;
+            /** @default normal */
             priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
             box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
             inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
             resolution: {
                 outcome: components["schemas"]["NotificationResolution"];
                 by: {
@@ -5210,7 +5214,10 @@ export interface components {
                 /** Format: date-time */
                 at: string;
             } | null;
-            /** Format: date-time */
+            /**
+             * Format: date-time
+             * @default null
+             */
             snoozedUntil: string | null;
             /** Format: date-time */
             createdAt: string;
@@ -5241,9 +5248,13 @@ export interface components {
             };
             count: number;
             read: boolean;
+            /** @default normal */
             priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
             box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
             inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
             resolution: {
                 outcome: components["schemas"]["NotificationResolution"];
                 by: {
@@ -5254,7 +5265,10 @@ export interface components {
                 /** Format: date-time */
                 at: string;
             } | null;
-            /** Format: date-time */
+            /**
+             * Format: date-time
+             * @default null
+             */
             snoozedUntil: string | null;
             /** Format: date-time */
             createdAt: string;
@@ -5286,9 +5300,13 @@ export interface components {
             };
             count: number;
             read: boolean;
+            /** @default normal */
             priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
             box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
             inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
             resolution: {
                 outcome: components["schemas"]["NotificationResolution"];
                 by: {
@@ -5299,7 +5317,10 @@ export interface components {
                 /** Format: date-time */
                 at: string;
             } | null;
-            /** Format: date-time */
+            /**
+             * Format: date-time
+             * @default null
+             */
             snoozedUntil: string | null;
             /** Format: date-time */
             createdAt: string;
@@ -5332,9 +5353,13 @@ export interface components {
             };
             count: number;
             read: boolean;
+            /** @default normal */
             priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
             box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
             inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
             resolution: {
                 outcome: components["schemas"]["NotificationResolution"];
                 by: {
@@ -5345,7 +5370,10 @@ export interface components {
                 /** Format: date-time */
                 at: string;
             } | null;
-            /** Format: date-time */
+            /**
+             * Format: date-time
+             * @default null
+             */
             snoozedUntil: string | null;
             /** Format: date-time */
             createdAt: string;
@@ -5376,9 +5404,13 @@ export interface components {
             };
             count: number;
             read: boolean;
+            /** @default normal */
             priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
             box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
             inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
             resolution: {
                 outcome: components["schemas"]["NotificationResolution"];
                 by: {
@@ -5389,7 +5421,10 @@ export interface components {
                 /** Format: date-time */
                 at: string;
             } | null;
-            /** Format: date-time */
+            /**
+             * Format: date-time
+             * @default null
+             */
             snoozedUntil: string | null;
             /** Format: date-time */
             createdAt: string;
@@ -5420,9 +5455,13 @@ export interface components {
             };
             count: number;
             read: boolean;
+            /** @default normal */
             priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
             box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
             inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
             resolution: {
                 outcome: components["schemas"]["NotificationResolution"];
                 by: {
@@ -5433,7 +5472,10 @@ export interface components {
                 /** Format: date-time */
                 at: string;
             } | null;
-            /** Format: date-time */
+            /**
+             * Format: date-time
+             * @default null
+             */
             snoozedUntil: string | null;
             /** Format: date-time */
             createdAt: string;
@@ -5464,9 +5506,13 @@ export interface components {
             };
             count: number;
             read: boolean;
+            /** @default normal */
             priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
             box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
             inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
             resolution: {
                 outcome: components["schemas"]["NotificationResolution"];
                 by: {
@@ -5477,7 +5523,10 @@ export interface components {
                 /** Format: date-time */
                 at: string;
             } | null;
-            /** Format: date-time */
+            /**
+             * Format: date-time
+             * @default null
+             */
             snoozedUntil: string | null;
             /** Format: date-time */
             createdAt: string;
@@ -5508,9 +5557,13 @@ export interface components {
             };
             count: number;
             read: boolean;
+            /** @default normal */
             priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
             box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
             inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
             resolution: {
                 outcome: components["schemas"]["NotificationResolution"];
                 by: {
@@ -5521,7 +5574,10 @@ export interface components {
                 /** Format: date-time */
                 at: string;
             } | null;
-            /** Format: date-time */
+            /**
+             * Format: date-time
+             * @default null
+             */
             snoozedUntil: string | null;
             /** Format: date-time */
             createdAt: string;
@@ -5550,9 +5606,13 @@ export interface components {
             };
             count: number;
             read: boolean;
+            /** @default normal */
             priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
             box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
             inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
             resolution: {
                 outcome: components["schemas"]["NotificationResolution"];
                 by: {
@@ -5563,7 +5623,10 @@ export interface components {
                 /** Format: date-time */
                 at: string;
             } | null;
-            /** Format: date-time */
+            /**
+             * Format: date-time
+             * @default null
+             */
             snoozedUntil: string | null;
             /** Format: date-time */
             createdAt: string;
@@ -5590,9 +5653,13 @@ export interface components {
             };
             count: number;
             read: boolean;
+            /** @default normal */
             priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
             box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
             inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
             resolution: {
                 outcome: components["schemas"]["NotificationResolution"];
                 by: {
@@ -5603,7 +5670,10 @@ export interface components {
                 /** Format: date-time */
                 at: string;
             } | null;
-            /** Format: date-time */
+            /**
+             * Format: date-time
+             * @default null
+             */
             snoozedUntil: string | null;
             /** Format: date-time */
             createdAt: string;
@@ -5630,9 +5700,13 @@ export interface components {
             };
             count: number;
             read: boolean;
+            /** @default normal */
             priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
             box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
             inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
             resolution: {
                 outcome: components["schemas"]["NotificationResolution"];
                 by: {
@@ -5643,7 +5717,10 @@ export interface components {
                 /** Format: date-time */
                 at: string;
             } | null;
-            /** Format: date-time */
+            /**
+             * Format: date-time
+             * @default null
+             */
             snoozedUntil: string | null;
             /** Format: date-time */
             createdAt: string;
@@ -5686,9 +5763,13 @@ export interface components {
             };
             count: number;
             read: boolean;
+            /** @default normal */
             priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
             box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
             inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
             resolution: {
                 outcome: components["schemas"]["NotificationResolution"];
                 by: {
@@ -5699,7 +5780,10 @@ export interface components {
                 /** Format: date-time */
                 at: string;
             } | null;
-            /** Format: date-time */
+            /**
+             * Format: date-time
+             * @default null
+             */
             snoozedUntil: string | null;
             /** Format: date-time */
             createdAt: string;
@@ -5731,9 +5815,13 @@ export interface components {
             };
             count: number;
             read: boolean;
+            /** @default normal */
             priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
             box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
             inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
             resolution: {
                 outcome: components["schemas"]["NotificationResolution"];
                 by: {
@@ -5744,7 +5832,10 @@ export interface components {
                 /** Format: date-time */
                 at: string;
             } | null;
-            /** Format: date-time */
+            /**
+             * Format: date-time
+             * @default null
+             */
             snoozedUntil: string | null;
             /** Format: date-time */
             createdAt: string;
@@ -5776,9 +5867,13 @@ export interface components {
             };
             count: number;
             read: boolean;
+            /** @default normal */
             priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
             box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
             inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
             resolution: {
                 outcome: components["schemas"]["NotificationResolution"];
                 by: {
@@ -5789,7 +5884,10 @@ export interface components {
                 /** Format: date-time */
                 at: string;
             } | null;
-            /** Format: date-time */
+            /**
+             * Format: date-time
+             * @default null
+             */
             snoozedUntil: string | null;
             /** Format: date-time */
             createdAt: string;
@@ -5820,9 +5918,13 @@ export interface components {
             };
             count: number;
             read: boolean;
+            /** @default normal */
             priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
             box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
             inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
             resolution: {
                 outcome: components["schemas"]["NotificationResolution"];
                 by: {
@@ -5833,7 +5935,10 @@ export interface components {
                 /** Format: date-time */
                 at: string;
             } | null;
-            /** Format: date-time */
+            /**
+             * Format: date-time
+             * @default null
+             */
             snoozedUntil: string | null;
             /** Format: date-time */
             createdAt: string;
@@ -5865,9 +5970,13 @@ export interface components {
             };
             count: number;
             read: boolean;
+            /** @default normal */
             priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
             box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
             inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
             resolution: {
                 outcome: components["schemas"]["NotificationResolution"];
                 by: {
@@ -5878,7 +5987,10 @@ export interface components {
                 /** Format: date-time */
                 at: string;
             } | null;
-            /** Format: date-time */
+            /**
+             * Format: date-time
+             * @default null
+             */
             snoozedUntil: string | null;
             /** Format: date-time */
             createdAt: string;
@@ -5911,9 +6023,13 @@ export interface components {
             };
             count: number;
             read: boolean;
+            /** @default normal */
             priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
             box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
             inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
             resolution: {
                 outcome: components["schemas"]["NotificationResolution"];
                 by: {
@@ -5924,7 +6040,10 @@ export interface components {
                 /** Format: date-time */
                 at: string;
             } | null;
-            /** Format: date-time */
+            /**
+             * Format: date-time
+             * @default null
+             */
             snoozedUntil: string | null;
             /** Format: date-time */
             createdAt: string;
@@ -5955,9 +6074,13 @@ export interface components {
             };
             count: number;
             read: boolean;
+            /** @default normal */
             priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
             box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
             inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
             resolution: {
                 outcome: components["schemas"]["NotificationResolution"];
                 by: {
@@ -5968,7 +6091,10 @@ export interface components {
                 /** Format: date-time */
                 at: string;
             } | null;
-            /** Format: date-time */
+            /**
+             * Format: date-time
+             * @default null
+             */
             snoozedUntil: string | null;
             /** Format: date-time */
             createdAt: string;
@@ -6001,9 +6127,13 @@ export interface components {
             };
             count: number;
             read: boolean;
+            /** @default normal */
             priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
             box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
             inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
             resolution: {
                 outcome: components["schemas"]["NotificationResolution"];
                 by: {
@@ -6014,7 +6144,10 @@ export interface components {
                 /** Format: date-time */
                 at: string;
             } | null;
-            /** Format: date-time */
+            /**
+             * Format: date-time
+             * @default null
+             */
             snoozedUntil: string | null;
             /** Format: date-time */
             createdAt: string;
@@ -6048,9 +6181,13 @@ export interface components {
             };
             count: number;
             read: boolean;
+            /** @default normal */
             priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
             box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
             inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
             resolution: {
                 outcome: components["schemas"]["NotificationResolution"];
                 by: {
@@ -6061,7 +6198,10 @@ export interface components {
                 /** Format: date-time */
                 at: string;
             } | null;
-            /** Format: date-time */
+            /**
+             * Format: date-time
+             * @default null
+             */
             snoozedUntil: string | null;
             /** Format: date-time */
             createdAt: string;
@@ -6093,9 +6233,13 @@ export interface components {
             };
             count: number;
             read: boolean;
+            /** @default normal */
             priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
             box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
             inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
             resolution: {
                 outcome: components["schemas"]["NotificationResolution"];
                 by: {
@@ -6106,7 +6250,10 @@ export interface components {
                 /** Format: date-time */
                 at: string;
             } | null;
-            /** Format: date-time */
+            /**
+             * Format: date-time
+             * @default null
+             */
             snoozedUntil: string | null;
             /** Format: date-time */
             createdAt: string;
@@ -6138,9 +6285,13 @@ export interface components {
             };
             count: number;
             read: boolean;
+            /** @default normal */
             priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
             box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
             inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
             resolution: {
                 outcome: components["schemas"]["NotificationResolution"];
                 by: {
@@ -6151,7 +6302,10 @@ export interface components {
                 /** Format: date-time */
                 at: string;
             } | null;
-            /** Format: date-time */
+            /**
+             * Format: date-time
+             * @default null
+             */
             snoozedUntil: string | null;
             /** Format: date-time */
             createdAt: string;
@@ -6183,9 +6337,13 @@ export interface components {
             };
             count: number;
             read: boolean;
+            /** @default normal */
             priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
             box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
             inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
             resolution: {
                 outcome: components["schemas"]["NotificationResolution"];
                 by: {
@@ -6196,7 +6354,10 @@ export interface components {
                 /** Format: date-time */
                 at: string;
             } | null;
-            /** Format: date-time */
+            /**
+             * Format: date-time
+             * @default null
+             */
             snoozedUntil: string | null;
             /** Format: date-time */
             createdAt: string;
@@ -6228,9 +6389,13 @@ export interface components {
             };
             count: number;
             read: boolean;
+            /** @default normal */
             priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
             box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
             inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
             resolution: {
                 outcome: components["schemas"]["NotificationResolution"];
                 by: {
@@ -6241,7 +6406,10 @@ export interface components {
                 /** Format: date-time */
                 at: string;
             } | null;
-            /** Format: date-time */
+            /**
+             * Format: date-time
+             * @default null
+             */
             snoozedUntil: string | null;
             /** Format: date-time */
             createdAt: string;
@@ -6275,9 +6443,13 @@ export interface components {
             };
             count: number;
             read: boolean;
+            /** @default normal */
             priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
             box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
             inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
             resolution: {
                 outcome: components["schemas"]["NotificationResolution"];
                 by: {
@@ -6288,7 +6460,10 @@ export interface components {
                 /** Format: date-time */
                 at: string;
             } | null;
-            /** Format: date-time */
+            /**
+             * Format: date-time
+             * @default null
+             */
             snoozedUntil: string | null;
             /** Format: date-time */
             createdAt: string;
@@ -6321,9 +6496,13 @@ export interface components {
             };
             count: number;
             read: boolean;
+            /** @default normal */
             priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
             box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
             inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
             resolution: {
                 outcome: components["schemas"]["NotificationResolution"];
                 by: {
@@ -6334,7 +6513,10 @@ export interface components {
                 /** Format: date-time */
                 at: string;
             } | null;
-            /** Format: date-time */
+            /**
+             * Format: date-time
+             * @default null
+             */
             snoozedUntil: string | null;
             /** Format: date-time */
             createdAt: string;
@@ -6369,9 +6551,13 @@ export interface components {
             };
             count: number;
             read: boolean;
+            /** @default normal */
             priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
             box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
             inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
             resolution: {
                 outcome: components["schemas"]["NotificationResolution"];
                 by: {
@@ -6382,7 +6568,10 @@ export interface components {
                 /** Format: date-time */
                 at: string;
             } | null;
-            /** Format: date-time */
+            /**
+             * Format: date-time
+             * @default null
+             */
             snoozedUntil: string | null;
             /** Format: date-time */
             createdAt: string;
@@ -6416,9 +6605,13 @@ export interface components {
             };
             count: number;
             read: boolean;
+            /** @default normal */
             priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
             box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
             inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
             resolution: {
                 outcome: components["schemas"]["NotificationResolution"];
                 by: {
@@ -6429,7 +6622,10 @@ export interface components {
                 /** Format: date-time */
                 at: string;
             } | null;
-            /** Format: date-time */
+            /**
+             * Format: date-time
+             * @default null
+             */
             snoozedUntil: string | null;
             /** Format: date-time */
             createdAt: string;
@@ -6465,9 +6661,13 @@ export interface components {
             };
             count: number;
             read: boolean;
+            /** @default normal */
             priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
             box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
             inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
             resolution: {
                 outcome: components["schemas"]["NotificationResolution"];
                 by: {
@@ -6478,7 +6678,10 @@ export interface components {
                 /** Format: date-time */
                 at: string;
             } | null;
-            /** Format: date-time */
+            /**
+             * Format: date-time
+             * @default null
+             */
             snoozedUntil: string | null;
             /** Format: date-time */
             createdAt: string;
@@ -6513,9 +6716,13 @@ export interface components {
             };
             count: number;
             read: boolean;
+            /** @default normal */
             priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
             box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
             inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
             resolution: {
                 outcome: components["schemas"]["NotificationResolution"];
                 by: {
@@ -6526,7 +6733,10 @@ export interface components {
                 /** Format: date-time */
                 at: string;
             } | null;
-            /** Format: date-time */
+            /**
+             * Format: date-time
+             * @default null
+             */
             snoozedUntil: string | null;
             /** Format: date-time */
             createdAt: string;
@@ -6559,9 +6769,13 @@ export interface components {
             };
             count: number;
             read: boolean;
+            /** @default normal */
             priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
             box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
             inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
             resolution: {
                 outcome: components["schemas"]["NotificationResolution"];
                 by: {
@@ -6572,7 +6786,10 @@ export interface components {
                 /** Format: date-time */
                 at: string;
             } | null;
-            /** Format: date-time */
+            /**
+             * Format: date-time
+             * @default null
+             */
             snoozedUntil: string | null;
             /** Format: date-time */
             createdAt: string;
@@ -6607,9 +6824,13 @@ export interface components {
             };
             count: number;
             read: boolean;
+            /** @default normal */
             priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
             box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
             inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
             resolution: {
                 outcome: components["schemas"]["NotificationResolution"];
                 by: {
@@ -6620,7 +6841,10 @@ export interface components {
                 /** Format: date-time */
                 at: string;
             } | null;
-            /** Format: date-time */
+            /**
+             * Format: date-time
+             * @default null
+             */
             snoozedUntil: string | null;
             /** Format: date-time */
             createdAt: string;
@@ -6654,9 +6878,13 @@ export interface components {
             };
             count: number;
             read: boolean;
+            /** @default normal */
             priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
             box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
             inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
             resolution: {
                 outcome: components["schemas"]["NotificationResolution"];
                 by: {
@@ -6667,7 +6895,10 @@ export interface components {
                 /** Format: date-time */
                 at: string;
             } | null;
-            /** Format: date-time */
+            /**
+             * Format: date-time
+             * @default null
+             */
             snoozedUntil: string | null;
             /** Format: date-time */
             createdAt: string;
@@ -6701,9 +6932,13 @@ export interface components {
             };
             count: number;
             read: boolean;
+            /** @default normal */
             priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
             box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
             inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
             resolution: {
                 outcome: components["schemas"]["NotificationResolution"];
                 by: {
@@ -6714,7 +6949,10 @@ export interface components {
                 /** Format: date-time */
                 at: string;
             } | null;
-            /** Format: date-time */
+            /**
+             * Format: date-time
+             * @default null
+             */
             snoozedUntil: string | null;
             /** Format: date-time */
             createdAt: string;
@@ -6748,9 +6986,13 @@ export interface components {
             };
             count: number;
             read: boolean;
+            /** @default normal */
             priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
             box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
             inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
             resolution: {
                 outcome: components["schemas"]["NotificationResolution"];
                 by: {
@@ -6761,7 +7003,10 @@ export interface components {
                 /** Format: date-time */
                 at: string;
             } | null;
-            /** Format: date-time */
+            /**
+             * Format: date-time
+             * @default null
+             */
             snoozedUntil: string | null;
             /** Format: date-time */
             createdAt: string;
@@ -6796,9 +7041,13 @@ export interface components {
             };
             count: number;
             read: boolean;
+            /** @default normal */
             priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
             box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
             inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
             resolution: {
                 outcome: components["schemas"]["NotificationResolution"];
                 by: {
@@ -6809,7 +7058,10 @@ export interface components {
                 /** Format: date-time */
                 at: string;
             } | null;
-            /** Format: date-time */
+            /**
+             * Format: date-time
+             * @default null
+             */
             snoozedUntil: string | null;
             /** Format: date-time */
             createdAt: string;
@@ -6843,9 +7095,13 @@ export interface components {
             };
             count: number;
             read: boolean;
+            /** @default normal */
             priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
             box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
             inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
             resolution: {
                 outcome: components["schemas"]["NotificationResolution"];
                 by: {
@@ -6856,7 +7112,10 @@ export interface components {
                 /** Format: date-time */
                 at: string;
             } | null;
-            /** Format: date-time */
+            /**
+             * Format: date-time
+             * @default null
+             */
             snoozedUntil: string | null;
             /** Format: date-time */
             createdAt: string;
@@ -6888,9 +7147,13 @@ export interface components {
             };
             count: number;
             read: boolean;
+            /** @default normal */
             priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
             box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
             inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
             resolution: {
                 outcome: components["schemas"]["NotificationResolution"];
                 by: {
@@ -6901,7 +7164,10 @@ export interface components {
                 /** Format: date-time */
                 at: string;
             } | null;
-            /** Format: date-time */
+            /**
+             * Format: date-time
+             * @default null
+             */
             snoozedUntil: string | null;
             /** Format: date-time */
             createdAt: string;
@@ -6933,9 +7199,13 @@ export interface components {
             };
             count: number;
             read: boolean;
+            /** @default normal */
             priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
             box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
             inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
             resolution: {
                 outcome: components["schemas"]["NotificationResolution"];
                 by: {
@@ -6946,7 +7216,10 @@ export interface components {
                 /** Format: date-time */
                 at: string;
             } | null;
-            /** Format: date-time */
+            /**
+             * Format: date-time
+             * @default null
+             */
             snoozedUntil: string | null;
             /** Format: date-time */
             createdAt: string;
@@ -6980,9 +7253,13 @@ export interface components {
             };
             count: number;
             read: boolean;
+            /** @default normal */
             priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
             box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
             inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
             resolution: {
                 outcome: components["schemas"]["NotificationResolution"];
                 by: {
@@ -6993,7 +7270,10 @@ export interface components {
                 /** Format: date-time */
                 at: string;
             } | null;
-            /** Format: date-time */
+            /**
+             * Format: date-time
+             * @default null
+             */
             snoozedUntil: string | null;
             /** Format: date-time */
             createdAt: string;
@@ -7027,9 +7307,13 @@ export interface components {
             };
             count: number;
             read: boolean;
+            /** @default normal */
             priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
             box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
             inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
             resolution: {
                 outcome: components["schemas"]["NotificationResolution"];
                 by: {
@@ -7040,7 +7324,10 @@ export interface components {
                 /** Format: date-time */
                 at: string;
             } | null;
-            /** Format: date-time */
+            /**
+             * Format: date-time
+             * @default null
+             */
             snoozedUntil: string | null;
             /** Format: date-time */
             createdAt: string;
@@ -7073,9 +7360,13 @@ export interface components {
             };
             count: number;
             read: boolean;
+            /** @default normal */
             priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
             box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
             inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
             resolution: {
                 outcome: components["schemas"]["NotificationResolution"];
                 by: {
@@ -7086,7 +7377,10 @@ export interface components {
                 /** Format: date-time */
                 at: string;
             } | null;
-            /** Format: date-time */
+            /**
+             * Format: date-time
+             * @default null
+             */
             snoozedUntil: string | null;
             /** Format: date-time */
             createdAt: string;
@@ -7112,9 +7406,13 @@ export interface components {
             };
             count: number;
             read: boolean;
+            /** @default normal */
             priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
             box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
             inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
             resolution: {
                 outcome: components["schemas"]["NotificationResolution"];
                 by: {
@@ -7125,7 +7423,10 @@ export interface components {
                 /** Format: date-time */
                 at: string;
             } | null;
-            /** Format: date-time */
+            /**
+             * Format: date-time
+             * @default null
+             */
             snoozedUntil: string | null;
             /** Format: date-time */
             createdAt: string;
@@ -7152,9 +7453,13 @@ export interface components {
             };
             count: number;
             read: boolean;
+            /** @default normal */
             priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
             box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
             inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
             resolution: {
                 outcome: components["schemas"]["NotificationResolution"];
                 by: {
@@ -7165,7 +7470,10 @@ export interface components {
                 /** Format: date-time */
                 at: string;
             } | null;
-            /** Format: date-time */
+            /**
+             * Format: date-time
+             * @default null
+             */
             snoozedUntil: string | null;
             /** Format: date-time */
             createdAt: string;
@@ -7196,9 +7504,13 @@ export interface components {
             };
             count: number;
             read: boolean;
+            /** @default normal */
             priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
             box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
             inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
             resolution: {
                 outcome: components["schemas"]["NotificationResolution"];
                 by: {
@@ -7209,7 +7521,10 @@ export interface components {
                 /** Format: date-time */
                 at: string;
             } | null;
-            /** Format: date-time */
+            /**
+             * Format: date-time
+             * @default null
+             */
             snoozedUntil: string | null;
             /** Format: date-time */
             createdAt: string;
@@ -7247,9 +7562,13 @@ export interface components {
             };
             count: number;
             read: boolean;
+            /** @default normal */
             priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
             box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
             inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
             resolution: {
                 outcome: components["schemas"]["NotificationResolution"];
                 by: {
@@ -7260,7 +7579,10 @@ export interface components {
                 /** Format: date-time */
                 at: string;
             } | null;
-            /** Format: date-time */
+            /**
+             * Format: date-time
+             * @default null
+             */
             snoozedUntil: string | null;
             /** Format: date-time */
             createdAt: string;
@@ -7296,9 +7618,13 @@ export interface components {
             };
             count: number;
             read: boolean;
+            /** @default normal */
             priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
             box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
             inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
             resolution: {
                 outcome: components["schemas"]["NotificationResolution"];
                 by: {
@@ -7309,7 +7635,10 @@ export interface components {
                 /** Format: date-time */
                 at: string;
             } | null;
-            /** Format: date-time */
+            /**
+             * Format: date-time
+             * @default null
+             */
             snoozedUntil: string | null;
             /** Format: date-time */
             createdAt: string;
@@ -7344,9 +7673,13 @@ export interface components {
             };
             count: number;
             read: boolean;
+            /** @default normal */
             priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
             box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
             inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
             resolution: {
                 outcome: components["schemas"]["NotificationResolution"];
                 by: {
@@ -7357,7 +7690,10 @@ export interface components {
                 /** Format: date-time */
                 at: string;
             } | null;
-            /** Format: date-time */
+            /**
+             * Format: date-time
+             * @default null
+             */
             snoozedUntil: string | null;
             /** Format: date-time */
             createdAt: string;
@@ -7388,9 +7724,13 @@ export interface components {
             };
             count: number;
             read: boolean;
+            /** @default normal */
             priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
             box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
             inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
             resolution: {
                 outcome: components["schemas"]["NotificationResolution"];
                 by: {
@@ -7401,7 +7741,10 @@ export interface components {
                 /** Format: date-time */
                 at: string;
             } | null;
-            /** Format: date-time */
+            /**
+             * Format: date-time
+             * @default null
+             */
             snoozedUntil: string | null;
             /** Format: date-time */
             createdAt: string;
@@ -7430,9 +7773,13 @@ export interface components {
             };
             count: number;
             read: boolean;
+            /** @default normal */
             priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
             box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
             inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
             resolution: {
                 outcome: components["schemas"]["NotificationResolution"];
                 by: {
@@ -7443,7 +7790,10 @@ export interface components {
                 /** Format: date-time */
                 at: string;
             } | null;
-            /** Format: date-time */
+            /**
+             * Format: date-time
+             * @default null
+             */
             snoozedUntil: string | null;
             /** Format: date-time */
             createdAt: string;
@@ -7473,9 +7823,13 @@ export interface components {
             };
             count: number;
             read: boolean;
+            /** @default normal */
             priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
             box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
             inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
             resolution: {
                 outcome: components["schemas"]["NotificationResolution"];
                 by: {
@@ -7486,7 +7840,10 @@ export interface components {
                 /** Format: date-time */
                 at: string;
             } | null;
-            /** Format: date-time */
+            /**
+             * Format: date-time
+             * @default null
+             */
             snoozedUntil: string | null;
             /** Format: date-time */
             createdAt: string;
@@ -7519,9 +7876,13 @@ export interface components {
             };
             count: number;
             read: boolean;
+            /** @default normal */
             priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
             box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
             inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
             resolution: {
                 outcome: components["schemas"]["NotificationResolution"];
                 by: {
@@ -7532,7 +7893,10 @@ export interface components {
                 /** Format: date-time */
                 at: string;
             } | null;
-            /** Format: date-time */
+            /**
+             * Format: date-time
+             * @default null
+             */
             snoozedUntil: string | null;
             /** Format: date-time */
             createdAt: string;
@@ -7564,9 +7928,13 @@ export interface components {
             };
             count: number;
             read: boolean;
+            /** @default normal */
             priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
             box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
             inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
             resolution: {
                 outcome: components["schemas"]["NotificationResolution"];
                 by: {
@@ -7577,7 +7945,10 @@ export interface components {
                 /** Format: date-time */
                 at: string;
             } | null;
-            /** Format: date-time */
+            /**
+             * Format: date-time
+             * @default null
+             */
             snoozedUntil: string | null;
             /** Format: date-time */
             createdAt: string;
@@ -7607,9 +7978,13 @@ export interface components {
             };
             count: number;
             read: boolean;
+            /** @default normal */
             priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
             box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
             inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
             resolution: {
                 outcome: components["schemas"]["NotificationResolution"];
                 by: {
@@ -7620,7 +7995,10 @@ export interface components {
                 /** Format: date-time */
                 at: string;
             } | null;
-            /** Format: date-time */
+            /**
+             * Format: date-time
+             * @default null
+             */
             snoozedUntil: string | null;
             /** Format: date-time */
             createdAt: string;
@@ -7649,9 +8027,13 @@ export interface components {
             };
             count: number;
             read: boolean;
+            /** @default normal */
             priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
             box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
             inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
             resolution: {
                 outcome: components["schemas"]["NotificationResolution"];
                 by: {
@@ -7662,7 +8044,10 @@ export interface components {
                 /** Format: date-time */
                 at: string;
             } | null;
-            /** Format: date-time */
+            /**
+             * Format: date-time
+             * @default null
+             */
             snoozedUntil: string | null;
             /** Format: date-time */
             createdAt: string;
@@ -7690,9 +8075,13 @@ export interface components {
             };
             count: number;
             read: boolean;
+            /** @default normal */
             priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
             box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
             inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
             resolution: {
                 outcome: components["schemas"]["NotificationResolution"];
                 by: {
@@ -7703,7 +8092,10 @@ export interface components {
                 /** Format: date-time */
                 at: string;
             } | null;
-            /** Format: date-time */
+            /**
+             * Format: date-time
+             * @default null
+             */
             snoozedUntil: string | null;
             /** Format: date-time */
             createdAt: string;
@@ -7732,9 +8124,13 @@ export interface components {
             };
             count: number;
             read: boolean;
+            /** @default normal */
             priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
             box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
             inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
             resolution: {
                 outcome: components["schemas"]["NotificationResolution"];
                 by: {
@@ -7745,7 +8141,10 @@ export interface components {
                 /** Format: date-time */
                 at: string;
             } | null;
-            /** Format: date-time */
+            /**
+             * Format: date-time
+             * @default null
+             */
             snoozedUntil: string | null;
             /** Format: date-time */
             createdAt: string;
@@ -7771,9 +8170,13 @@ export interface components {
             };
             count: number;
             read: boolean;
+            /** @default normal */
             priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
             box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
             inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
             resolution: {
                 outcome: components["schemas"]["NotificationResolution"];
                 by: {
@@ -7784,7 +8187,10 @@ export interface components {
                 /** Format: date-time */
                 at: string;
             } | null;
-            /** Format: date-time */
+            /**
+             * Format: date-time
+             * @default null
+             */
             snoozedUntil: string | null;
             /** Format: date-time */
             createdAt: string;
@@ -7811,9 +8217,13 @@ export interface components {
             };
             count: number;
             read: boolean;
+            /** @default normal */
             priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
             box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
             inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
             resolution: {
                 outcome: components["schemas"]["NotificationResolution"];
                 by: {
@@ -7824,7 +8234,10 @@ export interface components {
                 /** Format: date-time */
                 at: string;
             } | null;
-            /** Format: date-time */
+            /**
+             * Format: date-time
+             * @default null
+             */
             snoozedUntil: string | null;
             /** Format: date-time */
             createdAt: string;
@@ -7853,9 +8266,13 @@ export interface components {
             };
             count: number;
             read: boolean;
+            /** @default normal */
             priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
             box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
             inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
             resolution: {
                 outcome: components["schemas"]["NotificationResolution"];
                 by: {
@@ -7866,7 +8283,10 @@ export interface components {
                 /** Format: date-time */
                 at: string;
             } | null;
-            /** Format: date-time */
+            /**
+             * Format: date-time
+             * @default null
+             */
             snoozedUntil: string | null;
             /** Format: date-time */
             createdAt: string;
@@ -7894,9 +8314,13 @@ export interface components {
             };
             count: number;
             read: boolean;
+            /** @default normal */
             priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
             box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
             inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
             resolution: {
                 outcome: components["schemas"]["NotificationResolution"];
                 by: {
@@ -7907,7 +8331,10 @@ export interface components {
                 /** Format: date-time */
                 at: string;
             } | null;
-            /** Format: date-time */
+            /**
+             * Format: date-time
+             * @default null
+             */
             snoozedUntil: string | null;
             /** Format: date-time */
             createdAt: string;
@@ -7933,9 +8360,13 @@ export interface components {
             };
             count: number;
             read: boolean;
+            /** @default normal */
             priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
             box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
             inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
             resolution: {
                 outcome: components["schemas"]["NotificationResolution"];
                 by: {
@@ -7946,7 +8377,10 @@ export interface components {
                 /** Format: date-time */
                 at: string;
             } | null;
-            /** Format: date-time */
+            /**
+             * Format: date-time
+             * @default null
+             */
             snoozedUntil: string | null;
             /** Format: date-time */
             createdAt: string;
@@ -7978,9 +8412,13 @@ export interface components {
             };
             count: number;
             read: boolean;
+            /** @default normal */
             priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
             box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
             inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
             resolution: {
                 outcome: components["schemas"]["NotificationResolution"];
                 by: {
@@ -7991,7 +8429,10 @@ export interface components {
                 /** Format: date-time */
                 at: string;
             } | null;
-            /** Format: date-time */
+            /**
+             * Format: date-time
+             * @default null
+             */
             snoozedUntil: string | null;
             /** Format: date-time */
             createdAt: string;
@@ -8023,9 +8464,13 @@ export interface components {
             };
             count: number;
             read: boolean;
+            /** @default normal */
             priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
             box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
             inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
             resolution: {
                 outcome: components["schemas"]["NotificationResolution"];
                 by: {
@@ -8036,7 +8481,10 @@ export interface components {
                 /** Format: date-time */
                 at: string;
             } | null;
-            /** Format: date-time */
+            /**
+             * Format: date-time
+             * @default null
+             */
             snoozedUntil: string | null;
             /** Format: date-time */
             createdAt: string;

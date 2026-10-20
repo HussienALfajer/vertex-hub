@@ -1063,11 +1063,15 @@ const notificationBaseSchema = z.object({
   /** Merged `task_commented`, `task_file_added` and `approval_responded` notifications count their items (rule 5); otherwise 1. */
   count: z.number().int().min(1),
   read: z.boolean(),
-  /** F16: the priority the notification was sent with; critical rows sort first (rule B6). */
-  priority: notificationPrioritySchema,
-  box: notificationBoxSchema,
+  /*
+   * F16: the defaults only cover notifications rendered before F16 into queued email jobs, which
+   * the worker still sends after the deploy; the API always sets them.
+   */
+  /** The priority the notification was sent with; critical rows sort first (rule B6). */
+  priority: notificationPrioritySchema.default('normal'),
+  box: notificationBoxSchema.default('info'),
   /** Rule B6: the list it shows in, for its recipient. */
-  inbox: notificationInboxSchema,
+  inbox: notificationInboxSchema.default('fyi'),
   /** Rule B5: how and by whom it was closed; `by` is null for automatic resolution. */
   resolution: z
     .object({
@@ -1075,9 +1079,10 @@ const notificationBaseSchema = z.object({
       by: z.object({ id: z.uuid(), name: z.string() }).nullable(),
       at: z.iso.datetime(),
     })
-    .nullable(),
+    .nullable()
+    .default(null),
   /** Rule B8: when a snoozed notification wakes. */
-  snoozedUntil: z.iso.datetime().nullable(),
+  snoozedUntil: z.iso.datetime().nullable().default(null),
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
 });
