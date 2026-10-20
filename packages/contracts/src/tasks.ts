@@ -24,7 +24,12 @@ import {
 import { NOTIFICATION_EXCERPT_MAX } from './notifications.js';
 import { deliverableKindSchema } from './retainers.js';
 import { httpUrlSchema, optionalText } from './text.js';
-import { WORKFLOW_STATUSES } from './workflow.js';
+import {
+  revisionDecisionSchema,
+  TASK_STATUSES,
+  type TaskStatus,
+  taskStatusSchema,
+} from './workflow.js';
 
 /*
  * The task engine (spec F06, ADR 0016): one workflow for every department, requests between
@@ -38,12 +43,15 @@ export const taskTypeSchema = z.enum(TASK_TYPES).meta({ id: 'TaskType' });
 
 export type TaskType = z.infer<typeof taskTypeSchema>;
 
-/** The unified workflow plus `cancelled`. */
-export const TASK_STATUSES = [...WORKFLOW_STATUSES, 'cancelled'] as const;
-
-export const taskStatusSchema = z.enum(TASK_STATUSES).meta({ id: 'TaskStatus' });
-
-export type TaskStatus = z.infer<typeof taskStatusSchema>;
+// The statuses and revision decisions live in `workflow.ts`: notification snapshots name them.
+export {
+  REVISION_DECISIONS,
+  type RevisionDecision,
+  revisionDecisionSchema,
+  TASK_STATUSES,
+  type TaskStatus,
+  taskStatusSchema,
+} from './workflow.js';
 
 /** "Open": any status except delivered and cancelled. */
 export const OPEN_TASK_STATUSES = [
@@ -82,12 +90,6 @@ export const REVISION_SOURCES = ['internal', 'client', 'medical'] as const;
 export const revisionSourceSchema = z.enum(REVISION_SOURCES).meta({ id: 'RevisionSource' });
 
 export type RevisionSource = z.infer<typeof revisionSourceSchema>;
-
-export const REVISION_DECISIONS = ['free', 'extra_work'] as const;
-
-export const revisionDecisionSchema = z.enum(REVISION_DECISIONS).meta({ id: 'RevisionDecision' });
-
-export type RevisionDecision = z.infer<typeof revisionDecisionSchema>;
 
 /** The stages of `internal_review` (F09, ADR 0020): `medical` only for healthcare clients. */
 export const REVIEW_STAGES = ['internal', 'medical'] as const;

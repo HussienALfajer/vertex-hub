@@ -363,7 +363,7 @@ export class PostApprovals {
         ...(note && { note }),
       },
     });
-    await this.notices.send(tx, [
+    await this.notices.sendChange(tx, post, null, [
       this.notices.notice(
         post,
         approved ? 'post_approved' : 'post_returned',

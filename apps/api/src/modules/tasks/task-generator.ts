@@ -13,6 +13,7 @@ import { DATABASE } from '../../core/database/database.module.js';
 import { type AuditActor, recordAudit } from '../audit/index.js';
 import type { CurrentUserInfo } from '../auth/index.js';
 import { ClientDirectory } from '../clients/index.js';
+import { RecordFollowers } from '../notifications/index.js';
 import { EngagementDirectory } from '../projects/index.js';
 import { readableTask } from './task-access.js';
 
@@ -48,6 +49,7 @@ export class TaskGenerator {
     @Inject(DATABASE) private readonly db: Database,
     private readonly clients: ClientDirectory,
     private readonly engagements: EngagementDirectory,
+    private readonly followers: RecordFollowers,
   ) {}
 
   /** 404 unless the actor may read the task (F06, rule 17 for read-only tasks). */
@@ -120,6 +122,11 @@ export class TaskGenerator {
           ...(draft.checklist.length > 0 && { checklist: draft.checklist }),
         },
       });
+      // F16 rule B12: the creator and the assignee follow the task.
+      await this.followers.follow(tx, { type: 'task', id: idOf(draft.key) }, [
+        actor?.id ?? null,
+        draft.assigneeId ?? null,
+      ]);
     }
     return ids;
   }

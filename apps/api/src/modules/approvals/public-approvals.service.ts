@@ -12,7 +12,7 @@ import {
   type PublicResponse,
 } from '@vertex-hub/contracts';
 import { approvalItems, approvalRequests, type Database, type Transaction } from '@vertex-hub/db';
-import { and, asc, eq, inArray, isNotNull, ne } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNotNull, isNull, ne } from 'drizzle-orm';
 import { DATABASE } from '../../core/database/database.module.js';
 import { CodedException } from '../../core/errors/index.js';
 import { UserDirectory } from '../auth/index.js';
@@ -85,6 +85,7 @@ export class PublicApprovalsService {
 
   async page(token: string): Promise<PublicApproval> {
     const { request, client, contact } = await this.open(this.db, token);
+    await this.markOpened(request);
     const [items, people] = await Promise.all([
       this.db
         .select()
@@ -273,7 +274,7 @@ export class PublicApprovalsService {
     } else {
       throw new Error(`Approval item ${item.id} sends neither a task nor a post`);
     }
-    await closeItem(
+    const { completed } = await closeItem(
       tx,
       item,
       { decision, responseId: response.id, via: 'approval_link' },
@@ -281,6 +282,23 @@ export class PublicApprovalsService {
       contact.name,
     );
     await this.notices.send(tx, request, { type: 'approval_responded', decision });
+    await this.notices.itemClosed(tx, request.id, { answered: true, completed, actorId: null });
+  }
+
+  /**
+   * F16 part C rule 2: the first load of the current link sets `first_opened_at` and tells the
+   * account manager and the creator. Nothing else about the client is recorded.
+   */
+  private async markOpened(request: RequestRow): Promise<void> {
+    if (request.firstOpenedAt) return;
+    await this.db.transaction(async (tx) => {
+      const [first] = await tx
+        .update(approvalRequests)
+        .set({ firstOpenedAt: new Date() })
+        .where(and(eq(approvalRequests.id, request.id), isNull(approvalRequests.firstOpenedAt)))
+        .returning({ id: approvalRequests.id });
+      if (first) await this.notices.send(tx, request, { type: 'approval_opened' });
+    });
   }
 
   /**

@@ -1,19 +1,22 @@
 import { Inject, Injectable, Logger, type OnModuleInit } from '@nestjs/common';
 import {
+  businessDate,
+  businessInstant,
   type CalendarDate,
   isWorkDay,
   type NotificationReminderKind,
   nextWorkDay,
+  timedReminderWindow,
 } from '@vertex-hub/contracts';
 import { contentPosts, type Database } from '@vertex-hub/db';
-import { and, asc, eq, gte, inArray, lt, type SQL } from 'drizzle-orm';
+import { and, asc, between, eq, gte, inArray, isNotNull, lt, type SQL } from 'drizzle-orm';
 import { DATABASE } from '../../core/database/database.module.js';
 import { runEach } from '../../core/jobs/index.js';
 import { ClientDirectory } from '../clients/index.js';
-import { DailyReminders, type Notice } from '../notifications/index.js';
+import { DailyReminders, type Notice, TimedNotifications } from '../notifications/index.js';
 import { ContentService } from './content.service.js';
 import type { PostAccess } from './post-access.js';
-import { PostNotices } from './post-notices.js';
+import { PostNotices, toTimeOfDay } from './post-notices.js';
 
 /**
  * The post reminders of the `notifications.daily` job (spec F08, "Jobs"): the publish day, and a
@@ -30,10 +33,58 @@ export class PostReminders implements OnModuleInit {
     private readonly content: ContentService,
     private readonly notices: PostNotices,
     private readonly reminders: DailyReminders,
+    private readonly timed: TimedNotifications,
   ) {}
 
   onModuleInit(): void {
     this.reminders.register('content', (today) => this.remind(today));
+    this.timed.register('content', (now) => this.publishShortly(now));
+  }
+
+  /**
+   * F16 rule B13: `post_publish_shortly` two hours before the publish time of an approved or
+   * scheduled post, once per post and publish time; work days do not apply.
+   */
+  async publishShortly(now: Date): Promise<number> {
+    const { from, to } = timedReminderWindow('post_publish_shortly', now);
+    const filters = [
+      isNotNull(contentPosts.publishTime),
+      between(contentPosts.publishDate, businessDate(from), businessDate(to)),
+    ];
+    const candidates = await this.db
+      .select({ id: contentPosts.id })
+      .from(contentPosts)
+      .where(this.eligible(filters))
+      .orderBy(asc(contentPosts.id));
+    let sent = 0;
+    await runEach(
+      candidates,
+      this.logger,
+      ({ id }) => `Post publish-shortly reminder ${id}`,
+      async ({ id }) => {
+        const recorded = await this.db.transaction(async (tx) => {
+          const [row] = await tx
+            .select()
+            .from(contentPosts)
+            .where(and(eq(contentPosts.id, id), this.eligible(filters)))
+            .for('update', { of: contentPosts });
+          const client = row && (await this.clients.summary(row.clientId, tx));
+          const time = row && toTimeOfDay(row.publishTime);
+          if (!row || !client || !time) return false;
+          const occursAt = businessInstant(row.publishDate, time);
+          // The moment is in the window: not passed (edge case 15), not yet two hours away.
+          if (occursAt <= from || occursAt > to) return false;
+          const post = { ...row, client };
+          return this.timed.remindOnce(
+            tx,
+            { kind: 'post_publish_shortly', subjectId: id, occursAt },
+            this.notices.notice(post, 'post_publish_shortly', [post.responsibleId], null),
+          );
+        });
+        if (recorded) sent += 1;
+      },
+    );
+    return sent;
   }
 
   async remind(today: CalendarDate): Promise<number> {

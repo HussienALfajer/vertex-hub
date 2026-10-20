@@ -48,6 +48,12 @@ import { TimedNotifications } from './timed-notifications.js';
     TimedNotifications,
     { provide: STREAM_TIMING, useValue: DEFAULT_STREAM_TIMING },
   ],
-  exports: [NotificationCenter, DailyReminders, NotificationEmails, RecordFollowers],
+  exports: [
+    NotificationCenter,
+    DailyReminders,
+    NotificationEmails,
+    RecordFollowers,
+    TimedNotifications,
+  ],
 })
 export class NotificationsModule {}

@@ -480,7 +480,8 @@ describe('posts in approval requests (F08 rules 20–27)', () => {
       });
       expect(await cast.typesOf(cast.writer.id, changed.id)).toContain('post_returned');
 
-      // The request is complete, and its two answers reached the account manager as one notice.
+      // The request is complete, and its two answers reached the account manager as one notice,
+      // followed by the completed request (F16 part C).
       expect((await requestDetail(request.id)).state).toBe('completed');
       const notices = await db
         .select()
@@ -488,7 +489,14 @@ describe('posts in approval requests (F08 rules 20–27)', () => {
         .where(
           and(eq(notifications.recipientId, cast.am.id), eq(notifications.subjectId, request.id)),
         );
-      expect(notices).toMatchObject([{ type: 'approval_responded', count: 2 }]);
+      expect(
+        notices
+          .map(({ type, count }) => ({ type, count }))
+          .sort((a, b) => a.type.localeCompare(b.type)),
+      ).toEqual([
+        { type: 'approval_completed', count: 1 },
+        { type: 'approval_responded', count: 2 },
+      ]);
 
       // The client's history lists the answers on posts beside those on tasks.
       const history = await client.get(`/api/clients/${clientId}/approvals`, cast.am.cookie);

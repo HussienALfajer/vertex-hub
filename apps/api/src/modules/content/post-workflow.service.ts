@@ -237,8 +237,10 @@ export class PostWorkflowService implements OnModuleInit {
       // Rule 18: publishing delivers the linked tasks, so the unit counts now.
       if (move === 'publish') await this.tasks.deliver(tx, id, reviewer);
       // Rule 19: a cancelled post gives its tasks back for another post.
+      const unlinkedAssignees: (string | null)[] = [];
       if (move === 'cancel') {
         for (const task of await this.tasks.unlinkAll(tx, id, reviewer)) {
+          unlinkedAssignees.push(task.assigneeId);
           await recordAudit(tx, {
             actor: reviewer,
             action: 'post.task_unlinked',
@@ -253,11 +255,36 @@ export class PostWorkflowService implements OnModuleInit {
       if (post.status === 'awaiting_client') {
         await this.reviewHooks.left(tx, { postId: id, actor: reviewer, response });
       }
-      await this.notices.send(
+      await this.notices.sendChange(
         tx,
+        post,
+        actor.id,
         medical
           ? [await this.notices.medicalRequested(tx, post, actor.id)]
-          : await this.moveNotices(tx, actor.id, post, move),
+          : [
+              ...(await this.moveNotices(tx, actor.id, post, move)),
+              // F16 part C: the post's people hear that it was published or cancelled.
+              ...(move === 'publish'
+                ? [
+                    this.notices.notice(
+                      post,
+                      'post_published',
+                      [post.client.accountManagerId],
+                      actor.id,
+                    ),
+                  ]
+                : []),
+              ...(move === 'cancel'
+                ? [
+                    this.notices.notice(
+                      post,
+                      'post_cancelled',
+                      [post.client.accountManagerId, post.responsibleId, ...unlinkedAssignees],
+                      actor.id,
+                    ),
+                  ]
+                : []),
+            ],
       );
     });
     return this.content.detail(actor, id);
@@ -300,7 +327,9 @@ export class PostWorkflowService implements OnModuleInit {
           .set({ status: to, reviewStage: null, clearedReviewId: reviewId })
           .where(eq(contentPosts.id, id));
         await this.auditMove(tx, reviewer, post, to, { ...(note && { note }) });
-        await this.notices.send(tx, [this.clearedNotice(post, to, actor.id, 'medical')]);
+        await this.notices.sendChange(tx, post, actor.id, [
+          this.clearedNotice(post, to, actor.id, 'medical'),
+        ]);
         return;
       }
       // The contract requires the note of a return.
@@ -310,7 +339,7 @@ export class PostWorkflowService implements OnModuleInit {
         .set({ status: 'in_production', reviewStage: null })
         .where(eq(contentPosts.id, id));
       await this.auditMove(tx, reviewer, post, 'in_production', { note });
-      await this.notices.send(tx, [
+      await this.notices.sendChange(tx, post, actor.id, [
         this.notices.notice(post, 'post_returned', [post.responsibleId], actor.id, {
           source: 'medical',
         }),
@@ -361,7 +390,7 @@ export class PostWorkflowService implements OnModuleInit {
           reviewStage: 'medical',
           reason: 'healthcare_on',
         });
-        await this.notices.send(tx, [
+        await this.notices.sendChange(tx, post, change.actor.id, [
           await this.notices.medicalRequested(tx, post, change.actor.id),
         ]);
         continue;
@@ -373,7 +402,9 @@ export class PostWorkflowService implements OnModuleInit {
         .set({ status: to, reviewStage: null, clearedReviewId: internal.id })
         .where(eq(contentPosts.id, post.id));
       await this.auditMove(tx, change.actor, post, to, { reason: 'healthcare_off' });
-      await this.notices.send(tx, [this.clearedNotice(post, to, change.actor.id, 'internal')]);
+      await this.notices.sendChange(tx, post, change.actor.id, [
+        this.clearedNotice(post, to, change.actor.id, 'internal'),
+      ]);
     }
   }
 

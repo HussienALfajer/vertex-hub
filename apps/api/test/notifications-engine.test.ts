@@ -350,8 +350,8 @@ describe('notification engine (F16 part B)', () => {
       expect(await list(cast.employee.cookie, '?inbox=snoozed')).toHaveLength(1);
 
       const timed = app.get(TimedNotifications);
-      expect(await timed.runTimed(new Date())).toBe(0);
-      expect(await timed.runTimed(new Date(Date.now() + 2 * 60 * 60 * 1000))).toBe(1);
+      expect((await timed.runTimed(new Date())).woken).toBe(0);
+      expect((await timed.runTimed(new Date(Date.now() + 2 * 60 * 60 * 1000))).woken).toBe(1);
       const [woken] = await list(cast.employee.cookie);
       expect(woken).toMatchObject({ read: false, snoozedUntil: null, inbox: 'needs_you' });
     });
@@ -395,7 +395,8 @@ describe('notification engine (F16 part B)', () => {
         }),
       );
       expect(
-        await app.get(TimedNotifications).runTimed(new Date(Date.now() + 2 * 60 * 60 * 1000)),
+        (await app.get(TimedNotifications).runTimed(new Date(Date.now() + 2 * 60 * 60 * 1000)))
+          .woken,
       ).toBe(0);
       await expectError(await snooze(cast.employee.cookie, row.id, '1h'), 409, 'ALREADY_RESOLVED');
       expect((await snooze(cast.employee.cookie, row.id, 'later')).status).toBe(400);
@@ -503,17 +504,18 @@ describe('notification engine (F16 part B)', () => {
       const path = `/api/tasks/${created.id}/following`;
       const initial = await client.get(path, cast.employee.cookie);
       expect(initial.status).toBe(200);
-      expect(await initial.json()).toEqual({ following: false, followers: 0 });
+      // The creator follows the task from the start.
+      expect(await initial.json()).toEqual({ following: false, followers: 1 });
       const followed = await client.request('PUT', path, {
         cookie: cast.employee.cookie,
         body: { following: true },
       });
-      expect(await followed.json()).toEqual({ following: true, followers: 1 });
+      expect(await followed.json()).toEqual({ following: true, followers: 2 });
       const unfollowed = await client.request('PUT', path, {
         cookie: cast.employee.cookie,
         body: { following: false },
       });
-      expect(await unfollowed.json()).toEqual({ following: false, followers: 0 });
+      expect(await unfollowed.json()).toEqual({ following: false, followers: 1 });
 
       const post = await cast.createPost(cast.writer.cookie, { clientId });
       const postPath = `/api/content/posts/${post.id}/following`;

@@ -87,10 +87,28 @@ export class TaskCommentsService {
       });
       // A mentioned assignee gets the mention only, unless they muted it (F14 rule 2).
       const excerpt = await this.excerpt(tx, input.body);
-      await this.notices.send(tx, [
-        this.notices.notice(task, 'task_mentioned', mentions, actor.id, { excerpt }),
-        this.notices.notice(task, 'task_commented', [task.assigneeId], actor.id, { excerpt }),
-      ]);
+      // F16 rule B12: followers hear of the comment; the commenter and those mentioned follow.
+      const followers = await this.notices.followersOf(tx, taskId);
+      await this.notices.send(
+        tx,
+        [
+          this.notices.notice(task, 'task_mentioned', mentions, actor.id, { excerpt }),
+          this.notices.notice(task, 'task_commented', [task.assigneeId, ...followers], actor.id, {
+            excerpt,
+          }),
+        ],
+        // F16 part C: commenting answers the commenter's own mention.
+        [
+          {
+            subject: { type: 'task', id: taskId },
+            types: ['task_mentioned'],
+            outcome: 'done',
+            actorId: actor.id,
+            recipients: [actor.id],
+          },
+        ],
+      );
+      await this.notices.follow(tx, taskId, [actor.id, ...mentions]);
       return { task, created };
     });
     return this.one(actor, row.task, row.created);
@@ -137,6 +155,7 @@ export class TaskCommentsService {
         await this.notices.send(tx, [
           this.notices.notice(task, 'task_mentioned', added, actor.id, { excerpt }),
         ]);
+        await this.notices.follow(tx, taskId, added);
       }
       return { task, comment: updated };
     });

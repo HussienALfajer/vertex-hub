@@ -35,7 +35,7 @@ import { CodedException } from '../../core/errors/index.js';
 import { JobQueue } from '../../core/jobs/index.js';
 import { changedFields, recordAudit } from '../audit/index.js';
 import { type CurrentUserInfo, UserDirectory } from '../auth/index.js';
-import { NotificationCenter } from '../notifications/index.js';
+import { NotificationCenter, RecordFollowers } from '../notifications/index.js';
 import {
   actorOf,
   assertNotSent,
@@ -85,6 +85,7 @@ export class FilesService {
     private readonly owners: FileOwnerRegistry,
     private readonly users: UserDirectory,
     private readonly center: NotificationCenter,
+    private readonly followers: RecordFollowers,
     private readonly jobs: JobQueue,
   ) {}
 
@@ -612,21 +613,43 @@ export class FilesService {
     };
   }
 
-  /** `task_file_added` for the task's assignee, when someone else adds a file. */
+  /**
+   * `task_file_added` for the task's assignee and followers (F16 rule B12), `post_file_added`
+   * for the post's responsible and followers, when someone else adds a file. The one who adds a
+   * file to a post follows it.
+   */
   private async notifyFileAdded(
     tx: Transaction,
     actor: CurrentUserInfo,
     owner: FileOwner,
     file: string,
   ) {
-    if (!owner.task?.assigneeId) return;
-    await this.center.notify(tx, {
-      type: 'task_file_added',
-      data: { task: owner.task.snapshot, file },
-      recipients: [owner.task.assigneeId],
-      actorId: actor.id,
-      subjectId: owner.id,
-    });
+    if (owner.task) {
+      const followers = await this.followers.recipients(
+        tx,
+        { type: 'task', id: owner.id },
+        'tasks.read',
+      );
+      await this.center.notify(tx, {
+        type: 'task_file_added',
+        data: { task: owner.task.snapshot, file },
+        recipients: [...(owner.task.assigneeId ? [owner.task.assigneeId] : []), ...followers],
+        actorId: actor.id,
+        subjectId: owner.id,
+      });
+    }
+    if (owner.post) {
+      const record = { type: 'post' as const, id: owner.id };
+      const followers = await this.followers.recipients(tx, record, 'content.read');
+      await this.center.notify(tx, {
+        type: 'post_file_added',
+        data: { post: owner.post.snapshot, file },
+        recipients: [owner.post.responsibleId, ...followers],
+        actorId: actor.id,
+        subjectId: owner.id,
+      });
+      await this.followers.follow(tx, record, [actor.id]);
+    }
   }
 }
 

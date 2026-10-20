@@ -14,6 +14,7 @@ import { type DepartmentCode, departmentCodeSchema } from './departments.js';
 import { clientEmailKindSchema } from './email-basics.js';
 import { pageQuerySchema, pageSchema, queryBooleanSchema } from './lists.js';
 import { currencySchema, minorAmountSchema, signedMinorAmountSchema } from './money.js';
+import { postStatusSchema } from './post-values.js';
 import {
   BEHIND_ALERT_DAYS,
   deliverableKindSchema,
@@ -21,6 +22,7 @@ import {
   termEndActionSchema,
 } from './retainers.js';
 import type { Role } from './roles.js';
+import { revisionDecisionSchema, taskStatusSchema } from './workflow.js';
 
 /*
  * In-app notifications (spec F14, ADR 0018): a fixed catalog of types, each rendered by the web
@@ -50,6 +52,7 @@ export const NOTIFICATION_TYPES = [
   'task_approved',
   'task_opened',
   'request_finished',
+  'task_delivered',
   'post_returned',
   'post_review_requested',
   'post_medical_review_requested',
@@ -92,10 +95,25 @@ export const NOTIFICATION_TYPES = [
   'lead_won',
   'lead_follow_up_overdue',
   'lead_follow_up_due',
+  'task_reopened',
+  'task_revision_decided',
+  'task_due_shortly',
+  'post_published',
+  'post_cancelled',
+  'post_file_added',
+  'post_publish_shortly',
+  'approval_opened',
+  'approval_completed',
+  'shoot_starting',
+  'meeting_starting',
+  'shoot_completed',
   'push_device_lost',
   'action_reminder',
   'action_escalated',
   'action_escalated_top',
+  // F16: the followers' status notices come last, after every other notice of the change.
+  'task_progressed',
+  'post_progressed',
 ] as const;
 
 export const notificationTypeSchema = z.enum(NOTIFICATION_TYPES).meta({ id: 'NotificationType' });
@@ -223,6 +241,21 @@ const CATALOG: Record<
   lead_follow_up_overdue: { category: 'reminders', subject: 'lead', mutable: false },
   lead_follow_up_due: { category: 'reminders', subject: 'lead', mutable: false },
   push_device_lost: { category: 'account', subject: 'user', mutable: true },
+  task_reopened: { category: 'tasks', subject: 'task', mutable: true },
+  task_delivered: { category: 'tasks', subject: 'task', mutable: true },
+  task_revision_decided: { category: 'tasks', subject: 'task', mutable: true },
+  task_progressed: { category: 'tasks', subject: 'task', mutable: true },
+  task_due_shortly: { category: 'reminders', subject: 'task', mutable: true },
+  post_published: { category: 'tasks', subject: 'post', mutable: true },
+  post_cancelled: { category: 'tasks', subject: 'post', mutable: true },
+  post_file_added: { category: 'tasks', subject: 'post', mutable: true },
+  post_progressed: { category: 'tasks', subject: 'post', mutable: true },
+  post_publish_shortly: { category: 'reminders', subject: 'post', mutable: true },
+  approval_opened: { category: 'tasks', subject: 'approval_request', mutable: true },
+  approval_completed: { category: 'tasks', subject: 'approval_request', mutable: true },
+  shoot_starting: { category: 'calendar', subject: 'shoot', mutable: true },
+  meeting_starting: { category: 'calendar', subject: 'meeting', mutable: true },
+  shoot_completed: { category: 'calendar', subject: 'shoot', mutable: true },
   /** F16 rule B11: the escalation steps open the original's record; its subject type is given. */
   action_reminder: { category: 'reminders', subject: 'task', mutable: false },
   action_escalated: { category: 'reminders', subject: 'task', mutable: false },
@@ -346,6 +379,21 @@ const CHANNELS: Record<NotificationType, Channels> = {
   lead_follow_up_due: important(),
   lead_follow_up_overdue: critical(),
   push_device_lost: informational,
+  task_reopened: normal(),
+  task_delivered: informational,
+  task_revision_decided: informational,
+  task_progressed: normal(),
+  task_due_shortly: important(),
+  post_published: informational,
+  post_cancelled: normal(),
+  post_file_added: normal(),
+  post_progressed: normal(),
+  post_publish_shortly: important(),
+  approval_opened: informational,
+  approval_completed: normal(),
+  shoot_starting: important(),
+  meeting_starting: important(),
+  shoot_completed: informational,
   action_reminder: important(),
   action_escalated: important('on'),
   action_escalated_top: critical(),
@@ -511,6 +559,21 @@ const ENGINE: Record<NotificationType, Engine> = {
   lead_follow_up_due: action(),
   lead_follow_up_overdue: action(),
   push_device_lost: info,
+  task_reopened: info,
+  task_delivered: info,
+  task_revision_decided: info,
+  task_progressed: merged,
+  task_due_shortly: action(),
+  post_published: info,
+  post_cancelled: info,
+  post_file_added: merged,
+  post_progressed: merged,
+  post_publish_shortly: action(),
+  approval_opened: info,
+  approval_completed: info,
+  shoot_starting: info,
+  meeting_starting: info,
+  shoot_completed: info,
   action_reminder: action(),
   action_escalated: action(),
   action_escalated_top: action(),
@@ -847,6 +910,34 @@ export const NOTIFICATION_DATA_SCHEMAS = {
   lead_follow_up_due: leadData.extend({ followUpOn: calendarDateSchema }),
   /** F16 rule A13: the push service refused a device's subscription for good. */
   push_device_lost: z.object({ device: nameSchema }),
+  /** F16 part C: a cancelled task went back to work. */
+  task_reopened: taskData,
+  /** The task was delivered; for the project manager and the account manager. */
+  task_delivered: taskData,
+  /** An over-limit client revision was decided: free, or billed as extra work. */
+  task_revision_decided: taskData.extend({ decision: revisionDecisionSchema }),
+  /** Merged per task for its followers: the latest status, `count` moves (rule B12). */
+  task_progressed: taskData.extend({ status: taskStatusSchema }),
+  /** Rule B13: two hours before the due time of an open, assigned task. */
+  task_due_shortly: taskData.extend(dueSchema.shape),
+  post_published: postData,
+  post_cancelled: postData,
+  /** Merged per post like `task_file_added`: the latest file name, `count` files. */
+  post_file_added: postData.extend({ file: nameSchema }),
+  /** Merged per post for its followers: the latest status, `count` moves. */
+  post_progressed: postData.extend({ status: postStatusSchema }),
+  /** Rule B13: two hours before the publish time of an approved or scheduled post. */
+  post_publish_shortly: postData,
+  /** Part C rule 2: the client opened the link for the first time. */
+  approval_opened: approvalData,
+  /** Every item of the request is answered. */
+  approval_completed: approvalData,
+  /** Rule B13: two hours before a scheduled shoot starts. */
+  shoot_starting: shootData,
+  /** Rule B13: fifteen minutes before a meeting starts; `joinUrl` when it has a link. */
+  meeting_starting: meetingData.extend({ joinUrl: z.string().nullable() }),
+  /** The shoot was closed. */
+  shoot_completed: shootData,
   /** F16 rule B11 step 1: the original still waits on its recipients. */
   action_reminder: escalationData,
   /** Step 2: the managers of those it waits on (or the step's department or role). */
@@ -1302,3 +1393,44 @@ export type NotificationReminderKind = (typeof NOTIFICATION_REMINDER_KINDS)[numb
 export const NOTIFICATION_EMAIL_STATES = ['pending', 'sent', 'skipped'] as const;
 
 export type NotificationEmailState = (typeof NOTIFICATION_EMAIL_STATES)[number];
+
+/** F16 rule B13: the timed sources of the minute job, keyed in `timed_reminders`. */
+export const TIMED_REMINDER_KINDS = [
+  'task_due_shortly',
+  'post_publish_shortly',
+  'shoot_starting',
+  'meeting_starting',
+] as const;
+
+export type TimedReminderKind = (typeof TIMED_REMINDER_KINDS)[number];
+
+/** How long before its moment each timed reminder is sent. */
+export const TIMED_REMINDER_LEAD_MINUTES: Record<TimedReminderKind, number> = {
+  task_due_shortly: 120,
+  post_publish_shortly: 120,
+  shoot_starting: 120,
+  meeting_starting: 15,
+};
+
+/**
+ * A run this late after a reminder's send time still sends it; later, the reminder is skipped
+ * (rule B13, edge case 15). Covers the few seconds or minutes a run can start late.
+ */
+export const TIMED_REMINDER_GRACE_MINUTES = 5;
+
+/** `timed_reminders` rows are purged this many days after their moment. */
+export const TIMED_REMINDER_RETENTION_DAYS = 30;
+
+const MINUTE_MS = 60 * 1000;
+
+/**
+ * Rule B13: the moments a run at `now` sends reminders of `kind` for: after `from`, up to `to`.
+ * A moment whose send time is more than the grace before `now` has passed and is skipped.
+ */
+export function timedReminderWindow(kind: TimedReminderKind, now: Date): { from: Date; to: Date } {
+  const lead = TIMED_REMINDER_LEAD_MINUTES[kind] * MINUTE_MS;
+  return {
+    from: new Date(now.getTime() + lead - TIMED_REMINDER_GRACE_MINUTES * MINUTE_MS),
+    to: new Date(now.getTime() + lead),
+  };
+}

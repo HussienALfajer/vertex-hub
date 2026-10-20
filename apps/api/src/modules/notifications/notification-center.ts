@@ -86,9 +86,17 @@ export class NotificationCenter {
    * the channel policy of rule B1), in the same transaction; a merged one is pushed again and
    * replaces the older notice by its tag. Each row snapshots its priority, box and resolution
    * type (rules B5–B6).
+   *
+   * `resolutions` are what the same change closes (rule B5): they close the existing rows first,
+   * and a notice they cover is stored already resolved, with no push or toast (edge case 9).
    * Returns the number of notifications stored or merged.
    */
-  async notify(tx: Transaction, notices: Notice | readonly Notice[]): Promise<number> {
+  async notify(
+    tx: Transaction,
+    notices: Notice | readonly Notice[],
+    resolutions: readonly Resolution[] = [],
+  ): Promise<number> {
+    for (const resolution of resolutions) await this.resolve(tx, resolution);
     const list = Array.isArray(notices) ? (notices as readonly Notice[]) : [notices as Notice];
     const candidates = list.flatMap((notice) =>
       [...new Set(notice.recipients)]
@@ -118,6 +126,7 @@ export class NotificationCenter {
 
     const pushed: { recipientId: string; notificationId: string }[] = [];
     const toDevices: string[] = [];
+    let storedResolved = 0;
     for (const { recipientId, notice } of deliverable) {
       const data = NOTIFICATION_DATA_SCHEMAS[notice.type].parse(notice.data);
       const priority = notificationPriority(notice);
@@ -128,6 +137,29 @@ export class NotificationCenter {
         active.has(recipientId),
         settings.get(recipientId),
       );
+      const resolutionType = resolutionTypeOf(notice);
+      const resolved = resolvedOnCreation(notice, resolutionType, recipientId, resolutions);
+      if (resolved) {
+        await tx.insert(notifications).values({
+          recipientId,
+          type: notice.type,
+          actorId: notice.actorId,
+          subjectType: notice.subjectType ?? NOTIFICATION_CATALOG[notice.type].subject,
+          subjectId: notice.subjectId,
+          data,
+          priority,
+          box: notificationBox(notice),
+          resolutionType,
+          resolvedAt: new Date(),
+          resolvedById: resolved.actorId,
+          resolution: resolved.outcome,
+          // Rule B5: read for the actor and for void; "Handled by" for the others.
+          readAt:
+            resolved.outcome === 'void' || resolved.actorId === recipientId ? new Date() : null,
+        });
+        storedResolved += 1;
+        continue;
+      }
       const merged = NOTIFICATION_CATALOG[notice.type].merges
         ? await this.mergeUnread(tx, recipientId, notice, data, email)
         : null;
@@ -143,7 +175,7 @@ export class NotificationCenter {
           data,
           priority,
           box: notificationBox(notice),
-          resolutionType: resolutionTypeOf(notice),
+          resolutionType,
           ...email,
         });
       }
@@ -157,7 +189,7 @@ export class NotificationCenter {
     for (const payload of pushPayloads(pushed)) {
       await tx.execute(sql`select pg_notify(${NOTIFICATIONS_CHANNEL}, ${payload})`);
     }
-    return pushed.length;
+    return pushed.length + storedResolved;
   }
 
   /**
@@ -309,6 +341,24 @@ export class NotificationCenter {
       .where(eq(notifications.id, open.id));
     return open.id;
   }
+}
+
+/** The resolution of the same change that covers a new row of `notice` for `recipientId`. */
+function resolvedOnCreation(
+  notice: Notice,
+  resolutionType: NotificationType | null,
+  recipientId: string,
+  resolutions: readonly Resolution[],
+): Resolution | undefined {
+  if (!resolutionType) return undefined;
+  const subjectType = notice.subjectType ?? NOTIFICATION_CATALOG[notice.type].subject;
+  return resolutions.find(
+    (resolution) =>
+      resolution.subject.type === subjectType &&
+      resolution.subject.id === notice.subjectId &&
+      resolution.types.includes(resolutionType) &&
+      (!resolution.recipients || resolution.recipients.includes(recipientId)),
+  );
 }
 
 type EmailMarking = { emailState: NotificationEmailState | null; emailAfter: Date | null };

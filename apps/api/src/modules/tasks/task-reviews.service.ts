@@ -83,7 +83,7 @@ export class TaskReviewsService implements OnModuleInit {
           .set({ status: 'awaiting_client', reviewStage: null, clearedReviewId: reviewId })
           .where(eq(tasks.id, id));
         await this.auditMove(tx, reviewer, id, 'awaiting_client', input.note ?? null);
-        await this.notices.send(tx, [
+        await this.notices.sendChange(tx, task, actor.id, [
           this.notices.notice(task, 'task_approved', assignee, actor.id, { source: 'medical' }),
           this.notices.notice(
             task,
@@ -103,7 +103,7 @@ export class TaskReviewsService implements OnModuleInit {
         .set({ status: 'revisions', reviewStage: null })
         .where(eq(tasks.id, id));
       await this.auditMove(tx, reviewer, id, 'revisions', note, { revisionSource: 'medical' });
-      await this.notices.send(tx, [
+      await this.notices.sendChange(tx, task, actor.id, [
         this.notices.notice(task, 'task_returned', assignee, actor.id, { source: 'medical' }),
       ]);
     });
@@ -178,7 +178,7 @@ export class TaskReviewsService implements OnModuleInit {
           before: { status: 'awaiting_client' },
           after: { status: 'internal_review', reviewStage: 'medical', reason: 'healthcare_on' },
         });
-        await this.notices.send(tx, [
+        await this.notices.sendChange(tx, task, change.actor.id, [
           await this.reviews.medicalRequested(tx, task, change.actor.id),
         ]);
         continue;
@@ -196,7 +196,7 @@ export class TaskReviewsService implements OnModuleInit {
         before: { status: 'internal_review', reviewStage: 'medical' },
         after: { status: 'awaiting_client', reason: 'healthcare_off' },
       });
-      await this.notices.send(tx, [
+      await this.notices.sendChange(tx, task, change.actor.id, [
         this.notices.notice(
           task,
           'task_awaiting_client',

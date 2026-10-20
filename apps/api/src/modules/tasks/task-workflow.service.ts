@@ -58,7 +58,7 @@ import {
   lockDependencyGraph,
 } from './task-dependencies.js';
 import { TaskGuards } from './task-guards.js';
-import { blocksDependents, requesterOf, TaskNotices } from './task-notices.js';
+import { blocksDependents, TaskNotices } from './task-notices.js';
 import { TaskReviews } from './task-reviews.js';
 import { TasksService } from './tasks.service.js';
 
@@ -307,8 +307,10 @@ export class TaskWorkflowService {
         await unlinkRemovedTask(tx, this.postHooks, task, 'reopened', actorOf(actor));
       }
       const overLimit = !!revision?.overLimit;
-      await this.notices.send(
+      await this.notices.sendChange(
         tx,
+        task,
+        actor.id,
         medical
           ? [await this.reviews.medicalRequested(tx, task, actor.id)]
           : await this.moveNotices(tx, actor, task, move, overLimit),
@@ -367,6 +369,23 @@ export class TaskWorkflowService {
           decidedAt: new Date(),
         })
         .where(eq(taskRevisions.id, revisionId));
+      // F16 part C: the decision closes the account manager's notices and tells the assignee.
+      await this.notices.send(
+        tx,
+        [
+          this.notices.notice(task, 'task_revision_decided', [task.assigneeId], actor.id, {
+            decision: input.decision,
+          }),
+        ],
+        [
+          {
+            subject: { type: 'task', id },
+            types: ['task_over_limit', 'task_over_limit_pending'],
+            outcome: 'done',
+            actorId: actor.id,
+          },
+        ],
+      );
       await recordAudit(tx, {
         actor: actorOf(actor),
         action: 'task.revision_decided',
@@ -477,11 +496,9 @@ export class TaskWorkflowService {
           ...(await this.notices.openedDependents(tx, [task.id], actor.id)),
         ];
       case 'deliver':
-        return [
-          notice(task, 'request_finished', [requesterOf(task)], actor.id, {
-            outcome: 'delivered',
-          }),
-        ];
+        return this.notices.delivered(task, actor.id);
+      case 'reopen':
+        return [notice(task, 'task_reopened', [task.assigneeId, task.createdById], actor.id)];
       case 'cancel':
         return [
           ...this.notices.cancelled(task, actor.id),

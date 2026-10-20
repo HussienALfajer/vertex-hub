@@ -61,6 +61,22 @@ describe('notification catalog', () => {
         'task_file_added',
         'task_mentioned',
         'task_opened',
+        // F16 part C: every new type of the workflow modules.
+        'task_reopened',
+        'task_delivered',
+        'task_revision_decided',
+        'task_progressed',
+        'task_due_shortly',
+        'post_published',
+        'post_cancelled',
+        'post_file_added',
+        'post_progressed',
+        'post_publish_shortly',
+        'approval_opened',
+        'approval_completed',
+        'shoot_starting',
+        'meeting_starting',
+        'shoot_completed',
       ].sort(),
     );
   });
@@ -507,6 +523,9 @@ describe('inboxes and resolution (F16 rules B5–B6)', () => {
       'lead_assigned',
       'lead_follow_up_overdue',
       'lead_follow_up_due',
+      // F16 part C, created after the backfill.
+      'task_due_shortly',
+      'post_publish_shortly',
     ]);
   });
 

@@ -13,8 +13,11 @@ import { type DepartmentCode, departmentCodeSchema } from './departments.js';
 import { pageQuerySchema, pageSchema, queryBooleanSchema, queryListSchema } from './lists.js';
 import {
   POST_PLATFORMS,
+  POST_STATUSES,
+  type PostStatus,
   type PostType,
   postPlatformSchema,
+  postStatusSchema,
   postTypeSchema,
 } from './post-values.js';
 import { deliverableKindSchema } from './retainers.js';
@@ -37,20 +40,8 @@ import { httpUrlSchema, optionalText } from './text.js';
  * scheduled and published by hand.
  */
 
-export const POST_STATUSES = [
-  'idea',
-  'in_production',
-  'internal_review',
-  'awaiting_client',
-  'approved',
-  'scheduled',
-  'published',
-  'cancelled',
-] as const;
-
-export const postStatusSchema = z.enum(POST_STATUSES).meta({ id: 'PostStatus' });
-
-export type PostStatus = z.infer<typeof postStatusSchema>;
+// The statuses live in `post-values.ts`: notification snapshots name them.
+export { POST_STATUSES, type PostStatus, postStatusSchema } from './post-values.js';
 
 /** "Open": any status except published and cancelled. */
 export const OPEN_POST_STATUSES = [

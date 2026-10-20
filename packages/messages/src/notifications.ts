@@ -1,4 +1,10 @@
-import type { DeliverableKind, DepartmentCode, Notification } from '@vertex-hub/contracts';
+import type {
+  DeliverableKind,
+  DepartmentCode,
+  Notification,
+  PostStatus,
+  TaskStatus,
+} from '@vertex-hub/contracts';
 import { CLIENT_EMAIL_KIND_NAMES } from './client-emails.js';
 import {
   formatAmount,
@@ -42,6 +48,29 @@ export const DELIVERABLE_KIND_NAMES: Record<DeliverableKind, string> = {
 export function lineName(line: { kind: DeliverableKind; label?: string | null }): string {
   return line.label || DELIVERABLE_KIND_NAMES[line.kind];
 }
+
+/** The status names a follower's notice shows (F16 `task_progressed`, `post_progressed`). */
+export const TASK_STATUS_NAMES: Record<TaskStatus, string> = {
+  new: 'جديدة',
+  in_progress: 'قيد التنفيذ',
+  internal_review: 'مراجعة داخلية',
+  awaiting_client: 'بانتظار العميل',
+  revisions: 'تعديلات',
+  approved: 'معتمدة',
+  delivered: 'مسلّمة',
+  cancelled: 'ملغاة',
+};
+
+export const POST_STATUS_NAMES: Record<PostStatus, string> = {
+  idea: 'فكرة',
+  in_production: 'قيد الإنتاج',
+  internal_review: 'مراجعة داخلية',
+  awaiting_client: 'بانتظار العميل',
+  approved: 'معتمد',
+  scheduled: 'مجدول',
+  published: 'نُشر',
+  cancelled: 'ملغى',
+};
 
 /** The texts of the notification types, with `{{name}}` placeholders. */
 export const NOTIFICATION_TEXT = {
@@ -230,6 +259,48 @@ export const NOTIFICATION_TEXT = {
   lead_follow_up_overdue: 'تأخرت متابعة العميل المحتمل «{{lead}}»؛ كان موعدها {{date}}',
   lead_follow_up_due: 'حان موعد متابعة العميل المحتمل «{{lead}}»',
   push_device_lost: 'توقفت الإشعارات على {{device}}. فعّلها من جديد من ذلك الجهاز',
+  task_reopened: 'أعاد {{actor}} فتح «{{task}}»',
+  task_delivered: 'سُلّمت «{{task}}»',
+  task_revision_decided: {
+    free: 'قرر {{actor}} تنفيذ تعديل العميل على «{{task}}» دون مقابل',
+    extra_work: 'قرر {{actor}} احتساب تعديل العميل على «{{task}}» عملًا إضافيًا',
+  },
+  task_progressed: 'انتقلت «{{task}}» إلى «{{status}}» بواسطة {{actor}}',
+  task_progressed_merged: {
+    zero: 'تحديثات على حالة «{{task}}»، وهي الآن «{{status}}»',
+    one: 'تحديث على حالة «{{task}}»، وهي الآن «{{status}}»',
+    two: 'تحديثان على حالة «{{task}}»، وهي الآن «{{status}}»',
+    few: '{{n}} تحديثات على حالة «{{task}}»، وهي الآن «{{status}}»',
+    many: '{{n}} تحديثًا على حالة «{{task}}»، وهي الآن «{{status}}»',
+    other: '{{n}} تحديث على حالة «{{task}}»، وهي الآن «{{status}}»',
+  },
+  task_due_shortly: '«{{task}}» مستحقة خلال ساعتين، في {{due}}',
+  post_published: 'نُشر المنشور «{{post}}»',
+  post_cancelled: 'ألغى {{actor}} المنشور «{{post}}»',
+  post_file_added: 'أضاف {{actor}} الملف «{{file}}» إلى المنشور «{{post}}»',
+  post_file_added_merged: {
+    zero: 'ملفات جديدة على المنشور «{{post}}»',
+    one: 'ملف جديد على المنشور «{{post}}»',
+    two: 'ملفان جديدان على المنشور «{{post}}»',
+    few: '{{n}} ملفات جديدة على المنشور «{{post}}»',
+    many: '{{n}} ملفًا جديدًا على المنشور «{{post}}»',
+    other: '{{n}} ملف جديد على المنشور «{{post}}»',
+  },
+  post_progressed: 'انتقل المنشور «{{post}}» إلى «{{status}}» بواسطة {{actor}}',
+  post_progressed_merged: {
+    zero: 'تحديثات على حالة المنشور «{{post}}»، وهو الآن «{{status}}»',
+    one: 'تحديث على حالة المنشور «{{post}}»، وهو الآن «{{status}}»',
+    two: 'تحديثان على حالة المنشور «{{post}}»، وهو الآن «{{status}}»',
+    few: '{{n}} تحديثات على حالة المنشور «{{post}}»، وهو الآن «{{status}}»',
+    many: '{{n}} تحديثًا على حالة المنشور «{{post}}»، وهو الآن «{{status}}»',
+    other: '{{n}} تحديث على حالة المنشور «{{post}}»، وهو الآن «{{status}}»',
+  },
+  post_publish_shortly: 'موعد نشر المنشور «{{post}}» خلال ساعتين، في {{date}}',
+  approval_opened: 'فتح {{contact}} رابط اعتماد «{{client}}»',
+  approval_completed: 'ردّ {{contact}} على كل أعمال رابط «{{client}}»',
+  shoot_starting: 'تبدأ جلسة التصوير «{{shoot}}» خلال ساعتين، في {{when}}',
+  shoot_completed: 'أُغلقت جلسة التصوير «{{shoot}}» بواسطة {{actor}}',
+  meeting_starting: 'يبدأ الاجتماع «{{meeting}}» خلال 15 دقيقة، في {{when}}',
   /** F16 rule B11: each escalation step wraps the original's text. */
   action_reminder: 'تذكير: {{text}}',
   action_escalated: 'تصعيد: {{text}}',
@@ -605,6 +676,8 @@ export function notificationText(
     }
     case 'approval_no_response':
     case 'approval_expired':
+    case 'approval_opened':
+    case 'approval_completed':
       return {
         text: fill(text[notification.type], {
           client: notification.data.client,
@@ -621,6 +694,27 @@ export function notificationText(
         }),
         context: notification.data.post.client,
       };
+    case 'post_file_added': {
+      const { data, count } = notification;
+      return {
+        text:
+          count > 1
+            ? counted(text.post_file_added_merged, count, { post: data.post.title })
+            : fill(text.post_file_added, { actor, post: data.post.title, file: data.file }),
+        context: data.post.client,
+      };
+    }
+    case 'post_progressed': {
+      const { data, count } = notification;
+      const values = { actor, post: data.post.title, status: POST_STATUS_NAMES[data.status] };
+      return {
+        text:
+          count > 1
+            ? counted(text.post_progressed_merged, count, values)
+            : fill(text.post_progressed, values),
+        context: data.post.client,
+      };
+    }
     case 'post_task_ready':
       return {
         text: fill(text.post_task_ready, {
@@ -642,7 +736,10 @@ export function notificationText(
     case 'post_medical_review_requested':
     case 'post_awaiting_client':
     case 'post_publish_today':
-    case 'post_publish_overdue': {
+    case 'post_publish_overdue':
+    case 'post_published':
+    case 'post_cancelled':
+    case 'post_publish_shortly': {
       const { post } = notification.data;
       return {
         text: fill(text[notification.type], {
@@ -657,7 +754,9 @@ export function notificationText(
     case 'shoot_upcoming':
     case 'shoot_not_closed':
     case 'shoot_dropped':
-    case 'shoot_changed': {
+    case 'shoot_changed':
+    case 'shoot_starting':
+    case 'shoot_completed': {
       const { shoot } = notification.data;
       const values = { actor, shoot: shoot.title, when: formatDateTime(shoot.startsAt) };
       return {
@@ -668,7 +767,8 @@ export function notificationText(
     case 'meeting_invited':
     case 'meeting_upcoming':
     case 'meeting_dropped':
-    case 'meeting_changed': {
+    case 'meeting_changed':
+    case 'meeting_starting': {
       const { meeting } = notification.data;
       const values = { actor, meeting: meeting.title, when: formatDateTime(meeting.startsAt) };
       return { text: calendarText(notification, values), context: meeting.client };
@@ -757,6 +857,8 @@ type TaskNotification = Exclude<
       | 'approval_responded'
       | 'approval_no_response'
       | 'approval_expired'
+      | 'approval_opened'
+      | 'approval_completed'
       | `post_${string}`
       | 'push_device_lost'
       | `action_${string}`
@@ -789,7 +891,16 @@ function taskText(notification: TaskNotification, actor: string): string {
       return fill(text.request_finished[notification.data.outcome], { task });
     case 'task_due_soon':
     case 'task_overdue':
+    case 'task_due_shortly':
       return fill(text[notification.type], { task, due: formatDue(notification.data) });
+    case 'task_revision_decided':
+      return fill(text.task_revision_decided[notification.data.decision], { actor, task });
+    case 'task_progressed': {
+      const values = { actor, task, status: TASK_STATUS_NAMES[notification.data.status] };
+      return notification.count > 1
+        ? counted(text.task_progressed_merged, notification.count, values)
+        : fill(text.task_progressed, values);
+    }
     case 'task_over_limit_pending':
       return fill(text.task_over_limit_pending, {
         task,

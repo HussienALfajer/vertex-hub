@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { NotificationData, NotificationType } from '@vertex-hub/contracts';
 import type { Transaction } from '@vertex-hub/db';
-import { type Notice, NotificationCenter } from '../notifications/index.js';
+import { type Notice, NotificationCenter, type Resolution } from '../notifications/index.js';
 import type { ShootRow } from './shoot-access.js';
 
 /** Types whose snapshot is a shoot plus fields of their own. */
@@ -51,8 +51,15 @@ export class ShootNotices {
     } as Notice;
   }
 
-  async send(tx: Transaction, notices: readonly Notice[]): Promise<void> {
+  /** `resolutions`: what the change closes (F16 rule B5). */
+  async send(
+    tx: Transaction,
+    notices: readonly Notice[],
+    resolutions: readonly Resolution[] = [],
+  ): Promise<void> {
     const sendable = notices.filter((notice) => notice.recipients.length > 0);
-    if (sendable.length > 0) await this.center.notify(tx, sendable);
+    if (sendable.length > 0 || resolutions.length > 0) {
+      await this.center.notify(tx, sendable, resolutions);
+    }
   }
 }

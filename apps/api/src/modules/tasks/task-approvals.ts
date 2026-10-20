@@ -224,12 +224,12 @@ export class TaskApprovals {
     const notice = this.notices.notice.bind(this.notices);
     if (approved) {
       await this.files.markSnapshotFinal(tx, taskId, pass.versionIds, null);
-      await this.notices.send(tx, [
+      await this.notices.sendChange(tx, task, null, [
         notice(task, 'task_approved', [task.assigneeId], null, { source: 'client' }),
         ...(await this.notices.openedDependents(tx, [taskId], null)),
       ]);
     } else {
-      await this.notices.send(tx, [
+      await this.notices.sendChange(tx, task, null, [
         notice(task, 'task_returned', [task.assigneeId], null, { source: 'client' }),
         ...(revision?.overLimit
           ? [notice(task, 'task_over_limit', [task.client?.accountManagerId ?? null], null)]

@@ -1,17 +1,20 @@
 import { Inject, Injectable, Logger, type OnModuleInit } from '@nestjs/common';
 import {
+  businessDate,
+  businessInstant,
   type CalendarDate,
   isWorkDay,
   type NotificationReminderKind,
   nextWorkDay,
   OPEN_TASK_STATUSES,
+  timedReminderWindow,
 } from '@vertex-hub/contracts';
 import { type Database, type Transaction, tasks } from '@vertex-hub/db';
-import { and, asc, eq, gt, inArray, isNotNull, lt, lte, type SQL } from 'drizzle-orm';
+import { and, asc, between, eq, gt, inArray, isNotNull, lt, lte, ne, type SQL } from 'drizzle-orm';
 import { DATABASE } from '../../core/database/database.module.js';
 import { runEach } from '../../core/jobs/index.js';
 import { UserDirectory } from '../auth/index.js';
-import { DailyReminders, type Notice } from '../notifications/index.js';
+import { DailyReminders, type Notice, TimedNotifications } from '../notifications/index.js';
 import { type NoticeTask, TaskNotices, toTimeOfDay } from './task-notices.js';
 import { TasksService } from './tasks.service.js';
 
@@ -30,10 +33,60 @@ export class TaskReminders implements OnModuleInit {
     private readonly tasks: TasksService,
     private readonly notices: TaskNotices,
     private readonly reminders: DailyReminders,
+    private readonly timed: TimedNotifications,
   ) {}
 
   onModuleInit(): void {
     this.reminders.register('tasks', (today) => this.remind(today));
+    this.timed.register('tasks', (now) => this.dueShortly(now));
+  }
+
+  /**
+   * F16 rule B13: `task_due_shortly` two hours before the due time of an open, assigned, not yet
+   * approved task, once per task and due time; work days do not apply.
+   */
+  async dueShortly(now: Date): Promise<number> {
+    const { from, to } = timedReminderWindow('task_due_shortly', now);
+    const filters = [
+      isNotNull(tasks.assigneeId),
+      isNotNull(tasks.dueTime),
+      ne(tasks.status, 'approved'),
+      between(tasks.dueDate, businessDate(from), businessDate(to)),
+    ];
+    const candidates = await this.db
+      .select({ id: tasks.id })
+      .from(tasks)
+      .where(this.eligible(filters))
+      .orderBy(asc(tasks.id));
+    let sent = 0;
+    await runEach(
+      candidates,
+      this.logger,
+      ({ id }) => `Task due-shortly reminder ${id}`,
+      async ({ id }) => {
+        const recorded = await this.db.transaction(async (tx) => {
+          const [row] = await tx
+            .select({ id: tasks.id })
+            .from(tasks)
+            .where(and(eq(tasks.id, id), this.eligible(filters)))
+            .for('update', { of: tasks });
+          if (!row) return false;
+          const task = await this.notices.load(tx, id);
+          const due = dueOf(task);
+          if (!due.dueTime) return false;
+          const occursAt = businessInstant(due.dueDate, due.dueTime);
+          // The moment is in the window: not passed (edge case 15), not yet two hours away.
+          if (occursAt <= from || occursAt > to) return false;
+          return this.timed.remindOnce(
+            tx,
+            { kind: 'task_due_shortly', subjectId: id, occursAt },
+            this.notices.notice(task, 'task_due_shortly', [task.assigneeId], null, due),
+          );
+        });
+        if (recorded) sent += 1;
+      },
+    );
+    return sent;
   }
 
   async remind(today: CalendarDate): Promise<number> {
