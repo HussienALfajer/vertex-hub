@@ -578,9 +578,9 @@ Primary key `(announcement_id, user_id)`; index `(user_id)`.
    - `contract_signed` is sent once per contract or annex: a new scan of a signed one is not a new signature.
    - `responsibility_moved` covers the post responsible, the account manager, the project manager and the lead owner here; the campaign owner and the department manager come with C1c.
 8. **Settled in C1c** (invoices, campaigns, auth, email):
-   - Archiving a user stays blocked by open assigned tasks, posts they are responsible for, open leads and managed departments (F01 rule 9, F02 rule 8; owner, 2026-10-20). `member_archived_open_work` therefore covers the open items that do not block archiving (campaigns they own), counted through `auth`'s `ResponsibilityRegistry`. It goes to the managers of the member's departments, else the GMs. The daily job closes it as `done` once no open item is left, and as `void` when the member is restored.
+   - Archiving a user stays blocked by open assigned tasks, posts they are responsible for, open leads and managed departments (F01 rule 9, F02 rule 8; owner, 2026-10-20). `member_archived_open_work` therefore covers the open items that do not block archiving (campaigns they own), counted through `auth`'s `ResponsibilityRegistry`. It goes to the managers of the member's departments, else the GMs. The daily job closes it as `done` once no open item is left; restoring the member makes it `void` at once.
    - `invoice_draft_created` is `done` when the draft is issued and `void` when it is discarded. `invoice_overdue` is `done` when the invoice is paid and `void` when it is voided.
-   - `invoice_due_soon` is sent once per invoice and due date, for a `sent` or `partially_paid` invoice due within three days (a run after missed days still sends it).
+   - `invoice_due_soon` is sent once per invoice and due date, for a `sent` or `partially_paid` invoice due today or within three days (a run after missed days still sends it).
    - `payment_recorded` is sent when the invoice stays unpaid after the payment; a payment that pays it in full sends `invoice_paid`.
    - `campaign_end_passed` is sent once per campaign and end date. Completing the campaign or moving its end date makes it `done`; cancelling makes it `void`.
    - `ad_budget_low` is `done` when the balance is back at or above the threshold and `void` when the threshold is removed.

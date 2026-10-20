@@ -3,7 +3,7 @@ import { type Database, notifications } from '@vertex-hub/db';
 import { and, eq, isNull } from 'drizzle-orm';
 import { DATABASE } from '../../core/database/database.module.js';
 import { runEach } from '../../core/jobs/index.js';
-import { AccountNotices, ResponsibilityRegistry, UserDirectory } from '../auth/index.js';
+import { AccountNotices, ResponsibilityRegistry } from '../auth/index.js';
 import { DailyReminders } from './daily-reminders.js';
 import { NotificationCenter } from './notification-center.js';
 
@@ -11,7 +11,7 @@ import { NotificationCenter } from './notification-center.js';
  * F16 part C: stores the notices of `auth` (department managers, membership changes, archived
  * members with open work) through `AccountNotices`, since `auth` cannot import this module. In the
  * daily job, `member_archived_open_work` closes once the member holds no open item any more (the
- * modules' checks in `ResponsibilityRegistry`), and goes void when the member is restored.
+ * modules' checks in `ResponsibilityRegistry`); restoring the member voids it (`UsersService`).
  */
 @Injectable()
 export class MemberNotices implements OnModuleInit {
@@ -23,12 +23,11 @@ export class MemberNotices implements OnModuleInit {
     private readonly accountNotices: AccountNotices,
     private readonly reminders: DailyReminders,
     private readonly responsibilities: ResponsibilityRegistry,
-    private readonly users: UserDirectory,
   ) {}
 
   onModuleInit(): void {
-    this.accountNotices.register(async (tx, notices) => {
-      await this.center.notify(tx, notices);
+    this.accountNotices.register(async (tx, notices, resolutions) => {
+      await this.center.notify(tx, notices, resolutions);
     });
     this.reminders.register('member-open-work', async () => {
       await this.resolveOpenWork();
@@ -54,13 +53,11 @@ export class MemberNotices implements OnModuleInit {
       ({ userId }) => `Open work of ${userId}`,
       async ({ userId }) => {
         const resolved = await this.db.transaction(async (tx) => {
-          const member = (await this.users.summaries([userId], tx)).get(userId);
-          const restored = member?.archived === false;
-          if (!restored && (await this.responsibilities.openWork(tx, userId)) > 0) return 0;
+          if ((await this.responsibilities.openWork(tx, userId)) > 0) return 0;
           return this.center.resolve(tx, {
             subject: { type: 'user', id: userId },
             types: ['member_archived_open_work'],
-            outcome: restored ? 'void' : 'done',
+            outcome: 'done',
             actorId: null,
           });
         });

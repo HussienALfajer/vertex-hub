@@ -299,6 +299,19 @@ export class UsersService {
         before: { status: 'archived' },
         after: { status: 'invited' },
       });
+      // F16: the work of a restored member is theirs again.
+      await this.notices.send(
+        tx,
+        [],
+        [
+          {
+            subject: { type: 'user', id },
+            types: ['member_archived_open_work'],
+            outcome: 'void',
+            actorId: actor.id,
+          },
+        ],
+      );
       return this.issueLink(tx, actor, id, 'activation', { restored: true });
     });
     return { user: await this.detail(actor, id), link };

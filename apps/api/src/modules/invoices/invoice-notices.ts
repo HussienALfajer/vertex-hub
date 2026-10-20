@@ -7,7 +7,7 @@ import {
   type NotificationResolution,
 } from '@vertex-hub/contracts';
 import { type Database, invoices, type Transaction } from '@vertex-hub/db';
-import { and, asc, eq, gt, inArray, isNull, lte } from 'drizzle-orm';
+import { and, asc, eq, gte, inArray, isNull, lte } from 'drizzle-orm';
 import { DATABASE } from '../../core/database/database.module.js';
 import { runEach } from '../../core/jobs/index.js';
 import { UserDirectory } from '../auth/index.js';
@@ -111,14 +111,14 @@ export class InvoiceNotices implements OnModuleInit {
   }
 
   /**
-   * Part C rule 3: once per invoice and due date, an issued invoice not yet paid that is due within
-   * three days; archived ones are skipped.
+   * Part C rule 3: once per invoice and due date, an issued invoice not yet paid that is due today
+   * or within three days; archived ones are skipped.
    */
   async remindDueSoon(today: CalendarDate): Promise<number> {
     const due = and(
       inArray(invoices.status, ['sent', 'partially_paid']),
       isNull(invoices.archivedAt),
-      gt(invoices.dueOn, today),
+      gte(invoices.dueOn, today),
       lte(invoices.dueOn, addDays(today, DUE_SOON_DAYS)),
     );
     const candidates = await this.db

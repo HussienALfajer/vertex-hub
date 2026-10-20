@@ -17,6 +17,7 @@ import {
 import { testDatabaseUrl } from '@vertex-hub/db/testing';
 import { and, eq, inArray } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { AccountEmails } from '../src/modules/auth/account-emails.js';
 import { CampaignNotices } from '../src/modules/campaigns/campaign-notices.js';
 import { InvoiceNotices } from '../src/modules/invoices/invoice-notices.js';
 import { EmailFailureNotices } from '../src/modules/notifications/email-failure-notices.js';
@@ -248,6 +249,15 @@ describe('notification catalog of the finance, campaigns and people modules (F16
         });
       }
     });
+
+    it('reminds of an invoice due today, which is not overdue yet', async () => {
+      const sent = await issue(await automaticDraft());
+      await db.update(invoices).set({ dueOn: today }).where(eq(invoices.id, sent.id));
+      await app.get(InvoiceNotices).remindDueSoon(today);
+      expect((await oneOf(cast.am.id, 'invoice_due_soon', sent.id)).data).toMatchObject({
+        dueOn: today,
+      });
+    });
   });
 
   describe('campaigns', () => {
@@ -317,6 +327,64 @@ describe('notification catalog of the finance, campaigns and people modules (F16
       });
     });
 
+    it('closes the end-date reminder when the end date moves, and voids it when cancelled', async () => {
+      const { id: clientId } = await cast.createClient();
+      const moved = await cast.activeCampaign(clientId, { endsOn: '2026-08-31' });
+      const cancelled = await cast.activeCampaign(clientId, { endsOn: '2026-08-31' });
+      await app.get(CampaignNotices).remindEndPassed(today);
+      await ok(
+        await client.request('PUT', `/api/campaigns/${moved.id}`, {
+          cookie: cast.marketer.cookie,
+          body: {
+            name: moved.name,
+            platform: moved.platform,
+            objective: moved.objective,
+            funding: moved.funding,
+            budgetMinor: moved.budgetMinor,
+            startsOn: moved.startsOn,
+            endsOn: addDays(today, 7),
+            ownerId: moved.owner.id,
+            projectId: null,
+            retainerId: null,
+            taskId: null,
+            notes: moved.notes,
+            updatedAt: moved.updatedAt,
+          },
+        }),
+      );
+      expect(await oneOf(cast.am.id, 'campaign_end_passed', moved.id)).toMatchObject({
+        resolution: 'done',
+      });
+      await ok(await cast.changeStatus(cancelled.id, 'cancelled', 'توقفت'));
+      expect(await oneOf(cast.am.id, 'campaign_end_passed', cancelled.id)).toMatchObject({
+        resolution: 'void',
+      });
+    });
+
+    it('voids the low-balance alert when the threshold is removed', async () => {
+      const { id: clientId } = await cast.createClient();
+      const threshold = (value: number | null) =>
+        patch(`/api/clients/${clientId}/ad-wallet`, cast.marketer.cookie, {
+          lowBalanceThresholdMinor: value,
+        });
+      await ok(await threshold(10_000));
+      await ok(
+        await client.post(`/api/clients/${clientId}/ad-wallet/entries`, cast.finance.cookie, {
+          kind: 'deposit',
+          occurredOn: today,
+          amountMinor: 5_000,
+          currency: 'USD',
+          method: 'bank_transfer',
+        }),
+        201,
+      );
+      expect((await oneOf(cast.am.id, 'ad_budget_low', clientId)).resolvedAt).toBeNull();
+      await ok(await threshold(null));
+      expect(await oneOf(cast.am.id, 'ad_budget_low', clientId)).toMatchObject({
+        resolution: 'void',
+      });
+    });
+
     it('tells of a deposit, and closes the low-balance alert once the balance is back', async () => {
       const { id: clientId } = await cast.createClient();
       await ok(
@@ -371,6 +439,31 @@ describe('notification catalog of the finance, campaigns and people modules (F16
       );
     });
 
+    it('tells nobody when a department’s manager is only removed', async () => {
+      const marketing = await departmentId(db, 'marketing');
+      await ok(await patch(`/api/departments/${marketing}`, cast.gm.cookie, { managerId: null }));
+      expect(await rowsOf(marketingManager.id, 'responsibility_moved', marketing)).toHaveLength(0);
+      await ok(
+        await patch(`/api/departments/${marketing}`, cast.gm.cookie, {
+          managerId: marketingManager.id,
+        }),
+      );
+    });
+
+    it('says nothing when only the primary department changes', async () => {
+      const member = await cast.signedIn({
+        departments: [{ code: 'design' }, { code: 'marketing' }],
+      });
+      await ok(
+        await patch(`/api/users/${member.id}`, cast.gm.cookie, {
+          primaryDepartmentId: await departmentId(db, 'marketing'),
+          secondaryDepartmentIds: [await departmentId(db, 'design')],
+        }),
+      );
+      expect(await rowsOf(member.id, 'member_moved', member.id)).toHaveLength(0);
+      expect(await rowsOf(marketingManager.id, 'member_moved', member.id)).toHaveLength(0);
+    });
+
     it('tells the member and the managers of the departments they left and joined', async () => {
       const member = await cast.signedIn({ departments: [{ code: 'design' }] });
       const marketing = await departmentId(db, 'marketing');
@@ -406,6 +499,30 @@ describe('notification catalog of the finance, campaigns and people modules (F16
       expect(
         await oneOf(marketingManager.id, 'member_archived_open_work', member.id),
       ).toMatchObject({ resolution: 'done', resolvedById: null });
+    });
+
+    it('voids the open-work notice when the member is restored', async () => {
+      const member = await cast.signedIn({ departments: [{ code: 'marketing' }] });
+      const { id: clientId } = await cast.createClient();
+      await cast.createCampaign(clientId, { ownerId: member.id }, cast.gm.cookie);
+      await ok(await client.post(`/api/users/${member.id}/archive`, cast.gm.cookie));
+      await ok(await client.post(`/api/users/${member.id}/restore`, cast.gm.cookie));
+      expect(
+        await oneOf(marketingManager.id, 'member_archived_open_work', member.id),
+      ).toMatchObject({ resolution: 'void', resolvedById: cast.gm.id });
+    });
+
+    it('copies a new-device email into the app (rule 5)', async () => {
+      const member = await cast.signedIn();
+      const emails = app.get(AccountEmails);
+      // The member signed in once already; this browser and system are new.
+      await emails.signedIn({
+        userId: member.id,
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/130.0 Safari/537.36',
+      });
+      const row = await oneOf(member.id, 'security_new_device', member.id);
+      expect(row).toMatchObject({ box: 'info', priority: 'important', emailState: null });
+      await db.delete(notifications).where(eq(notifications.recipientId, member.id));
     });
 
     it('copies a security email into the app without emailing it twice (rule 5)', async () => {
