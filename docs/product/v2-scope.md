@@ -34,7 +34,7 @@ Two tracks run in parallel: the Hub (this repository) and Vertex Mizan (its own 
 |---|---|---|
 | 1 | F16 Notifications 2.0, installable app and announcements | — |
 | 2 | F17 HR: employee files, attendance and leave | F16 (installed app, passkeys on registered devices) |
-| 3 | F18 Accounting through Vertex Mizan: integration, purchases for clients, profitability | Mizan's posting API, chart of accounts and cash boxes stable (Mizan phase 1) |
+| 3 | F18 Accounting through Vertex Mizan: integration, purchases for clients, profitability | Mizan's posting API, chart of accounts and cash boxes stable (ADR 0035) |
 | 4 | F19 HR: payroll, commissions and profit shares | F17, F18; Q15 and Q16 |
 | 5 | F20 Client portal (with client conversations) | F16 |
 | 6 | F21 Chat | F16, F20 for client conversations |
@@ -171,4 +171,4 @@ Approved by the owner in full (2026-10-20). The spec's analysis completes it int
 
 ## 5. Vertex Mizan
 
-Accounting is built in parallel as a separate product, Vertex Mizan, in its own repository: four phases, Vertex Media as its first tenant, sold later as an optional add-on to Vertex Food and Vertex Shifa and on its own. Decision, phases, integration and feature split: ADR 0035.
+Accounting is built in parallel as Vertex Mizan, a separate product in its own repository, `vertex-mizan`, where its scope, phases and roadmap live. The Hub's side of the decision and the integration: ADR 0035.
