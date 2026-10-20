@@ -73,7 +73,7 @@ Split from C1c because the remaining catalog still spans eight modules: C1b hold
 - [x] api campaigns: `campaign_assigned`, `campaign_status_changed`, owner `responsibility_moved`, `campaign_end_passed` daily (+ resolves), `ad_deposit_recorded`, `ad_budget_low` resolves; open campaigns as open work of an archived owner
 - [x] api auth: `department_manager_assigned` + manager `responsibility_moved`, `member_moved`, `member_archived_open_work` (+ daily resolution in notifications); security copies from the account emails; `email_failed` resolves on a later successful email
 - [x] bridge: `openapi:export`, `api:generate`, fixtures; web typecheck
-- [ ] checks, reviewer, acceptance, PR with auto-merge
+- [x] checks, reviewer, acceptance (owner, 2026-10-20), PR with auto-merge
 
 ## PR C2 — catalog: web texts and links
 - [ ] `ar.json` / `packages/messages` texts and links; E2E; checks, reviewer, acceptance (owner step C7), PR with auto-merge
