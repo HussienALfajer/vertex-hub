@@ -65,6 +65,7 @@ import {
   wasSent,
 } from './announcement-access.js';
 import { AnnouncementDelivery, type Unsendable } from './announcement-delivery.js';
+import { AnnouncementPolls, type AuditedPoll, auditedPoll } from './announcement-polls.js';
 
 /** The notification types an acknowledgement closes, and a withdrawal voids (rules D4, D10). */
 const ACK_TYPES = ['announcement', 'announcement_ack_reminder'] as const;
@@ -78,9 +79,10 @@ const unsendable = (code: Unsendable) =>
     ? new CodedException(409, code, 'Nobody is in the audience')
     : new CodedException(403, code, 'Critical or pinned for recipients outside your reach');
 
-/** The text an audit entry keeps of an announcement's editable fields. */
-function audited(row: Partial<AnnouncementRow>) {
+/** The text an audit entry keeps of an announcement's editable fields, with its poll if given. */
+function audited(row: Partial<AnnouncementRow>, poll?: AuditedPoll | null) {
   return {
+    poll,
     title: row.title,
     body: row.body === undefined ? undefined : announcementExcerpt(row.body as AnnouncementBody),
     linkUrl: row.linkUrl,
@@ -100,6 +102,7 @@ export class AnnouncementsService {
     private readonly delivery: AnnouncementDelivery,
     private readonly users: UserDirectory,
     private readonly center: NotificationCenter,
+    private readonly polls: AnnouncementPolls,
   ) {}
 
   /* Writing */
@@ -110,6 +113,9 @@ export class AnnouncementsService {
     this.assertPin(input.pinnedUntil ?? null, now);
     const scheduledAt =
       input.send === 'schedule' ? this.scheduleTime(input.scheduledAt, now) : null;
+    if (input.send !== 'draft') {
+      this.polls.assertCloseTime(input.poll?.closesAt ?? null, scheduledAt ?? now, now);
+    }
     const id = await this.db.transaction(async (tx) => {
       const [row] = await tx
         .insert(announcements)
@@ -128,6 +134,7 @@ export class AnnouncementsService {
         })
         .returning();
       if (!row) throw new Error('Insert returned no row');
+      if (input.poll) await this.polls.write(tx, row.id, input.poll);
       if (input.send === 'now') await this.sendNow(tx, actor, row, now);
       if (input.send === 'schedule') await this.schedule(tx, actor, { ...row, status: 'draft' });
       return row.id;
@@ -166,7 +173,17 @@ export class AnnouncementsService {
         throw new BadRequestException('Only a scheduled announcement takes a new time');
       }
       if (input.pinnedUntil !== undefined) this.assertPin(input.pinnedUntil, now);
-      const { notifyAgain, scheduledAt, ...fields } = input;
+      const { notifyAgain, scheduledAt, poll, ...fields } = input;
+      // Rule D10: a sent announcement's existing poll changes only while nobody has voted.
+      if (sent && poll !== undefined) {
+        const existing = await this.polls.pollOf(tx, id);
+        if (!existing || poll === null || (await this.polls.hasVotes(tx, id))) {
+          throw new CodedException(409, 'LOCKED_FIELD', 'Locked once sent', { fields: ['poll'] });
+        }
+        this.polls.assertCloseTime(poll.closesAt, row.sentAt ?? now, now);
+      }
+      const pollBefore = poll === undefined ? undefined : await this.polls.audited(tx, id);
+      const pollAfter = poll === undefined ? undefined : poll && auditedPoll(poll);
       const linkUrl = fields.linkUrl === undefined ? row.linkUrl : fields.linkUrl;
       const priority = fields.priority ?? row.priority;
       const next: Partial<AnnouncementRow> = {
@@ -180,8 +197,8 @@ export class AnnouncementsService {
         requiresAck: priority === 'critical' ? true : (fields.requiresAck ?? row.requiresAck),
         ...(scheduledAt ? { scheduledAt: this.scheduleTime(scheduledAt, now) } : {}),
       };
-      const changes = changedFields(audited(row), audited(next));
-      const contentChanged = ['title', 'body', 'linkUrl', 'linkLabel'].some(
+      const changes = changedFields(audited(row, pollBefore), audited(next, pollAfter));
+      const contentChanged = ['title', 'body', 'linkUrl', 'linkLabel', 'poll'].some(
         (key) => changes?.after[key as keyof typeof changes.after] !== undefined,
       );
       if (sent && next.pinnedUntil && next.pinnedUntil !== row.pinnedUntil) {
@@ -197,7 +214,9 @@ export class AnnouncementsService {
         .where(eq(announcements.id, id))
         .returning();
       if (!updated) throw new NotFoundException();
+      if (poll !== undefined) await this.polls.write(tx, id, poll);
       if (updated.status === 'scheduled') {
+        await this.polls.assertStoredCloseTime(tx, id, updated.scheduledAt ?? now, now);
         // The audience as it is now, as when it was scheduled (rule D5).
         const recipients = await this.delivery.recipientsOf(tx, updated, actor.access);
         if (!Array.isArray(recipients)) throw unsendable(recipients);
@@ -231,8 +250,10 @@ export class AnnouncementsService {
           .set({ status: 'scheduled', scheduledAt, unsentAt: null })
           .where(eq(announcements.id, id))
           .returning();
+        await this.polls.assertStoredCloseTime(tx, id, scheduledAt, now);
         if (updated) await this.schedule(tx, actor, { ...updated, status: 'draft' });
       } else {
+        await this.polls.assertStoredCloseTime(tx, id, now, now);
         await this.sendNow(tx, actor, row, now);
       }
     });
@@ -281,7 +302,7 @@ export class AnnouncementsService {
         .where(eq(announcements.id, id));
       await this.center.resolve(tx, {
         subject: { type: 'announcement', id },
-        types: ACK_TYPES,
+        types: [...ACK_TYPES, 'poll_closing'],
         outcome: 'void',
         actorId: actor.id,
         includeInfo: true,
@@ -744,6 +765,10 @@ export class AnnouncementsService {
         ),
       );
     const receiptOf = new Map(receipts.map((r) => [r.announcementId, r]));
+    const polls = await this.polls.views(
+      actor,
+      rows.map((row) => ({ row, receipt: receiptOf.get(row.id) ?? null })),
+    );
     return rows.map((row, index) => {
       const summary = summaries[index] as AnnouncementSummary;
       const showsAudience = row.authorId === actor.id || managesAll(actor.access);
@@ -757,6 +782,7 @@ export class AnnouncementsService {
         withdrawnBy: row.withdrawnById
           ? { id: row.withdrawnById, name: withdrawers.get(row.withdrawnById)?.name ?? '' }
           : null,
+        poll: polls.get(row.id) ?? null,
         rights: rightsOf(actor, row, receiptOf.get(row.id) ?? null),
       };
     });

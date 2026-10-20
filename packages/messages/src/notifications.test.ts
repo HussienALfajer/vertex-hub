@@ -231,6 +231,8 @@ const SAMPLES: Record<NotificationType, unknown> = {
   },
   announcement_ack_reminder: { title: 'دوام رمضان' },
   announcement_ack_summary: { title: 'دوام رمضان', pending: 4 },
+  poll_closing: { title: 'دوام رمضان', closesAt: '2026-10-22T09:00:00.000Z' },
+  poll_results: { title: 'دوام رمضان', voters: 12 },
   action_reminder: {
     originalType: 'task_review_requested',
     originalData: { task },
@@ -610,6 +612,14 @@ describe('announcements (F16 part D)', () => {
       'لم يؤكد 4 مستلمين قراءة إعلانك «دوام رمضان» بعد ثلاثة تذكيرات',
     );
     expect(linkPath(notificationLink(sample('announcement')))).toBe(`/announcements/${SUBJECT_ID}`);
+  });
+
+  it('reminds a non-voter before a poll closes and tells the author how many voted (rule D11)', () => {
+    expect(render('poll_closing').text).toBe(
+      'لم تصوّت بعد في استطلاع الإعلان «دوام رمضان»، ويُغلق في 22 تشرين الأول 2026 في 12:00 م',
+    );
+    expect(render('poll_results').text).toBe('أُغلق استطلاع إعلانك «دوام رمضان» بـ12 صوتًا');
+    expect(linkPath(notificationLink(sample('poll_results')))).toBe(`/announcements/${SUBJECT_ID}`);
   });
 
   it("pushes an announcement as its title and the body's first characters (rule D13)", () => {

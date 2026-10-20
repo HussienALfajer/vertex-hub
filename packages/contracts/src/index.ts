@@ -1,3 +1,4 @@
+export * from './announcement-templates.js';
 export * from './announcements.js';
 export * from './approval-views.js';
 export * from './approvals.js';

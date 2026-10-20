@@ -6,8 +6,12 @@ import {
   adCampaignUpdates,
   adWalletEntries,
   adWallets,
+  announcementPollOptions,
+  announcementPolls,
+  announcementPollVotes,
   announcementRecipients,
   announcements,
+  announcementTemplates,
   approvalItems,
   approvalRequests,
   auditEntries,
@@ -248,6 +252,8 @@ export async function removeUsers(db: Database, ids: string[]): Promise<void> {
     ).map((row) => row.id),
   );
   await db.delete(announcementRecipients).where(inArray(announcementRecipients.userId, ids));
+  await db.delete(announcementPollVotes).where(inArray(announcementPollVotes.userId, ids));
+  await db.delete(announcementTemplates).where(inArray(announcementTemplates.ownerId, ids));
   await removeShoots(
     db,
     [
@@ -332,7 +338,10 @@ export async function removeUsers(db: Database, ids: string[]): Promise<void> {
   await db.delete(users).where(inArray(users.id, ids));
 }
 
-/** Removes announcements with their recipients, files, notifications and audit (test cleanup). */
+/**
+ * Removes announcements with their recipients, polls, files, notifications and audit (test
+ * cleanup).
+ */
 export async function removeAnnouncements(db: Database, ids: string[]): Promise<void> {
   if (ids.length === 0) return;
   await removeFileItems(db, inArray(fileItems.announcementId, ids) as SQL);
@@ -342,6 +351,11 @@ export async function removeAnnouncements(db: Database, ids: string[]): Promise<
   await db
     .delete(announcementRecipients)
     .where(inArray(announcementRecipients.announcementId, ids));
+  await db.delete(announcementPollVotes).where(inArray(announcementPollVotes.announcementId, ids));
+  await db
+    .delete(announcementPollOptions)
+    .where(inArray(announcementPollOptions.announcementId, ids));
+  await db.delete(announcementPolls).where(inArray(announcementPolls.announcementId, ids));
   await db.delete(announcements).where(inArray(announcements.id, ids));
 }
 

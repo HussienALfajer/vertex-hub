@@ -352,11 +352,13 @@
     "ALREADY_RESOLVED": "أُغلق هذا الإشعار، فلا يمكن تأجيله.",
     "EMPTY_AUDIENCE": "لا يوجد أحد في هذا الجمهور.",
     "FORBIDDEN_AUDIENCE": "لا يمكنك إرسال إعلان حرج أو تثبيته لهذا الجمهور: بعض المستلمين خارج أقسامك.",
-    "LOCKED_FIELD": "لا يمكن تغيير الجمهور أو الأولوية أو تأكيد القراءة بعد إرسال الإعلان.",
+    "LOCKED_FIELD": "لا يمكن تغيير الجمهور أو الأولوية أو تأكيد القراءة بعد إرسال الإعلان، ولا الاستطلاع بعد أول تصويت.",
     "NOT_DRAFT": "هذا الإعلان ليس مسودة.",
     "NOT_SCHEDULED": "هذا الإعلان غير مجدول.",
     "ALREADY_WITHDRAWN": "سُحب هذا الإعلان من قبل.",
     "NO_ACK_REQUIRED": "هذا الإعلان لا يطلب تأكيد القراءة.",
+    "POLL_CLOSED": "أُغلق هذا الاستطلاع، فلا يمكن التصويت فيه.",
+    "SINGLE_CHOICE": "هذا الاستطلاع يقبل خيارًا واحدًا فقط.",
     "CONCURRENT_CHANGE": "تغيّر هذا السجل في اللحظة نفسها من طلب آخر. أعد المحاولة.",
     "FILE_EMPTY": "الملف فارغ.",
     "FILE_TOO_LARGE": "الملف أكبر من 250 ميغابايت. أضفه كرابط.",
@@ -889,7 +891,8 @@
       "retainer_contract": "عقد تقديم خدمات",
       "retainer_contract_annex": "ملحق عقد",
       "notification_policy": "سياسة قنوات الإشعارات",
-      "announcement": "إعلان"
+      "announcement": "إعلان",
+      "announcement_template": "قالب إعلان"
     },
     "actions": {
       "user": {
@@ -1229,6 +1232,14 @@
         "edited": "عدّل إعلانًا",
         "withdrawn": "سحب إعلانًا",
         "archived": "تجاهل مسودة إعلان"
+      },
+      "announcement_poll": {
+        "closed": "أغلق استطلاع إعلان"
+      },
+      "announcement_template": {
+        "created": "أنشأ قالب إعلان مشتركًا",
+        "updated": "عدّل قالب إعلان مشتركًا",
+        "archived": "أرشف قالب إعلان مشتركًا"
       }
     },
     "fields": {
@@ -1536,7 +1547,10 @@
       "pinnedUntil": "مثبت حتى",
       "scheduledAt": "موعد الإرسال",
       "recipients": "المستلمون",
-      "notifyAgain": "إشعار من جديد"
+      "notifyAgain": "إشعار من جديد",
+      "poll": "الاستطلاع",
+      "closed": "مغلق",
+      "voters": "المصوّتون"
     },
     "kinds": {
       "activation": "تفعيل",
@@ -4498,6 +4512,8 @@
       "announcement": "إعلان وصلني",
       "announcement_ack_reminder": "تذكير بتأكيد قراءة إعلان",
       "announcement_ack_summary": "ملخص من لم يؤكد قراءة إعلاني",
+      "poll_closing": "استطلاع لم أصوّت فيه يُغلق غدًا",
+      "poll_results": "إغلاق استطلاع في إعلاني",
       "action_reminder": "تذكير بعمل ما زال ينتظر",
       "action_escalated": "تصعيد عمل متأخر إليّ",
       "action_escalated_top": "تصعيد عمل متأخر إلى الإدارة"

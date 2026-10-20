@@ -143,6 +143,8 @@ export const NOTIFICATION_TYPES = [
   'announcement',
   'announcement_ack_reminder',
   'announcement_ack_summary',
+  'poll_closing',
+  'poll_results',
   'action_reminder',
   'action_escalated',
   'action_escalated_top',
@@ -337,6 +339,8 @@ const CATALOG: Record<
     mutable: false,
   },
   announcement_ack_summary: { category: 'announcements', subject: 'announcement', mutable: true },
+  poll_closing: { category: 'announcements', subject: 'announcement', mutable: true },
+  poll_results: { category: 'announcements', subject: 'announcement', mutable: true },
   /** F16 rule B11: the escalation steps open the original's record; its subject type is given. */
   action_reminder: { category: 'reminders', subject: 'task', mutable: false },
   action_escalated: { category: 'reminders', subject: 'task', mutable: false },
@@ -507,6 +511,8 @@ const CHANNELS: Record<NotificationType, Channels> = {
   announcement: normal(),
   announcement_ack_reminder: important(),
   announcement_ack_summary: normal(),
+  poll_closing: normal(),
+  poll_results: informational,
   action_reminder: important(),
   action_escalated: important('on'),
   action_escalated_top: critical(),
@@ -718,6 +724,9 @@ const ENGINE: Record<NotificationType, Engine> = {
   announcement: info,
   announcement_ack_reminder: action(),
   announcement_ack_summary: info,
+  /** Rule D11: closed by a vote, or void when the poll closes. */
+  poll_closing: action(),
+  poll_results: info,
   action_reminder: action(),
   action_escalated: action(),
   action_escalated_top: action(),
@@ -1202,6 +1211,10 @@ export const NOTIFICATION_DATA_SCHEMAS = {
   announcement_ack_reminder: announcementData,
   /** Rule D8: after the third round, `pending` recipients still have not acknowledged it. */
   announcement_ack_summary: announcementData.extend({ pending: z.number().int().min(1) }),
+  /** Rule D11: the poll closes at `closesAt`; the recipient has not voted yet. */
+  poll_closing: announcementData.extend({ closesAt: z.iso.datetime() }),
+  /** Rule D11: the poll closed with `voters` people having voted. */
+  poll_results: announcementData.extend({ voters: z.number().int().min(0) }),
   /** F16 rule B11 step 1: the original still waits on its recipients. */
   action_reminder: escalationData,
   /** Step 2: the managers of those it waits on (or the step's department or role). */
@@ -1678,6 +1691,8 @@ export const NOTIFICATION_REMINDER_KINDS = [
   /** F16 rule D8: once per announcement and work day, and the author's summary once. */
   'ack_reminder',
   'ack_summary',
+  /** F16 rule D11: once per poll and closing date. */
+  'poll_closing',
 ] as const;
 
 export type NotificationReminderKind = (typeof NOTIFICATION_REMINDER_KINDS)[number];

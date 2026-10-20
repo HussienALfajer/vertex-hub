@@ -246,6 +246,10 @@ export const AUDIT_ACTIONS = [
   'announcement.edited',
   'announcement.withdrawn',
   'announcement.archived',
+  'announcement_poll.closed',
+  'announcement_template.created',
+  'announcement_template.updated',
+  'announcement_template.archived',
 ] as const;
 
 export const auditActionSchema = z.enum(AUDIT_ACTIONS).meta({ id: 'AuditAction' });
@@ -299,6 +303,7 @@ export const AUDIT_ENTITY_TYPES = [
   'retainer_contract_annex',
   'notification_policy',
   'announcement',
+  'announcement_template',
 ] as const;
 
 export const auditEntityTypeSchema = z.enum(AUDIT_ENTITY_TYPES).meta({ id: 'AuditEntityType' });
