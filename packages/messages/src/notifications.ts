@@ -1,4 +1,5 @@
 import type {
+  AdCampaignStatus,
   DeliverableKind,
   DepartmentCode,
   Notification,
@@ -19,6 +20,7 @@ import {
   formatPeriod,
   formatTimeOfDay,
 } from './format.js';
+import { SECURITY_CHANGE_TEXT } from './security-changes.js';
 import { fill, type PluralForms, plural } from './text.js';
 
 /*
@@ -31,7 +33,7 @@ import { fill, type PluralForms, plural } from './text.js';
 const BEHIND_LINES_SHOWN = 3;
 
 /** Who did it, when the notification has no actor (the daily job, automatic runs). */
-const SYSTEM_ACTOR = 'النظام';
+export const SYSTEM_ACTOR = 'النظام';
 
 /** The deliverable kinds of a retainer line without a label of its own (P2A). */
 export const DELIVERABLE_KIND_NAMES: Record<DeliverableKind, string> = {
@@ -87,6 +89,15 @@ export const RETAINER_STATUS_NAMES: Record<RetainerStatus, string> = {
   active: 'نشط',
   paused: 'متوقف مؤقتًا',
   ended: 'منتهٍ',
+};
+
+/** The status names of a campaign notice (F16 part C). */
+export const CAMPAIGN_STATUS_NAMES: Record<AdCampaignStatus, string> = {
+  planned: 'مخطّطة',
+  active: 'نشطة',
+  paused: 'متوقفة مؤقتًا',
+  completed: 'مكتملة',
+  cancelled: 'ملغاة',
 };
 
 /** The texts of the notification types, with `{{name}}` placeholders. */
@@ -318,6 +329,8 @@ export const NOTIFICATION_TEXT = {
     account_manager: 'نقل {{actor}} إدارة حساب {{record}} إلى {{holder}}',
     project_manager: 'نقل {{actor}} إدارة المشروع «{{record}}» إلى {{holder}}',
     lead_owner: 'نقل {{actor}} العميل المحتمل «{{record}}» إلى {{holder}}',
+    campaign_owner: 'نقل {{actor}} الحملة «{{record}}» إلى {{holder}}',
+    department_manager: 'نقل {{actor}} إدارة قسم {{record}} إلى {{holder}}',
   },
   approval_opened: 'فتح {{contact}} رابط اعتماد «{{client}}»',
   approval_completed: 'ردّ {{contact}} على كل أعمال رابط «{{client}}»',
@@ -348,6 +361,32 @@ export const NOTIFICATION_TEXT = {
   contract_voided: {
     contract: 'ألغى {{actor}} العقد {{contract}}',
     annex: 'ألغى {{actor}} الملحق {{annex}} من العقد {{contract}}',
+  },
+  invoice_draft_created: 'مسودة فاتورة جديدة بانتظار الإصدار: «{{description}}»',
+  invoice_due_soon: 'تستحق الفاتورة {{invoice}} في {{date}}',
+  payment_recorded: 'سجّل {{actor}} دفعة {{amount}} على الفاتورة {{invoice}}',
+  payment_voided: 'ألغى {{actor}} دفعة {{amount}} على الفاتورة {{invoice}}',
+  invoice_voided: 'ألغى {{actor}} الفاتورة {{invoice}}',
+  ad_deposit_recorded: 'سجّل {{actor}} إيداعًا في محفظة إعلانات {{client}} (الإيصال {{receipt}})',
+  campaign_assigned: 'أسند إليك {{actor}} الحملة «{{campaign}}»',
+  campaign_status_changed: 'انتقلت الحملة «{{campaign}}» إلى «{{status}}» بواسطة {{actor}}',
+  campaign_end_passed: 'انتهى موعد الحملة «{{campaign}}» في {{date}} وما زالت نشطة',
+  department_manager_assigned: 'عيّنك {{actor}} مديرًا لقسم {{department}}',
+  member_moved: 'غيّر {{actor}} أقسام {{member}}',
+  memberLeft: 'غادر {{departments}}',
+  memberJoined: 'انضم إلى {{departments}}',
+  member_archived_open_work: {
+    zero: 'أُرشف {{member}}',
+    one: 'أُرشف {{member}} وما زال لديه عمل مفتوح',
+    two: 'أُرشف {{member}} وما زال لديه عملان مفتوحان',
+    few: 'أُرشف {{member}} وما زالت لديه {{n}} أعمال مفتوحة',
+    many: 'أُرشف {{member}} وما زال لديه {{n}} عملًا مفتوحًا',
+    other: 'أُرشف {{member}} وما زال لديه {{n}} عمل مفتوح',
+  },
+  security_new_device: 'سُجّل الدخول إلى حسابك من جهاز جديد: {{device}}',
+  security_notice: {
+    by: '{{what}} بواسطة {{by}}',
+    self: '{{what}} بواسطتك',
   },
   /** F16 rule B11: each escalation step wraps the original's text. */
   action_reminder: 'تذكير: {{text}}',
@@ -390,7 +429,7 @@ export function notificationLink(notification: Notification): NotificationLink {
   const original = escalatedOriginal(notification);
   if (original) return notificationLink(original);
   const { subject } = notification;
-  if (notification.type === 'ad_budget_low') {
+  if (notification.type === 'ad_budget_low' || notification.type === 'ad_deposit_recorded') {
     // The client's wallet is on its Ads tab (F12 screen 6).
     return { to: '/clients/$clientId', params: { clientId: subject.id }, search: { tab: 'ads' } };
   }
@@ -447,8 +486,19 @@ export function notificationLink(notification: Notification): NotificationLink {
     case 'lead':
       return { to: '/leads/$leadId', params: { leadId: subject.id } };
     case 'user':
-      // F16 rule A13: the signed-in devices are on My account.
+      // F16 part C: a member's notices open their profile.
+      if (
+        notification.type === 'member_moved' ||
+        notification.type === 'member_archived_open_work'
+      ) {
+        return { to: '/team/$userId', params: { userId: subject.id } };
+      }
+      // F16 rule A13 and part C rule 5: the signed-in devices and security are on My account.
       return { to: '/account' };
+    case 'campaign':
+      return { to: '/campaigns/$campaignId', params: { campaignId: subject.id } };
+    case 'department':
+      return { to: '/departments/$departmentId', params: { departmentId: subject.id } };
     default:
       return { to: '/tasks/$taskId', params: { taskId: subject.id } };
   }
@@ -922,6 +972,112 @@ export function notificationText(
         text: fill(text.push_device_lost, { device: notification.data.device }),
         context: null,
       };
+    case 'invoice_draft_created':
+      return {
+        text: fill(text.invoice_draft_created, { description: notification.data.description }),
+        context: notification.data.client,
+      };
+    case 'invoice_due_soon':
+      return {
+        text: fill(text.invoice_due_soon, {
+          invoice: notification.data.invoice.displayNumber,
+          date: formatCalendarDate(notification.data.dueOn),
+        }),
+        context: notification.data.invoice.client,
+      };
+    case 'payment_recorded':
+    case 'payment_voided': {
+      const { data } = notification;
+      return {
+        text: fill(text[notification.type], {
+          actor,
+          amount: formatMoney(data.amountMinor, data.currency),
+          invoice: data.invoice.displayNumber,
+        }),
+        context: data.invoice.client,
+      };
+    }
+    case 'invoice_voided':
+      return {
+        text: fill(text.invoice_voided, {
+          actor,
+          invoice: notification.data.invoice.displayNumber,
+        }),
+        context: notification.data.invoice.client,
+      };
+    case 'ad_deposit_recorded':
+      return {
+        text: fill(text.ad_deposit_recorded, {
+          actor,
+          client: notification.data.client,
+          receipt: notification.data.receipt,
+        }),
+        context: null,
+      };
+    case 'campaign_assigned':
+    case 'campaign_status_changed':
+    case 'campaign_end_passed': {
+      const { campaign } = notification.data;
+      return {
+        text: fill(text[notification.type], {
+          actor,
+          campaign: campaign.name,
+          status:
+            notification.type === 'campaign_status_changed'
+              ? CAMPAIGN_STATUS_NAMES[notification.data.status]
+              : '',
+          date:
+            notification.type === 'campaign_end_passed'
+              ? formatCalendarDate(notification.data.endsOn)
+              : '',
+        }),
+        context: campaign.client,
+      };
+    }
+    case 'department_manager_assigned': {
+      const { department } = notification.data;
+      return {
+        text: fill(text.department_manager_assigned, {
+          actor,
+          department: departmentName(department) || department,
+        }),
+        context: null,
+      };
+    }
+    case 'member_moved': {
+      const { data } = notification;
+      const names = (codes: readonly DepartmentCode[]) =>
+        formatList(codes.map((code) => departmentName(code) || code));
+      return {
+        text: fill(text.member_moved, { actor, member: data.member }),
+        context: context(
+          data.left.length ? fill(text.memberLeft, { departments: names(data.left) }) : null,
+          data.joined.length ? fill(text.memberJoined, { departments: names(data.joined) }) : null,
+        ),
+      };
+    }
+    case 'member_archived_open_work':
+      return {
+        text: counted(text.member_archived_open_work, notification.data.count, {
+          member: notification.data.member,
+        }),
+        context: null,
+      };
+    case 'security_new_device':
+      return {
+        text: fill(text.security_new_device, { device: notification.data.device }),
+        context: formatDateTime(notification.data.at),
+      };
+    case 'security_notice': {
+      const { change, by } = notification.data;
+      const what = SECURITY_CHANGE_TEXT[change].what;
+      return {
+        text: by
+          ? fill(text.security_notice.by, { what, by })
+          : fill(text.security_notice.self, { what }),
+        context: null,
+      };
+    }
     case 'action_reminder':
     case 'action_escalated':
     case 'action_escalated_top': {
@@ -1014,6 +1170,12 @@ type TaskNotification = Exclude<
       | 'extra_work_created'
       | `retainer_${string}`
       | `contract_${string}`
+      | `payment_${string}`
+      | 'ad_deposit_recorded'
+      | `campaign_${string}`
+      | 'department_manager_assigned'
+      | `member_${string}`
+      | `security_${string}`
       | CalendarNotification['type'];
   }
 >;

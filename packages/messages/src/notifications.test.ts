@@ -7,7 +7,7 @@ import {
   notificationSchema,
 } from '@vertex-hub/contracts';
 import { describe, expect, it } from 'vitest';
-import { formatAmount, formatCalendarDate } from './format.js';
+import { formatAmount, formatCalendarDate, formatMoney } from './format.js';
 import { linkPath, notificationLink, notificationText } from './notifications.js';
 import { morningPush, notificationPush, PUSH_APP_NAME, testPush } from './push.js';
 
@@ -199,6 +199,30 @@ const SAMPLES: Record<NotificationType, unknown> = {
     contract: 'C-2026-0003',
     annex: 2,
   },
+  invoice_draft_created: {
+    client: 'مطعم الشام',
+    origin: 'milestone_done',
+    description: 'إطلاق المنيو — التصميم',
+  },
+  invoice_due_soon: { invoice, dueOn: '2026-10-08' },
+  payment_recorded: { invoice, amountMinor: 120_000, currency: 'USD' },
+  payment_voided: { invoice, amountMinor: 120_000, currency: 'USD' },
+  invoice_voided: { invoice },
+  ad_deposit_recorded: { client: 'مطعم الشام', receipt: 'AD-2026-0002' },
+  campaign_assigned: { campaign: { name: 'حملة رمضان', client: 'مطعم الشام' } },
+  campaign_status_changed: {
+    campaign: { name: 'حملة رمضان', client: 'مطعم الشام' },
+    status: 'paused',
+  },
+  campaign_end_passed: {
+    campaign: { name: 'حملة رمضان', client: 'مطعم الشام' },
+    endsOn: '2026-10-03',
+  },
+  department_manager_assigned: { department: 'design' },
+  member_moved: { member: 'سامر', left: ['design'], joined: ['photography'] },
+  member_archived_open_work: { member: 'سامر', count: 3 },
+  security_new_device: { device: 'Chrome على Windows', at: '2026-10-05T07:00:00.000Z' },
+  security_notice: { change: 'roles_changed', by: 'رنا' },
   action_reminder: {
     originalType: 'task_review_requested',
     originalData: { task },
@@ -366,6 +390,62 @@ describe('sales and engagement notices (F16 part C)', () => {
         sample('extra_work_created', { subject: { type: 'retainer', id: SUBJECT_ID } }),
       ),
     ).toEqual({ to: '/retainers/$retainerId', params: { retainerId: SUBJECT_ID } });
+  });
+});
+
+describe('finance, campaigns and people notices (F16 part C)', () => {
+  const names: Record<string, string> = { design: 'التصميم', photography: 'التصوير' };
+  const render = (type: NotificationType) =>
+    notificationText(sample(type), (code) => names[code] ?? '');
+
+  it('names the payment amount in the bell and leaves it off the push (rule A9)', () => {
+    expect(render('payment_recorded').text).toBe(
+      `سجّل رنا دفعة ${formatMoney(120_000, 'USD')} على الفاتورة INV-2026-0012`,
+    );
+    expect(notificationPush(sample('payment_voided'), departmentName).body).toBe(
+      'ألغى رنا دفعة على الفاتورة INV-2026-0012',
+    );
+  });
+
+  it('names a campaign, its new status and its passed end date', () => {
+    expect(render('campaign_status_changed').text).toBe(
+      'انتقلت الحملة «حملة رمضان» إلى «متوقفة مؤقتًا» بواسطة رنا',
+    );
+    expect(render('campaign_end_passed')).toEqual({
+      text: `انتهى موعد الحملة «حملة رمضان» في ${formatCalendarDate('2026-10-03')} وما زالت نشطة`,
+      context: 'مطعم الشام',
+    });
+  });
+
+  it('names departments by their current name, and the open work of an archived member', () => {
+    expect(render('department_manager_assigned').text).toBe('عيّنك رنا مديرًا لقسم التصميم');
+    expect(render('member_moved')).toEqual({
+      text: 'غيّر رنا أقسام سامر',
+      context: 'غادر التصميم · انضم إلى التصوير',
+    });
+    expect(render('member_archived_open_work').text).toBe('أُرشف سامر وما زالت لديه 3 أعمال مفتوحة');
+  });
+
+  it('copies the security emails, naming who made the change', () => {
+    expect(render('security_notice').text).toBe('تغيّرت الأدوار المسندة إليك بواسطة رنا');
+    expect(
+      notificationText(
+        sample('security_notice', { data: { change: 'password_changed', by: null } } as never),
+        () => '',
+      ).text,
+    ).toBe('تغيّرت كلمة مرور حسابك بواسطتك');
+  });
+
+  it('opens a campaign, a department, a member, the ads tab and My account', () => {
+    const link = (type: NotificationType, subjectType: string) =>
+      linkPath(
+        notificationLink(sample(type, { subject: { type: subjectType, id: SUBJECT_ID } } as never)),
+      );
+    expect(link('campaign_assigned', 'campaign')).toBe(`/campaigns/${SUBJECT_ID}`);
+    expect(link('department_manager_assigned', 'department')).toBe(`/departments/${SUBJECT_ID}`);
+    expect(link('member_moved', 'user')).toBe(`/team/${SUBJECT_ID}`);
+    expect(link('ad_deposit_recorded', 'client')).toBe(`/clients/${SUBJECT_ID}?tab=ads`);
+    expect(link('security_new_device', 'user')).toBe('/account');
   });
 });
 

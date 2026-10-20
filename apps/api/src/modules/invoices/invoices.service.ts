@@ -68,6 +68,7 @@ import {
   covers,
   holdsAll,
 } from './invoice-access.js';
+import { InvoiceNotices } from './invoice-notices.js';
 import { InvoiceSettingsService } from './invoice-settings.service.js';
 import { InvoiceSnapshots } from './invoice-snapshots.js';
 
@@ -140,6 +141,7 @@ export class InvoicesService {
     private readonly files: GeneratedFiles,
     private readonly snapshots: InvoiceSnapshots,
     private readonly catalog: CatalogDirectory,
+    private readonly notices: InvoiceNotices,
   ) {}
 
   private readonly logger = new Logger(InvoicesService.name);
@@ -381,6 +383,7 @@ export class InvoicesService {
         before: { ...identity(invoice), archived: false },
         after: { ...identity(invoice), archived: true },
       });
+      await this.notices.draftClosed(tx, id, 'void', actor.id);
       return invoice.draftPdfObjectKey;
     });
     // The preview of a discarded draft is deleted.

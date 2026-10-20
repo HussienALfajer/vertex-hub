@@ -15,6 +15,7 @@ import { InvoiceDueDates } from './invoice-due-dates.js';
 import { InvoiceEmailsController } from './invoice-emails.controller.js';
 import { InvoiceEmailsService } from './invoice-emails.service.js';
 import { InvoiceFileOwner } from './invoice-file-owner.js';
+import { InvoiceNotices } from './invoice-notices.js';
 import { InvoiceOverdueService } from './invoice-overdue.service.js';
 import { InvoicePdfService } from './invoice-pdf.service.js';
 import { InvoiceReports } from './invoice-reports.js';
@@ -41,7 +42,9 @@ import { ProjectExpensesService } from './project-expenses.service.js';
  * `notifications.daily`. Owns `project_expenses` and serves client balances and statements, and the
  * billing summaries of projects (with their margin) and retainers; exports `InvoiceDueDates` for
  * the company calendar, and `DocumentNumbers` (ad deposit receipt numbers and the current rate)
- * for `campaigns` (F12), and `InvoiceReports` for `reports` (F15). Numbers contracts and gives
+ * for `campaigns` (F12), and `InvoiceReports` for `reports` (F15). F16 part C: `InvoiceNotices`
+ * tells Finance of automatic drafts, and of voided invoices and those due soon (a source of
+ * `notifications.daily`). Numbers contracts and gives
  * them the payment terms through `projects`' `ContractSources` (F05C). Invoice lines may name a catalog
  * service, checked through `catalog`'s `CatalogDirectory` (F15).
  */
@@ -70,6 +73,7 @@ import { ProjectExpensesService } from './project-expenses.service.js';
     InvoiceEmailsService,
     InvoiceWorkflowService,
     InvoiceDrafts,
+    InvoiceNotices,
     PaymentsService,
     InvoiceOverdueService,
     InvoiceFileOwner,

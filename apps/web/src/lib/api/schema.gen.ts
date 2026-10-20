@@ -8761,7 +8761,7 @@ export interface components {
             type: "responsibility_moved";
             data: {
                 /** @enum {string} */
-                role: "post_responsible" | "account_manager" | "project_manager" | "lead_owner";
+                role: "post_responsible" | "account_manager" | "project_manager" | "lead_owner" | "campaign_owner" | "department_manager";
                 record: string;
                 holder: string;
             };
@@ -9355,6 +9355,304 @@ export interface components {
             /** Format: date-time */
             updatedAt: string;
             /** @enum {string} */
+            type: "invoice_draft_created";
+            data: {
+                client: string;
+                /** @enum {string} */
+                origin: "quote_accepted" | "milestone_done" | "cycle_opened" | "retainer_amendment" | "retainer_termination";
+                description: string;
+            };
+        } | {
+            /** Format: uuid */
+            id: string;
+            actor: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            subject: {
+                type: components["schemas"]["NotificationSubjectType"];
+                /** Format: uuid */
+                id: string;
+            };
+            count: number;
+            read: boolean;
+            /** @default normal */
+            priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
+            box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
+            inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
+            resolution: {
+                outcome: components["schemas"]["NotificationResolution"];
+                by: {
+                    /** Format: uuid */
+                    id: string;
+                    name: string;
+                } | null;
+                /** Format: date-time */
+                at: string;
+            } | null;
+            /**
+             * Format: date-time
+             * @default null
+             */
+            snoozedUntil: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @enum {string} */
+            type: "invoice_due_soon";
+            data: {
+                invoice: {
+                    displayNumber: string;
+                    client: string;
+                };
+                /** Format: date */
+                dueOn: string;
+            };
+        } | {
+            /** Format: uuid */
+            id: string;
+            actor: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            subject: {
+                type: components["schemas"]["NotificationSubjectType"];
+                /** Format: uuid */
+                id: string;
+            };
+            count: number;
+            read: boolean;
+            /** @default normal */
+            priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
+            box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
+            inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
+            resolution: {
+                outcome: components["schemas"]["NotificationResolution"];
+                by: {
+                    /** Format: uuid */
+                    id: string;
+                    name: string;
+                } | null;
+                /** Format: date-time */
+                at: string;
+            } | null;
+            /**
+             * Format: date-time
+             * @default null
+             */
+            snoozedUntil: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @enum {string} */
+            type: "payment_recorded";
+            data: {
+                invoice: {
+                    displayNumber: string;
+                    client: string;
+                };
+                amountMinor: number;
+                currency: components["schemas"]["Currency"];
+            };
+        } | {
+            /** Format: uuid */
+            id: string;
+            actor: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            subject: {
+                type: components["schemas"]["NotificationSubjectType"];
+                /** Format: uuid */
+                id: string;
+            };
+            count: number;
+            read: boolean;
+            /** @default normal */
+            priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
+            box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
+            inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
+            resolution: {
+                outcome: components["schemas"]["NotificationResolution"];
+                by: {
+                    /** Format: uuid */
+                    id: string;
+                    name: string;
+                } | null;
+                /** Format: date-time */
+                at: string;
+            } | null;
+            /**
+             * Format: date-time
+             * @default null
+             */
+            snoozedUntil: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @enum {string} */
+            type: "payment_voided";
+            data: {
+                invoice: {
+                    displayNumber: string;
+                    client: string;
+                };
+                amountMinor: number;
+                currency: components["schemas"]["Currency"];
+            };
+        } | {
+            /** Format: uuid */
+            id: string;
+            actor: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            subject: {
+                type: components["schemas"]["NotificationSubjectType"];
+                /** Format: uuid */
+                id: string;
+            };
+            count: number;
+            read: boolean;
+            /** @default normal */
+            priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
+            box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
+            inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
+            resolution: {
+                outcome: components["schemas"]["NotificationResolution"];
+                by: {
+                    /** Format: uuid */
+                    id: string;
+                    name: string;
+                } | null;
+                /** Format: date-time */
+                at: string;
+            } | null;
+            /**
+             * Format: date-time
+             * @default null
+             */
+            snoozedUntil: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @enum {string} */
+            type: "invoice_voided";
+            data: {
+                invoice: {
+                    displayNumber: string;
+                    client: string;
+                };
+            };
+        } | {
+            /** Format: uuid */
+            id: string;
+            actor: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            subject: {
+                type: components["schemas"]["NotificationSubjectType"];
+                /** Format: uuid */
+                id: string;
+            };
+            count: number;
+            read: boolean;
+            /** @default normal */
+            priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
+            box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
+            inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
+            resolution: {
+                outcome: components["schemas"]["NotificationResolution"];
+                by: {
+                    /** Format: uuid */
+                    id: string;
+                    name: string;
+                } | null;
+                /** Format: date-time */
+                at: string;
+            } | null;
+            /**
+             * Format: date-time
+             * @default null
+             */
+            snoozedUntil: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @enum {string} */
+            type: "ad_deposit_recorded";
+            data: {
+                client: string;
+                receipt: string;
+            };
+        } | {
+            /** Format: uuid */
+            id: string;
+            actor: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            subject: {
+                type: components["schemas"]["NotificationSubjectType"];
+                /** Format: uuid */
+                id: string;
+            };
+            count: number;
+            read: boolean;
+            /** @default normal */
+            priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
+            box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
+            inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
+            resolution: {
+                outcome: components["schemas"]["NotificationResolution"];
+                by: {
+                    /** Format: uuid */
+                    id: string;
+                    name: string;
+                } | null;
+                /** Format: date-time */
+                at: string;
+            } | null;
+            /**
+             * Format: date-time
+             * @default null
+             */
+            snoozedUntil: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @enum {string} */
             type: "project_status_changed";
             data: {
                 project: string;
@@ -9602,6 +9900,393 @@ export interface components {
                 client: string;
                 contract: string;
                 annex: number | null;
+            };
+        } | {
+            /** Format: uuid */
+            id: string;
+            actor: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            subject: {
+                type: components["schemas"]["NotificationSubjectType"];
+                /** Format: uuid */
+                id: string;
+            };
+            count: number;
+            read: boolean;
+            /** @default normal */
+            priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
+            box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
+            inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
+            resolution: {
+                outcome: components["schemas"]["NotificationResolution"];
+                by: {
+                    /** Format: uuid */
+                    id: string;
+                    name: string;
+                } | null;
+                /** Format: date-time */
+                at: string;
+            } | null;
+            /**
+             * Format: date-time
+             * @default null
+             */
+            snoozedUntil: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @enum {string} */
+            type: "campaign_assigned";
+            data: {
+                campaign: {
+                    name: string;
+                    client: string;
+                };
+            };
+        } | {
+            /** Format: uuid */
+            id: string;
+            actor: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            subject: {
+                type: components["schemas"]["NotificationSubjectType"];
+                /** Format: uuid */
+                id: string;
+            };
+            count: number;
+            read: boolean;
+            /** @default normal */
+            priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
+            box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
+            inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
+            resolution: {
+                outcome: components["schemas"]["NotificationResolution"];
+                by: {
+                    /** Format: uuid */
+                    id: string;
+                    name: string;
+                } | null;
+                /** Format: date-time */
+                at: string;
+            } | null;
+            /**
+             * Format: date-time
+             * @default null
+             */
+            snoozedUntil: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @enum {string} */
+            type: "campaign_status_changed";
+            data: {
+                campaign: {
+                    name: string;
+                    client: string;
+                };
+                status: components["schemas"]["AdCampaignStatus"];
+            };
+        } | {
+            /** Format: uuid */
+            id: string;
+            actor: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            subject: {
+                type: components["schemas"]["NotificationSubjectType"];
+                /** Format: uuid */
+                id: string;
+            };
+            count: number;
+            read: boolean;
+            /** @default normal */
+            priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
+            box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
+            inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
+            resolution: {
+                outcome: components["schemas"]["NotificationResolution"];
+                by: {
+                    /** Format: uuid */
+                    id: string;
+                    name: string;
+                } | null;
+                /** Format: date-time */
+                at: string;
+            } | null;
+            /**
+             * Format: date-time
+             * @default null
+             */
+            snoozedUntil: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @enum {string} */
+            type: "campaign_end_passed";
+            data: {
+                campaign: {
+                    name: string;
+                    client: string;
+                };
+                /** Format: date */
+                endsOn: string;
+            };
+        } | {
+            /** Format: uuid */
+            id: string;
+            actor: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            subject: {
+                type: components["schemas"]["NotificationSubjectType"];
+                /** Format: uuid */
+                id: string;
+            };
+            count: number;
+            read: boolean;
+            /** @default normal */
+            priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
+            box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
+            inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
+            resolution: {
+                outcome: components["schemas"]["NotificationResolution"];
+                by: {
+                    /** Format: uuid */
+                    id: string;
+                    name: string;
+                } | null;
+                /** Format: date-time */
+                at: string;
+            } | null;
+            /**
+             * Format: date-time
+             * @default null
+             */
+            snoozedUntil: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @enum {string} */
+            type: "department_manager_assigned";
+            data: {
+                department: components["schemas"]["DepartmentCode"];
+            };
+        } | {
+            /** Format: uuid */
+            id: string;
+            actor: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            subject: {
+                type: components["schemas"]["NotificationSubjectType"];
+                /** Format: uuid */
+                id: string;
+            };
+            count: number;
+            read: boolean;
+            /** @default normal */
+            priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
+            box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
+            inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
+            resolution: {
+                outcome: components["schemas"]["NotificationResolution"];
+                by: {
+                    /** Format: uuid */
+                    id: string;
+                    name: string;
+                } | null;
+                /** Format: date-time */
+                at: string;
+            } | null;
+            /**
+             * Format: date-time
+             * @default null
+             */
+            snoozedUntil: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @enum {string} */
+            type: "member_moved";
+            data: {
+                member: string;
+                left: components["schemas"]["DepartmentCode"][];
+                joined: components["schemas"]["DepartmentCode"][];
+            };
+        } | {
+            /** Format: uuid */
+            id: string;
+            actor: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            subject: {
+                type: components["schemas"]["NotificationSubjectType"];
+                /** Format: uuid */
+                id: string;
+            };
+            count: number;
+            read: boolean;
+            /** @default normal */
+            priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
+            box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
+            inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
+            resolution: {
+                outcome: components["schemas"]["NotificationResolution"];
+                by: {
+                    /** Format: uuid */
+                    id: string;
+                    name: string;
+                } | null;
+                /** Format: date-time */
+                at: string;
+            } | null;
+            /**
+             * Format: date-time
+             * @default null
+             */
+            snoozedUntil: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @enum {string} */
+            type: "member_archived_open_work";
+            data: {
+                member: string;
+                count: number;
+            };
+        } | {
+            /** Format: uuid */
+            id: string;
+            actor: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            subject: {
+                type: components["schemas"]["NotificationSubjectType"];
+                /** Format: uuid */
+                id: string;
+            };
+            count: number;
+            read: boolean;
+            /** @default normal */
+            priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
+            box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
+            inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
+            resolution: {
+                outcome: components["schemas"]["NotificationResolution"];
+                by: {
+                    /** Format: uuid */
+                    id: string;
+                    name: string;
+                } | null;
+                /** Format: date-time */
+                at: string;
+            } | null;
+            /**
+             * Format: date-time
+             * @default null
+             */
+            snoozedUntil: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @enum {string} */
+            type: "security_new_device";
+            data: {
+                device: string;
+                /** Format: date-time */
+                at: string;
+            };
+        } | {
+            /** Format: uuid */
+            id: string;
+            actor: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            subject: {
+                type: components["schemas"]["NotificationSubjectType"];
+                /** Format: uuid */
+                id: string;
+            };
+            count: number;
+            read: boolean;
+            /** @default normal */
+            priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
+            box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
+            inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
+            resolution: {
+                outcome: components["schemas"]["NotificationResolution"];
+                by: {
+                    /** Format: uuid */
+                    id: string;
+                    name: string;
+                } | null;
+                /** Format: date-time */
+                at: string;
+            } | null;
+            /**
+             * Format: date-time
+             * @default null
+             */
+            snoozedUntil: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @enum {string} */
+            type: "security_notice";
+            data: {
+                /** @enum {string} */
+                change: "password_changed" | "two_factor_enabled" | "two_factor_disabled" | "two_factor_reset" | "backup_codes_regenerated" | "roles_changed" | "archived" | "device_signed_out" | "all_devices_signed_out";
+                by: string | null;
             };
         } | {
             /** Format: uuid */
@@ -9912,7 +10597,7 @@ export interface components {
             };
         };
         /** @enum {string} */
-        NotificationSubjectType: "task" | "client" | "project" | "retainer" | "template_run" | "approval_request" | "post" | "shoot" | "meeting" | "quote" | "invoice" | "lead" | "user";
+        NotificationSubjectType: "task" | "client" | "project" | "retainer" | "template_run" | "approval_request" | "post" | "shoot" | "meeting" | "quote" | "invoice" | "lead" | "user" | "campaign" | "department";
         /** @enum {string} */
         NotificationPriority: "critical" | "important" | "normal" | "informational";
         /** @enum {string} */
@@ -9936,7 +10621,9 @@ export interface components {
         /** @enum {string} */
         RetainerStatus: "active" | "paused" | "ended";
         /** @enum {string} */
-        NotificationType: "task_assigned" | "task_mentioned" | "task_returned" | "task_review_requested" | "task_medical_review_requested" | "task_awaiting_client" | "task_over_limit" | "approval_responded" | "approval_no_response" | "approval_expired" | "task_changed" | "task_commented" | "task_file_added" | "task_requested" | "tasks_generated" | "task_approved" | "task_opened" | "request_finished" | "task_delivered" | "post_returned" | "post_review_requested" | "post_medical_review_requested" | "post_awaiting_client" | "post_assigned" | "post_approved" | "post_task_ready" | "post_task_unlinked" | "shoot_booked" | "shoot_dropped" | "shoot_changed" | "meeting_invited" | "meeting_dropped" | "meeting_changed" | "task_due_soon" | "task_overdue" | "task_overdue_escalated" | "task_over_limit_pending" | "post_publish_today" | "post_publish_overdue" | "shoot_upcoming" | "shoot_not_closed" | "meeting_upcoming" | "client_account_manager_assigned" | "project_manager_assigned" | "retainer_renewal_due" | "retainer_behind" | "retainer_term_renewed" | "retainer_cycle_report_ready" | "retainer_amendment_pending" | "retainer_amendment_decided" | "quote_approval_requested" | "quote_approval_decided" | "quote_accepted" | "invoice_overdue" | "invoice_paid" | "ad_budget_low" | "email_failed" | "lead_assigned" | "lead_won" | "lead_follow_up_overdue" | "lead_follow_up_due" | "task_reopened" | "task_revision_decided" | "task_due_shortly" | "post_published" | "post_cancelled" | "post_file_added" | "post_publish_shortly" | "responsibility_moved" | "approval_opened" | "approval_completed" | "shoot_starting" | "meeting_starting" | "shoot_completed" | "client_status_changed" | "client_healthcare_changed" | "lead_lost" | "quote_expiring" | "quote_expired" | "quote_rejected" | "project_status_changed" | "milestone_completed" | "extra_work_created" | "retainer_status_changed" | "contract_signed" | "contract_voided" | "push_device_lost" | "action_reminder" | "action_escalated" | "action_escalated_top" | "task_progressed" | "post_progressed";
+        AdCampaignStatus: "planned" | "active" | "paused" | "completed" | "cancelled";
+        /** @enum {string} */
+        NotificationType: "task_assigned" | "task_mentioned" | "task_returned" | "task_review_requested" | "task_medical_review_requested" | "task_awaiting_client" | "task_over_limit" | "approval_responded" | "approval_no_response" | "approval_expired" | "task_changed" | "task_commented" | "task_file_added" | "task_requested" | "tasks_generated" | "task_approved" | "task_opened" | "request_finished" | "task_delivered" | "post_returned" | "post_review_requested" | "post_medical_review_requested" | "post_awaiting_client" | "post_assigned" | "post_approved" | "post_task_ready" | "post_task_unlinked" | "shoot_booked" | "shoot_dropped" | "shoot_changed" | "meeting_invited" | "meeting_dropped" | "meeting_changed" | "task_due_soon" | "task_overdue" | "task_overdue_escalated" | "task_over_limit_pending" | "post_publish_today" | "post_publish_overdue" | "shoot_upcoming" | "shoot_not_closed" | "meeting_upcoming" | "client_account_manager_assigned" | "project_manager_assigned" | "retainer_renewal_due" | "retainer_behind" | "retainer_term_renewed" | "retainer_cycle_report_ready" | "retainer_amendment_pending" | "retainer_amendment_decided" | "quote_approval_requested" | "quote_approval_decided" | "quote_accepted" | "invoice_overdue" | "invoice_paid" | "ad_budget_low" | "email_failed" | "lead_assigned" | "lead_won" | "lead_follow_up_overdue" | "lead_follow_up_due" | "task_reopened" | "task_revision_decided" | "task_due_shortly" | "post_published" | "post_cancelled" | "post_file_added" | "post_publish_shortly" | "responsibility_moved" | "approval_opened" | "approval_completed" | "shoot_starting" | "meeting_starting" | "shoot_completed" | "client_status_changed" | "client_healthcare_changed" | "lead_lost" | "quote_expiring" | "quote_expired" | "quote_rejected" | "invoice_draft_created" | "invoice_due_soon" | "payment_recorded" | "payment_voided" | "invoice_voided" | "ad_deposit_recorded" | "project_status_changed" | "milestone_completed" | "extra_work_created" | "retainer_status_changed" | "contract_signed" | "contract_voided" | "campaign_assigned" | "campaign_status_changed" | "campaign_end_passed" | "department_manager_assigned" | "member_moved" | "member_archived_open_work" | "security_new_device" | "security_notice" | "push_device_lost" | "action_reminder" | "action_escalated" | "action_escalated_top" | "task_progressed" | "post_progressed";
         /** @enum {string} */
         TaskStatus: "new" | "in_progress" | "internal_review" | "awaiting_client" | "revisions" | "approved" | "delivered" | "cancelled";
         /** @enum {string} */
@@ -15478,8 +16165,6 @@ export interface components {
         PublicApprovalItems: {
             items: components["schemas"]["PublicApprovalItem"][];
         };
-        /** @enum {string} */
-        AdCampaignStatus: "planned" | "active" | "paused" | "completed" | "cancelled";
         /** @enum {string} */
         AdPlatform: "meta" | "google" | "tiktok" | "snapchat" | "linkedin" | "x" | "other";
         /** @enum {string} */

@@ -36,6 +36,8 @@ export interface Resolution {
   actorId: string | null;
   /** Only these recipients' rows; all when left out. */
   recipients?: readonly string[];
+  /** Only rows whose snapshot has these top-level values (`email_failed`: the email's kind). */
+  data?: Readonly<Record<string, string>>;
 }
 
 /** One type of notification for one change, as the owning module resolved its recipients. */
@@ -52,6 +54,8 @@ export type Notice = NotificationContent & {
    * task, so it is not emailed to those whose digest is on.
    */
   digestCovered?: boolean;
+  /** F16 part C rule 5: an account email the module sent itself; the row is not emailed again. */
+  emailSent?: boolean;
 };
 
 /** A recipient's settings as `notify` reads them; no row means the defaults. */
@@ -201,7 +205,7 @@ export class NotificationCenter {
    * does not wake. Returns the number of rows closed.
    */
   async resolve(tx: Transaction, resolution: Resolution): Promise<number> {
-    const { subject, types, outcome, actorId, recipients } = resolution;
+    const { subject, types, outcome, actorId, recipients, data } = resolution;
     if (types.length === 0 || recipients?.length === 0) return 0;
     const now = new Date();
     const filters: SQL[] = [
@@ -215,6 +219,9 @@ export class NotificationCenter {
       ) as SQL,
     ];
     if (recipients) filters.push(inArray(notifications.recipientId, [...recipients]));
+    for (const [key, value] of Object.entries(data ?? {})) {
+      filters.push(sql`${notifications.data}->>${key} = ${value}`);
+    }
     const readAt =
       outcome === 'void'
         ? sql`coalesce(${notifications.readAt}, ${now.toISOString()}::timestamptz)`
@@ -357,7 +364,10 @@ function resolvedOnCreation(
       resolution.subject.type === subjectType &&
       resolution.subject.id === notice.subjectId &&
       resolution.types.includes(resolutionType) &&
-      (!resolution.recipients || resolution.recipients.includes(recipientId)),
+      (!resolution.recipients || resolution.recipients.includes(recipientId)) &&
+      Object.entries(resolution.data ?? {}).every(
+        ([key, value]) => (notice.data as Record<string, unknown>)[key] === value,
+      ),
   );
 }
 
@@ -366,7 +376,7 @@ type EmailMarking = { emailState: NotificationEmailState | null; emailAfter: Dat
 /**
  * F14 email rules 3–4: `pending` for 10 minutes when email is on for the active recipient
  * (F16 rule B3), at once for a critical one (F16 rule B4), `skipped` when the morning digest
- * covers it, null otherwise.
+ * covers it, null otherwise and for a copy of an account email (F16 part C rule 5).
  */
 function emailMarking(
   notice: Notice,
@@ -379,7 +389,7 @@ function emailMarking(
     channelModeOf(notice, 'email', policies),
     settings?.email[notice.type],
   );
-  if (!active || !emailed) return { emailState: null, emailAfter: null };
+  if (!active || !emailed || notice.emailSent) return { emailState: null, emailAfter: null };
   if (notice.digestCovered && (settings?.digestEnabled ?? true)) {
     return { emailState: 'skipped', emailAfter: null };
   }

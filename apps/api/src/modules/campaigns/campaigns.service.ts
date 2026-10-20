@@ -28,6 +28,7 @@ import { EngagementDirectory } from '../projects/index.js';
 import { TaskLinks } from '../tasks/index.js';
 import { AdWalletBalances } from './ad-wallet-balances.js';
 import { actorOf, covers, readsAll } from './campaign-access.js';
+import { CampaignNotices } from './campaign-notices.js';
 
 export type CampaignRow = typeof adCampaigns.$inferSelect;
 
@@ -86,6 +87,7 @@ export class CampaignsService {
     private readonly engagements: EngagementDirectory,
     private readonly tasks: TaskLinks,
     private readonly wallets: AdWalletBalances,
+    private readonly notices: CampaignNotices,
   ) {}
 
   async list(actor: CurrentUserInfo, query: CampaignListQuery): Promise<CampaignPage> {
@@ -169,6 +171,7 @@ export class CampaignsService {
         entityId: row.id,
         after: { ...identity(row), ...editable(row), status: row.status },
       });
+      await this.notices.ownerSet(tx, actor.id, row, client, null);
       return this.toDetail(actor, row, client, tx);
     });
   }
@@ -216,6 +219,10 @@ export class CampaignsService {
         after: { ...identity(updated), ...changes.after },
       });
       if (wallet) await this.wallets.settle(tx, actorOf(actor), wallet, client);
+      if (updated.ownerId !== campaign.ownerId) {
+        await this.notices.ownerSet(tx, actor.id, updated, client, campaign.ownerId);
+      }
+      if (updated.endsOn !== campaign.endsOn) await this.notices.endMoved(tx, id, actor.id);
       return this.toDetail(actor, updated, client, tx);
     });
   }
@@ -252,6 +259,7 @@ export class CampaignsService {
         before: { ...identity(campaign), status: campaign.status },
         after: { ...identity(updated), status: updated.status, ...(reason ? { reason } : {}) },
       });
+      await this.notices.statusChanged(tx, actor.id, updated, client);
       return this.toDetail(actor, updated, client, tx);
     });
   }

@@ -64,9 +64,16 @@ Split from C1c because the remaining catalog still spans eight modules: C1b hold
 - [x] bridge: `openapi:export`, `api:generate`, fixtures; web typecheck
 - [x] checks, reviewer, acceptance (owner, 2026-10-20), PR with auto-merge
 
-## PR C1c — catalog: finance, campaigns and people modules api
-- [ ] campaigns, invoices, auth, email: `invoice_draft_created`, `invoice_due_soon` (daily), `payment_recorded`, `payment_voided`, `invoice_voided`, `ad_deposit_recorded`, `campaign_assigned`, `campaign_status_changed`, `campaign_end_passed` (daily), `department_manager_assigned`, `member_moved`, `member_archived_open_work` (+ daily resolution), `security_new_device`, `security_notice`; `responsibility_moved` for campaign owner and department manager; resolves of `invoice_overdue`, `ad_budget_low`, `email_failed`; payment push texts without amounts
-- [ ] checks, reviewer, acceptance, PR with auto-merge
+## PR C1c — catalog: finance, campaigns and people modules api (branch `claude/sleepy-ramanujan-ealgys`)
+- [x] ask the owner: archiving stays blocked by open tasks, posts, leads and managed departments, so `member_archived_open_work` covers what stays open (campaigns)? Yes, keep the blocks (owner, 2026-10-20)
+- [x] contracts: new types `invoice_draft_created`, `invoice_due_soon`, `payment_recorded`, `payment_voided`, `invoice_voided`, `ad_deposit_recorded`, `campaign_assigned`, `campaign_status_changed`, `campaign_end_passed`, `department_manager_assigned`, `member_moved`, `member_archived_open_work`, `security_new_device`, `security_notice` (catalog, order, snapshots); subjects `campaign`, `department`; roles `campaign_owner`, `department_manager`; daily kinds `invoice_due_soon`, `campaign_end_passed`; messages texts and links (payment push texts without amounts); `ar.json` type labels; unit tests
+- [x] db (`/db-migration`): enum values
+- [x] api engine: `resolve` matches a snapshot field (`email_failed` per kind); the mailer's queued and sent hooks
+- [x] api invoices: `invoice_draft_created` (+ resolves on issue and archive), `invoice_due_soon` daily, `payment_recorded`, `payment_voided`, `invoice_voided`; `invoice_overdue` resolves on paid and void
+- [x] api campaigns: `campaign_assigned`, `campaign_status_changed`, owner `responsibility_moved`, `campaign_end_passed` daily (+ resolves), `ad_deposit_recorded`, `ad_budget_low` resolves; open campaigns as open work of an archived owner
+- [x] api auth: `department_manager_assigned` + manager `responsibility_moved`, `member_moved`, `member_archived_open_work` (+ daily resolution in notifications); security copies from the account emails; `email_failed` resolves on a later successful email
+- [x] bridge: `openapi:export`, `api:generate`, fixtures; web typecheck
+- [x] checks, reviewer, acceptance (owner, 2026-10-20), PR with auto-merge
 
 ## PR C2 — catalog: web texts and links
 - [ ] `ar.json` / `packages/messages` texts and links; E2E; checks, reviewer, acceptance (owner step C7), PR with auto-merge

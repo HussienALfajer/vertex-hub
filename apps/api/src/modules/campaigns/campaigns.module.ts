@@ -14,6 +14,7 @@ import { AdWalletEmailsService } from './ad-wallet-emails.service.js';
 import { AdWalletEntryFileOwner } from './ad-wallet-entry-file-owner.js';
 import { AdWalletsController } from './ad-wallets.controller.js';
 import { AdWalletsService } from './ad-wallets.service.js';
+import { CampaignNotices } from './campaign-notices.js';
 import { CampaignReports } from './campaign-reports.js';
 import { CampaignUpdatesService } from './campaign-updates.service.js';
 import { CampaignsController } from './campaigns.controller.js';
@@ -30,7 +31,9 @@ import { CampaignsService } from './campaigns.service.js';
  * `quotes`' `QuoteDirectory`, and keeps entry proofs and receipts as documents of the entry
  * (`files`' `GeneratedFiles`, owner type `ad_wallet_entry`). Receipts are rendered by the worker
  * (`campaigns.pdf`) and attached by `AdReceiptsService` (`campaigns.pdf-ready`). Exports
- * `CampaignReports` for `reports`, its only importer.
+ * `CampaignReports` for `reports`, its only importer. F16 part C: `CampaignNotices` tells owners
+ * and account managers of assignments, status changes and passed end dates (a source of
+ * `notifications.daily`), and gives `auth` the open campaigns of a user being archived.
  */
 @Module({
   imports: [
@@ -46,6 +49,7 @@ import { CampaignsService } from './campaigns.service.js';
   controllers: [CampaignsController, AdWalletsController, AdWalletEmailsController],
   providers: [
     CampaignsService,
+    CampaignNotices,
     CampaignUpdatesService,
     AdWalletBalances,
     AdWalletsService,

@@ -4,6 +4,7 @@ import { EmailModule } from '../email/index.js';
 import { DailyReminders } from './daily-reminders.js';
 import { EmailFailureNotices } from './email-failure-notices.js';
 import { Escalations } from './escalations.js';
+import { MemberNotices } from './member-notices.js';
 import { NotificationCenter } from './notification-center.js';
 import { NotificationEmails } from './notification-emails.js';
 import { NotificationPoliciesController } from './notification-policies.controller.js';
@@ -15,6 +16,7 @@ import { PushController } from './push.controller.js';
 import { PushService } from './push.service.js';
 import { PushQueue } from './push-queue.js';
 import { RecordFollowers } from './record-followers.js';
+import { SecurityNotices } from './security-notices.js';
 import { TimedNotifications } from './timed-notifications.js';
 
 /**
@@ -29,6 +31,8 @@ import { TimedNotifications } from './timed-notifications.js';
  * notifications with `NotificationCenter.resolve`; the channel policy, snoozes and the minute job
  * (`notifications.timed`), the escalation chain in the daily job and the morning push live here,
  * and `RecordFollowers` keeps who follows a task or a post for the `tasks` and `content` modules.
+ * F16 part C: copies the security emails into the app (`SecurityNotices`, through the `email`
+ * outbox) and stores `auth`'s notices (`MemberNotices`, through `AccountNotices`).
  */
 @Module({
   imports: [AuthModule, EmailModule],
@@ -40,6 +44,8 @@ import { TimedNotifications } from './timed-notifications.js';
     DailyReminders,
     NotificationEmails,
     EmailFailureNotices,
+    SecurityNotices,
+    MemberNotices,
     Escalations,
     PushQueue,
     PushService,

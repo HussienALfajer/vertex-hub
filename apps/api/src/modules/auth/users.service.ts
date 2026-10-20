@@ -43,9 +43,11 @@ import { DATABASE } from '../../core/database/database.module.js';
 import { CodedException } from '../../core/errors/index.js';
 import { type AuditActor, changedFields, recordAudit } from '../audit/index.js';
 import { AccountEmails } from './account-emails.js';
+import { AccountNotices } from './account-notices.js';
 import type { CurrentUserInfo } from './current-user.decorator.js';
 import { resetTwoFactor } from './reset-two-factor.js';
 import { ResponsibilityRegistry } from './responsibility-registry.js';
+import { UserDirectory } from './user-directory.js';
 import { UserLinksService } from './user-links.service.js';
 import { hasPassword, lockAccessChanges, statusOf } from './user-status.js';
 
@@ -84,6 +86,8 @@ export class UsersService {
     private readonly links: UserLinksService,
     private readonly responsibilities: ResponsibilityRegistry,
     private readonly emails: AccountEmails,
+    private readonly notices: AccountNotices,
+    private readonly directory: UserDirectory,
   ) {}
 
   async list(actor: CurrentUserInfo, query: UserListQuery): Promise<UserPage> {
@@ -256,6 +260,7 @@ export class UsersService {
         await this.assertAnotherActiveGeneralManager(tx, id);
       }
       this.assertNoResponsibilities(await this.responsibilitiesOf(tx, id));
+      const openWork = await this.responsibilities.openWork(tx, id);
       await tx.update(users).set({ archivedAt: new Date() }).where(eq(users.id, id));
       await tx.delete(sessions).where(eq(sessions.userId, id));
       await this.links.revoke(tx, id);
@@ -269,6 +274,7 @@ export class UsersService {
         before: { status: user.status },
         after: { status: 'archived' },
       });
+      if (openWork > 0) await this.notifyOpenWork(tx, actor, user, openWork);
     });
     return this.detail(actor, id);
   }
@@ -293,6 +299,19 @@ export class UsersService {
         before: { status: 'archived' },
         after: { status: 'invited' },
       });
+      // F16: the work of a restored member is theirs again.
+      await this.notices.send(
+        tx,
+        [],
+        [
+          {
+            subject: { type: 'user', id },
+            types: ['member_archived_open_work'],
+            outcome: 'void',
+            actorId: actor.id,
+          },
+        ],
+      );
       return this.issueLink(tx, actor, id, 'activation', { restored: true });
     });
     return { user: await this.detail(actor, id), link };
@@ -556,6 +575,77 @@ export class UsersService {
       before: { ...before },
       after: { ...(await this.departmentsSnapshot(tx, current.id)) },
     });
+    if (removed.length > 0 || added.length > 0) {
+      await this.notifyMoved(tx, actor, current, removed, added);
+    }
+  }
+
+  /** F16 `member_moved`: the member and the managers of the departments they left and joined. */
+  private async notifyMoved(
+    tx: Transaction,
+    actor: CurrentUserInfo,
+    member: LoadedUser,
+    removed: UserDepartment[],
+    addedIds: string[],
+  ): Promise<void> {
+    const joined = await this.departmentsOf(tx, addedIds);
+    const left = await this.departmentsOf(
+      tx,
+      removed.map((d) => d.id),
+    );
+    await this.notices.send(tx, [
+      {
+        type: 'member_moved',
+        recipients: [
+          member.id,
+          ...[...left, ...joined].flatMap((d) => (d.managerId ? [d.managerId] : [])),
+        ],
+        actorId: actor.id,
+        subjectId: member.id,
+        data: {
+          member: member.name,
+          left: left.map((d) => d.code),
+          joined: joined.map((d) => d.code),
+        },
+      },
+    ]);
+  }
+
+  /**
+   * F16 `member_archived_open_work`: the managers of the archived member's departments, else the
+   * General Managers, about the open items that did not block archiving (F01 rule 9).
+   */
+  private async notifyOpenWork(
+    tx: Transaction,
+    actor: CurrentUserInfo,
+    member: LoadedUser,
+    count: number,
+  ): Promise<void> {
+    const managers = (
+      await this.departmentsOf(
+        tx,
+        member.departments.map((d) => d.id),
+      )
+    ).flatMap((d) => (d.managerId && d.managerId !== member.id ? [d.managerId] : []));
+    await this.notices.send(tx, [
+      {
+        type: 'member_archived_open_work',
+        recipients:
+          managers.length > 0 ? managers : await this.directory.withRole('general_manager', tx),
+        actorId: actor.id,
+        subjectId: member.id,
+        data: { member: member.name, count },
+      },
+    ]);
+  }
+
+  private async departmentsOf(tx: Transaction, ids: string[]) {
+    if (ids.length === 0) return [];
+    return tx
+      .select({ code: departments.code, managerId: departments.managerId })
+      .from(departments)
+      .where(inArray(departments.id, ids))
+      .orderBy(asc(departments.name));
   }
 
   private async departmentsSnapshot(tx: Transaction, userId: string): Promise<DepartmentsSnapshot> {

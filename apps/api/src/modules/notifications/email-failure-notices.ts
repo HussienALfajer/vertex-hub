@@ -7,12 +7,13 @@ import {
   type NotificationSubjectType,
 } from '@vertex-hub/contracts';
 import type { Transaction } from '@vertex-hub/db';
-import { type FailedEmail, Mailer } from '../email/index.js';
+import { type FailedEmail, Mailer, type SentEmail } from '../email/index.js';
 import { NotificationCenter } from './notification-center.js';
 
 /**
  * F14 email rule 23: a client email that failed for good notifies its sender with
- * `email_failed`, opening the document (the client for statements, reports and ad emails).
+ * `email_failed`, opening the document (the client for statements, reports and ad emails). F16:
+ * the sender's next email of the same kind about the same record that is sent closes it.
  * Registered with `email`, which imports no module.
  */
 @Injectable()
@@ -24,6 +25,25 @@ export class EmailFailureNotices implements OnModuleInit {
 
   onModuleInit(): void {
     this.mailer.onFailure((tx, email) => this.notify(tx, email));
+    this.mailer.onSent((tx, email) => this.resolve(tx, email));
+  }
+
+  /** F16: done by the sender, for their own notice about that kind of email only. */
+  async resolve(tx: Transaction, email: SentEmail): Promise<void> {
+    const kind = clientEmailKindSchema.safeParse(email.kind);
+    if (!kind.success) return;
+    // A row the schema no longer reads is left alone: the sending is recorded either way.
+    const data = EMAIL_DATA_SCHEMAS[kind.data].safeParse(email.data);
+    const subject = data.success && subjectOf(kind.data, data.data, email);
+    if (!subject) return;
+    await this.center.resolve(tx, {
+      subject,
+      types: ['email_failed'],
+      outcome: 'done',
+      actorId: email.senderId,
+      recipients: [email.senderId],
+      data: { kind: kind.data },
+    });
   }
 
   async notify(tx: Transaction, email: FailedEmail): Promise<void> {
