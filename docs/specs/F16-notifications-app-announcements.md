@@ -1,6 +1,6 @@
 # F16 — Notifications 2.0, installable app and announcements
 
-Status: Draft · Date: 2026-10-20 · Scope: `docs/product/v2-scope.md` §F16 (and §2) · ADRs: 0008, 0013, 0014, 0018, 0019, 0028, 0032, 0036, 0037, 0038
+Status: Approved · Date: 2026-10-20 · Scope: `docs/product/v2-scope.md` §F16 (and §2) · ADRs: 0008, 0013, 0014, 0018, 0019, 0028, 0032, 0036, 0037, 0038
 
 ## Summary
 The bell works only while the app is open in a browser tab. A phone in a pocket hears nothing, so the team still pings each other outside the system. Read notifications also stay in the bell after the work behind them is done, so the bell is not a list of what is left to do. And management has no way to tell everyone something and know who read it.

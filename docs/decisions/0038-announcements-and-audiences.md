@@ -1,6 +1,6 @@
 # 0038 — Announcements and one audience resolver
 
-Status: Proposed · Date: 2026-10-20
+Status: Accepted · Date: 2026-10-20
 
 ## Context
 F16 adds announcements written by people: everyone may send to any audience (owner, 2026-10-20), with receipts, reminders, scheduling, pinning, attachments, templates and a poll. The board (F22), chat (F21) and the client portal (F20) will also address audiences, such as departments, roles, people, or a project's or client's team. There is no team table: a team is implied by the project manager, the account manager, task assignees and the record's departments.

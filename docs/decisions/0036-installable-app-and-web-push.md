@@ -1,6 +1,6 @@
 # 0036 — Installable app and Web Push: a service worker, one subscription per session, sent by the worker
 
-Status: Proposed · Date: 2026-10-20
+Status: Accepted · Date: 2026-10-20
 
 ## Context
 F16 (`docs/specs/F16-notifications-app-announcements.md`) makes the Hub installable on Android, iPhone and computers. Notifications must arrive with the app closed and the phone locked. The owner tested Web Push from Syria and it works (2026-10-20). External channels (WhatsApp, Telegram) are excluded (owner). A signed-in device is a Better Auth session (ADR 0032), and signing a device out must stop its pushes. The worker already sends email from a full payload and reports back (ADR 0028). On iPhone, push works only for an app added to the home screen, on iOS 16.4 or later.

@@ -1,6 +1,6 @@
 # 0037 — Notification engine 2.0: priorities, channel policy, self-resolving rows, escalation and a minute job
 
-Status: Proposed · Date: 2026-10-20 · Extends ADR 0018 and ADR 0028
+Status: Accepted · Date: 2026-10-20 · Extends ADR 0018 and ADR 0028
 
 ## Context
 F14 stores one row per recipient and pushes it over SSE (ADR 0018), and emails chosen types in batches (ADR 0028). The owner wants a complete engine (F16), built around four needs:

@@ -39,9 +39,9 @@ Short records of decisions that shape the system. Each has a status: **Accepted*
 | [0033](0033-noto-kufi-arabic-typeface.md) | Noto Kufi Arabic is the Arabic typeface (replaces Madani Arabic) | Accepted |
 | [0034](0034-backups-on-the-server-for-now.md) | Backups stay on the server until an off-server storage is subscribed | Accepted |
 | [0035](0035-accounting-in-vertex-mizan.md) | Accounting in Vertex Mizan, a separate product integrated with the Hub through an API | Accepted |
-| [0036](0036-installable-app-and-web-push.md) | Installable app and Web Push: a service worker, one subscription per session, sent by the worker | Proposed |
-| [0037](0037-notification-engine-2.md) | Notification engine 2.0: priorities, channel policy, self-resolving rows, escalation and a minute job | Proposed |
-| [0038](0038-announcements-and-audiences.md) | Announcements and one audience resolver | Proposed |
+| [0036](0036-installable-app-and-web-push.md) | Installable app and Web Push: a service worker, one subscription per session, sent by the worker | Accepted |
+| [0037](0037-notification-engine-2.md) | Notification engine 2.0: priorities, channel policy, self-resolving rows, escalation and a minute job | Accepted |
+| [0038](0038-announcements-and-audiences.md) | Announcements and one audience resolver | Accepted |
 
 Template:
 
