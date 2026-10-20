@@ -48,7 +48,7 @@ Split from C1b because the catalog touches twelve modules: C1 holds tasks, conte
 - [x] api approvals: `first_opened_at` + `approval_opened`, `approval_completed`, resolves (included in a request, responses, reissue, revoke)
 - [x] api calendar: `shoot_completed`, `shoot_not_closed` resolve
 - [x] timed sources in the minute job (`task_due_shortly`, `post_publish_shortly`, `shoot_starting`, `meeting_starting`) with `timed_reminders` and its purge
-- [ ] bridge: `openapi:export`, `api:generate`, fixtures; web typecheck
+- [x] bridge: `openapi:export`, `api:generate`, fixtures; web typecheck
 - [ ] checks, reviewer, acceptance, PR with auto-merge
 
 ## PR C1b — catalog: business modules api
