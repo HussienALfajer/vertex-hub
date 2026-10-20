@@ -12,7 +12,7 @@ import {
   type PublicResponse,
 } from '@vertex-hub/contracts';
 import { approvalItems, approvalRequests, type Database, type Transaction } from '@vertex-hub/db';
-import { and, asc, eq, inArray, isNotNull, ne } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNotNull, isNull, ne } from 'drizzle-orm';
 import { DATABASE } from '../../core/database/database.module.js';
 import { CodedException } from '../../core/errors/index.js';
 import { UserDirectory } from '../auth/index.js';
@@ -85,6 +85,7 @@ export class PublicApprovalsService {
 
   async page(token: string): Promise<PublicApproval> {
     const { request, client, contact } = await this.open(this.db, token);
+    await this.markOpened(request);
     const [items, people] = await Promise.all([
       this.db
         .select()
@@ -281,6 +282,33 @@ export class PublicApprovalsService {
       contact.name,
     );
     await this.notices.send(tx, request, { type: 'approval_responded', decision });
+    // F16 part C: an answer ends the wait for one; the last answer completes the request.
+    await this.notices.resolve(tx, request.id, ['approval_no_response'], 'done', null);
+    const [now] = await tx
+      .select({ completedAt: approvalRequests.completedAt })
+      .from(approvalRequests)
+      .where(eq(approvalRequests.id, request.id));
+    if (now?.completedAt) {
+      await this.notices.resolve(tx, request.id, ['approval_expired'], 'done', null);
+      // Its own notify call: in the answer's, the first-match order would keep the response only.
+      await this.notices.send(tx, request, { type: 'approval_completed' });
+    }
+  }
+
+  /**
+   * F16 part C rule 2: the first load of the current link sets `first_opened_at` and tells the
+   * account manager and the creator. Nothing else about the client is recorded.
+   */
+  private async markOpened(request: RequestRow): Promise<void> {
+    if (request.firstOpenedAt) return;
+    await this.db.transaction(async (tx) => {
+      const [first] = await tx
+        .update(approvalRequests)
+        .set({ firstOpenedAt: new Date() })
+        .where(and(eq(approvalRequests.id, request.id), isNull(approvalRequests.firstOpenedAt)))
+        .returning({ id: approvalRequests.id });
+      if (first) await this.notices.send(tx, request, { type: 'approval_opened' });
+    });
   }
 
   /**

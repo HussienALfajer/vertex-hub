@@ -333,6 +333,8 @@ export class ContentService {
       await this.notices.send(tx, [
         this.notices.notice({ ...post, client }, 'post_assigned', [responsibleId], actor.id),
       ]);
+      // F16 rule B12: the creator and the responsible follow the post.
+      await this.notices.follow(tx, post.id, [actor.id, responsibleId]);
       return post.id;
     });
     return this.detail(actor, id);
@@ -404,15 +406,24 @@ export class ContentService {
         after: auditFields(diff.after),
       });
       if (diff.after.responsibleId) {
-        await this.notices.send(tx, [
-          this.notices.notice(
-            { ...post, ...fields },
-            'post_assigned',
-            [diff.after.responsibleId],
-            actor.id,
-          ),
-        ]);
+        await this.notices.follow(tx, id, [diff.after.responsibleId]);
       }
+      // F16 part C: a new responsible or publish time closes what no longer applies.
+      await this.notices.sendChange(
+        tx,
+        post,
+        actor.id,
+        diff.after.responsibleId
+          ? [
+              this.notices.notice(
+                { ...post, ...fields },
+                'post_assigned',
+                [diff.after.responsibleId],
+                actor.id,
+              ),
+            ]
+          : [],
+      );
     });
     return this.detail(actor, id);
   }
@@ -506,6 +517,8 @@ export class ContentService {
       if (archived && post.status === 'awaiting_client') {
         await this.reviewHooks.left(tx, { postId: id, actor: actorOf(actor), response: null });
       }
+      // F16 rule B5: archiving voids what the post still waited for.
+      await this.notices.sendChange(tx, post, actor.id);
     });
   }
 

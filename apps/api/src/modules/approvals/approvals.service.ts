@@ -48,6 +48,7 @@ import {
   shownPost,
   stateSql,
 } from './approval-items.js';
+import { ApprovalNotices } from './approval-notices.js';
 
 type Executor = Database | Transaction;
 
@@ -97,6 +98,7 @@ export class ApprovalsService implements OnModuleInit {
     private readonly reviewHooks: ClientReviewHooks,
     private readonly posts: PostApprovals,
     private readonly postHooks: PostReviewHooks,
+    private readonly notices: ApprovalNotices,
   ) {}
 
   onModuleInit(): void {
@@ -360,6 +362,7 @@ export class ApprovalsService implements OnModuleInit {
           expiresAt: link.expiresAt.toISOString(),
         },
       });
+      await this.notices.resolveSent(tx, { taskIds, postIds }, actor.id);
       const emailId = input.email
         ? await this.emailRequest(tx, actor, {
             kind: 'client_approval_link',
@@ -396,8 +399,17 @@ export class ApprovalsService implements OnModuleInit {
           expiresAt: link.expiresAt,
           remindedAt: null,
           expiryNotifiedAt: null,
+          // F16 part C rule 2: the new link has not been opened.
+          firstOpenedAt: null,
         })
         .where(eq(approvalRequests.id, id));
+      await this.notices.resolve(
+        tx,
+        id,
+        ['approval_no_response', 'approval_expired'],
+        'done',
+        actor.id,
+      );
       await recordAudit(tx, {
         actor: actorOf(actor),
         action: 'approval_request.link_reissued',
@@ -484,6 +496,13 @@ export class ApprovalsService implements OnModuleInit {
           ...(postIds.length > 0 && { postIds }),
         },
       });
+      await this.notices.resolve(
+        tx,
+        id,
+        ['approval_no_response', 'approval_expired'],
+        'void',
+        actor.id,
+      );
     });
     return this.detail(actor, id);
   }

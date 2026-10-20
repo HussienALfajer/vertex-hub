@@ -216,6 +216,8 @@ export class PostLinksService implements OnModuleInit {
       before: { status: 'idea' },
       after: { status: 'in_production', reason: 'task_linked' },
     });
+    // F16 rule B12: followers hear that the post moved.
+    await this.notices.sendChange(tx, post, actor.id);
   }
 
   /** The post as it is now, for a notice; null when it is gone with its client. */
