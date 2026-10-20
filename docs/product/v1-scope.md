@@ -172,7 +172,6 @@ Business decisions are recorded in `docs/decisions/` (see ADR 0007 and ADR 0006)
 - Per-user settings to mute notification types and to choose which ones arrive by email.
 - Account emails: activation and password reset links, self-service "forgot password", security notices, sign-in from a new device (owner, 2026-10-04).
 - Client emails sent by hand from each document, PDF attached: quotes and expiry reminders, approval links and reminders, invoices and overdue reminders, receipts, statements, the monthly client report, ad budget receipts and low-balance notices (owner, 2026-10-04).
-- **Not in V1:** WhatsApp notifications (first item for V2).
 
 ### F15 — Dashboards and basic reports
 - General Manager: active projects and retainers, overdue tasks by department, department workload, invoiced vs collected this month, outstanding amounts, new leads and conversion rate.
@@ -205,7 +204,6 @@ Business decisions are recorded in `docs/decisions/` (see ADR 0007 and ADR 0006)
 |---|---|
 | Auto-publishing to social platforms | Platform app review takes weeks; manual publishing is enough for now |
 | Meta Ads / Google Ads integration | Complex; weekly manual entry is enough initially |
-| WhatsApp notifications | Needs a verified WhatsApp Business API account and per-message cost; first V2 item |
 | Full client portal with login | Approval links deliver most of the value for a fraction of the effort |
 | Time tracking | Needs team discipline; add after the team adopts the system |
 | Full accounting and tax | Use an off-the-shelf accounting tool in parallel |

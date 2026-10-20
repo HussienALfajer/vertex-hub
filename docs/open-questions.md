@@ -4,6 +4,9 @@ Decisions that belong to the owner. Agents must not guess answers to these. When
 
 | ID | Question | Needed before | Recommendation |
 |---|---|---|---|
+| Q15 | A department revenue share (e.g. the developer's 50% of the Development department): computed on invoiced or collected amounts, and before or after the department's direct expenses? | F19 spec | Collected amounts only, on invoice lines whose service belongs to the department; excluding purchases for clients, ad budget and taxes; after the direct expenses recorded on those projects for that department. A share paid on an amount later voided or refunded is deducted from the next payroll |
+| Q16 | A company profit share: settled monthly, quarterly or yearly, and is a losing month carried forward? | F19 spec | Settled quarterly on Mizan's net profit, with an optional monthly advance; losses carried forward within the fiscal year and reset at its start |
+| Q17 | How does the Hub's existing financial history (invoices, payments, expenses since production started) reach Mizan? | F18 spec | Replay all of it through the posting API: production started on 2026-10-19, so the history is short, and Mizan then holds the complete record instead of opening balances |
 
 ## Resolved
 
