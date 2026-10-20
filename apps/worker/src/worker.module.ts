@@ -16,6 +16,7 @@ import { HeartbeatJob } from './jobs/heartbeat.job.js';
 import { InvoicesDailyJob } from './jobs/invoices-daily.job.js';
 import { InvoicesPdfJob } from './jobs/invoices-pdf.job.js';
 import { NotificationsDailyJob } from './jobs/notifications-daily.job.js';
+import { NotificationsTimedJob } from './jobs/notifications-timed.job.js';
 import { PgBossService } from './jobs/pg-boss.service.js';
 import { PushSendJob } from './jobs/push-send.job.js';
 import { QuotesDailyJob } from './jobs/quotes-daily.job.js';
@@ -44,6 +45,7 @@ import { PushSender } from './push/push-sender.js';
     HeartbeatJob,
     RetainerCyclesJob,
     NotificationsDailyJob,
+    NotificationsTimedJob,
     FilesPurgeUploadsJob,
     ApprovalsRemindersJob,
     QuotesDailyJob,

@@ -1,0 +1,6 @@
+-- F16: snapshot each existing notification's box from the catalog (rows before F16 stay
+-- unresolved). Their `resolution_type` stays null: `resolve` closes them by their type, and the
+-- escalation chain, which needs it, leaves them out (spec F16, edge case 21).
+UPDATE "notifications" SET "box" = 'action'::notification_box
+WHERE ("type" = 'tasks_generated' AND ("data"->>'unassigned')::boolean)
+	OR "type" IN ('task_assigned', 'task_mentioned', 'task_returned', 'task_review_requested', 'task_medical_review_requested', 'task_awaiting_client', 'task_over_limit', 'approval_responded', 'approval_no_response', 'approval_expired', 'task_requested', 'post_returned', 'post_review_requested', 'post_medical_review_requested', 'post_awaiting_client', 'post_assigned', 'post_task_unlinked', 'task_due_soon', 'task_overdue', 'task_overdue_escalated', 'task_over_limit_pending', 'post_publish_today', 'post_publish_overdue', 'shoot_not_closed', 'client_account_manager_assigned', 'project_manager_assigned', 'retainer_renewal_due', 'retainer_behind', 'retainer_cycle_report_ready', 'retainer_amendment_pending', 'quote_approval_requested', 'quote_approval_decided', 'invoice_overdue', 'ad_budget_low', 'email_failed', 'lead_assigned', 'lead_follow_up_due', 'lead_follow_up_overdue');

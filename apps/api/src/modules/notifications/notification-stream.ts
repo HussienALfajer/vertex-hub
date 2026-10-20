@@ -122,7 +122,7 @@ export class NotificationStream implements BeforeApplicationShutdown, OnApplicat
       byRecipient.set(recipientId, [...(byRecipient.get(recipientId) ?? []), notificationId]);
     }
     for (const [recipientId, ids] of byRecipient) {
-      const [items, unreadCount] = await Promise.all([
+      const [items, { count: unreadCount }] = await Promise.all([
         this.notifications.byIds(recipientId, ids),
         this.notifications.unreadCount(recipientId),
       ]);

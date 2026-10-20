@@ -227,6 +227,21 @@ export class UserDirectory {
     return new Map(rows.map((row) => [row.code, row.name]));
   }
 
+  /** The primary department of each of the given users; users without one are left out. */
+  async primaryDepartments(
+    ids: readonly string[],
+    executor: Database | Transaction = this.db,
+  ): Promise<Map<string, DepartmentCode>> {
+    const unique = [...new Set(ids)];
+    if (unique.length === 0) return new Map();
+    const rows = await executor
+      .select({ userId: departmentMembers.userId, code: departments.code })
+      .from(departmentMembers)
+      .innerJoin(departments, eq(departments.id, departmentMembers.departmentId))
+      .where(and(inArray(departmentMembers.userId, unique), eq(departmentMembers.isPrimary, true)));
+    return new Map(rows.map((row) => [row.userId, row.code]));
+  }
+
   /** The department codes each of the given users belongs to. */
   async memberships(ids: string[], executor: Database | Transaction = this.db) {
     const unique = [...new Set(ids)];

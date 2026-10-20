@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger, type OnModuleInit } from '@nestjs/common';
 import {
   businessDate,
+  businessInstant,
   type CalendarDate,
   type DepartmentCode,
   type DigestTask,
@@ -16,16 +17,18 @@ import {
   emailDigests,
   notificationSettings,
   notifications,
+  pushDeliveries,
   type Transaction,
 } from '@vertex-hub/db';
-import { digestEmail, notificationBatchEmail } from '@vertex-hub/messages';
-import { and, count, desc, eq, inArray, isNull, lte } from 'drizzle-orm';
+import { digestEmail, morningPush, notificationBatchEmail } from '@vertex-hub/messages';
+import { and, count, desc, eq, gte, inArray, isNull, lte } from 'drizzle-orm';
 import { ENV, type Env } from '../../core/config/env.js';
 import { DATABASE } from '../../core/database/database.module.js';
 import { JobQueue, runEach } from '../../core/jobs/index.js';
 import { type Mailbox, UserDirectory } from '../auth/index.js';
 import { Mailer } from '../email/index.js';
 import { notificationResponses } from './notification-responses.js';
+import { PushQueue } from './push-queue.js';
 
 /** A list cut to its first items, with how many were left out. */
 export interface ShortList<Item> {
@@ -57,6 +60,7 @@ export class NotificationEmails implements OnModuleInit {
     private readonly jobs: JobQueue,
     private readonly users: UserDirectory,
     private readonly mailer: Mailer,
+    private readonly push: PushQueue,
   ) {}
 
   onModuleInit(): void {
@@ -67,6 +71,8 @@ export class NotificationEmails implements OnModuleInit {
     this.jobs.work(EMAIL_DIGEST_JOB.queue, async () => {
       const sent = await this.runDigest();
       this.logger.log(`Digests: ${sent} queued`);
+      const pushed = await this.runMorningPush();
+      this.logger.log(`Morning pushes: ${pushed} users`);
     });
   }
 
@@ -76,29 +82,41 @@ export class NotificationEmails implements OnModuleInit {
 
   /**
    * Rules 5–7: inside the window, one batch email per recipient whose pending notifications are
-   * due; read ones are skipped. Returns the number of emails queued.
+   * due; read ones are skipped. F16 rule B4: outside it (at night, on Fridays), the critical ones
+   * only. Returns the number of emails queued.
    */
   async runBatches(now: Date = new Date()): Promise<number> {
-    if (!isEmailBatchWindow(now)) return 0;
+    const criticalOnly = !isEmailBatchWindow(now);
     const recipients = await this.db
       .selectDistinct({ id: notifications.recipientId })
       .from(notifications)
-      .where(and(eq(notifications.emailState, 'pending'), lte(notifications.emailAfter, now)));
+      .where(
+        and(
+          eq(notifications.emailState, 'pending'),
+          lte(notifications.emailAfter, now),
+          criticalOnly ? eq(notifications.priority, 'critical') : undefined,
+        ),
+      );
     let sent = 0;
     await runEach(
       recipients,
       this.logger,
       ({ id }) => `Notification email to ${id}`,
       async ({ id }) => {
-        const queued = await this.db.transaction((tx) => this.sendBatch(tx, id, now));
+        const queued = await this.db.transaction((tx) => this.sendBatch(tx, id, now, criticalOnly));
         if (queued) sent += 1;
       },
     );
     return sent;
   }
 
-  private async sendBatch(tx: Transaction, recipientId: string, now: Date): Promise<boolean> {
-    const due = await this.lockPending(tx, recipientId, now);
+  private async sendBatch(
+    tx: Transaction,
+    recipientId: string,
+    now: Date,
+    criticalOnly: boolean,
+  ): Promise<boolean> {
+    const due = await this.lockPending(tx, recipientId, now, criticalOnly);
     const mailbox = (await this.users.mailboxes([recipientId], tx)).get(recipientId);
     // Edge case 6: an archived recipient gets nothing; their pending notifications are skipped.
     if (!mailbox) {
@@ -205,6 +223,81 @@ export class NotificationEmails implements OnModuleInit {
     return true;
   }
 
+  /**
+   * F16 rule B14: on work days, with the digest, one push to each active user with the morning
+   * push on and an open device: overdue tasks, tasks due today and "Needs you". Not a bell row;
+   * nothing when the three counts are 0, and once a day. Returns the number of users pushed.
+   */
+  async runMorningPush(
+    date: CalendarDate = businessDate(),
+    now: Date = new Date(),
+  ): Promise<number> {
+    if (!isWorkDay(date)) return 0;
+    const [mailboxes, off] = await Promise.all([
+      this.users.mailboxes(null),
+      this.db
+        .select({ userId: notificationSettings.userId })
+        .from(notificationSettings)
+        .where(eq(notificationSettings.morningPush, false)),
+    ]);
+    const skip = new Set(off.map((row) => row.userId));
+    let pushed = 0;
+    await runEach(
+      [...mailboxes.values()].filter((mailbox) => !skip.has(mailbox.id)),
+      this.logger,
+      (mailbox) => `Morning push for ${mailbox.id}`,
+      async (mailbox) => {
+        const devices = await this.db.transaction((tx) =>
+          this.sendMorningPush(tx, mailbox.id, now),
+        );
+        if (devices > 0) pushed += 1;
+      },
+    );
+    return pushed;
+  }
+
+  private async sendMorningPush(tx: Transaction, userId: string, now: Date): Promise<number> {
+    // Once a day: a rerun of the job finds the morning's delivery.
+    const [already] = await tx
+      .select({ id: pushDeliveries.id })
+      .from(pushDeliveries)
+      .where(
+        and(
+          eq(pushDeliveries.userId, userId),
+          eq(pushDeliveries.kind, 'morning_summary'),
+          gte(pushDeliveries.createdAt, businessInstant(businessDate(now), '00:00')),
+        ),
+      )
+      .limit(1);
+    if (already) return 0;
+    const tasks = await this.digestTasks(userId, now);
+    const [needsYou] = await tx
+      .select({ value: count() })
+      .from(notifications)
+      .where(
+        and(
+          eq(notifications.recipientId, userId),
+          eq(notifications.box, 'action'),
+          isNull(notifications.resolvedAt),
+          isNull(notifications.snoozedUntil),
+        ),
+      );
+    const counts = {
+      overdue: tasks.overdue.items.length + tasks.overdue.more,
+      dueToday: tasks.dueToday.items.length + tasks.dueToday.more,
+      needsYou: needsYou?.value ?? 0,
+    };
+    if (counts.overdue + counts.dueToday + counts.needsYou === 0) return 0;
+    return this.push.toUser(tx, userId, {
+      kind: 'morning_summary',
+      notificationId: null,
+      priority: 'normal',
+      ...morningPush(counts),
+      link: '/',
+      tag: MORNING_PUSH_TAG,
+    });
+  }
+
   /** The registered sources' tasks, merged and cut to `digestTasks` each. */
   private async digestTasks(userId: string, now: Date) {
     const parts = await Promise.all(this.sources.map((source) => source(userId, now)));
@@ -225,6 +318,7 @@ export class NotificationEmails implements OnModuleInit {
     tx: Transaction,
     recipientId: string,
     now: Date | null,
+    criticalOnly = false,
   ): Promise<NotificationRow[]> {
     return tx
       .select()
@@ -234,6 +328,7 @@ export class NotificationEmails implements OnModuleInit {
           eq(notifications.recipientId, recipientId),
           eq(notifications.emailState, 'pending'),
           now ? lte(notifications.emailAfter, now) : undefined,
+          criticalOnly ? eq(notifications.priority, 'critical') : undefined,
         ),
       )
       .orderBy(desc(notifications.updatedAt), desc(notifications.id))
@@ -288,6 +383,9 @@ export class NotificationEmails implements OnModuleInit {
     >;
   }
 }
+
+/** Each morning's summary replaces the day before's on the device. */
+const MORNING_PUSH_TAG = 'morning-summary';
 
 const toAddress = (mailbox: Mailbox) => ({
   name: mailbox.name,

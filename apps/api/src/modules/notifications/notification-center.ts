@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import {
   type ChannelOverrides,
+  type ChannelPolicies,
   channelModeOf,
   effectiveChannel,
   firstMatchPerRecipient,
@@ -9,25 +10,33 @@ import {
   NOTIFICATION_EMAIL,
   type NotificationContent,
   type NotificationEmailState,
+  type NotificationPriority,
+  type NotificationResolution,
   type NotificationSubjectType,
   type NotificationType,
+  notificationBox,
   notificationPriority,
+  resolutionTypeOf,
 } from '@vertex-hub/contracts';
 import { newId, notificationSettings, notifications, type Transaction } from '@vertex-hub/db';
-import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull, isNull, or, type SQL, sql } from 'drizzle-orm';
 import { UserDirectory } from '../auth/index.js';
 import { NOTIFICATIONS_CHANNEL, pushPayloads } from './notification-channel.js';
+import { NotificationPolicies } from './notification-policies.service.js';
 import { PushQueue } from './push-queue.js';
 
-/**
- * Types merged into the recipient's unread notification of the same type and subject (rule 5,
- * F10, F09).
- */
-const MERGED_TYPES: readonly NotificationType[] = [
-  'task_commented',
-  'task_file_added',
-  'approval_responded',
-];
+/** F16 rule B5: what a module's event closes. */
+export interface Resolution {
+  /** The record the notifications are about. */
+  subject: { type: NotificationSubjectType; id: string };
+  /** The types it closes (`resolution_type`; escalation steps close with their original). */
+  types: readonly NotificationType[];
+  outcome: NotificationResolution;
+  /** Null for automatic resolution (the daily job). */
+  actorId: string | null;
+  /** Only these recipients' rows; all when left out. */
+  recipients?: readonly string[];
+}
 
 /** One type of notification for one change, as the owning module resolved its recipients. */
 export type Notice = NotificationContent & {
@@ -62,6 +71,7 @@ export class NotificationCenter {
   constructor(
     private readonly users: UserDirectory,
     private readonly push: PushQueue,
+    private readonly policies: NotificationPolicies,
   ) {}
 
   /**
@@ -69,10 +79,13 @@ export class NotificationCenter {
    * the notices give one recipient several types for one subject, keeps only the first by the
    * catalog order (other subjects and several notices of that type all stay). Rule
    * 5: merges a comment (or an added file, F10) into the recipient's unread notification of the
-   * same type on the same task. The
+   * same type on the same task; F16 rule B9 merges the catalog's `merges` types into unread,
+   * unresolved rows that are not snoozed. The
    * `pg_notify` runs in the transaction, so PostgreSQL delivers it only on commit (rule 4). F16
-   * rule A8: queues a push of each notification whose push is on for its recipient (rule B3), in
-   * the same transaction; a merged one is pushed again and replaces the older notice by its tag.
+   * rule A8: queues a push of each notification whose push is on for its recipient (rule B3, with
+   * the channel policy of rule B1), in the same transaction; a merged one is pushed again and
+   * replaces the older notice by its tag. Each row snapshots its priority, box and resolution
+   * type (rules B5–B6).
    * Returns the number of notifications stored or merged.
    */
   async notify(tx: Transaction, notices: Notice | readonly Notice[]): Promise<number> {
@@ -93,6 +106,7 @@ export class NotificationCenter {
     const people = await this.users.summaries(recipientIds, tx);
     const active = await this.users.mailboxes(recipientIds, tx);
     const settings = await this.settingsOf(tx, recipientIds);
+    const policies = await this.policies.current(tx);
     // Filters first, in rule 2's order: a muted type leaves room for the next type of the change.
     const deliverable = firstMatchPerRecipient(
       candidates.filter(
@@ -106,8 +120,15 @@ export class NotificationCenter {
     const toDevices: string[] = [];
     for (const { recipientId, notice } of deliverable) {
       const data = NOTIFICATION_DATA_SCHEMAS[notice.type].parse(notice.data);
-      const email = emailMarking(notice, active.has(recipientId), settings.get(recipientId));
-      const merged = MERGED_TYPES.includes(notice.type)
+      const priority = notificationPriority(notice);
+      const email = emailMarking(
+        notice,
+        priority,
+        policies,
+        active.has(recipientId),
+        settings.get(recipientId),
+      );
+      const merged = NOTIFICATION_CATALOG[notice.type].merges
         ? await this.mergeUnread(tx, recipientId, notice, data, email)
         : null;
       const notificationId = merged ?? newId();
@@ -120,13 +141,15 @@ export class NotificationCenter {
           subjectType: notice.subjectType ?? NOTIFICATION_CATALOG[notice.type].subject,
           subjectId: notice.subjectId,
           data,
-          priority: notificationPriority(notice),
+          priority,
+          box: notificationBox(notice),
+          resolutionType: resolutionTypeOf(notice),
           ...email,
         });
       }
       pushed.push({ recipientId, notificationId });
       const pushOverride = settings.get(recipientId)?.push[notice.type];
-      if (effectiveChannel(channelModeOf(notice, 'push'), pushOverride)) {
+      if (effectiveChannel(channelModeOf(notice, 'push', policies), pushOverride)) {
         toDevices.push(notificationId);
       }
     }
@@ -135,6 +158,89 @@ export class NotificationCenter {
       await tx.execute(sql`select pg_notify(${NOTIFICATIONS_CHANNEL}, ${payload})`);
     }
     return pushed.length;
+  }
+
+  /**
+   * F16 rule B5: closes the unresolved `action` rows on the subject whose resolution type is in
+   * `types` (rows from before F16 by their own type), for the given recipients or all. With
+   * `done`, the actor's own row is read and goes to "Done"; the others stay as read or unread
+   * as they were and show "Handled by" in "For your information". With `void`, every row is read
+   * and goes to "Done". A resolved row is never touched again (edge case 8), and a snoozed one
+   * does not wake. Returns the number of rows closed.
+   */
+  async resolve(tx: Transaction, resolution: Resolution): Promise<number> {
+    const { subject, types, outcome, actorId, recipients } = resolution;
+    if (types.length === 0 || recipients?.length === 0) return 0;
+    const now = new Date();
+    const filters: SQL[] = [
+      eq(notifications.subjectType, subject.type),
+      eq(notifications.subjectId, subject.id),
+      eq(notifications.box, 'action'),
+      isNull(notifications.resolvedAt),
+      or(
+        inArray(notifications.resolutionType, [...types]),
+        and(isNull(notifications.resolutionType), inArray(notifications.type, [...types])),
+      ) as SQL,
+    ];
+    if (recipients) filters.push(inArray(notifications.recipientId, [...recipients]));
+    const readAt =
+      outcome === 'void'
+        ? sql`coalesce(${notifications.readAt}, ${now.toISOString()}::timestamptz)`
+        : actorId === null
+          ? sql`${notifications.readAt}`
+          : sql`case when ${notifications.recipientId} = ${actorId} then coalesce(${notifications.readAt}, ${now.toISOString()}::timestamptz) else ${notifications.readAt} end`;
+    const closed = await tx
+      .update(notifications)
+      .set({
+        resolvedAt: now,
+        resolvedById: actorId,
+        resolution: outcome,
+        snoozedUntil: null,
+        readAt,
+      })
+      .where(and(...filters))
+      .returning({ id: notifications.id });
+    return closed.length;
+  }
+
+  /**
+   * F16 rule B8: wakes the snoozed rows the filter selects that are still unresolved: unread,
+   * `updated_at` now, a toast, and a push where push is on for the type. Returns their ids.
+   */
+  async wake(tx: Transaction, filter: SQL): Promise<string[]> {
+    const woken = await tx
+      .update(notifications)
+      .set({ readAt: null, snoozedUntil: null, updatedAt: new Date() })
+      .where(and(filter, isNotNull(notifications.snoozedUntil), isNull(notifications.resolvedAt)))
+      .returning({
+        id: notifications.id,
+        recipientId: notifications.recipientId,
+        type: notifications.type,
+        data: notifications.data,
+      });
+    if (woken.length === 0) return [];
+    const settings = await this.settingsOf(tx, [...new Set(woken.map((row) => row.recipientId))]);
+    const policies = await this.policies.current(tx);
+    await this.push.notifications(
+      tx,
+      woken
+        .filter((row) =>
+          effectiveChannel(
+            channelModeOf(
+              { type: row.type, data: row.data } as NotificationContent,
+              'push',
+              policies,
+            ),
+            settings.get(row.recipientId)?.push[row.type],
+          ),
+        )
+        .map((row) => row.id),
+    );
+    const pairs = woken.map((row) => ({ recipientId: row.recipientId, notificationId: row.id }));
+    for (const payload of pushPayloads(pairs)) {
+      await tx.execute(sql`select pg_notify(${NOTIFICATIONS_CHANNEL}, ${payload})`);
+    }
+    return woken.map((row) => row.id);
   }
 
   private async settingsOf(tx: Transaction, userIds: string[]) {
@@ -183,6 +289,8 @@ export class NotificationCenter {
           eq(notifications.type, notice.type),
           eq(notifications.subjectId, notice.subjectId),
           isNull(notifications.readAt),
+          isNull(notifications.resolvedAt),
+          isNull(notifications.snoozedUntil),
         ),
       )
       .limit(1)
@@ -207,19 +315,24 @@ type EmailMarking = { emailState: NotificationEmailState | null; emailAfter: Dat
 
 /**
  * F14 email rules 3–4: `pending` for 10 minutes when email is on for the active recipient
- * (F16 rule B3),
- * `skipped` when the morning digest covers it, null otherwise.
+ * (F16 rule B3), at once for a critical one (F16 rule B4), `skipped` when the morning digest
+ * covers it, null otherwise.
  */
 function emailMarking(
   notice: Notice,
+  priority: NotificationPriority,
+  policies: ChannelPolicies,
   active: boolean,
   settings: RecipientSettings | undefined,
 ): EmailMarking {
-  const emailed = effectiveChannel(channelModeOf(notice, 'email'), settings?.email[notice.type]);
+  const emailed = effectiveChannel(
+    channelModeOf(notice, 'email', policies),
+    settings?.email[notice.type],
+  );
   if (!active || !emailed) return { emailState: null, emailAfter: null };
   if (notice.digestCovered && (settings?.digestEnabled ?? true)) {
     return { emailState: 'skipped', emailAfter: null };
   }
-  const emailAfter = new Date(Date.now() + NOTIFICATION_EMAIL.delayMinutes * 60 * 1000);
-  return { emailState: 'pending', emailAfter };
+  const delay = priority === 'critical' ? 0 : NOTIFICATION_EMAIL.delayMinutes * 60 * 1000;
+  return { emailState: 'pending', emailAfter: new Date(Date.now() + delay) };
 }

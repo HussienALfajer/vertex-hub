@@ -12,7 +12,7 @@ import {
   notifications,
   type Transaction,
 } from '@vertex-hub/db';
-import { and, eq, inArray, lt } from 'drizzle-orm';
+import { and, eq, inArray, lt, or } from 'drizzle-orm';
 import { DATABASE } from '../../core/database/database.module.js';
 import { JobQueue, runEach } from '../../core/jobs/index.js';
 import { type Notice, NotificationCenter } from './notification-center.js';
@@ -34,8 +34,8 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 
 /**
  * The `notifications.daily` job (rule 8): runs the sources other modules register (tasks: A07,
- * A08 and escalation; projects: renewal), then deletes notifications read more than 90 days ago
- * (rule 13). `apps/worker` schedules it; this process works it.
+ * A08 and escalation; projects: renewal) and the F16 escalation chain, then deletes notifications
+ * read, or resolved, more than 90 days ago (rule 13, F16 rule B15). `apps/worker` schedules it; this process works it.
  */
 @Injectable()
 export class DailyReminders implements OnModuleInit {
@@ -153,9 +153,10 @@ export class DailyReminders implements OnModuleInit {
 
   private async purge(now: Date): Promise<number> {
     const cutoff = new Date(now.getTime() - NOTIFICATION_RETENTION_DAYS * DAY_MS);
+    // F16 rule B15: resolved rows go 90 days after resolution, read or not.
     const deleted = await this.db
       .delete(notifications)
-      .where(lt(notifications.readAt, cutoff))
+      .where(or(lt(notifications.readAt, cutoff), lt(notifications.resolvedAt, cutoff)))
       .returning({ id: notifications.id });
     return deleted.length;
   }

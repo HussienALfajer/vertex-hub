@@ -9,6 +9,7 @@ import {
   type AuditAction,
   businessDate,
   type CreateTask,
+  type Following,
   isTaskOverdue,
   permissionScopes,
   TASK_LIMITS,
@@ -50,7 +51,7 @@ import { changedFields, recordAudit } from '../audit/index.js';
 import { type CurrentUserInfo, lockAccessChanges, UserDirectory } from '../auth/index.js';
 import { ClientDirectory, type ClientSummary } from '../clients/index.js';
 import { FileVersions } from '../files/index.js';
-import type { Notice } from '../notifications/index.js';
+import { type Notice, RecordFollowers } from '../notifications/index.js';
 import { EngagementDirectory } from '../projects/index.js';
 import { ClientReviewHooks } from './client-review-hooks.js';
 import { PostTaskHooks, unlinkRemovedTask } from './post-task-hooks.js';
@@ -118,7 +119,20 @@ export class TasksService {
     private readonly reviewHooks: ClientReviewHooks,
     private readonly postHooks: PostTaskHooks,
     private readonly guards: TaskGuards,
+    private readonly followers: RecordFollowers,
   ) {}
+
+  /** F16 rule B12: whether the actor follows a task they may read. */
+  async following(actor: CurrentUserInfo, id: string): Promise<Following> {
+    await readableTask(this.db, this.directories, actor, id);
+    return this.followers.following({ type: 'task', id }, actor.id);
+  }
+
+  /** F16 rule B12: anyone who may read the task follows or unfollows it by hand. */
+  async setFollowing(actor: CurrentUserInfo, id: string, following: boolean): Promise<Following> {
+    await readableTask(this.db, this.directories, actor, id);
+    return this.followers.setFollowing({ type: 'task', id }, actor.id, following);
+  }
 
   private get directories() {
     return { clients: this.clients, engagements: this.engagements };

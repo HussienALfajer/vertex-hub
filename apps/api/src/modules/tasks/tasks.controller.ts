@@ -11,10 +11,12 @@ import {
   Query,
   SerializeOptions,
 } from '@nestjs/common';
-import { ApiCreatedResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
+import { ApiCreatedResponse, ApiNotFoundResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import {
   type CreateTask,
   createTaskSchema,
+  type Following,
+  followingSchema,
   type RevisionDecisionInput,
   revisionDecisionInputSchema,
   type TaskDependenciesInput,
@@ -31,7 +33,9 @@ import {
   taskPageSchema,
   taskRevisionSchema,
   taskStatusChangeSchema,
+  type UpdateFollowing,
   type UpdateTask,
+  updateFollowingSchema,
   updateTaskSchema,
 } from '@vertex-hub/contracts';
 import { RequirePermissions } from '../../core/access/index.js';
@@ -59,6 +63,34 @@ export class TasksController {
     @Query({ schema: taskListQuerySchema }) query: TaskListQuery,
   ): Promise<TaskPage> {
     return this.tasks.list(actor, query);
+  }
+
+  @Get(':id/following')
+  @RequirePermissions('tasks.read')
+  @SerializeOptions({ schema: followingSchema })
+  @ApiOkResponse({
+    description: 'Whether the caller follows the task, and how many do (F16 rule B12)',
+    standardSchema: followingSchema,
+  })
+  @ApiNotFoundResponse({ description: 'No task the caller may read' })
+  following(
+    @CurrentUser() actor: CurrentUserInfo,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<Following> {
+    return this.tasks.following(actor, id);
+  }
+
+  @Put(':id/following')
+  @RequirePermissions('tasks.read')
+  @SerializeOptions({ schema: followingSchema })
+  @ApiOkResponse({ description: 'Followed or unfollowed by hand', standardSchema: followingSchema })
+  @ApiNotFoundResponse({ description: 'No task the caller may read' })
+  setFollowing(
+    @CurrentUser() actor: CurrentUserInfo,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body({ schema: updateFollowingSchema }) input: UpdateFollowing,
+  ): Promise<Following> {
+    return this.tasks.setFollowing(actor, id, input.following);
   }
 
   @Get(':id')

@@ -1,6 +1,6 @@
 import { type DepartmentCode, type Notification, pushText } from '@vertex-hub/contracts';
 import { formatNumber } from './format.js';
-import { notificationText } from './notifications.js';
+import { escalatedOriginal, NOTIFICATION_TEXT, notificationText } from './notifications.js';
 import { fill } from './text.js';
 
 /*
@@ -17,6 +17,8 @@ export const PUSH_TEXT = {
   /** Rule A9: the bell text names the reduction's amount; the push does not. */
   retainer_amendment_pending: 'طلب {{actor}} اعتماد التعديل {{number}} على عقد «{{retainer}}»',
   test: 'وصلت الإشعارات إلى هذا الجهاز',
+  /** Rule B14: the morning summary. */
+  morning: '{{overdue}} متأخرة · {{dueToday}} مستحقة اليوم · {{needsYou}} تحتاجك',
 } as const;
 
 /** The title and body of a notification's push. */
@@ -42,9 +44,32 @@ function withoutAmount(notification: Notification): string | null {
         number: formatNumber(notification.data.number),
         retainer: notification.data.retainer,
       });
+    case 'action_reminder':
+    case 'action_escalated':
+    case 'action_escalated_top': {
+      // Rule B11: a step wraps its original's text, so it takes the original's push variant.
+      const original = escalatedOriginal(notification);
+      const inner = original && withoutAmount(original);
+      return inner ? fill(NOTIFICATION_TEXT[notification.type], { text: inner }) : null;
+    }
     default:
       return null;
   }
+}
+
+/** Rule B14: the morning summary push: overdue tasks, tasks due today, "Needs you". */
+export function morningPush(counts: { overdue: number; dueToday: number; needsYou: number }): {
+  title: string;
+  body: string;
+} {
+  return {
+    title: PUSH_APP_NAME,
+    body: fill(PUSH_TEXT.morning, {
+      overdue: formatNumber(counts.overdue),
+      dueToday: formatNumber(counts.dueToday),
+      needsYou: formatNumber(counts.needsYou),
+    }),
+  };
 }
 
 /** Rule A12: the test push. */

@@ -218,9 +218,12 @@ import {
   type Note,
   type NoteChannel,
   type Notification,
+  type NotificationContent,
   type NotificationSettings,
   type NotificationType,
   needsDiscountApproval,
+  notificationBox,
+  notificationPriority,
   OPEN_AD_CAMPAIGN_STATUSES,
   OPEN_INVOICE_STATUSES,
   OPEN_LEAD_STAGES,
@@ -8943,17 +8946,38 @@ const autumnMenuSnapshot = {
   project: 'الهوية البصرية الجديدة',
 } as const;
 
+/** The fields `notificationFor` fills in when a fixture leaves them out. */
+type NotificationDefaults =
+  | 'id'
+  | 'count'
+  | 'read'
+  | 'createdAt'
+  | 'updatedAt'
+  | 'priority'
+  | 'box'
+  | 'inbox'
+  | 'resolution'
+  | 'snoozedUntil';
+
 /** A notification for a test user, typed by the contract. */
 export function notificationFor(
   recipient: MeResponse,
   n: number,
-  notification: Omit<Notification, 'id' | 'count' | 'read' | 'createdAt' | 'updatedAt'> &
-    Partial<Pick<Notification, 'count' | 'read' | 'updatedAt'>>,
+  notification: Omit<Notification, NotificationDefaults> &
+    Partial<Pick<Notification, NotificationDefaults>>,
 ): NotificationRecord {
   const at = notification.updatedAt ?? '2026-09-30T08:00:00.000Z';
+  const content = { type: notification.type, data: notification.data } as NotificationContent;
+  const box = notification.box ?? notificationBox(content);
   return {
     count: 1,
     read: false,
+    // F16 part B: the catalog's priority and box, open and not snoozed.
+    priority: notificationPriority(content),
+    box,
+    inbox: box === 'action' ? 'needs_you' : 'fyi',
+    resolution: null,
+    snoozedUntil: null,
     ...notification,
     id: id(n),
     createdAt: at,
@@ -9118,6 +9142,7 @@ function notificationRoutes({
         emailLocked: off.has(type),
       })),
       digestEnabled: digest.get(me().user.id) ?? true,
+      morningPush: true,
     };
   };
 
@@ -9143,7 +9168,10 @@ function notificationRoutes({
       });
     }
     if (path === '/api/me/notifications/unread-count') {
-      return json(route, { count: unreadCount() });
+      return json(route, {
+        count: unreadCount(),
+        needsYou: mine().filter((n) => n.box === 'action' && !n.resolution).length,
+      });
     }
     if (path === '/api/me/notifications/stream') {
       // `retry` keeps EventSource from reconnecting during the test once the body ends.

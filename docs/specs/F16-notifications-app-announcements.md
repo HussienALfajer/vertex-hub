@@ -297,14 +297,15 @@ Indexes: `(user_id, created_at desc)`, `(created_at)`.
 | `resolved_by_id` | uuid → `users.id` | optional; null for automatic resolution |
 | `resolution` | enum (`done`, `void`) | optional, with `resolved_at` |
 | `snoozed_until` | timestamptz | optional |
-| `escalation` | jsonb | optional; for `action_*` rows: `{ step, originalType, originalData, waitingWorkDays, recipients[] (names) }` |
 
 Indexes:
 - partial `(recipient_id, updated_at desc) where box = 'action' and resolved_at is null`;
 - partial `(snoozed_until) where snoozed_until is not null`;
 - `(subject_type, subject_id, resolution_type) where resolved_at is null`, used by `resolve`.
 
-Rows created before F16 are backfilled: `priority` and `box` from the catalog, unresolved.
+Rows created before F16 are backfilled: `priority` and `box` from the catalog, unresolved. Their `resolution_type` stays null: `resolve` closes them by their own type, and the escalation chain, which reads it, leaves them out (edge case 21; settled in B1).
+
+The escalation snapshot of an `action_*` row is its `data` (`originalType`, `originalData`, `waitingWorkDays`, `waitingOn` names and `waitingOnMore`), as every type's display snapshot is; there is no separate `escalation` column (settled in B1).
 
 ### `notification_settings` (changed)
 | Field | Type | Constraints |
@@ -313,7 +314,7 @@ Rows created before F16 are backfilled: `priority` and `box` from the catalog, u
 | `email_overrides` | jsonb | required, default `{}`; replaces `email_types`. The migration turns each saved `email_types` into overrides against the defaults, so saved choices are kept |
 | `morning_push` | boolean | required, default true |
 
-`email_types` is no longer read or written from A1 and is dropped in a later release (expand, then contract: the previous release still reads it during a deploy or a rollback).
+`email_types` is no longer read or written from A1 and is dropped in the first release after the F16 deploy (expand, then contract: the previous release still reads it during a deploy or a rollback, and F16 reaches production in one deploy).
 
 ### `notification_policies`
 One row per type that management changed. No row means the catalog default. Audited (`notification_policy.updated`).
@@ -525,7 +526,7 @@ Primary key `(announcement_id, user_id)`; index `(user_id)`.
     - "step 2 added" (`post_publish_overdue` → managers of Content Management; `shoot_not_closed` → managers of Photography; `ad_budget_low` after 7 days → Finance);
     - "step 3 added" (`task_overdue_escalated` → GMs + Ops two work days after the escalation; `invoice_overdue` → GMs on the 14th day overdue).
 
-    The existing escalations (A08, over-limit, lead follow-up, invoice repeats) keep their rules. Idempotent through `notification_reminders` (`escalation_<n>`).
+    A step that is "added" without step 1 is timed as in the chain: step 2 two work days after the original, step 3 four (settled in B1), except where a time is named above. The existing escalations (A08, over-limit, lead follow-up, invoice repeats) keep their rules. Idempotent through `notification_reminders` (`escalation_<n>`).
 
 **Followers**
 12. **Following.**
@@ -645,12 +646,12 @@ All routes are under the session guard unless a permission is named. Each acts o
 | `POST /api/me/push/test` | session | — | 202 | `NO_SUBSCRIPTION`, 429 |
 | `POST /api/me/push/deliveries/:id/click` | session (own) | — | 204 | 404 |
 | `GET /api/me/sessions` (changed) | session | — | each device + `push: { state, lastDeliveredAt }` | — |
-| `GET /api/me/notifications` (changed) | session | + `inbox` (`needs_you`, `fyi`, `done`, `snoozed`) | each row + `priority`, `box`, `inbox`, `resolution` (`done` / `void`, by whom, when), `snoozedUntil`, `escalation` | — |
+| `GET /api/me/notifications` (changed) | session | + `inbox` (`needs_you`, `fyi`, `done`, `snoozed`) | each row + `priority`, `box`, `inbox`, `resolution` (`done` / `void`, by whom, when), `snoozedUntil`; an escalation step carries its original in `data`; without `inbox`, every row not snoozed | — |
 | `GET /api/me/notifications/unread-count` (changed) | session | — | `{ count, needsYou }` | — |
 | `POST /api/me/notifications/:id/snooze` | session (own) | `{ for: '1h' \| '3h' \| 'next_work_day' }` | notification | 404, `ALREADY_RESOLVED` |
 | `POST /api/me/notifications/:id/unsnooze` | session (own) | — | notification | 404 |
 | `GET` / `PUT /api/me/notification-settings` (changed) | session | per type `muted`, `push`, `email`; `digestEnabled`, `morningPush` | settings with each type's `priority`, policy modes and effective values | `NOT_MUTABLE`, `CHANNEL_REQUIRED`, `CHANNEL_UNAVAILABLE` |
-| `GET /api/notification-policies` | `notifications.policy` | — | every type with its default and current push and email modes | 403 |
+| `GET /api/notification-policies` | `notifications.policy` | — | `{ items }`: every type with its default and current push and email modes | 403 |
 | `PUT /api/notification-policies/:type` | `notifications.policy` | `{ push, email }` or `{ reset: true }` | the type's policy | 403, 404 |
 | `GET /api/push-deliveries` | `notifications.policy` | `userId`, `status`, `from`, `to`, page | page of deliveries | 403 |
 | `GET` / `PUT /api/tasks/:id/following` | `tasks.read` covering the task | `{ following }` | `{ following, followers: count }` | 403, 404 |
@@ -795,7 +796,7 @@ None. Decisions made in this interview (owner, 2026-10-20):
 - shared templates by management, personal ones by everyone.
 
 ## Acceptance
-- **Owner, in the browser and on phones** (each part on its own deploy):
+- **Owner, in the browser and on phones** (the phone steps after the single F16 deploy; the computer steps in the local checkout as each part is merged):
   1. **A:** On an Android phone, install the app from Chrome; it opens without a browser bar with the Vertex icon. Turn notifications on. From a PC, assign a task to that user: the phone shows the push with the screen locked. The icon shows the unread count. Tap the push: the task opens. Read it on the PC: the push leaves the phone at the next push or opening.
   2. **A:** On an iPhone (iOS 16.4+), follow `/install`, add to the home screen, turn notifications on, and repeat step 1.
   3. **A:** Turn off the Wi-Fi: the app opens with the last data and the offline banner; invoices show "Not available offline".
@@ -826,7 +827,7 @@ None. Decisions made in this interview (owner, 2026-10-20):
     - announcement editor, page, receipts, poll, home pin and critical dialog;
     - the offline banner (Playwright offline mode);
     - service worker registration and a push delivered through the `log` transport, displayed via the service worker in Chromium.
-- **Delivery** (owner, 2026-10-20: in this order; each part is deployed when done):
+- **Delivery** (owner, 2026-10-20: in this order). F16 is deployed to production once, after every part (A–D) is merged, not part by part (owner, 2026-10-20). The drop of `notification_settings.email_types` follows in the first release after that deploy:
   - **A1:** contracts, db, API and worker (push, sessions, priorities in the catalog, push switches).
   - **A2:** the web (manifest, service worker, icons, install, offline, badge, device rows, settings column) and E2E.
   - **B1, B2:** the engine, API then web.

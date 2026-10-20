@@ -55,6 +55,9 @@ const NOT_BUSINESS_RECORDS: Record<string, string> = {
   notification_reminders: 'Idempotency keys of the daily job, insert-only (F14 rule 8)',
   push_subscriptions: 'Technical: a device subscription, deleted with its session (F16 rule A7)',
   push_deliveries: 'Technical delivery log, purged after 30 days, never archived (F16 rule A15)',
+  notification_policies:
+    'One row per changed type, removed on reset to the catalog default; audited (F16 rule B2)',
+  record_followers: 'Personal: who follows a task or post, never archived (F16 rule B12)',
   lead_interests:
     'Part of its lead; replaced as a whole when the lead is saved, audited on the lead (F03)',
   file_uploads: 'Temporary: deleted when attached or purged after 24 hours (F10)',
@@ -91,6 +94,7 @@ const NATURAL_KEYS: Record<string, string> = {
   worker_heartbeats: 'One row per worker name, upserted',
   retainer_templates: 'One row per retainer, keyed by the retainer (F07)',
   notification_settings: 'One row per user, keyed by the user (F14)',
+  notification_policies: 'One row per notification type, keyed by the type (F16 rule B2)',
   contract_settings: 'A single row, keyed by a constant (F05C)',
   quote_settings: 'A single row, keyed by a constant (F04)',
   quote_numbers: 'One row per year, keyed by the year (F04 rule 2)',

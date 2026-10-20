@@ -230,6 +230,18 @@ export const NOTIFICATION_TEXT = {
   lead_follow_up_overdue: 'تأخرت متابعة العميل المحتمل «{{lead}}»؛ كان موعدها {{date}}',
   lead_follow_up_due: 'حان موعد متابعة العميل المحتمل «{{lead}}»',
   push_device_lost: 'توقفت الإشعارات على {{device}}. فعّلها من جديد من ذلك الجهاز',
+  /** F16 rule B11: each escalation step wraps the original's text. */
+  action_reminder: 'تذكير: {{text}}',
+  action_escalated: 'تصعيد: {{text}}',
+  action_escalated_top: 'تصعيد إلى الإدارة: {{text}}',
+  waitingOn: {
+    zero: 'بانتظار {{names}} منذ اليوم',
+    one: 'بانتظار {{names}} منذ يوم عمل',
+    two: 'بانتظار {{names}} منذ يومَي عمل',
+    few: 'بانتظار {{names}} منذ {{n}} أيام عمل',
+    many: 'بانتظار {{names}} منذ {{n}} يوم عمل',
+    other: 'بانتظار {{names}} منذ {{n}} يوم عمل',
+  },
   /** The parts of a shoot or a meeting that changed. */
   changes: {
     shoot: { time: 'الموعد', location: 'المكان', lead: 'القائد' },
@@ -256,6 +268,8 @@ export interface NotificationLink {
 
 /** What a notification opens (F14 rule 15). */
 export function notificationLink(notification: Notification): NotificationLink {
+  const original = escalatedOriginal(notification);
+  if (original) return notificationLink(original);
   const { subject } = notification;
   if (notification.type === 'ad_budget_low') {
     // The client's wallet is on its Ads tab (F12 screen 6).
@@ -336,6 +350,22 @@ export function linkPath(link: NotificationLink): string {
     ]),
   ).toString();
   return search ? `${path}?${search}` : path;
+}
+
+/**
+ * F16 rule B11: the original an escalation step is about, as the notification it was, so its
+ * text and link render as they did.
+ */
+export function escalatedOriginal(notification: Notification): Notification | null {
+  if (
+    notification.type !== 'action_reminder' &&
+    notification.type !== 'action_escalated' &&
+    notification.type !== 'action_escalated_top'
+  ) {
+    return null;
+  }
+  const { originalType, originalData } = notification.data;
+  return { ...notification, type: originalType, data: originalData, count: 1 } as Notification;
 }
 
 function formatDue(due: { dueDate: string; dueTime: string | null }): string {
@@ -648,6 +678,23 @@ export function notificationText(
         text: fill(text.push_device_lost, { device: notification.data.device }),
         context: null,
       };
+    case 'action_reminder':
+    case 'action_escalated':
+    case 'action_escalated_top': {
+      const { data } = notification;
+      const original = escalatedOriginal(notification);
+      const names = formatList(
+        data.waitingOnMore > 0
+          ? [...data.waitingOn, fill(text.behindMore, { n: formatNumber(data.waitingOnMore) })]
+          : data.waitingOn,
+      );
+      return {
+        text: fill(text[notification.type], {
+          text: original ? notificationText(original, departmentName).text : '',
+        }),
+        context: counted(text.waitingOn, data.waitingWorkDays, { names }),
+      };
+    }
     default: {
       const { task } = notification.data;
       return {
@@ -712,6 +759,7 @@ type TaskNotification = Exclude<
       | 'approval_expired'
       | `post_${string}`
       | 'push_device_lost'
+      | `action_${string}`
       | CalendarNotification['type'];
   }
 >;

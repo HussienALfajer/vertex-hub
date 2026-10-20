@@ -37,6 +37,7 @@ import {
   meetingContacts,
   meetings,
   newId,
+  notificationPolicies,
   notificationReminders,
   notificationSettings,
   notifications,
@@ -297,8 +298,15 @@ export async function removeUsers(db: Database, ids: string[]): Promise<void> {
     .where(or(inArray(auditEntries.actorId, ids), inArray(auditEntries.entityId, ids)));
   await db
     .delete(notifications)
-    .where(or(inArray(notifications.recipientId, ids), inArray(notifications.actorId, ids)));
+    .where(
+      or(
+        inArray(notifications.recipientId, ids),
+        inArray(notifications.actorId, ids),
+        inArray(notifications.resolvedById, ids),
+      ),
+    );
   await db.delete(notificationSettings).where(inArray(notificationSettings.userId, ids));
+  await db.delete(notificationPolicies).where(inArray(notificationPolicies.updatedById, ids));
   // Digests, and the staff emails sent to the users (F14 email).
   await db.delete(emailDigests).where(inArray(emailDigests.userId, ids));
   await db.delete(emailMessages).where(

@@ -1,5 +1,6 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import {
+  type ChannelPolicies,
   channelOverrides,
   effectiveChannel,
   isMutableNotificationType,
@@ -8,31 +9,71 @@ import {
   NOTIFICATION_TYPES,
   type Notification,
   type NotificationChannel,
+  type NotificationInbox,
   type NotificationListQuery,
   type NotificationPage,
   type NotificationSettings,
   type NotificationType,
   notificationTypesOf,
   type ReadAllResult,
+  type SnoozeOption,
+  snoozeUntil,
+  typeChannelMode,
+  type UnreadCount,
   type UpdateNotificationSettings,
 } from '@vertex-hub/contracts';
 import { type Database, notificationSettings, notifications } from '@vertex-hub/db';
-import { and, count, desc, eq, inArray, isNotNull, isNull, type SQL } from 'drizzle-orm';
+import { and, count, desc, eq, inArray, isNotNull, isNull, or, type SQL, sql } from 'drizzle-orm';
 import { DATABASE } from '../../core/database/database.module.js';
 import { CodedException } from '../../core/errors/index.js';
 import { UserDirectory } from '../auth/index.js';
+import { NotificationCenter } from './notification-center.js';
+import { NotificationPolicies } from './notification-policies.service.js';
 import { notificationResponses } from './notification-responses.js';
 
-/** Each user's own notifications and mute settings (spec F14); another user's id answers 404. */
+const open = isNull(notifications.resolvedAt);
+const notSnoozed = isNull(notifications.snoozedUntil);
+const resolvedByOther = sql`${notifications.resolvedById} is distinct from ${notifications.recipientId}`;
+
+/** F16 rule B6: the rows of each inbox, as `notificationInbox` derives it. */
+const INBOX_FILTERS: Record<NotificationInbox, SQL> = {
+  needs_you: and(eq(notifications.box, 'action'), open, notSnoozed) as SQL,
+  fyi: and(
+    notSnoozed,
+    or(eq(notifications.box, 'info'), and(eq(notifications.resolution, 'done'), resolvedByOther)),
+  ) as SQL,
+  done: and(
+    notSnoozed,
+    or(
+      eq(notifications.resolution, 'void'),
+      and(
+        eq(notifications.resolution, 'done'),
+        eq(notifications.resolvedById, notifications.recipientId),
+      ),
+    ),
+  ) as SQL,
+  snoozed: isNotNull(notifications.snoozedUntil),
+};
+
+/**
+ * Each user's own notifications, inboxes, snoozes and settings (spec F14, F16 part B); another
+ * user's id answers 404.
+ */
 @Injectable()
 export class NotificationsService {
   constructor(
     @Inject(DATABASE) private readonly db: Database,
     private readonly users: UserDirectory,
+    private readonly center: NotificationCenter,
+    private readonly policies: NotificationPolicies,
   ) {}
 
+  /** Rule B6: one inbox, or everything not snoozed; critical rows first, then newest. */
   async list(userId: string, query: NotificationListQuery): Promise<NotificationPage> {
-    const filters: SQL[] = [eq(notifications.recipientId, userId)];
+    const filters: SQL[] = [
+      eq(notifications.recipientId, userId),
+      query.inbox ? INBOX_FILTERS[query.inbox] : notSnoozed,
+    ];
     if (query.unread !== undefined) {
       filters.push(query.unread ? isNull(notifications.readAt) : isNotNull(notifications.readAt));
     }
@@ -45,7 +86,11 @@ export class NotificationsService {
         .select()
         .from(notifications)
         .where(where)
-        .orderBy(desc(notifications.updatedAt), desc(notifications.id))
+        .orderBy(
+          desc(sql`${notifications.priority} = 'critical'`),
+          desc(notifications.updatedAt),
+          desc(notifications.id),
+        )
         .limit(query.pageSize)
         .offset((query.page - 1) * query.pageSize),
       this.db.select({ value: count() }).from(notifications).where(where),
@@ -58,26 +103,92 @@ export class NotificationsService {
     };
   }
 
-  async unreadCount(userId: string): Promise<number> {
+  /**
+   * Rule B6: unread rows that are not snoozed, and the open "Needs you" rows. Resolved rows of
+   * "Done" are read, so they never count.
+   */
+  async unreadCount(userId: string): Promise<UnreadCount> {
     const [row] = await this.db
-      .select({ value: count() })
+      .select({
+        count:
+          sql<number>`count(*) filter (where ${notifications.readAt} is null and ${notifications.snoozedUntil} is null)`.mapWith(
+            Number,
+          ),
+        needsYou: sql<number>`count(*) filter (where ${INBOX_FILTERS.needs_you})`.mapWith(Number),
+      })
       .from(notifications)
-      .where(and(eq(notifications.recipientId, userId), isNull(notifications.readAt)));
-    return row?.value ?? 0;
+      .where(eq(notifications.recipientId, userId));
+    return { count: row?.count ?? 0, needsYou: row?.needsYou ?? 0 };
   }
 
-  /** Idempotent: a notification already read keeps its first read time (edge case 10). */
+  /**
+   * Idempotent: a notification already read keeps its first read time (edge case 10). F16 rule
+   * B5: opening an open "opened" type resolves it as done by its recipient.
+   */
   async markRead(userId: string, id: string): Promise<void> {
     const [row] = await this.db
-      .select({ readAt: notifications.readAt })
+      .select({
+        type: notifications.type,
+        box: notifications.box,
+        readAt: notifications.readAt,
+        resolvedAt: notifications.resolvedAt,
+      })
       .from(notifications)
       .where(and(eq(notifications.id, id), eq(notifications.recipientId, userId)));
     if (!row) throw new NotFoundException('Notification not found');
-    if (row.readAt) return;
+    const resolves =
+      NOTIFICATION_CATALOG[row.type].opened && row.box === 'action' && !row.resolvedAt;
+    if (row.readAt && !resolves) return;
+    const now = new Date();
     await this.db
       .update(notifications)
-      .set({ readAt: new Date() })
-      .where(and(eq(notifications.id, id), isNull(notifications.readAt)));
+      .set({
+        readAt: row.readAt ?? now,
+        ...(resolves && {
+          resolvedAt: now,
+          resolvedById: userId,
+          resolution: 'done' as const,
+          snoozedUntil: null,
+        }),
+      })
+      .where(and(eq(notifications.id, id), resolves ? open : isNull(notifications.readAt)));
+  }
+
+  /**
+   * Rule B8: takes the row out of the lists and the count until its time. A resolved row cannot
+   * be snoozed.
+   */
+  async snooze(userId: string, id: string, option: SnoozeOption): Promise<Notification> {
+    const [row] = await this.db
+      .select({ resolvedAt: notifications.resolvedAt })
+      .from(notifications)
+      .where(and(eq(notifications.id, id), eq(notifications.recipientId, userId)));
+    if (!row) throw new NotFoundException('Notification not found');
+    if (row.resolvedAt) {
+      throw new CodedException(409, 'ALREADY_RESOLVED', 'This notification is already closed');
+    }
+    await this.db
+      .update(notifications)
+      .set({ snoozedUntil: snoozeUntil(option, new Date()) })
+      .where(and(eq(notifications.id, id), open));
+    return this.one(userId, id);
+  }
+
+  /** Rule B8: wakes the row at once, as its time would. */
+  async unsnooze(userId: string, id: string): Promise<Notification> {
+    await this.db.transaction((tx) =>
+      this.center.wake(
+        tx,
+        and(eq(notifications.id, id), eq(notifications.recipientId, userId)) as SQL,
+      ),
+    );
+    return this.one(userId, id);
+  }
+
+  private async one(userId: string, id: string): Promise<Notification> {
+    const [item] = await this.byIds(userId, [id]);
+    if (!item) throw new NotFoundException('Notification not found');
+    return item;
   }
 
   async markUnread(userId: string, id: string): Promise<void> {
@@ -93,7 +204,7 @@ export class NotificationsService {
     const updated = await this.db
       .update(notifications)
       .set({ readAt: new Date() })
-      .where(and(eq(notifications.recipientId, userId), isNull(notifications.readAt)))
+      .where(and(eq(notifications.recipientId, userId), isNull(notifications.readAt), notSnoozed))
       .returning({ id: notifications.id });
     return { updated: updated.length };
   }
@@ -110,19 +221,23 @@ export class NotificationsService {
   }
 
   async settings(userId: string): Promise<NotificationSettings> {
+    const policies = await this.policies.current();
     const [row] = await this.db
       .select({
         mutedTypes: notificationSettings.mutedTypes,
         pushOverrides: notificationSettings.pushOverrides,
         emailOverrides: notificationSettings.emailOverrides,
         digestEnabled: notificationSettings.digestEnabled,
+        morningPush: notificationSettings.morningPush,
       })
       .from(notificationSettings)
       .where(eq(notificationSettings.userId, userId));
     const muted = new Set(row?.mutedTypes ?? []);
     return {
       types: NOTIFICATION_TYPES.map((type) => {
-        const { category, mutable, priority, push, email } = NOTIFICATION_CATALOG[type];
+        const { category, mutable, priority } = NOTIFICATION_CATALOG[type];
+        const push = typeChannelMode(type, 'push', policies);
+        const email = typeChannelMode(type, 'email', policies);
         return {
           type,
           category,
@@ -139,13 +254,15 @@ export class NotificationsService {
         };
       }),
       digestEnabled: row?.digestEnabled ?? true,
+      morningPush: row?.morningPush ?? true,
     };
   }
 
   /**
    * Rule 3: only mutable types may be muted; unmuting affects later events only. F14 email
-   * rules 2 and 11 and F16 rule A7: email and push choices and the digest switch, kept when left
-   * out, stored as overrides of the catalog defaults (F16 rule B3).
+   * rules 2 and 11 and F16 rules A7 and B14: email and push choices, the digest and the morning
+   * push switches, kept when left out, stored as overrides of the current modes (F16 rules
+   * B1–B3).
    */
   async updateSettings(
     userId: string,
@@ -157,9 +274,10 @@ export class NotificationsService {
         types: [...new Set(locked)],
       });
     }
+    const policies = await this.policies.current();
     for (const channel of NOTIFICATION_CHANNELS) {
       const chosen = channel === 'push' ? input.pushTypes : input.emailTypes;
-      if (chosen) refuseLockedChannel(channel, new Set(chosen));
+      if (chosen) refuseLockedChannel(channel, new Set(chosen), policies);
     }
     const mutedTypes: NotificationType[] = NOTIFICATION_TYPES.filter((type) =>
       input.mutedTypes.includes(type),
@@ -180,6 +298,7 @@ export class NotificationsService {
             'email',
             new Set(input.emailTypes),
             saved?.emailOverrides ?? {},
+            policies,
           ),
         }),
         ...(input.pushTypes && {
@@ -187,9 +306,11 @@ export class NotificationsService {
             'push',
             new Set(input.pushTypes),
             saved?.pushOverrides ?? {},
+            policies,
           ),
         }),
         ...(input.digestEnabled !== undefined && { digestEnabled: input.digestEnabled }),
+        ...(input.morningPush !== undefined && { morningPush: input.morningPush }),
       };
       await tx
         .insert(notificationSettings)
@@ -204,8 +325,12 @@ export class NotificationsService {
 }
 
 /** F16 rule B1: a `required` channel cannot be turned off, nor an `unavailable` one on. */
-function refuseLockedChannel(channel: NotificationChannel, chosen: ReadonlySet<NotificationType>) {
-  const modeOf = (type: NotificationType) => NOTIFICATION_CATALOG[type][channel];
+function refuseLockedChannel(
+  channel: NotificationChannel,
+  chosen: ReadonlySet<NotificationType>,
+  policies: ChannelPolicies,
+) {
+  const modeOf = (type: NotificationType) => typeChannelMode(type, channel, policies);
   const required = NOTIFICATION_TYPES.filter(
     (type) => modeOf(type) === 'required' && !chosen.has(type),
   );
