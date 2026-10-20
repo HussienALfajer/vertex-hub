@@ -13,6 +13,7 @@ import {
   PUSH_DELIVERY_KINDS,
   PUSH_DELIVERY_STATUSES,
   PUSH_LIMITS,
+  TIMED_REMINDER_KINDS,
 } from '@vertex-hub/contracts';
 import { sql } from 'drizzle-orm';
 import {
@@ -227,6 +228,29 @@ export const notificationReminders = pgTable(
     sentOn: date('sent_on', { mode: 'string' }).notNull(),
   },
   (table) => [primaryKey({ columns: [table.kind, table.subjectId, table.occurrence] })],
+);
+
+/** F16 rule B13: the timed sources of the minute job. */
+export const timedReminderKindEnum = pgEnum('timed_reminder_kind', TIMED_REMINDER_KINDS);
+
+/**
+ * F16 rule B13: idempotency of the minute job, one row per reminder sent. A moved time is a new
+ * key. Purged 30 days after its moment.
+ */
+export const timedReminders = pgTable(
+  'timed_reminders',
+  {
+    kind: timedReminderKindEnum('kind').notNull(),
+    /** The task, post, shoot or meeting. */
+    subjectId: uuid('subject_id').notNull(),
+    /** The moment the reminder is for: the due, publish or start time. */
+    occursAt: timestamp('occurs_at', { withTimezone: true }).notNull(),
+    sentAt: timestamp('sent_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.kind, table.subjectId, table.occursAt] }),
+    index('timed_reminders_occurs_at_idx').on(table.occursAt),
+  ],
 );
 
 /**

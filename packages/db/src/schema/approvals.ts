@@ -51,6 +51,8 @@ export const approvalRequests = pgTable(
     remindedAt: timestamp('reminded_at', { withTimezone: true }),
     expiryNotifiedAt: timestamp('expiry_notified_at', { withTimezone: true }),
     revokedAt: timestamp('revoked_at', { withTimezone: true }),
+    /** F16 part C rule 2: the client's first load of the current link; cleared on reissue. */
+    firstOpenedAt: timestamp('first_opened_at', { withTimezone: true }),
     revokedById: uuid('revoked_by_id').references(() => users.id),
     /** Set when no item is pending any more. */
     completedAt: timestamp('completed_at', { withTimezone: true }),
