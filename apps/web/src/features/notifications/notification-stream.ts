@@ -88,6 +88,11 @@ function useEventToast(openBell: () => void) {
   return (event: NotificationStreamEvent) => {
     // The notifications page updates its list instead.
     if (pathname === '/notifications') return;
+    // F16 rule B10: a critical notice stays until it is closed, so a burst never collapses it.
+    if (event.notification.priority === 'critical') {
+      showToast(event, 0);
+      return;
+    }
     const now = Date.now();
     if (!burst.current || now - burst.current.start > BURST_MS) {
       burst.current = { start: now, count: 0, toastIds: [] };
@@ -123,14 +128,16 @@ function useEventToast(openBell: () => void) {
       return;
     }
 
-    const { notification } = event;
+    current.toastIds.push(showToast(event, TOAST_MS));
+  };
+
+  function showToast({ notification }: NotificationStreamEvent, timeout: number) {
     const { text, context } = notificationText(notification, departmentName);
     const id = toast.add({
       title: text,
       description: context ?? undefined,
       type: 'info',
-      // F16 rule B10: a critical notice stays until it is closed.
-      timeout: notification.priority === 'critical' ? 0 : TOAST_MS,
+      timeout,
       actionProps: {
         children: t('notifications.open'),
         onClick: () => {
@@ -140,8 +147,8 @@ function useEventToast(openBell: () => void) {
         },
       },
     });
-    current.toastIds.push(id);
-  };
+    return id;
+  }
 }
 
 /** A pushed event checked against the contract, or null. */

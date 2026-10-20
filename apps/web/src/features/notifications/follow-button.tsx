@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { Button, IconButton, toast } from '@vertex-hub/ui';
+import { Button, IconButton, Popover, PopoverContent, PopoverTrigger, toast } from '@vertex-hub/ui';
 import { BellOffIcon, BellPlusIcon, InfoIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { errorMessage } from '../../lib/errors';
@@ -50,9 +50,15 @@ export function FollowButton({ target }: { target: FollowTarget }) {
           {t('notifications.follow.followers', { count: followers, n: formatNumber(followers) })}
         </span>
       </Button>
-      <IconButton label={hint}>
-        <InfoIcon />
-      </IconButton>
+      {/* A tap opens the hint on phones, where tooltips never show. */}
+      <Popover>
+        <PopoverTrigger render={<IconButton label={t('notifications.follow.why')} />}>
+          <InfoIcon />
+        </PopoverTrigger>
+        <PopoverContent align="end" className="max-w-72 p-3 text-sm">
+          {hint}
+        </PopoverContent>
+      </Popover>
     </span>
   );
 }

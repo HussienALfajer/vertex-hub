@@ -1,6 +1,6 @@
 import { NOTIFICATION_TEXT } from '@vertex-hub/messages';
 import ar from '../src/i18n/locales/ar.json' with { type: 'json' };
-import { employeeMe, manager, mockApi, seedIds } from './fixtures';
+import { employeeMe, manager, mockApi, notificationFor, seedIds } from './fixtures';
 import { expect, test } from './test';
 
 // F16 part B in the web app: inboxes, snooze, settings, the channel policy and following, against
@@ -172,4 +172,46 @@ test('follow a task by hand, then stop', async ({ page }) => {
   await expect(following).toContainText('3');
   await following.click();
   await expect(page.getByText(ar.notifications.follow.unfollowed)).toBeVisible();
+});
+
+test('a critical toast stays beside a collapsed burst (rule B10)', async ({ page }) => {
+  const generated = [1, 2, 3, 4].map((n) =>
+    notificationFor(employeeMe, 5920 + n, {
+      type: 'tasks_generated',
+      actor: null,
+      subject: { type: 'template_run', id: seedIds.monthlyTemplate },
+      data: {
+        template: `قالب ${n}`,
+        count: 2,
+        department: 'photography',
+        unassigned: false,
+        client: 'مطعم الياسمين',
+        project: null,
+        retainer: 'إدارة السوشيال ميديا',
+      },
+    }),
+  );
+  const overdue = notificationFor(employeeMe, 5930, {
+    type: 'task_overdue',
+    actor: null,
+    subject: { type: 'task', id: seedIds.dishShoot },
+    data: {
+      task: {
+        title: 'تصوير الأطباق',
+        department: 'photography',
+        client: 'مطعم الياسمين',
+        project: null,
+      },
+      dueDate: '2026-09-28',
+      dueTime: null,
+    },
+  });
+  await mockApi(page, { signedIn: true, me: employeeMe, streamed: [overdue, ...generated] });
+  await page.goto('/');
+  const toasts = page.locator('[data-slot="toast"]');
+  await expect(
+    toasts.filter({ hasText: fill(ar.notifications.newMany_few, { n: '4' }) }),
+  ).toBeVisible();
+  await expect(toasts.filter({ hasText: 'تصوير الأطباق' })).toBeVisible();
+  await expect(toasts).toHaveCount(2);
 });

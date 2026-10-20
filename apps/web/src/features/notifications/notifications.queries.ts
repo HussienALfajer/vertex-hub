@@ -101,7 +101,11 @@ export async function applyStreamEvent(queryClient: QueryClient, event: Notifica
   queryClient.setQueryData<NotificationPage>(bellKey, (page) => {
     if (!page) return page;
     const known = page.items.some((item) => item.id === notification.id);
-    const items = [notification, ...page.items.filter((item) => item.id !== notification.id)];
+    // Rule B6: critical rows first, then newest; the new row is the newest of its rank.
+    const others = page.items.filter((item) => item.id !== notification.id);
+    const critical = notification.priority === 'critical';
+    const at = critical ? 0 : others.filter((item) => item.priority === 'critical').length;
+    const items = [...others.slice(0, at), notification, ...others.slice(at)];
     return {
       ...page,
       items: items.slice(0, page.pageSize),
