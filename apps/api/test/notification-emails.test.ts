@@ -151,7 +151,7 @@ describe('notification emails (F14 email rules 2–12)', () => {
       const saved = await saveSettings(cookie, {
         mutedTypes: ['task_mentioned'],
         // A type that cannot be muted can still be emailed (owner decision).
-        emailTypes: ['task_review_requested', 'task_mentioned'],
+        emailTypes: [...REQUIRED_EMAIL, 'task_review_requested', 'task_mentioned'],
         digestEnabled: false,
       });
       expect(saved.digestEnabled).toBe(false);
@@ -175,12 +175,19 @@ describe('notification emails (F14 email rules 2–12)', () => {
     });
   });
 
+  /** F16 rule B1: types always emailed; a saved list that leaves them out is refused. */
+  const REQUIRED_EMAIL = ['task_over_limit_pending', 'invoice_overdue'] as const;
+
+  /** F16: the types emailed by default, required ones included. */
   const emailedDefaults = () => [
+    ...REQUIRED_EMAIL,
     'task_assigned',
     'task_mentioned',
     'task_due_soon',
     'task_overdue',
     'task_overdue_escalated',
+    'post_publish_overdue',
+    'lead_follow_up_overdue',
     'approval_responded',
     'invoice_paid',
   ];
@@ -230,7 +237,9 @@ describe('notification emails (F14 email rules 2–12)', () => {
     });
 
     it('puts a merged comment back to pending, so a later batch carries it once', async () => {
-      await saveSettings(cast.designer.cookie, { emailTypes: ['task_commented'] });
+      await saveSettings(cast.designer.cookie, {
+        emailTypes: [...REQUIRED_EMAIL, 'task_commented'],
+      });
       const subjectId = newId();
       const comment = {
         type: 'task_commented' as const,

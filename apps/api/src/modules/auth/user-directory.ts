@@ -93,6 +93,21 @@ export class UserDirectory {
     return !!row;
   }
 
+  /** The given sessions that still exist and have not expired (F16: where push may go). */
+  async openSessions(
+    sessionIds: readonly string[],
+    executor: Database | Transaction = this.db,
+  ): Promise<Set<string>> {
+    if (sessionIds.length === 0) return new Set();
+    const rows = await executor
+      .select({ id: sessions.id })
+      .from(sessions)
+      .where(
+        and(inArray(sessions.id, [...new Set(sessionIds)]), gt(sessions.expiresAt, new Date())),
+      );
+    return new Set(rows.map((row) => row.id));
+  }
+
   /** A non-archived user; an invited user qualifies. */
   async activeUser(
     userId: string,

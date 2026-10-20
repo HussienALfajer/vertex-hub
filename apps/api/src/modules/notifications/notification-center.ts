@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import {
-  emailedTypes,
+  type ChannelOverrides,
+  channelModeOf,
+  effectiveChannel,
   firstMatchPerRecipient,
   NOTIFICATION_CATALOG,
   NOTIFICATION_DATA_SCHEMAS,
@@ -9,11 +11,13 @@ import {
   type NotificationEmailState,
   type NotificationSubjectType,
   type NotificationType,
+  notificationPriority,
 } from '@vertex-hub/contracts';
 import { newId, notificationSettings, notifications, type Transaction } from '@vertex-hub/db';
 import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { UserDirectory } from '../auth/index.js';
 import { NOTIFICATIONS_CHANNEL, pushPayloads } from './notification-channel.js';
+import { PushQueue } from './push-queue.js';
 
 /**
  * Types merged into the recipient's unread notification of the same type and subject (rule 5,
@@ -44,7 +48,8 @@ export type Notice = NotificationContent & {
 /** A recipient's settings as `notify` reads them; no row means the defaults. */
 interface RecipientSettings {
   muted: Set<NotificationType>;
-  emailed: Set<NotificationType>;
+  push: ChannelOverrides;
+  email: ChannelOverrides;
   digestEnabled: boolean;
 }
 
@@ -54,7 +59,10 @@ interface RecipientSettings {
  */
 @Injectable()
 export class NotificationCenter {
-  constructor(private readonly users: UserDirectory) {}
+  constructor(
+    private readonly users: UserDirectory,
+    private readonly push: PushQueue,
+  ) {}
 
   /**
    * Rule 2: drops the actor, archived users, duplicates and recipients who muted the type; when
@@ -62,7 +70,9 @@ export class NotificationCenter {
    * catalog order (other subjects and several notices of that type all stay). Rule
    * 5: merges a comment (or an added file, F10) into the recipient's unread notification of the
    * same type on the same task. The
-   * `pg_notify` runs in the transaction, so PostgreSQL delivers it only on commit (rule 4).
+   * `pg_notify` runs in the transaction, so PostgreSQL delivers it only on commit (rule 4). F16
+   * rule A8: queues a push of each notification whose push is on for its recipient (rule B3), in
+   * the same transaction; a merged one is pushed again and replaces the older notice by its tag.
    * Returns the number of notifications stored or merged.
    */
   async notify(tx: Transaction, notices: Notice | readonly Notice[]): Promise<number> {
@@ -93,6 +103,7 @@ export class NotificationCenter {
     );
 
     const pushed: { recipientId: string; notificationId: string }[] = [];
+    const toDevices: string[] = [];
     for (const { recipientId, notice } of deliverable) {
       const data = NOTIFICATION_DATA_SCHEMAS[notice.type].parse(notice.data);
       const email = emailMarking(notice, active.has(recipientId), settings.get(recipientId));
@@ -109,11 +120,17 @@ export class NotificationCenter {
           subjectType: notice.subjectType ?? NOTIFICATION_CATALOG[notice.type].subject,
           subjectId: notice.subjectId,
           data,
+          priority: notificationPriority(notice),
           ...email,
         });
       }
       pushed.push({ recipientId, notificationId });
+      const pushOverride = settings.get(recipientId)?.push[notice.type];
+      if (effectiveChannel(channelModeOf(notice, 'push'), pushOverride)) {
+        toDevices.push(notificationId);
+      }
     }
+    await this.push.notifications(tx, toDevices);
     for (const payload of pushPayloads(pushed)) {
       await tx.execute(sql`select pg_notify(${NOTIFICATIONS_CHANNEL}, ${payload})`);
     }
@@ -125,7 +142,8 @@ export class NotificationCenter {
       .select({
         userId: notificationSettings.userId,
         mutedTypes: notificationSettings.mutedTypes,
-        emailTypes: notificationSettings.emailTypes,
+        pushOverrides: notificationSettings.pushOverrides,
+        emailOverrides: notificationSettings.emailOverrides,
         digestEnabled: notificationSettings.digestEnabled,
       })
       .from(notificationSettings)
@@ -135,7 +153,8 @@ export class NotificationCenter {
         row.userId,
         {
           muted: new Set(row.mutedTypes),
-          emailed: emailedTypes(row.emailTypes),
+          push: row.pushOverrides,
+          email: row.emailOverrides,
           digestEnabled: row.digestEnabled,
         },
       ]),
@@ -187,7 +206,8 @@ export class NotificationCenter {
 type EmailMarking = { emailState: NotificationEmailState | null; emailAfter: Date | null };
 
 /**
- * F14 email rules 3–4: `pending` for 10 minutes when the active recipient emails the type,
+ * F14 email rules 3–4: `pending` for 10 minutes when email is on for the active recipient
+ * (F16 rule B3),
  * `skipped` when the morning digest covers it, null otherwise.
  */
 function emailMarking(
@@ -195,8 +215,8 @@ function emailMarking(
   active: boolean,
   settings: RecipientSettings | undefined,
 ): EmailMarking {
-  const emailed = settings?.emailed ?? emailedTypes(null);
-  if (!active || !emailed.has(notice.type)) return { emailState: null, emailAfter: null };
+  const emailed = effectiveChannel(channelModeOf(notice, 'email'), settings?.email[notice.type]);
+  if (!active || !emailed) return { emailState: null, emailAfter: null };
   if (notice.digestCovered && (settings?.digestEnabled ?? true)) {
     return { emailState: 'skipped', emailAfter: null };
   }

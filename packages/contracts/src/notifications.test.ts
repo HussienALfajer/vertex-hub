@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
-  emailedTypes,
+  channelOverrides,
+  effectiveChannel,
   firstMatchPerRecipient,
   isMutableNotificationType,
   NOTIFICATION_CATALOG,
   NOTIFICATION_DATA_SCHEMAS,
   NOTIFICATION_TYPES,
+  type NotificationData,
+  notificationPriority,
   notificationSchema,
   notificationTypesOf,
   updateNotificationSettingsSchema,
@@ -24,6 +27,7 @@ describe('notification catalog', () => {
         'post_assigned',
         'post_publish_today',
         'post_task_ready',
+        'push_device_lost',
         'invoice_overdue',
         'invoice_paid',
         'lead_won',
@@ -53,6 +57,7 @@ describe('notification catalog', () => {
       ...notificationTypesOf('reminders'),
       ...notificationTypesOf('calendar'),
       ...notificationTypesOf('clients_projects'),
+      ...notificationTypesOf('account'),
     ];
     expect(all.sort()).toEqual([...NOTIFICATION_TYPES].sort());
     expect(NOTIFICATION_CATALOG.tasks_generated.subject).toBe('template_run');
@@ -193,17 +198,15 @@ describe('notification schema', () => {
 
 describe('invoice notifications (spec F13)', () => {
   it('sends overdue alerts as reminders and paid invoices to clients and projects, both mutable', () => {
-    expect(NOTIFICATION_CATALOG.invoice_overdue).toEqual({
+    expect(NOTIFICATION_CATALOG.invoice_overdue).toMatchObject({
       category: 'reminders',
       subject: 'invoice',
       mutable: true,
-      emailByDefault: false,
     });
-    expect(NOTIFICATION_CATALOG.invoice_paid).toEqual({
+    expect(NOTIFICATION_CATALOG.invoice_paid).toMatchObject({
       category: 'clients_projects',
       subject: 'invoice',
       mutable: true,
-      emailByDefault: true,
     });
   });
 
@@ -221,11 +224,10 @@ describe('invoice notifications (spec F13)', () => {
 
 describe('ad budget notifications (spec F12, A11)', () => {
   it('is a mutable reminder that opens the client', () => {
-    expect(NOTIFICATION_CATALOG.ad_budget_low).toEqual({
+    expect(NOTIFICATION_CATALOG.ad_budget_low).toMatchObject({
       category: 'reminders',
       subject: 'client',
       mutable: true,
-      emailByDefault: false,
     });
   });
 
@@ -242,24 +244,21 @@ describe('ad budget notifications (spec F12, A11)', () => {
 
 describe('lead notifications (spec F03, A12)', () => {
   it('locks the reminders and the assignment and lets users mute a win', () => {
-    expect(NOTIFICATION_CATALOG.lead_assigned).toEqual({
+    expect(NOTIFICATION_CATALOG.lead_assigned).toMatchObject({
       category: 'clients_projects',
       subject: 'lead',
       mutable: false,
-      emailByDefault: false,
     });
-    expect(NOTIFICATION_CATALOG.lead_won).toEqual({
+    expect(NOTIFICATION_CATALOG.lead_won).toMatchObject({
       category: 'clients_projects',
       subject: 'lead',
       mutable: true,
-      emailByDefault: false,
     });
     for (const type of ['lead_follow_up_due', 'lead_follow_up_overdue'] as const) {
-      expect(NOTIFICATION_CATALOG[type]).toEqual({
+      expect(NOTIFICATION_CATALOG[type]).toMatchObject({
         category: 'reminders',
         subject: 'lead',
         mutable: false,
-        emailByDefault: false,
       });
     }
   });
@@ -283,26 +282,93 @@ describe('lead notifications (spec F03, A12)', () => {
   });
 });
 
-describe('notification emails (F14 email rule 2)', () => {
-  it('emails the triggers of the scope by default', () => {
-    expect([...emailedTypes(null)].sort()).toEqual(
+describe('channels (F16 rule B3)', () => {
+  it('emails the triggers of the scope and the critical reminders by default', () => {
+    const emailed = NOTIFICATION_TYPES.filter((type) =>
+      effectiveChannel(NOTIFICATION_CATALOG[type].email, undefined),
+    );
+    expect(emailed.sort()).toEqual(
       [
         'approval_responded',
+        'invoice_overdue',
         'invoice_paid',
+        'lead_follow_up_overdue',
+        'post_publish_overdue',
         'task_assigned',
         'task_due_soon',
         'task_mentioned',
+        'task_over_limit_pending',
         'task_overdue',
         'task_overdue_escalated',
       ].sort(),
     );
-    expect(NOTIFICATION_CATALOG.task_assigned.emailByDefault).toBe(true);
-    expect(NOTIFICATION_CATALOG.task_commented.emailByDefault).toBe(false);
   });
 
-  it('follows a saved choice, even an empty one', () => {
-    expect([...emailedTypes(['task_commented'])]).toEqual(['task_commented']);
-    expect(emailedTypes([]).size).toBe(0);
+  it('pushes every type but the informational ones, and critical ones always', () => {
+    for (const type of NOTIFICATION_TYPES) {
+      const { priority, push } = NOTIFICATION_CATALOG[type];
+      expect(push).toBe(
+        priority === 'critical' ? 'required' : priority === 'informational' ? 'off' : 'on',
+      );
+    }
+    expect(NOTIFICATION_CATALOG.push_device_lost).toMatchObject({
+      category: 'account',
+      subject: 'user',
+      priority: 'informational',
+      push: 'off',
+      email: 'off',
+    });
+  });
+
+  it('applies required and unavailable over the override, else the override, else the mode', () => {
+    expect(effectiveChannel('required', false)).toBe(true);
+    expect(effectiveChannel('unavailable', true)).toBe(false);
+    expect(effectiveChannel('on', false)).toBe(false);
+    expect(effectiveChannel('off', true)).toBe(true);
+    expect(effectiveChannel('on', undefined)).toBe(true);
+    expect(effectiveChannel('off', undefined)).toBe(false);
+  });
+
+  it('stores only the departures from the defaults and keeps overrides of locked types', () => {
+    const chosen = new Set(['task_commented', 'meeting_upcoming'] as const);
+    const overrides = channelOverrides('push', chosen, { task_overdue: false });
+    // On by default and not chosen: off; off by default and chosen: on; locked: kept as it was.
+    expect(overrides.task_assigned).toBe(false);
+    expect(overrides.task_commented).toBeUndefined();
+    expect(overrides.task_overdue).toBe(false);
+    expect(channelOverrides('email', new Set(['task_commented']), {})).toMatchObject({
+      task_commented: true,
+      task_assigned: false,
+    });
+  });
+
+  it('snapshots the priority of the final behind reminder and the managers notice', () => {
+    const behind: NotificationData<'retainer_behind'> = {
+      retainer: 'R',
+      client: 'C',
+      periodEnd: '2026-10-31',
+      daysLeft: 2,
+      final: true,
+      lines: [{ kind: 'design', label: null, delivered: 0, committed: 1, ready: 0 }],
+    };
+    expect(notificationPriority({ type: 'retainer_behind', data: behind })).toBe('critical');
+    expect(
+      notificationPriority({ type: 'retainer_behind', data: { ...behind, final: false } }),
+    ).toBe('important');
+    const run = {
+      template: 'T',
+      count: 2,
+      department: 'design',
+      client: null,
+      project: null,
+      retainer: null,
+    } as const;
+    expect(
+      notificationPriority({ type: 'tasks_generated', data: { ...run, unassigned: true } }),
+    ).toBe('important');
+    expect(
+      notificationPriority({ type: 'tasks_generated', data: { ...run, unassigned: false } }),
+    ).toBe('normal');
   });
 
   it('keeps email choices and the digest switch when an update leaves them out', () => {

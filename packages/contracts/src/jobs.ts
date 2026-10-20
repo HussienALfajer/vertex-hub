@@ -15,6 +15,7 @@ import {
   receiptSnapshotSchema,
   statementSnapshotSchema,
 } from './invoices.js';
+import { PUSH_LIMITS, pushPayloadSchema } from './push.js';
 import { quoteSnapshotSchema } from './quotes.js';
 import { clientReportSnapshotSchema, cycleReportSnapshotSchema } from './reports.js';
 import { annexSnapshotSchema, contractSnapshotSchema } from './retainer-contracts.js';
@@ -412,3 +413,52 @@ export const EMAIL_PURGE_JOB = {
   cron: '30 3 * * *',
   tz: BUSINESS_TIME_ZONE,
 } as const;
+
+/**
+ * F16 rule A8 (ADR 0036): sends one push to one subscription. Queued by `NotificationCenter` in
+ * the transaction of the notification, one job per device, so a retry resends only that message.
+ * It carries the rendered payload and the subscription, so the worker reads no table; the outcome
+ * goes back to the API (`push.result`).
+ */
+export const PUSH_SEND_JOB = {
+  queue: 'push.send',
+  retryLimit: 3,
+  /** Seconds before the first retry, doubled for each next one. */
+  retryDelay: 30,
+  retryBackoff: true,
+} as const;
+
+export const pushSendJobSchema = z.object({
+  subscription: z.object({
+    endpoint: z.string().max(PUSH_LIMITS.endpoint),
+    keys: z.object({ p256dh: z.string(), auth: z.string() }),
+  }),
+  urgency: z.enum(['high', 'normal', 'low']),
+  ttlSeconds: z.number().int().min(0),
+  payload: pushPayloadSchema,
+});
+
+export type PushSendJob = z.infer<typeof pushSendJobSchema>;
+
+/**
+ * The outcome of a `push.send`, worked by the API: `sent`; `gone` when the push service refused
+ * the subscription for good (404, 410); `failed` after the last retry.
+ */
+export const PUSH_RESULT_JOB = { queue: 'push.result' } as const;
+
+export const pushResultJobSchema = z.discriminatedUnion('status', [
+  z.object({
+    deliveryId: z.uuid(),
+    status: z.literal('sent'),
+    attempts: z.number().int().min(1),
+    sentAt: z.iso.datetime(),
+  }),
+  z.object({
+    deliveryId: z.uuid(),
+    status: z.enum(['gone', 'failed']),
+    attempts: z.number().int().min(1),
+    error: z.string().max(PUSH_LIMITS.error),
+  }),
+]);
+
+export type PushResultJob = z.infer<typeof pushResultJobSchema>;

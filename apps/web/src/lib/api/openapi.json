@@ -1196,10 +1196,232 @@
             }
           },
           "400": {
-            "description": "`NOT_MUTABLE`: a type that requires action"
+            "description": "`NOT_MUTABLE`: a type that requires action; `CHANNEL_REQUIRED`: a required type left out of `pushTypes` or `emailTypes`; `CHANNEL_UNAVAILABLE`: an unavailable type in them"
           },
           "401": {
             "description": "No valid session"
+          }
+        },
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/api/me/push/config": {
+      "get": {
+        "operationId": "PushController_config",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Whether push is available, and the VAPID public key to subscribe with",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PushConfig"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session"
+          }
+        },
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/api/me/push/subscription": {
+      "put": {
+        "operationId": "PushController_subscribe",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PushSubscriptionInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Stored on the current session, replacing its earlier one"
+          },
+          "400": {
+            "description": "Not a valid https push subscription"
+          },
+          "401": {
+            "description": "No valid session"
+          },
+          "409": {
+            "description": "`PUSH_UNAVAILABLE`: no VAPID keys on this server"
+          }
+        },
+        "tags": [
+          "notifications"
+        ]
+      },
+      "delete": {
+        "operationId": "PushController_unsubscribe",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": "Push turned off on the current device"
+          },
+          "401": {
+            "description": "No valid session"
+          }
+        },
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/api/me/push/test": {
+      "post": {
+        "operationId": "PushController_test",
+        "parameters": [],
+        "responses": {
+          "202": {
+            "description": "A test push is queued for the current device"
+          },
+          "401": {
+            "description": "No valid session"
+          },
+          "409": {
+            "description": "`NO_SUBSCRIPTION`: push is not on for this device"
+          },
+          "429": {
+            "description": "One test push a minute"
+          }
+        },
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/api/me/push/deliveries/{id}/click": {
+      "post": {
+        "operationId": "PushController_click",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Recorded; the notification is marked read"
+          },
+          "401": {
+            "description": "No valid session"
+          },
+          "404": {
+            "description": "Not one of the caller’s pushes"
+          }
+        },
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/api/push-deliveries": {
+      "get": {
+        "operationId": "PushController_deliveries",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 1,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 50,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          {
+            "name": "userId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/PushDeliveryStatus"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PushDeliveryStatus"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The delivery log",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PushDeliveryPage"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session"
+          },
+          "403": {
+            "description": "Without `notifications.policy`"
           }
         },
         "tags": [
@@ -16443,7 +16665,8 @@
           "expenses.manage",
           "reports.read",
           "reports.finance",
-          "audit.read"
+          "audit.read",
+          "notifications.policy"
         ]
       },
       "PermissionScope": {
@@ -16650,6 +16873,9 @@
             "items": {
               "$ref": "#/components/schemas/SharedDeviceUser"
             }
+          },
+          "push": {
+            "$ref": "#/components/schemas/DevicePush"
           }
         },
         "required": [
@@ -16658,7 +16884,8 @@
           "device",
           "signIn",
           "lastActive",
-          "sharedWith"
+          "sharedWith",
+          "push"
         ],
         "additionalProperties": false
       },
@@ -16767,6 +16994,29 @@
           "same_browser",
           "same_device"
         ]
+      },
+      "DevicePush": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "on",
+              "off"
+            ]
+          },
+          "lastDeliveredAt": {
+            "nullable": true,
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          }
+        },
+        "required": [
+          "state",
+          "lastDeliveredAt"
+        ],
+        "additionalProperties": false
       },
       "HardwareSignals": {
         "type": "object",
@@ -17303,7 +17553,8 @@
           "tasks",
           "reminders",
           "calendar",
-          "clients_projects"
+          "clients_projects",
+          "account"
         ]
       },
       "NotificationPage": {
@@ -24580,6 +24831,101 @@
               "data"
             ],
             "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "actor": {
+                "nullable": true,
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "name"
+                ],
+                "additionalProperties": false
+              },
+              "subject": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "$ref": "#/components/schemas/NotificationSubjectType"
+                  },
+                  "id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  }
+                },
+                "required": [
+                  "type",
+                  "id"
+                ],
+                "additionalProperties": false
+              },
+              "count": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "read": {
+                "type": "boolean"
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+              },
+              "updatedAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "push_device_lost"
+                ]
+              },
+              "data": {
+                "type": "object",
+                "properties": {
+                  "device": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "device"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "id",
+              "actor",
+              "subject",
+              "count",
+              "read",
+              "createdAt",
+              "updatedAt",
+              "type",
+              "data"
+            ],
+            "additionalProperties": false
           }
         ]
       },
@@ -24597,7 +24943,8 @@
           "meeting",
           "quote",
           "invoice",
-          "lead"
+          "lead",
+          "user"
         ]
       },
       "TermEndAction": {
@@ -24693,8 +25040,20 @@
                 "muted": {
                   "type": "boolean"
                 },
+                "priority": {
+                  "$ref": "#/components/schemas/NotificationPriority"
+                },
+                "push": {
+                  "type": "boolean"
+                },
+                "pushMode": {
+                  "$ref": "#/components/schemas/ChannelMode"
+                },
                 "email": {
                   "type": "boolean"
+                },
+                "emailMode": {
+                  "$ref": "#/components/schemas/ChannelMode"
                 },
                 "emailLocked": {
                   "type": "boolean"
@@ -24705,7 +25064,11 @@
                 "category",
                 "mutable",
                 "muted",
+                "priority",
+                "push",
+                "pushMode",
                 "email",
+                "emailMode",
                 "emailLocked"
               ],
               "additionalProperties": false
@@ -24783,21 +25146,47 @@
           "lead_assigned",
           "lead_won",
           "lead_follow_up_overdue",
-          "lead_follow_up_due"
+          "lead_follow_up_due",
+          "push_device_lost"
+        ]
+      },
+      "NotificationPriority": {
+        "type": "string",
+        "enum": [
+          "critical",
+          "important",
+          "normal",
+          "informational"
+        ]
+      },
+      "ChannelMode": {
+        "type": "string",
+        "enum": [
+          "required",
+          "on",
+          "off",
+          "unavailable"
         ]
       },
       "UpdateNotificationSettings": {
         "type": "object",
         "properties": {
           "mutedTypes": {
-            "maxItems": 60,
+            "maxItems": 61,
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/NotificationType"
             }
           },
           "emailTypes": {
-            "maxItems": 60,
+            "maxItems": 61,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NotificationType"
+            }
+          },
+          "pushTypes": {
+            "maxItems": 61,
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/NotificationType"
@@ -24809,6 +25198,186 @@
         },
         "required": [
           "mutedTypes"
+        ]
+      },
+      "PushConfig": {
+        "type": "object",
+        "properties": {
+          "available": {
+            "type": "boolean"
+          },
+          "vapidPublicKey": {
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "required": [
+          "available",
+          "vapidPublicKey"
+        ],
+        "additionalProperties": false
+      },
+      "PushSubscriptionInput": {
+        "type": "object",
+        "properties": {
+          "endpoint": {
+            "type": "string",
+            "maxLength": 1000,
+            "format": "uri"
+          },
+          "keys": {
+            "type": "object",
+            "properties": {
+              "p256dh": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              "auth": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              }
+            },
+            "required": [
+              "p256dh",
+              "auth"
+            ]
+          }
+        },
+        "required": [
+          "endpoint",
+          "keys"
+        ]
+      },
+      "PushDeliveryStatus": {
+        "type": "string",
+        "enum": [
+          "queued",
+          "sent",
+          "gone",
+          "failed"
+        ]
+      },
+      "PushDeliveryPage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PushDelivery"
+            }
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "page",
+          "pageSize"
+        ],
+        "additionalProperties": false,
+        "description": "Pushes of the last 30 days, newest first"
+      },
+      "PushDelivery": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "user": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ],
+            "additionalProperties": false
+          },
+          "device": {
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/PushDeliveryKind"
+          },
+          "notification": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Notification"
+              }
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/PushDeliveryStatus"
+          },
+          "error": {
+            "nullable": true,
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "sentAt": {
+            "nullable": true,
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "clickedAt": {
+            "nullable": true,
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          }
+        },
+        "required": [
+          "id",
+          "user",
+          "device",
+          "kind",
+          "notification",
+          "status",
+          "error",
+          "createdAt",
+          "sentAt",
+          "clickedAt"
+        ],
+        "additionalProperties": false
+      },
+      "PushDeliveryKind": {
+        "type": "string",
+        "enum": [
+          "notification",
+          "morning_summary",
+          "test"
         ]
       },
       "FileUpload": {

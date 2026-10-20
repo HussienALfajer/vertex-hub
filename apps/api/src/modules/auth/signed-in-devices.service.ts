@@ -19,6 +19,7 @@ import { CodedException } from '../../core/errors/index.js';
 import { recordAudit } from '../audit/index.js';
 import { AccountEmails } from './account-emails.js';
 import type { CurrentUserInfo } from './current-user.decorator.js';
+import { DevicePushStates } from './device-push-states.js';
 import { IpLocations } from './ip-locations.js';
 
 const sessionColumns = {
@@ -51,6 +52,7 @@ export class SignedInDevicesService {
     @Inject(ENV) private readonly env: Env,
     private readonly locations: IpLocations,
     private readonly emails: AccountEmails,
+    private readonly push: DevicePushStates,
   ) {}
 
   /** Rules 14–16. */
@@ -91,6 +93,7 @@ export class SignedInDevicesService {
               ),
             );
 
+    const pushOf = await this.push.of(own.map((session) => session.id));
     const items = own.map((session): SignedInDevice => {
       const shared = new Map<string, SharedDeviceUser>();
       for (const other of others) {
@@ -129,6 +132,7 @@ export class SignedInDevicesService {
           location: this.locations.lookup(lastIp),
         },
         sharedWith: [...shared.values()].sort((a, b) => a.user.name.localeCompare(b.user.name)),
+        push: pushOf(session.id),
       };
     });
     items.sort(

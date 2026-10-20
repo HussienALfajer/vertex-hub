@@ -43,6 +43,18 @@ export const envSchema = z
       .string()
       .refine((value) => Buffer.from(value, 'base64').length === 32, 'Expected 32 bytes, base64')
       .optional(),
+    /**
+     * F16 rule A16 (ADR 0036): `webpush` sends with VAPID; `log` writes each push as a JSON file
+     * under `PUSH_LOG_DIR` and sends nothing. Defaults to `log` outside production.
+     */
+    PUSH_TRANSPORT: z.enum(['webpush', 'log']).optional(),
+    PUSH_LOG_DIR: z.string().min(1).default('.data/push'),
+    VAPID_PUBLIC_KEY: z.string().min(1).optional(),
+    VAPID_PRIVATE_KEY: z.string().min(1).optional(),
+    VAPID_SUBJECT: z
+      .string()
+      .regex(/^(mailto:|https:\/\/)/, 'Expected a mailto: or https: URL')
+      .default('mailto:info@vertexmedia.pro'),
   })
   // Links in emails must point at the served origin, never the local default.
   .refine((env) => env.NODE_ENV !== 'production' || env.APP_URL.startsWith('https://'), {
@@ -53,6 +65,14 @@ export const envSchema = z
     message: 'EMAIL_SECRET_KEY is required in production',
     path: ['EMAIL_SECRET_KEY'],
   })
+  .refine(
+    (env) =>
+      env.PUSH_TRANSPORT !== 'webpush' || Boolean(env.VAPID_PUBLIC_KEY && env.VAPID_PRIVATE_KEY),
+    {
+      message: 'The webpush transport needs VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY',
+      path: ['PUSH_TRANSPORT'],
+    },
+  )
   .refine((env) => env.NODE_ENV !== 'production' || isAbsolute(env.FILES_ROOT), {
     message: 'FILES_ROOT must be an absolute path in production',
     path: ['FILES_ROOT'],
@@ -60,6 +80,9 @@ export const envSchema = z
   .transform(({ EMAIL_SECRET_KEY, ...env }) => ({
     ...env,
     EMAIL_TRANSPORT: env.EMAIL_TRANSPORT ?? (env.NODE_ENV === 'production' ? 'smtp' : 'log'),
+    // Production without keys gets no subscriptions (the API reports push unavailable), so the
+    // default `webpush` never has to send.
+    PUSH_TRANSPORT: env.PUSH_TRANSPORT ?? (env.NODE_ENV === 'production' ? 'webpush' : 'log'),
     EMAIL_SECRET_KEY: EMAIL_SECRET_KEY
       ? Buffer.from(EMAIL_SECRET_KEY, 'base64')
       : createHash('sha256').update(`vertex-hub-dev-email:${env.DATABASE_URL}`).digest(),

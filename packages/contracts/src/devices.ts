@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { departmentCodeSchema } from './departments.js';
+import { devicePushSchema } from './push.js';
 
 /*
  * F14 email rule 15: a device is the browser family and the operating system family read from
@@ -179,6 +180,8 @@ export const signedInDeviceSchema = z
     signIn: devicePlaceSchema,
     lastActive: devicePlaceSchema,
     sharedWith: z.array(sharedDeviceUserSchema),
+    /** F16 rule A12. */
+    push: devicePushSchema,
   })
   .meta({ id: 'SignedInDevice' });
 

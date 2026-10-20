@@ -82,6 +82,7 @@ export const NOTIFICATION_TYPES = [
   'lead_won',
   'lead_follow_up_overdue',
   'lead_follow_up_due',
+  'push_device_lost',
 ] as const;
 
 export const notificationTypeSchema = z.enum(NOTIFICATION_TYPES).meta({ id: 'NotificationType' });
@@ -93,6 +94,7 @@ export const NOTIFICATION_CATEGORIES = [
   'reminders',
   'calendar',
   'clients_projects',
+  'account',
 ] as const;
 
 export const notificationCategorySchema = z
@@ -115,6 +117,8 @@ export const NOTIFICATION_SUBJECTS = [
   'quote',
   'invoice',
   'lead',
+  /** The recipient's own account (F16 `push_device_lost`): opens My account. */
+  'user',
 ] as const;
 
 export const notificationSubjectTypeSchema = z
@@ -122,20 +126,6 @@ export const notificationSubjectTypeSchema = z
   .meta({ id: 'NotificationSubjectType' });
 
 export type NotificationSubjectType = z.infer<typeof notificationSubjectTypeSchema>;
-
-/**
- * The types emailed to a user who saved no email choice (F14 email rule 2): the triggers of the
- * scope.
- */
-const EMAILED_BY_DEFAULT: readonly NotificationType[] = [
-  'task_assigned',
-  'task_mentioned',
-  'task_due_soon',
-  'task_overdue',
-  'task_overdue_escalated',
-  'approval_responded',
-  'invoice_paid',
-];
 
 /** Category, subject and whether a user may mute the type; action-required types may not. */
 const CATALOG: Record<
@@ -219,15 +209,132 @@ const CATALOG: Record<
   lead_won: { category: 'clients_projects', subject: 'lead', mutable: true },
   lead_follow_up_overdue: { category: 'reminders', subject: 'lead', mutable: false },
   lead_follow_up_due: { category: 'reminders', subject: 'lead', mutable: false },
+  push_device_lost: { category: 'account', subject: 'user', mutable: true },
 };
 
-/** Each type with whether it is emailed when the user saved no email choice. */
+/*
+ * F16 (ADR 0037): priorities and the default push and email modes of each type. Priorities are
+ * code, not settings: push urgency and, later, escalation depend on them.
+ */
+
+export const NOTIFICATION_PRIORITIES = [
+  'critical',
+  'important',
+  'normal',
+  'informational',
+] as const;
+
+export const notificationPrioritySchema = z
+  .enum(NOTIFICATION_PRIORITIES)
+  .meta({ id: 'NotificationPriority' });
+
+export type NotificationPriority = z.infer<typeof notificationPrioritySchema>;
+
+/**
+ * How a channel (push, email) reaches a type: `required` always, `on` until the user turns it
+ * off, `off` until the user turns it on, `unavailable` never.
+ */
+export const CHANNEL_MODES = ['required', 'on', 'off', 'unavailable'] as const;
+
+export const channelModeSchema = z.enum(CHANNEL_MODES).meta({ id: 'ChannelMode' });
+
+export type ChannelMode = z.infer<typeof channelModeSchema>;
+
+/** The delivery channels a user chooses per type; the app channel follows the mute rule (F14). */
+export const NOTIFICATION_CHANNELS = ['push', 'email'] as const;
+
+export type NotificationChannel = (typeof NOTIFICATION_CHANNELS)[number];
+
+type Channels = { priority: NotificationPriority; push: ChannelMode; email: ChannelMode };
+
+const important = (email: ChannelMode = 'off'): Channels => ({
+  priority: 'important',
+  push: 'on',
+  email,
+});
+const normal = (email: ChannelMode = 'off'): Channels => ({
+  priority: 'normal',
+  push: 'on',
+  email,
+});
+const critical = (email: ChannelMode = 'on'): Channels => ({
+  priority: 'critical',
+  push: 'required',
+  email,
+});
+const informational: Channels = { priority: 'informational', push: 'off', email: 'off' };
+
+/** Spec F16, "Notification types": the priority and the default modes of each type. */
+const CHANNELS: Record<NotificationType, Channels> = {
+  task_assigned: important('on'),
+  task_mentioned: important('on'),
+  task_returned: important(),
+  task_review_requested: important(),
+  task_medical_review_requested: important(),
+  task_awaiting_client: important(),
+  task_over_limit: important(),
+  approval_responded: important('on'),
+  approval_no_response: important(),
+  approval_expired: important(),
+  task_changed: normal(),
+  task_commented: normal(),
+  task_file_added: normal(),
+  task_requested: important(),
+  /** The managers' notice about unassigned tasks is important (`notificationPriority`). */
+  tasks_generated: normal(),
+  task_approved: normal(),
+  task_opened: normal(),
+  request_finished: normal(),
+  post_returned: important(),
+  post_review_requested: important(),
+  post_medical_review_requested: important(),
+  post_awaiting_client: important(),
+  post_assigned: important(),
+  post_approved: normal(),
+  post_task_ready: normal(),
+  post_task_unlinked: important(),
+  shoot_booked: normal(),
+  shoot_dropped: normal(),
+  shoot_changed: important(),
+  meeting_invited: normal(),
+  meeting_dropped: normal(),
+  meeting_changed: important(),
+  task_due_soon: important('on'),
+  task_overdue: critical(),
+  task_overdue_escalated: critical(),
+  task_over_limit_pending: critical('required'),
+  post_publish_today: important(),
+  post_publish_overdue: critical(),
+  shoot_upcoming: important(),
+  shoot_not_closed: important(),
+  meeting_upcoming: normal(),
+  client_account_manager_assigned: important(),
+  project_manager_assigned: important(),
+  retainer_renewal_due: important(),
+  /** The final reminder is critical and pushed always (`notificationPriority`, `pushModeOf`). */
+  retainer_behind: important(),
+  retainer_term_renewed: normal(),
+  retainer_cycle_report_ready: important(),
+  retainer_amendment_pending: important(),
+  retainer_amendment_decided: normal(),
+  quote_approval_requested: important(),
+  quote_approval_decided: important(),
+  quote_accepted: normal(),
+  invoice_overdue: critical('required'),
+  invoice_paid: normal('on'),
+  ad_budget_low: important(),
+  email_failed: important(),
+  lead_assigned: important(),
+  lead_won: normal(),
+  lead_follow_up_due: important(),
+  lead_follow_up_overdue: critical(),
+  push_device_lost: informational,
+};
+
+/** Each type with its category, subject, mute rule, priority and default channel modes. */
 export const NOTIFICATION_CATALOG = Object.fromEntries(
-  NOTIFICATION_TYPES.map((type) => [
-    type,
-    { ...CATALOG[type], emailByDefault: EMAILED_BY_DEFAULT.includes(type) },
-  ]),
-) as Record<NotificationType, (typeof CATALOG)[NotificationType] & { emailByDefault: boolean }>;
+  NOTIFICATION_TYPES.map((type) => [type, { ...CATALOG[type], ...CHANNELS[type] }]),
+) as Record<NotificationType, (typeof CATALOG)[NotificationType] & Channels>;
 
 export function isMutableNotificationType(type: NotificationType): boolean {
   return NOTIFICATION_CATALOG[type].mutable;
@@ -526,6 +633,8 @@ export const NOTIFICATION_DATA_SCHEMAS = {
   lead_follow_up_overdue: leadData.extend({ followUpOn: calendarDateSchema, owner: nameSchema }),
   /** F03 A12 rule 18: the follow-up date is reached. */
   lead_follow_up_due: leadData.extend({ followUpOn: calendarDateSchema }),
+  /** F16 rule A13: the push service refused a device's subscription for good. */
+  push_device_lost: z.object({ device: nameSchema }),
 } satisfies Record<NotificationType, z.ZodType>;
 
 export type NotificationData<Type extends NotificationType> = z.infer<
@@ -536,6 +645,64 @@ export type NotificationData<Type extends NotificationType> = z.infer<
 export type NotificationContent = {
   [Type in NotificationType]: { type: Type; data: NotificationData<Type> };
 }[NotificationType];
+
+/**
+ * The priority a notification snapshots (spec F16, "Notification types"): the type's, except the
+ * final `retainer_behind` reminder (critical) and the managers' `tasks_generated` (important).
+ */
+export function notificationPriority(content: NotificationContent): NotificationPriority {
+  if (content.type === 'retainer_behind' && content.data.final) return 'critical';
+  if (content.type === 'tasks_generated' && content.data.unassigned) return 'important';
+  return NOTIFICATION_CATALOG[content.type].priority;
+}
+
+/** The mode of a channel for a notification: the catalog default (policies arrive with F16 B). */
+export function channelModeOf(
+  content: NotificationContent,
+  channel: NotificationChannel,
+): ChannelMode {
+  if (channel === 'push' && content.type === 'retainer_behind' && content.data.final) {
+    return 'required';
+  }
+  return NOTIFICATION_CATALOG[content.type][channel];
+}
+
+/**
+ * F16 rule B3: a channel is on for a user when it is `required`, never when `unavailable`, and
+ * otherwise as the user's override says, else as the mode's default.
+ */
+export function effectiveChannel(mode: ChannelMode, override: boolean | undefined): boolean {
+  if (mode === 'required') return true;
+  if (mode === 'unavailable') return false;
+  return override ?? mode === 'on';
+}
+
+/** A user's overrides of one channel: only the types where they depart from the default. */
+export const channelOverridesSchema = z.partialRecord(notificationTypeSchema, z.boolean());
+
+export type ChannelOverrides = z.infer<typeof channelOverridesSchema>;
+
+/**
+ * The overrides that make `chosen` the user's set of types on a channel, against the catalog
+ * defaults. `required` and `unavailable` types cannot be chosen: their earlier override is kept,
+ * so it applies again if the mode changes back (F16 edge case 7).
+ */
+export function channelOverrides(
+  channel: NotificationChannel,
+  chosen: ReadonlySet<NotificationType>,
+  previous: ChannelOverrides,
+): ChannelOverrides {
+  const overrides: ChannelOverrides = {};
+  for (const type of NOTIFICATION_TYPES) {
+    const mode = NOTIFICATION_CATALOG[type][channel];
+    if (mode === 'required' || mode === 'unavailable') {
+      if (previous[type] !== undefined) overrides[type] = previous[type];
+      continue;
+    }
+    if (chosen.has(type) !== (mode === 'on')) overrides[type] = chosen.has(type);
+  }
+  return overrides;
+}
 
 /* Responses. */
 
@@ -623,9 +790,15 @@ export const notificationSettingsSchema = z
         category: notificationCategorySchema,
         mutable: z.boolean(),
         muted: z.boolean(),
-        /** F14 email rule 2: the user's choice; nothing is emailed while `emailLocked`. */
+        /** F16: the type's fixed priority. */
+        priority: notificationPrioritySchema,
+        /** F16 rule B3: whether the type is pushed to the user's devices. */
+        push: z.boolean(),
+        pushMode: channelModeSchema,
+        /** F14 email rule 2 and F16 rule B3: the effective choice; nothing is emailed while `emailLocked`. */
         email: z.boolean(),
-        /** Muted in the app, so nothing is created to email. */
+        emailMode: channelModeSchema,
+        /** Muted in the app, so nothing is created to push or email. */
         emailLocked: z.boolean(),
       }),
     ),
@@ -637,14 +810,18 @@ export const notificationSettingsSchema = z
 export type NotificationSettings = z.infer<typeof notificationSettingsSchema>;
 
 /**
- * The API refuses non-mutable types with `NOT_MUTABLE` (rule 3). `emailTypes` and
- * `digestEnabled` stay as they are when left out.
+ * The API refuses non-mutable types with `NOT_MUTABLE` (rule 3), a channel list that leaves out a
+ * `required` type with `CHANNEL_REQUIRED` and one that holds an `unavailable` type with
+ * `CHANNEL_UNAVAILABLE` (F16 rule B1). `emailTypes`, `pushTypes` and `digestEnabled` stay as they
+ * are when left out. The API stores the lists as overrides of the defaults (F16 rule B3).
  */
 export const updateNotificationSettingsSchema = z
   .object({
     mutedTypes: z.array(notificationTypeSchema).max(NOTIFICATION_TYPES.length),
     /** F14 email rule 2: every type may be emailed, including those that cannot be muted. */
     emailTypes: z.array(notificationTypeSchema).max(NOTIFICATION_TYPES.length).optional(),
+    /** F16 rule A7: the types pushed to the user's devices. */
+    pushTypes: z.array(notificationTypeSchema).max(NOTIFICATION_TYPES.length).optional(),
     digestEnabled: z.boolean().optional(),
   })
   .meta({ id: 'UpdateNotificationSettings' });
@@ -676,11 +853,6 @@ export const NOTIFICATION_REMINDER_KINDS = [
 ] as const;
 
 export type NotificationReminderKind = (typeof NOTIFICATION_REMINDER_KINDS)[number];
-
-/** F14 email rule 2: the types a user emails, from their saved choice or the catalog defaults. */
-export function emailedTypes(saved: readonly NotificationType[] | null): Set<NotificationType> {
-  return new Set(saved ?? EMAILED_BY_DEFAULT);
-}
 
 /** F14 email rules 3–8: a notification waits to be emailed, was emailed, or was not needed. */
 export const NOTIFICATION_EMAIL_STATES = ['pending', 'sent', 'skipped'] as const;
