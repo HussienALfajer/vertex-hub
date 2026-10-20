@@ -237,7 +237,9 @@ describe('notification events', () => {
       await cast.moveOk(delivered.id, cast.designer.cookie, { status: 'internal_review' });
       await cast.moveOk(delivered.id, cast.designManager.cookie, { status: 'approved' });
       await cast.moveOk(delivered.id, cast.designer.cookie, { status: 'delivered' });
+      // F16 rule B12: the creator follows the task and hears of its moves, merged.
       expect(await inbox(cast.am.id, delivered.id)).toMatchObject([
+        { type: 'task_progressed' },
         { type: 'task_review_requested' },
         { type: 'request_finished', data: { outcome: 'delivered' } },
       ]);

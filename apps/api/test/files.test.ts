@@ -339,7 +339,10 @@ describe('files (F10)', () => {
           and(eq(notifications.subjectId, task.id), eq(notifications.type, 'task_file_added')),
         );
       expect(after.filter((n) => n.recipientId === cast.designer.id)).toHaveLength(1);
-      expect(after.every((n) => n.recipientId === cast.designer.id)).toBe(true);
+      // F16 rule B12: besides the assignee, only the task's followers (its creator) hear of files.
+      expect(
+        after.every((n) => [cast.designer.id, cast.designManager.id].includes(n.recipientId)),
+      ).toBe(true);
 
       const list = await listItems(cast.writer.cookie, 'task', task.id, '&role=reference');
       expect(list.items.map((item) => item.name)).toEqual(['own', 'brief', 'mood']);

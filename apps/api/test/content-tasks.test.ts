@@ -714,7 +714,7 @@ describe('tasks linked to posts (F08 rules 5–10, 12, 16, 18, 19)', () => {
 
       // A failure after the delivery rolls everything back.
       const notices = app.get(PostNotices);
-      const send = vi.spyOn(notices, 'send').mockRejectedValueOnce(new Error('boom'));
+      const send = vi.spyOn(notices, 'sendChange').mockRejectedValueOnce(new Error('boom'));
       try {
         expect((await cast.move(post.id, cast.writer.cookie, { to: 'published' })).status).toBe(
           500,

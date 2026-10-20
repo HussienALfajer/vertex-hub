@@ -504,17 +504,18 @@ describe('notification engine (F16 part B)', () => {
       const path = `/api/tasks/${created.id}/following`;
       const initial = await client.get(path, cast.employee.cookie);
       expect(initial.status).toBe(200);
-      expect(await initial.json()).toEqual({ following: false, followers: 0 });
+      // The creator follows the task from the start.
+      expect(await initial.json()).toEqual({ following: false, followers: 1 });
       const followed = await client.request('PUT', path, {
         cookie: cast.employee.cookie,
         body: { following: true },
       });
-      expect(await followed.json()).toEqual({ following: true, followers: 1 });
+      expect(await followed.json()).toEqual({ following: true, followers: 2 });
       const unfollowed = await client.request('PUT', path, {
         cookie: cast.employee.cookie,
         body: { following: false },
       });
-      expect(await unfollowed.json()).toEqual({ following: false, followers: 0 });
+      expect(await unfollowed.json()).toEqual({ following: false, followers: 1 });
 
       const post = await cast.createPost(cast.writer.cookie, { clientId });
       const postPath = `/api/content/posts/${post.id}/following`;
