@@ -29,6 +29,7 @@ export * from './push.js';
 export * from './quotes.js';
 export * from './report-labels.js';
 export * from './reports.js';
+export * from './resolutions.js';
 export * from './retainer-contracts.js';
 export * from './retainer-cycles.js';
 export * from './retainers.js';

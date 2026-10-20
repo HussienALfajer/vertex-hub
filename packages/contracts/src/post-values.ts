@@ -27,3 +27,18 @@ export const POST_PLATFORMS = [
 export const postPlatformSchema = z.enum(POST_PLATFORMS).meta({ id: 'PostPlatform' });
 
 export type PostPlatform = z.infer<typeof postPlatformSchema>;
+
+export const POST_STATUSES = [
+  'idea',
+  'in_production',
+  'internal_review',
+  'awaiting_client',
+  'approved',
+  'scheduled',
+  'published',
+  'cancelled',
+] as const;
+
+export const postStatusSchema = z.enum(POST_STATUSES).meta({ id: 'PostStatus' });
+
+export type PostStatus = z.infer<typeof postStatusSchema>;
