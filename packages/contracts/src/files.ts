@@ -19,13 +19,15 @@ export const FILE_OWNER_TYPES = [
   'invoice',
   'ad_wallet_entry',
   'retainer_contract',
+  /** F16 part D. */
+  'announcement',
 ] as const;
 
 export const fileOwnerTypeSchema = z.enum(FILE_OWNER_TYPES).meta({ id: 'FileOwnerType' });
 
 export type FileOwnerType = z.infer<typeof fileOwnerTypeSchema>;
 
-export const FILE_ROLES = ['deliverable', 'reference', 'brand', 'document'] as const;
+export const FILE_ROLES = ['deliverable', 'reference', 'brand', 'document', 'attachment'] as const;
 
 export const fileRoleSchema = z.enum(FILE_ROLES).meta({ id: 'FileRole' });
 
@@ -42,6 +44,7 @@ export const FILE_ROLES_BY_OWNER: Record<FileOwnerType, readonly FileRole[]> = {
   invoice: ['document'],
   ad_wallet_entry: ['document'],
   retainer_contract: ['document'],
+  announcement: ['attachment'],
 };
 
 export const brandFileKindSchema = z.enum(BRAND_FILE_KINDS).meta({ id: 'BrandFileKind' });
@@ -99,6 +102,8 @@ export const FILE_LIMITS = {
   reference: 30,
   brand: 30,
   document: 100,
+  /** F16 part D: an announcement's attachments. */
+  attachment: 5,
   versions: 100,
 } as const;
 

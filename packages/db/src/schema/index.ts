@@ -1,3 +1,4 @@
+export * from './announcements.js';
 export * from './approvals.js';
 export * from './audit.js';
 export * from './auth.js';

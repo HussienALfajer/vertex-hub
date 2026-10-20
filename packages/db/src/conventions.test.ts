@@ -59,6 +59,8 @@ const NOT_BUSINESS_RECORDS: Record<string, string> = {
     'One row per changed type, removed on reset to the catalog default; audited (F16 rule B2)',
   record_followers: 'Personal: who follows a task or post, never archived (F16 rule B12)',
   timed_reminders: 'Idempotency keys of the minute job, purged after 30 days (F16 rule B13)',
+  announcement_recipients:
+    'Part of its announcement, frozen when it is sent; openings and acknowledgements are personal (F16 rule D3)',
   lead_interests:
     'Part of its lead; replaced as a whole when the lead is saved, audited on the lead (F03)',
   file_uploads: 'Temporary: deleted when attached or purged after 24 hours (F10)',

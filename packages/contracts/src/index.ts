@@ -1,5 +1,7 @@
+export * from './announcements.js';
 export * from './approval-views.js';
 export * from './approvals.js';
+export * from './audiences.js';
 export * from './audit.js';
 export * from './auth.js';
 export * from './calendar.js';

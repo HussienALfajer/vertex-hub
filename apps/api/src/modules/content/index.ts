@@ -12,3 +12,4 @@ export {
   PostReviewHooks,
   type PostReviewSource,
 } from './post-review-hooks.js';
+export { PostTeams } from './post-teams.js';

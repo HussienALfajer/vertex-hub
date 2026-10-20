@@ -11,7 +11,9 @@ import { DatabaseModule } from './core/database/database.module.js';
 import { DatabaseErrorFilter } from './core/errors/database-error.filter.js';
 import { redactLoggedRequest } from './core/http/redact-link-token.js';
 import { JobsModule } from './core/jobs/index.js';
+import { AnnouncementsModule } from './modules/announcements/index.js';
 import { ApprovalsModule } from './modules/approvals/index.js';
+import { AudiencesModule } from './modules/audiences/index.js';
 import { AuditModule } from './modules/audit/index.js';
 import { AuthModule } from './modules/auth/index.js';
 import { CalendarModule } from './modules/calendar/index.js';
@@ -66,6 +68,8 @@ import { TemplatesModule } from './modules/templates/index.js';
     LeadsModule,
     CampaignsModule,
     ReportsModule,
+    AudiencesModule,
+    AnnouncementsModule,
     HealthModule,
   ],
   providers: [

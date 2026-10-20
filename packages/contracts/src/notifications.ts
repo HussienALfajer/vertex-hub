@@ -140,6 +140,9 @@ export const NOTIFICATION_TYPES = [
   'security_new_device',
   'security_notice',
   'push_device_lost',
+  'announcement',
+  'announcement_ack_reminder',
+  'announcement_ack_summary',
   'action_reminder',
   'action_escalated',
   'action_escalated_top',
@@ -158,6 +161,7 @@ export const NOTIFICATION_CATEGORIES = [
   'calendar',
   'clients_projects',
   'account',
+  'announcements',
 ] as const;
 
 export const notificationCategorySchema = z
@@ -185,6 +189,8 @@ export const NOTIFICATION_SUBJECTS = [
   /** F16 part C: an ad campaign (F12) and a department (F01). */
   'campaign',
   'department',
+  /** F16 part D. */
+  'announcement',
 ] as const;
 
 export const notificationSubjectTypeSchema = z
@@ -323,6 +329,14 @@ const CATALOG: Record<
   /** Part C rule 5: copies of the account emails, which are never switched off. */
   security_new_device: { category: 'account', subject: 'user', mutable: false },
   security_notice: { category: 'account', subject: 'user', mutable: false },
+  /** F16 part D: what waits on an acknowledgement cannot be muted. */
+  announcement: { category: 'announcements', subject: 'announcement', mutable: false },
+  announcement_ack_reminder: {
+    category: 'announcements',
+    subject: 'announcement',
+    mutable: false,
+  },
+  announcement_ack_summary: { category: 'announcements', subject: 'announcement', mutable: true },
   /** F16 rule B11: the escalation steps open the original's record; its subject type is given. */
   action_reminder: { category: 'reminders', subject: 'task', mutable: false },
   action_escalated: { category: 'reminders', subject: 'task', mutable: false },
@@ -489,6 +503,10 @@ const CHANNELS: Record<NotificationType, Channels> = {
   /** Part C rule 5: the account email is required and sent on its own (`emailSent`). */
   security_new_device: important('required'),
   security_notice: { ...informational, email: 'required' },
+  /** Rule D3: the announcement's own priority and push (`notificationPriority`, `channelModeOf`). */
+  announcement: normal(),
+  announcement_ack_reminder: important(),
+  announcement_ack_summary: normal(),
   action_reminder: important(),
   action_escalated: important('on'),
   action_escalated_top: critical(),
@@ -696,6 +714,10 @@ const ENGINE: Record<NotificationType, Engine> = {
   member_archived_open_work: chain,
   security_new_device: info,
   security_notice: info,
+  /** "Needs you" when it requires an acknowledgement (`notificationBox`). */
+  announcement: info,
+  announcement_ack_reminder: action(),
+  announcement_ack_summary: info,
   action_reminder: action(),
   action_escalated: action(),
   action_escalated_top: action(),
@@ -873,6 +895,9 @@ export const MEETING_CHANGES = ['time', 'place', 'link'] as const;
 
 /** Why someone left a shoot or a meeting. */
 export const CALENDAR_DROP_CAUSES = ['cancelled', 'removed'] as const;
+
+/** F16 part D: an announcement by its title. */
+const announcementData = z.object({ title: nameSchema });
 
 /** Rule B11: names of those an escalation waits on, before "n more". */
 export const ESCALATION_NAMES_SHOWN = 10;
@@ -1167,6 +1192,16 @@ export const NOTIFICATION_DATA_SCHEMAS = {
   security_new_device: z.object({ device: nameSchema, at: z.iso.datetime() }),
   /** F14 email rule 14: `by` is the user manager who made the change; null for the user. */
   security_notice: z.object({ change: z.enum(SECURITY_CHANGES), by: nameSchema.nullable() }),
+  /** Rule D3: sent, or notified again after an edit (rule D10). */
+  announcement: announcementData.extend({
+    excerpt: z.string(),
+    priority: notificationPrioritySchema,
+    requiresAck: z.boolean(),
+  }),
+  /** Rule D8: the recipient has not acknowledged it yet. */
+  announcement_ack_reminder: announcementData,
+  /** Rule D8: after the third round, `pending` recipients still have not acknowledged it. */
+  announcement_ack_summary: announcementData.extend({ pending: z.number().int().min(1) }),
   /** F16 rule B11 step 1: the original still waits on its recipients. */
   action_reminder: escalationData,
   /** Step 2: the managers of those it waits on (or the step's department or role). */
@@ -1191,6 +1226,7 @@ export type NotificationContent = {
 export function notificationPriority(content: NotificationContent): NotificationPriority {
   if (content.type === 'retainer_behind' && content.data.final) return 'critical';
   if (content.type === 'tasks_generated' && content.data.unassigned) return 'important';
+  if (content.type === 'announcement') return content.data.priority;
   return NOTIFICATION_CATALOG[content.type].priority;
 }
 
@@ -1200,6 +1236,7 @@ export function notificationPriority(content: NotificationContent): Notification
  */
 export function notificationBox(content: NotificationContent): NotificationBox {
   if (content.type === 'tasks_generated' && content.data.unassigned) return 'action';
+  if (content.type === 'announcement' && content.data.requiresAck) return 'action';
   return NOTIFICATION_CATALOG[content.type].box;
 }
 
@@ -1255,19 +1292,38 @@ export function typeChannelMode(
   return policies[type]?.[channel] ?? NOTIFICATION_CATALOG[type][channel];
 }
 
+/** Rule D3: an announcement's push by its priority. */
+const ANNOUNCEMENT_PUSH: Record<NotificationPriority, ChannelMode> = {
+  critical: 'required',
+  important: 'on',
+  normal: 'on',
+  informational: 'off',
+};
+
 /**
  * The mode of a channel for a notification (rule B1): the type's policy, else the catalog
- * default, where the final `retainer_behind` reminder is always pushed.
+ * default, where the final `retainer_behind` reminder is always pushed. An announcement pushes
+ * by its priority (rule D3), and a critical one always.
  */
 export function channelModeOf(
   content: NotificationContent,
   channel: NotificationChannel,
   policies: ChannelPolicies,
 ): ChannelMode {
+  if (
+    channel === 'push' &&
+    content.type === 'announcement' &&
+    content.data.priority === 'critical'
+  ) {
+    return 'required';
+  }
   const policy = policies[content.type]?.[channel];
   if (policy) return policy;
   if (channel === 'push' && content.type === 'retainer_behind' && content.data.final) {
     return 'required';
+  }
+  if (channel === 'push' && content.type === 'announcement') {
+    return ANNOUNCEMENT_PUSH[content.data.priority];
   }
   return NOTIFICATION_CATALOG[content.type][channel];
 }
@@ -1619,6 +1675,9 @@ export const NOTIFICATION_REMINDER_KINDS = [
   'escalation_1',
   'escalation_2',
   'escalation_3',
+  /** F16 rule D8: once per announcement and work day, and the author's summary once. */
+  'ack_reminder',
+  'ack_summary',
 ] as const;
 
 export type NotificationReminderKind = (typeof NOTIFICATION_REMINDER_KINDS)[number];

@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import type { DepartmentCode, Role, UserAccess } from '@vertex-hub/contracts';
+import type { AudienceMember, DepartmentCode, Role, UserAccess } from '@vertex-hub/contracts';
 import {
   type Database,
   departmentMembers,
@@ -9,7 +9,7 @@ import {
   userRoles,
   users,
 } from '@vertex-hub/db';
-import { and, eq, gt, inArray, isNull } from 'drizzle-orm';
+import { and, asc, eq, gt, inArray, isNotNull, isNull, or, type SQL } from 'drizzle-orm';
 import { DATABASE } from '../../core/database/database.module.js';
 import { resolveAccess } from './resolve-access.js';
 import { hasPassword } from './user-status.js';
@@ -27,6 +27,14 @@ export interface Signature {
   title: string | null;
   phone: string | null;
   email: string;
+}
+
+/** The sources of an audience this module resolves (F16 rule D1). */
+export interface PeopleSources {
+  everyone?: boolean;
+  departments?: readonly DepartmentCode[];
+  roles?: readonly Role[];
+  users?: readonly string[];
 }
 
 export interface UserSummary {
@@ -258,5 +266,91 @@ export class UserDirectory {
       result.set(row.userId, codes);
     }
     return result;
+  }
+
+  /**
+   * F16 rule D1: the active users (a password set, not archived) of the sources: everyone, the
+   * members of departments (primary or not), the holders of roles (`employee`: every user;
+   * `department_manager`: the managers of any department) and the given people.
+   */
+  async activeOf(
+    sources: PeopleSources,
+    executor: Database | Transaction = this.db,
+  ): Promise<string[]> {
+    const { everyone, departments: codes = [], roles = [], users: ids = [] } = sources;
+    const assigned = roles.filter(
+      (role): role is Exclude<Role, 'employee' | 'department_manager'> =>
+        role !== 'employee' && role !== 'department_manager',
+    );
+    const matches: SQL[] = [];
+    if (ids.length > 0) matches.push(inArray(users.id, [...ids]));
+    if (codes.length > 0) {
+      matches.push(
+        inArray(
+          users.id,
+          executor
+            .select({ id: departmentMembers.userId })
+            .from(departmentMembers)
+            .innerJoin(departments, eq(departments.id, departmentMembers.departmentId))
+            .where(inArray(departments.code, [...codes])),
+        ),
+      );
+    }
+    if (assigned.length > 0) {
+      matches.push(
+        inArray(
+          users.id,
+          executor
+            .select({ id: userRoles.userId })
+            .from(userRoles)
+            .where(inArray(userRoles.role, assigned)),
+        ),
+      );
+    }
+    if (roles.includes('department_manager')) {
+      matches.push(
+        inArray(
+          users.id,
+          executor
+            .select({ id: departments.managerId })
+            .from(departments)
+            .where(isNotNull(departments.managerId)),
+        ),
+      );
+    }
+    const all = everyone || roles.includes('employee');
+    if (!all && matches.length === 0) return [];
+    const rows = await executor
+      .select({ id: users.id })
+      .from(users)
+      .where(and(isNull(users.archivedAt), hasPassword, all ? undefined : or(...matches)))
+      .orderBy(users.id);
+    return rows.map((row) => row.id);
+  }
+
+  /** The given users that are active (a password set, not archived). */
+  async activeIds(
+    ids: readonly string[],
+    executor: Database | Transaction = this.db,
+  ): Promise<string[]> {
+    return [...(await this.mailboxes(ids, executor)).keys()];
+  }
+
+  /** F16 rule D2: how an audience picker lists people, by name. */
+  async audienceMembers(
+    ids: readonly string[],
+    executor: Database | Transaction = this.db,
+  ): Promise<AudienceMember[]> {
+    if (ids.length === 0) return [];
+    const rows = await executor
+      .select({ id: users.id, name: users.name, image: users.image })
+      .from(users)
+      .where(inArray(users.id, [...new Set(ids)]))
+      .orderBy(asc(users.name), asc(users.id));
+    const primary = await this.primaryDepartments(
+      rows.map((row) => row.id),
+      executor,
+    );
+    return rows.map((row) => ({ ...row, department: primary.get(row.id) ?? null }));
   }
 }

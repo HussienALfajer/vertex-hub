@@ -34,6 +34,13 @@ export function notificationPush(
   notification: Notification,
   departmentName: (code: DepartmentCode) => string,
 ): { title: string; body: string } {
+  if (notification.type === 'announcement') {
+    // Rule D13: the announcement's title, then the body's first characters.
+    return {
+      title: pushText(notification.data.title),
+      body: pushText(notification.data.excerpt || notification.data.title),
+    };
+  }
   const { text, context } = notificationText(notification, departmentName);
   return {
     title: pushText(context ?? PUSH_APP_NAME),

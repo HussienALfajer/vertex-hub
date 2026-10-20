@@ -47,6 +47,7 @@ export const PERMISSIONS = [
   'reports.finance',
   'audit.read',
   'notifications.policy',
+  'announcements.manage',
 ] as const;
 
 export const permissionSchema = z.enum(PERMISSIONS).meta({ id: 'Permission' });
@@ -82,6 +83,8 @@ export const PERMISSION_MAP: Readonly<Record<Role, Grants>> = {
     'tasks.work': 'department',
     'tasks.manage': 'department',
     'reports.read': 'department',
+    // F16 part D: critical and pinned announcements to the members of their departments.
+    'announcements.manage': 'department',
   },
   employee: {
     'users.read': 'all',
@@ -150,6 +153,7 @@ export const DEPARTMENT_CAPABILITIES: Readonly<
       'quotes.manage': 'all',
       'audit.read': 'all',
       'notifications.policy': 'all',
+      'announcements.manage': 'all',
       'templates.read': 'all',
       'templates.manage': 'all',
       'projects.manage': 'all',

@@ -6,6 +6,8 @@ import {
   adCampaignUpdates,
   adWalletEntries,
   adWallets,
+  announcementRecipients,
+  announcements,
   approvalItems,
   approvalRequests,
   auditEntries,
@@ -235,6 +237,17 @@ export async function removeUsers(db: Database, ids: string[]): Promise<void> {
     ) as SQL,
   );
   await db.delete(fileUploads).where(inArray(fileUploads.userId, ids));
+  // Announcements point at their author and who withdrew them, recipients at the user (F16).
+  await removeAnnouncements(
+    db,
+    (
+      await db
+        .select({ id: announcements.id })
+        .from(announcements)
+        .where(or(inArray(announcements.authorId, ids), inArray(announcements.withdrawnById, ids)))
+    ).map((row) => row.id),
+  );
+  await db.delete(announcementRecipients).where(inArray(announcementRecipients.userId, ids));
   await removeShoots(
     db,
     [
@@ -317,6 +330,19 @@ export async function removeUsers(db: Database, ids: string[]): Promise<void> {
   await db.delete(verifications).where(inArray(verifications.value, ids));
   await db.update(departments).set({ managerId: null }).where(inArray(departments.managerId, ids));
   await db.delete(users).where(inArray(users.id, ids));
+}
+
+/** Removes announcements with their recipients, files, notifications and audit (test cleanup). */
+export async function removeAnnouncements(db: Database, ids: string[]): Promise<void> {
+  if (ids.length === 0) return;
+  await removeFileItems(db, inArray(fileItems.announcementId, ids) as SQL);
+  await db.delete(auditEntries).where(inArray(auditEntries.entityId, ids));
+  await db.delete(notifications).where(inArray(notifications.subjectId, ids));
+  await db.delete(notificationReminders).where(inArray(notificationReminders.subjectId, ids));
+  await db
+    .delete(announcementRecipients)
+    .where(inArray(announcementRecipients.announcementId, ids));
+  await db.delete(announcements).where(inArray(announcements.id, ids));
 }
 
 /** Removes shoots with their crew, shots, notifications and audit entries (test cleanup only). */

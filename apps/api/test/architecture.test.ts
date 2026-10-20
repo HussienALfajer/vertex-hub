@@ -301,6 +301,7 @@ describe('module boundaries', () => {
    * does). A new schema file must be added here, which forces the ownership decision.
    */
   const TABLE_OWNERS: Record<string, string | null> = {
+    announcements: 'announcements',
     approvals: 'approvals',
     audit: 'audit',
     auth: 'auth',

@@ -240,6 +240,12 @@ export const AUDIT_ACTIONS = [
   'retainer_contract_annex.issued',
   'retainer_contract_annex.signed',
   'retainer_contract_annex.voided',
+  'announcement.sent',
+  'announcement.scheduled',
+  'announcement.schedule_cancelled',
+  'announcement.edited',
+  'announcement.withdrawn',
+  'announcement.archived',
 ] as const;
 
 export const auditActionSchema = z.enum(AUDIT_ACTIONS).meta({ id: 'AuditAction' });
@@ -292,6 +298,7 @@ export const AUDIT_ENTITY_TYPES = [
   'retainer_contract',
   'retainer_contract_annex',
   'notification_policy',
+  'announcement',
 ] as const;
 
 export const auditEntityTypeSchema = z.enum(AUDIT_ENTITY_TYPES).meta({ id: 'AuditEntityType' });
