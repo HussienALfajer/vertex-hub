@@ -49,9 +49,10 @@ Split from C1b because the catalog touches twelve modules: C1 holds tasks, conte
 - [x] api calendar: `shoot_completed`, `shoot_not_closed` resolve
 - [x] timed sources in the minute job (`task_due_shortly`, `post_publish_shortly`, `shoot_starting`, `meeting_starting`) with `timed_reminders` and its purge
 - [x] bridge: `openapi:export`, `api:generate`, fixtures; web typecheck
-- [ ] checks, reviewer, acceptance, PR with auto-merge
+- [x] checks, reviewer, acceptance (owner, 2026-10-20), PR with auto-merge
 
 ## PR C1b — catalog: business modules api
+- [ ] ask the owner: should archiving a scheduled shoot void `shoot_not_closed`? (the spec names closing and cancelling only; found in C1)
 - [ ] clients, leads, quotes, projects, campaigns, invoices, auth, templates (`tasks_generated`), email: new types, recipient changes (`quote_accepted` + Finance, `lead_won` + GMs), `resolve` calls; `responsibility_moved`; daily sources (`quote_expiring`, `invoice_due_soon`, `campaign_end_passed`, `member_archived_open_work` resolution); security copies
 - [ ] checks, reviewer, acceptance, PR with auto-merge
 
