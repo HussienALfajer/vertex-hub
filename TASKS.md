@@ -62,7 +62,7 @@ Split from C1c because the remaining catalog still spans eight modules: C1b hold
 - [x] api projects: `project_status_changed`, `milestone_completed`, `extra_work_created`, `retainer_status_changed`, `contract_signed`, `contract_voided`, PM `responsibility_moved`; resolves of `retainer_renewal_due`, `retainer_behind`, `retainer_amendment_pending`
 - [x] api templates: `tasks_generated` managers' notice resolves when the run's unassigned tasks in that department are assigned or closed
 - [x] bridge: `openapi:export`, `api:generate`, fixtures; web typecheck
-- [ ] checks, reviewer, acceptance (API at `/api/docs`), PR with auto-merge
+- [x] checks, reviewer, acceptance (owner, 2026-10-20), PR with auto-merge
 
 ## PR C1c — catalog: finance, campaigns and people modules api
 - [ ] campaigns, invoices, auth, email: `invoice_draft_created`, `invoice_due_soon` (daily), `payment_recorded`, `payment_voided`, `invoice_voided`, `ad_deposit_recorded`, `campaign_assigned`, `campaign_status_changed`, `campaign_end_passed` (daily), `department_manager_assigned`, `member_moved`, `member_archived_open_work` (+ daily resolution), `security_new_device`, `security_notice`; `responsibility_moved` for campaign owner and department manager; resolves of `invoice_overdue`, `ad_budget_low`, `email_failed`; payment push texts without amounts
