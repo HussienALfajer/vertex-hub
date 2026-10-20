@@ -51,9 +51,21 @@ Split from C1b because the catalog touches twelve modules: C1 holds tasks, conte
 - [x] bridge: `openapi:export`, `api:generate`, fixtures; web typecheck
 - [x] checks, reviewer, acceptance (owner, 2026-10-20), PR with auto-merge
 
-## PR C1b — catalog: business modules api
+## PR C1b — catalog: sales and engagement modules api (branch `claude/stoic-allen-1amzb7`)
+Split from C1c because the remaining catalog still spans eight modules: C1b holds clients, leads, quotes, projects (projects, milestones, extra work, retainers, contracts) and templates.
 - [ ] ask the owner: should archiving a scheduled shoot void `shoot_not_closed`? (the spec names closing and cancelling only; found in C1)
-- [ ] clients, leads, quotes, projects, campaigns, invoices, auth, templates (`tasks_generated`), email: new types, recipient changes (`quote_accepted` + Finance, `lead_won` + GMs), `resolve` calls; `responsibility_moved`; daily sources (`quote_expiring`, `invoice_due_soon`, `campaign_end_passed`, `member_archived_open_work` resolution); security copies
+- [ ] contracts: new types `client_status_changed`, `client_healthcare_changed`, `lead_lost`, `quote_expiring`, `quote_expired`, `quote_rejected`, `project_status_changed`, `milestone_completed`, `extra_work_created`, `retainer_status_changed`, `contract_signed`, `contract_voided`, `responsibility_moved` (catalog, order, snapshots); `quote_expiring` daily kind; messages texts and links; `ar.json` type labels; unit tests
+- [ ] db (`/db-migration`): enum values
+- [ ] api clients: status and healthcare types; `responsibility_moved` for the AM
+- [ ] api leads: `lead_lost`, `lead_won` + GMs, owner `responsibility_moved`; `lead_follow_up_due`/`_overdue` resolve on follow-up, date move, close
+- [ ] api quotes: `quote_accepted` + Finance, `quote_rejected` (also when the lead is lost), `quote_expired`, `quote_expiring` in the daily job; `quote_approval_requested` resolve on decide or withdraw
+- [ ] api projects: `project_status_changed`, `milestone_completed`, `extra_work_created`, `retainer_status_changed`, `contract_signed`, `contract_voided`, PM `responsibility_moved`; resolves of `retainer_renewal_due`, `retainer_behind`, `retainer_amendment_pending`
+- [ ] api templates: `tasks_generated` managers' notice resolves when the run's unassigned tasks in that department are assigned or closed
+- [ ] bridge: `openapi:export`, `api:generate`, fixtures; web typecheck
+- [ ] checks, reviewer, acceptance (API at `/api/docs`), PR with auto-merge
+
+## PR C1c — catalog: finance, campaigns and people modules api
+- [ ] campaigns, invoices, auth, email: `invoice_draft_created`, `invoice_due_soon` (daily), `payment_recorded`, `payment_voided`, `invoice_voided`, `ad_deposit_recorded`, `campaign_assigned`, `campaign_status_changed`, `campaign_end_passed` (daily), `department_manager_assigned`, `member_moved`, `member_archived_open_work` (+ daily resolution), `security_new_device`, `security_notice`; `responsibility_moved` for campaign owner and department manager; resolves of `invoice_overdue`, `ad_budget_low`, `email_failed`; payment push texts without amounts
 - [ ] checks, reviewer, acceptance, PR with auto-merge
 
 ## PR C2 — catalog: web texts and links
