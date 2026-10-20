@@ -52,7 +52,7 @@ The owner wants a complete, comprehensive and very professional notification sys
 - **The engine:**
   - channels per type: in-app, push, email, each user choosing within limits set by management;
   - priority levels: critical, important, normal, informational;
-  - no double alert: no push while the user is active in the app;
+  - ~~no double alert: no push while the user is active in the app~~ changed: a push is always sent, and reading a notification on one device clears it from the others (owner, 2026-10-20, F16 spec);
   - grouping ("5 new comments on task X");
   - "remind me later";
   - **self-resolving notifications**: a "review requested" notification closes itself when the review is done, so the bell is a real to-do list;
