@@ -65,7 +65,7 @@ Build order (owner, 2026-09-30): F10 → F09 → F08 → F11. F09 approves exact
 
 ## V2 — Hub track
 Order and directions: `docs/product/v2-scope.md` §3–4. Each feature starts with a `/spec` session: full analysis, every possible feature, the owner's questions, then the spec.
-- [ ] F16 Notifications 2.0, installable app and announcements
+- [~] F16 Notifications 2.0, installable app and announcements (spec `docs/specs/F16-notifications-app-announcements.md`)
 - [ ] F17 HR: employee files, attendance and leave
 - [ ] F18 Accounting through Vertex Mizan: integration, purchases for clients, profitability (starts when Mizan's posting API is stable, ADR 0035; Q17)
 - [ ] F19 HR: payroll, commissions and profit shares (Q15, Q16)
