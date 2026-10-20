@@ -149,6 +149,23 @@ describe('notification catalog of the workflow modules (F16 part C)', () => {
       expect(row.readAt).not.toBeNull();
     });
 
+    it("voids the previous assignee's assignment and keeps the new one open", async () => {
+      const task = await cast.createTask(cast.designManager.cookie, {
+        assigneeId: cast.designer.id,
+        clientId,
+      });
+      const response = await client.request('PATCH', `/api/tasks/${task.id}`, {
+        cookie: cast.designManager.cookie,
+        body: { assigneeId: cast.employee.id },
+      });
+      expect(response.status, await response.clone().text()).toBe(200);
+      expect((await oneOf(cast.designer.id, 'task_assigned', task.id)).resolution).toBe('void');
+      expect(await oneOf(cast.employee.id, 'task_assigned', task.id)).toMatchObject({
+        resolvedAt: null,
+        readAt: null,
+      });
+    });
+
     it('voids the due reminders of a task that is re-dated', async () => {
       const task = await cast.createTask(cast.designManager.cookie, {
         assigneeId: cast.designer.id,
@@ -339,6 +356,31 @@ describe('notification catalog of the workflow modules (F16 part C)', () => {
         .from(approvalRequests)
         .where(eq(approvalRequests.id, issued.id));
       expect(request?.firstOpenedAt).not.toBeNull();
+    });
+  });
+
+  describe('approval completed by a response recorded by hand', () => {
+    it('closes the expiry wait and tells of the completed request', async () => {
+      const task = await cast.taskAt('awaiting_client', { clientId });
+      const response = await client.post('/api/approvals/requests', cast.gm.cookie, {
+        clientId,
+        contactId: await cast.contactOf(clientId),
+        items: [{ taskId: task.id }],
+      });
+      expect(response.status, await response.clone().text()).toBe(201);
+      const issued = issuedApprovalRequestSchema.parse(await response.json());
+      await db.transaction((tx) =>
+        app.get(NotificationCenter).notify(tx, {
+          type: 'approval_expired',
+          recipients: [cast.am.id],
+          actorId: null,
+          subjectId: issued.id,
+          data: { client: 'عميل', contact: 'جهة' },
+        }),
+      );
+      await cast.task.moveOk(task.id, cast.am.cookie, { status: 'approved' });
+      expect((await oneOf(cast.am.id, 'approval_expired', issued.id)).resolution).toBe('done');
+      expect(await rowsOf(cast.am.id, 'approval_completed', issued.id)).toHaveLength(1);
     });
   });
 

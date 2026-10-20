@@ -697,7 +697,12 @@ export class ApprovalsService implements OnModuleInit {
               taskId: item.taskId,
             });
       }
-      await closeItem(tx, item, { withdrawn: 'resent' }, actor);
+      const { completed } = await closeItem(tx, item, { withdrawn: 'resent' }, actor);
+      await this.notices.itemClosed(tx, item.requestId, {
+        answered: false,
+        completed,
+        actorId: actor.id,
+      });
     }
   }
 
@@ -750,7 +755,7 @@ export class ApprovalsService implements OnModuleInit {
     await lockRequest(tx, held.requestId);
     const [item] = await tx.select().from(approvalItems).where(pendingOf).for('update');
     if (!item) return;
-    await closeItem(
+    const { completed } = await closeItem(
       tx,
       item,
       exit.response
@@ -758,6 +763,11 @@ export class ApprovalsService implements OnModuleInit {
         : { withdrawn: moved },
       exit.actor,
     );
+    await this.notices.itemClosed(tx, item.requestId, {
+      answered: !!exit.response,
+      completed,
+      actorId: exit.actor?.id ?? null,
+    });
   }
 
   /** One page of requests, newest first; those of archived clients for scope-all holders only. */

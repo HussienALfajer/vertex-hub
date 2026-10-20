@@ -57,7 +57,7 @@ describe('task resolutions (F16 rule B5, part C)', () => {
       { types: ['task_assigned'], outcome: 'done' },
     ]);
     expect(taskResolutions(task, { ...task, assigneeId: 'b' })).toEqual([
-      { types: ['task_assigned', 'task_returned'], outcome: 'void' },
+      { types: ['task_assigned', 'task_returned'], outcome: 'void', recipients: ['a'] },
     ]);
   });
 
@@ -139,7 +139,7 @@ describe('post resolutions (F16 rule B5, part C)', () => {
 
   it('voids the assignment and a return when the responsible changes', () => {
     expect(postResolutions(post, { ...post, responsibleId: 's' })).toEqual([
-      { types: ['post_returned', 'post_assigned'], outcome: 'void' },
+      { types: ['post_returned', 'post_assigned'], outcome: 'void', recipients: ['r'] },
     ]);
   });
 

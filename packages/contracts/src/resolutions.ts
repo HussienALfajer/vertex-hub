@@ -13,6 +13,8 @@ import { isTaskFinished, type ReviewStage, type TaskStatus } from './tasks.js';
 export interface ResolutionRule {
   types: readonly NotificationType[];
   outcome: NotificationResolution;
+  /** Only these recipients' rows (the previous holder's on a reassignment); all when left out. */
+  recipients?: readonly string[];
 }
 
 /** The fields of a task the resolution rules read. */
@@ -63,9 +65,17 @@ export function taskResolutions(
   if (closed(after) && !closed(before)) return [{ types: TASK_ACTION_TYPES, outcome: 'void' }];
   const voided: NotificationType[] = [];
   const done: NotificationType[] = [];
-  if (before.assigneeId && before.assigneeId !== after.assigneeId) {
-    voided.push('task_assigned', 'task_returned');
-  }
+  // The previous assignee's rows only: the new one's assignment is open work.
+  const reassigned: ResolutionRule[] =
+    before.assigneeId && before.assigneeId !== after.assigneeId
+      ? [
+          {
+            types: ['task_assigned', 'task_returned'],
+            outcome: 'void',
+            recipients: [before.assigneeId],
+          },
+        ]
+      : [];
   if (!before.assigneeId && after.assigneeId) done.push('task_requested');
   if (before.status === 'new' && after.status !== 'new') done.push('task_assigned');
   if (inStage(before, 'internal') && !inStage(after, 'internal')) {
@@ -83,7 +93,7 @@ export function taskResolutions(
   } else if (before.dueDate !== after.dueDate || before.dueTime !== after.dueTime) {
     voided.push(...TASK_DUE_TYPES);
   }
-  return rules(voided, done);
+  return [...reassigned, ...rules(voided, done)];
 }
 
 /** The fields of a post the resolution rules read. */
@@ -131,7 +141,17 @@ export function postResolutions(
   }
   const voided: NotificationType[] = [];
   const done: NotificationType[] = [];
-  if (before.responsibleId !== after.responsibleId) voided.push('post_returned', 'post_assigned');
+  // The previous responsible's rows only: the new one's assignment is open work.
+  const reassigned: ResolutionRule[] =
+    before.responsibleId !== after.responsibleId
+      ? [
+          {
+            types: ['post_returned', 'post_assigned'],
+            outcome: 'void',
+            recipients: [before.responsibleId],
+          },
+        ]
+      : [];
   // Submitted, or resubmitted after a return.
   if (before.status !== 'internal_review' && after.status === 'internal_review') {
     done.push('post_assigned', 'post_returned');
@@ -150,7 +170,7 @@ export function postResolutions(
   } else if (before.publishDate !== after.publishDate || before.publishTime !== after.publishTime) {
     voided.push(...POST_PUBLISH_TYPES);
   }
-  return rules(voided, done);
+  return [...reassigned, ...rules(voided, done)];
 }
 
 function rules(voided: NotificationType[], done: NotificationType[]): ResolutionRule[] {

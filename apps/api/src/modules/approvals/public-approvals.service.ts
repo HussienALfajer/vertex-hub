@@ -274,7 +274,7 @@ export class PublicApprovalsService {
     } else {
       throw new Error(`Approval item ${item.id} sends neither a task nor a post`);
     }
-    await closeItem(
+    const { completed } = await closeItem(
       tx,
       item,
       { decision, responseId: response.id, via: 'approval_link' },
@@ -282,17 +282,7 @@ export class PublicApprovalsService {
       contact.name,
     );
     await this.notices.send(tx, request, { type: 'approval_responded', decision });
-    // F16 part C: an answer ends the wait for one; the last answer completes the request.
-    await this.notices.resolve(tx, request.id, ['approval_no_response'], 'done', null);
-    const [now] = await tx
-      .select({ completedAt: approvalRequests.completedAt })
-      .from(approvalRequests)
-      .where(eq(approvalRequests.id, request.id));
-    if (now?.completedAt) {
-      await this.notices.resolve(tx, request.id, ['approval_expired'], 'done', null);
-      // Its own notify call: in the answer's, the first-match order would keep the response only.
-      await this.notices.send(tx, request, { type: 'approval_completed' });
-    }
+    await this.notices.itemClosed(tx, request.id, { answered: true, completed, actorId: null });
   }
 
   /**

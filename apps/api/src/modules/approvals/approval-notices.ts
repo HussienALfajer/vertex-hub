@@ -4,7 +4,8 @@ import type {
   NotificationResolution,
   NotificationType,
 } from '@vertex-hub/contracts';
-import type { Transaction } from '@vertex-hub/db';
+import { approvalRequests, type Transaction } from '@vertex-hub/db';
+import { eq } from 'drizzle-orm';
 import { ClientDirectory } from '../clients/index.js';
 import { NotificationCenter } from '../notifications/index.js';
 import type { RequestRow } from './approval-items.js';
@@ -48,6 +49,29 @@ export class ApprovalNotices {
       actorId: null,
       subjectId: request.id,
     });
+  }
+
+  /**
+   * F16 part C, after an item of the request closed: an answer ends the wait for one
+   * (`approval_no_response`); the request's completion ends `approval_expired`, and when the
+   * last item was answered rather than withdrawn tells of it in its own `notify` call (in the
+   * answer's, the first-match order would keep the response only).
+   */
+  async itemClosed(
+    tx: Transaction,
+    requestId: string,
+    closed: { answered: boolean; completed: boolean; actorId: string | null },
+  ): Promise<void> {
+    const { answered, completed, actorId } = closed;
+    if (answered) await this.resolve(tx, requestId, ['approval_no_response'], 'done', actorId);
+    if (!completed) return;
+    await this.resolve(tx, requestId, ['approval_expired'], 'done', actorId);
+    if (!answered) return;
+    const [request] = await tx
+      .select()
+      .from(approvalRequests)
+      .where(eq(approvalRequests.id, requestId));
+    if (request) await this.send(tx, request, { type: 'approval_completed' });
   }
 
   /** F16 rule B5: closes `types` on the request. */

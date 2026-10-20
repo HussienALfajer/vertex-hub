@@ -74,7 +74,7 @@ export type ItemOutcome =
 
 /**
  * Closes a pending item and audits it on its request; the request completes when this was its
- * last pending item (rule 15). The caller holds the request's lock. `actorName` names the
+ * last pending item (rule 15): `completed` says so. The caller holds the request's lock. `actorName` names the
  * contact when no user acts (a response through the link).
  */
 export async function closeItem(
@@ -83,7 +83,7 @@ export async function closeItem(
   outcome: ItemOutcome,
   actor: AuditActor | null,
   actorName?: string,
-): Promise<Date> {
+): Promise<{ closedAt: Date; completed: boolean }> {
   const closedAt = new Date();
   const decided = 'decision' in outcome;
   await tx
@@ -115,7 +115,7 @@ export async function closeItem(
         : { reason: outcome.withdrawn }),
     },
   });
-  await tx
+  const completed = await tx
     .update(approvalRequests)
     .set({ completedAt: closedAt })
     .where(
@@ -127,6 +127,7 @@ export async function closeItem(
           where ${approvalItems.requestId} = ${item.requestId}
             and ${approvalItems.status} = 'pending')`,
       ),
-    );
-  return closedAt;
+    )
+    .returning({ id: approvalRequests.id });
+  return { closedAt, completed: completed.length > 0 };
 }
