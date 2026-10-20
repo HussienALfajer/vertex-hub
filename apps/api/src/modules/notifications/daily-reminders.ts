@@ -17,6 +17,7 @@ import { DATABASE } from '../../core/database/database.module.js';
 import { JobQueue, runEach } from '../../core/jobs/index.js';
 import { type Notice, NotificationCenter } from './notification-center.js';
 import { PushService } from './push.service.js';
+import { TimedNotifications } from './timed-notifications.js';
 
 /** A module's part of the daily job; returns how many reminders it sent. */
 export type DailyReminderSource = (today: CalendarDate) => Promise<number>;
@@ -47,6 +48,7 @@ export class DailyReminders implements OnModuleInit {
     private readonly jobs: JobQueue,
     private readonly center: NotificationCenter,
     private readonly push: PushService,
+    private readonly timed: TimedNotifications,
   ) {}
 
   onModuleInit(): void {
@@ -88,6 +90,13 @@ export class DailyReminders implements OnModuleInit {
         async () => {
           const deleted = await this.push.purge(now);
           this.logger.log(`Push deliveries: ${deleted} purged`);
+        },
+      ],
+      [
+        'Timed reminder purge',
+        async () => {
+          const deleted = await this.timed.purge(now);
+          this.logger.log(`Timed reminders: ${deleted} purged`);
         },
       ],
     ];

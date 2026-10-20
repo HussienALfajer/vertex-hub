@@ -12,3 +12,8 @@ export {
 } from './notification-emails.js';
 export { NotificationsModule } from './notifications.module.js';
 export { type FollowedRecord, RecordFollowers } from './record-followers.js';
+export {
+  TimedNotifications,
+  type TimedReminderKey,
+  type TimedReminderSource,
+} from './timed-notifications.js';

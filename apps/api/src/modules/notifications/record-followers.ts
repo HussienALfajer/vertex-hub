@@ -1,8 +1,14 @@
 import { Inject, Injectable } from '@nestjs/common';
-import type { Following, FollowSubject } from '@vertex-hub/contracts';
-import { type Database, recordFollowers } from '@vertex-hub/db';
+import {
+  type Following,
+  type FollowSubject,
+  type Permission,
+  permissionScopes,
+} from '@vertex-hub/contracts';
+import { type Database, recordFollowers, type Transaction } from '@vertex-hub/db';
 import { and, count, eq } from 'drizzle-orm';
 import { DATABASE } from '../../core/database/database.module.js';
+import { UserDirectory } from '../auth/index.js';
 
 /** A followed record: a task or a post (F16 rule B12). */
 export interface FollowedRecord {
@@ -17,7 +23,56 @@ export interface FollowedRecord {
  */
 @Injectable()
 export class RecordFollowers {
-  constructor(@Inject(DATABASE) private readonly db: Database) {}
+  constructor(
+    @Inject(DATABASE) private readonly db: Database,
+    private readonly users: UserDirectory,
+  ) {}
+
+  /**
+   * Automatic following, in the transaction of the change that makes the users follow (the
+   * creator, the assignee, a commenter): a user who unfollowed stays out.
+   */
+  async follow(
+    tx: Transaction,
+    record: FollowedRecord,
+    userIds: readonly (string | null)[],
+  ): Promise<void> {
+    const ids = [...new Set(userIds.filter((id): id is string => !!id))];
+    if (ids.length === 0) return;
+    await tx
+      .insert(recordFollowers)
+      .values(
+        ids.map((userId) => ({
+          subjectType: record.type,
+          subjectId: record.id,
+          userId,
+          following: true,
+          source: 'auto' as const,
+        })),
+      )
+      .onConflictDoNothing();
+  }
+
+  /**
+   * The followers who still receive (rule B12, edge case 13): following, not archived, and
+   * holding `permission` (the record's read permission) over every record, as reading it needs.
+   */
+  async recipients(
+    tx: Transaction,
+    record: FollowedRecord,
+    permission: Permission,
+  ): Promise<string[]> {
+    const rows = await tx
+      .select({ userId: recordFollowers.userId })
+      .from(recordFollowers)
+      .where(and(this.of(record), eq(recordFollowers.following, true)));
+    const readers: string[] = [];
+    for (const { userId } of rows) {
+      const access = await this.users.access(userId, tx);
+      if (access && permissionScopes(access, permission).includes('all')) readers.push(userId);
+    }
+    return readers;
+  }
 
   async following(record: FollowedRecord, userId: string): Promise<Following> {
     const [[row], [total]] = await Promise.all([
