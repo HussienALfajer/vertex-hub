@@ -323,8 +323,10 @@ export class AnnouncementPolls implements OnModuleInit {
       ({ id }) => `Poll closing reminder ${id}`,
       async ({ id, closesAt }) => {
         const done = await this.db.transaction(async (tx) => {
+          // Closed or withdrawn since the candidates were read: no reminder nothing would close.
+          const poll = await this.lockPoll(tx, id);
           const [row] = await tx.select().from(announcements).where(eq(announcements.id, id));
-          if (!row || !closesAt) return false;
+          if (!poll || !row || !closesAt || poll.closedAt || row.status !== 'sent') return false;
           const recipients = await tx
             .select({ userId: announcementRecipients.userId })
             .from(announcementRecipients)
@@ -461,7 +463,8 @@ export class AnnouncementPolls implements OnModuleInit {
     return poll;
   }
 
-  private async lockPoll(tx: Transaction, id: string) {
+  /** The poll locked against votes, closing and edits; null without one. */
+  async lockPoll(tx: Transaction, id: string) {
     const [poll] = await tx
       .select()
       .from(announcementPolls)

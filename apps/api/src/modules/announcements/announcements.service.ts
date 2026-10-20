@@ -176,9 +176,13 @@ export class AnnouncementsService {
       const { notifyAgain, scheduledAt, poll, ...fields } = input;
       // Rule D10: a sent announcement's existing poll changes only while nobody has voted.
       if (sent && poll !== undefined) {
-        const existing = await this.polls.pollOf(tx, id);
+        // Locked first, so a vote arriving now waits for this edit or is seen by it.
+        const existing = await this.polls.lockPoll(tx, id);
         if (!existing || poll === null || (await this.polls.hasVotes(tx, id))) {
           throw new CodedException(409, 'LOCKED_FIELD', 'Locked once sent', { fields: ['poll'] });
+        }
+        if (existing.closedAt || (existing.closesAt && existing.closesAt <= now)) {
+          throw new CodedException(409, 'POLL_CLOSED', 'The poll is closed');
         }
         this.polls.assertCloseTime(poll.closesAt, row.sentAt ?? now, now);
       }

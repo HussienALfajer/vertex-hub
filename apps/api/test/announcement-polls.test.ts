@@ -329,6 +329,33 @@ describe('announcement polls (F16 rule D11)', () => {
     );
   });
 
+  it('never reopens a closed poll by editing it', async () => {
+    const sent = await create(author);
+    await client.post(`/api/announcements/${sent.id}/poll/close`, author.cookie);
+    await expectError(
+      await client.request('PATCH', `/api/announcements/${sent.id}`, {
+        cookie: author.cookie,
+        body: { poll: poll() },
+      }),
+      409,
+      'POLL_CLOSED',
+    );
+    expect((await read(author, sent.id)).poll?.closed).toBe(true);
+  });
+
+  it('sends no closing reminder for a poll closed since the job read it', async () => {
+    const sent = await create(author, {
+      poll: poll({ closesAt: new Date(Date.now() + 3 * 24 * HOUR).toISOString() }) as never,
+    });
+    const closesAt = new Date(sent.poll?.closesAt as string);
+    await db
+      .update(announcementPolls)
+      .set({ closedAt: new Date() })
+      .where(eq(announcementPolls.announcementId, sent.id));
+    expect(await polls.runTimed(new Date(closesAt.getTime() - 23 * HOUR))).toBe(0);
+    expect(await notificationsOf(sent.id, 'poll_closing')).toHaveLength(0);
+  });
+
   it('removes the poll of a draft', async () => {
     const draft = await create(author, { send: 'draft' });
     const response = await client.request('PATCH', `/api/announcements/${draft.id}`, {
