@@ -388,6 +388,20 @@ export const NOTIFICATION_TEXT = {
     by: '{{what}} بواسطة {{by}}',
     self: '{{what}} بواسطتك',
   },
+  /** F16 part D: the context line is the body's first characters. */
+  announcement: {
+    plain: 'إعلان من {{actor}}: «{{title}}»',
+    ack: 'إعلان من {{actor}} يطلب تأكيد القراءة: «{{title}}»',
+  },
+  announcement_ack_reminder: 'تذكير: أكّد قراءة الإعلان «{{title}}»',
+  announcement_ack_summary: {
+    zero: 'أكّد الجميع قراءة إعلانك «{{title}}»',
+    one: 'لم يؤكد مستلم واحد قراءة إعلانك «{{title}}» بعد ثلاثة تذكيرات',
+    two: 'لم يؤكد مستلمان قراءة إعلانك «{{title}}» بعد ثلاثة تذكيرات',
+    few: 'لم يؤكد {{n}} مستلمين قراءة إعلانك «{{title}}» بعد ثلاثة تذكيرات',
+    many: 'لم يؤكد {{n}} مستلمًا قراءة إعلانك «{{title}}» بعد ثلاثة تذكيرات',
+    other: 'لم يؤكد {{n}} مستلم قراءة إعلانك «{{title}}» بعد ثلاثة تذكيرات',
+  },
   /** F16 rule B11: each escalation step wraps the original's text. */
   action_reminder: 'تذكير: {{text}}',
   action_escalated: 'تصعيد: {{text}}',
@@ -514,6 +528,8 @@ export function notificationLink(notification: Notification): NotificationLink {
       return { to: '/campaigns/$campaignId', params: { campaignId: subject.id } };
     case 'department':
       return { to: '/departments/$departmentId', params: { departmentId: subject.id } };
+    case 'announcement':
+      return { to: '/announcements/$announcementId', params: { announcementId: subject.id } };
     default:
       return { to: '/tasks/$taskId', params: { taskId: subject.id } };
   }
@@ -987,6 +1003,26 @@ export function notificationText(
         text: fill(text.push_device_lost, { device: notification.data.device }),
         context: null,
       };
+    case 'announcement':
+      return {
+        text: fill(text.announcement[notification.data.requiresAck ? 'ack' : 'plain'], {
+          actor,
+          title: notification.data.title,
+        }),
+        context: notification.data.excerpt || null,
+      };
+    case 'announcement_ack_reminder':
+      return {
+        text: fill(text.announcement_ack_reminder, { title: notification.data.title }),
+        context: null,
+      };
+    case 'announcement_ack_summary':
+      return {
+        text: counted(text.announcement_ack_summary, notification.data.pending, {
+          title: notification.data.title,
+        }),
+        context: null,
+      };
     case 'invoice_draft_created':
       return {
         text: fill(text.invoice_draft_created, { description: notification.data.description }),
@@ -1176,6 +1212,7 @@ type TaskNotification = Exclude<
       | 'approval_completed'
       | `post_${string}`
       | 'push_device_lost'
+      | `announcement${string}`
       | `action_${string}`
       | 'responsibility_moved'
       | `client_${string}`

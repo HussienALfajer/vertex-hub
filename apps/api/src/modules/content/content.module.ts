@@ -16,6 +16,7 @@ import { PostNotices } from './post-notices.js';
 import { PostReminders } from './post-reminders.js';
 import { PostReviewHooks } from './post-review-hooks.js';
 import { PostReviews } from './post-reviews.js';
+import { PostTeams } from './post-teams.js';
 import { PostWorkflowService } from './post-workflow.service.js';
 
 /**
@@ -53,7 +54,8 @@ import { PostWorkflowService } from './post-workflow.service.js';
     PostApprovals,
     PostReviewHooks,
     ContentReports,
+    PostTeams,
   ],
-  exports: [PostApprovals, PostReviewHooks, ContentReports],
+  exports: [PostApprovals, PostReviewHooks, ContentReports, PostTeams],
 })
 export class ContentModule {}

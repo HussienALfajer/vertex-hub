@@ -82,8 +82,18 @@ The texts, type labels and most links arrived with C1–C1c (`packages/messages`
 - [x] E2E: `f16-catalog.spec.ts` (acceptance C7's types and the other new records render their text and open their record, one test per type; the Join link); rows in `catalogNotificationsSeed()`; RTL screenshots of the catalog rows in both themes
 - [x] checks, reviewer, acceptance (owner, 2026-10-20), PR with auto-merge
 
-## PR D1 — announcements and audiences: contracts, db, api
-- [ ] `announcements*` tables, polls, templates, F10 owner type; `AudienceResolver`; announcement API; reminders in the daily job, scheduling in the minute job
+## PR D1 — announcements and audiences: contracts, db, api (branch `claude/zealous-franklin-paqwgx`)
+Split from D1b because Part D spans two new modules, seven tables and about twenty routes: D1 holds audiences and announcements with receipts, reminders, scheduling, pinning and attachments; D1b adds polls and templates.
+- [x] contracts: `audiences.ts` (`audienceSchema`, preview); `announcements.ts` (statuses, `announcementBodySchema` with the TipTap whitelist and its plain-text excerpt, create/update/list/detail/receipts/home schemas, limits); `announcements.manage` permission and grants (department scope); error codes `EMPTY_AUDIENCE`, `FORBIDDEN_AUDIENCE`, `LOCKED_FIELD`, `NOT_DRAFT`, `NOT_SCHEDULED`, `ALREADY_WITHDRAWN`, `NO_ACK_REQUIRED`; audit actions and entity type; notification types `announcement`, `announcement_ack_reminder`, `announcement_ack_summary` (category `announcements`, subject `announcement`, priority, box and push by the announcement); reminder kind `ack_reminder`; F10 owner type `announcement`; unit tests (body sanitizing, audience, channel by priority); messages texts and links; `ar.json` keys
+- [x] db (`/db-migration`): `announcements`, `announcement_recipients`; enum values; `file_items.announcement_id` and its check; `TABLE_OWNERS`
+- [x] api audiences: `AudienceResolver.resolve` (every source, through the exported services of `auth`, `projects`, `tasks`, `content`, `clients`), `POST /api/audiences/preview`; `test/audiences.test.ts`
+- [x] api announcements: create (draft, now, schedule), send, cancel schedule, edit (+ notify again), withdraw, archive, read (opened), acknowledge, remind (1/h), receipts, list (received, sent, all), home; critical and pin checked per recipient; `NotificationCenter` reopen for "Notify again"; F10 owner type; `test/announcements.test.ts`
+- [x] jobs: acknowledgement reminders and the author's summary in the daily job; scheduled sending in the minute job (author archived or empty audience → back to draft)
+- [x] bridge: `openapi:export`, `api:generate`; web typecheck (no fixture changes needed)
+- [ ] checks, reviewer, acceptance (API at `/api/docs`), PR with auto-merge
+
+## PR D1b — polls and templates: contracts, db, api
+- [ ] polls (tables, create/edit with the announcement, vote, close, results as allowed, anonymous never returned), `poll_closing` and `poll_results`, closing in the minute job; templates (personal and shared, audit for shared)
 - [ ] checks, reviewer, acceptance, PR with auto-merge
 
 ## PR D2 — announcements: web

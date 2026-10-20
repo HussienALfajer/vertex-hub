@@ -383,6 +383,15 @@ New kinds:
 
 Files: F10 gains owner type `announcement` (a new FK column on `file_items` and its check constraint; roles `attachment`; at most 5 files). Reading follows the announcement; uploading belongs to the author while `draft` or `scheduled`, or when editing.
 
+Settled in D1 (2026-10-20):
+- Columns beyond the table above: `unsent_at` (edge case 17: the scheduled send found nobody in the audience, or recipients out of the author's reach; cleared when sent) and `reminded_at` (the author's last "Remind now", rule D8).
+- "Active users" (rule D1) are users with a password set who are not archived; invited users receive nothing.
+- `POST /api/announcements/:id/send` takes an optional `{ scheduledAt }`: a draft is sent now, or scheduled.
+- A sent announcement still changes its pin (`pinned_until`, checked against `announcements.manage` over its recipients); `requires_ack` is locked with the audience and priority.
+- A scheduled announcement is checked when scheduled and on each edit (empty audience, reach), and again when the minute job sends it.
+- The announcement types sit in a new settings category, "Announcements"; `announcement` and `announcement_ack_reminder` cannot be muted.
+- Attachments use the new F10 role `attachment` (owner type `announcement`, no client).
+
 ### `announcement_recipients`
 Frozen when the announcement is sent (rule D3).
 

@@ -17,6 +17,7 @@ export {
 } from './responsibility-registry.js';
 export {
   type Mailbox,
+  type PeopleSources,
   type Signature,
   UserDirectory,
   type UserSummary,

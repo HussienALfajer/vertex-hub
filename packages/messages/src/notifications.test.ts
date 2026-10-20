@@ -223,6 +223,14 @@ const SAMPLES: Record<NotificationType, unknown> = {
   member_archived_open_work: { member: 'سامر', count: 3 },
   security_new_device: { device: 'Chrome على Windows', at: '2026-10-05T07:00:00.000Z' },
   security_notice: { change: 'roles_changed', by: 'رنا' },
+  announcement: {
+    title: 'دوام رمضان',
+    excerpt: 'يبدأ الدوام في رمضان الساعة العاشرة',
+    priority: 'important',
+    requiresAck: true,
+  },
+  announcement_ack_reminder: { title: 'دوام رمضان' },
+  announcement_ack_summary: { title: 'دوام رمضان', pending: 4 },
   action_reminder: {
     originalType: 'task_review_requested',
     originalData: { task },
@@ -586,5 +594,28 @@ describe('push texts (spec F16 rules A8–A9)', () => {
 
   it('opens My account for a lost device', () => {
     expect(linkPath(notificationLink(sample('push_device_lost')))).toBe('/account');
+  });
+});
+
+describe('announcements (F16 part D)', () => {
+  const render = (type: NotificationType) => notificationText(sample(type), departmentName);
+
+  it("shows an announcement, its reminder and the author's summary", () => {
+    expect(render('announcement')).toEqual({
+      text: 'إعلان من رنا يطلب تأكيد القراءة: «دوام رمضان»',
+      context: 'يبدأ الدوام في رمضان الساعة العاشرة',
+    });
+    expect(render('announcement_ack_reminder').text).toBe('تذكير: أكّد قراءة الإعلان «دوام رمضان»');
+    expect(render('announcement_ack_summary').text).toBe(
+      'لم يؤكد 4 مستلمين قراءة إعلانك «دوام رمضان» بعد ثلاثة تذكيرات',
+    );
+    expect(linkPath(notificationLink(sample('announcement')))).toBe(`/announcements/${SUBJECT_ID}`);
+  });
+
+  it("pushes an announcement as its title and the body's first characters (rule D13)", () => {
+    expect(notificationPush(sample('announcement'), departmentName)).toEqual({
+      title: 'دوام رمضان',
+      body: 'يبدأ الدوام في رمضان الساعة العاشرة',
+    });
   });
 });

@@ -257,12 +257,62 @@ export class NotificationCenter {
         type: notifications.type,
         data: notifications.data,
       });
-    if (woken.length === 0) return [];
-    const settings = await this.settingsOf(tx, [...new Set(woken.map((row) => row.recipientId))]);
+    await this.announce(tx, woken);
+    return woken.map((row) => row.id);
+  }
+
+  /**
+   * F16 rule D10, "Notify again": the subject's rows of `type` for the recipients become unread
+   * and unresolved again, with `data` as their new snapshot, a toast and a push where push is on;
+   * a recipient whose row is gone (purged) gets a new one. Archived recipients get nothing.
+   */
+  async reopen(tx: Transaction, notice: Notice): Promise<void> {
+    const data = NOTIFICATION_DATA_SCHEMAS[notice.type].parse(notice.data);
+    const recipients = [...new Set(notice.recipients)].filter((id) => id !== notice.actorId);
+    if (recipients.length === 0) return;
+    const people = await this.users.summaries(recipients, tx);
+    const live = recipients.filter((id) => people.get(id)?.archived === false);
+    if (live.length === 0) return;
+    const reopened = await tx
+      .update(notifications)
+      .set({
+        data,
+        readAt: null,
+        snoozedUntil: null,
+        resolvedAt: null,
+        resolvedById: null,
+        resolution: null,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(notifications.type, notice.type),
+          eq(notifications.subjectId, notice.subjectId),
+          inArray(notifications.recipientId, live),
+        ),
+      )
+      .returning({
+        id: notifications.id,
+        recipientId: notifications.recipientId,
+        type: notifications.type,
+        data: notifications.data,
+      });
+    await this.announce(tx, reopened);
+    const missing = live.filter((id) => !reopened.some((row) => row.recipientId === id));
+    if (missing.length > 0) await this.notify(tx, { ...notice, recipients: missing });
+  }
+
+  /** Queues the pushes of rows that came back (woken, reopened) and tells the open tabs. */
+  private async announce(
+    tx: Transaction,
+    rows: { id: string; recipientId: string; type: NotificationType; data: unknown }[],
+  ): Promise<void> {
+    if (rows.length === 0) return;
+    const settings = await this.settingsOf(tx, [...new Set(rows.map((row) => row.recipientId))]);
     const policies = await this.policies.current(tx);
     await this.push.notifications(
       tx,
-      woken
+      rows
         .filter((row) =>
           effectiveChannel(
             channelModeOf(
@@ -275,11 +325,10 @@ export class NotificationCenter {
         )
         .map((row) => row.id),
     );
-    const pairs = woken.map((row) => ({ recipientId: row.recipientId, notificationId: row.id }));
+    const pairs = rows.map((row) => ({ recipientId: row.recipientId, notificationId: row.id }));
     for (const payload of pushPayloads(pairs)) {
       await tx.execute(sql`select pg_notify(${NOTIFICATIONS_CHANNEL}, ${payload})`);
     }
-    return woken.map((row) => row.id);
   }
 
   private async settingsOf(tx: Transaction, userIds: string[]) {

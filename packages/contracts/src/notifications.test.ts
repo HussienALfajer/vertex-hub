@@ -34,6 +34,7 @@ describe('notification catalog', () => {
     expect(mutable.sort()).toEqual(
       [
         'ad_budget_low',
+        'announcement_ack_summary',
         'meeting_changed',
         'meeting_dropped',
         'meeting_invited',
@@ -109,6 +110,7 @@ describe('notification catalog', () => {
       ...notificationTypesOf('calendar'),
       ...notificationTypesOf('clients_projects'),
       ...notificationTypesOf('account'),
+      ...notificationTypesOf('announcements'),
     ];
     expect(all.sort()).toEqual([...NOTIFICATION_TYPES].sort());
     expect(NOTIFICATION_CATALOG.tasks_generated.subject).toBe('template_run');
@@ -594,6 +596,8 @@ describe('inboxes and resolution (F16 rules B5–B6)', () => {
       'campaign_end_passed',
       'department_manager_assigned',
       'member_archived_open_work',
+      // F16 part D (an announcement that asks for an acknowledgement is "action" by its data).
+      'announcement_ack_reminder',
     ]);
   });
 

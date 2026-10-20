@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
-import type { TaskStatus } from '@vertex-hub/contracts';
+import { OPEN_TASK_STATUSES, type TaskStatus } from '@vertex-hub/contracts';
 import { type Database, type Transaction, tasks } from '@vertex-hub/db';
-import { inArray } from 'drizzle-orm';
+import { and, inArray, isNotNull, isNull, or, type SQL } from 'drizzle-orm';
 import { DATABASE } from '../../core/database/database.module.js';
 
 /** A task another record links to for display (F12 rule 3). */
@@ -38,5 +38,32 @@ export class TaskLinks {
     return new Map(
       rows.map(({ archivedAt, ...row }) => [row.id, { ...row, archived: !!archivedAt }]),
     );
+  }
+
+  /**
+   * F16 rule D1: the assignees of the open, non-archived tasks of the projects and of the
+   * clients (a project's or a client's team).
+   */
+  async openAssignees(
+    of: { projectIds?: readonly string[]; clientIds?: readonly string[] },
+    executor: Database | Transaction = this.db,
+  ): Promise<string[]> {
+    const { projectIds = [], clientIds = [] } = of;
+    const owners: SQL[] = [];
+    if (projectIds.length > 0) owners.push(inArray(tasks.projectId, [...projectIds]));
+    if (clientIds.length > 0) owners.push(inArray(tasks.clientId, [...clientIds]));
+    if (owners.length === 0) return [];
+    const rows = await executor
+      .selectDistinct({ id: tasks.assigneeId })
+      .from(tasks)
+      .where(
+        and(
+          or(...owners),
+          inArray(tasks.status, [...OPEN_TASK_STATUSES]),
+          isNull(tasks.archivedAt),
+          isNotNull(tasks.assigneeId),
+        ),
+      );
+    return rows.map((row) => row.id as string);
   }
 }

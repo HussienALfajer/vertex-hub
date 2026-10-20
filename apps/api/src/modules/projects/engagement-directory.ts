@@ -2,6 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import {
   type CycleStatus,
   type DeliverableKind,
+  type DepartmentCode,
   type ExtraWorkBilling,
   isProjectClosed,
   type KeyDateKind,
@@ -184,6 +185,47 @@ export class EngagementDirectory {
       .where(inArray(projects.id, unique));
     const rows = options.lock ? await query.for('share') : await query;
     return byId(rows.map(({ archivedAt, ...row }) => ({ ...row, archived: !!archivedAt })));
+  }
+
+  /**
+   * F16 rule D1: what a project's team is made of: its manager, its client (whose account manager
+   * joins) and its departments (whose managers join). Archived projects have no team.
+   */
+  async teams(
+    ids: readonly string[],
+    executor: Executor = this.db,
+  ): Promise<
+    { id: string; clientId: string; projectManagerId: string; departments: DepartmentCode[] }[]
+  > {
+    if (ids.length === 0) return [];
+    return executor
+      .select({
+        id: projects.id,
+        clientId: projects.clientId,
+        projectManagerId: projects.projectManagerId,
+        departments: projects.departments,
+      })
+      .from(projects)
+      .where(and(inArray(projects.id, [...new Set(ids)]), isNull(projects.archivedAt)));
+  }
+
+  /** F16 rule D1: the managers of the clients' non-archived projects not completed or cancelled. */
+  async openProjectManagers(
+    clientIds: readonly string[],
+    executor: Executor = this.db,
+  ): Promise<string[]> {
+    if (clientIds.length === 0) return [];
+    const rows = await executor
+      .selectDistinct({ id: projects.projectManagerId })
+      .from(projects)
+      .where(
+        and(
+          inArray(projects.clientId, [...clientIds]),
+          inArray(projects.status, [...OPEN_PROJECT_STATUSES]),
+          isNull(projects.archivedAt),
+        ),
+      );
+    return rows.map((row) => row.id);
   }
 
   async milestones(
