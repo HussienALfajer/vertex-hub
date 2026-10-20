@@ -98,7 +98,7 @@ Split from D1b because Part D spans two new modules, seven tables and about twen
 - [x] api polls: written with the announcement (locked once voted), close time checked on send and schedule, vote, close, results as allowed (anonymous never named), `poll_closing` and closing in the minute job, `poll_results`; withdraw voids `poll_closing`; `test/announcement-polls.test.ts`
 - [x] api templates: personal and shared (`announcements.manage` `all`, audited), list, create, update, archive; `test/announcement-templates.test.ts`
 - [x] bridge: `openapi:export`, `api:generate`; web typecheck (no fixture changes needed)
-- [ ] checks, reviewer, acceptance (API at `/api/docs`), PR with auto-merge
+- [x] checks, reviewer, acceptance (owner, 2026-10-20), PR with auto-merge
 
 ## PR D2 — announcements: web
 - [ ] `AudiencePicker`, rich-text editor, list, page, receipts, poll, templates, home pin, critical dialog; manifest shortcut "New announcement" (`apps/web/vite.config.ts`)

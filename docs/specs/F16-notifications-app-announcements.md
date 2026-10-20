@@ -417,9 +417,9 @@ Settled in D1b (2026-10-20):
 - The poll is written with the announcement (`poll` in the create and update schemas; `null` removes it from a draft or scheduled one). After sending, the existing poll may still change until the first vote; adding or removing one, or changing it after a vote, answers `LOCKED_FIELD`. Changing a poll before any vote replaces its options.
 - `closes_at` is checked when the announcement is sent or scheduled (against the send time) and on each edit; a draft keeps any value until then.
 - `poll_closing` is sent by the minute job 24 hours before `closes_at` (polls running at least 48 hours), keyed in `notification_reminders` by the poll and the closing date. Closing voids it; a vote closes it for the voter; withdrawing the announcement voids it.
-- `poll_results` (`{ title, voters }`) goes to the author when the minute job closes the poll; an author who closes it by hand gets none (the actor is left out, F14 rule 2). Withdrawn announcements keep their poll as it was.
+- `poll_results` (`{ title, voters }`) goes to the author when the minute job closes the poll; an author who closes it by hand gets none (the actor is left out, F14 rule 2; owner, 2026-10-20). Withdrawn announcements keep their poll as it was.
 - Results: the author and holders of `announcements.manage` `all` see the counts, and the names for a named poll; recipients see the counts once they voted or the poll closed, when the results are for everyone, never the names. A vote is the caller's whole choice (`PUT`, at least one option) and replaces the previous one.
-- `poll_closing` and `poll_results` can be muted.
+- `poll_closing` and `poll_results` can be muted (owner, 2026-10-20).
 - Templates: `GET /api/announcement-templates` returns `{ items }`, the caller's personal templates then the shared ones, each by name; a template stays personal or shared; someone else's personal template answers 404, a shared one 403 without `announcements.manage` `all`. Archiving answers the template.
 
 ### Contracts
