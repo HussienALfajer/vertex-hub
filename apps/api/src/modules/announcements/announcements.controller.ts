@@ -7,6 +7,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Put,
   Query,
   SerializeOptions,
 } from '@nestjs/common';
@@ -27,16 +28,20 @@ import {
   type AnnouncementHome,
   type AnnouncementListQuery,
   type AnnouncementPage,
+  type AnnouncementPoll,
   type AnnouncementReceipts,
   type AnnouncementReceiptsQuery,
   announcementHomeSchema,
   announcementListQuerySchema,
   announcementPageSchema,
+  announcementPollSchema,
   announcementReceiptsQuerySchema,
   announcementReceiptsSchema,
   announcementSchema,
   type CreateAnnouncement,
   createAnnouncementSchema,
+  type PollVote,
+  pollVoteSchema,
   type RemindAnnouncementResult,
   remindAnnouncementResultSchema,
   type SendAnnouncement,
@@ -46,6 +51,7 @@ import {
 } from '@vertex-hub/contracts';
 import { RequireSession } from '../../core/access/index.js';
 import { CurrentUser, type CurrentUserInfo } from '../auth/index.js';
+import { AnnouncementPolls } from './announcement-polls.js';
 import { AnnouncementsService } from './announcements.service.js';
 
 /**
@@ -56,7 +62,10 @@ import { AnnouncementsService } from './announcements.service.js';
 @ApiUnauthorizedResponse({ description: 'No valid session' })
 @Controller('announcements')
 export class AnnouncementsController {
-  constructor(private readonly announcements: AnnouncementsService) {}
+  constructor(
+    private readonly announcements: AnnouncementsService,
+    private readonly polls: AnnouncementPolls,
+  ) {}
 
   @Get()
   @RequireSession()
@@ -239,5 +248,38 @@ export class AnnouncementsController {
     @Query({ schema: announcementReceiptsQuerySchema }) query: AnnouncementReceiptsQuery,
   ): Promise<AnnouncementReceipts> {
     return this.announcements.receipts(actor, id, query);
+  }
+
+  @Put(':id/poll/vote')
+  @RequireSession()
+  @SerializeOptions({ schema: announcementPollSchema })
+  @ApiOkResponse({
+    description: "The poll with the caller's vote, which replaces their previous one",
+    standardSchema: announcementPollSchema,
+  })
+  @ApiBadRequestResponse({ description: '`SINGLE_CHOICE`, or an option of another poll' })
+  @ApiConflictResponse({ description: '`POLL_CLOSED`' })
+  @ApiNotFoundResponse({ description: 'No poll on a sent announcement the caller received' })
+  vote(
+    @CurrentUser() actor: CurrentUserInfo,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body({ schema: pollVoteSchema }) input: PollVote,
+  ): Promise<AnnouncementPoll> {
+    return this.polls.vote(actor, id, input);
+  }
+
+  @Post(':id/poll/close')
+  @HttpCode(200)
+  @RequireSession()
+  @SerializeOptions({ schema: announcementPollSchema })
+  @ApiOkResponse({ description: 'The poll, closed', standardSchema: announcementPollSchema })
+  @ApiConflictResponse({ description: '`POLL_CLOSED`' })
+  @ApiForbiddenResponse({ description: 'Not the author' })
+  @ApiNotFoundResponse({ description: 'No such poll, or not for the caller' })
+  closePoll(
+    @CurrentUser() actor: CurrentUserInfo,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<AnnouncementPoll> {
+    return this.polls.close(actor, id);
   }
 }

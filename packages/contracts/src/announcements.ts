@@ -38,6 +38,83 @@ export const ANNOUNCEMENT_LIMITS = {
   homePinned: 3,
 } as const;
 
+/* Polls (rule D11) */
+
+export const POLL_LIMITS = {
+  questionMin: 3,
+  questionMax: 200,
+  optionLabel: 100,
+  optionsMin: 2,
+  optionsMax: 10,
+  /** A poll closes 1 hour to 90 days after the announcement is sent. */
+  closeMinHours: 1,
+  closeMaxDays: 90,
+  /** `poll_closing` goes this long before closing, to polls that run at least `closingMinRunHours`. */
+  closingLeadHours: 24,
+  closingMinRunHours: 48,
+} as const;
+
+/** Who sees the counts: everyone once they voted (or the poll closed), or the author only. */
+export const POLL_RESULTS_VISIBILITY = ['everyone_after_voting', 'author_only'] as const;
+
+export const pollResultsVisibilitySchema = z
+  .enum(POLL_RESULTS_VISIBILITY)
+  .meta({ id: 'PollResultsVisibility' });
+
+export type PollResultsVisibility = z.infer<typeof pollResultsVisibilitySchema>;
+
+/** A poll as the author writes it; the options get their ids when stored. */
+export const pollInputSchema = z
+  .object({
+    question: z.string().trim().min(POLL_LIMITS.questionMin).max(POLL_LIMITS.questionMax),
+    options: z
+      .array(z.string().trim().min(1).max(POLL_LIMITS.optionLabel))
+      .min(POLL_LIMITS.optionsMin)
+      .max(POLL_LIMITS.optionsMax)
+      .refine((labels) => new Set(labels).size === labels.length, {
+        message: 'Two options have the same label',
+      }),
+    multiple: z.boolean().default(false),
+    anonymous: z.boolean().default(false),
+    results: pollResultsVisibilitySchema.default('everyone_after_voting'),
+    /** 1 hour to 90 days after sending (checked when sent or scheduled); null: closed by hand. */
+    closesAt: instantSchema.nullable().default(null),
+  })
+  .meta({ id: 'PollInput' });
+
+export type PollInput = z.infer<typeof pollInputSchema>;
+
+/** Rule D11: whether a poll sent at `sentAt` may close at `closesAt`. */
+export function isPollCloseTime(closesAt: Date, sentAt: Date): boolean {
+  const ms = closesAt.getTime() - sentAt.getTime();
+  return ms >= POLL_LIMITS.closeMinHours * 3_600_000 && ms <= POLL_LIMITS.closeMaxDays * 86_400_000;
+}
+
+/**
+ * Rule D11: when `poll_closing` is due, one day before closing; null when the poll runs less
+ * than two days or closes by hand.
+ */
+export function pollClosingReminderAt(sentAt: Date, closesAt: Date | null): Date | null {
+  if (!closesAt) return null;
+  if (closesAt.getTime() - sentAt.getTime() < POLL_LIMITS.closingMinRunHours * 3_600_000) {
+    return null;
+  }
+  return new Date(closesAt.getTime() - POLL_LIMITS.closingLeadHours * 3_600_000);
+}
+
+/** `PUT /announcements/:id/poll/vote`: the caller's whole vote, which replaces the previous one. */
+export const pollVoteSchema = z
+  .object({
+    optionIds: z
+      .array(z.uuid())
+      .min(1)
+      .max(POLL_LIMITS.optionsMax)
+      .refine((ids) => new Set(ids).size === ids.length, { message: 'An option is listed twice' }),
+  })
+  .meta({ id: 'PollVote' });
+
+export type PollVote = z.infer<typeof pollVoteSchema>;
+
 /** A link in an announcement: `https:` only. */
 const httpsUrlSchema = z
   .string()
@@ -76,11 +153,11 @@ const headingSchema = z.object({
   content: inlineContent,
 });
 
-type ListNode =
+export type ListNode =
   | { type: 'bulletList'; content: ListItemNode[] }
   | { type: 'orderedList'; attrs?: { start?: number }; content: ListItemNode[] };
 
-type ListItemNode = {
+export type ListItemNode = {
   type: 'listItem';
   content: (z.infer<typeof paragraphSchema> | ListNode)[];
 };
@@ -152,7 +229,7 @@ const titleSchema = z
 
 const linkLabelSchema = z.string().trim().min(1).max(ANNOUNCEMENT_LIMITS.linkLabel);
 
-const announcementFieldsSchema = z.object({
+export const announcementFieldsSchema = z.object({
   title: titleSchema,
   body: announcementBodySchema,
   linkUrl: httpsUrlSchema.nullable(),
@@ -163,22 +240,25 @@ const announcementFieldsSchema = z.object({
   audience: audienceSchema,
   /** Rule D7: needs `announcements.manage` covering every recipient. */
   pinnedUntil: calendarDateSchema.nullable(),
+  /** Rule D11: one optional poll; locked once sent and voted on. */
+  poll: pollInputSchema.nullable(),
 });
 
 /** Rule D3: critical forces the acknowledgement. */
-const ackOfCritical = <T extends { priority?: string; requiresAck?: boolean }>(input: T): T =>
-  input.priority === 'critical' ? { ...input, requiresAck: true } : input;
+export const ackOfCritical = <T extends { priority?: string; requiresAck?: boolean }>(
+  input: T,
+): T => (input.priority === 'critical' ? { ...input, requiresAck: true } : input);
 
-const labelNeedsLink = (input: { linkUrl?: string | null; linkLabel?: string | null }) =>
+export const labelNeedsLink = (input: { linkUrl?: string | null; linkLabel?: string | null }) =>
   !input.linkLabel || !!input.linkUrl;
 
-const labelNeedsLinkIssue = { message: 'A link label needs a link', path: ['linkLabel'] };
+export const labelNeedsLinkIssue = { message: 'A link label needs a link', path: ['linkLabel'] };
 
 /** How a new announcement leaves the editor (rules D3, D5). */
 export const ANNOUNCEMENT_SEND_MODES = ['now', 'schedule', 'draft'] as const;
 
 export const createAnnouncementSchema = announcementFieldsSchema
-  .partial({ linkUrl: true, linkLabel: true, pinnedUntil: true })
+  .partial({ linkUrl: true, linkLabel: true, pinnedUntil: true, poll: true })
   .extend({
     send: z.enum(ANNOUNCEMENT_SEND_MODES),
     /** Required with `schedule`: 5 minutes to 90 days ahead (checked when stored). */
@@ -198,7 +278,8 @@ export type CreateAnnouncementInput = z.input<typeof createAnnouncementSchema>;
 
 /**
  * Rule D10: a draft or scheduled announcement changes in full; a sent one only its title, body,
- * link and pin (`LOCKED_FIELD` otherwise). `notifyAgain` re-notifies a sent one.
+ * link, pin and its existing poll until someone votes (`LOCKED_FIELD` otherwise). `notifyAgain`
+ * re-notifies a sent one.
  */
 export const updateAnnouncementSchema = announcementFieldsSchema
   .partial()
@@ -222,6 +303,7 @@ export const SENT_ANNOUNCEMENT_FIELDS = [
   'linkUrl',
   'linkLabel',
   'pinnedUntil',
+  'poll',
   'notifyAgain',
 ] as const satisfies readonly (keyof UpdateAnnouncement)[];
 
@@ -244,6 +326,43 @@ export function isSchedulable(at: Date, now: Date): boolean {
 /* Responses */
 
 const personSchema = z.object({ id: z.uuid(), name: z.string() });
+
+/**
+ * A poll as the caller may see it (rule D11). Counts show to the author and holders of
+ * `announcements.manage` `all`, and to recipients once they voted or the poll closed when the
+ * results are for everyone; the voters' names only to the author and managers, never for an
+ * anonymous poll.
+ */
+export const announcementPollSchema = z
+  .object({
+    question: z.string(),
+    multiple: z.boolean(),
+    anonymous: z.boolean(),
+    results: pollResultsVisibilitySchema,
+    closesAt: z.iso.datetime().nullable(),
+    closedAt: z.iso.datetime().nullable(),
+    /** Closed by hand or by time; no more votes. */
+    closed: z.boolean(),
+    options: z.array(
+      z.object({
+        id: z.uuid(),
+        label: z.string(),
+        /** Null when the caller may not see the results. */
+        votes: z.number().int().min(0).nullable(),
+        /** Null unless the caller may see named votes. */
+        voters: z.array(personSchema).nullable(),
+      }),
+    ),
+    /** People who voted; null when the caller may not see the results. */
+    voters: z.number().int().min(0).nullable(),
+    /** The caller's own choice; empty when they have not voted. */
+    myVote: z.array(z.uuid()),
+    /** What the caller may do (the API enforces each). */
+    rights: z.object({ vote: z.boolean(), close: z.boolean() }),
+  })
+  .meta({ id: 'AnnouncementPoll' });
+
+export type AnnouncementPoll = z.infer<typeof announcementPollSchema>;
 
 /** The caller's own receipt; null for a caller who is not a recipient. */
 const receiptSchema = z
@@ -294,6 +413,7 @@ export const announcementSchema = announcementSummarySchema
     audience: audienceSchema.nullable(),
     renotifiedAt: z.iso.datetime().nullable(),
     withdrawnBy: personSchema.nullable(),
+    poll: announcementPollSchema.nullable(),
     /** What the caller may do with it (the API enforces each). */
     rights: z.object({
       edit: z.boolean(),

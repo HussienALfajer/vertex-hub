@@ -95,6 +95,8 @@ describe('notification catalog', () => {
         'invoice_due_soon',
         'payment_recorded',
         'payment_voided',
+        'poll_closing',
+        'poll_results',
         'invoice_voided',
         'ad_deposit_recorded',
         'campaign_status_changed',
@@ -598,6 +600,7 @@ describe('inboxes and resolution (F16 rules B5–B6)', () => {
       'member_archived_open_work',
       // F16 part D (an announcement that asks for an acknowledgement is "action" by its data).
       'announcement_ack_reminder',
+      'poll_closing',
     ]);
   });
 

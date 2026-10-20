@@ -92,9 +92,13 @@ Split from D1b because Part D spans two new modules, seven tables and about twen
 - [x] bridge: `openapi:export`, `api:generate`; web typecheck (no fixture changes needed)
 - [x] checks, reviewer, acceptance (owner, 2026-10-20), PR with auto-merge
 
-## PR D1b — polls and templates: contracts, db, api
-- [ ] polls (tables, create/edit with the announcement, vote, close, results as allowed, anonymous never returned), `poll_closing` and `poll_results`, closing in the minute job; templates (personal and shared, audit for shared)
-- [ ] checks, reviewer, acceptance, PR with auto-merge
+## PR D1b — polls and templates: contracts, db, api (branch `claude/optimistic-dirac-p6hjsp`)
+- [x] contracts: poll input, vote and response schemas, `POLL_LIMITS`, close-time and closing-reminder rules; `poll` on create, update and the announcement; template schemas (`announcement-templates.ts`); error codes `POLL_CLOSED`, `SINGLE_CHOICE`; audit actions `announcement_poll.closed`, `announcement_template.*` and entity type; notification types `poll_closing`, `poll_results`; reminder kind `poll_closing`; unit tests; messages texts; `ar.json` keys
+- [x] db (`/db-migration`): `announcement_polls`, `announcement_poll_options`, `announcement_poll_votes`, `announcement_templates`; enum values; conventions exceptions
+- [x] api polls: written with the announcement (locked once voted), close time checked on send and schedule, vote, close, results as allowed (anonymous never named), `poll_closing` and closing in the minute job, `poll_results`; withdraw voids `poll_closing`; `test/announcement-polls.test.ts`
+- [x] api templates: personal and shared (`announcements.manage` `all`, audited), list, create, update, archive; `test/announcement-templates.test.ts`
+- [x] bridge: `openapi:export`, `api:generate`; web typecheck (no fixture changes needed)
+- [x] checks, reviewer, acceptance (owner, 2026-10-20), PR with auto-merge
 
 ## PR D2 — announcements: web
 - [ ] `AudiencePicker`, rich-text editor, list, page, receipts, poll, templates, home pin, critical dialog; manifest shortcut "New announcement" (`apps/web/vite.config.ts`)

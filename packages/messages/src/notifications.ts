@@ -402,6 +402,16 @@ export const NOTIFICATION_TEXT = {
     many: 'لم يؤكد {{n}} مستلمًا قراءة إعلانك «{{title}}» بعد ثلاثة تذكيرات',
     other: 'لم يؤكد {{n}} مستلم قراءة إعلانك «{{title}}» بعد ثلاثة تذكيرات',
   },
+  /** F16 rule D11: a poll closes tomorrow; the author learns how many voted. */
+  poll_closing: 'لم تصوّت بعد في استطلاع الإعلان «{{title}}»، ويُغلق في {{when}}',
+  poll_results: {
+    zero: 'أُغلق استطلاع إعلانك «{{title}}» ولم يصوّت أحد',
+    one: 'أُغلق استطلاع إعلانك «{{title}}» بصوت واحد',
+    two: 'أُغلق استطلاع إعلانك «{{title}}» بصوتين',
+    few: 'أُغلق استطلاع إعلانك «{{title}}» بـ{{n}} أصوات',
+    many: 'أُغلق استطلاع إعلانك «{{title}}» بـ{{n}} صوتًا',
+    other: 'أُغلق استطلاع إعلانك «{{title}}» بـ{{n}} صوت',
+  },
   /** F16 rule B11: each escalation step wraps the original's text. */
   action_reminder: 'تذكير: {{text}}',
   action_escalated: 'تصعيد: {{text}}',
@@ -1023,6 +1033,21 @@ export function notificationText(
         }),
         context: null,
       };
+    case 'poll_closing':
+      return {
+        text: fill(text.poll_closing, {
+          title: notification.data.title,
+          when: formatDateTime(notification.data.closesAt),
+        }),
+        context: null,
+      };
+    case 'poll_results':
+      return {
+        text: counted(text.poll_results, notification.data.voters, {
+          title: notification.data.title,
+        }),
+        context: null,
+      };
     case 'invoice_draft_created':
       return {
         text: fill(text.invoice_draft_created, { description: notification.data.description }),
@@ -1213,6 +1238,7 @@ type TaskNotification = Exclude<
       | `post_${string}`
       | 'push_device_lost'
       | `announcement${string}`
+      | `poll_${string}`
       | `action_${string}`
       | 'responsibility_moved'
       | `client_${string}`

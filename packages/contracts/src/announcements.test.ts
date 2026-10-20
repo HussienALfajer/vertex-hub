@@ -1,9 +1,14 @@
 import { describe, expect, it } from 'vitest';
+import { createAnnouncementTemplateSchema } from './announcement-templates.js';
 import {
   announcementBodySchema,
   announcementExcerpt,
   createAnnouncementSchema,
+  isPollCloseTime,
   isSchedulable,
+  pollClosingReminderAt,
+  pollInputSchema,
+  pollVoteSchema,
   updateAnnouncementSchema,
 } from './announcements.js';
 import { audienceSchema } from './audiences.js';
@@ -178,5 +183,81 @@ describe('announcement notifications (rule D3)', () => {
     expect(channelModeOf(content('informational'), 'push', {})).toBe('off');
     expect(channelModeOf(content('normal'), 'push', off)).toBe('off');
     expect(channelModeOf(content('normal'), 'email', {})).toBe('off');
+  });
+});
+
+describe('polls (rule D11)', () => {
+  const poll = { question: 'أي يوم يناسب الاجتماع؟', options: ['الأحد', 'الاثنين'] };
+
+  it('takes 2 to 10 distinct options, single choice, named and results for everyone by default', () => {
+    expect(pollInputSchema.parse(poll)).toEqual({
+      ...poll,
+      multiple: false,
+      anonymous: false,
+      results: 'everyone_after_voting',
+      closesAt: null,
+    });
+    expect(pollInputSchema.safeParse({ ...poll, options: ['الأحد'] }).success).toBe(false);
+    expect(
+      pollInputSchema.safeParse({ ...poll, options: Array.from({ length: 11 }, (_, i) => `${i}`) })
+        .success,
+    ).toBe(false);
+    expect(pollInputSchema.safeParse({ ...poll, options: ['الأحد', 'الأحد'] }).success).toBe(false);
+    expect(pollInputSchema.safeParse({ ...poll, question: 'لا' }).success).toBe(false);
+    expect(createAnnouncementSchema.parse({ ...valid, poll }).poll?.options).toHaveLength(2);
+  });
+
+  it('closes 1 hour to 90 days after sending', () => {
+    const sentAt = new Date('2026-10-20T09:00:00Z');
+    const later = (ms: number) => new Date(sentAt.getTime() + ms);
+    expect(isPollCloseTime(later(3_599_000), sentAt)).toBe(false);
+    expect(isPollCloseTime(later(3_600_000), sentAt)).toBe(true);
+    expect(isPollCloseTime(later(90 * 86_400_000), sentAt)).toBe(true);
+    expect(isPollCloseTime(later(90 * 86_400_000 + 1000), sentAt)).toBe(false);
+  });
+
+  it('reminds non-voters one day before closing, when the poll runs at least two days', () => {
+    const sentAt = new Date('2026-10-20T09:00:00Z');
+    expect(pollClosingReminderAt(sentAt, null)).toBeNull();
+    expect(pollClosingReminderAt(sentAt, new Date('2026-10-22T08:59:00Z'))).toBeNull();
+    expect(pollClosingReminderAt(sentAt, new Date('2026-10-22T09:00:00Z'))).toEqual(
+      new Date('2026-10-21T09:00:00Z'),
+    );
+  });
+
+  it('votes for one or more distinct options', () => {
+    const id = '019a0000-0000-7000-8000-000000000001';
+    expect(pollVoteSchema.safeParse({ optionIds: [] }).success).toBe(false);
+    expect(pollVoteSchema.safeParse({ optionIds: [id, id] }).success).toBe(false);
+    expect(pollVoteSchema.parse({ optionIds: [id] })).toEqual({ optionIds: [id] });
+  });
+});
+
+describe('templates (rule D12)', () => {
+  const template = {
+    name: 'دوام رمضان',
+    title: valid.title,
+    body: valid.body,
+    priority: 'critical',
+    requiresAck: false,
+  } as const;
+
+  it('holds no audience, is personal by default and keeps the acknowledgement of critical', () => {
+    const parsed = createAnnouncementTemplateSchema.parse({
+      ...template,
+      audience: { everyone: true },
+    });
+    expect(parsed).not.toHaveProperty('audience');
+    expect(parsed.shared).toBe(false);
+    expect(parsed.requiresAck).toBe(true);
+  });
+
+  it('needs a 3–60 character name and a link for a link label', () => {
+    expect(createAnnouncementTemplateSchema.safeParse({ ...template, name: 'ab' }).success).toBe(
+      false,
+    );
+    expect(
+      createAnnouncementTemplateSchema.safeParse({ ...template, linkLabel: 'النموذج' }).success,
+    ).toBe(false);
   });
 });

@@ -59,6 +59,9 @@ const NOT_BUSINESS_RECORDS: Record<string, string> = {
     'One row per changed type, removed on reset to the catalog default; audited (F16 rule B2)',
   record_followers: 'Personal: who follows a task or post, never archived (F16 rule B12)',
   timed_reminders: 'Idempotency keys of the minute job, purged after 30 days (F16 rule B13)',
+  announcement_polls: 'Part of its announcement, audited with it (F16 rule D11)',
+  announcement_poll_options: 'Part of its poll, replaced while nobody has voted (F16 rule D11)',
+  announcement_poll_votes: 'Personal votes, changed until the poll closes (F16 rule D11)',
   announcement_recipients:
     'Part of its announcement, frozen when it is sent; openings and acknowledgements are personal (F16 rule D3)',
   lead_interests:
@@ -104,6 +107,7 @@ const NATURAL_KEYS: Record<string, string> = {
   invoice_settings: 'A single row, keyed by a constant (F13)',
   ad_wallets: 'One row per client, keyed by the client (F12)',
   retainer_cycle_reports: 'One row per retainer cycle, keyed by the cycle (F05C)',
+  announcement_polls: 'One row per announcement, keyed by the announcement (F16 rule D11)',
 };
 
 describe('database conventions', () => {
