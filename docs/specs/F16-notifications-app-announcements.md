@@ -562,6 +562,12 @@ Primary key `(announcement_id, user_id)`; index `(user_id)`.
    - announcement reminders (announcements).
 4. **Responsibility moved.** Every change of a record's holder (post responsible, AM, PM, lead owner, campaign owner, department manager) tells the previous holder with `responsibility_moved`, unless they made the change.
 5. **Security copies.** The account emails of F14 rules 14–15 also create `security_new_device` and `security_notice` rows (in the same transaction as the email), so they reach the phone. The email stays required.
+6. **Settled in C1** (tasks, content, approvals, calendar, files):
+   - Cancelling or archiving a task or a post voids every action row on it, including the types whose column names cancelling among the `done` events (the work no longer applies, rule B5). The rules are `taskResolutions` and `postResolutions` in `packages/contracts/src/resolutions.ts`.
+   - A change's resolutions are passed to `notify`, so a row the same change resolves is stored resolved, without push or toast (edge case 9).
+   - `approval_completed` is sent in its own `notify` call after the last answer: in the answer's call the first-match order would keep `approval_responded` only.
+   - A timed reminder is still sent by a run up to 5 minutes after its send time (`TIMED_REMINDER_GRACE_MINUTES`); later, it is skipped. `task_due_shortly` leaves out approved tasks, which count as finished.
+   - Deciding an over-limit revision closes `task_over_limit` and `task_over_limit_pending` on the task and sends `task_revision_decided` to the assignee.
 
 ### Part D: announcements and audiences
 **Audience**

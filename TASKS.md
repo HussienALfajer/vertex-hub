@@ -40,14 +40,14 @@ PR order fixed by the spec's "Delivery" (owner, 2026-10-20). F16 is deployed to 
 
 ## PR C1 — catalog: workflow modules api (branch `claude/vigilant-hamilton-t49k8y`)
 Split from C1b because the catalog touches twelve modules: C1 holds tasks, content, approvals, calendar and files, with the engine pieces they need.
-- [ ] contracts: new types `task_reopened`, `task_delivered`, `task_revision_decided`, `task_progressed`, `task_due_shortly`, `post_published`, `post_cancelled`, `post_file_added`, `post_progressed`, `post_publish_shortly`, `approval_opened`, `approval_completed`, `shoot_starting`, `meeting_starting`, `shoot_completed` (catalog, order, snapshots); `timed_reminders` kinds; task and post resolution rules (pure, unit tests); messages texts and links; `ar.json` type labels
-- [ ] db (`/db-migration`): enum values, `timed_reminders`, `approval_requests.first_opened_at`; `TABLE_OWNERS`, conventions exception
-- [ ] api engine: rows resolved in the transaction that created them send no push or toast (edge case 9); automatic following and follower recipients with read access (rule B12)
-- [ ] api tasks: `resolve` on every status, assignee and due change, mention reply, revision decision; new task types; followers on create, assign, comment, mention, file
-- [ ] api content and files: `resolve` on post changes; new post types; post followers (creator, responsible, file adders)
-- [ ] api approvals: `first_opened_at` + `approval_opened`, `approval_completed`, resolves (included in a request, responses, reissue, revoke)
-- [ ] api calendar: `shoot_completed`, `shoot_not_closed` resolve
-- [ ] timed sources in the minute job (`task_due_shortly`, `post_publish_shortly`, `shoot_starting`, `meeting_starting`) with `timed_reminders` and its purge
+- [x] contracts: new types `task_reopened`, `task_delivered`, `task_revision_decided`, `task_progressed`, `task_due_shortly`, `post_published`, `post_cancelled`, `post_file_added`, `post_progressed`, `post_publish_shortly`, `approval_opened`, `approval_completed`, `shoot_starting`, `meeting_starting`, `shoot_completed` (catalog, order, snapshots); `timed_reminders` kinds; task and post resolution rules (pure, unit tests); messages texts and links; `ar.json` type labels
+- [x] db (`/db-migration`): enum values, `timed_reminders`, `approval_requests.first_opened_at`; `TABLE_OWNERS`, conventions exception
+- [x] api engine: rows resolved in the transaction that created them send no push or toast (edge case 9); automatic following and follower recipients with read access (rule B12)
+- [x] api tasks: `resolve` on every status, assignee and due change, mention reply, revision decision; new task types; followers on create, assign, comment, mention, file
+- [x] api content and files: `resolve` on post changes; new post types; post followers (creator, responsible, file adders)
+- [x] api approvals: `first_opened_at` + `approval_opened`, `approval_completed`, resolves (included in a request, responses, reissue, revoke)
+- [x] api calendar: `shoot_completed`, `shoot_not_closed` resolve
+- [x] timed sources in the minute job (`task_due_shortly`, `post_publish_shortly`, `shoot_starting`, `meeting_starting`) with `timed_reminders` and its purge
 - [ ] bridge: `openapi:export`, `api:generate`, fixtures; web typecheck
 - [ ] checks, reviewer, acceptance, PR with auto-merge
 
