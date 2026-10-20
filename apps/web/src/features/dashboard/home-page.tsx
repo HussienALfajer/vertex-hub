@@ -6,6 +6,8 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { can, scopesOf, useMe } from '../../lib/auth';
 import { formatTime } from '../../lib/format';
+import { InstallCard } from '../app/install-card';
+import { DevicePushCard } from '../notifications/device-push-card';
 import { reportsKeys } from '../reports/reports.queries';
 import { tasksKeys } from '../tasks/tasks.queries';
 import { CompanySection } from './company-section';
@@ -71,6 +73,8 @@ export function HomePage() {
           </div>
         }
       />
+      <InstallCard />
+      <DevicePushCard placement="home" />
       {show.company && <CompanySection />}
       {show.finance && <FinanceSection />}
       {show.departments && <DepartmentsSection />}

@@ -1,12 +1,16 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import {
+  type ChannelMode,
   NOTIFICATION_CATEGORIES,
+  type NotificationPriority,
   type NotificationSettings,
   type NotificationType,
   type UpdateNotificationSettings,
 } from '@vertex-hub/contracts';
 import {
+  Badge,
+  type BadgeProps,
   Button,
   Card,
   CardHeader,
@@ -20,11 +24,15 @@ import { ArrowRightIcon, LockIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { LoadError } from '../../components/load-error';
 import { errorMessage } from '../../lib/errors';
+import { DevicePushCard } from './device-push-card';
 import { notificationSettingsQuery, useUpdateNotificationSettings } from './notifications.queries';
+import { pushConfigQuery } from './push.queries';
 
 /**
  * Mute the types that need no action, grouped by category (F14 screen 3, rule 3), and choose the
- * types emailed and the morning digest (F14 email screen 1, rules 2 and 11).
+ * types pushed (F16 screen 5, rule A7) and emailed, and the morning digest (F14 email screen 1,
+ * rules 2 and 11). Management's policy locks a channel on (`required`) or hides it
+ * (`unavailable`).
  */
 export function NotificationSettingsPage() {
   const { t } = useTranslation();
@@ -53,7 +61,10 @@ export function NotificationSettingsPage() {
           onRetry={() => settings.refetch()}
         />
       ) : (
-        <SettingsForm settings={settings.data} />
+        <>
+          <DevicePushCard placement="settings" />
+          <SettingsForm settings={settings.data} />
+        </>
       )}
     </>
   );
@@ -67,9 +78,46 @@ function toggled(set: Set<NotificationType>, type: NotificationType, on: boolean
   return [...next];
 }
 
+const PRIORITY_TONES: Record<NotificationPriority, BadgeProps['tone']> = {
+  critical: 'danger',
+  important: 'warning',
+  normal: 'neutral',
+  informational: 'outline',
+};
+
+/** A channel's switch under the policy: hidden when unavailable, locked on when required. */
+function ChannelSwitch({
+  mode,
+  label,
+  checked,
+  disabled,
+  onChange,
+}: {
+  mode: ChannelMode;
+  label: string;
+  checked: boolean;
+  disabled: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  // An empty cell keeps the column lined up.
+  if (mode === 'unavailable') return <span className="w-10" />;
+  return (
+    <span className="flex w-10 justify-center">
+      <Switch
+        aria-label={label}
+        checked={checked}
+        disabled={disabled || mode === 'required'}
+        onCheckedChange={onChange}
+      />
+    </span>
+  );
+}
+
 function SettingsForm({ settings }: { settings: NotificationSettings }) {
   const { t } = useTranslation();
   const update = useUpdateNotificationSettings();
+  // Rule A16: without the server's keys, there is no push column.
+  const pushAvailable = useQuery(pushConfigQuery).data?.available === true;
   // Shows the change at once; a failed save falls back to the stored settings.
   const pending = update.isPending ? update.variables : undefined;
   const muted = new Set<NotificationType>(
@@ -78,7 +126,12 @@ function SettingsForm({ settings }: { settings: NotificationSettings }) {
   const emailed = new Set<NotificationType>(
     pending?.emailTypes ?? settings.types.filter((item) => item.email).map((item) => item.type),
   );
+  const pushed = new Set<NotificationType>(
+    pending?.pushTypes ?? settings.types.filter((item) => item.push).map((item) => item.type),
+  );
   const digestEnabled = pending?.digestEnabled ?? settings.digestEnabled;
+  // Every channel save sends both lists, so neither falls back to what the server held before.
+  const channels = { pushTypes: [...pushed], emailTypes: [...emailed] };
 
   function save(input: UpdateNotificationSettings) {
     update.mutate(input, {
@@ -114,6 +167,9 @@ function SettingsForm({ settings }: { settings: NotificationSettings }) {
               className="flex gap-4 text-xs font-medium text-muted-foreground"
             >
               <span className="w-10 text-center">{t('notifications.settings.app')}</span>
+              {pushAvailable && (
+                <span className="w-10 text-center">{t('notifications.settings.push')}</span>
+              )}
               <span className="w-10 text-center">{t('notifications.settings.email')}</span>
             </div>
           </CardHeader>
@@ -126,11 +182,23 @@ function SettingsForm({ settings }: { settings: NotificationSettings }) {
                 return (
                   <li key={item.type} className="flex items-center justify-between gap-4 py-3">
                     <div className="flex flex-col gap-0.5">
-                      <span className="text-sm font-medium">{name}</span>
+                      <span className="flex flex-wrap items-center gap-2 text-sm font-medium">
+                        {name}
+                        <Badge tone={PRIORITY_TONES[item.priority]}>
+                          {t(`notifications.priorities.${item.priority}`)}
+                        </Badge>
+                      </span>
                       {!item.mutable && (
                         <span className="flex items-center gap-1 text-xs text-muted-foreground">
                           <LockIcon className="size-3" aria-hidden="true" />
                           {t('notifications.settings.locked')}
+                        </span>
+                      )}
+                      {((pushAvailable && item.pushMode === 'required') ||
+                        item.emailMode === 'required') && (
+                        <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                          <LockIcon className="size-3" aria-hidden="true" />
+                          {t('notifications.settings.required')}
                         </span>
                       )}
                       {!inApp && (
@@ -148,14 +216,32 @@ function SettingsForm({ settings }: { settings: NotificationSettings }) {
                           save({ mutedTypes: toggled(muted, item.type, !checked) })
                         }
                       />
-                      <Switch
-                        aria-label={t('notifications.settings.emailLabel', { name })}
+                      {pushAvailable && (
+                        <ChannelSwitch
+                          mode={item.pushMode}
+                          label={t('notifications.settings.pushLabel', { name })}
+                          // A type muted in the app creates nothing to push.
+                          checked={inApp && pushed.has(item.type)}
+                          disabled={!inApp || update.isPending}
+                          onChange={(checked) =>
+                            save({
+                              mutedTypes: [...muted],
+                              ...channels,
+                              pushTypes: toggled(pushed, item.type, checked),
+                            })
+                          }
+                        />
+                      )}
+                      <ChannelSwitch
+                        mode={item.emailMode}
+                        label={t('notifications.settings.emailLabel', { name })}
                         // A type muted in the app creates nothing to email (rule 2).
                         checked={inApp && emailed.has(item.type)}
                         disabled={!inApp || update.isPending}
-                        onCheckedChange={(checked) =>
+                        onChange={(checked) =>
                           save({
                             mutedTypes: [...muted],
+                            ...channels,
                             emailTypes: toggled(emailed, item.type, checked),
                           })
                         }

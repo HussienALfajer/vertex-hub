@@ -43,6 +43,7 @@ vertex-hub/
 | Logging | pino (nestjs-pino) | — |
 | Frontend | React 19, Vite, TanStack Router / Query / Table | 0003 |
 | API client | Generated from the OpenAPI document (openapi-typescript + openapi-fetch) | 0003 |
+| Installable app | Web app manifest and service worker (vite-plugin-pwa, `injectManifest`, Workbox precaching; `apps/web/src/service-worker/`), Web Push with VAPID; the query cache kept in IndexedDB for 7 days, financial queries excluded (`apps/web/src/lib/offline-cache.ts`) | 0036 |
 | Design system | shadcn/ui on Base UI, Tailwind CSS v4, RTL | 0004 |
 | Forms | React Hook Form + Zod | 0003 |
 | Calendar views | FullCalendar (MIT core), RTL and Arabic locale | 0003 |
@@ -103,7 +104,7 @@ Rules (module anatomy, naming and the tests that enforce them: ADR 0013):
 
 ```
 Internet → nginx (TLS, rate limits, the only public listener)
-   ├── /        → static SPA build (served by nginx)
+   ├── /        → static SPA build (served by nginx), with the service worker and manifest (F16)
    ├── /api     → 127.0.0.1:<port> → apps/api   (PM2)
    └── /_files/ → internal only: files served after the API authorizes them (X-Accel-Redirect)
 apps/worker (PM2) → pg-boss jobs, PDF (Chromium), email

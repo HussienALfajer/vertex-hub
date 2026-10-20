@@ -19,6 +19,9 @@ export default defineConfig({
     locale: 'ar',
     timezoneId: 'Asia/Damascus',
     trace: 'retain-on-failure',
+    // The app's service worker (F16) would answer requests before `mockApi` sees them; the specs
+    // that test it allow it themselves (f16.spec.ts).
+    serviceWorkers: 'block',
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   // Serves the production build; `pnpm test:e2e` from the root builds it first.

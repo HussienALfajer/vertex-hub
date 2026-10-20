@@ -3,9 +3,17 @@ import { createRouter, RouterProvider } from '@tanstack/react-router';
 import { DirectionProvider, Toaster } from '@vertex-hub/ui';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
+import { catchInstallPrompt } from './features/app/install';
+import { followPushClicks } from './features/app/push-clicks';
 import i18n from './i18n';
 import { ApiError } from './lib/api/client';
 import { leaveSession } from './lib/auth';
+import {
+  followConnection,
+  keepOfflineCache,
+  OFFLINE_GC_MS,
+  restoreOfflineCache,
+} from './lib/offline-cache';
 import { routeTree } from './routeTree.gen';
 import './styles.css';
 
@@ -45,6 +53,8 @@ const queryClient = new QueryClient({
   mutationCache: new MutationCache({ onError: onApiError }),
   defaultOptions: {
     queries: {
+      // F16 rule A5: what the device keeps stays in memory as long, so each save keeps it.
+      gcTime: OFFLINE_GC_MS,
       // Do not retry what the server refused on purpose.
       retry: (failureCount, error) =>
         !(error instanceof ApiError && error.status < 500) && failureCount < 2,
@@ -52,11 +62,19 @@ const queryClient = new QueryClient({
   },
 });
 
+// F16: the browser offers the install once, early; the app keeps the offer for its button.
+catchInstallPrompt();
+followConnection(queryClient);
+await restoreOfflineCache(queryClient);
+keepOfflineCache(queryClient);
+
 const router = createRouter({
   routeTree,
   context: { queryClient },
   defaultPreload: 'intent',
 });
+
+followPushClicks(router);
 
 declare module '@tanstack/react-router' {
   interface Register {

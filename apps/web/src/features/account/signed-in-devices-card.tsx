@@ -19,6 +19,7 @@ import {
 } from '@vertex-hub/ui';
 import type { TFunction } from 'i18next';
 import {
+  BellIcon,
   InfoIcon,
   LaptopIcon,
   MonitorSmartphoneIcon,
@@ -33,6 +34,8 @@ import { ApiError } from '../../lib/api/client';
 import { leaveSession } from '../../lib/auth';
 import { formatDateTime, formatNumber, formatRelativeTime, isolateLtr } from '../../lib/format';
 import { type ReturnFocus, useReturnFocus } from '../../lib/use-return-focus';
+import { usePushActions, usePushState } from '../notifications/device-push-card';
+import { pushConfigQuery } from '../notifications/push.queries';
 import { placeText } from './device-place';
 import {
   devicesKeys,
@@ -181,8 +184,66 @@ function DeviceRow({
           </Button>
         )}
       </div>
+      <DevicePush device={device} />
       {device.sharedWith.length > 0 && <SharedWith device={device} />}
     </li>
+  );
+}
+
+/**
+ * F16 rule A12: whether the device gets notifications and the last one delivered. This device
+ * reads its own state from the browser and offers the test and the switch.
+ */
+function DevicePush({ device }: { device: SignedInDevice }) {
+  const { t } = useTranslation();
+  const config = useQuery(pushConfigQuery);
+  const local = usePushState();
+  const actions = usePushActions();
+  // Rule A16: without the server's keys there is no push to speak of.
+  if (!config.data?.available) return null;
+  const state = device.current && local ? local : device.push.state;
+  const label =
+    state === 'on'
+      ? t('push.row.on')
+      : state === 'unsupported' || state === 'too-old' || state === 'install'
+        ? t('push.row.unsupported')
+        : state === 'blocked'
+          ? t('push.row.blocked')
+          : t('push.row.off');
+  return (
+    <div className="flex flex-col gap-2 ps-8 sm:flex-row sm:items-center sm:justify-between">
+      <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
+        <BellIcon aria-hidden="true" className="size-4 shrink-0" />
+        {label}
+        {state === 'on' && device.push.lastDeliveredAt && (
+          <>
+            {' · '}
+            {t('push.row.lastDelivered', { time: formatRelativeTime(device.push.lastDeliveredAt) })}
+          </>
+        )}
+      </span>
+      {device.current && local === 'on' && (
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" size="sm" disabled={actions.testing} onClick={actions.test}>
+            {t('push.test')}
+          </Button>
+          <Button variant="outline" size="sm" disabled={actions.pending} onClick={actions.turnOff}>
+            {t('push.turnOff')}
+          </Button>
+        </div>
+      )}
+      {device.current && local === 'off' && (
+        <Button
+          variant="outline"
+          size="sm"
+          className="w-full sm:w-auto"
+          disabled={actions.pending}
+          onClick={actions.turnOn}
+        >
+          {t('push.turnOn')}
+        </Button>
+      )}
+    </div>
   );
 }
 

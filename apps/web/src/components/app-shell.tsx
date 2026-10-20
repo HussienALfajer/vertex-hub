@@ -25,6 +25,7 @@ import {
   ChartNoAxesCombinedIcon,
   ChevronDownIcon,
   CircleUserIcon,
+  DownloadIcon,
   FileTextIcon,
   FolderKanbanIcon,
   HouseIcon,
@@ -46,12 +47,16 @@ import {
 } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useInstallOffer } from '../features/app/install';
+import { OfflineBanner } from '../features/app/offline-banner';
+import { UpdateBanner } from '../features/app/update-banner';
 import { hasApprovalQueue } from '../features/approvals/approvals-page';
 import { NotificationBell } from '../features/notifications/notification-bell';
 import { hasReports } from '../features/reports/reports-page';
 import { managesTeams } from '../features/tasks/task-access';
 import { authClient, can, leaveSession, useMe } from '../lib/auth';
 import { formatList } from '../lib/format';
+import { useOnline } from '../lib/use-online';
 import { ThemeToggle } from './theme-toggle';
 
 interface NavItem {
@@ -147,6 +152,7 @@ const navItems: NavItem[] = [
 export function AppShell({ children }: { children: ReactNode }) {
   const { t } = useTranslation();
   const me = useMe();
+  const online = useOnline();
   return (
     <div className="flex min-h-dvh bg-background">
       {/* Keyboard users skip the navigation on every page (WCAG 2.4.1). */}
@@ -162,7 +168,14 @@ export function AppShell({ children }: { children: ReactNode }) {
       <div className="flex min-w-0 flex-1 flex-col">
         <TopBar me={me} />
         <main id="main" tabIndex={-1} className="flex-1 outline-none">
-          <div className="mx-auto flex max-w-6xl flex-col gap-8 px-4 py-8 md:px-8">{children}</div>
+          <div className="mx-auto flex max-w-6xl flex-col gap-8 px-4 py-8 md:px-8">
+            <UpdateBanner />
+            <OfflineBanner />
+            {/* F16 rule A5: offline the pages are read-only; every control that acts is off. */}
+            <fieldset disabled={!online} className="contents">
+              {children}
+            </fieldset>
+          </div>
         </main>
       </div>
     </div>
@@ -265,6 +278,7 @@ function UserMenu({ me }: { me: MeResponse }) {
   const { t } = useTranslation();
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { offer, install } = useInstallOffer();
 
   async function signOut() {
     await authClient.signOut();
@@ -299,6 +313,19 @@ function UserMenu({ me }: { me: MeResponse }) {
           <CircleUserIcon />
           {t('user.account')}
         </DropdownMenuItem>
+        {/* F16 rule A3: the browser's own offer, or the guide on iPhone. */}
+        {offer === 'prompt' && (
+          <DropdownMenuItem onClick={() => void install()}>
+            <DownloadIcon />
+            {t('pwa.install.menu')}
+          </DropdownMenuItem>
+        )}
+        {offer === 'guide' && (
+          <DropdownMenuItem render={<Link to="/install" />}>
+            <DownloadIcon />
+            {t('pwa.install.menu')}
+          </DropdownMenuItem>
+        )}
         <DropdownMenuItem onClick={signOut}>
           <LogOutIcon className="rtl:-scale-x-100" />
           {t('user.signOut')}

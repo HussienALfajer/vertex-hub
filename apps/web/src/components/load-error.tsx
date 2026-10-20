@@ -1,7 +1,8 @@
 import { Button, EmptyState } from '@vertex-hub/ui';
-import { CloudOffIcon, SearchXIcon } from 'lucide-react';
+import { CloudOffIcon, SearchXIcon, WifiOffIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { ApiError } from '../lib/api/client';
+import { useOnline } from '../lib/use-online';
 
 /** The record does not exist or is hidden from the caller (404), or the id is malformed (400). */
 export const isMissing = (error: unknown): boolean =>
@@ -10,7 +11,7 @@ export const isMissing = (error: unknown): boolean =>
 /**
  * A query failed: say what could not load and offer a retry. When `error` says the record does
  * not exist (404, or a malformed id: 400), retrying cannot help: the page's back link is the way
- * out, so there is no retry and no "report it".
+ * out, so there is no retry and no "report it". Offline, it says the page is not available offline.
  */
 export function LoadError({
   message,
@@ -22,6 +23,18 @@ export function LoadError({
   error?: unknown;
 }) {
   const { t } = useTranslation();
+  const online = useOnline();
+  // F16 rule A5: a page never loaded with a connection has nothing kept to show.
+  if (!online) {
+    return (
+      <EmptyState
+        role="alert"
+        icon={<WifiOffIcon />}
+        title={t('pwa.offline.notAvailable')}
+        description={t('pwa.offline.notAvailableHint')}
+      />
+    );
+  }
   if (isMissing(error)) {
     return (
       <EmptyState

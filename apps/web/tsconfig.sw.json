@@ -1,0 +1,10 @@
+{
+  "extends": "@vertex-hub/config/tsconfig/base.json",
+  "compilerOptions": {
+    "lib": ["ES2024", "WebWorker"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "noEmit": true
+  },
+  "include": ["src/service-worker"]
+}
