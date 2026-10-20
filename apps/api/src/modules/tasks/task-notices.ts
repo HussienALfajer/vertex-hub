@@ -22,6 +22,7 @@ import {
 import { EngagementDirectory, type ProjectLink } from '../projects/index.js';
 import { accessColumns, type TaskRow } from './task-access.js';
 import { dependentsOf, isBlocked } from './task-dependencies.js';
+import { TaskQueueHooks } from './task-queue-hooks.js';
 
 type Executor = Database | Transaction;
 
@@ -54,6 +55,12 @@ const resolutionState = (task: TaskRow): TaskResolutionState => ({
   archived: !!task.archivedAt,
 });
 
+/** The task waits in its department's queue: open, not archived and unassigned. */
+const queued = (task: TaskRow): boolean =>
+  !task.assigneeId && !task.archivedAt && task.status !== 'cancelled';
+
+const leftQueue = (before: TaskRow, after: TaskRow): boolean => queued(before) && !queued(after);
+
 /** `HH:MM:SS` from the database to `HH:MM`. */
 export const toTimeOfDay = (time: string | null): TimeOfDay | null => time?.slice(0, 5) ?? null;
 
@@ -70,6 +77,7 @@ export class TaskNotices {
     private readonly engagements: EngagementDirectory,
     private readonly center: NotificationCenter,
     private readonly followers: RecordFollowers,
+    private readonly queueHooks: TaskQueueHooks,
   ) {}
 
   /** The task as it is now in the transaction, with its client and project. */
@@ -234,6 +242,10 @@ export class TaskNotices {
               { status: after.status },
             ),
           ];
+    // F16 part C: a generated task assigned or closed may empty its run's queue.
+    if (leftQueue(before, after)) {
+      await this.queueHooks.left(tx, { taskId: before.id, actorId });
+    }
     return this.center.notify(
       tx,
       [...notices, ...progressed],

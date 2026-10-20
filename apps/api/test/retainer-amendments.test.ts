@@ -638,6 +638,20 @@ describe("retainer amendments (F05B A1–A9, C5, C6, C9, F05C A1'–A2')", () =>
         status: 'rejected',
         decision: { approved: false, note: 'ليس الآن' },
       });
+      // F16 part C: the General Managers' wait closes once no amendment waits for approval.
+      const waits = () =>
+        db
+          .select({ resolution: notifications.resolution })
+          .from(notifications)
+          .where(
+            and(
+              eq(notifications.recipientId, cast.gm.id),
+              eq(notifications.subjectId, subject.id),
+              eq(notifications.type, 'retainer_amendment_pending'),
+            ),
+          )
+          .orderBy(asc(notifications.createdAt));
+      expect(await waits()).toEqual([{ resolution: 'done' }]);
 
       const second = await created(subject.id, {
         scope: 'cycle',
@@ -652,6 +666,7 @@ describe("retainer amendments (F05B A1–A9, C5, C6, C9, F05C A1'–A2')", () =>
         (body) => amendmentSchema.parse(body),
       );
       expect(withdrawn.status).toBe('withdrawn');
+      expect(await waits()).toEqual([{ resolution: 'done' }, { resolution: 'void' }]);
 
       const third = await created(subject.id, {
         scope: 'cycle',

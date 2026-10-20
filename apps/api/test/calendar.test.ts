@@ -11,8 +11,9 @@ import {
   nextWorkDay,
   upcomingReminderDay,
 } from '@vertex-hub/contracts';
-import { createDatabase } from '@vertex-hub/db';
+import { createDatabase, notifications } from '@vertex-hub/db';
 import { testDatabaseUrl } from '@vertex-hub/db/testing';
+import { and, eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { CalendarReminders } from '../src/modules/calendar/calendar-reminders.js';
 import { expectError } from './client-cast.js';
@@ -412,6 +413,18 @@ describe('company calendar (F11 rules 15–16)', () => {
       ]);
       expect(await cast.typesOf(cast.videographer.id, shoot.id)).toEqual(['shoot_booked']);
       expect(await cast.typesOf(cast.am.id, cancelled.id)).toEqual([]);
+
+      // F16 part C (owner, 2026-10-20): archiving the shoot voids the wait for its closing.
+      const archived = await client.post(`/api/shoots/${shoot.id}/archive`, cast.gm.cookie, {});
+      expect(archived.status, await archived.clone().text()).toBe(200);
+      const waiting = await db
+        .select({ resolution: notifications.resolution })
+        .from(notifications)
+        .where(
+          and(eq(notifications.subjectId, shoot.id), eq(notifications.type, 'shoot_not_closed')),
+        );
+      expect(waiting.length).toBeGreaterThan(0);
+      expect(waiting.every((row) => row.resolution === 'void')).toBe(true);
     });
   });
 });

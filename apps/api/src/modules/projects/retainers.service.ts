@@ -77,6 +77,7 @@ import {
 import { ClientDirectory, type ClientSummary } from '../clients/index.js';
 import { BillingLocks } from './billing-locks.js';
 import { changedDepartments } from './engagement-departments.js';
+import { EngagementNotices } from './engagement-notices.js';
 import {
   actorOf,
   assertCanEditMoney,
@@ -145,6 +146,7 @@ export class RetainersService {
     private readonly charges: RetainerCharges,
     private readonly terms: RetainerTermsService,
     private readonly amendments: RetainerAmendmentsService,
+    private readonly notices: EngagementNotices,
   ) {}
 
   async list(actor: CurrentUserInfo, query: RetainerListQuery): Promise<RetainerPage> {
@@ -707,6 +709,7 @@ export class RetainersService {
       if (resume?.opensNow) {
         await this.cycles.open(tx, retainer, today, actorOf(actor), { startNow: true });
       }
+      await this.notices.retainerStatus(tx, id, to, actor.id);
     });
     return this.detail(actor, id);
   }
@@ -767,6 +770,7 @@ export class RetainersService {
         before: { archived: false },
         after: { archived: true },
       });
+      await this.notices.retainerArchived(tx, id, actor.id);
     });
     return this.detail(actor, id);
   }

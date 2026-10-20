@@ -669,6 +669,19 @@ export class ShootsService implements OnModuleInit {
         before: { archived: false },
         after: { archived: true },
       });
+      // F16 part C: the shoot no longer needs closing (owner, 2026-10-20).
+      await this.notices.send(
+        tx,
+        [],
+        [
+          {
+            subject: { type: 'shoot', id },
+            types: ['shoot_not_closed'],
+            outcome: 'void',
+            actorId: actor.id,
+          },
+        ],
+      );
     });
     return this.detail(actor, id);
   }

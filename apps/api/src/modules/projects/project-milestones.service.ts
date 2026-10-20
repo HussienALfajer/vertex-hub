@@ -19,6 +19,7 @@ import { changedFields, recordAudit } from '../audit/index.js';
 import { type CurrentUserInfo, UserDirectory } from '../auth/index.js';
 import { ClientDirectory } from '../clients/index.js';
 import { BillingLocks } from './billing-locks.js';
+import { EngagementNotices } from './engagement-notices.js';
 import { MilestoneDoneHooks } from './milestone-done-hooks.js';
 import {
   actorOf,
@@ -66,6 +67,7 @@ export class ProjectMilestonesService {
     private readonly progress: WorkProgress,
     private readonly locks: BillingLocks,
     private readonly doneHooks: MilestoneDoneHooks,
+    private readonly notices: EngagementNotices,
   ) {}
 
   /** Non-archived milestones of the projects, by position. */
@@ -244,6 +246,7 @@ export class ProjectMilestonesService {
       });
       // F13 rule 3: the installment is drafted inside the completion.
       await this.doneHooks.run(tx, { milestoneId, projectId, actor: actorOf(actor) });
+      await this.notices.milestoneCompleted(tx, project, current.name, actor.id);
     });
     return this.one(actor, projectId, milestoneId);
   }

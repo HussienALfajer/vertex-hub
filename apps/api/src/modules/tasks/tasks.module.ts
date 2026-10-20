@@ -21,6 +21,7 @@ import { TaskLinks } from './task-links.js';
 import { TaskNotices } from './task-notices.js';
 import { TaskPartsController } from './task-parts.controller.js';
 import { TaskPartsService } from './task-parts.service.js';
+import { TaskQueueHooks } from './task-queue-hooks.js';
 import { TaskReminders } from './task-reminders.js';
 import { TaskReports } from './task-reports.js';
 import { TaskReviewsController } from './task-reviews.controller.js';
@@ -81,9 +82,11 @@ import { TasksService } from './tasks.service.js';
     TaskGuards,
     TaskLinks,
     TaskReports,
+    TaskQueueHooks,
   ],
   exports: [
     TaskGenerator,
+    TaskQueueHooks,
     TaskApprovals,
     ClientReviewHooks,
     PostTasks,

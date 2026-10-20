@@ -48,7 +48,7 @@ import {
   type QuoteRenewalApplied,
   QuoteRenewalHooks,
 } from '../projects/index.js';
-import { TaskGenerator } from '../tasks/index.js';
+import { TaskGenerator, type TaskQueueEvent, TaskQueueHooks } from '../tasks/index.js';
 import type { NewProjectPlan } from './template-runner.js';
 import { type TemplateForRun, TemplatesService } from './templates.service.js';
 
@@ -88,11 +88,13 @@ export class TemplateRunsService implements OnModuleInit {
     private readonly templates: TemplatesService,
     private readonly clients: ClientDirectory,
     private readonly notifications: NotificationCenter,
+    private readonly queueHooks: TaskQueueHooks,
   ) {}
 
   onModuleInit(): void {
     this.openedHooks.register((tx, event) => this.onCycleOpened(tx, event));
     this.renewalHooks.register((tx, event) => this.onQuoteRenewal(tx, event));
+    this.queueHooks.register((tx, event) => this.onQueueLeft(tx, event));
   }
 
   /** The plan a run would create; nothing is written. */
@@ -500,6 +502,44 @@ export class TemplateRunsService implements OnModuleInit {
       ),
     ];
     await this.notifications.notify(tx, notices);
+  }
+
+  /**
+   * F16 part C: a task of a run left its department's unassigned queue. The managers' notice of
+   * each department whose unassigned tasks of the run are all assigned or closed is done; a
+   * manager of a department that still has some keeps it.
+   */
+  private async onQueueLeft(tx: Transaction, event: TaskQueueEvent): Promise<void> {
+    const runs = await tx
+      .select({ runId: templateRunTasks.runId })
+      .from(templateRunTasks)
+      .where(eq(templateRunTasks.taskId, event.taskId));
+    for (const { runId } of runs) {
+      const taskIds = await tx
+        .select({ taskId: templateRunTasks.taskId })
+        .from(templateRunTasks)
+        .where(eq(templateRunTasks.runId, runId));
+      const queue = await this.generator.queue(
+        tx,
+        taskIds.map((row) => row.taskId),
+      );
+      const waiting = new Set(queue.filter((task) => task.waiting).map((task) => task.department));
+      const done = [...new Set(queue.map((task) => task.department))].filter(
+        (department) => !waiting.has(department),
+      );
+      if (done.length === 0) continue;
+      const managers = await this.users.departmentManagers([...done, ...waiting], tx);
+      const busy = new Set([...waiting].flatMap((department) => managers.get(department) ?? []));
+      await this.notifications.resolve(tx, {
+        subject: { type: 'template_run', id: runId },
+        types: ['tasks_generated'],
+        outcome: 'done',
+        actorId: event.actorId,
+        recipients: done
+          .flatMap((department) => managers.get(department) ?? [])
+          .filter((userId) => !busy.has(userId)),
+      });
+    }
   }
 
   /** The monthly template linked to the retainer, or null. */

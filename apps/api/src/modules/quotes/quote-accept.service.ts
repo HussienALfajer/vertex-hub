@@ -44,6 +44,7 @@ import {
   coversEngagements,
   type Recipient,
 } from './quote-access.js';
+import { QuoteNotices } from './quote-notices.js';
 import { QuotePdfService } from './quote-pdf.service.js';
 import { QuoteRecipients } from './quote-recipients.js';
 import {
@@ -100,6 +101,7 @@ export class QuoteAcceptService {
     private readonly acceptedHooks: QuoteAcceptedHooks,
     private readonly recipients: QuoteRecipients,
     private readonly leadPipeline: LeadPipeline,
+    private readonly notices: QuoteNotices,
   ) {}
 
   /**
@@ -467,8 +469,10 @@ export class QuoteAcceptService {
         actor: actorOf(actor),
       });
 
-      // A11: the account manager and the departments' managers, never the actor.
+      // A11: the account manager, the departments' managers and (F16) Finance, never the actor.
       const managers = await this.users.departmentManagers([...departments], tx);
+      const finance = await this.users.withRole('finance', tx);
+      await this.notices.resolveExpiring(tx, quote.id, actor.id);
       await this.notifications.notify(tx, {
         type: 'quote_accepted',
         data: {
@@ -480,7 +484,7 @@ export class QuoteAcceptService {
           project: project?.name ?? null,
           retainer: retainer?.name ?? null,
         },
-        recipients: [client.accountManagerId, ...[...managers.values()].flat()],
+        recipients: [client.accountManagerId, ...[...managers.values()].flat(), ...finance],
         actorId: actor.id,
         subjectId: quote.id,
       });

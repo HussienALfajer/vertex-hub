@@ -23,6 +23,7 @@ import { type CurrentUserInfo, UserDirectory } from '../auth/index.js';
 import { ClientDirectory } from '../clients/index.js';
 import { GeneratedFiles } from '../files/index.js';
 import { type AnnexRow, annexOf, contractOf, contractRetainer } from './contract-access.js';
+import { EngagementNotices } from './engagement-notices.js';
 import { actorOf } from './project-access.js';
 import { assertRetainerNotArchived } from './retainer-access.js';
 import { ContractPdfs } from './retainer-contract-pdfs.js';
@@ -47,6 +48,7 @@ export class RetainerContractAnnexesService {
     private readonly contracts: RetainerContractsService,
     private readonly pdfs: ContractPdfs,
     private readonly files: GeneratedFiles,
+    private readonly notices: EngagementNotices,
   ) {}
 
   async issue(
@@ -227,6 +229,13 @@ export class RetainerContractAnnexesService {
           reason: input.reason,
         },
       });
+      await this.notices.contract(
+        tx,
+        'contract_voided',
+        retainerId,
+        { contract: contractNumber ?? '', annex: annex.annexNumber },
+        actor.id,
+      );
       return updated;
     });
     return this.present(annex);
@@ -276,6 +285,15 @@ export class RetainerContractAnnexesService {
           signedOn: input.signedOn,
         },
       });
+      if (annex.status !== 'signed') {
+        await this.notices.contract(
+          tx,
+          'contract_signed',
+          retainerId,
+          { contract: contractNumber ?? '', annex: annex.annexNumber },
+          actor.id,
+        );
+      }
       return { annex: updated, preview: copy.preview };
     });
     if (preview) await this.files.queuePreviews();

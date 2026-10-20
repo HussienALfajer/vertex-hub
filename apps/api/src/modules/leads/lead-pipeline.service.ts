@@ -96,6 +96,7 @@ export class LeadPipelineService {
           ...(dateChanged ? { nextFollowUpOn: updated.nextFollowUpOn } : {}),
         },
       });
+      if (dateChanged) await this.leads.resolveFollowUps(tx, actor, id, 'void');
       return this.leads.toDetail(actor, updated, tx);
     });
   }
@@ -127,7 +128,7 @@ export class LeadPipelineService {
         before: { ...identity(lead), ownerId: lead.ownerId },
         after: { ...identity(updated), ownerId: updated.ownerId },
       });
-      await this.leads.notifyAssigned(tx, actor, updated);
+      await this.leads.notifyAssigned(tx, actor, updated, lead.ownerId);
       return this.leads.toDetail(actor, updated, tx);
     });
   }
@@ -177,6 +178,7 @@ export class LeadPipelineService {
           rejectedQuotes,
         },
       });
+      await this.leads.notifyLost(tx, actor, updated);
       return { ...(await this.leads.toDetail(actor, updated, tx)), rejectedQuotes };
     });
   }
@@ -231,7 +233,7 @@ export class LeadPipelineService {
           ...(ownerChanged ? { ownerId } : {}),
         },
       });
-      if (ownerChanged) await this.leads.notifyAssigned(tx, actor, updated);
+      if (ownerChanged) await this.leads.notifyAssigned(tx, actor, updated, lead.ownerId);
       return this.leads.toDetail(actor, updated, tx);
     });
   }
@@ -282,5 +284,6 @@ export class LeadPipelineService {
       before: { ...identity(lead), archived: !archive },
       after: { ...identity(lead), archived: archive },
     });
+    if (archive) await this.leads.resolveFollowUps(tx, actor, lead.id, 'void');
   }
 }

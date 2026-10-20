@@ -65,6 +65,8 @@ export class LeadNotesService {
         entityId: note.id,
         after: { leadId, ...identity(lead), ...noteFields(note) },
       });
+      // F16 part C: the follow-up is recorded.
+      await this.leads.resolveFollowUps(tx, actor, leadId, 'done');
       if (input.nextFollowUpOn !== lead.nextFollowUpOn) {
         await tx
           .update(leads)

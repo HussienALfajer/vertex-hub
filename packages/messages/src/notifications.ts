@@ -3,6 +3,8 @@ import type {
   DepartmentCode,
   Notification,
   PostStatus,
+  ProjectStatus,
+  RetainerStatus,
   TaskStatus,
 } from '@vertex-hub/contracts';
 import { CLIENT_EMAIL_KIND_NAMES } from './client-emails.js';
@@ -70,6 +72,21 @@ export const POST_STATUS_NAMES: Record<PostStatus, string> = {
   scheduled: 'مجدول',
   published: 'نُشر',
   cancelled: 'ملغى',
+};
+
+/** The status names of a project and a retainer notice (F16 part C). */
+export const PROJECT_STATUS_NAMES: Record<ProjectStatus, string> = {
+  planned: 'مخطّط',
+  active: 'جارٍ',
+  on_hold: 'معلّق',
+  completed: 'مكتمل',
+  cancelled: 'ملغى',
+};
+
+export const RETAINER_STATUS_NAMES: Record<RetainerStatus, string> = {
+  active: 'نشط',
+  paused: 'متوقف مؤقتًا',
+  ended: 'منتهٍ',
 };
 
 /** The texts of the notification types, with `{{name}}` placeholders. */
@@ -296,11 +313,42 @@ export const NOTIFICATION_TEXT = {
     other: '{{n}} تحديث على حالة المنشور «{{post}}»، وهو الآن «{{status}}»',
   },
   post_publish_shortly: 'موعد نشر المنشور «{{post}}» خلال ساعتين، في {{date}}',
+  responsibility_moved: {
+    post_responsible: 'نقل {{actor}} مسؤولية المنشور «{{record}}» إلى {{holder}}',
+    account_manager: 'نقل {{actor}} إدارة حساب {{record}} إلى {{holder}}',
+    project_manager: 'نقل {{actor}} إدارة المشروع «{{record}}» إلى {{holder}}',
+    lead_owner: 'نقل {{actor}} العميل المحتمل «{{record}}» إلى {{holder}}',
+  },
   approval_opened: 'فتح {{contact}} رابط اعتماد «{{client}}»',
   approval_completed: 'ردّ {{contact}} على كل أعمال رابط «{{client}}»',
   shoot_starting: 'تبدأ جلسة التصوير «{{shoot}}» خلال ساعتين، في {{when}}',
   shoot_completed: 'أُغلقت جلسة التصوير «{{shoot}}» بواسطة {{actor}}',
   meeting_starting: 'يبدأ الاجتماع «{{meeting}}» خلال 15 دقيقة، في {{when}}',
+  client_status_changed: {
+    active: 'أصبح {{client}} عميلًا نشطًا بواسطة {{actor}}',
+    paused: 'أُوقف التعامل مع {{client}} مؤقتًا بواسطة {{actor}}',
+    ended: 'أُنهي التعامل مع {{client}} بواسطة {{actor}}',
+  },
+  client_healthcare_changed: {
+    on: 'صنّف {{actor}} {{client}} عميل رعاية صحية',
+    off: 'ألغى {{actor}} تصنيف {{client}} عميل رعاية صحية',
+  },
+  lead_lost: 'سجّل {{actor}} خسارة العميل المحتمل «{{lead}}»',
+  quote_expiring: 'ينتهي سريان {{quote}} في {{date}}',
+  quote_expired: 'انتهى سريان {{quote}} دون رد',
+  quote_rejected: 'سجّل {{actor}} رفض {{quote}}',
+  project_status_changed: 'انتقل المشروع «{{project}}» إلى «{{status}}» بواسطة {{actor}}',
+  milestone_completed: 'أنجز {{actor}} المرحلة «{{milestone}}» من المشروع «{{project}}»',
+  extra_work_created: 'سجّل {{actor}} عملًا إضافيًا «{{title}}» على «{{engagement}}»',
+  retainer_status_changed: 'انتقل عقد «{{retainer}}» إلى «{{status}}» بواسطة {{actor}}',
+  contract_signed: {
+    contract: 'سجّل {{actor}} توقيع العقد {{contract}}',
+    annex: 'سجّل {{actor}} توقيع الملحق {{annex}} من العقد {{contract}}',
+  },
+  contract_voided: {
+    contract: 'ألغى {{actor}} العقد {{contract}}',
+    annex: 'ألغى {{actor}} الملحق {{annex}} من العقد {{contract}}',
+  },
   /** F16 rule B11: each escalation step wraps the original's text. */
   action_reminder: 'تذكير: {{text}}',
   action_escalated: 'تصعيد: {{text}}',
@@ -773,6 +821,102 @@ export function notificationText(
       const values = { actor, meeting: meeting.title, when: formatDateTime(meeting.startsAt) };
       return { text: calendarText(notification, values), context: meeting.client };
     }
+    case 'responsibility_moved': {
+      const { data } = notification;
+      return {
+        text: fill(text.responsibility_moved[data.role], {
+          actor,
+          record: data.record,
+          holder: data.holder,
+        }),
+        context: null,
+      };
+    }
+    case 'client_status_changed':
+      return {
+        text: fill(text.client_status_changed[notification.data.status], {
+          actor,
+          client: notification.data.client,
+        }),
+        context: null,
+      };
+    case 'client_healthcare_changed':
+      return {
+        text: fill(text.client_healthcare_changed[notification.data.healthcare ? 'on' : 'off'], {
+          actor,
+          client: notification.data.client,
+        }),
+        context: null,
+      };
+    case 'lead_lost':
+      return {
+        text: fill(text.lead_lost, { actor, lead: notification.data.lead }),
+        context: null,
+      };
+    case 'quote_expiring':
+    case 'quote_expired':
+    case 'quote_rejected': {
+      const { quote } = notification.data;
+      return {
+        text: fill(text[notification.type], {
+          actor,
+          quote: quote.displayNumber,
+          date:
+            notification.type === 'quote_expiring'
+              ? formatCalendarDate(notification.data.validUntil)
+              : '',
+        }),
+        context: context(quote.client, quote.title),
+      };
+    }
+    case 'project_status_changed':
+      return {
+        text: fill(text.project_status_changed, {
+          actor,
+          project: notification.data.project,
+          status: PROJECT_STATUS_NAMES[notification.data.status],
+        }),
+        context: notification.data.client,
+      };
+    case 'milestone_completed':
+      return {
+        text: fill(text.milestone_completed, {
+          actor,
+          project: notification.data.project,
+          milestone: notification.data.milestone,
+        }),
+        context: notification.data.client,
+      };
+    case 'extra_work_created':
+      return {
+        text: fill(text.extra_work_created, {
+          actor,
+          title: notification.data.title,
+          engagement: notification.data.engagement,
+        }),
+        context: notification.data.client,
+      };
+    case 'retainer_status_changed':
+      return {
+        text: fill(text.retainer_status_changed, {
+          actor,
+          retainer: notification.data.retainer,
+          status: RETAINER_STATUS_NAMES[notification.data.status],
+        }),
+        context: notification.data.client,
+      };
+    case 'contract_signed':
+    case 'contract_voided': {
+      const { data } = notification;
+      return {
+        text: fill(text[notification.type][data.annex === null ? 'contract' : 'annex'], {
+          actor,
+          contract: data.contract,
+          annex: data.annex === null ? '' : formatNumber(data.annex),
+        }),
+        context: context(data.client, data.retainer),
+      };
+    }
     case 'push_device_lost':
       return {
         text: fill(text.push_device_lost, { device: notification.data.device }),
@@ -862,6 +1006,14 @@ type TaskNotification = Exclude<
       | `post_${string}`
       | 'push_device_lost'
       | `action_${string}`
+      | 'responsibility_moved'
+      | `client_${string}`
+      | `quote_${string}`
+      | `project_${string}`
+      | 'milestone_completed'
+      | 'extra_work_created'
+      | `retainer_${string}`
+      | `contract_${string}`
       | CalendarNotification['type'];
   }
 >;

@@ -13,6 +13,7 @@ import {
   contractPdfStorageKey,
   contractSettingsSchema,
   fileUploadSchema,
+  type NotificationType,
   quotePdfRenderSchema,
   type RetainerContractDetail,
   type RetainerDetail,
@@ -30,9 +31,10 @@ import {
   fileItems,
   fileVersions,
   invoiceSettings,
+  notifications,
 } from '@vertex-hub/db';
 import { testDatabaseUrl } from '@vertex-hub/db/testing';
-import { asc, eq, notInArray } from 'drizzle-orm';
+import { and, asc, eq, notInArray } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { JobQueue } from '../src/core/jobs/index.js';
 import { ContractPdfs } from '../src/modules/projects/index.js';
@@ -78,6 +80,17 @@ describe('retainer contracts (F05C K1–K12)', () => {
     client.post(base(retainerId), cookie, body);
   const patch = (retainerId: string, contractId: string, body: unknown, cookie = cast.am.cookie) =>
     client.request('PATCH', `${base(retainerId)}/${contractId}`, { cookie, body });
+  const noticesOf = (recipientId: string, type: NotificationType, subjectId: string) =>
+    db
+      .select()
+      .from(notifications)
+      .where(
+        and(
+          eq(notifications.recipientId, recipientId),
+          eq(notifications.type, type),
+          eq(notifications.subjectId, subjectId),
+        ),
+      );
   const action = (
     retainerId: string,
     contractId: string,
@@ -533,6 +546,12 @@ describe('retainer contracts (F05C K1–K12)', () => {
         action: 'retainer_contract.signed',
         after: { status: 'signed', signedOn: today },
       });
+      // F16 part C: Finance and the General Manager hear of the signature once, not of a new scan.
+      for (const recipientId of [finance.id, cast.gm.id]) {
+        const told = await noticesOf(recipientId, 'contract_signed', held.id);
+        expect(told).toHaveLength(1);
+        expect(told[0]?.data).toMatchObject({ contract: draft.number, annex: null });
+      }
     });
 
     it('is voided with a reason; then a new draft may be prepared (K8)', async () => {
@@ -553,6 +572,7 @@ describe('retainer contracts (F05C K1–K12)', () => {
       );
       const fresh = await draftFor(held.id, { kind: 'term', termId });
       expect(fresh.status).toBe('draft');
+      expect(await noticesOf(finance.id, 'contract_voided', held.id)).toHaveLength(1);
     });
 
     it('discards a draft by archiving it (K8)', async () => {

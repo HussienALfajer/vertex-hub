@@ -54,6 +54,7 @@ import { type CurrentUserInfo, lockAccessChanges, UserDirectory } from '../auth/
 import { ClientDirectory } from '../clients/index.js';
 import { CycleClosedHooks } from './cycle-closed-hooks.js';
 import { CycleOpenedHooks } from './cycle-opened-hooks.js';
+import { EngagementNotices } from './engagement-notices.js';
 import { actorOf } from './project-access.js';
 import { readableRetainer, workableRetainer } from './retainer-access.js';
 import { RetainerAmendmentsService } from './retainer-amendments.service.js';
@@ -133,6 +134,7 @@ export class RetainerCyclesService implements OnModuleInit {
     private readonly charges: RetainerCharges,
     private readonly terms: RetainerTermsService,
     private readonly amendments: RetainerAmendmentsService,
+    private readonly notices: EngagementNotices,
   ) {}
 
   onModuleInit(): void {
@@ -264,6 +266,7 @@ export class RetainerCyclesService implements OnModuleInit {
     await this.closeAll(tx, retainerId, endOn, null);
     await this.terms.endEarly(tx, retainer, today, null);
     await this.amendments.cancelOpen(tx, retainerId, null);
+    await this.notices.retainerStatus(tx, retainerId, 'ended', null);
   }
 
   /**
@@ -444,6 +447,7 @@ export class RetainerCyclesService implements OnModuleInit {
       .update(retainerCycles)
       .set({ status: 'closed', closedAt: new Date(), periodEnd })
       .where(eq(retainerCycles.id, cycle.id));
+    await this.notices.cycleClosed(tx, cycle.retainerId, actor?.id ?? null);
     await recordAudit(tx, {
       actor,
       action: 'retainer_cycle.closed',

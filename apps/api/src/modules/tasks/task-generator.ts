@@ -150,4 +150,28 @@ export class TaskGenerator {
       rows.map(({ archivedAt, ...row }) => [row.id, { ...row, archived: !!archivedAt }]),
     );
   }
+
+  /**
+   * F16 part C: the department of each task and whether it still waits in that department's
+   * unassigned queue (open, not archived, no assignee).
+   */
+  async queue(
+    executor: Database | Transaction,
+    ids: string[],
+  ): Promise<{ department: DepartmentCode; waiting: boolean }[]> {
+    if (ids.length === 0) return [];
+    const rows = await executor
+      .select({
+        department: tasks.department,
+        assigneeId: tasks.assigneeId,
+        status: tasks.status,
+        archivedAt: tasks.archivedAt,
+      })
+      .from(tasks)
+      .where(inArray(tasks.id, [...new Set(ids)]));
+    return rows.map((row) => ({
+      department: row.department,
+      waiting: !row.assigneeId && !row.archivedAt && row.status !== 'cancelled',
+    }));
+  }
 }

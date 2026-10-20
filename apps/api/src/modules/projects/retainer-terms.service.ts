@@ -38,6 +38,7 @@ import type { CurrentUserInfo } from '../auth/index.js';
 import { ClientDirectory } from '../clients/index.js';
 import { NotificationCenter } from '../notifications/index.js';
 import { BillingLocks } from './billing-locks.js';
+import { EngagementNotices } from './engagement-notices.js';
 import { actorOf, assertCanEditMoney, seesMoney } from './project-access.js';
 import { readableRetainer, workableRetainer } from './retainer-access.js';
 import { RetainerCharges } from './retainer-charges.js';
@@ -103,6 +104,7 @@ export class RetainerTermsService {
     private readonly charges: RetainerCharges,
     private readonly locks: BillingLocks,
     private readonly notifications: NotificationCenter,
+    private readonly notices: EngagementNotices,
   ) {}
 
   async list(actor: CurrentUserInfo, retainerId: string): Promise<RetainerTermList> {
@@ -938,6 +940,7 @@ export class RetainerTermsService {
       before: { renewalDate: row.renewalDate },
       after: { renewalDate },
     });
+    await this.notices.renewalMoved(tx, retainerId, actor?.id ?? null);
   }
 
   /**

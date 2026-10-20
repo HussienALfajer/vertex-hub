@@ -15,6 +15,7 @@ import { CycleOpenedHooks } from './cycle-opened-hooks.js';
 import { EngagementDirectory } from './engagement-directory.js';
 import { EngagementFactory } from './engagement-factory.js';
 import { EngagementFileOwners } from './engagement-file-owners.js';
+import { EngagementNotices } from './engagement-notices.js';
 import { EngagementReports } from './engagement-reports.js';
 import { ExtraWorkController } from './extra-work.controller.js';
 import { ExtraWorkService } from './extra-work.service.js';
@@ -90,6 +91,7 @@ import { WorkProgress } from './work-progress.js';
     WorkProgress,
     EngagementDirectory,
     EngagementFactory,
+    EngagementNotices,
     BillingSources,
     BillingLocks,
     ChargeInvoices,

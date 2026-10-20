@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { CLIENT_DECISIONS } from './approvals.js';
+import { clientStatusSchema } from './clients.js';
 import {
   addDays,
   businessDate,
@@ -15,10 +16,12 @@ import { clientEmailKindSchema } from './email-basics.js';
 import { pageQuerySchema, pageSchema, queryBooleanSchema } from './lists.js';
 import { currencySchema, minorAmountSchema, signedMinorAmountSchema } from './money.js';
 import { postStatusSchema } from './post-values.js';
+import { projectStatusSchema } from './projects.js';
 import {
   BEHIND_ALERT_DAYS,
   deliverableKindSchema,
   RETAINER_LIMITS,
+  retainerStatusSchema,
   termEndActionSchema,
 } from './retainers.js';
 import type { Role } from './roles.js';
@@ -102,11 +105,24 @@ export const NOTIFICATION_TYPES = [
   'post_cancelled',
   'post_file_added',
   'post_publish_shortly',
+  'responsibility_moved',
   'approval_opened',
   'approval_completed',
   'shoot_starting',
   'meeting_starting',
   'shoot_completed',
+  'client_status_changed',
+  'client_healthcare_changed',
+  'lead_lost',
+  'quote_expiring',
+  'quote_expired',
+  'quote_rejected',
+  'project_status_changed',
+  'milestone_completed',
+  'extra_work_created',
+  'retainer_status_changed',
+  'contract_signed',
+  'contract_voided',
   'push_device_lost',
   'action_reminder',
   'action_escalated',
@@ -256,6 +272,21 @@ const CATALOG: Record<
   shoot_starting: { category: 'calendar', subject: 'shoot', mutable: true },
   meeting_starting: { category: 'calendar', subject: 'meeting', mutable: true },
   shoot_completed: { category: 'calendar', subject: 'shoot', mutable: true },
+  /** Part C rule 4: opens the record whose holder changed; its subject type is given. */
+  responsibility_moved: { category: 'clients_projects', subject: 'client', mutable: true },
+  client_status_changed: { category: 'clients_projects', subject: 'client', mutable: true },
+  client_healthcare_changed: { category: 'clients_projects', subject: 'client', mutable: true },
+  lead_lost: { category: 'clients_projects', subject: 'lead', mutable: true },
+  quote_expiring: { category: 'reminders', subject: 'quote', mutable: false },
+  quote_expired: { category: 'clients_projects', subject: 'quote', mutable: true },
+  quote_rejected: { category: 'clients_projects', subject: 'quote', mutable: true },
+  project_status_changed: { category: 'clients_projects', subject: 'project', mutable: true },
+  milestone_completed: { category: 'clients_projects', subject: 'project', mutable: true },
+  /** Opens the project or the retainer the extra work is logged on; its subject type is given. */
+  extra_work_created: { category: 'clients_projects', subject: 'project', mutable: true },
+  retainer_status_changed: { category: 'clients_projects', subject: 'retainer', mutable: true },
+  contract_signed: { category: 'clients_projects', subject: 'retainer', mutable: true },
+  contract_voided: { category: 'clients_projects', subject: 'retainer', mutable: true },
   /** F16 rule B11: the escalation steps open the original's record; its subject type is given. */
   action_reminder: { category: 'reminders', subject: 'task', mutable: false },
   action_escalated: { category: 'reminders', subject: 'task', mutable: false },
@@ -394,6 +425,19 @@ const CHANNELS: Record<NotificationType, Channels> = {
   shoot_starting: important(),
   meeting_starting: important(),
   shoot_completed: informational,
+  responsibility_moved: informational,
+  client_status_changed: normal(),
+  client_healthcare_changed: normal(),
+  lead_lost: normal(),
+  quote_expiring: important(),
+  quote_expired: normal(),
+  quote_rejected: normal(),
+  project_status_changed: normal(),
+  milestone_completed: normal(),
+  extra_work_created: normal(),
+  retainer_status_changed: normal(),
+  contract_signed: normal(),
+  contract_voided: normal(),
   action_reminder: important(),
   action_escalated: important('on'),
   action_escalated_top: critical(),
@@ -574,6 +618,19 @@ const ENGINE: Record<NotificationType, Engine> = {
   shoot_starting: info,
   meeting_starting: info,
   shoot_completed: info,
+  responsibility_moved: info,
+  client_status_changed: info,
+  client_healthcare_changed: info,
+  lead_lost: info,
+  quote_expiring: action(),
+  quote_expired: info,
+  quote_rejected: info,
+  project_status_changed: info,
+  milestone_completed: info,
+  extra_work_created: info,
+  retainer_status_changed: info,
+  contract_signed: info,
+  contract_voided: info,
   action_reminder: action(),
   action_escalated: action(),
   action_escalated_top: action(),
@@ -702,6 +759,28 @@ const quoteData = z.object({
 /** An invoice as it was when the notification was sent (F13). */
 const invoiceData = z.object({
   invoice: z.object({ displayNumber: nameSchema, client: nameSchema }),
+});
+
+/**
+ * Part C rule 4: the roles on a record whose previous holder is told when they change. Campaign
+ * owners and department managers come with their modules (C1c).
+ */
+export const RESPONSIBILITY_ROLES = [
+  'post_responsible',
+  'account_manager',
+  'project_manager',
+  'lead_owner',
+] as const;
+
+export type ResponsibilityRole = (typeof RESPONSIBILITY_ROLES)[number];
+
+/** A retainer contract (or one of its annexes) as it was when the notification was sent (F05C). */
+const contractData = z.object({
+  retainer: nameSchema,
+  client: nameSchema,
+  contract: nameSchema,
+  /** The annex number; null for the contract itself. */
+  annex: z.number().int().min(1).nullable(),
 });
 
 /** What changed on a scheduled shoot that its crew is told about. */
@@ -938,6 +1017,40 @@ export const NOTIFICATION_DATA_SCHEMAS = {
   meeting_starting: meetingData.extend({ joinUrl: z.string().nullable() }),
   /** The shoot was closed. */
   shoot_completed: shootData,
+  /** Part C rule 4: the record's role went from the recipient to `holder`. */
+  responsibility_moved: z.object({
+    role: z.enum(RESPONSIBILITY_ROLES),
+    record: nameSchema,
+    holder: nameSchema,
+  }),
+  /** The client became active, paused or ended. */
+  client_status_changed: z.object({ client: nameSchema, status: clientStatusSchema }),
+  /** The client's healthcare flag was turned on or off. */
+  client_healthcare_changed: z.object({ client: nameSchema, healthcare: z.boolean() }),
+  /** F03 rule 8: the lead was lost. */
+  lead_lost: leadData,
+  /** Part C rule 3: a sent quote is valid until `validUntil`, three days from today or sooner. */
+  quote_expiring: quoteData.extend({ validUntil: calendarDateSchema }),
+  /** F04 rule 9: the daily job expired the quote. */
+  quote_expired: quoteData,
+  /** F04 rule 11 or F03 rule 8: the client's no was recorded, or the lead was lost. */
+  quote_rejected: quoteData,
+  project_status_changed: z.object({
+    project: nameSchema,
+    client: nameSchema,
+    status: projectStatusSchema,
+  }),
+  milestone_completed: z.object({ project: nameSchema, client: nameSchema, milestone: nameSchema }),
+  /** By hand or from a revision decision, on the project or retainer `engagement`. */
+  extra_work_created: z.object({ title: nameSchema, engagement: nameSchema, client: nameSchema }),
+  /** Paused, ended (by hand or by its term) or active again. */
+  retainer_status_changed: z.object({
+    retainer: nameSchema,
+    client: nameSchema,
+    status: retainerStatusSchema,
+  }),
+  contract_signed: contractData,
+  contract_voided: contractData,
   /** F16 rule B11 step 1: the original still waits on its recipients. */
   action_reminder: escalationData,
   /** Step 2: the managers of those it waits on (or the step's department or role). */
@@ -1381,6 +1494,8 @@ export const NOTIFICATION_REMINDER_KINDS = [
   'ad_budget_low',
   'lead_follow_up_due',
   'lead_follow_up_overdue',
+  /** F16 part C rule 3: once per quote and last valid day. */
+  'quote_expiring',
   /** F16 rule B11: keyed by the original's subject and the day it was created. */
   'escalation_1',
   'escalation_2',
