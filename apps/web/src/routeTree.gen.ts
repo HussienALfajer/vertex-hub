@@ -19,6 +19,7 @@ import { Route as AppAccountRouteImport } from './routes/_app/account'
 import { Route as AppAuditRouteImport } from './routes/_app/audit'
 import { Route as AppDesignSystemRouteImport } from './routes/_app/design-system'
 import { Route as AppEmailsRouteImport } from './routes/_app/emails'
+import { Route as AppInstallRouteImport } from './routes/_app/install'
 import { Route as ATokenRouteImport } from './routes/a.$token'
 import { Route as AppApprovalsIndexRouteImport } from './routes/_app/approvals/index'
 import { Route as AppCalendarIndexRouteImport } from './routes/_app/calendar/index'
@@ -121,6 +122,11 @@ const AppDesignSystemRoute = AppDesignSystemRouteImport.update({
 const AppEmailsRoute = AppEmailsRouteImport.update({
   id: '/emails',
   path: '/emails',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppInstallRoute = AppInstallRouteImport.update({
+  id: '/install',
+  path: '/install',
   getParentRoute: () => AppRoute,
 } as any)
 const ATokenRoute = ATokenRouteImport.update({
@@ -412,6 +418,7 @@ export interface FileRoutesByFullPath {
   '/audit': typeof AppAuditRoute
   '/design-system': typeof AppDesignSystemRoute
   '/emails': typeof AppEmailsRoute
+  '/install': typeof AppInstallRoute
   '/a/$token': typeof ATokenRoute
   '/campaigns/$campaignId': typeof AppCampaignsCampaignIdRoute
   '/catalog/settings': typeof AppCatalogSettingsRoute
@@ -476,6 +483,7 @@ export interface FileRoutesByTo {
   '/audit': typeof AppAuditRoute
   '/design-system': typeof AppDesignSystemRoute
   '/emails': typeof AppEmailsRoute
+  '/install': typeof AppInstallRoute
   '/a/$token': typeof ATokenRoute
   '/': typeof AppIndexRoute
   '/campaigns/$campaignId': typeof AppCampaignsCampaignIdRoute
@@ -543,6 +551,7 @@ export interface FileRoutesById {
   '/_app/audit': typeof AppAuditRoute
   '/_app/design-system': typeof AppDesignSystemRoute
   '/_app/emails': typeof AppEmailsRoute
+  '/_app/install': typeof AppInstallRoute
   '/a/$token': typeof ATokenRoute
   '/_app/': typeof AppIndexRoute
   '/_app/campaigns/$campaignId': typeof AppCampaignsCampaignIdRoute
@@ -611,6 +620,7 @@ export interface FileRouteTypes {
     | '/audit'
     | '/design-system'
     | '/emails'
+    | '/install'
     | '/a/$token'
     | '/campaigns/$campaignId'
     | '/catalog/settings'
@@ -675,6 +685,7 @@ export interface FileRouteTypes {
     | '/audit'
     | '/design-system'
     | '/emails'
+    | '/install'
     | '/a/$token'
     | '/'
     | '/campaigns/$campaignId'
@@ -741,6 +752,7 @@ export interface FileRouteTypes {
     | '/_app/audit'
     | '/_app/design-system'
     | '/_app/emails'
+    | '/_app/install'
     | '/a/$token'
     | '/_app/'
     | '/_app/campaigns/$campaignId'
@@ -877,6 +889,13 @@ declare module '@tanstack/react-router' {
       path: '/emails'
       fullPath: '/emails'
       preLoaderRoute: typeof AppEmailsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/install': {
+      id: '/_app/install'
+      path: '/install'
+      fullPath: '/install'
+      preLoaderRoute: typeof AppInstallRouteImport
       parentRoute: typeof AppRoute
     }
     '/a/$token': {
@@ -1265,6 +1284,7 @@ interface AppRouteChildren {
   AppAuditRoute: typeof AppAuditRoute
   AppDesignSystemRoute: typeof AppDesignSystemRoute
   AppEmailsRoute: typeof AppEmailsRoute
+  AppInstallRoute: typeof AppInstallRoute
   AppIndexRoute: typeof AppIndexRoute
   AppCampaignsCampaignIdRoute: typeof AppCampaignsCampaignIdRoute
   AppCatalogSettingsRoute: typeof AppCatalogSettingsRoute
@@ -1326,6 +1346,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppAuditRoute: AppAuditRoute,
   AppDesignSystemRoute: AppDesignSystemRoute,
   AppEmailsRoute: AppEmailsRoute,
+  AppInstallRoute: AppInstallRoute,
   AppIndexRoute: AppIndexRoute,
   AppCampaignsCampaignIdRoute: AppCampaignsCampaignIdRoute,
   AppCatalogSettingsRoute: AppCatalogSettingsRoute,

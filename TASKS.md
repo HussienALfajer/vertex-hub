@@ -12,15 +12,17 @@ PR order fixed by the spec's "Delivery" (owner, 2026-10-20); each part is deploy
 - [x] worker: `push.send` with `web-push` (VAPID, urgency/TTL by priority, retry 3) and the `log` transport to `.data/push/`; tests against a fake push service (201, 404, 410, 500)
 - [x] env: `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `PUSH_TRANSPORT` in config validation and `docs/deployment.md`
 - [x] bridge: `openapi:export`, `api:generate`; web typecheck
-- [ ] checks, reviewer, acceptance (API at `/api/docs`), PR with auto-merge
+- [x] checks, reviewer, acceptance (API at `/api/docs`), PR with auto-merge (#139, merged)
 
-## PR A2 — the app: web and E2E
-- [ ] `.env.example`: the push lines (A1's session could not edit `.env*` files): `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `PUSH_TRANSPORT` as placeholders; local VAPID keys in `.env` for manual testing (`npx web-push generate-vapid-keys`)
-- [ ] manifest, icons from `brand/logo` (new square PNGs), service worker (push, notificationclick, "remind me" action later in B), no `/api/` caching
-- [ ] install card, `/install` guide, update banner, icon badge, offline cache (IndexedDB, 7 days, no financial data) and banner
-- [ ] device rows: push state, test push, turn off; settings push column; re-subscribe after sign-in
-- [ ] E2E + RTL screenshots (desktop and phone, both themes); SW registration and a push via the `log` transport
-- [ ] checks, reviewer, acceptance (owner steps A1–A4), PR with auto-merge
+## PR A2 — the app: web and E2E (branch `feat/f16-a2-push-web`)
+- [x] `.env.example`: the push lines as placeholders (owner); local VAPID keys in `.env` (owner)
+- [x] icons in `brand/logo/app/` (192, 512, maskable 512, badge 96) and square `png/icon-192.png`, `png/apple-touch-icon.png`, from `vertex-mark.svg`; `publicDir` copies them
+- [x] manifest and service worker (vite-plugin-pwa 2.0 `injectManifest`, `src/service-worker/`): precache, app-shell navigation, `push`, `notificationclick`, no `/api/` caching; own `tsconfig.sw.json`
+- [x] install card (home), user-menu item, `/install` guide, update banner, icon badge
+- [x] offline: query cache in IndexedDB for 7 days (allowlist without money), cleared on sign-out, refusal and another user; banner, read-only shell, "Not available offline" in `LoadError`
+- [x] device push: card (settings, home invite), device rows (state, test, turn off), settings push column with priority chips and policy locks, silent re-subscribe after sign-in, closing read pushes on open and focus
+- [x] E2E: `f16.spec.ts`, `f16-push.spec.ts` (service worker push via CDP), screenshots (install card and guide, offline, desktop and phone, both themes); mocks for the push endpoints; Playwright blocks service workers elsewhere
+- [x] checks, reviewer, acceptance (owner: computer steps in Chrome; phone steps A1–A4 after the deploy), PR with auto-merge
 
 ## PR B1 — engine: contracts, db, api
 - [ ] box, resolution, snooze, escalation columns; `notification_policies`, `record_followers`, `timed_reminders`; `morning_push`
@@ -29,7 +31,7 @@ PR order fixed by the spec's "Delivery" (owner, 2026-10-20); each part is deploy
 - [ ] checks, reviewer, acceptance, PR with auto-merge
 
 ## PR B2 — engine: web
-- [ ] bell inboxes and snooze, notifications page tabs, settings (policy locks, morning push), policy page + delivery log tab, follow button, SW "remind me" action
+- [ ] bell inboxes and snooze, notifications page tabs, settings (policy locks, morning push, "turn all on or off" per category and channel), policy page + delivery log tab, follow button, SW action buttons "Open" and "Remind me in an hour" (rule A11)
 - [ ] E2E, checks, reviewer, acceptance (owner steps B5–B6), PR with auto-merge
 
 ## PR C1 (+ C1b if large) — catalog: api per module
@@ -44,5 +46,5 @@ PR order fixed by the spec's "Delivery" (owner, 2026-10-20); each part is deploy
 - [ ] checks, reviewer, acceptance, PR with auto-merge
 
 ## PR D2 — announcements: web
-- [ ] `AudiencePicker`, rich-text editor, list, page, receipts, poll, templates, home pin, critical dialog
+- [ ] `AudiencePicker`, rich-text editor, list, page, receipts, poll, templates, home pin, critical dialog; manifest shortcut "New announcement" (`apps/web/vite.config.ts`)
 - [ ] E2E, checks, reviewer, acceptance (owner step D8), PR with auto-merge, ROADMAP F16 done

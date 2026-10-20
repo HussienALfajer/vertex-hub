@@ -1,9 +1,10 @@
-import { type QueryClient, queryOptions, useQuery } from '@tanstack/react-query';
+import { onlineManager, type QueryClient, queryOptions, useQuery } from '@tanstack/react-query';
 import { useRouteContext } from '@tanstack/react-router';
 import type { MeResponse, Permission, PermissionScope } from '@vertex-hub/contracts';
 import { createAuthClient } from 'better-auth/client';
 import { twoFactorClient } from 'better-auth/client/plugins';
 import { api } from './api/client';
+import { clearOfflineCache } from './offline-cache';
 
 /** Better Auth is served by the API under the same origin (the Vite proxy locally, nginx in production). */
 export const authClient = createAuthClient({
@@ -29,6 +30,31 @@ export const meQuery = queryOptions({
   refetchOnWindowFocus: 'always',
   retry: false,
 });
+
+/** Whether the session was asked once since the app started (`loadMe`). */
+let sessionChecked = false;
+
+/**
+ * The signed-in user for the app shell's guard. The first time, online, the API is asked even when
+ * the device kept an answer (F16 rule A5): the session may have ended while the app was closed,
+ * and the kept data must not show to whoever signs in next. Offline, or when the API cannot be
+ * reached, the kept answer opens the app.
+ */
+export async function loadMe(queryClient: QueryClient): Promise<MeResponse | null> {
+  if (sessionChecked || !onlineManager.isOnline()) return queryClient.ensureQueryData(meQuery);
+  try {
+    // Even an answer kept a moment ago may belong to a session that has ended since.
+    const me = await queryClient.fetchQuery({ ...meQuery, staleTime: 0 });
+    sessionChecked = true;
+    // No page is open yet: whatever the device kept goes with the session.
+    if (!me) queryClient.removeQueries({ predicate: (query) => query.queryKey[0] !== 'me' });
+    return me;
+  } catch (error) {
+    const kept = queryClient.getQueryData(meQuery.queryKey);
+    if (kept) return kept;
+    throw error;
+  }
+}
 
 /**
  * The signed-in user inside the app shell, kept fresh by the query (the route context holds the
@@ -64,7 +90,7 @@ export function scopesOf(me: MeResponse, permission: Permission): PermissionScop
  * Leaves the signed-in state after sign-out or an expired session: stops running requests, marks
  * the session gone, runs `navigate` (to the sign-in page), then drops every cached answer once
  * the app's pages have unmounted, so nothing refetches with the old session and the next user
- * never sees the previous one's data.
+ * never sees the previous one's data; the copy kept on the device goes too (F16 rule A5).
  */
 export async function leaveSession(
   queryClient: QueryClient,
@@ -72,6 +98,7 @@ export async function leaveSession(
 ): Promise<void> {
   await queryClient.cancelQueries();
   queryClient.setQueryData(meQuery.queryKey, null);
+  await clearOfflineCache();
   await navigate();
   queryClient.removeQueries({ predicate: (query) => query.queryKey[0] !== meQuery.queryKey[0] });
 }

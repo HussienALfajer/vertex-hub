@@ -258,6 +258,7 @@ import {
   type PublicApproveAll,
   type PublicResponse,
   type PublishedLink,
+  type PushSubscriptionInput,
   packageIssues,
   periodInOneMonth,
   periodsOverlap,
@@ -1086,6 +1087,8 @@ export interface SessionRecord {
   lastLocation: IpLocation;
   signedInAt: string;
   lastActiveAt: string;
+  /** F16 rule A7: the session's push subscription, when push is on for the device. */
+  push?: { lastDeliveredAt: string | null };
 }
 
 /**
@@ -1194,8 +1197,10 @@ function signedInDevices(
         signIn: { at: s.signedInAt, ip: s.ip, location: s.location },
         lastActive: { at: s.lastActiveAt, ip: s.lastIp, location: s.lastLocation },
         sharedWith: [...shared.values()],
-        // F16 rule A12: no device of the mocks has push on.
-        push: { state: 'off' as const, lastDeliveredAt: null },
+        // F16 rule A12.
+        push: s.push
+          ? { state: 'on' as const, lastDeliveredAt: s.push.lastDeliveredAt }
+          : { state: 'off' as const, lastDeliveredAt: null },
       };
     })
     .sort(
@@ -1224,7 +1229,13 @@ interface MockOptions {
   content?: boolean;
   /** Adds October's shoots and meetings with their Photography tasks (`calendarSeed`, F11). */
   calendar?: boolean;
+  /** F16 rule A16: the server has VAPID keys; true by default. */
+  pushAvailable?: boolean;
 }
+
+/** A P-256 public key as `GET /api/me/push/config` sends it (fake: no private key exists). */
+export const VAPID_PUBLIC_KEY =
+  'BF2zxNv-SsZD27lwglRpNUJNl6Xaa3oaouS6vN-Uz7Iq-ASfBgy1CQSFhfF2Z1pCb3uOdtv_FhBNyXvBj_mR3gg';
 
 const json = (route: Route, body: unknown, status = 200) => route.fulfill({ status, json: body });
 /**
@@ -1250,6 +1261,8 @@ export interface MockedApi {
   signInAs: (next: MeResponse) => void;
   /** The hardware the page reported for its session (F01B rule 5). */
   hardwareReports: HardwareSignals[];
+  /** The push subscriptions the page stored on its session, and the test pushes (F16). */
+  push: { subscriptions: PushSubscriptionInput[]; tests: number; clicks: string[] };
 }
 
 /** Mocks the API with an in-memory team. `signedIn` decides whether /api/me finds a session. */
@@ -1259,6 +1272,8 @@ export async function mockApi(page: Page, options: MockOptions): Promise<MockedA
   const users = teamSeed();
   const sessions = options.sessions ?? sessionsSeed();
   const hardwareReports: HardwareSignals[] = [];
+  const pushAvailable = options.pushAvailable ?? true;
+  const push: MockedApi['push'] = { subscriptions: [], tests: 0, clicks: [] };
   /** This page's session, opened for the user when the list has none (or it was signed out). */
   const openSession = (preferred?: string) => {
     const found =
@@ -1520,6 +1535,36 @@ export async function mockApi(page: Page, options: MockOptions): Promise<MockedA
       hardwareReports.push(request.postDataJSON() as HardwareSignals);
       return route.fulfill({ status: 204 });
     }
+
+    // Push on the signed-in devices (F16 part A).
+    const current = sessions.find((s) => s.id === currentSession);
+    if (path === '/api/me/push/config' && method === 'GET') {
+      return json(route, {
+        available: pushAvailable,
+        vapidPublicKey: pushAvailable ? VAPID_PUBLIC_KEY : null,
+      });
+    }
+    if (path === '/api/me/push/subscription' && method === 'PUT') {
+      if (!pushAvailable || !current) return fail(route, 409, 'PUSH_UNAVAILABLE');
+      push.subscriptions.push(request.postDataJSON() as PushSubscriptionInput);
+      current.push = { lastDeliveredAt: null };
+      return route.fulfill({ status: 204 });
+    }
+    if (path === '/api/me/push/subscription' && method === 'DELETE') {
+      if (current) delete current.push;
+      return route.fulfill({ status: 204 });
+    }
+    if (path === '/api/me/push/test' && method === 'POST') {
+      if (!current?.push) return fail(route, 409, 'NO_SUBSCRIPTION');
+      push.tests += 1;
+      current.push.lastDeliveredAt = new Date().toISOString();
+      return route.fulfill({ status: 202 });
+    }
+    const pushClick = path.match(/^\/api\/me\/push\/deliveries\/([^/]+)\/click$/);
+    if (pushClick?.[1] && method === 'POST') {
+      push.clicks.push(pushClick[1]);
+      return route.fulfill({ status: 204 });
+    }
     if (path === '/api/me/sessions/sign-out-all' && method === 'POST') {
       const { includeCurrent } = request.postDataJSON() as { includeCurrent: boolean };
       const removed = sessions.filter(
@@ -1754,6 +1799,7 @@ export async function mockApi(page: Page, options: MockOptions): Promise<MockedA
       currentSession = openSession();
     },
     hardwareReports,
+    push,
   };
 }
 
@@ -9046,6 +9092,7 @@ function notificationRoutes({
   const muted = new Map<string, Set<NotificationType>>();
   const emailed = new Map<string, Set<NotificationType>>();
   const digest = new Map<string, boolean>();
+  const pushed = new Map<string, Set<NotificationType>>();
   const mine = () => notifications.filter((n) => n.recipientId === me().user.id);
   const unreadCount = () => mine().filter((n) => !n.read).length;
   const strip = ({ recipientId: _, ...rest }: NotificationRecord) => rest as Notification;
@@ -9058,7 +9105,10 @@ function notificationRoutes({
         mutable: NOTIFICATION_CATALOG[type].mutable,
         muted: off.has(type),
         priority: NOTIFICATION_CATALOG[type].priority,
-        push: NOTIFICATION_CATALOG[type].push !== 'off',
+        // F16 rule B3: the saved choice, else the catalog default.
+        push:
+          pushed.get(me().user.id)?.has(type) ??
+          ['on', 'required'].includes(NOTIFICATION_CATALOG[type].push),
         pushMode: NOTIFICATION_CATALOG[type].push,
         // F14 email: the saved choice, else the catalog defaults, kept while the type is muted.
         email:
@@ -9121,7 +9171,7 @@ function notificationRoutes({
       return json(route, settings());
     }
     if (path === '/api/me/notification-settings' && method === 'PUT') {
-      const { mutedTypes, emailTypes, digestEnabled } = route
+      const { mutedTypes, emailTypes, pushTypes, digestEnabled } = route
         .request()
         .postDataJSON() as UpdateNotificationSettings;
       if (mutedTypes.some((type) => !NOTIFICATION_CATALOG[type].mutable)) {
@@ -9129,6 +9179,7 @@ function notificationRoutes({
       }
       muted.set(me().user.id, new Set(mutedTypes));
       if (emailTypes) emailed.set(me().user.id, new Set(emailTypes));
+      if (pushTypes) pushed.set(me().user.id, new Set(pushTypes));
       if (digestEnabled !== undefined) digest.set(me().user.id, digestEnabled);
       return json(route, settings());
     }

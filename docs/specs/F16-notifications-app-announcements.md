@@ -418,7 +418,7 @@ Primary key `(announcement_id, user_id)`; index `(user_id)`.
    - `display` `standalone`, `start_url` `/`, `scope` `/`;
    - `theme_color` and `background_color` Vertex Green `#004139`;
    - icons 192, 512 and maskable 512;
-   - shortcuts: My tasks, Notifications, New announcement.
+   - shortcuts: My tasks, Notifications, New announcement (added with the announcements screens, PR D2).
 
    The icon files are made from `brand/logo/svg/vertex-mark-*.svg`:
    - `brand/logo/app/icon-192.png`, `icon-512.png`, `icon-maskable-512.png` (the mark inside the safe zone on green), `badge-96.png` (a white mark on transparent, for the Android status bar);
@@ -426,7 +426,7 @@ Primary key `(announcement_id, user_id)`; index `(user_id)`.
    - `brand/logo/png/icon-192.png` (192×191) is replaced by a square one.
 
    The build copies them from `brand/`; the app holds no copy.
-2. **Service worker** `/sw.js`, built with the web app; the exact plugin and version are fixed at implementation. It:
+2. **Service worker** `/sw.js`, built with the web app by vite-plugin-pwa 2.0 (`injectManifest`, Workbox 7.4 precaching; settled in A2). It:
    - precaches the app shell (HTML, JS, CSS, fonts, icons);
    - handles `push` and `notificationclick`;
    - never caches `/api/` responses.
@@ -458,7 +458,7 @@ Primary key `(announcement_id, user_id)`; index `(user_id)`.
    - Push is sent at any hour (no quiet hours) and whether or not the user is in the app (owner, 2026-10-20).
 9. **Lock-screen text.** Pushes show the full text of the notification, except money amounts: a push never contains an amount (owner, 2026-10-20). Types whose bell text holds an amount have a push variant without it in `packages/messages`: `ad_budget_low`, `retainer_amendment_pending`, `payment_recorded`, `payment_voided`. A test asserts that no push text contains a formatted amount.
 10. **Opening.** Clicking a push focuses an open window of the app and navigates it, or opens the app at the notification's link. It marks the notification read and records `clicked_at` (`POST /api/me/push/deliveries/:id/click`).
-11. **Action buttons**, where the platform shows them (Android, Chrome and Edge on computers; not iPhone): "Open" and "Remind me in an hour" (rule B8). "Remind me" works from the service worker without opening the app.
+11. **Action buttons**, where the platform shows them (Android, Chrome and Edge on computers; not iPhone): "Open" and "Remind me in an hour" (rule B8). "Remind me" works from the service worker without opening the app. They arrive with snoozing (PR B2); until then a click opens the link (rule A10).
 12. **Signed-in devices** (F01B). Each device row shows its push state (on · off · not supported) and the last push delivered. The current device has "Send a test notification" (at most one a minute) and "Turn off on this device". Signing a device out, or signing out of all devices, deletes its subscription with its session.
 13. **Dead subscriptions.**
     - A push service answer of 404 or 410 deletes the subscription (`gone`), and the user gets `push_device_lost` naming the device.

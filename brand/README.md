@@ -15,7 +15,8 @@ Visual identity rules: [identity.md](identity.md).
 | `logo/svg/favicon.svg` | Sand mark on a green rounded square | Browser favicon |
 | `logo/png/vertex-logo-{green,gold,white}.png` | 1024 px, transparent | Email clients and tools that don't support SVG |
 | `logo/png/vertex-mark-{green,gold,white}.png` | 512 px, transparent | Same |
-| `logo/png/icon-192.png`, `icon-512.png`, `apple-touch-icon.png` | Sand mark on Vertex Green | PWA manifest and home-screen icons |
+| `logo/png/icon-192.png`, `icon-512.png`, `apple-touch-icon.png` | Sand mark on Vertex Green, square | Home-screen icons; `apple-touch-icon.png` is the iPhone one (`apps/web/index.html`) |
+| `logo/app/icon-192.png`, `icon-512.png`, `icon-maskable-512.png`, `badge-96.png` | Sand mark on Vertex Green (maskable: full bleed, mark inside the safe zone); badge: white mark on transparent | The installed app's manifest and the Android status bar (F16); the web build serves this folder at its root |
 
 ## Provenance
 

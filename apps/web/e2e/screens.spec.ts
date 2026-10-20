@@ -176,6 +176,43 @@ for (const colorScheme of ['light', 'dark'] as const) {
       [1280, 900, 'desktop'],
       [390, 844, 'phone'],
     ] as const) {
+      // F16 screen 1: the install card on the home page and the guide.
+      test(`installing the app (${size})`, async ({ page }, testInfo) => {
+        await page.setViewportSize({ width, height });
+        await mockApi(page, { signedIn: true });
+        await page.goto('/');
+        await page.evaluate(() => {
+          const offer = Object.assign(new Event('beforeinstallprompt', { cancelable: true }), {
+            prompt: async () => undefined,
+            userChoice: new Promise(() => undefined),
+          });
+          window.dispatchEvent(offer);
+        });
+        await expect(page.getByText(ar.pwa.install.cardTitle)).toBeVisible();
+        await screenshot(page, testInfo, `install-card-${size}-${colorScheme}`);
+
+        await page.goto('/install');
+        await expect(page.getByRole('heading', { name: ar.pwa.guide.title })).toBeVisible();
+        await screenshot(page, testInfo, `install-guide-${size}-${colorScheme}`);
+      });
+
+      // F16 rule A5: the offline banner, with the actions turned off.
+      test(`offline (${size})`, async ({ page, context }, testInfo) => {
+        await page.setViewportSize({ width, height });
+        await mockApi(page, { signedIn: true });
+        await page.goto('/');
+        await expect(page.getByRole('heading', { name: ar.dashboard.title })).toBeVisible();
+        await context.setOffline(true);
+        await expect(page.getByText(ar.pwa.offline.hint)).toBeVisible();
+        await screenshot(page, testInfo, `offline-${size}-${colorScheme}`);
+        await context.setOffline(false);
+      });
+    }
+
+    for (const [width, height, size] of [
+      [1280, 900, 'desktop'],
+      [390, 844, 'phone'],
+    ] as const) {
       test(`signed-in devices (${size})`, async ({ page }, testInfo) => {
         await page.setViewportSize({ width, height });
         await page.clock.setFixedTime(new Date(DEVICES_NOW));
