@@ -96,9 +96,32 @@ export class QuoteNotices implements OnModuleInit {
     );
   }
 
-  /** Accepted or extended: the reminder is done. */
-  resolveExpiring(tx: Transaction, quoteId: string, actorId: string): Promise<number> {
-    return this.center.resolve(tx, expiringClosed(quoteId, 'done', actorId));
+  /** Accepted or extended: the reminder is done; superseded by a new version: void. */
+  resolveExpiring(
+    tx: Transaction,
+    quoteId: string,
+    actorId: string,
+    outcome: NotificationResolution = 'done',
+  ): Promise<number> {
+    return this.center.resolve(tx, expiringClosed(quoteId, outcome, actorId));
+  }
+
+  /**
+   * The General Managers' `quote_approval_requested`: `done` when decided, `void` when the
+   * request is withdrawn or its draft discarded.
+   */
+  resolveApproval(
+    tx: Transaction,
+    quoteId: string,
+    outcome: NotificationResolution,
+    actorId: string,
+  ): Promise<number> {
+    return this.center.resolve(tx, {
+      subject: { type: 'quote', id: quoteId },
+      types: ['quote_approval_requested'],
+      outcome,
+      actorId,
+    });
   }
 
   /**

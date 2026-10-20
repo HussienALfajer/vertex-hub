@@ -74,13 +74,15 @@ export class EngagementNotices {
 
   /**
    * The account manager, the project manager and the managers of the project's departments;
-   * Finance too when it completes or is cancelled.
+   * Finance too when it completes or is cancelled. `assignedId`: a new project manager told of
+   * the project by the same change, who is not told twice (F14 rule 2).
    */
   async projectStatus(
     tx: Transaction,
     project: NoticeProject,
     status: ProjectStatus,
     actorId: string,
+    assignedId: string | null = null,
   ): Promise<void> {
     const [row] = await tx
       .select({ departments: projects.departments })
@@ -98,7 +100,7 @@ export class EngagementNotices {
         project.projectManagerId,
         ...[...managers.values()].flat(),
         ...finance,
-      ],
+      ].filter((userId) => userId !== assignedId),
       actorId,
       subjectId: project.id,
       data: { project: project.name, client: project.client.name, status },

@@ -278,12 +278,14 @@ export class ClientFactory {
 
   /**
    * F16 part C: a client became active, paused or ended; its account manager, the General
-   * Managers, the Internal Operations managers and Finance hear about it.
+   * Managers, the Internal Operations managers and Finance hear about it. `assignedId`: a new
+   * account manager told of the client by the same change, who is not told twice (F14 rule 2).
    */
   async notifyStatus(
     tx: Transaction,
     actor: AuditActor | null,
     client: { id: string; tradeName: string; accountManagerId: string; status: ClientStatus },
+    assignedId: string | null = null,
   ): Promise<void> {
     const [managers, finance, ops] = await Promise.all([
       this.users.withRole('general_manager', tx),
@@ -292,7 +294,12 @@ export class ClientFactory {
     ]);
     await this.notifications.notify(tx, {
       type: 'client_status_changed',
-      recipients: [client.accountManagerId, ...managers, ...finance, ...[...ops.values()].flat()],
+      recipients: [
+        client.accountManagerId,
+        ...managers,
+        ...finance,
+        ...[...ops.values()].flat(),
+      ].filter((userId) => userId !== assignedId),
       actorId: actor?.id ?? null,
       subjectId: client.id,
       data: { client: client.tradeName, status: client.status },

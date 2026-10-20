@@ -371,12 +371,17 @@ export class ClientsService implements OnModuleInit {
         );
       }
       if (statusChange && input.status) {
-        await this.factory.notifyStatus(tx, actorOf(actor), {
-          id,
-          tradeName,
-          accountManagerId: manager?.id ?? current.accountManagerId,
-          status: input.status,
-        });
+        await this.factory.notifyStatus(
+          tx,
+          actorOf(actor),
+          {
+            id,
+            tradeName,
+            accountManagerId: manager?.id ?? current.accountManagerId,
+            status: input.status,
+          },
+          managerChange && manager ? manager.id : null,
+        );
       }
     });
     return this.detail(actor, id);

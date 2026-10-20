@@ -543,6 +543,7 @@ export class ProjectsService implements OnModuleInit {
         { ...project, projectManagerId: manager?.id ?? project.projectManagerId },
         to,
         actor.id,
+        managerChanges && manager ? manager.id : null,
       );
     });
     return this.detail(actor, id);

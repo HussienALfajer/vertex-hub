@@ -4,7 +4,6 @@ import {
   businessDate,
   type ExtendQuote,
   installmentsValid,
-  type NotificationResolution,
   needsDiscountApproval,
   QUOTE_LIMITS,
   QUOTES_DAILY_JOB,
@@ -94,7 +93,7 @@ export class QuoteWorkflowService implements OnModuleInit {
         await this.audit(tx, actor, quote, 'quote.approval_withdrawn', {
           discountApproval: 'none',
         });
-        await this.resolveApproval(tx, quote.id, 'void', actor.id);
+        await this.notices.resolveApproval(tx, quote.id, 'void', actor.id);
         return this.quotes.toDetail(actor, updated, client, tx);
       }
       if (!['none', 'returned'].includes(quote.discountApproval)) {
@@ -151,7 +150,7 @@ export class QuoteWorkflowService implements OnModuleInit {
         approved ? 'quote.approval_approved' : 'quote.approval_returned',
         { discountApproval: updated.discountApproval, ...(input.note ? { note: input.note } : {}) },
       );
-      await this.resolveApproval(tx, quote.id, 'done', actor.id);
+      await this.notices.resolveApproval(tx, quote.id, 'done', actor.id);
       if (quote.discountRequestedById) {
         await this.notifications.notify(tx, {
           type: 'quote_approval_decided',
@@ -270,6 +269,8 @@ export class QuoteWorkflowService implements OnModuleInit {
           before: { ...identity(older), status: older.status },
           after: { ...identity(older), status: 'superseded', byQuoteId: quote.id },
         });
+        // F16 part C: the older version's expiry no longer applies.
+        await this.notices.resolveExpiring(tx, older.id, actor.id, 'void');
       }
       // F03 rule 14: sending a lead quote moves the lead to Quote sent.
       if (client.kind === 'lead') {
@@ -422,21 +423,6 @@ export class QuoteWorkflowService implements OnModuleInit {
       },
     );
     return expired;
-  }
-
-  /** F16 part C: the General Managers' `quote_approval_requested` is decided or withdrawn. */
-  private resolveApproval(
-    tx: Transaction,
-    quoteId: string,
-    outcome: NotificationResolution,
-    actorId: string,
-  ): Promise<number> {
-    return this.notifications.resolve(tx, {
-      subject: { type: 'quote', id: quoteId },
-      types: ['quote_approval_requested'],
-      outcome,
-      actorId,
-    });
   }
 
   private async children(tx: Transaction, quote: QuoteRow): Promise<QuoteChildren> {

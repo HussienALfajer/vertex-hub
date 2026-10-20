@@ -183,12 +183,20 @@ describe('notification catalog of the sales and engagement modules (F16 part C)'
       const lead = await cast.createLead();
       await plant(followUpDue(lead.id));
       await ok(
-        await client.post(`/api/leads/${lead.id}/lose`, cast.gm.cookie, { reason: 'price' }),
+        await client.post(`/api/leads/${lead.id}/lose`, cast.am.cookie, { reason: 'price' }),
       );
-      for (const recipientId of [cast.am.id, salesManager.id]) {
+      for (const recipientId of [cast.gm.id, salesManager.id]) {
         await oneOf(recipientId, 'lead_lost', lead.id);
       }
       expect((await oneOf(cast.am.id, 'lead_follow_up_due', lead.id)).resolution).toBe('done');
+    });
+
+    it('voids the follow-up reminder of an archived lead', async () => {
+      const lead = await cast.createLead();
+      await plant(followUpDue(lead.id));
+      const archived = await client.post(`/api/leads/${lead.id}/archive`, cast.gm.cookie, {});
+      expect(archived.status, await archived.clone().text()).toBeLessThan(300);
+      expect((await oneOf(cast.am.id, 'lead_follow_up_due', lead.id)).resolution).toBe('void');
     });
 
     it('tells the previous owner who owns the lead now (rule 4)', async () => {
@@ -276,6 +284,17 @@ describe('notification catalog of the sales and engagement modules (F16 part C)'
       await app.get(QuoteWorkflowService).runDaily(addDays(today, 1));
       expect((await oneOf(cast.am.id, 'quote_expiring', quote.id)).resolution).toBe('void');
       expect(await oneOf(cast.am.id, 'quote_expired', quote.id)).toMatchObject({ box: 'info' });
+    });
+
+    it('voids the reminder of a version a new one supersedes', async () => {
+      const quote = await sentQuote();
+      await expiresOn(quote.id, addDays(today, 2));
+      await app.get(QuoteNotices).remindExpiring(today);
+      const next = quoteDetailSchema.parse(
+        await ok(await client.post(`/api/quotes/${quote.id}/versions`, cast.am.cookie, {}), 201),
+      );
+      await ok(await client.post(`/api/quotes/${next.id}/send`, cast.am.cookie, {}));
+      expect((await oneOf(cast.am.id, 'quote_expiring', quote.id)).resolution).toBe('void');
     });
 
     it('tells the creator and the General Managers of a rejection, closing the reminder', async () => {

@@ -698,6 +698,13 @@ describe('retainer contracts (F05C K1–K12)', () => {
         (body) => contractAnnexSchema.parse(body),
       );
       expect(voided).toMatchObject({ status: 'void', voided: { reason: 'خطأ في التاريخ' } });
+      // F16 part C: the annex's signature and its voiding, by number.
+      for (const type of ['contract_signed', 'contract_voided'] as const) {
+        const told = await noticesOf(finance.id, type, held.id);
+        expect(told.map((row) => row.data)).toContainEqual(
+          expect.objectContaining({ contract: contract.number, annex: 1 }),
+        );
+      }
       // A void annex frees the amendment: the next annex takes number 2.
       const second = await ok(await annex(change), (body) => contractAnnexSchema.parse(body), 201);
       expect(second.annexNumber).toBe(2);
