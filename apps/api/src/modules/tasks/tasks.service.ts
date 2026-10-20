@@ -522,6 +522,8 @@ export class TasksService {
             actor.id,
           ),
     ]);
+    // F16 rule B12: the creator and the assignee follow the task.
+    await this.notices.follow(tx, created.id, [actor.id, input.assigneeId ?? null]);
     return created.id;
   }
 
@@ -792,7 +794,7 @@ export class TasksService {
       }
       // F08 rule 8: an archived task leaves its post.
       await unlinkRemovedTask(tx, this.postHooks, task, 'archived', actorOf(actor));
-      await this.notices.send(tx, [
+      await this.notices.sendChange(tx, task, actor.id, [
         this.notices.notice(task, 'task_changed', [task.assigneeId], actor.id, {
           change: 'archived',
           from: null,
@@ -883,7 +885,10 @@ export class TasksService {
         }),
       );
     }
-    await this.notices.send(tx, list);
+    if (after.assigneeId !== before.assigneeId) {
+      await this.notices.follow(tx, after.id, [after.assigneeId]);
+    }
+    await this.notices.sendChange(tx, before, actor.id, list);
   }
 
   /**

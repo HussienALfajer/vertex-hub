@@ -57,8 +57,15 @@ export interface FileOwner {
      */
     sentVersionIds: readonly string[];
   } | null;
-  /** For posts (F08): files change only while the content is unlocked (`POST_LOCKED`). */
-  post?: { locked: boolean };
+  /**
+   * For posts (F08): files change only while the content is unlocked (`POST_LOCKED`); F16 part
+   * C: who `post_file_added` tells, and the post's snapshot.
+   */
+  post?: {
+    locked: boolean;
+    responsibleId: string;
+    snapshot: NotificationData<'post_file_added'>['post'];
+  };
   rights: FileOwnerRights;
 }
 

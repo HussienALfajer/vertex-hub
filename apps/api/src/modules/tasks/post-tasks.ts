@@ -18,7 +18,7 @@ import type { CurrentUserInfo } from '../auth/index.js';
 import { EngagementDirectory } from '../projects/index.js';
 import { clearPostLink } from './post-task-hooks.js';
 import { accessColumns, actorOf } from './task-access.js';
-import { requesterOf, TaskNotices } from './task-notices.js';
+import { TaskNotices } from './task-notices.js';
 import { TaskReviews } from './task-reviews.js';
 import { TasksService } from './tasks.service.js';
 
@@ -212,6 +212,13 @@ export class PostTasks {
         ...(task.needsClientApproval && { needsClientApproval: false }),
       },
     });
+    // F16 part C: a linked task answers the post's "a task was unlinked" notice.
+    await this.notices.resolve(tx, {
+      subject: { type: 'post', id: post.id },
+      types: ['post_task_unlinked'],
+      outcome: 'done',
+      actorId: actor.id,
+    });
     return linked;
   }
 
@@ -362,7 +369,7 @@ export class PostTasks {
       },
     });
     const notice = this.notices.notice.bind(this.notices);
-    await this.notices.send(tx, [
+    await this.notices.sendChange(tx, task, actor.id, [
       notice(task, 'task_returned', [task.assigneeId], actor.id, {
         source: response ? 'client' : 'internal',
       }),
@@ -399,11 +406,11 @@ export class PostTasks {
     const linked = await this.assertApproved(tx, postId);
     if (linked.length === 0) return;
     const ids = linked.map((task) => task.id);
+    const delivered = await this.notices.loadMany(tx, ids);
     await tx
       .update(tasks)
       .set({ status: 'delivered', deliveredAt: new Date() })
       .where(inArray(tasks.id, ids));
-    const delivered = await this.notices.loadMany(tx, ids);
     for (const task of delivered) {
       await recordAudit(tx, {
         actor,
@@ -414,14 +421,9 @@ export class PostTasks {
         after: { status: 'delivered', reason: 'post_published', postId },
       });
     }
-    await this.notices.send(
-      tx,
-      delivered.map((task) =>
-        this.notices.notice(task, 'request_finished', [requesterOf(task)], actor.id, {
-          outcome: 'delivered',
-        }),
-      ),
-    );
+    for (const task of delivered) {
+      await this.notices.sendChange(tx, task, actor.id, this.notices.delivered(task, actor.id));
+    }
   }
 
   /** The tasks linked to the post, locked by id (the order of every task lock set), by link time. */

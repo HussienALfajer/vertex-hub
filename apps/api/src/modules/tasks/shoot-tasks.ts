@@ -4,6 +4,7 @@ import {
   createTaskSchema,
   type DepartmentCode,
   SHOOT_DEPARTMENT,
+  TASK_DUE_TYPES,
   type TaskStatus,
 } from '@vertex-hub/contracts';
 import { type Database, type Transaction, taskDependencies, tasks } from '@vertex-hub/db';
@@ -14,7 +15,7 @@ import type { CurrentUserInfo } from '../auth/index.js';
 import { ClientReviewHooks } from './client-review-hooks.js';
 import { actorOf } from './task-access.js';
 import { cancelledColumns, TaskHooksService } from './task-hooks.service.js';
-import { blocksDependents, requesterOf, TaskNotices } from './task-notices.js';
+import { blocksDependents, TaskNotices } from './task-notices.js';
 import { TasksService } from './tasks.service.js';
 
 type Executor = Database | Transaction;
@@ -206,6 +207,13 @@ export class ShootTasks {
       before: { dueDate: task.dueDate },
       after: { dueDate },
     });
+    // F16 rule B5: the reminders of the old date no longer apply.
+    await this.notices.resolve(tx, {
+      subject: { type: 'task', id: task.id },
+      types: TASK_DUE_TYPES,
+      outcome: 'void',
+      actorId: actor.id,
+    });
   }
 
   /**
@@ -237,10 +245,8 @@ export class ShootTasks {
     if (task.status === 'awaiting_client') {
       await this.reviewHooks.left(tx, { taskId, actor: actorOf(actor), response: null });
     }
-    await this.notices.send(tx, [
-      this.notices.notice(task, 'request_finished', [requesterOf(task)], actor.id, {
-        outcome: 'delivered',
-      }),
+    await this.notices.sendChange(tx, task, actor.id, [
+      ...this.notices.delivered(task, actor.id),
       ...(blocksDependents(task)
         ? await this.notices.openedDependents(tx, [taskId], actor.id)
         : []),

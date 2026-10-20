@@ -203,7 +203,12 @@ export class TaskHooksService implements OnModuleInit {
       // F08 rule 8: a cancelled task leaves its post.
       await unlinkRemovedTask(tx, this.postHooks, task, 'cancelled', actor);
       const cancelled = await this.notices.load(tx, task.id);
-      await this.notices.send(tx, this.notices.cancelled(cancelled, actor.id));
+      await this.notices.sendChange(
+        tx,
+        { ...cancelled, status: task.status },
+        actor.id,
+        this.notices.cancelled(cancelled, actor.id),
+      );
     }
     // Rule 7: the tasks waiting on the cancelled ones, once each.
     const blocking = open.filter((task) => blocksDependents({ ...task, archivedAt: null }));

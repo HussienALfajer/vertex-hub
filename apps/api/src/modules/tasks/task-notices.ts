@@ -5,13 +5,20 @@ import {
   type NotificationData,
   type NotificationType,
   type TaskDependency,
+  type TaskResolutionState,
   type TimeOfDay,
+  taskResolutions,
 } from '@vertex-hub/contracts';
 import { type Database, type Transaction, tasks } from '@vertex-hub/db';
 import { inArray } from 'drizzle-orm';
 import { UserDirectory } from '../auth/index.js';
 import { ClientDirectory, type ClientSummary } from '../clients/index.js';
-import { type Notice, NotificationCenter } from '../notifications/index.js';
+import {
+  type Notice,
+  NotificationCenter,
+  RecordFollowers,
+  type Resolution,
+} from '../notifications/index.js';
 import { EngagementDirectory, type ProjectLink } from '../projects/index.js';
 import { accessColumns, type TaskRow } from './task-access.js';
 import { dependentsOf, isBlocked } from './task-dependencies.js';
@@ -37,6 +44,16 @@ export const requesterOf = (task: NoticeTask): string | null =>
 export const blocksDependents = (task: Pick<TaskRow, 'status' | 'archivedAt'>): boolean =>
   !task.archivedAt && !isTaskFinished(task.status) && task.status !== 'cancelled';
 
+/** The fields the F16 resolution rules read. */
+const resolutionState = (task: TaskRow): TaskResolutionState => ({
+  status: task.status,
+  reviewStage: task.reviewStage,
+  assigneeId: task.assigneeId,
+  dueDate: task.dueDate,
+  dueTime: toTimeOfDay(task.dueTime),
+  archived: !!task.archivedAt,
+});
+
 /** `HH:MM:SS` from the database to `HH:MM`. */
 export const toTimeOfDay = (time: string | null): TimeOfDay | null => time?.slice(0, 5) ?? null;
 
@@ -52,6 +69,7 @@ export class TaskNotices {
     private readonly clients: ClientDirectory,
     private readonly engagements: EngagementDirectory,
     private readonly center: NotificationCenter,
+    private readonly followers: RecordFollowers,
   ) {}
 
   /** The task as it is now in the transaction, with its client and project. */
@@ -149,6 +167,24 @@ export class TaskNotices {
     return notices;
   }
 
+  /**
+   * A delivered task: its requester, then (F16 part C) the project manager and the account
+   * manager.
+   */
+  delivered(task: NoticeTask, actorId: string | null): Notice[] {
+    return [
+      this.notice(task, 'request_finished', [requesterOf(task)], actorId, {
+        outcome: 'delivered',
+      }),
+      this.notice(
+        task,
+        'task_delivered',
+        [task.project?.projectManagerId ?? null, task.client?.accountManagerId ?? null],
+        actorId,
+      ),
+    ];
+  }
+
   /** A cancelled task: its assignee and its requester hear about it. */
   cancelled(task: NoticeTask, actorId: string | null): Notice[] {
     return [
@@ -163,7 +199,67 @@ export class TaskNotices {
     ];
   }
 
-  send(tx: Transaction, notices: readonly Notice[]): Promise<number> {
-    return this.center.notify(tx, notices);
+  send(
+    tx: Transaction,
+    notices: readonly Notice[],
+    resolutions: readonly Resolution[] = [],
+  ): Promise<number> {
+    return this.center.notify(tx, notices, resolutions);
+  }
+
+  /**
+   * F16 part C: sends the notices of one change of the task (`before`: the task as it was) with
+   * what the change closes (rule B5) and, when its status moved, `task_progressed` to its
+   * followers, which the first-match order drops for those another notice of the change already
+   * tells (rule B12). `resolutions` adds what events of the change close.
+   */
+  async sendChange(
+    tx: Transaction,
+    before: TaskRow,
+    actorId: string | null,
+    notices: readonly Notice[] = [],
+    resolutions: readonly Resolution[] = [],
+  ): Promise<number> {
+    const after = await this.load(tx, before.id);
+    const subject = { type: 'task' as const, id: before.id };
+    const progressed =
+      before.status === after.status
+        ? []
+        : [
+            this.notice(
+              after,
+              'task_progressed',
+              await this.followers.recipients(tx, subject, 'tasks.read'),
+              actorId,
+              { status: after.status },
+            ),
+          ];
+    return this.center.notify(
+      tx,
+      [...notices, ...progressed],
+      [
+        ...taskResolutions(resolutionState(before), resolutionState(after)).map((rule) => ({
+          subject,
+          ...rule,
+          actorId,
+        })),
+        ...resolutions,
+      ],
+    );
+  }
+
+  /** Rule B12: the users follow the task from now on, unless they unfollowed it. */
+  follow(tx: Transaction, taskId: string, userIds: readonly (string | null)[]): Promise<void> {
+    return this.followers.follow(tx, { type: 'task', id: taskId }, userIds);
+  }
+
+  /** Rule B12: the followers who receive the task's notices. */
+  followersOf(tx: Transaction, taskId: string): Promise<string[]> {
+    return this.followers.recipients(tx, { type: 'task', id: taskId }, 'tasks.read');
+  }
+
+  /** Rule B5: closes what an event of a task change closes (a mention answered, a task linked). */
+  resolve(tx: Transaction, resolution: Resolution): Promise<number> {
+    return this.center.resolve(tx, resolution);
   }
 }

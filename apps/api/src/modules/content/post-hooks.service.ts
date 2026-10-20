@@ -8,6 +8,7 @@ import { ClientDirectory } from '../clients/index.js';
 import { type FileOwner, FileOwnerRegistry } from '../files/index.js';
 import { WorkProgress } from '../projects/index.js';
 import { holdsAll, isReadOnly, postRights, readablePost } from './post-access.js';
+import { toTimeOfDay } from './post-notices.js';
 
 type Executor = Database | Transaction;
 
@@ -71,7 +72,16 @@ export class PostHooksService implements OnModuleInit {
       label: post.title,
       archivedCode: isReadOnly(post) ? 'POST_ARCHIVED' : null,
       task: null,
-      post: { locked: !isPostContentEditable(post.status) },
+      post: {
+        locked: !isPostContentEditable(post.status),
+        responsibleId: post.responsibleId,
+        snapshot: {
+          title: post.title,
+          client: post.client.name,
+          publishDate: post.publishDate,
+          publishTime: toTimeOfDay(post.publishTime),
+        },
+      },
       rights: {
         addDeliverable: edit,
         addReference: false,
