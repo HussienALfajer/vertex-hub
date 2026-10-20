@@ -229,6 +229,7 @@ export const NOTIFICATION_TEXT = {
   lead_won: 'حوّل {{actor}} العميل المحتمل «{{lead}}» إلى عميل',
   lead_follow_up_overdue: 'تأخرت متابعة العميل المحتمل «{{lead}}»؛ كان موعدها {{date}}',
   lead_follow_up_due: 'حان موعد متابعة العميل المحتمل «{{lead}}»',
+  push_device_lost: 'توقفت الإشعارات على {{device}}. فعّلها من جديد من ذلك الجهاز',
   /** The parts of a shoot or a meeting that changed. */
   changes: {
     shoot: { time: 'الموعد', location: 'المكان', lead: 'القائد' },
@@ -312,6 +313,9 @@ export function notificationLink(notification: Notification): NotificationLink {
       return { to: '/invoices/$invoiceId', params: { invoiceId: subject.id } };
     case 'lead':
       return { to: '/leads/$leadId', params: { leadId: subject.id } };
+    case 'user':
+      // F16 rule A13: the signed-in devices are on My account.
+      return { to: '/account' };
     default:
       return { to: '/tasks/$taskId', params: { taskId: subject.id } };
   }
@@ -639,6 +643,11 @@ export function notificationText(
       const values = { actor, meeting: meeting.title, when: formatDateTime(meeting.startsAt) };
       return { text: calendarText(notification, values), context: meeting.client };
     }
+    case 'push_device_lost':
+      return {
+        text: fill(text.push_device_lost, { device: notification.data.device }),
+        context: null,
+      };
     default: {
       const { task } = notification.data;
       return {
@@ -702,6 +711,7 @@ type TaskNotification = Exclude<
       | 'approval_no_response'
       | 'approval_expired'
       | `post_${string}`
+      | 'push_device_lost'
       | CalendarNotification['type'];
   }
 >;

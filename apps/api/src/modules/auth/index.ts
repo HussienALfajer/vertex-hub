@@ -3,6 +3,7 @@ export { AuthModule } from './auth.module.js';
 export { createUser, type NewUser } from './create-user.js';
 export { CurrentUser, type CurrentUserInfo } from './current-user.decorator.js';
 export { deviceCookie } from './device-cookie.js';
+export { type DevicePushLookup, DevicePushStates } from './device-push-states.js';
 export { resetTwoFactor, userIdByEmail } from './reset-two-factor.js';
 export { type ResponsibilityCheck, ResponsibilityRegistry } from './responsibility-registry.js';
 export {

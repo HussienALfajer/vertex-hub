@@ -43,6 +43,11 @@ export const envSchema = z
       .string()
       .refine((value) => Buffer.from(value, 'base64').length === 32, 'Expected 32 bytes, base64')
       .optional(),
+    /**
+     * F16 rule A16 (ADR 0036): the VAPID public key the browsers subscribe with; the private key
+     * stays with the worker. Without it, push is unavailable and the app hides it.
+     */
+    VAPID_PUBLIC_KEY: z.string().min(1).optional(),
   })
   .refine((env) => env.NODE_ENV !== 'production' || env.EMAIL_SECRET_KEY, {
     message: 'EMAIL_SECRET_KEY is required in production',

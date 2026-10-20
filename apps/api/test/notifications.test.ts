@@ -227,8 +227,12 @@ describe('notifications', () => {
         category: 'tasks',
         mutable: false,
         muted: false,
-        // F14 email rule 2: emailed by default.
+        priority: 'important',
+        // F16: pushed and emailed by default.
+        push: true,
+        pushMode: 'on',
         email: true,
+        emailMode: 'on',
         emailLocked: false,
       });
       expect(initial.types.every((type) => !type.muted)).toBe(true);

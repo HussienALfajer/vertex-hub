@@ -46,6 +46,7 @@ export const PERMISSIONS = [
   'reports.read',
   'reports.finance',
   'audit.read',
+  'notifications.policy',
 ] as const;
 
 export const permissionSchema = z.enum(PERMISSIONS).meta({ id: 'Permission' });
@@ -148,6 +149,7 @@ export const DEPARTMENT_CAPABILITIES: Readonly<
       'quotes.read': 'all',
       'quotes.manage': 'all',
       'audit.read': 'all',
+      'notifications.policy': 'all',
       'templates.read': 'all',
       'templates.manage': 'all',
       'projects.manage': 'all',

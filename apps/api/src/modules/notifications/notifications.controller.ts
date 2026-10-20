@@ -170,7 +170,10 @@ export class NotificationsController {
     description: 'The settings after the change',
     standardSchema: notificationSettingsSchema,
   })
-  @ApiBadRequestResponse({ description: '`NOT_MUTABLE`: a type that requires action' })
+  @ApiBadRequestResponse({
+    description:
+      '`NOT_MUTABLE`: a type that requires action; `CHANNEL_REQUIRED`: a required type left out of `pushTypes` or `emailTypes`; `CHANNEL_UNAVAILABLE`: an unavailable type in them',
+  })
   updateSettings(
     @CurrentUser() current: CurrentUserInfo,
     @Body({ schema: updateNotificationSettingsSchema }) input: UpdateNotificationSettings,

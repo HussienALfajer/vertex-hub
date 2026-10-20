@@ -452,6 +452,86 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/me/push/config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PushController_config"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/me/push/subscription": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["PushController_subscribe"];
+        post?: never;
+        delete: operations["PushController_unsubscribe"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/me/push/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PushController_test"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/me/push/deliveries/{id}/click": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PushController_click"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/push-deliveries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PushController_deliveries"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/files/uploads": {
         parameters: {
             query?: never;
@@ -4786,7 +4866,7 @@ export interface components {
             scopes: components["schemas"]["PermissionScope"][];
         };
         /** @enum {string} */
-        Permission: "users.read" | "users.manage" | "clients.read" | "clients.manage" | "clients.log" | "leads.read" | "leads.manage" | "catalog.read" | "catalog.manage" | "quotes.read" | "quotes.manage" | "quotes.approve_discount" | "projects.read" | "projects.manage" | "retainers.approve_reduction" | "tasks.read" | "tasks.request" | "tasks.work" | "tasks.manage" | "templates.read" | "templates.manage" | "content.read" | "content.manage" | "content.review" | "approvals.review_medical" | "calendar.read" | "shoots.manage" | "meetings.manage" | "campaigns.read" | "campaigns.manage" | "campaigns.fund" | "invoices.read" | "invoices.manage" | "invoices.send" | "payments.manage" | "expenses.manage" | "reports.read" | "reports.finance" | "audit.read";
+        Permission: "users.read" | "users.manage" | "clients.read" | "clients.manage" | "clients.log" | "leads.read" | "leads.manage" | "catalog.read" | "catalog.manage" | "quotes.read" | "quotes.manage" | "quotes.approve_discount" | "projects.read" | "projects.manage" | "retainers.approve_reduction" | "tasks.read" | "tasks.request" | "tasks.work" | "tasks.manage" | "templates.read" | "templates.manage" | "content.read" | "content.manage" | "content.review" | "approvals.review_medical" | "calendar.read" | "shoots.manage" | "meetings.manage" | "campaigns.read" | "campaigns.manage" | "campaigns.fund" | "invoices.read" | "invoices.manage" | "invoices.send" | "payments.manage" | "expenses.manage" | "reports.read" | "reports.finance" | "audit.read" | "notifications.policy";
         /** @enum {string} */
         PermissionScope: "all" | "department" | "own_clients" | "assigned";
         UpdateOwnProfile: {
@@ -4836,6 +4916,7 @@ export interface components {
                 location: components["schemas"]["IpLocation"];
             };
             sharedWith: components["schemas"]["SharedDeviceUser"][];
+            push: components["schemas"]["DevicePush"];
         };
         IpLocation: ({
             countryCode: string;
@@ -4861,6 +4942,12 @@ export interface components {
         };
         /** @enum {string} */
         DeviceMatch: "same_browser" | "same_device";
+        DevicePush: {
+            /** @enum {string} */
+            state: "on" | "off";
+            /** Format: date-time */
+            lastDeliveredAt: string | null;
+        };
         HardwareSignals: {
             cores: number | null;
             timeZone: string | null;
@@ -4989,7 +5076,7 @@ export interface components {
             email: string;
         };
         /** @enum {string} */
-        NotificationCategory: "tasks" | "reminders" | "calendar" | "clients_projects";
+        NotificationCategory: "tasks" | "reminders" | "calendar" | "clients_projects" | "account";
         /** @description Newest `updatedAt` first */
         NotificationPage: {
             items: components["schemas"]["Notification"][];
@@ -6794,9 +6881,33 @@ export interface components {
                 /** Format: date */
                 followUpOn: string;
             };
+        } | {
+            /** Format: uuid */
+            id: string;
+            actor: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            subject: {
+                type: components["schemas"]["NotificationSubjectType"];
+                /** Format: uuid */
+                id: string;
+            };
+            count: number;
+            read: boolean;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @enum {string} */
+            type: "push_device_lost";
+            data: {
+                device: string;
+            };
         };
         /** @enum {string} */
-        NotificationSubjectType: "task" | "client" | "project" | "retainer" | "template_run" | "approval_request" | "post" | "shoot" | "meeting" | "quote" | "invoice" | "lead";
+        NotificationSubjectType: "task" | "client" | "project" | "retainer" | "template_run" | "approval_request" | "post" | "shoot" | "meeting" | "quote" | "invoice" | "lead" | "user";
         /** @enum {string} */
         TermEndAction: "renew" | "end" | "continue";
         /** @enum {string} */
@@ -6817,18 +6928,70 @@ export interface components {
                 category: components["schemas"]["NotificationCategory"];
                 mutable: boolean;
                 muted: boolean;
+                priority: components["schemas"]["NotificationPriority"];
+                push: boolean;
+                pushMode: components["schemas"]["ChannelMode"];
                 email: boolean;
+                emailMode: components["schemas"]["ChannelMode"];
                 emailLocked: boolean;
             }[];
             digestEnabled: boolean;
         };
         /** @enum {string} */
-        NotificationType: "task_assigned" | "task_mentioned" | "task_returned" | "task_review_requested" | "task_medical_review_requested" | "task_awaiting_client" | "task_over_limit" | "approval_responded" | "approval_no_response" | "approval_expired" | "task_changed" | "task_commented" | "task_file_added" | "task_requested" | "tasks_generated" | "task_approved" | "task_opened" | "request_finished" | "post_returned" | "post_review_requested" | "post_medical_review_requested" | "post_awaiting_client" | "post_assigned" | "post_approved" | "post_task_ready" | "post_task_unlinked" | "shoot_booked" | "shoot_dropped" | "shoot_changed" | "meeting_invited" | "meeting_dropped" | "meeting_changed" | "task_due_soon" | "task_overdue" | "task_overdue_escalated" | "task_over_limit_pending" | "post_publish_today" | "post_publish_overdue" | "shoot_upcoming" | "shoot_not_closed" | "meeting_upcoming" | "client_account_manager_assigned" | "project_manager_assigned" | "retainer_renewal_due" | "retainer_behind" | "retainer_term_renewed" | "retainer_cycle_report_ready" | "retainer_amendment_pending" | "retainer_amendment_decided" | "quote_approval_requested" | "quote_approval_decided" | "quote_accepted" | "invoice_overdue" | "invoice_paid" | "ad_budget_low" | "email_failed" | "lead_assigned" | "lead_won" | "lead_follow_up_overdue" | "lead_follow_up_due";
+        NotificationType: "task_assigned" | "task_mentioned" | "task_returned" | "task_review_requested" | "task_medical_review_requested" | "task_awaiting_client" | "task_over_limit" | "approval_responded" | "approval_no_response" | "approval_expired" | "task_changed" | "task_commented" | "task_file_added" | "task_requested" | "tasks_generated" | "task_approved" | "task_opened" | "request_finished" | "post_returned" | "post_review_requested" | "post_medical_review_requested" | "post_awaiting_client" | "post_assigned" | "post_approved" | "post_task_ready" | "post_task_unlinked" | "shoot_booked" | "shoot_dropped" | "shoot_changed" | "meeting_invited" | "meeting_dropped" | "meeting_changed" | "task_due_soon" | "task_overdue" | "task_overdue_escalated" | "task_over_limit_pending" | "post_publish_today" | "post_publish_overdue" | "shoot_upcoming" | "shoot_not_closed" | "meeting_upcoming" | "client_account_manager_assigned" | "project_manager_assigned" | "retainer_renewal_due" | "retainer_behind" | "retainer_term_renewed" | "retainer_cycle_report_ready" | "retainer_amendment_pending" | "retainer_amendment_decided" | "quote_approval_requested" | "quote_approval_decided" | "quote_accepted" | "invoice_overdue" | "invoice_paid" | "ad_budget_low" | "email_failed" | "lead_assigned" | "lead_won" | "lead_follow_up_overdue" | "lead_follow_up_due" | "push_device_lost";
+        /** @enum {string} */
+        NotificationPriority: "critical" | "important" | "normal" | "informational";
+        /** @enum {string} */
+        ChannelMode: "required" | "on" | "off" | "unavailable";
         UpdateNotificationSettings: {
             mutedTypes: components["schemas"]["NotificationType"][];
             emailTypes?: components["schemas"]["NotificationType"][];
+            pushTypes?: components["schemas"]["NotificationType"][];
             digestEnabled?: boolean;
         };
+        PushConfig: {
+            available: boolean;
+            vapidPublicKey: string | null;
+        };
+        PushSubscriptionInput: {
+            /** Format: uri */
+            endpoint: string;
+            keys: {
+                p256dh: string;
+                auth: string;
+            };
+        };
+        /** @enum {string} */
+        PushDeliveryStatus: "queued" | "sent" | "gone" | "failed";
+        /** @description Pushes of the last 30 days, newest first */
+        PushDeliveryPage: {
+            items: components["schemas"]["PushDelivery"][];
+            total: number;
+            page: number;
+            pageSize: number;
+        };
+        PushDelivery: {
+            /** Format: uuid */
+            id: string;
+            user: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            };
+            device: string;
+            kind: components["schemas"]["PushDeliveryKind"];
+            notification: components["schemas"]["Notification"] | null;
+            status: components["schemas"]["PushDeliveryStatus"];
+            error: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            sentAt: string | null;
+            /** Format: date-time */
+            clickedAt: string | null;
+        };
+        /** @enum {string} */
+        PushDeliveryKind: "notification" | "morning_summary" | "test";
         /** @description An upload waiting to be attached */
         FileUpload: {
             /** Format: uuid */
@@ -14049,7 +14212,7 @@ export interface operations {
                     "application/json": components["schemas"]["NotificationSettings"];
                 };
             };
-            /** @description `NOT_MUTABLE`: a type that requires action */
+            /** @description `NOT_MUTABLE`: a type that requires action; `CHANNEL_REQUIRED`: a required type left out of `pushTypes` or `emailTypes`; `CHANNEL_UNAVAILABLE`: an unavailable type in them */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -14058,6 +14221,215 @@ export interface operations {
             };
             /** @description No valid session */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PushController_config: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Whether push is available, and the VAPID public key to subscribe with */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushConfig"];
+                };
+            };
+            /** @description No valid session */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PushController_subscribe: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PushSubscriptionInput"];
+            };
+        };
+        responses: {
+            /** @description Stored on the current session, replacing its earlier one */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not a valid https push subscription */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No valid session */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `PUSH_UNAVAILABLE`: no VAPID keys on this server */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PushController_unsubscribe: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Push turned off on the current device */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No valid session */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PushController_test: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A test push is queued for the current device */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No valid session */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `NO_SUBSCRIPTION`: push is not on for this device */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description One test push a minute */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PushController_click: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Recorded; the notification is marked read */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No valid session */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not one of the caller’s pushes */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PushController_deliveries: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+                userId?: string;
+                status?: components["schemas"]["PushDeliveryStatus"] | components["schemas"]["PushDeliveryStatus"][];
+                from?: string;
+                to?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The delivery log */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushDeliveryPage"];
+                };
+            };
+            /** @description No valid session */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Without `notifications.policy` */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };

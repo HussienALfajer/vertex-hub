@@ -1194,6 +1194,8 @@ function signedInDevices(
         signIn: { at: s.signedInAt, ip: s.ip, location: s.location },
         lastActive: { at: s.lastActiveAt, ip: s.lastIp, location: s.lastLocation },
         sharedWith: [...shared.values()],
+        // F16 rule A12: no device of the mocks has push on.
+        push: { state: 'off' as const, lastDeliveredAt: null },
       };
     })
     .sort(
@@ -9055,8 +9057,14 @@ function notificationRoutes({
         category: NOTIFICATION_CATALOG[type].category,
         mutable: NOTIFICATION_CATALOG[type].mutable,
         muted: off.has(type),
+        priority: NOTIFICATION_CATALOG[type].priority,
+        push: NOTIFICATION_CATALOG[type].push !== 'off',
+        pushMode: NOTIFICATION_CATALOG[type].push,
         // F14 email: the saved choice, else the catalog defaults, kept while the type is muted.
-        email: emailed.get(me().user.id)?.has(type) ?? NOTIFICATION_CATALOG[type].emailByDefault,
+        email:
+          emailed.get(me().user.id)?.has(type) ??
+          ['on', 'required'].includes(NOTIFICATION_CATALOG[type].email),
+        emailMode: NOTIFICATION_CATALOG[type].email,
         emailLocked: off.has(type),
       })),
       digestEnabled: digest.get(me().user.id) ?? true,

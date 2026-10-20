@@ -17,11 +17,13 @@ import { InvoicesDailyJob } from './jobs/invoices-daily.job.js';
 import { InvoicesPdfJob } from './jobs/invoices-pdf.job.js';
 import { NotificationsDailyJob } from './jobs/notifications-daily.job.js';
 import { PgBossService } from './jobs/pg-boss.service.js';
+import { PushSendJob } from './jobs/push-send.job.js';
 import { QuotesDailyJob } from './jobs/quotes-daily.job.js';
 import { QuotesPdfJob } from './jobs/quotes-pdf.job.js';
 import { ReportsPdfJob } from './jobs/reports-pdf.job.js';
 import { RetainerCyclesJob } from './jobs/retainer-cycles.job.js';
 import { PdfRenderer } from './pdf/pdf-renderer.js';
+import { PushSender } from './push/push-sender.js';
 
 @Module({
   imports: [
@@ -57,6 +59,8 @@ import { PdfRenderer } from './pdf/pdf-renderer.js';
     EmailPurgeJob,
     EmailNotificationsJob,
     EmailDigestJob,
+    PushSender,
+    PushSendJob,
   ],
 })
 export class WorkerModule {}

@@ -16,6 +16,7 @@ import { and, eq, inArray, lt } from 'drizzle-orm';
 import { DATABASE } from '../../core/database/database.module.js';
 import { JobQueue, runEach } from '../../core/jobs/index.js';
 import { type Notice, NotificationCenter } from './notification-center.js';
+import { PushService } from './push.service.js';
 
 /** A module's part of the daily job; returns how many reminders it sent. */
 export type DailyReminderSource = (today: CalendarDate) => Promise<number>;
@@ -45,6 +46,7 @@ export class DailyReminders implements OnModuleInit {
     @Inject(DATABASE) private readonly db: Database,
     private readonly jobs: JobQueue,
     private readonly center: NotificationCenter,
+    private readonly push: PushService,
   ) {}
 
   onModuleInit(): void {
@@ -79,6 +81,13 @@ export class DailyReminders implements OnModuleInit {
         'Notification purge',
         async () => {
           purged = await this.purge(now);
+        },
+      ],
+      [
+        'Push delivery purge',
+        async () => {
+          const deleted = await this.push.purge(now);
+          this.logger.log(`Push deliveries: ${deleted} purged`);
         },
       ],
     ];

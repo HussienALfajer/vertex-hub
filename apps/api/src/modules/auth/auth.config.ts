@@ -163,8 +163,9 @@ export function createAuth(db: Database, env: Env, emails: AccountEmails) {
       disableSignUp: true,
       minPasswordLength: MIN_PASSWORD_LENGTH,
     },
+    // F16: 30 days, renewed on use once a day, so an idle phone keeps its push for a month.
     session: {
-      expiresIn: 60 * 60 * 24 * 7,
+      expiresIn: 60 * 60 * 24 * 30,
       updateAge: 60 * 60 * 24,
     },
     disabledPaths: DISABLED_PATHS,

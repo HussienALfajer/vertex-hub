@@ -1,10 +1,13 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import {
-  emailedTypes,
+  channelOverrides,
+  effectiveChannel,
   isMutableNotificationType,
   NOTIFICATION_CATALOG,
+  NOTIFICATION_CHANNELS,
   NOTIFICATION_TYPES,
   type Notification,
+  type NotificationChannel,
   type NotificationListQuery,
   type NotificationPage,
   type NotificationSettings,
@@ -110,31 +113,39 @@ export class NotificationsService {
     const [row] = await this.db
       .select({
         mutedTypes: notificationSettings.mutedTypes,
-        emailTypes: notificationSettings.emailTypes,
+        pushOverrides: notificationSettings.pushOverrides,
+        emailOverrides: notificationSettings.emailOverrides,
         digestEnabled: notificationSettings.digestEnabled,
       })
       .from(notificationSettings)
       .where(eq(notificationSettings.userId, userId));
     const muted = new Set(row?.mutedTypes ?? []);
-    const emailed = emailedTypes(row?.emailTypes ?? null);
     return {
-      types: NOTIFICATION_TYPES.map((type) => ({
-        type,
-        category: NOTIFICATION_CATALOG[type].category,
-        mutable: NOTIFICATION_CATALOG[type].mutable,
-        muted: muted.has(type),
-        // F14 email rule 2: the saved choice, kept while the type is muted in the app (which
-        // creates nothing to email), so saving the switches never drops it.
-        email: emailed.has(type),
-        emailLocked: muted.has(type),
-      })),
+      types: NOTIFICATION_TYPES.map((type) => {
+        const { category, mutable, priority, push, email } = NOTIFICATION_CATALOG[type];
+        return {
+          type,
+          category,
+          mutable,
+          muted: muted.has(type),
+          priority,
+          // F16 rule B3. The choices are kept while the type is muted in the app (which creates
+          // nothing to push or email), so saving the switches never drops them.
+          push: effectiveChannel(push, row?.pushOverrides[type]),
+          pushMode: push,
+          email: effectiveChannel(email, row?.emailOverrides[type]),
+          emailMode: email,
+          emailLocked: muted.has(type),
+        };
+      }),
       digestEnabled: row?.digestEnabled ?? true,
     };
   }
 
   /**
    * Rule 3: only mutable types may be muted; unmuting affects later events only. F14 email
-   * rules 2 and 11: email choices and the digest switch, kept when left out.
+   * rules 2 and 11 and F16 rule A7: email and push choices and the digest switch, kept when left
+   * out, stored as overrides of the catalog defaults (F16 rule B3).
    */
   async updateSettings(
     userId: string,
@@ -146,23 +157,71 @@ export class NotificationsService {
         types: [...new Set(locked)],
       });
     }
+    for (const channel of NOTIFICATION_CHANNELS) {
+      const chosen = channel === 'push' ? input.pushTypes : input.emailTypes;
+      if (chosen) refuseLockedChannel(channel, new Set(chosen));
+    }
     const mutedTypes: NotificationType[] = NOTIFICATION_TYPES.filter((type) =>
       input.mutedTypes.includes(type),
     );
-    const changes = {
-      mutedTypes,
-      ...(input.emailTypes && {
-        emailTypes: NOTIFICATION_TYPES.filter((type) => input.emailTypes?.includes(type)),
-      }),
-      ...(input.digestEnabled !== undefined && { digestEnabled: input.digestEnabled }),
-    };
-    await this.db
-      .insert(notificationSettings)
-      .values({ userId, ...changes })
-      .onConflictDoUpdate({
-        target: notificationSettings.userId,
-        set: { ...changes, updatedAt: new Date() },
-      });
+    await this.db.transaction(async (tx) => {
+      const [saved] = await tx
+        .select({
+          pushOverrides: notificationSettings.pushOverrides,
+          emailOverrides: notificationSettings.emailOverrides,
+        })
+        .from(notificationSettings)
+        .where(eq(notificationSettings.userId, userId))
+        .for('update');
+      const changes = {
+        mutedTypes,
+        ...(input.emailTypes && {
+          emailOverrides: channelOverrides(
+            'email',
+            new Set(input.emailTypes),
+            saved?.emailOverrides ?? {},
+          ),
+        }),
+        ...(input.pushTypes && {
+          pushOverrides: channelOverrides(
+            'push',
+            new Set(input.pushTypes),
+            saved?.pushOverrides ?? {},
+          ),
+        }),
+        ...(input.digestEnabled !== undefined && { digestEnabled: input.digestEnabled }),
+      };
+      await tx
+        .insert(notificationSettings)
+        .values({ userId, ...changes })
+        .onConflictDoUpdate({
+          target: notificationSettings.userId,
+          set: { ...changes, updatedAt: new Date() },
+        });
+    });
     return this.settings(userId);
+  }
+}
+
+/** F16 rule B1: a `required` channel cannot be turned off, nor an `unavailable` one on. */
+function refuseLockedChannel(channel: NotificationChannel, chosen: ReadonlySet<NotificationType>) {
+  const modeOf = (type: NotificationType) => NOTIFICATION_CATALOG[type][channel];
+  const required = NOTIFICATION_TYPES.filter(
+    (type) => modeOf(type) === 'required' && !chosen.has(type),
+  );
+  if (required.length > 0) {
+    throw new CodedException(400, 'CHANNEL_REQUIRED', `These types always use ${channel}`, {
+      channel,
+      types: required,
+    });
+  }
+  const unavailable = NOTIFICATION_TYPES.filter(
+    (type) => modeOf(type) === 'unavailable' && chosen.has(type),
+  );
+  if (unavailable.length > 0) {
+    throw new CodedException(400, 'CHANNEL_UNAVAILABLE', `These types never use ${channel}`, {
+      channel,
+      types: unavailable,
+    });
   }
 }

@@ -262,9 +262,10 @@ Lifetime 30 days, renewed on use (`expiresIn` 30 days, `updateAge` 1 day; owner,
 |---|---|---|
 | `id` | uuid | primary key |
 | `user_id` | uuid → `users.id` | required, cascade |
-| `session_id` | text → `sessions.id` | required, **unique**, `on delete cascade`: signing a device out, or the session expiring and being removed, deletes its subscription (rule A3) |
+| `session_id` | uuid → `sessions.id` | required, **unique**, `on delete cascade`: signing a device out, or the session expiring and being removed, deletes its subscription (rule A3) |
 | `endpoint` | text | required, unique, ≤ 1000, `https:` only |
 | `p256dh`, `auth` | text | required; the browser's public keys |
+| `device_label` | text | required; "Chrome · Android" from the user agent that subscribed, copied onto each delivery (settled in A1) |
 | `created_at`, `updated_at` | timestamptz | |
 | `last_success_at`, `last_failure_at` | timestamptz | optional |
 | `failure_count` | integer | default 0; reset on success |
@@ -312,7 +313,7 @@ Rows created before F16 are backfilled: `priority` and `box` from the catalog, u
 | `email_overrides` | jsonb | required, default `{}`; replaces `email_types`. The migration turns each saved `email_types` into overrides against the defaults, so saved choices are kept |
 | `morning_push` | boolean | required, default true |
 
-`email_types` is dropped after the backfill.
+`email_types` is no longer read or written from A1 and is dropped in a later release (expand, then contract: the previous release still reads it during a deploy or a rollback).
 
 ### `notification_policies`
 One row per type that management changed. No row means the catalog default. Audited (`notification_policy.updated`).

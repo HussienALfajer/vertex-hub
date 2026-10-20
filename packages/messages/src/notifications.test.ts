@@ -7,7 +7,9 @@ import {
   notificationSchema,
 } from '@vertex-hub/contracts';
 import { describe, expect, it } from 'vitest';
+import { formatAmount } from './format.js';
 import { linkPath, notificationLink, notificationText } from './notifications.js';
+import { notificationPush, PUSH_APP_NAME, testPush } from './push.js';
 
 const task = { title: 'تصميم منيو', department: 'design', client: 'مطعم الشام', project: null };
 const post = {
@@ -158,6 +160,7 @@ const SAMPLES: Record<NotificationType, unknown> = {
   lead_won: { lead: 'مقهى الياسمين', client: 'مقهى الياسمين' },
   lead_follow_up_overdue: { lead: 'مقهى الياسمين', followUpOn: '2026-10-01', owner: 'رنا' },
   lead_follow_up_due: { lead: 'مقهى الياسمين', followUpOn: '2026-10-05' },
+  push_device_lost: { device: 'Chrome · Android' },
 };
 
 const SUBJECT_ID = '0192a5a0-0000-7000-8000-000000000001';
@@ -300,5 +303,45 @@ describe('failed client emails (F14 email rule 23)', () => {
       },
     });
     expect(linkPath(notificationLink(statement))).toBe(`/clients/${SUBJECT_ID}?tab=invoices`);
+  });
+});
+
+describe('push texts (spec F16 rules A8–A9)', () => {
+  /** Every amount a snapshot holds, as the bell text formats it. */
+  const amountsOf = (data: unknown): string[] =>
+    Object.entries(data as Record<string, unknown>).flatMap(([key, value]) =>
+      key.endsWith('Minor') && typeof value === 'number' ? [formatAmount(Math.abs(value))] : [],
+    );
+
+  it('never puts a money amount on the lock screen', () => {
+    for (const type of NOTIFICATION_TYPES) {
+      const { title, body } = notificationPush(sample(type), departmentName);
+      for (const amount of amountsOf(SAMPLES[type])) {
+        expect(`${title} ${body}`, type).not.toContain(amount);
+      }
+    }
+    // The bell keeps them.
+    expect(notificationText(sample('ad_budget_low'), departmentName).text).toContain(
+      formatAmount(4_500),
+    );
+  });
+
+  it('shows the notification text under its context, cut to 140 characters', () => {
+    const push = notificationPush(sample('task_assigned'), departmentName);
+    expect(push).toEqual({
+      title: 'مطعم الشام',
+      body: notificationText(sample('task_assigned'), departmentName).text,
+    });
+    const long = notificationPush(
+      sample('task_assigned', { data: { task: { ...task, title: 'x'.repeat(200) } } } as never),
+      departmentName,
+    );
+    expect(long.body).toHaveLength(140);
+    expect(notificationPush(sample('push_device_lost'), departmentName).title).toBe(PUSH_APP_NAME);
+    expect(testPush().title).toBe(PUSH_APP_NAME);
+  });
+
+  it('opens My account for a lost device', () => {
+    expect(linkPath(notificationLink(sample('push_device_lost')))).toBe('/account');
   });
 });

@@ -10,6 +10,7 @@ import { AccountEmails } from './account-emails.js';
 import { createAuth } from './auth.config.js';
 import { DepartmentsController } from './departments.controller.js';
 import { DepartmentsService } from './departments.service.js';
+import { DevicePushStates } from './device-push-states.js';
 import { IpLocations } from './ip-locations.js';
 import { MeController } from './me.controller.js';
 import { PasswordLinksController } from './password-links.controller.js';
@@ -55,12 +56,13 @@ import { UsersService } from './users.service.js';
     AccountEmails,
     DepartmentsService,
     ResponsibilityRegistry,
+    DevicePushStates,
     UserDirectory,
     IpLocations,
     SessionActivity,
     SignedInDevicesService,
     { provide: APP_GUARD, useClass: PermissionsGuard },
   ],
-  exports: [ResponsibilityRegistry, UserDirectory],
+  exports: [ResponsibilityRegistry, DevicePushStates, UserDirectory],
 })
 export class AuthModule {}
