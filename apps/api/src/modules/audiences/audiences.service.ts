@@ -13,9 +13,12 @@ export class AudiencesService {
     private readonly users: UserDirectory,
   ) {}
 
-  /** Rule D2: the live count and the first 500 names, by name. */
-  async preview(audience: Audience): Promise<AudiencePreview> {
-    const ids = await this.resolver.resolve(this.db, audience);
+  /**
+   * Rule D2: the live count and the first 500 names, by name, without the caller: as the author,
+   * they are left out of what they send (rule D3).
+   */
+  async preview(callerId: string, audience: Audience): Promise<AudiencePreview> {
+    const ids = (await this.resolver.resolve(this.db, audience)).filter((id) => id !== callerId);
     const members = await this.users.audienceMembers(ids);
     return { count: ids.length, users: members.slice(0, AUDIENCE_PREVIEW_MAX) };
   }

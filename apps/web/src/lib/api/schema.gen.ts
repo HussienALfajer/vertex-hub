@@ -27789,7 +27789,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description How many active users the audience reaches, and their names (up to 500) */
+            /** @description How many active users the audience reaches without the caller, and their names (up to 500) */
             200: {
                 headers: {
                     [name: string]: unknown;

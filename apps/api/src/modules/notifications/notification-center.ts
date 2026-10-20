@@ -38,6 +38,11 @@ export interface Resolution {
   recipients?: readonly string[];
   /** Only rows whose snapshot has these top-level values (`email_failed`: the email's kind). */
   data?: Readonly<Record<string, string>>;
+  /**
+   * Also "For your information" rows of these types (F16 part D: an announcement without an
+   * acknowledgement closes when opened, and every row of a withdrawn one is voided).
+   */
+  includeInfo?: boolean;
 }
 
 /** One type of notification for one change, as the owning module resolved its recipients. */
@@ -205,13 +210,13 @@ export class NotificationCenter {
    * does not wake. Returns the number of rows closed.
    */
   async resolve(tx: Transaction, resolution: Resolution): Promise<number> {
-    const { subject, types, outcome, actorId, recipients, data } = resolution;
+    const { subject, types, outcome, actorId, recipients, data, includeInfo } = resolution;
     if (types.length === 0 || recipients?.length === 0) return 0;
     const now = new Date();
     const filters: SQL[] = [
       eq(notifications.subjectType, subject.type),
       eq(notifications.subjectId, subject.id),
-      eq(notifications.box, 'action'),
+      ...(includeInfo ? [] : [eq(notifications.box, 'action')]),
       isNull(notifications.resolvedAt),
       or(
         inArray(notifications.resolutionType, [...types]),

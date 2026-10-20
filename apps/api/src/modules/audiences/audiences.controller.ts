@@ -12,6 +12,7 @@ import {
   audienceSchema,
 } from '@vertex-hub/contracts';
 import { RequireSession } from '../../core/access/index.js';
+import { CurrentUser, type CurrentUserInfo } from '../auth/index.js';
 import { AudiencesService } from './audiences.service.js';
 
 /** F16 rule D2: what the audience picker shows before sending. */
@@ -26,11 +27,15 @@ export class AudiencesController {
   @RequireSession()
   @SerializeOptions({ schema: audiencePreviewSchema })
   @ApiOkResponse({
-    description: 'How many active users the audience reaches, and their names (up to 500)',
+    description:
+      'How many active users the audience reaches without the caller, and their names (up to 500)',
     standardSchema: audiencePreviewSchema,
   })
   @ApiBadRequestResponse({ description: 'The audience has no source, or a list is too long' })
-  preview(@Body({ schema: audienceSchema }) audience: Audience): Promise<AudiencePreview> {
-    return this.audiences.preview(audience);
+  preview(
+    @CurrentUser() actor: CurrentUserInfo,
+    @Body({ schema: audienceSchema }) audience: Audience,
+  ): Promise<AudiencePreview> {
+    return this.audiences.preview(actor.id, audience);
   }
 }

@@ -16083,7 +16083,7 @@
         },
         "responses": {
           "200": {
-            "description": "How many active users the audience reaches, and their names (up to 500)",
+            "description": "How many active users the audience reaches without the caller, and their names (up to 500)",
             "content": {
               "application/json": {
                 "schema": {

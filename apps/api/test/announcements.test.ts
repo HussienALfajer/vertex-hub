@@ -132,9 +132,56 @@ describe('announcements (F16 part D)', () => {
   });
 
   it('answers 401 without a session', async () => {
+    const sent = await create(author);
+    const id = sent.id;
     expect((await client.get('/api/announcements')).status).toBe(401);
     expect((await client.get('/api/announcements/home')).status).toBe(401);
     expect((await client.post('/api/announcements', undefined, input())).status).toBe(401);
+    expect((await client.get(`/api/announcements/${id}`)).status).toBe(401);
+    expect((await client.get(`/api/announcements/${id}/receipts`)).status).toBe(401);
+    expect(
+      (await client.request('PATCH', `/api/announcements/${id}`, { body: { title: 'عنوان' } }))
+        .status,
+    ).toBe(401);
+    for (const action of [
+      'send',
+      'cancel-schedule',
+      'withdraw',
+      'archive',
+      'acknowledge',
+      'remind',
+    ]) {
+      expect((await client.post(`/api/announcements/${id}/${action}`)).status).toBe(401);
+    }
+  });
+
+  it("answers 404 for someone else's draft or scheduled announcement", async () => {
+    const draft = await create(author, { send: 'draft' });
+    const scheduled = await create(author, {
+      send: 'schedule',
+      scheduledAt: new Date(Date.now() + 10 * 60_000).toISOString(),
+    });
+    for (const person of [designer, gm]) {
+      expect((await read(person, draft.id)).status).toBe(404);
+      expect((await client.post(`/api/announcements/${draft.id}/send`, person.cookie)).status).toBe(
+        404,
+      );
+      expect(
+        (await client.post(`/api/announcements/${draft.id}/archive`, person.cookie)).status,
+      ).toBe(404);
+      expect(
+        (
+          await client.request('PATCH', `/api/announcements/${draft.id}`, {
+            cookie: person.cookie,
+            body: { title: 'عنوان آخر' },
+          })
+        ).status,
+      ).toBe(404);
+      expect(
+        (await client.post(`/api/announcements/${scheduled.id}/cancel-schedule`, person.cookie))
+          .status,
+      ).toBe(404);
+    }
   });
 
   it('sends at once: freezes the recipients without the author and notifies them (rule D3)', async () => {
@@ -203,6 +250,8 @@ describe('announcements (F16 part D)', () => {
     expect(opened.body?.receipt?.openedAt).not.toBeNull();
     expect(opened.body?.audience).toBeNull();
     expect((await receipt(plain.id, designer.id))?.openedAt).not.toBeNull();
+    expect((await notificationsOf(plain.id, designer.id))[0]?.resolution).toBe('done');
+    expect((await notificationsOf(plain.id, photographer.id))[0]?.resolvedAt).toBeNull();
     await expectError(
       await client.post(`/api/announcements/${plain.id}/acknowledge`, designer.cookie),
       409,
@@ -306,7 +355,23 @@ describe('announcements (F16 part D)', () => {
     expect((row?.data as { title: string } | undefined)?.title).toBe('دوام رمضان المعدّل');
   });
 
+  it('clears the link label while the link stays', async () => {
+    const sent = await create(author, { linkUrl: 'https://vertex.example/a', linkLabel: 'الملف' });
+    const response = await client.request('PATCH', `/api/announcements/${sent.id}`, {
+      cookie: author.cookie,
+      body: { linkLabel: null },
+    });
+    const edited = announcementSchema.parse(await response.json());
+    expect(edited.linkUrl).toBe('https://vertex.example/a');
+    expect(edited.linkLabel).toBeNull();
+  });
+
   it('withdraws: voids the notifications and leaves the lists of recipients (rule D10)', async () => {
+    const plain = await create(author, { requiresAck: false });
+    expect(
+      (await client.post(`/api/announcements/${plain.id}/withdraw`, author.cookie)).status,
+    ).toBe(200);
+    expect((await notificationsOf(plain.id)).every((row) => row.resolution === 'void')).toBe(true);
     const sent = await create(author);
     expect(
       (await client.post(`/api/announcements/${sent.id}/withdraw`, designer.cookie)).status,
@@ -389,6 +454,17 @@ describe('announcements (F16 part D)', () => {
     const back = (await read(author, emptied.id)).body as Announcement;
     expect(back.status).toBe('draft');
     expect(back.unsentAt).not.toBeNull();
+
+    // An author archived before the time: not sent, back to draft (rule D5).
+    const leaving = await seedUser(db);
+    seeded.push(leaving.id);
+    const leavingPerson = { id: leaving.id, cookie: await client.signIn(leaving.email) };
+    const orphan = await create(leavingPerson, { send: 'schedule', scheduledAt: at.toISOString() });
+    await db.update(users).set({ archivedAt: new Date() }).where(eq(users.id, leaving.id));
+    await delivery.sendScheduled(new Date(at.getTime() + 60_000));
+    const [row] = await db.select().from(announcements).where(eq(announcements.id, orphan.id));
+    expect(row?.status).toBe('draft');
+    expect(await notificationsOf(orphan.id)).toHaveLength(0);
   });
 
   it('lists received, sent and all; all needs announcements.manage scope all', async () => {
@@ -467,6 +543,11 @@ describe('announcements (F16 part D)', () => {
       // A second run on the same day sends nothing again.
       await delivery.remindUnacknowledged(day);
       expect((await receipt(sent.id, photographer.id))?.remindersSent).toBe(round);
+      // The author's summary waits for the third round, reruns included.
+      const summaries = (await notificationsOf(sent.id, author.id)).filter(
+        (row) => row.type === 'announcement_ack_summary',
+      );
+      expect(summaries).toHaveLength(round === 3 ? 1 : 0);
     }
     expect((await receipt(sent.id, designer.id))?.remindersSent).toBe(0);
     const reminders = (await notificationsOf(sent.id, photographer.id)).filter(

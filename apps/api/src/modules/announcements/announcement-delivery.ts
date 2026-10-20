@@ -6,6 +6,7 @@ import {
   businessDate,
   businessInstant,
   type CalendarDate,
+  isWorkDay,
   permissionScopes,
   storedAudience,
   type UserAccess,
@@ -199,6 +200,7 @@ export class AnnouncementDelivery implements OnModuleInit {
    * times at most each. After the third round the author gets `announcement_ack_summary` once.
    */
   async remindUnacknowledged(today: CalendarDate): Promise<number> {
+    if (!isWorkDay(today)) return 0;
     const candidates = await this.db
       .select({ id: announcements.id })
       .from(announcements)
@@ -248,8 +250,9 @@ export class AnnouncementDelivery implements OnModuleInit {
     const open = pending.filter((p) => active.has(p.userId));
     const due = open.filter((p) => p.sent < ANNOUNCEMENT_LIMITS.reminders).map((p) => p.userId);
     let sent = 0;
+    let recorded = false;
     if (due.length > 0) {
-      const recorded = await this.reminders.remindOnce(
+      recorded = await this.reminders.remindOnce(
         tx,
         { kind: 'ack_reminder', subjectId: id, occurrence: today },
         today,
@@ -275,7 +278,7 @@ export class AnnouncementDelivery implements OnModuleInit {
       }
     }
     // Everyone still open has had the third reminder (this round included): tell the author once.
-    const afterRound = open.map((p) => (due.includes(p.userId) ? p.sent + 1 : p.sent));
+    const afterRound = open.map((p) => (recorded && due.includes(p.userId) ? p.sent + 1 : p.sent));
     if (open.length > 0 && afterRound.every((n) => n >= ANNOUNCEMENT_LIMITS.reminders)) {
       const summarized = await this.reminders.remindOnce(
         tx,

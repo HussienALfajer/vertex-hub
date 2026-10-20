@@ -172,7 +172,11 @@ export class AnnouncementsService {
       const next: Partial<AnnouncementRow> = {
         ...fields,
         // A label without a link is dropped with the link; critical keeps the acknowledgement.
-        linkLabel: linkUrl ? (fields.linkLabel ?? row.linkLabel) : null,
+        linkLabel: linkUrl
+          ? fields.linkLabel === undefined
+            ? row.linkLabel
+            : fields.linkLabel
+          : null,
         requiresAck: priority === 'critical' ? true : (fields.requiresAck ?? row.requiresAck),
         ...(scheduledAt ? { scheduledAt: this.scheduleTime(scheduledAt, now) } : {}),
       };
@@ -280,6 +284,7 @@ export class AnnouncementsService {
         types: ACK_TYPES,
         outcome: 'void',
         actorId: actor.id,
+        includeInfo: true,
       });
       await recordAudit(tx, {
         actor: actorOf(actor),
@@ -399,6 +404,7 @@ export class AnnouncementsService {
           outcome: 'done',
           actorId: actor.id,
           recipients: [actor.id],
+          includeInfo: true,
         });
       }
     });

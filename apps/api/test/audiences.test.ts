@@ -147,7 +147,7 @@ describe('audiences (F16 part D, rules D1–D2)', () => {
     expect((await client.post('/api/audiences/preview', cast.employee.cookie, {})).status).toBe(
       400,
     );
-    const response = await client.post('/api/audiences/preview', cast.employee.cookie, {
+    const response = await client.post('/api/audiences/preview', cast.otherAm.cookie, {
       projects: [projectId],
       exclude: [cast.am.id],
     });
@@ -159,5 +159,16 @@ describe('audiences (F16 part D, rules D1–D2)', () => {
     );
     const photoManager = preview.users.find((user) => user.id === people.photoManager?.id);
     expect(photoManager?.department).toBe('photography');
+    // The caller is left out, as the author is left out of what they send (rule D3).
+    const own = audiencePreviewSchema.parse(
+      await (
+        await client.post('/api/audiences/preview', cast.employee.cookie, {
+          projects: [projectId],
+          exclude: [cast.am.id],
+        })
+      ).json(),
+    );
+    expect(own.users.map((user) => user.id)).not.toContain(cast.employee.id);
+    expect(own.count).toBe(2);
   });
 });
