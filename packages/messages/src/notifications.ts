@@ -454,6 +454,21 @@ export function notificationLink(notification: Notification): NotificationLink {
       params: { retainerId: subject.id, cycleId: notification.data.cycleId },
     };
   }
+  if (notification.type === 'contract_signed' || notification.type === 'contract_voided') {
+    // F05C: a retainer's contracts and annexes are on its Contract tab.
+    return {
+      to: '/retainers/$retainerId',
+      params: { retainerId: subject.id },
+      search: { tab: 'contract' },
+    };
+  }
+  if (notification.type === 'extra_work_created') {
+    // The subject is the project or the retainer the extra work was logged on.
+    const tab = { tab: 'extra-work' };
+    return subject.type === 'retainer'
+      ? { to: '/retainers/$retainerId', params: { retainerId: subject.id }, search: tab }
+      : { to: '/projects/$projectId', params: { projectId: subject.id }, search: tab };
+  }
   if (notification.type === 'tasks_generated') {
     // No run filter on the task list (owner decision): the assignee's newest tasks, or the
     // department's unassigned queue for its managers.

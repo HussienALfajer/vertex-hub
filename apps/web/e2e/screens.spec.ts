@@ -2,6 +2,7 @@ import ar from '../src/i18n/locales/ar.json' with { type: 'json' };
 import {
   accountManagerMe,
   CONTENT_LINK_TOKEN,
+  catalogNotificationsSeed,
   DEVICES_NOW,
   departmentManagerMe,
   EXPIRED_LINK_TOKEN,
@@ -242,6 +243,15 @@ for (const colorScheme of ['light', 'dark'] as const) {
       });
 
       // F16 screen 6: the channel policy and the push delivery log.
+      // F16 part C: the catalog's new types, with a meeting's "Join" link.
+      test(`notification catalog (${size})`, async ({ page }, testInfo) => {
+        await page.setViewportSize({ width, height });
+        await mockApi(page, { signedIn: true, notifications: catalogNotificationsSeed() });
+        await page.goto('/notifications?inbox=fyi');
+        await expect(page.getByRole('link', { name: ar.notifications.join })).toBeVisible();
+        await screenshot(page, testInfo, `notifications-catalog-${size}-${colorScheme}`);
+      });
+
       test(`notification policy (${size})`, async ({ page }, testInfo) => {
         await page.setViewportSize({ width, height });
         await mockApi(page, { signedIn: true, me: manager });
