@@ -32,9 +32,10 @@ PR order fixed by the spec's "Delivery" (owner, 2026-10-20). F16 is deployed to 
 - [x] bridge: `ar.json` keys (types, errors, audit), `openapi:export`, `api:generate`, fixtures; web typecheck
 - [x] checks, reviewer, acceptance (API at `/api/docs`), PR with auto-merge
 
-## PR B2 — engine: web
-- [ ] bell inboxes and snooze, notifications page tabs, settings (policy locks, morning push, "turn all on or off" per category and channel), policy page + delivery log tab, follow button, SW action buttons "Open" and "Remind me in an hour" (rule A11)
-- [ ] E2E, checks, reviewer, acceptance (owner steps B5–B6), PR with auto-merge
+## PR B2 — engine: web (branch `claude/busy-gauss-n0tl8z`)
+- [x] bell inboxes and snooze, notifications page tabs, settings (policy locks, morning push, "turn all on or off" per category and channel), policy page + delivery log tab, follow button, SW action buttons "Open" and "Remind me in an hour" (rule A11); critical toasts stay until closed (B10)
+- [x] E2E (`f16-engine.spec.ts`, F14 bell test on the tabs, screenshots: inboxes, snooze, Done and Snoozed, policy, delivery log, follow button, desktop and phone, both themes); mocks for inboxes, snooze, policy, deliveries and following
+- [x] checks, reviewer, PR with auto-merge (the owner tests B5 after the merge, at their request; B6's "Handled by" needs the C1 `resolve` calls)
 
 ## PR C1 (+ C1b if large) — catalog: api per module
 - [ ] new types, recipient changes, `resolve` calls per module (and rows stored resolved, edge case 9); `approval_requests.first_opened_at`; daily sources; security copies

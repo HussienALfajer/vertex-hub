@@ -2,8 +2,10 @@ import { useQuery } from '@tanstack/react-query';
 import { Link, useNavigate } from '@tanstack/react-router';
 import {
   NOTIFICATION_CATEGORIES,
+  NOTIFICATION_INBOXES,
   type Notification,
   type NotificationCategory,
+  type NotificationInbox,
 } from '@vertex-hub/contracts';
 import {
   Button,
@@ -17,6 +19,9 @@ import {
   SelectTrigger,
   SelectValue,
   Skeleton,
+  Tabs,
+  TabsList,
+  TabsTrigger,
   ToggleGroup,
   ToggleGroupItem,
 } from '@vertex-hub/ui';
@@ -28,6 +33,7 @@ import { formatNumber } from '../../lib/format';
 import { ALL, flagParam, oneOfParam, pageParam } from '../../lib/search-params';
 import { useFocusAfterChange } from '../../lib/use-focus-after-change';
 import { usePageInRange } from '../../lib/use-page-in-range';
+import { unreadBadge } from './notification-bell';
 import { NotificationItem } from './notification-item';
 import {
   notificationListQuery,
@@ -38,6 +44,8 @@ import {
 } from './notifications.queries';
 
 export interface NotificationsSearch {
+  /** F16 screen 4: the tab; "Needs you" when left out. */
+  inbox?: Exclude<NotificationInbox, 'needs_you'>;
   unread?: true;
   category?: NotificationCategory;
   page?: number;
@@ -45,22 +53,33 @@ export interface NotificationsSearch {
 
 const PAGE_SIZE = 20;
 
+/** The tabs a URL names; "Needs you" is the page without one. */
+const PAGE_INBOXES = NOTIFICATION_INBOXES.filter(
+  (inbox): inbox is Exclude<NotificationInbox, 'needs_you'> => inbox !== 'needs_you',
+);
+
 /** Reads the notification filters from the URL, dropping anything malformed. */
 export function parseNotificationsSearch(search: Record<string, unknown>): NotificationsSearch {
   return {
+    inbox: oneOfParam(PAGE_INBOXES, search.inbox),
     unread: flagParam(search.unread),
     category: oneOfParam(NOTIFICATION_CATEGORIES, search.category),
     page: pageParam(search.page),
   };
 }
 
-/** Every notification of the signed-in user, filtered and paged (F14 screen 2). */
+/**
+ * The signed-in user's notifications by inbox (Needs you, For your information, Done, Snoozed),
+ * filtered and paged (F14 screen 2, F16 screen 4).
+ */
 export function NotificationsPage({ search }: { search: NotificationsSearch }) {
   const { t } = useTranslation();
   const navigate = useNavigate({ from: '/notifications/' });
   const page = search.page ?? 1;
+  const inbox: NotificationInbox = search.inbox ?? 'needs_you';
   const list = useQuery(
     notificationListQuery({
+      inbox,
       unread: search.unread ? 'true' : undefined,
       category: search.category,
       page,
@@ -124,6 +143,25 @@ export function NotificationsPage({ search }: { search: NotificationsSearch }) {
         }
       />
 
+      <Tabs
+        value={inbox}
+        onValueChange={(next: NotificationInbox) =>
+          setFilter({ inbox: next === 'needs_you' ? undefined : next })
+        }
+      >
+        <TabsList aria-label={t('notifications.inbox')}>
+          {NOTIFICATION_INBOXES.map((value) => (
+            <TabsTrigger key={value} value={value}>
+              {value === 'needs_you' && unread.data?.needsYou
+                ? t('notifications.inboxes.needsYouCount', {
+                    n: unreadBadge(unread.data.needsYou),
+                  })
+                : t(`notifications.inboxes.${value}`)}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </Tabs>
+
       <div className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-3 sm:flex-row sm:items-center">
         <ToggleGroup
           aria-label={t('notifications.readFilter')}
@@ -169,12 +207,12 @@ export function NotificationsPage({ search }: { search: NotificationsSearch }) {
               ? t('notifications.emptyUnread')
               : search.category
                 ? t('notifications.emptyCategory')
-                : t('notifications.emptyTitle')
+                : t(`notifications.empty.${inbox}.title`)
           }
           description={
             search.unread || search.category
               ? t('notifications.emptyFilterHint')
-              : t('notifications.emptyHint')
+              : t(`notifications.empty.${inbox}.hint`)
           }
         />
       ) : (

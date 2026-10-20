@@ -59,8 +59,25 @@ export function readPushPayload(text: string | null | undefined): PushPayload | 
   return valid ? (payload as PushPayload) : null;
 }
 
-/** How the platform shows the push: Arabic, right to left, replacing older ones with its tag. */
-export function notificationOptions(payload: PushPayload): NotificationOptions {
+/** Rule A11: the buttons a notification's push carries, where the platform shows them. */
+export const PUSH_ACTIONS = ['open', 'snooze'] as const;
+
+export type PushAction = (typeof PUSH_ACTIONS)[number];
+
+/** Not yet in TypeScript's lib: Chrome and Edge show `actions`; other platforms ignore them. */
+export type PushNotificationOptions = NotificationOptions & {
+  actions?: { action: PushAction; title: string }[];
+};
+
+/**
+ * How the platform shows the push: Arabic, right to left, replacing older ones with its tag. A
+ * notification's push has "Open" and "Remind me in an hour" (rule A11); the test and the morning
+ * push have no row to snooze.
+ */
+export function notificationOptions(
+  payload: PushPayload,
+  titles: Record<PushAction, string>,
+): PushNotificationOptions {
   const data: PushData = {
     link: payload.link,
     deliveryId: payload.deliveryId,
@@ -75,6 +92,9 @@ export function notificationOptions(payload: PushPayload): NotificationOptions {
     badge: '/badge-96.png',
     requireInteraction: payload.requireInteraction === true,
     data,
+    ...(payload.notificationId && {
+      actions: PUSH_ACTIONS.map((action) => ({ action, title: titles[action] })),
+    }),
   };
 }
 

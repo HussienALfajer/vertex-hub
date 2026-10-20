@@ -21,6 +21,7 @@ import { Route as AppDesignSystemRouteImport } from './routes/_app/design-system
 import { Route as AppEmailsRouteImport } from './routes/_app/emails'
 import { Route as AppInstallRouteImport } from './routes/_app/install'
 import { Route as ATokenRouteImport } from './routes/a.$token'
+import { Route as AppAdminNotificationPolicyRouteImport } from './routes/_app/admin/notification-policy'
 import { Route as AppApprovalsIndexRouteImport } from './routes/_app/approvals/index'
 import { Route as AppCalendarIndexRouteImport } from './routes/_app/calendar/index'
 import { Route as AppCampaignsIndexRouteImport } from './routes/_app/campaigns/index'
@@ -134,6 +135,12 @@ const ATokenRoute = ATokenRouteImport.update({
   path: '/a/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AppAdminNotificationPolicyRoute =
+  AppAdminNotificationPolicyRouteImport.update({
+    id: '/admin/notification-policy',
+    path: '/admin/notification-policy',
+    getParentRoute: () => AppRoute,
+  } as any)
 const AppApprovalsIndexRoute = AppApprovalsIndexRouteImport.update({
   id: '/approvals/',
   path: '/approvals/',
@@ -420,6 +427,7 @@ export interface FileRoutesByFullPath {
   '/emails': typeof AppEmailsRoute
   '/install': typeof AppInstallRoute
   '/a/$token': typeof ATokenRoute
+  '/admin/notification-policy': typeof AppAdminNotificationPolicyRoute
   '/campaigns/$campaignId': typeof AppCampaignsCampaignIdRoute
   '/catalog/settings': typeof AppCatalogSettingsRoute
   '/clients/new': typeof AppClientsNewRoute
@@ -486,6 +494,7 @@ export interface FileRoutesByTo {
   '/install': typeof AppInstallRoute
   '/a/$token': typeof ATokenRoute
   '/': typeof AppIndexRoute
+  '/admin/notification-policy': typeof AppAdminNotificationPolicyRoute
   '/campaigns/$campaignId': typeof AppCampaignsCampaignIdRoute
   '/catalog/settings': typeof AppCatalogSettingsRoute
   '/clients/new': typeof AppClientsNewRoute
@@ -554,6 +563,7 @@ export interface FileRoutesById {
   '/_app/install': typeof AppInstallRoute
   '/a/$token': typeof ATokenRoute
   '/_app/': typeof AppIndexRoute
+  '/_app/admin/notification-policy': typeof AppAdminNotificationPolicyRoute
   '/_app/campaigns/$campaignId': typeof AppCampaignsCampaignIdRoute
   '/_app/catalog/settings': typeof AppCatalogSettingsRoute
   '/_app/clients/new': typeof AppClientsNewRoute
@@ -622,6 +632,7 @@ export interface FileRouteTypes {
     | '/emails'
     | '/install'
     | '/a/$token'
+    | '/admin/notification-policy'
     | '/campaigns/$campaignId'
     | '/catalog/settings'
     | '/clients/new'
@@ -688,6 +699,7 @@ export interface FileRouteTypes {
     | '/install'
     | '/a/$token'
     | '/'
+    | '/admin/notification-policy'
     | '/campaigns/$campaignId'
     | '/catalog/settings'
     | '/clients/new'
@@ -755,6 +767,7 @@ export interface FileRouteTypes {
     | '/_app/install'
     | '/a/$token'
     | '/_app/'
+    | '/_app/admin/notification-policy'
     | '/_app/campaigns/$campaignId'
     | '/_app/catalog/settings'
     | '/_app/clients/new'
@@ -904,6 +917,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/a/$token'
       preLoaderRoute: typeof ATokenRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_app/admin/notification-policy': {
+      id: '/_app/admin/notification-policy'
+      path: '/admin/notification-policy'
+      fullPath: '/admin/notification-policy'
+      preLoaderRoute: typeof AppAdminNotificationPolicyRouteImport
+      parentRoute: typeof AppRoute
     }
     '/_app/approvals/': {
       id: '/_app/approvals/'
@@ -1286,6 +1306,7 @@ interface AppRouteChildren {
   AppEmailsRoute: typeof AppEmailsRoute
   AppInstallRoute: typeof AppInstallRoute
   AppIndexRoute: typeof AppIndexRoute
+  AppAdminNotificationPolicyRoute: typeof AppAdminNotificationPolicyRoute
   AppCampaignsCampaignIdRoute: typeof AppCampaignsCampaignIdRoute
   AppCatalogSettingsRoute: typeof AppCatalogSettingsRoute
   AppClientsNewRoute: typeof AppClientsNewRoute
@@ -1348,6 +1369,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppEmailsRoute: AppEmailsRoute,
   AppInstallRoute: AppInstallRoute,
   AppIndexRoute: AppIndexRoute,
+  AppAdminNotificationPolicyRoute: AppAdminNotificationPolicyRoute,
   AppCampaignsCampaignIdRoute: AppCampaignsCampaignIdRoute,
   AppCatalogSettingsRoute: AppCatalogSettingsRoute,
   AppClientsNewRoute: AppClientsNewRoute,

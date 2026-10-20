@@ -5,16 +5,19 @@ import {
   precacheAndRoute,
 } from 'workbox-precaching';
 import { NavigationRoute, registerRoute } from 'workbox-routing';
+// Only this key of the app's texts reaches the service worker (Vite's named JSON exports).
+import { push as texts } from '../i18n/locales/ar.json';
 import {
   appPath,
   notificationOptions,
   type OpenMessage,
+  type PushData,
   readPushData,
   readPushPayload,
 } from './push-payload';
 
 /*
- * The service worker (F16 rules A2, A4, A8, A10, A14; ADR 0036), built by vite-plugin-pwa. It
+ * The service worker (F16 rules A2, A4, A8, A10, A11, A14; ADR 0036), built by vite-plugin-pwa. It
  * precaches the app shell, answers the app's pages with it offline, and shows pushes. API
  * responses never go through it: the app's own cache keeps what may be read offline (rule A5).
  */
@@ -50,15 +53,23 @@ self.addEventListener('push', (event) => {
       }
       // Rule A4: the icon shows the unread count; platforms without badges ignore it.
       await setBadge(payload.unreadCount);
-      await self.registration.showNotification(payload.title, notificationOptions(payload));
+      await self.registration.showNotification(
+        payload.title,
+        notificationOptions(payload, texts.actions),
+      );
     })(),
   );
 });
 
-// Rule A10: focus an open window of the app and navigate it, or open the app at the link.
+// Rule A10: focus an open window of the app and navigate it, or open the app at the link. Rule
+// A11: "Remind me in an hour" snoozes the notification without opening the app.
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   const data = readPushData(event.notification.data);
+  if (event.action === 'snooze' && data?.notificationId) {
+    event.waitUntil(snooze(data));
+    return;
+  }
   const link = appPath(data?.link, self.location.origin);
   if (!data || !link) return;
   event.waitUntil(
@@ -83,6 +94,27 @@ self.addEventListener('notificationclick', (event) => {
     })(),
   );
 });
+
+/** Rule B8 from the push: an hour later it comes back, with a push. */
+async function snooze(data: PushData) {
+  try {
+    const snoozed = await fetch(
+      `/api/me/notifications/${encodeURIComponent(data.notificationId ?? '')}/snooze`,
+      {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ for: '1h' }),
+      },
+    );
+    if (!snoozed.ok) return;
+    // A snoozed row leaves the count (rule B6): the icon follows.
+    const count = await fetch('/api/me/notifications/unread-count', { credentials: 'same-origin' });
+    if (count.ok) await setBadge(((await count.json()) as { count: number }).count);
+  } catch {
+    // Offline or signed out: the notification stays in the app, unsnoozed.
+  }
+}
 
 async function setBadge(count: number) {
   const navigator = self.navigator as WorkerNavigator & Partial<NavigatorBadge>;

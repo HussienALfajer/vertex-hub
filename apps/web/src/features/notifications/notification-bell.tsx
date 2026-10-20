@@ -8,6 +8,9 @@ import {
   PopoverTitle,
   PopoverTrigger,
   Skeleton,
+  Tabs,
+  TabsList,
+  TabsTrigger,
 } from '@vertex-hub/ui';
 import { BellIcon, CheckCheckIcon, CloudOffIcon, SettingsIcon } from 'lucide-react';
 import { useState } from 'react';
@@ -16,7 +19,9 @@ import { formatNumber } from '../../lib/format';
 import { NotificationItem } from './notification-item';
 import { useNotificationStream } from './notification-stream';
 import {
-  BELL_FILTERS,
+  BELL_INBOXES,
+  type BellInbox,
+  bellFilters,
   notificationListQuery,
   unreadCountQuery,
   useMarkAllRead,
@@ -27,7 +32,10 @@ export function unreadBadge(count: number): string {
   return count > 99 ? `${formatNumber(99)}+` : formatNumber(count);
 }
 
-/** The bell in the app shell header, with the 10 newest notifications (F14 screen 1). */
+/**
+ * The bell in the app shell header, with the 10 newest notifications of "Needs you" and of "For
+ * your information" (F14 screen 1, F16 screen 3).
+ */
 export function NotificationBell() {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
@@ -54,15 +62,28 @@ export function NotificationBell() {
         )}
       </PopoverTrigger>
       <PopoverContent align="end" className="w-96">
-        <BellPanel onClose={() => setOpen(false)} unread={count} />
+        <BellPanel
+          onClose={() => setOpen(false)}
+          unread={count}
+          needsYou={unread.data?.needsYou ?? 0}
+        />
       </PopoverContent>
     </Popover>
   );
 }
 
-function BellPanel({ onClose, unread }: { onClose: () => void; unread: number }) {
+function BellPanel({
+  onClose,
+  unread,
+  needsYou,
+}: {
+  onClose: () => void;
+  unread: number;
+  needsYou: number;
+}) {
   const { t } = useTranslation();
-  const list = useQuery(notificationListQuery(BELL_FILTERS));
+  const [inbox, setInbox] = useState<BellInbox>('needs_you');
+  const list = useQuery(notificationListQuery(bellFilters(inbox)));
   const markAll = useMarkAllRead();
 
   return (
@@ -89,6 +110,17 @@ function BellPanel({ onClose, unread }: { onClose: () => void; unread: number })
           </IconButton>
         </div>
       </div>
+      <Tabs value={inbox} onValueChange={(next: BellInbox) => setInbox(next)}>
+        <TabsList aria-label={t('notifications.inbox')} className="px-2">
+          {BELL_INBOXES.map((value) => (
+            <TabsTrigger key={value} value={value}>
+              {value === 'needs_you' && needsYou > 0
+                ? t('notifications.inboxes.needsYouCount', { n: unreadBadge(needsYou) })
+                : t(`notifications.inboxes.${value}`)}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </Tabs>
       <div className="min-h-0 flex-1 overflow-y-auto">
         {list.isPending ? (
           <div className="flex flex-col gap-4 p-4">
@@ -113,8 +145,10 @@ function BellPanel({ onClose, unread }: { onClose: () => void; unread: number })
         ) : list.data.items.length === 0 ? (
           <div className="flex flex-col items-center gap-2 px-4 py-10 text-center">
             <BellIcon className="size-6 text-muted-foreground" aria-hidden="true" />
-            <p className="text-sm font-medium">{t('notifications.emptyTitle')}</p>
-            <p className="text-xs text-muted-foreground">{t('notifications.emptyHint')}</p>
+            <p className="text-sm font-medium">{t(`notifications.empty.${inbox}.title`)}</p>
+            <p className="text-xs text-muted-foreground">
+              {t(`notifications.empty.${inbox}.hint`)}
+            </p>
           </div>
         ) : (
           <ul className="divide-y divide-border">
@@ -126,15 +160,30 @@ function BellPanel({ onClose, unread }: { onClose: () => void; unread: number })
           </ul>
         )}
       </div>
-      <div className="border-t border-border p-2">
+      <div className="flex items-center gap-1 border-t border-border p-2">
         <Button
           variant="ghost"
-          className="w-full"
-          render={<Link to="/notifications" />}
+          className="flex-1"
+          render={
+            <Link
+              to="/notifications"
+              search={{ inbox: inbox === 'needs_you' ? undefined : inbox }}
+            />
+          }
           onClick={onClose}
         >
           {t('notifications.viewAll')}
         </Button>
+        {(['done', 'snoozed'] as const).map((value) => (
+          <Button
+            key={value}
+            variant="ghost"
+            render={<Link to="/notifications" search={{ inbox: value }} />}
+            onClick={onClose}
+          >
+            {t(`notifications.inboxes.${value}`)}
+          </Button>
+        ))}
       </div>
     </>
   );

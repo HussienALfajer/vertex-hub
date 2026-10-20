@@ -18,6 +18,7 @@ import {
   VertexMark,
 } from '@vertex-hub/ui';
 import {
+  BellRingIcon,
   BriefcaseBusinessIcon,
   Building2Icon,
   CalendarDaysIcon,
@@ -81,6 +82,7 @@ interface NavItem {
     | 'nav.departments'
     | 'nav.audit'
     | 'nav.emails'
+    | 'nav.notificationPolicy'
     | 'nav.designSystem';
   icon: LucideIcon;
   /** Hides the item from users without it. Cosmetic: the API enforces access. */
@@ -139,6 +141,12 @@ const navItems: NavItem[] = [
   { to: '/departments', label: 'nav.departments', icon: Building2Icon },
   { to: '/audit', label: 'nav.audit', icon: ScrollTextIcon, permission: 'audit.read' },
   { to: '/emails', label: 'nav.emails', icon: MailIcon, permission: 'audit.read' },
+  {
+    to: '/admin/notification-policy',
+    label: 'nav.notificationPolicy',
+    icon: BellRingIcon,
+    permission: 'notifications.policy',
+  },
   // A developer gallery (and the screenshot tests' page): listed in development only.
   {
     to: '/design-system',

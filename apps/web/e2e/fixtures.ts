@@ -46,6 +46,7 @@ import {
   type CatalogBilling,
   type CatalogPackage,
   type CatalogService,
+  type ChannelMode,
   type ClientApprovals,
   type ClientBilling,
   type ClientDetailResponse,
@@ -219,10 +220,12 @@ import {
   type NoteChannel,
   type Notification,
   type NotificationContent,
+  type NotificationPolicy,
   type NotificationSettings,
   type NotificationType,
   needsDiscountApproval,
   notificationBox,
+  notificationInbox,
   notificationPriority,
   OPEN_AD_CAMPAIGN_STATUSES,
   OPEN_INVOICE_STATUSES,
@@ -261,6 +264,7 @@ import {
   type PublicApproveAll,
   type PublicResponse,
   type PublishedLink,
+  type PushDelivery,
   type PushSubscriptionInput,
   packageIssues,
   periodInOneMonth,
@@ -318,11 +322,13 @@ import {
   type ShootType,
   type ShotListInput,
   type SignedInDevice,
+  type SnoozeNotification,
   type SourceInvoice,
   sendQuoteSchema,
   serviceIssues,
   setRetainerTemplateSchema,
   shootTaskTitle,
+  snoozeUntil,
   spendCountsInWallet,
   splitEvenly,
   statementRows,
@@ -358,7 +364,9 @@ import {
   type UpdateCampaign,
   type UpdateCycleLine,
   type UpdateExtraWork,
+  type UpdateFollowing,
   type UpdateMeeting,
+  type UpdateNotificationPolicy,
   type UpdateNotificationSettings,
   type UpdatePost,
   type UpdateRetainerTerm,
@@ -9086,6 +9094,58 @@ export function notificationsSeed(): NotificationRecord[] {
       read: true,
       updatedAt: '2026-09-20T10:00:00.000Z',
     }),
+    // F16 part B: one closed by someone else, one closed by Sara, one snoozed.
+    notificationFor(manager, 5011, {
+      type: 'task_review_requested',
+      actor: layan,
+      subject: { type: 'task', id: id(1003) },
+      data: {
+        task: {
+          title: 'بوستات أسبوع الافتتاح',
+          department: 'content_management',
+          client: 'مطعم الياسمين',
+          project: null,
+        },
+      },
+      read: true,
+      inbox: 'fyi',
+      resolution: {
+        outcome: 'done',
+        by: { id: id(2), name: 'عمر حداد' },
+        at: '2026-09-29T15:00:00.000Z',
+      },
+      updatedAt: '2026-09-29T14:00:00.000Z',
+    }),
+    notificationFor(manager, 5012, {
+      type: 'task_review_requested',
+      actor: layan,
+      subject: { type: 'task', id: id(1002) },
+      data: {
+        task: {
+          title: 'تصوير أطباق الموسم',
+          department: 'photography',
+          client: 'مطعم الياسمين',
+          project: null,
+        },
+      },
+      read: true,
+      inbox: 'done',
+      resolution: {
+        outcome: 'done',
+        by: { id: manager.user.id, name: manager.user.name },
+        at: '2026-09-28T12:00:00.000Z',
+      },
+      updatedAt: '2026-09-28T10:00:00.000Z',
+    }),
+    notificationFor(manager, 5013, {
+      type: 'task_returned',
+      actor: layan,
+      subject: { type: 'task', id: id(1001) },
+      data: { task: autumnMenuSnapshot, source: 'internal' },
+      inbox: 'snoozed',
+      snoozedUntil: '2026-10-01T06:00:00.000Z',
+      updatedAt: '2026-09-30T07:00:00.000Z',
+    }),
     notificationFor(employeeMe, 5010, {
       type: 'task_assigned',
       actor: { id: id(1), name: 'سارة الخطيب' },
@@ -9103,6 +9163,54 @@ export function notificationsSeed(): NotificationRecord[] {
   ];
 }
 
+/** F16 rule A15: a delivered and opened push, one to a device that is gone, and a test. */
+function pushDeliveriesSeed(notifications: NotificationRecord[]): PushDelivery[] {
+  const strip = ({ recipientId: _, ...rest }: NotificationRecord) => rest as Notification;
+  const sara = { id: manager.user.id, name: manager.user.name };
+  const found = (n: number) => {
+    const record = notifications.find((item) => item.id === id(n));
+    return record ? strip(record) : null;
+  };
+  return [
+    {
+      id: id(9701),
+      user: sara,
+      device: 'Chrome على Android',
+      kind: 'notification',
+      notification: found(5001),
+      status: 'sent',
+      error: null,
+      createdAt: '2026-09-30T09:40:00.000Z',
+      sentAt: '2026-09-30T09:40:02.000Z',
+      clickedAt: '2026-09-30T09:45:00.000Z',
+    },
+    {
+      id: id(9702),
+      user: { id: employeeMe.user.id, name: employeeMe.user.name },
+      device: 'Safari على iPhone',
+      kind: 'notification',
+      notification: found(5010),
+      status: 'gone',
+      error: '410 Gone',
+      createdAt: '2026-09-30T09:00:00.000Z',
+      sentAt: null,
+      clickedAt: null,
+    },
+    {
+      id: id(9703),
+      user: sara,
+      device: 'Edge على Windows',
+      kind: 'test',
+      notification: null,
+      status: 'sent',
+      error: null,
+      createdAt: '2026-09-29T08:00:00.000Z',
+      sentAt: '2026-09-29T08:00:01.000Z',
+      clickedAt: null,
+    },
+  ];
+}
+
 /** The notifications API (F14) over the in-memory rows: each user reads only their own. */
 function notificationRoutes({
   notifications,
@@ -9117,8 +9225,36 @@ function notificationRoutes({
   const emailed = new Map<string, Set<NotificationType>>();
   const digest = new Map<string, boolean>();
   const pushed = new Map<string, Set<NotificationType>>();
+  const morning = new Map<string, boolean>();
+  // F16 rules B1–B2: management's modes per type; the catalog default when absent.
+  const policies = new Map<
+    NotificationType,
+    Pick<NotificationPolicy, 'push' | 'email' | 'updatedBy' | 'updatedAt'>
+  >();
+  // F16 rule B12: who follows each task and post, by `<subject>:<id>`.
+  const followers = new Map<string, Set<string>>([
+    [`task:${id(1001)}`, new Set([id(3), employeeMe.user.id])],
+  ]);
   const mine = () => notifications.filter((n) => n.recipientId === me().user.id);
-  const unreadCount = () => mine().filter((n) => !n.read).length;
+  // F16 rule B6: snoozed rows leave the count.
+  const unreadCount = () => mine().filter((n) => !n.read && n.inbox !== 'snoozed').length;
+  const policyOf = (type: NotificationType): NotificationPolicy => {
+    const { category, priority, push, email } = NOTIFICATION_CATALOG[type];
+    const set = policies.get(type);
+    return {
+      type,
+      category,
+      priority,
+      defaults: { push, email },
+      push: set?.push ?? push,
+      email: set?.email ?? email,
+      updatedBy: set?.updatedBy ?? null,
+      updatedAt: set?.updatedAt ?? null,
+    };
+  };
+  // F16 rule B3: required is on, unavailable off, else the user's choice, else the mode.
+  const effective = (mode: ChannelMode, chosen: boolean | undefined) =>
+    mode === 'required' ? true : mode === 'unavailable' ? false : (chosen ?? mode === 'on');
   const strip = ({ recipientId: _, ...rest }: NotificationRecord) => rest as Notification;
   const settings = (): NotificationSettings => {
     const off = muted.get(me().user.id) ?? new Set();
@@ -9129,20 +9265,16 @@ function notificationRoutes({
         mutable: NOTIFICATION_CATALOG[type].mutable,
         muted: off.has(type),
         priority: NOTIFICATION_CATALOG[type].priority,
-        // F16 rule B3: the saved choice, else the catalog default.
-        push:
-          pushed.get(me().user.id)?.has(type) ??
-          ['on', 'required'].includes(NOTIFICATION_CATALOG[type].push),
-        pushMode: NOTIFICATION_CATALOG[type].push,
+        // F16 rule B3: the policy, then the saved choice, else the mode.
+        push: effective(policyOf(type).push, pushed.get(me().user.id)?.has(type)),
+        pushMode: policyOf(type).push,
         // F14 email: the saved choice, else the catalog defaults, kept while the type is muted.
-        email:
-          emailed.get(me().user.id)?.has(type) ??
-          ['on', 'required'].includes(NOTIFICATION_CATALOG[type].email),
-        emailMode: NOTIFICATION_CATALOG[type].email,
+        email: effective(policyOf(type).email, emailed.get(me().user.id)?.has(type)),
+        emailMode: policyOf(type).email,
         emailLocked: off.has(type),
       })),
       digestEnabled: digest.get(me().user.id) ?? true,
-      morningPush: true,
+      morningPush: morning.get(me().user.id) ?? true,
     };
   };
 
@@ -9153,13 +9285,20 @@ function notificationRoutes({
       const pageSize = Number(url.searchParams.get('pageSize') ?? 20);
       const unread = url.searchParams.get('unread') === 'true';
       const category = url.searchParams.get('category');
+      const inbox = url.searchParams.get('inbox');
       const items = mine()
         .filter(
           (n) =>
+            (inbox ? n.inbox === inbox : n.inbox !== 'snoozed') &&
             (!unread || !n.read) &&
             (!category || NOTIFICATION_CATALOG[n.type].category === category),
         )
-        .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+        // F16 rule B6: critical first, then newest.
+        .sort(
+          (a, b) =>
+            Number(b.priority === 'critical') - Number(a.priority === 'critical') ||
+            b.updatedAt.localeCompare(a.updatedAt),
+        );
       return json(route, {
         items: items.slice((page - 1) * pageSize, page * pageSize).map(strip),
         total: items.length,
@@ -9170,7 +9309,7 @@ function notificationRoutes({
     if (path === '/api/me/notifications/unread-count') {
       return json(route, {
         count: unreadCount(),
-        needsYou: mine().filter((n) => n.box === 'action' && !n.resolution).length,
+        needsYou: mine().filter((n) => n.inbox === 'needs_you').length,
       });
     }
     if (path === '/api/me/notifications/stream') {
@@ -9195,11 +9334,80 @@ function notificationRoutes({
       item.read = match[2] === 'read';
       return route.fulfill({ status: 204 });
     }
+    const snooze = path.match(/^\/api\/me\/notifications\/([^/]+)\/(snooze|unsnooze)$/);
+    if (snooze && method === 'POST') {
+      const item = mine().find((n) => n.id === snooze[1]);
+      if (!item) return fail(route, 404, null);
+      if (snooze[2] === 'snooze') {
+        if (item.resolution) return fail(route, 409, 'ALREADY_RESOLVED');
+        const input = route.request().postDataJSON() as SnoozeNotification;
+        item.snoozedUntil = snoozeUntil(input.for, new Date()).toISOString();
+        item.inbox = 'snoozed';
+      } else {
+        // Rule B8: wakes unread, at the top of its list.
+        item.snoozedUntil = null;
+        item.read = false;
+        item.updatedAt = new Date().toISOString();
+        item.inbox = notificationInbox({
+          recipientId: item.recipientId,
+          box: item.box,
+          snoozed: false,
+          resolution: item.resolution?.outcome ?? null,
+          resolvedById: item.resolution?.by?.id ?? null,
+        });
+      }
+      return json(route, strip(item));
+    }
     if (path === '/api/me/notification-settings' && method === 'GET') {
       return json(route, settings());
     }
+    const policyManager = () =>
+      me().permissions.some((granted) => granted.permission === 'notifications.policy');
+    if (path === '/api/notification-policies' && method === 'GET') {
+      if (!policyManager()) return fail(route, 403, null);
+      return json(route, { items: NOTIFICATION_TYPES.map(policyOf) });
+    }
+    const policy = path.match(/^\/api\/notification-policies\/([^/]+)$/);
+    if (policy && method === 'PUT') {
+      if (!policyManager()) return fail(route, 403, null);
+      const type = policy[1] as NotificationType;
+      if (!NOTIFICATION_TYPES.includes(type)) return fail(route, 404, null);
+      const input = route.request().postDataJSON() as UpdateNotificationPolicy;
+      if ('reset' in input) policies.delete(type);
+      else
+        policies.set(type, {
+          push: input.push,
+          email: input.email,
+          updatedBy: { id: me().user.id, name: me().user.name },
+          updatedAt: new Date().toISOString(),
+        });
+      return json(route, policyOf(type));
+    }
+    if (path === '/api/push-deliveries' && method === 'GET') {
+      if (!policyManager()) return fail(route, 403, null);
+      const userId = url.searchParams.get('userId');
+      const statuses = url.searchParams.getAll('status');
+      const items = pushDeliveriesSeed(notifications).filter(
+        (delivery) =>
+          (!userId || delivery.user.id === userId) &&
+          (statuses.length === 0 || statuses.includes(delivery.status)),
+      );
+      return json(route, { items, total: items.length, page: 1, pageSize: 30 });
+    }
+    const follow = path.match(/^\/api\/(tasks|content\/posts)\/([^/]+)\/following$/);
+    if (follow?.[2] && (method === 'GET' || method === 'PUT')) {
+      const key = `${follow[1] === 'tasks' ? 'task' : 'post'}:${follow[2]}`;
+      const set = followers.get(key) ?? new Set<string>();
+      followers.set(key, set);
+      if (method === 'PUT') {
+        const { following } = route.request().postDataJSON() as UpdateFollowing;
+        if (following) set.add(me().user.id);
+        else set.delete(me().user.id);
+      }
+      return json(route, { following: set.has(me().user.id), followers: set.size });
+    }
     if (path === '/api/me/notification-settings' && method === 'PUT') {
-      const { mutedTypes, emailTypes, pushTypes, digestEnabled } = route
+      const { mutedTypes, emailTypes, pushTypes, digestEnabled, morningPush } = route
         .request()
         .postDataJSON() as UpdateNotificationSettings;
       if (mutedTypes.some((type) => !NOTIFICATION_CATALOG[type].mutable)) {
@@ -9209,6 +9417,7 @@ function notificationRoutes({
       if (emailTypes) emailed.set(me().user.id, new Set(emailTypes));
       if (pushTypes) pushed.set(me().user.id, new Set(pushTypes));
       if (digestEnabled !== undefined) digest.set(me().user.id, digestEnabled);
+      if (morningPush !== undefined) morning.set(me().user.id, morningPush);
       return json(route, settings());
     }
     return undefined;

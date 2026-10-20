@@ -30,6 +30,7 @@ import {
 import { useFocusAfterChange } from '../../lib/use-focus-after-change';
 import { useShownWhileClosing } from '../../lib/use-shown-while-closing';
 import { PostApprovalSection } from '../approvals/task-approval-panel';
+import { FollowButton } from '../notifications/follow-button';
 import { PersonName } from '../projects/project-badges';
 import { lineName } from '../retainers/retainer-badges';
 import { focusTarget, type TaskFocus } from '../tasks/task-actions';
@@ -172,7 +173,10 @@ function PostHero({
             )}
           </div>
         </div>
-        <PostActions post={post} focus={focus} onArchive={onArchive} />
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          {!post.archivedAt && <FollowButton target={{ subject: 'post', id: post.id }} />}
+          <PostActions post={post} focus={focus} onArchive={onArchive} />
+        </div>
       </div>
       <dl className="grid gap-4 border-t border-border pt-5 text-sm sm:grid-cols-2 lg:grid-cols-4">
         <Fact label={t('content.page.publish')}>

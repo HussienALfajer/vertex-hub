@@ -22,12 +22,7 @@ test('the bell counts unread notifications and opens one, marking it read', asyn
   await page.getByRole('button', { name: bellLabel(3) }).click();
   const panel = page.getByRole('dialog', { name: ar.notifications.title });
   await expect(panel.getByRole('link', { name: reviewText })).toBeVisible();
-  // A merged comment says how many; the daily job's reminders have no actor.
-  await expect(
-    panel.getByRole('link', {
-      name: fill(NOTIFICATION_TEXT.task_commented_merged.two, { task: 'تصاميم منيو الخريف' }),
-    }),
-  ).toBeVisible();
+  // The daily job's reminders have no actor.
   await expect(
     panel.getByRole('link', {
       name: fill(NOTIFICATION_TEXT.tasks_generated_queued.few, {
@@ -37,6 +32,14 @@ test('the bell counts unread notifications and opens one, marking it read', asyn
       }),
     }),
   ).toBeVisible();
+  // A merged comment says how many; it needs no action, so it waits in "For your information".
+  await panel.getByRole('tab', { name: ar.notifications.inboxes.fyi }).click();
+  await expect(
+    panel.getByRole('link', {
+      name: fill(NOTIFICATION_TEXT.task_commented_merged.two, { task: 'تصاميم منيو الخريف' }),
+    }),
+  ).toBeVisible();
+  await panel.getByRole('tab', { name: /^تحتاجك/ }).click();
 
   await panel.getByRole('link', { name: reviewText }).click();
   await expect(page).toHaveURL(new RegExp(`/tasks/${seedIds.autumnMenu}$`));
@@ -187,5 +190,5 @@ test('an empty bell', async ({ page }) => {
   await mockApi(page, { signedIn: true, notifications: [] });
   await page.goto('/');
   await page.getByRole('button', { name: ar.notifications.bell, exact: true }).click();
-  await expect(page.getByText(ar.notifications.emptyTitle)).toBeVisible();
+  await expect(page.getByText(ar.notifications.empty.needs_you.title)).toBeVisible();
 });
