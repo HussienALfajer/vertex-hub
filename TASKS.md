@@ -90,7 +90,7 @@ Split from D1b because Part D spans two new modules, seven tables and about twen
 - [x] api announcements: create (draft, now, schedule), send, cancel schedule, edit (+ notify again), withdraw, archive, read (opened), acknowledge, remind (1/h), receipts, list (received, sent, all), home; critical and pin checked per recipient; `NotificationCenter` reopen for "Notify again"; F10 owner type; `test/announcements.test.ts`
 - [x] jobs: acknowledgement reminders and the author's summary in the daily job; scheduled sending in the minute job (author archived or empty audience → back to draft)
 - [x] bridge: `openapi:export`, `api:generate`; web typecheck (no fixture changes needed)
-- [ ] checks, reviewer, acceptance (API at `/api/docs`), PR with auto-merge
+- [x] checks, reviewer, acceptance (owner, 2026-10-20), PR with auto-merge
 
 ## PR D1b — polls and templates: contracts, db, api
 - [ ] polls (tables, create/edit with the announcement, vote, close, results as allowed, anonymous never returned), `poll_closing` and `poll_results`, closing in the minute job; templates (personal and shared, audit for shared)
