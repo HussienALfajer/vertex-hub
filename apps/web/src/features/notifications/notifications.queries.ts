@@ -72,7 +72,11 @@ export async function applyStreamEvent(queryClient: QueryClient, event: Notifica
     queryClient.cancelQueries({ queryKey: notificationsKeys.unreadCount }),
     queryClient.cancelQueries({ queryKey: bellKey, exact: true }),
   ]);
-  queryClient.setQueryData<UnreadCount>(notificationsKeys.unreadCount, { count: unreadCount });
+  // The event carries the unread count only; "Needs you" keeps its last value until refetched.
+  queryClient.setQueryData<UnreadCount>(notificationsKeys.unreadCount, (current) => ({
+    count: unreadCount,
+    needsYou: current?.needsYou ?? 0,
+  }));
   queryClient.setQueryData<NotificationPage>(bellKey, (page) => {
     if (!page) return page;
     const known = page.items.some((item) => item.id === notification.id);

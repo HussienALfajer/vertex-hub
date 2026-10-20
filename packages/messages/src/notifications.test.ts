@@ -9,7 +9,7 @@ import {
 import { describe, expect, it } from 'vitest';
 import { formatAmount } from './format.js';
 import { linkPath, notificationLink, notificationText } from './notifications.js';
-import { notificationPush, PUSH_APP_NAME, testPush } from './push.js';
+import { morningPush, notificationPush, PUSH_APP_NAME, testPush } from './push.js';
 
 const task = { title: 'تصميم منيو', department: 'design', client: 'مطعم الشام', project: null };
 const post = {
@@ -161,6 +161,27 @@ const SAMPLES: Record<NotificationType, unknown> = {
   lead_follow_up_overdue: { lead: 'مقهى الياسمين', followUpOn: '2026-10-01', owner: 'رنا' },
   lead_follow_up_due: { lead: 'مقهى الياسمين', followUpOn: '2026-10-05' },
   push_device_lost: { device: 'Chrome · Android' },
+  action_reminder: {
+    originalType: 'task_review_requested',
+    originalData: { task },
+    waitingWorkDays: 1,
+    waitingOn: ['رنا'],
+    waitingOnMore: 0,
+  },
+  action_escalated: {
+    originalType: 'task_review_requested',
+    originalData: { task },
+    waitingWorkDays: 2,
+    waitingOn: ['رنا', 'سامر'],
+    waitingOnMore: 0,
+  },
+  action_escalated_top: {
+    originalType: 'ad_budget_low',
+    originalData: { client: 'مقهى الياسمين', balanceMinor: 5000, thresholdMinor: 10000 },
+    waitingWorkDays: 4,
+    waitingOn: ['رنا'],
+    waitingOnMore: 3,
+  },
 };
 
 const SUBJECT_ID = '0192a5a0-0000-7000-8000-000000000001';
@@ -174,6 +195,11 @@ function sample(type: NotificationType, overrides: Partial<Notification> = {}): 
     data: SAMPLES[type],
     count: 1,
     read: false,
+    priority: NOTIFICATION_CATALOG[type].priority,
+    box: NOTIFICATION_CATALOG[type].box,
+    inbox: 'fyi',
+    resolution: null,
+    snoozedUntil: null,
     createdAt: '2026-10-05T07:00:00.000Z',
     updatedAt: '2026-10-05T07:00:00.000Z',
     ...overrides,
@@ -258,6 +284,33 @@ describe('notification texts', () => {
   });
 });
 
+describe('escalation steps (F16 rule B11)', () => {
+  it('wrap the original text and name who it waits on and for how long', () => {
+    expect(notificationText(sample('action_reminder'), departmentName)).toEqual({
+      text: `تذكير: ${notificationText(sample('task_review_requested'), departmentName).text}`,
+      context: 'بانتظار رنا منذ يوم عمل',
+    });
+    expect(notificationText(sample('action_escalated'), departmentName).context).toBe(
+      'بانتظار رنا وسامر منذ يومَي عمل',
+    );
+    expect(notificationText(sample('action_escalated_top'), departmentName)).toMatchObject({
+      text: 'تصعيد إلى الإدارة: رصيد إعلانات مقهى الياسمين منخفض: 50.00 دولار (حد التنبيه 100.00)',
+      context: 'بانتظار رنا و+3 منذ 4 أيام عمل',
+    });
+  });
+
+  it('open the record of the original', () => {
+    const step = sample('action_escalated_top', { subject: { type: 'client', id: SUBJECT_ID } });
+    expect(notificationLink(step)).toEqual(
+      notificationLink(sample('ad_budget_low', { subject: { type: 'client', id: SUBJECT_ID } })),
+    );
+    expect(notificationLink(sample('action_reminder'))).toEqual({
+      to: '/tasks/$taskId',
+      params: { taskId: SUBJECT_ID },
+    });
+  });
+});
+
 describe('notification links', () => {
   it('opens the subject of the notification', () => {
     expect(linkPath(notificationLink(sample('task_assigned')))).toBe(`/tasks/${SUBJECT_ID}`);
@@ -309,9 +362,12 @@ describe('failed client emails (F14 email rule 23)', () => {
 describe('push texts (spec F16 rules A8–A9)', () => {
   /** Every amount a snapshot holds, as the bell text formats it. */
   const amountsOf = (data: unknown): string[] =>
-    Object.entries(data as Record<string, unknown>).flatMap(([key, value]) =>
-      key.endsWith('Minor') && typeof value === 'number' ? [formatAmount(Math.abs(value))] : [],
-    );
+    Object.entries(data as Record<string, unknown>).flatMap(([key, value]) => {
+      if (key.endsWith('Minor') && typeof value === 'number')
+        return [formatAmount(Math.abs(value))];
+      // An escalation step holds its original's snapshot.
+      return key === 'originalData' ? amountsOf(value) : [];
+    });
 
   it('never puts a money amount on the lock screen', () => {
     for (const type of NOTIFICATION_TYPES) {
@@ -339,6 +395,13 @@ describe('push texts (spec F16 rules A8–A9)', () => {
     expect(long.body).toHaveLength(140);
     expect(notificationPush(sample('push_device_lost'), departmentName).title).toBe(PUSH_APP_NAME);
     expect(testPush().title).toBe(PUSH_APP_NAME);
+  });
+
+  it('sums up the morning without a bell row (rule B14)', () => {
+    expect(morningPush({ overdue: 3, dueToday: 5, needsYou: 2 })).toEqual({
+      title: PUSH_APP_NAME,
+      body: '3 متأخرة · 5 مستحقة اليوم · 2 تحتاجك',
+    });
   });
 
   it('opens My account for a lost device', () => {

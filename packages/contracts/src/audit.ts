@@ -168,6 +168,7 @@ export const AUDIT_ACTIONS = [
   'catalog_package.archived',
   'catalog_package.restored',
   'quote_settings.updated',
+  'notification_policy.updated',
   'contract_settings.updated',
   'contract_settings.articles_updated',
   'quote.created',
@@ -290,6 +291,7 @@ export const AUDIT_ENTITY_TYPES = [
   'retainer_cycle_report',
   'retainer_contract',
   'retainer_contract_annex',
+  'notification_policy',
 ] as const;
 
 export const auditEntityTypeSchema = z.enum(AUDIT_ENTITY_TYPES).meta({ id: 'AuditEntityType' });

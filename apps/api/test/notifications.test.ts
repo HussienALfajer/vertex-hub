@@ -159,7 +159,7 @@ describe('notifications', () => {
       const count = await client.request('GET', '/api/me/notifications/unread-count', {
         cookie: me.cookie,
       });
-      expect(await count.json()).toEqual({ count: 2 });
+      expect(await count.json()).toEqual({ count: 2, needsYou: 2 });
     });
 
     it('filters by unread and category', async () => {

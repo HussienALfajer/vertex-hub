@@ -86,6 +86,25 @@ export class PushQueue {
     }
   }
 
+  /**
+   * Rule B14: one push that is not a bell row (the morning summary) to every open device of the
+   * user. Returns the number of devices.
+   */
+  async toUser(
+    tx: Transaction,
+    userId: string,
+    push: Omit<Push, 'unreadCount' | 'close'>,
+  ): Promise<number> {
+    const subscriptions = (await this.devices(tx, [userId])).get(userId) ?? [];
+    if (subscriptions.length === 0) return 0;
+    const unreadCount = await this.unreadCount(tx, userId);
+    const close = (await this.recentlyRead(tx, [userId])).get(userId) ?? [];
+    for (const subscription of subscriptions) {
+      await this.send(tx, subscription, { ...push, unreadCount, close });
+    }
+    return subscriptions.length;
+  }
+
   /** The recipient's unread count, for the icon badge (rule A4). */
   async unreadCount(tx: Transaction, userId: string): Promise<number> {
     return (await this.unreadCounts(tx, [userId])).get(userId) ?? 0;
@@ -158,7 +177,14 @@ export class PushQueue {
     const rows = await tx
       .select({ userId: notifications.recipientId, value: count() })
       .from(notifications)
-      .where(and(inArray(notifications.recipientId, userIds), isNull(notifications.readAt)))
+      .where(
+        and(
+          inArray(notifications.recipientId, userIds),
+          isNull(notifications.readAt),
+          // F16 rule B6: snoozed rows leave the count.
+          isNull(notifications.snoozedUntil),
+        ),
+      )
       .groupBy(notifications.recipientId);
     return new Map(rows.map((row) => [row.userId, row.value]));
   }

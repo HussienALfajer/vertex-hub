@@ -6,6 +6,7 @@ import {
   type ContentCalendarQuery,
   type CreatePost,
   type DuplicatePost,
+  type Following,
   isPostContentEditable,
   isPostOpen,
   isPostOverdue,
@@ -49,6 +50,7 @@ import { CodedException } from '../../core/errors/index.js';
 import { changedFields, recordAudit } from '../audit/index.js';
 import { type CurrentUserInfo, lockAccessChanges, UserDirectory } from '../auth/index.js';
 import { ClientDirectory, type ClientSummary } from '../clients/index.js';
+import { RecordFollowers } from '../notifications/index.js';
 import { EngagementDirectory } from '../projects/index.js';
 import { countedTwice, PostTasks } from '../tasks/index.js';
 import {
@@ -118,7 +120,20 @@ export class ContentService {
     private readonly reviews: PostReviews,
     private readonly notices: PostNotices,
     private readonly reviewHooks: PostReviewHooks,
+    private readonly followers: RecordFollowers,
   ) {}
+
+  /** F16 rule B12: whether the actor follows a post they may read. */
+  async following(actor: CurrentUserInfo, id: string): Promise<Following> {
+    await readablePost(this.db, this.clients, actor, id);
+    return this.followers.following({ type: 'post', id }, actor.id);
+  }
+
+  /** F16 rule B12: anyone who may read the post follows or unfollows it by hand. */
+  async setFollowing(actor: CurrentUserInfo, id: string, following: boolean): Promise<Following> {
+    await readablePost(this.db, this.clients, actor, id);
+    return this.followers.setFollowing({ type: 'post', id }, actor.id, following);
+  }
 
   async calendar(actor: CurrentUserInfo, query: ContentCalendarQuery): Promise<ContentCalendar> {
     const now = new Date();

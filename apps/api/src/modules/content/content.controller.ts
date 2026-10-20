@@ -16,6 +16,7 @@ import {
   ApiConflictResponse,
   ApiCreatedResponse,
   ApiNoContentResponse,
+  ApiNotFoundResponse,
   ApiOkResponse,
   ApiTags,
 } from '@nestjs/swagger';
@@ -30,6 +31,8 @@ import {
   createPostTaskSchema,
   type DuplicatePost,
   duplicatePostSchema,
+  type Following,
+  followingSchema,
   type LinkableTaskList,
   type LinkableTaskQuery,
   linkableTaskListSchema,
@@ -48,7 +51,9 @@ import {
   postStatusChangeSchema,
   type ReturnPostTask,
   returnPostTaskSchema,
+  type UpdateFollowing,
   type UpdatePost,
+  updateFollowingSchema,
   updatePostSchema,
 } from '@vertex-hub/contracts';
 import { RequirePermissions } from '../../core/access/index.js';
@@ -119,6 +124,34 @@ export class ContentController {
     @Body({ schema: createPostSchema }) input: CreatePost,
   ): Promise<PostDetail> {
     return this.content.create(actor, input);
+  }
+
+  @Get('content/posts/:id/following')
+  @RequirePermissions('content.read')
+  @SerializeOptions({ schema: followingSchema })
+  @ApiOkResponse({
+    description: 'Whether the caller follows the post, and how many do (F16 rule B12)',
+    standardSchema: followingSchema,
+  })
+  @ApiNotFoundResponse({ description: 'No post the caller may read' })
+  following(
+    @CurrentUser() actor: CurrentUserInfo,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<Following> {
+    return this.content.following(actor, id);
+  }
+
+  @Put('content/posts/:id/following')
+  @RequirePermissions('content.read')
+  @SerializeOptions({ schema: followingSchema })
+  @ApiOkResponse({ description: 'Followed or unfollowed by hand', standardSchema: followingSchema })
+  @ApiNotFoundResponse({ description: 'No post the caller may read' })
+  setFollowing(
+    @CurrentUser() actor: CurrentUserInfo,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body({ schema: updateFollowingSchema }) input: UpdateFollowing,
+  ): Promise<Following> {
+    return this.content.setFollowing(actor, id, input.following);
   }
 
   @Get('content/posts/:id')

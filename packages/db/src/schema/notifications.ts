@@ -1,8 +1,13 @@
 import {
+  CHANNEL_MODES,
   type ChannelOverrides,
+  FOLLOW_SOURCES,
+  FOLLOW_SUBJECTS,
+  NOTIFICATION_BOXES,
   NOTIFICATION_EMAIL_STATES,
   NOTIFICATION_PRIORITIES,
   NOTIFICATION_REMINDER_KINDS,
+  NOTIFICATION_RESOLUTIONS,
   NOTIFICATION_SUBJECTS,
   NOTIFICATION_TYPES,
   PUSH_DELIVERY_KINDS,
@@ -47,6 +52,15 @@ export const notificationEmailStateEnum = pgEnum(
 /** F16: the type's priority, snapshotted on each row. */
 export const notificationPriorityEnum = pgEnum('notification_priority', NOTIFICATION_PRIORITIES);
 
+/** F16 rule B6: "Needs you" or "For your information". */
+export const notificationBoxEnum = pgEnum('notification_box', NOTIFICATION_BOXES);
+
+/** F16 rule B5: the work was done, or no longer applies. */
+export const notificationResolutionEnum = pgEnum(
+  'notification_resolution',
+  NOTIFICATION_RESOLUTIONS,
+);
+
 export const notificationReminderKindEnum = pgEnum(
   'notification_reminder_kind',
   NOTIFICATION_REMINDER_KINDS,
@@ -71,6 +85,23 @@ export const notifications = pgTable(
      * inserts during a deploy; `NotificationCenter` always sets it.
      */
     priority: notificationPriorityEnum('priority').notNull().default('normal'),
+    /**
+     * F16 rule B6: snapshot of the type's box. The default only covers rows a previous release
+     * inserts during a deploy; `NotificationCenter` always sets it.
+     */
+    box: notificationBoxEnum('box').notNull().default('info'),
+    /**
+     * F16 rule B5: for `action` rows, the type whose resolution closes it (itself, or the
+     * original's for an escalation step). Null on `info` rows and on rows created before F16,
+     * which `resolve` closes by their type and escalation skips (edge case 21).
+     */
+    resolutionType: notificationTypeEnum('resolution_type'),
+    resolvedAt: timestamp('resolved_at', { withTimezone: true }),
+    /** Null for automatic resolution. */
+    resolvedById: uuid('resolved_by_id').references(() => users.id),
+    resolution: notificationResolutionEnum('resolution'),
+    /** F16 rule B8: the row is out of the lists until then. */
+    snoozedUntil: timestamp('snoozed_until', { withTimezone: true }),
     /** Merged `task_commented` notifications count their comments (rule 5). */
     count: integer('count').notNull().default(1),
     readAt: timestamp('read_at', { withTimezone: true }),
@@ -91,6 +122,21 @@ export const notifications = pgTable(
       .where(sql`${table.emailState} = 'pending'`),
     index('notifications_email_id_idx').on(table.emailId),
     check('notifications_count_check', sql`${table.count} >= 1`),
+    index('notifications_needs_you_idx')
+      .on(table.recipientId, table.updatedAt.desc())
+      .where(sql`${table.box} = 'action' and ${table.resolvedAt} is null`),
+    index('notifications_snoozed_idx')
+      .on(table.snoozedUntil)
+      .where(sql`${table.snoozedUntil} is not null`),
+    index('notifications_open_subject_idx')
+      .on(table.subjectType, table.subjectId, table.resolutionType)
+      .where(sql`${table.resolvedAt} is null`),
+    index('notifications_resolved_at_idx').on(table.resolvedAt),
+    index('notifications_resolved_by_id_idx').on(table.resolvedById),
+    check(
+      'notifications_resolution_check',
+      sql`(${table.resolution} is null) = (${table.resolvedAt} is null)`,
+    ),
   ],
 );
 
@@ -111,11 +157,62 @@ export const notificationSettings = pgTable('notification_settings', {
   emailOverrides: jsonb('email_overrides').$type<ChannelOverrides>().notNull().default({}),
   /** F14 email rule 11. */
   digestEnabled: boolean('digest_enabled').notNull().default(true),
+  /** F16 rule B14: the morning push summary. */
+  morningPush: boolean('morning_push').notNull().default(true),
   updatedAt: timestamp('updated_at', { withTimezone: true })
     .notNull()
     .defaultNow()
     .$onUpdate(() => new Date()),
 });
+
+export const channelModeEnum = pgEnum('channel_mode', CHANNEL_MODES);
+
+/**
+ * F16 rules B1–B2: one row per type whose channels management changed; no row means the catalog
+ * default. Changes are audited (`notification_policy.updated`).
+ */
+export const notificationPolicies = pgTable(
+  'notification_policies',
+  {
+    type: notificationTypeEnum('type').primaryKey(),
+    push: channelModeEnum('push').notNull(),
+    email: channelModeEnum('email').notNull(),
+    updatedById: uuid('updated_by_id')
+      .notNull()
+      .references(() => users.id),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [index('notification_policies_updated_by_id_idx').on(table.updatedById)],
+);
+
+export const followSubjectEnum = pgEnum('follow_subject', FOLLOW_SUBJECTS);
+
+export const followSourceEnum = pgEnum('follow_source', FOLLOW_SOURCES);
+
+/**
+ * F16 rule B12: who follows a task or a post. `following` false keeps an unfollow, so automatic
+ * following does not add the user back. Personal, not a business record.
+ */
+export const recordFollowers = pgTable(
+  'record_followers',
+  {
+    subjectType: followSubjectEnum('subject_type').notNull(),
+    subjectId: uuid('subject_id').notNull(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    following: boolean('following').notNull(),
+    source: followSourceEnum('source').notNull(),
+    ...timestamps(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.subjectType, table.subjectId, table.userId] }),
+    index('record_followers_user_id_idx').on(table.userId),
+  ],
+);
 
 /** One row per reminder the daily job sent: its idempotency key (rule 8). Never purged. */
 export const notificationReminders = pgTable(

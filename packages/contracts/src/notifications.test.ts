@@ -1,17 +1,31 @@
 import { describe, expect, it } from 'vitest';
 import {
+  type ChannelPolicies,
+  channelModeOf,
   channelOverrides,
+  ESCALATING_TYPES,
   effectiveChannel,
+  escalationDue,
   firstMatchPerRecipient,
+  isEscalationType,
   isMutableNotificationType,
   NOTIFICATION_CATALOG,
   NOTIFICATION_DATA_SCHEMAS,
+  NOTIFICATION_RESOLUTIONS,
   NOTIFICATION_TYPES,
+  type NotificationContent,
   type NotificationData,
+  notificationBox,
+  notificationInbox,
   notificationPriority,
   notificationSchema,
   notificationTypesOf,
+  resolutionTypeOf,
+  snoozeUntil,
+  typeChannelMode,
+  updateNotificationPolicySchema,
   updateNotificationSettingsSchema,
+  workDaysSince,
 } from './notifications.js';
 
 describe('notification catalog', () => {
@@ -174,6 +188,11 @@ describe('notification schema', () => {
     subject: { type: 'task', id: '0199a000-0000-7000-8000-000000000002' },
     count: 1,
     read: false,
+    priority: 'important',
+    box: 'action',
+    inbox: 'needs_you',
+    resolution: null,
+    snoozedUntil: null,
     createdAt: '2026-10-01T06:00:00.000Z',
     updatedAt: '2026-10-01T06:00:00.000Z',
   };
@@ -289,6 +308,8 @@ describe('channels (F16 rule B3)', () => {
     );
     expect(emailed.sort()).toEqual(
       [
+        'action_escalated',
+        'action_escalated_top',
         'approval_responded',
         'invoice_overdue',
         'invoice_paid',
@@ -331,12 +352,12 @@ describe('channels (F16 rule B3)', () => {
 
   it('stores only the departures from the defaults and keeps overrides of locked types', () => {
     const chosen = new Set(['task_commented', 'meeting_upcoming'] as const);
-    const overrides = channelOverrides('push', chosen, { task_overdue: false });
+    const overrides = channelOverrides('push', chosen, { task_overdue: false }, {});
     // On by default and not chosen: off; off by default and chosen: on; locked: kept as it was.
     expect(overrides.task_assigned).toBe(false);
     expect(overrides.task_commented).toBeUndefined();
     expect(overrides.task_overdue).toBe(false);
-    expect(channelOverrides('email', new Set(['task_commented']), {})).toMatchObject({
+    expect(channelOverrides('email', new Set(['task_commented']), {}, {})).toMatchObject({
       task_commented: true,
       task_assigned: false,
     });
@@ -371,9 +392,241 @@ describe('channels (F16 rule B3)', () => {
     ).toBe('normal');
   });
 
+  it('reads the modes from the policy, and keeps the overrides of types it locks', () => {
+    const policies: ChannelPolicies = {
+      task_commented: { push: 'required', email: 'off' },
+      task_assigned: { push: 'unavailable', email: 'on' },
+    };
+    expect(typeChannelMode('task_commented', 'push', policies)).toBe('required');
+    expect(typeChannelMode('task_returned', 'push', policies)).toBe('on');
+    const overrides = channelOverrides(
+      'push',
+      new Set(['task_assigned']),
+      { task_commented: false },
+      policies,
+    );
+    expect(overrides).toMatchObject({ task_commented: false });
+    expect(overrides.task_assigned).toBeUndefined();
+  });
+
+  it('always pushes the final behind reminder unless a policy says otherwise', () => {
+    const content: NotificationContent = {
+      type: 'retainer_behind',
+      data: {
+        retainer: 'R',
+        client: 'C',
+        periodEnd: '2026-10-31',
+        daysLeft: 1,
+        final: true,
+        lines: [{ kind: 'design', label: null, delivered: 0, committed: 1, ready: 0 }],
+      },
+    };
+    expect(channelModeOf(content, 'push', {})).toBe('required');
+    expect(channelModeOf(content, 'push', { retainer_behind: { push: 'off', email: 'off' } })).toBe(
+      'off',
+    );
+  });
+
   it('keeps email choices and the digest switch when an update leaves them out', () => {
     const update = updateNotificationSettingsSchema.parse({ mutedTypes: [] });
     expect(update.emailTypes).toBeUndefined();
     expect(update.digestEnabled).toBeUndefined();
+  });
+});
+
+describe('inboxes and resolution (F16 rules B5–B6)', () => {
+  const run = {
+    template: 'T',
+    count: 2,
+    department: 'design',
+    client: null,
+    project: null,
+    retainer: null,
+  } as const;
+
+  it('puts the types with a resolution in "Needs you" and the managers notice too', () => {
+    expect(NOTIFICATION_CATALOG.task_review_requested.box).toBe('action');
+    expect(NOTIFICATION_CATALOG.task_commented).toMatchObject({ box: 'info', merges: true });
+    expect(NOTIFICATION_CATALOG.task_changed.merges).toBe(true);
+    expect(NOTIFICATION_CATALOG.lead_assigned).toMatchObject({ box: 'action', opened: true });
+    expect(notificationBox({ type: 'tasks_generated', data: { ...run, unassigned: true } })).toBe(
+      'action',
+    );
+    expect(notificationBox({ type: 'tasks_generated', data: { ...run, unassigned: false } })).toBe(
+      'info',
+    );
+    // Only what can be opened or merged has those flags.
+    for (const type of NOTIFICATION_TYPES) {
+      if (NOTIFICATION_CATALOG[type].opened) expect(NOTIFICATION_CATALOG[type].box).toBe('action');
+      if (NOTIFICATION_CATALOG[type].escalation.length > 0) {
+        expect(NOTIFICATION_CATALOG[type].box).toBe('action');
+      }
+    }
+  });
+
+  it('keeps the box list of the backfill migration (0069)', () => {
+    const action = NOTIFICATION_TYPES.filter(
+      (type) => NOTIFICATION_CATALOG[type].box === 'action' && !isEscalationType(type),
+    );
+    expect(action).toEqual([
+      'task_assigned',
+      'task_mentioned',
+      'task_returned',
+      'task_review_requested',
+      'task_medical_review_requested',
+      'task_awaiting_client',
+      'task_over_limit',
+      'approval_responded',
+      'approval_no_response',
+      'approval_expired',
+      'task_requested',
+      'post_returned',
+      'post_review_requested',
+      'post_medical_review_requested',
+      'post_awaiting_client',
+      'post_assigned',
+      'post_task_unlinked',
+      'task_due_soon',
+      'task_overdue',
+      'task_overdue_escalated',
+      'task_over_limit_pending',
+      'post_publish_today',
+      'post_publish_overdue',
+      'shoot_not_closed',
+      'client_account_manager_assigned',
+      'project_manager_assigned',
+      'retainer_renewal_due',
+      'retainer_behind',
+      'retainer_cycle_report_ready',
+      'retainer_amendment_pending',
+      'quote_approval_requested',
+      'quote_approval_decided',
+      'invoice_overdue',
+      'ad_budget_low',
+      'email_failed',
+      'lead_assigned',
+      'lead_follow_up_overdue',
+      'lead_follow_up_due',
+    ]);
+  });
+
+  it('closes an escalation step with its original, and other action rows with themselves', () => {
+    const step: NotificationContent = {
+      type: 'action_escalated',
+      data: {
+        originalType: 'task_review_requested',
+        originalData: {},
+        waitingWorkDays: 2,
+        waitingOn: ['A'],
+        waitingOnMore: 0,
+      },
+    };
+    expect(resolutionTypeOf(step)).toBe('task_review_requested');
+    expect(resolutionTypeOf({ type: 'tasks_generated', data: { ...run, unassigned: true } })).toBe(
+      'tasks_generated',
+    );
+    expect(
+      resolutionTypeOf({ type: 'tasks_generated', data: { ...run, unassigned: false } }),
+    ).toBeNull();
+  });
+
+  it('derives the inbox from the box, the resolution and who resolved it', () => {
+    const base = {
+      recipientId: 'me',
+      box: 'action',
+      snoozed: false,
+      resolution: null,
+      resolvedById: null,
+    } as const;
+    expect(notificationInbox(base)).toBe('needs_you');
+    expect(notificationInbox({ ...base, box: 'info' })).toBe('fyi');
+    expect(notificationInbox({ ...base, snoozed: true })).toBe('snoozed');
+    expect(notificationInbox({ ...base, resolution: 'done', resolvedById: 'me' })).toBe('done');
+    expect(notificationInbox({ ...base, resolution: 'done', resolvedById: 'other' })).toBe('fyi');
+    expect(notificationInbox({ ...base, resolution: 'done' })).toBe('fyi');
+    for (const resolution of NOTIFICATION_RESOLUTIONS) {
+      expect(['done', 'fyi']).toContain(notificationInbox({ ...base, resolution }));
+    }
+    expect(notificationInbox({ ...base, resolution: 'void', resolvedById: 'other' })).toBe('done');
+  });
+});
+
+describe('snooze (F16 rule B8)', () => {
+  it('wakes after one or three hours, or on the next work day at 09:00 Damascus time', () => {
+    // Thursday 2026-10-22, 15:00 in Damascus (UTC+3).
+    const now = new Date('2026-10-22T12:00:00Z');
+    expect(snoozeUntil('1h', now).toISOString()).toBe('2026-10-22T13:00:00.000Z');
+    expect(snoozeUntil('3h', now).toISOString()).toBe('2026-10-22T15:00:00.000Z');
+    // Friday is off: Saturday 09:00.
+    expect(snoozeUntil('next_work_day', now).toISOString()).toBe('2026-10-24T06:00:00.000Z');
+  });
+});
+
+describe('escalation (F16 rule B11)', () => {
+  it('escalates the chain types, the step-1-only types and the types with an added step', () => {
+    expect(ESCALATING_TYPES.sort()).toEqual(
+      [
+        'ad_budget_low',
+        'invoice_overdue',
+        'post_awaiting_client',
+        'post_medical_review_requested',
+        'post_publish_overdue',
+        'post_review_requested',
+        'quote_approval_requested',
+        'retainer_amendment_pending',
+        'shoot_not_closed',
+        'task_awaiting_client',
+        'task_medical_review_requested',
+        'task_overdue_escalated',
+        'task_requested',
+        'task_review_requested',
+      ].sort(),
+    );
+    expect(NOTIFICATION_CATALOG.quote_approval_requested.escalation.map((s) => s.step)).toEqual([
+      1,
+    ]);
+    expect(NOTIFICATION_CATALOG.task_review_requested.escalation.map((s) => s.step)).toEqual([
+      1, 2, 3,
+    ]);
+  });
+
+  it('counts work days after the original, skipping Fridays', () => {
+    // Wednesday 2026-10-21: Thursday is 1, Saturday 2, Sunday 3, Monday 4.
+    expect(workDaysSince('2026-10-21', '2026-10-21')).toBe(0);
+    expect(workDaysSince('2026-10-21', '2026-10-22')).toBe(1);
+    expect(workDaysSince('2026-10-21', '2026-10-23')).toBe(1);
+    expect(workDaysSince('2026-10-21', '2026-10-24')).toBe(2);
+    const [one, two, three] = NOTIFICATION_CATALOG.task_review_requested.escalation;
+    if (!one || !two || !three) throw new Error('chain');
+    expect(escalationDue(one, '2026-10-21', '2026-10-21')).toBe(false);
+    expect(escalationDue(one, '2026-10-21', '2026-10-22')).toBe(true);
+    expect(escalationDue(two, '2026-10-21', '2026-10-22')).toBe(false);
+    expect(escalationDue(two, '2026-10-21', '2026-10-24')).toBe(true);
+    expect(escalationDue(three, '2026-10-21', '2026-10-25')).toBe(false);
+    expect(escalationDue(three, '2026-10-21', '2026-10-26')).toBe(true);
+  });
+
+  it('times the calendar-day and overdue-day steps', () => {
+    const [budget] = NOTIFICATION_CATALOG.ad_budget_low.escalation;
+    const [invoice] = NOTIFICATION_CATALOG.invoice_overdue.escalation;
+    if (!budget || !invoice) throw new Error('steps');
+    expect(escalationDue(budget, '2026-10-01', '2026-10-07')).toBe(false);
+    expect(escalationDue(budget, '2026-10-01', '2026-10-08')).toBe(true);
+    // First overdue notice on its first overdue day: the 14th day is 13 days later.
+    expect(escalationDue(invoice, '2026-10-01', '2026-10-13', 1)).toBe(false);
+    expect(escalationDue(invoice, '2026-10-01', '2026-10-14', 1)).toBe(true);
+  });
+});
+
+describe('channel policy (F16 rule B2)', () => {
+  it('takes both modes, or a reset, and nothing else', () => {
+    expect(updateNotificationPolicySchema.safeParse({ push: 'on', email: 'off' }).success).toBe(
+      true,
+    );
+    expect(updateNotificationPolicySchema.safeParse({ reset: true }).success).toBe(true);
+    expect(updateNotificationPolicySchema.safeParse({ push: 'on' }).success).toBe(false);
+    expect(
+      updateNotificationPolicySchema.safeParse({ reset: true, push: 'on', email: 'on' }).success,
+    ).toBe(false);
   });
 });

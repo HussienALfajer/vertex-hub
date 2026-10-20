@@ -16,6 +16,7 @@ import {
 } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
+  ApiConflictResponse,
   ApiNoContentResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
@@ -24,14 +25,18 @@ import {
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import {
+  type Notification,
   type NotificationListQuery,
   type NotificationPage,
   type NotificationSettings,
   notificationListQuerySchema,
   notificationPageSchema,
+  notificationSchema,
   notificationSettingsSchema,
   type ReadAllResult,
   readAllResultSchema,
+  type SnoozeNotification,
+  snoozeNotificationSchema,
   type UnreadCount,
   type UpdateNotificationSettings,
   unreadCountSchema,
@@ -56,7 +61,10 @@ export class NotificationsController {
 
   @Get('notifications')
   @SerializeOptions({ schema: notificationPageSchema })
-  @ApiOkResponse({ description: 'Newest first', standardSchema: notificationPageSchema })
+  @ApiOkResponse({
+    description: 'One inbox, or every notification not snoozed; critical first, then newest',
+    standardSchema: notificationPageSchema,
+  })
   list(
     @CurrentUser() current: CurrentUserInfo,
     @Query({ schema: notificationListQuerySchema }) query: NotificationListQuery,
@@ -66,9 +74,12 @@ export class NotificationsController {
 
   @Get('notifications/unread-count')
   @SerializeOptions({ schema: unreadCountSchema })
-  @ApiOkResponse({ description: 'Unread notifications', standardSchema: unreadCountSchema })
-  async unreadCount(@CurrentUser() current: CurrentUserInfo): Promise<UnreadCount> {
-    return { count: await this.notifications.unreadCount(current.id) };
+  @ApiOkResponse({
+    description: 'Unread notifications not snoozed, and open "Needs you" ones',
+    standardSchema: unreadCountSchema,
+  })
+  unreadCount(@CurrentUser() current: CurrentUserInfo): Promise<UnreadCount> {
+    return this.notifications.unreadCount(current.id);
   }
 
   /**
@@ -152,6 +163,32 @@ export class NotificationsController {
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<void> {
     return this.notifications.markUnread(current.id, id);
+  }
+
+  @Post('notifications/:id/snooze')
+  @HttpCode(200)
+  @SerializeOptions({ schema: notificationSchema })
+  @ApiOkResponse({ description: 'Snoozed until its time', standardSchema: notificationSchema })
+  @ApiNotFoundResponse({ description: 'Not one of the caller’s notifications' })
+  @ApiConflictResponse({ description: '`ALREADY_RESOLVED`: the notification is closed' })
+  snooze(
+    @CurrentUser() current: CurrentUserInfo,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body({ schema: snoozeNotificationSchema }) input: SnoozeNotification,
+  ): Promise<Notification> {
+    return this.notifications.snooze(current.id, id, input.for);
+  }
+
+  @Post('notifications/:id/unsnooze')
+  @HttpCode(200)
+  @SerializeOptions({ schema: notificationSchema })
+  @ApiOkResponse({ description: 'Woken at once', standardSchema: notificationSchema })
+  @ApiNotFoundResponse({ description: 'Not one of the caller’s notifications' })
+  unsnooze(
+    @CurrentUser() current: CurrentUserInfo,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<Notification> {
+    return this.notifications.unsnooze(current.id, id);
   }
 
   @Get('notification-settings')

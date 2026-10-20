@@ -400,7 +400,20 @@ export const EMAIL_NOTIFICATIONS_JOB = {
   tz: BUSINESS_TIME_ZONE,
 } as const;
 
-/** F14 email rule 10: the morning digest, 08:00 on work days. Worked by the API. */
+/**
+ * F16 rule B13: every minute, wakes snoozed notifications. Worked by the API. A run that finds
+ * nothing does nothing; a missed minute is caught up by the next.
+ */
+export const NOTIFICATIONS_TIMED_JOB = {
+  queue: 'notifications.timed',
+  cron: '* * * * *',
+  tz: BUSINESS_TIME_ZONE,
+} as const;
+
+/**
+ * F14 email rule 10: the morning digest, 08:00 on work days, and the morning push summary (F16
+ * rule B14). Worked by the API.
+ */
 export const EMAIL_DIGEST_JOB = {
   queue: 'email.digest',
   cron: '0 8 * * 0-4,6',
