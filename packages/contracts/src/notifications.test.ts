@@ -90,6 +90,14 @@ describe('notification catalog', () => {
         'retainer_status_changed',
         'contract_signed',
         'contract_voided',
+        // F16 part C: the new types of the finance, campaigns and people modules.
+        'invoice_due_soon',
+        'payment_recorded',
+        'payment_voided',
+        'invoice_voided',
+        'ad_deposit_recorded',
+        'campaign_status_changed',
+        'member_moved',
       ].sort(),
     );
   });
@@ -104,6 +112,44 @@ describe('notification catalog', () => {
     ];
     expect(all.sort()).toEqual([...NOTIFICATION_TYPES].sort());
     expect(NOTIFICATION_CATALOG.tasks_generated.subject).toBe('template_run');
+  });
+});
+
+describe('the finance, campaigns and people types (F16 part C)', () => {
+  it('keeps the account emails required on their in-app copies (rule 5)', () => {
+    expect(NOTIFICATION_CATALOG.security_new_device).toMatchObject({
+      priority: 'important',
+      push: 'on',
+      email: 'required',
+      mutable: false,
+    });
+    expect(NOTIFICATION_CATALOG.security_notice).toMatchObject({
+      priority: 'informational',
+      push: 'off',
+      email: 'required',
+    });
+  });
+
+  it('names an automatic draft by its trigger, never a manual one', () => {
+    const schema = NOTIFICATION_DATA_SCHEMAS.invoice_draft_created;
+    const data = { client: 'Clinic', origin: 'milestone_done', description: 'Site — Design' };
+    expect(schema.safeParse(data).success).toBe(true);
+    expect(schema.safeParse({ ...data, origin: 'manual' }).success).toBe(false);
+  });
+
+  it('opens campaigns and departments, and asks for action on what waits', () => {
+    expect(NOTIFICATION_CATALOG.campaign_assigned).toMatchObject({
+      subject: 'campaign',
+      box: 'action',
+      opened: true,
+    });
+    expect(NOTIFICATION_CATALOG.department_manager_assigned).toMatchObject({
+      subject: 'department',
+      opened: true,
+    });
+    expect(NOTIFICATION_CATALOG.campaign_end_passed.escalation.map((s) => s.step)).toEqual([
+      1, 2, 3,
+    ]);
   });
 });
 
@@ -344,6 +390,9 @@ describe('channels (F16 rule B3)', () => {
         'invoice_paid',
         'lead_follow_up_overdue',
         'post_publish_overdue',
+        // Part C rule 5: copies of the account emails, sent on their own.
+        'security_new_device',
+        'security_notice',
         'task_assigned',
         'task_due_soon',
         'task_mentioned',
@@ -540,6 +589,11 @@ describe('inboxes and resolution (F16 rules B5–B6)', () => {
       'task_due_shortly',
       'post_publish_shortly',
       'quote_expiring',
+      'invoice_draft_created',
+      'campaign_assigned',
+      'campaign_end_passed',
+      'department_manager_assigned',
+      'member_archived_open_work',
     ]);
   });
 
@@ -600,7 +654,10 @@ describe('escalation (F16 rule B11)', () => {
     expect(ESCALATING_TYPES.sort()).toEqual(
       [
         'ad_budget_low',
+        'campaign_end_passed',
+        'invoice_draft_created',
         'invoice_overdue',
+        'member_archived_open_work',
         'post_awaiting_client',
         'post_medical_review_requested',
         'post_publish_overdue',

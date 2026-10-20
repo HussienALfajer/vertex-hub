@@ -72,6 +72,22 @@ export interface FailedEmail {
 /** Runs in the transaction that records the failure. */
 export type EmailFailureHandler = (tx: Transaction, email: FailedEmail) => Promise<void>;
 
+/** A client email that was sent (F16: it closes the sender's earlier `email_failed`). */
+export type SentEmail = FailedEmail;
+
+/** Runs in the transaction that records the sending. */
+export type EmailSentHandler = (tx: Transaction, email: SentEmail) => Promise<void>;
+
+/** An email as it was queued, with its parsed data, before its secrets are sealed. */
+export interface QueuedEmailEvent {
+  kind: SendableEmailKind;
+  to: EmailAddress[];
+  data: Record<string, unknown>;
+}
+
+/** Runs in the transaction that queues the email (F16 part C rule 5: the security copies). */
+export type EmailQueuedHandler = (tx: Transaction, email: QueuedEmailEvent) => Promise<void>;
+
 type EmailRow = typeof emailMessages.$inferSelect;
 
 /**
@@ -81,6 +97,8 @@ type EmailRow = typeof emailMessages.$inferSelect;
 @Injectable()
 export class Mailer {
   private readonly failureHandlers: EmailFailureHandler[] = [];
+  private readonly sentHandlers: EmailSentHandler[] = [];
+  private readonly queuedHandlers: EmailQueuedHandler[] = [];
 
   constructor(
     @Inject(DATABASE) private readonly db: Database,
@@ -101,6 +119,20 @@ export class Mailer {
     for (const handler of this.failureHandlers) await handler(tx, email);
   }
 
+  /** F16: how a client email that was sent closes its sender's notices; `email` imports no module. */
+  onSent(handler: EmailSentHandler): void {
+    this.sentHandlers.push(handler);
+  }
+
+  async sent(tx: Transaction, email: SentEmail): Promise<void> {
+    for (const handler of this.sentHandlers) await handler(tx, email);
+  }
+
+  /** F16 part C rule 5: what a queued email also stores, in the same transaction. */
+  onQueued(handler: EmailQueuedHandler): void {
+    this.queuedHandlers.push(handler);
+  }
+
   /**
    * Writes the email and its `email.send` job in `tx`, so both commit or roll back with the
    * change. Returns the email's id.
@@ -114,6 +146,9 @@ export class Mailer {
     const size = attachments.reduce((total, file) => total + file.sizeBytes, 0);
     if (size > EMAIL_ATTACHMENTS_MAX_BYTES) {
       throw new CodedException(409, 'ATTACHMENT_TOO_LARGE', 'The attachments exceed 10 MB');
+    }
+    for (const handler of this.queuedHandlers) {
+      await handler(tx, { kind: email.kind, to: email.to, data: parsed });
     }
     const { data, sealed } = this.seal(email.kind, parsed);
     const fields = {

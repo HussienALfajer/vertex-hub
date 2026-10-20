@@ -20,6 +20,7 @@ import type { CurrentUserInfo } from '../auth/index.js';
 import { BillingSources } from '../projects/index.js';
 import { nextDocumentNumber } from './document-numbers.js';
 import { actorOf, assertClientNotArchived } from './invoice-access.js';
+import { InvoiceNotices } from './invoice-notices.js';
 import { InvoicePdfService } from './invoice-pdf.service.js';
 import { InvoiceSettingsService } from './invoice-settings.service.js';
 import { InvoiceSnapshots } from './invoice-snapshots.js';
@@ -37,6 +38,7 @@ export class InvoiceWorkflowService {
     private readonly snapshots: InvoiceSnapshots,
     private readonly sources: BillingSources,
     private readonly pdf: InvoicePdfService,
+    private readonly notices: InvoiceNotices,
   ) {}
 
   /**
@@ -115,6 +117,7 @@ export class InvoiceWorkflowService {
         displayNumber,
         actorOf(actor),
       );
+      await this.notices.draftClosed(tx, id, 'done', actor.id);
       preview = invoice.draftPdfObjectKey;
       return { detail: await this.invoices.toDetail(actor, issued, client, tx), row: issued };
     });
@@ -214,6 +217,7 @@ export class InvoiceWorkflowService {
         identity(voided).number ?? '',
         actorOf(actor),
       );
+      await this.notices.voided(tx, voided, client, actor.id);
       return this.invoices.toDetail(actor, voided, client, tx);
     });
   }

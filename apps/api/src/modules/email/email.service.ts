@@ -101,7 +101,8 @@ export class EmailService implements OnModuleInit {
 
   /**
    * Rule 1: the worker's outcome. Only a `queued` email changes, so a repeated result is a no-op
-   * and nothing moves an email back. Rule 23: a client email that failed tells its sender.
+   * and nothing moves an email back. Rule 23: a client email that failed tells its sender; one
+   * that was sent closes the sender's earlier failure notice (F16).
    */
   async recordResult(result: EmailResultJob): Promise<void> {
     await this.db.transaction(async (tx) => {
@@ -123,8 +124,8 @@ export class EmailService implements OnModuleInit {
         )
         .where(and(eq(emailMessages.id, result.id), eq(emailMessages.status, 'queued')))
         .returning();
-      if (row?.status !== 'failed' || row.audience !== 'client' || !row.senderId) return;
-      await this.mailer.failed(tx, {
+      if (row?.audience !== 'client' || !row.senderId) return;
+      const email = {
         id: row.id,
         kind: row.kind,
         to: row.to as EmailAddress[],
@@ -132,7 +133,10 @@ export class EmailService implements OnModuleInit {
         clientId: row.clientId,
         record: row.recordType && row.recordId ? { type: row.recordType, id: row.recordId } : null,
         data: row.data as Record<string, unknown>,
-      });
+      };
+      if (row.status === 'failed') await this.mailer.failed(tx, email);
+      // F16: a later email of the same kind and record closes the sender's `email_failed`.
+      if (row.status === 'sent') await this.mailer.sent(tx, email);
     });
   }
 

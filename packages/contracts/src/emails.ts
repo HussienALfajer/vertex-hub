@@ -19,6 +19,7 @@ import {
   emailKindSchema,
   emailStatusSchema,
   emailSummarySchema,
+  SECURITY_CHANGES,
 } from './email-basics.js';
 import { clientStatementQuerySchema } from './invoices.js';
 import { pageQuerySchema, pageSchema, queryListSchema } from './lists.js';
@@ -104,21 +105,6 @@ export const digestTaskSchema = z.object({
 });
 
 export type DigestTask = z.infer<typeof digestTaskSchema>;
-
-/** Rule 14: what changed on the account. */
-export const SECURITY_CHANGES = [
-  'password_changed',
-  'two_factor_enabled',
-  'two_factor_disabled',
-  'two_factor_reset',
-  'backup_codes_regenerated',
-  'roles_changed',
-  'archived',
-  'device_signed_out',
-  'all_devices_signed_out',
-] as const;
-
-export type SecurityChange = (typeof SECURITY_CHANGES)[number];
 
 /** An activation or reset link (rule 13): its token is sealed in the job and redacted in the row. */
 const accountLinkSchema = z.object({

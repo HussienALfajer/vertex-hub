@@ -1,6 +1,11 @@
 import { type DepartmentCode, type Notification, pushText } from '@vertex-hub/contracts';
 import { formatNumber } from './format.js';
-import { escalatedOriginal, NOTIFICATION_TEXT, notificationText } from './notifications.js';
+import {
+  escalatedOriginal,
+  NOTIFICATION_TEXT,
+  notificationText,
+  SYSTEM_ACTOR,
+} from './notifications.js';
 import { fill } from './text.js';
 
 /*
@@ -16,6 +21,9 @@ export const PUSH_TEXT = {
   ad_budget_low: 'رصيد إعلانات {{client}} منخفض',
   /** Rule A9: the bell text names the reduction's amount; the push does not. */
   retainer_amendment_pending: 'طلب {{actor}} اعتماد التعديل {{number}} على عقد «{{retainer}}»',
+  /** Rule A9: the bell texts name the payment's amount; the pushes do not. */
+  payment_recorded: 'سجّل {{actor}} دفعة على الفاتورة {{invoice}}',
+  payment_voided: 'ألغى {{actor}} دفعة على الفاتورة {{invoice}}',
   test: 'وصلت الإشعارات إلى هذا الجهاز',
   /** Rule B14: the morning summary. */
   morning: '{{overdue}} متأخرة · {{dueToday}} مستحقة اليوم · {{needsYou}} تحتاجك',
@@ -43,6 +51,12 @@ function withoutAmount(notification: Notification): string | null {
         actor: notification.actor?.name ?? notification.data.creator,
         number: formatNumber(notification.data.number),
         retainer: notification.data.retainer,
+      });
+    case 'payment_recorded':
+    case 'payment_voided':
+      return fill(PUSH_TEXT[notification.type], {
+        actor: notification.actor?.name ?? SYSTEM_ACTOR,
+        invoice: notification.data.invoice.displayNumber,
       });
     case 'action_reminder':
     case 'action_escalated':

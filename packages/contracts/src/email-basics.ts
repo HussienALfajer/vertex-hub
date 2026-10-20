@@ -86,3 +86,18 @@ export const emailSummarySchema = z
   .meta({ id: 'EmailSummary', description: 'One email of the outbox' });
 
 export type EmailSummary = z.infer<typeof emailSummarySchema>;
+
+/** Rule 14: what changed on the account. */
+export const SECURITY_CHANGES = [
+  'password_changed',
+  'two_factor_enabled',
+  'two_factor_disabled',
+  'two_factor_reset',
+  'backup_codes_regenerated',
+  'roles_changed',
+  'archived',
+  'device_signed_out',
+  'all_devices_signed_out',
+] as const;
+
+export type SecurityChange = (typeof SECURITY_CHANGES)[number];

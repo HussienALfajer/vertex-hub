@@ -296,6 +296,8 @@ export class AdWalletsService {
       }
       const after = await this.balances.settle(tx, actorOf(actor), locked, client);
       recorded = await this.receipts.freeze(tx, entry, client, after.balanceMinor);
+      const receipt = receiptNumberOf(entry);
+      if (receipt) await this.balances.depositRecorded(tx, actorOf(actor), client, receipt);
       await recordAudit(tx, {
         actor: actorOf(actor),
         action: 'ad_wallet_entry.recorded',

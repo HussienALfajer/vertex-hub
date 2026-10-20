@@ -176,7 +176,13 @@ describe('notification emails (F14 email rules 2–12)', () => {
   });
 
   /** F16 rule B1: types always emailed; a saved list that leaves them out is refused. */
-  const REQUIRED_EMAIL = ['task_over_limit_pending', 'invoice_overdue'] as const;
+  const REQUIRED_EMAIL = [
+    'task_over_limit_pending',
+    'invoice_overdue',
+    // F16 part C rule 5: the copies of the account emails.
+    'security_new_device',
+    'security_notice',
+  ] as const;
 
   /** F16: the types emailed by default, required ones included. */
   const emailedDefaults = () => [

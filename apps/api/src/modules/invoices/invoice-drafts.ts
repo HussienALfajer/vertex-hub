@@ -22,6 +22,7 @@ import {
   sourceKey,
 } from '../projects/index.js';
 import { QuoteAcceptedHooks } from '../quotes/index.js';
+import { InvoiceNotices } from './invoice-notices.js';
 import { InvoiceSettingsService } from './invoice-settings.service.js';
 import { identity } from './invoices.service.js';
 
@@ -56,6 +57,7 @@ export class InvoiceDrafts implements OnModuleInit {
     private readonly locks: BillingLocks,
     private readonly chargeInvoices: ChargeInvoices,
     private readonly charges: RetainerCharges,
+    private readonly notices: InvoiceNotices,
   ) {}
 
   onModuleInit(): void {
@@ -266,6 +268,7 @@ export class InvoiceDrafts implements OnModuleInit {
         ...(quoteId && { quoteId }),
       },
     });
+    await this.notices.draftCreated(tx, row, client, origin, source.description);
   }
 
   /**

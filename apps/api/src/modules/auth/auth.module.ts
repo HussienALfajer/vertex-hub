@@ -7,6 +7,7 @@ import { DATABASE } from '../../core/database/database.module.js';
 import { EmailModule, Mailer } from '../email/index.js';
 import { AccessService } from './access.service.js';
 import { AccountEmails } from './account-emails.js';
+import { AccountNotices } from './account-notices.js';
 import { createAuth } from './auth.config.js';
 import { DepartmentsController } from './departments.controller.js';
 import { DepartmentsService } from './departments.service.js';
@@ -51,6 +52,7 @@ import { UsersService } from './users.service.js';
   ],
   providers: [
     AccessService,
+    AccountNotices,
     UsersService,
     UserLinksService,
     AccountEmails,
@@ -63,6 +65,6 @@ import { UsersService } from './users.service.js';
     SignedInDevicesService,
     { provide: APP_GUARD, useClass: PermissionsGuard },
   ],
-  exports: [ResponsibilityRegistry, DevicePushStates, UserDirectory],
+  exports: [ResponsibilityRegistry, DevicePushStates, UserDirectory, AccountNotices],
 })
 export class AuthModule {}

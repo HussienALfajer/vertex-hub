@@ -17,6 +17,7 @@ import { aliasedTable, and, asc, desc, eq, isNull, ne, sql } from 'drizzle-orm';
 import { DATABASE } from '../../core/database/database.module.js';
 import { CodedException } from '../../core/errors/index.js';
 import { changedFields, recordAudit } from '../audit/index.js';
+import { AccountNotices } from './account-notices.js';
 import type { CurrentUserInfo } from './current-user.decorator.js';
 import { hasPassword, lockAccessChanges } from './user-status.js';
 
@@ -40,7 +41,10 @@ const departmentFields = {
 /** The ten fixed departments (ADR 0014): names and managers are editable. */
 @Injectable()
 export class DepartmentsService {
-  constructor(@Inject(DATABASE) private readonly db: Database) {}
+  constructor(
+    @Inject(DATABASE) private readonly db: Database,
+    private readonly notices: AccountNotices,
+  ) {}
 
   async list(): Promise<DepartmentListResponse> {
     const rows = await this.db
@@ -91,6 +95,7 @@ export class DepartmentsService {
       await lockAccessChanges(tx);
       const [current] = await tx
         .select({
+          code: departments.code,
           name: departments.name,
           managerId: departments.managerId,
           managerName: managers.name,
@@ -143,8 +148,42 @@ export class DepartmentsService {
         entityId: id,
         ...change,
       });
+      if (manager !== undefined && manager?.id !== current.managerId) {
+        await this.notifyManager(tx, actor, id, current, input.name ?? current.name, manager);
+      }
     });
     return this.detail(actor, id);
+  }
+
+  /**
+   * F16 part C: the new manager is told, and the previous one learns who holds the department now
+   * (rule 4); nobody is told when the manager is only removed.
+   */
+  private async notifyManager(
+    tx: Transaction,
+    actor: CurrentUserInfo,
+    id: string,
+    current: { code: DepartmentResponse['code']; managerId: string | null },
+    name: string,
+    manager: { id: string; name: string } | null,
+  ): Promise<void> {
+    if (!manager) return;
+    const base = { actorId: actor.id, subjectId: id };
+    await this.notices.send(tx, [
+      {
+        ...base,
+        type: 'department_manager_assigned',
+        recipients: [manager.id],
+        data: { department: current.code },
+      },
+      {
+        ...base,
+        type: 'responsibility_moved',
+        subjectType: 'department',
+        recipients: current.managerId ? [current.managerId] : [],
+        data: { role: 'department_manager', record: name, holder: manager.name },
+      },
+    ]);
   }
 
   /** A manager must be an active member of the department (F01 rule 8). */

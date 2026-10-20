@@ -201,7 +201,34 @@ export class AdWalletBalances implements OnModuleInit {
     if (low && threshold !== null) {
       await this.center.notify(tx, await this.notice(tx, client, totals.balanceMinor, threshold));
     }
+    if (!low) {
+      // F16: back at or above the threshold, the alert is done; without a threshold or deposits
+      // it no longer applies.
+      const back = threshold !== null && totals.usesWallet;
+      await this.center.resolve(tx, {
+        subject: { type: 'client', id: client.id },
+        types: ['ad_budget_low'],
+        outcome: back ? 'done' : 'void',
+        actorId: actor.id,
+      });
+    }
     return totals;
+  }
+
+  /** F16 part C: a deposit tells the account manager and the owners of active wallet campaigns. */
+  async depositRecorded(
+    tx: Transaction,
+    actor: AuditActor,
+    client: ClientSummary,
+    receipt: string,
+  ): Promise<void> {
+    await this.center.notify(tx, {
+      type: 'ad_deposit_recorded',
+      recipients: [client.accountManagerId, ...(await this.activeOwners(tx, client.id))],
+      actorId: actor.id,
+      subjectId: client.id,
+      data: { client: client.name, receipt },
+    });
   }
 
   /**
@@ -259,23 +286,28 @@ export class AdWalletBalances implements OnModuleInit {
     balanceMinor: number,
     thresholdMinor: number,
   ): Promise<Notice> {
+    return {
+      type: 'ad_budget_low',
+      recipients: [client.accountManagerId, ...(await this.activeOwners(tx, client.id))],
+      actorId: null,
+      subjectId: client.id,
+      data: { client: client.name, balanceMinor, thresholdMinor },
+    };
+  }
+
+  /** The owners of the client's `active` wallet campaigns. */
+  private async activeOwners(tx: Transaction, clientId: string): Promise<string[]> {
     const owners = await tx
       .selectDistinct({ ownerId: adCampaigns.ownerId })
       .from(adCampaigns)
       .where(
         and(
-          eq(adCampaigns.clientId, client.id),
+          eq(adCampaigns.clientId, clientId),
           eq(adCampaigns.status, 'active'),
           eq(adCampaigns.funding, 'wallet'),
           isNull(adCampaigns.archivedAt),
         ),
       );
-    return {
-      type: 'ad_budget_low',
-      recipients: [client.accountManagerId, ...owners.map((row) => row.ownerId)],
-      actorId: null,
-      subjectId: client.id,
-      data: { client: client.name, balanceMinor, thresholdMinor },
-    };
+    return owners.map((row) => row.ownerId);
   }
 }

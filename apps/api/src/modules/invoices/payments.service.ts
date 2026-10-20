@@ -15,12 +15,13 @@ import { eq } from 'drizzle-orm';
 import { DATABASE } from '../../core/database/database.module.js';
 import { CodedException } from '../../core/errors/index.js';
 import { recordAudit } from '../audit/index.js';
-import type { CurrentUserInfo } from '../auth/index.js';
+import { type CurrentUserInfo, UserDirectory } from '../auth/index.js';
 import type { ClientSummary } from '../clients/index.js';
 import { GeneratedFiles } from '../files/index.js';
 import { NotificationCenter } from '../notifications/index.js';
 import { nextDocumentNumber } from './document-numbers.js';
 import { actorOf } from './invoice-access.js';
+import { invoiceNotice } from './invoice-notices.js';
 import { InvoiceOverdueService } from './invoice-overdue.service.js';
 import { InvoicePdfService } from './invoice-pdf.service.js';
 import { InvoiceSettingsService } from './invoice-settings.service.js';
@@ -43,6 +44,7 @@ export class PaymentsService {
     private readonly overdue: InvoiceOverdueService,
     private readonly snapshots: InvoiceSnapshots,
     private readonly pdf: InvoicePdfService,
+    private readonly users: UserDirectory,
   ) {}
 
   /**
@@ -145,6 +147,7 @@ export class PaymentsService {
         },
       });
       if (updated.status === 'paid') await this.notifyPaid(tx, actor, updated, client);
+      else await this.notifyPayment(tx, actor, 'payment_recorded', updated, payment, client);
       // Recorded on a past-due invoice before the daily job marked it: its readers are alerted.
       if (updated.status === 'overdue' && invoice.status !== 'overdue') {
         await this.overdue.alert(tx, updated, client, today);
@@ -213,6 +216,7 @@ export class PaymentsService {
           reason: input.reason,
         },
       });
+      await this.notifyPayment(tx, actor, 'payment_voided', updated, payment, client);
       // A paid invoice past its due date becomes overdue again: its readers are alerted (A10).
       if (updated.status === 'overdue' && invoice.status !== 'overdue') {
         await this.overdue.alert(tx, updated, client, today);
@@ -238,19 +242,59 @@ export class PaymentsService {
     return updated;
   }
 
-  /** Rule 23: the client's account manager, unless they recorded the payment. */
+  /**
+   * Rule 23: the client's account manager, unless they recorded the payment. F16: the paid invoice
+   * closes its `invoice_overdue`.
+   */
   private async notifyPaid(
     tx: Transaction,
     actor: CurrentUserInfo,
     invoice: InvoiceRow,
     client: ClientSummary,
   ): Promise<void> {
+    await this.center.notify(
+      tx,
+      {
+        type: 'invoice_paid',
+        recipients: [client.accountManagerId],
+        actorId: actor.id,
+        subjectId: invoice.id,
+        data: { invoice: invoiceNotice(invoice, client) },
+      },
+      [
+        {
+          subject: { type: 'invoice', id: invoice.id },
+          types: ['invoice_overdue'],
+          outcome: 'done',
+          actorId: actor.id,
+        },
+      ],
+    );
+  }
+
+  /**
+   * F16 part C: a payment that leaves the invoice partly paid tells the account manager; a voided
+   * one tells the account manager and Finance.
+   */
+  private async notifyPayment(
+    tx: Transaction,
+    actor: CurrentUserInfo,
+    type: 'payment_recorded' | 'payment_voided',
+    invoice: InvoiceRow,
+    payment: PaymentRow,
+    client: ClientSummary,
+  ): Promise<void> {
+    const finance = type === 'payment_voided' ? await this.users.withRole('finance', tx) : [];
     await this.center.notify(tx, {
-      type: 'invoice_paid',
-      recipients: [client.accountManagerId],
+      type,
+      recipients: [client.accountManagerId, ...finance],
       actorId: actor.id,
       subjectId: invoice.id,
-      data: { invoice: { displayNumber: identity(invoice).number ?? '', client: client.name } },
+      data: {
+        invoice: invoiceNotice(invoice, client),
+        amountMinor: payment.amountMinor,
+        currency: payment.currency,
+      },
     });
   }
 }

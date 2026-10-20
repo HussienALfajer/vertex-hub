@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { type AdCampaignStatus, adCampaignStatusSchema } from './campaign-values.js';
 import { calendarDateSchema } from './dates.js';
 import { paymentMethodSchema } from './invoices.js';
 import {
@@ -55,17 +56,12 @@ export const adObjectiveSchema = z.enum(AD_OBJECTIVES).meta({ id: 'AdObjective' 
 
 export type AdObjective = z.infer<typeof adObjectiveSchema>;
 
-export const AD_CAMPAIGN_STATUSES = [
-  'planned',
-  'active',
-  'paused',
-  'completed',
-  'cancelled',
-] as const;
-
-export const adCampaignStatusSchema = z.enum(AD_CAMPAIGN_STATUSES).meta({ id: 'AdCampaignStatus' });
-
-export type AdCampaignStatus = z.infer<typeof adCampaignStatusSchema>;
+// The statuses live in `campaign-values.ts`: notification snapshots name them.
+export {
+  AD_CAMPAIGN_STATUSES,
+  type AdCampaignStatus,
+  adCampaignStatusSchema,
+} from './campaign-values.js';
 
 /** Running or about to run: the list's default. */
 export const OPEN_AD_CAMPAIGN_STATUSES = [

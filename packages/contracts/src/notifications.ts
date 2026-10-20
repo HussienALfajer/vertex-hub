@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { CLIENT_DECISIONS } from './approvals.js';
+import { adCampaignStatusSchema } from './campaign-values.js';
 import { clientStatusSchema } from './clients.js';
 import {
   addDays,
@@ -12,7 +13,8 @@ import {
   workDaysBetween,
 } from './dates.js';
 import { type DepartmentCode, departmentCodeSchema } from './departments.js';
-import { clientEmailKindSchema } from './email-basics.js';
+import { clientEmailKindSchema, SECURITY_CHANGES } from './email-basics.js';
+import type { InvoiceOrigin } from './invoices.js';
 import { pageQuerySchema, pageSchema, queryBooleanSchema } from './lists.js';
 import { currencySchema, minorAmountSchema, signedMinorAmountSchema } from './money.js';
 import { postStatusSchema } from './post-values.js';
@@ -117,12 +119,26 @@ export const NOTIFICATION_TYPES = [
   'quote_expiring',
   'quote_expired',
   'quote_rejected',
+  'invoice_draft_created',
+  'invoice_due_soon',
+  'payment_recorded',
+  'payment_voided',
+  'invoice_voided',
+  'ad_deposit_recorded',
   'project_status_changed',
   'milestone_completed',
   'extra_work_created',
   'retainer_status_changed',
   'contract_signed',
   'contract_voided',
+  'campaign_assigned',
+  'campaign_status_changed',
+  'campaign_end_passed',
+  'department_manager_assigned',
+  'member_moved',
+  'member_archived_open_work',
+  'security_new_device',
+  'security_notice',
   'push_device_lost',
   'action_reminder',
   'action_escalated',
@@ -166,6 +182,9 @@ export const NOTIFICATION_SUBJECTS = [
   'lead',
   /** The recipient's own account (F16 `push_device_lost`): opens My account. */
   'user',
+  /** F16 part C: an ad campaign (F12) and a department (F01). */
+  'campaign',
+  'department',
 ] as const;
 
 export const notificationSubjectTypeSchema = z
@@ -287,6 +306,23 @@ const CATALOG: Record<
   retainer_status_changed: { category: 'clients_projects', subject: 'retainer', mutable: true },
   contract_signed: { category: 'clients_projects', subject: 'retainer', mutable: true },
   contract_voided: { category: 'clients_projects', subject: 'retainer', mutable: true },
+  invoice_draft_created: { category: 'clients_projects', subject: 'invoice', mutable: false },
+  invoice_due_soon: { category: 'reminders', subject: 'invoice', mutable: true },
+  payment_recorded: { category: 'clients_projects', subject: 'invoice', mutable: true },
+  payment_voided: { category: 'clients_projects', subject: 'invoice', mutable: true },
+  invoice_voided: { category: 'clients_projects', subject: 'invoice', mutable: true },
+  /** Opens the client's Ads tab, as `ad_budget_low` does. */
+  ad_deposit_recorded: { category: 'clients_projects', subject: 'client', mutable: true },
+  campaign_assigned: { category: 'clients_projects', subject: 'campaign', mutable: false },
+  campaign_status_changed: { category: 'clients_projects', subject: 'campaign', mutable: true },
+  campaign_end_passed: { category: 'reminders', subject: 'campaign', mutable: false },
+  department_manager_assigned: { category: 'account', subject: 'department', mutable: false },
+  /** Opens the member's profile. */
+  member_moved: { category: 'account', subject: 'user', mutable: true },
+  member_archived_open_work: { category: 'account', subject: 'user', mutable: false },
+  /** Part C rule 5: copies of the account emails, which are never switched off. */
+  security_new_device: { category: 'account', subject: 'user', mutable: false },
+  security_notice: { category: 'account', subject: 'user', mutable: false },
   /** F16 rule B11: the escalation steps open the original's record; its subject type is given. */
   action_reminder: { category: 'reminders', subject: 'task', mutable: false },
   action_escalated: { category: 'reminders', subject: 'task', mutable: false },
@@ -438,6 +474,21 @@ const CHANNELS: Record<NotificationType, Channels> = {
   retainer_status_changed: normal(),
   contract_signed: normal(),
   contract_voided: normal(),
+  invoice_draft_created: important(),
+  invoice_due_soon: normal(),
+  payment_recorded: normal(),
+  payment_voided: important(),
+  invoice_voided: normal(),
+  ad_deposit_recorded: informational,
+  campaign_assigned: important(),
+  campaign_status_changed: normal(),
+  campaign_end_passed: important(),
+  department_manager_assigned: important(),
+  member_moved: normal(),
+  member_archived_open_work: important(),
+  /** Part C rule 5: the account email is required and sent on its own (`emailSent`). */
+  security_new_device: important('required'),
+  security_notice: { ...informational, email: 'required' },
   action_reminder: important(),
   action_escalated: important('on'),
   action_escalated_top: critical(),
@@ -631,6 +682,20 @@ const ENGINE: Record<NotificationType, Engine> = {
   retainer_status_changed: info,
   contract_signed: info,
   contract_voided: info,
+  invoice_draft_created: chain,
+  invoice_due_soon: info,
+  payment_recorded: info,
+  payment_voided: info,
+  invoice_voided: info,
+  ad_deposit_recorded: info,
+  campaign_assigned: opened,
+  campaign_status_changed: info,
+  campaign_end_passed: chain,
+  department_manager_assigned: opened,
+  member_moved: info,
+  member_archived_open_work: chain,
+  security_new_device: info,
+  security_notice: info,
   action_reminder: action(),
   action_escalated: action(),
   action_escalated_top: action(),
@@ -761,15 +826,14 @@ const invoiceData = z.object({
   invoice: z.object({ displayNumber: nameSchema, client: nameSchema }),
 });
 
-/**
- * Part C rule 4: the roles on a record whose previous holder is told when they change. Campaign
- * owners and department managers come with their modules (C1c).
- */
+/** Part C rule 4: the roles on a record whose previous holder is told when they change. */
 export const RESPONSIBILITY_ROLES = [
   'post_responsible',
   'account_manager',
   'project_manager',
   'lead_owner',
+  'campaign_owner',
+  'department_manager',
 ] as const;
 
 export type ResponsibilityRole = (typeof RESPONSIBILITY_ROLES)[number];
@@ -781,6 +845,24 @@ const contractData = z.object({
   contract: nameSchema,
   /** The annex number; null for the contract itself. */
   annex: z.number().int().min(1).nullable(),
+});
+
+/** An ad campaign as it was when the notification was sent (F12). */
+const campaignData = z.object({ campaign: z.object({ name: nameSchema, client: nameSchema }) });
+
+/** How an automatic draft started (F13 rules 2–5; `invoices.ts` imports this file's users). */
+const AUTOMATIC_INVOICE_ORIGINS = [
+  'quote_accepted',
+  'milestone_done',
+  'cycle_opened',
+  'retainer_amendment',
+  'retainer_termination',
+] as const satisfies readonly Exclude<InvoiceOrigin, 'manual'>[];
+
+/** A payment as recorded, in its own currency (F13 rule 16). */
+const paymentData = invoiceData.extend({
+  amountMinor: minorAmountSchema,
+  currency: currencySchema,
 });
 
 /** What changed on a scheduled shoot that its crew is told about. */
@@ -1051,6 +1133,40 @@ export const NOTIFICATION_DATA_SCHEMAS = {
   }),
   contract_signed: contractData,
   contract_voided: contractData,
+  /** F13 rules 2–5: a draft started by its trigger; `description` is its line's text. */
+  invoice_draft_created: z.object({
+    client: nameSchema,
+    origin: z.enum(AUTOMATIC_INVOICE_ORIGINS),
+    description: nameSchema,
+  }),
+  /** Part C rule 3: an issued, unpaid invoice is due in three days. */
+  invoice_due_soon: invoiceData.extend({ dueOn: calendarDateSchema }),
+  /** The payment left the invoice partly paid; the push text has no amount (rule A9). */
+  payment_recorded: paymentData,
+  payment_voided: paymentData,
+  /** F13 rule 14: an issued invoice was voided. */
+  invoice_voided: invoiceData,
+  /** F12 rule 16: `receipt` is the deposit's receipt number. */
+  ad_deposit_recorded: z.object({ client: nameSchema, receipt: nameSchema }),
+  /** The recipient became the campaign's owner. */
+  campaign_assigned: campaignData,
+  campaign_status_changed: campaignData.extend({ status: adCampaignStatusSchema }),
+  /** Part C rule 3: an active campaign's end date has passed. */
+  campaign_end_passed: campaignData.extend({ endsOn: calendarDateSchema }),
+  /** The recipient became the department's manager; its current name is shown. */
+  department_manager_assigned: z.object({ department: departmentCodeSchema }),
+  /** The member left and joined these departments. */
+  member_moved: z.object({
+    member: nameSchema,
+    left: z.array(departmentCodeSchema),
+    joined: z.array(departmentCodeSchema),
+  }),
+  /** An archived member still owns `count` open items (campaigns: F01 rule 9 blocks the rest). */
+  member_archived_open_work: z.object({ member: nameSchema, count: z.number().int().min(1) }),
+  /** Part C rule 5: F14 email rule 15, a sign-in from a new device. */
+  security_new_device: z.object({ device: nameSchema, at: z.iso.datetime() }),
+  /** F14 email rule 14: `by` is the user manager who made the change; null for the user. */
+  security_notice: z.object({ change: z.enum(SECURITY_CHANGES), by: nameSchema.nullable() }),
   /** F16 rule B11 step 1: the original still waits on its recipients. */
   action_reminder: escalationData,
   /** Step 2: the managers of those it waits on (or the step's department or role). */
@@ -1496,6 +1612,9 @@ export const NOTIFICATION_REMINDER_KINDS = [
   'lead_follow_up_overdue',
   /** F16 part C rule 3: once per quote and last valid day. */
   'quote_expiring',
+  /** Once per invoice and due date, and per campaign and end date. */
+  'invoice_due_soon',
+  'campaign_end_passed',
   /** F16 rule B11: keyed by the original's subject and the day it was created. */
   'escalation_1',
   'escalation_2',
