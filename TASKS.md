@@ -100,9 +100,12 @@ Split from D1b because Part D spans two new modules, seven tables and about twen
 - [x] bridge: `openapi:export`, `api:generate`; web typecheck (no fixture changes needed)
 - [x] checks, reviewer, acceptance (owner, 2026-10-20), PR with auto-merge
 
-## PR D2 — announcements: web
-- [ ] `AudiencePicker`, rich-text editor, list, page, receipts, poll, templates, home pin, critical dialog; manifest shortcut "New announcement" (`apps/web/vite.config.ts`)
-- [ ] E2E, checks, reviewer, acceptance (owner step D8), PR with auto-merge, ROADMAP F16 done
+## PR D2 — announcements: web (branch `claude/gracious-rubin-pgjou2`)
+- [x] ui: `RichTextEditor` and `RichTextView` (TipTap 3, the body schema's nodes and marks only; emphasis shown as a highlight, never slanted); design-system section
+- [x] web audiences: `AudiencePicker` (source chips, search, live count and names, exclude and restore) and `audiencePreviewQuery`
+- [x] web announcements: queries; list (Received, Sent by me, All; search, status chips, unread and acknowledgement markers); page (body, link, attachments, "I have read this", poll, receipts with "Remind now", Edit, Withdraw); editor (new, draft, scheduled, sent: locked fields, notify again, schedule, cancel schedule, discard, poll builder, pin, priority with reasons, unsaved-changes guard); templates dialog (use, rename, archive) and "Save as template"; home pin; critical dialog; nav item; manifest shortcut "New announcement"; offline allowlist (list and detail); `ar.json`; unit tests of the form model
+- [x] E2E: mocks in `fixtures.ts`, `f16-announcements.spec.ts` (editor and audience preview, send, page with ack and poll, receipts, templates, home pin, critical dialog, role differences), screenshots in both themes (editor, page, receipts, list, home pin, critical dialog, desktop and phone)
+- [ ] checks, reviewer, acceptance (owner step D8), PR with auto-merge, ROADMAP F16 done
 
 ## After the F16 deploy — contract release
 - [ ] drop `notification_settings.email_types` (expand, then contract: only once production runs a release that no longer reads it, so the single F16 deploy cannot drop it)

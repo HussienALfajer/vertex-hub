@@ -6,6 +6,8 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { can, scopesOf, useMe } from '../../lib/auth';
 import { formatTime } from '../../lib/format';
+import { announcementsKeys } from '../announcements/announcements.queries';
+import { PinnedAnnouncements } from '../announcements/pinned-announcements';
 import { InstallCard } from '../app/install-card';
 import { DevicePushCard } from '../notifications/device-push-card';
 import { reportsKeys } from '../reports/reports.queries';
@@ -44,7 +46,7 @@ export function HomePage() {
     setRefreshing(true);
     try {
       await Promise.all(
-        [reportsKeys.dashboard, tasksKeys.all].map((queryKey) =>
+        [reportsKeys.dashboard, tasksKeys.all, announcementsKeys.home].map((queryKey) =>
           queryClient.invalidateQueries({ queryKey }),
         ),
       );
@@ -75,6 +77,7 @@ export function HomePage() {
       />
       <InstallCard />
       <DevicePushCard placement="home" />
+      <PinnedAnnouncements />
       {show.company && <CompanySection />}
       {show.finance && <FinanceSection />}
       {show.departments && <DepartmentsSection />}

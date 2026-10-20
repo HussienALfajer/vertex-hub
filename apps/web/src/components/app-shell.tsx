@@ -37,6 +37,7 @@ import {
   MailIcon,
   MegaphoneIcon,
   MenuIcon,
+  NewspaperIcon,
   PackageIcon,
   ReceiptTextIcon,
   RepeatIcon,
@@ -69,6 +70,7 @@ interface NavItem {
     | 'nav.leads'
     | 'nav.tasks'
     | 'nav.approvals'
+    | 'nav.announcements'
     | 'nav.content'
     | 'nav.calendar'
     | 'nav.projects'
@@ -124,6 +126,8 @@ const navItems: NavItem[] = [
     icon: StampIcon,
     show: hasApprovalQueue,
   },
+  // Everyone receives and writes announcements (F16 screen 11).
+  { to: '/announcements', label: 'nav.announcements', icon: NewspaperIcon },
   { to: '/content', label: 'nav.content', icon: CalendarDaysIcon, permission: 'content.read' },
   { to: '/calendar', label: 'nav.calendar', icon: CalendarRangeIcon, permission: 'calendar.read' },
   { to: '/leads', label: 'nav.leads', icon: TargetIcon, permission: 'leads.read' },

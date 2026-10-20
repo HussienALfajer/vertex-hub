@@ -4,6 +4,7 @@ import {
   CLIENT_PLATFORMS,
   CLIENT_STATUSES,
   type ClientStatus,
+  EMPHASIS_MARK,
   WORKFLOW_STATUSES,
   type WorkflowStatus,
 } from '@vertex-hub/contracts';
@@ -67,6 +68,9 @@ import {
   Progress,
   RadioCard,
   RadioGroup,
+  type RichTextDoc,
+  RichTextEditor,
+  RichTextView,
   Select,
   SelectContent,
   SelectItem,
@@ -106,6 +110,7 @@ import {
 } from 'lucide-react';
 import { type ReactNode, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useRichTextLabels } from '../../features/announcements/announcement-parts';
 import { formatNumber, formatWeekday, formatWeekdayDate } from '../../lib/format';
 
 export const Route = createFileRoute('/_app/design-system')({
@@ -239,6 +244,8 @@ function DesignSystemPage() {
           </Field>
         </div>
       </Section>
+
+      <RichTextSection />
 
       <Section title={t('designSystem.meters')}>
         <div className="grid gap-6 md:grid-cols-3">
@@ -476,6 +483,82 @@ function DesignSystemPage() {
 }
 
 const sampleSkills = ['figma', 'motion', 'copy', 'premiere', 'product'] as const;
+
+/** The light rich text of announcements (ADR 0038): the editor and the same document rendered. */
+function RichTextSection() {
+  const { t } = useTranslation();
+  const labelId = useId();
+  const labels = useRichTextLabels();
+  const [doc, setDoc] = useState<RichTextDoc>(() => ({
+    type: 'doc',
+    content: [
+      {
+        type: 'heading',
+        attrs: { level: 3 },
+        content: [{ type: 'text', text: t('designSystem.richTextHeading') }],
+      },
+      {
+        type: 'paragraph',
+        content: [
+          { type: 'text', text: t('designSystem.richTextLead') },
+          { type: 'text', text: t('designSystem.richTextBold'), marks: [{ type: 'bold' }] },
+          { type: 'text', text: ' · ' },
+          {
+            type: 'text',
+            text: t('designSystem.richTextEmphasis'),
+            marks: [{ type: EMPHASIS_MARK }],
+          },
+        ],
+      },
+      {
+        type: 'bulletList',
+        content: [
+          {
+            type: 'listItem',
+            content: [
+              {
+                type: 'paragraph',
+                content: [{ type: 'text', text: t('designSystem.richTextItem1') }],
+              },
+            ],
+          },
+          {
+            type: 'listItem',
+            content: [
+              {
+                type: 'paragraph',
+                content: [{ type: 'text', text: t('designSystem.richTextItem2') }],
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  }));
+  return (
+    <Section title={t('designSystem.richText')}>
+      <div className="grid gap-6 lg:grid-cols-2">
+        <div className="flex flex-col gap-2">
+          <span id={labelId} className="text-sm font-medium">
+            {t('designSystem.richTextEditor')}
+          </span>
+          <RichTextEditor
+            defaultValue={doc}
+            onChange={setDoc}
+            labels={labels}
+            aria-labelledby={labelId}
+          />
+        </div>
+        <div className="flex flex-col gap-2">
+          <span className="text-sm font-medium">{t('designSystem.richTextView')}</span>
+          <div className="rounded-md border border-border bg-surface p-4">
+            <RichTextView doc={doc} />
+          </div>
+        </div>
+      </div>
+    </Section>
+  );
+}
 
 /** Avatars, checkbox, multi-select with chips, one-time code, empty state, loading and paging. */
 function PeopleSection() {

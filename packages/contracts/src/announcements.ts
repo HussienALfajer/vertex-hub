@@ -123,9 +123,15 @@ const httpsUrlSchema = z
 
 /* The body: a TipTap document limited to the allowed nodes and marks (rule D13). */
 
+/**
+ * TipTap's name of the emphasis mark. The web renders it as a highlight, never slanted: Arabic is
+ * not italicized (brand/identity.md).
+ */
+export const EMPHASIS_MARK = 'italic';
+
 const markSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('bold') }),
-  z.object({ type: z.literal('italic') }),
+  z.object({ type: z.literal(EMPHASIS_MARK) }),
   z.object({
     type: z.literal('link'),
     attrs: z.object({
