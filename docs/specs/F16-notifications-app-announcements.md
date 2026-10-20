@@ -354,7 +354,7 @@ Primary key `(kind, subject_id, occurs_at)`. A moved time is a new key.
 ### `notification_reminders` (changed)
 New kinds:
 - `quote_expiring`, `invoice_due_soon`, `campaign_end_passed`;
-- `escalation_1`, `escalation_2`, `escalation_3`, keyed by subject and the date the original was created;
+- `escalation_1`, `escalation_2`, `escalation_3`, keyed by the original (a name-based id of its type and subject, so two originals on one record keep separate keys; settled in B1) and the date it was created;
 - `ack_reminder` (per announcement and work day);
 - `poll_closing`.
 

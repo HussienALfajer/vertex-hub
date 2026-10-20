@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { Inject, Injectable, Logger, type OnModuleInit } from '@nestjs/common';
 import {
   businessDate,
@@ -46,8 +47,9 @@ interface Original {
 /**
  * F16 rule B11: the escalation chain, a source of the `notifications.daily` job. While an
  * original of an escalating type stays unresolved for at least one recipient, each of its steps
- * is sent once, when due, keyed in `notification_reminders` by the subject and the day the
- * original was created. Rows from before F16 have no resolution type and never escalate (edge
+ * is sent once, when due, keyed in `notification_reminders` by the original (its type and
+ * subject, `escalationKey`) and the day it was created, so two originals on one record never
+ * share a step. Rows from before F16 have no resolution type and never escalate (edge
  * case 21). Each step resolves with the original.
  */
 @Injectable()
@@ -116,7 +118,7 @@ export class Escalations implements OnModuleInit {
       .insert(notificationReminders)
       .values({
         kind: `escalation_${step.step}`,
-        subjectId: original.subject.id,
+        subjectId: escalationKey(original),
         occurrence: original.anchor,
         sentOn: today,
       })
@@ -251,4 +253,18 @@ function originals(rows: OpenRow[]): Original[] {
       },
     ];
   });
+}
+
+/**
+ * The id an original's steps are keyed by: a name-based UUID (version 5 layout) of its type and
+ * subject, so two escalating types open on one record keep separate keys.
+ */
+export function escalationKey(original: Pick<Original, 'type' | 'subject'>): string {
+  const hash = createHash('sha1')
+    .update(`escalation:${original.type}:${original.subject.type}:${original.subject.id}`)
+    .digest();
+  hash[6] = ((hash[6] ?? 0) & 0x0f) | 0x50;
+  hash[8] = ((hash[8] ?? 0) & 0x3f) | 0x80;
+  const hex = hash.subarray(0, 16).toString('hex');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }

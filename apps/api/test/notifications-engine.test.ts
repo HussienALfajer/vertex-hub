@@ -27,7 +27,7 @@ import { testDatabaseUrl } from '@vertex-hub/db/testing';
 import { and, eq, inArray } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { ENV, type Env, parseEnv } from '../src/core/config/env.js';
-import { Escalations } from '../src/modules/notifications/escalations.js';
+import { Escalations, escalationKey } from '../src/modules/notifications/escalations.js';
 import {
   DailyReminders,
   type Notice,
@@ -602,9 +602,30 @@ describe('notification engine (F16 part B)', () => {
           actorId: cast.designManager.id,
         }),
       );
+      subjects.push(
+        escalationKey({ type: 'task_review_requested', subject: { type: 'task', id } }),
+      );
       for (const user of [cast.writer, cast.contentManager, cast.gm, cast.operations]) {
         const open = (await rowsOf(user.id)).filter((row) => row.resolvedAt === null);
         expect(open, user.name).toEqual([]);
+      }
+    });
+
+    it('keys the steps of two originals on one record apart', async () => {
+      const id = subject();
+      await notify([
+        notice('task_review_requested', [cast.writer.id], id),
+        notice('task_requested', [cast.employee.id], id),
+      ]);
+      await db
+        .update(notifications)
+        .set({ createdAt: created })
+        .where(eq(notifications.subjectId, id));
+      await app.get(Escalations).run('2026-10-22');
+      expect((await stepsOf(cast.writer.id)).map((row) => row.type)).toEqual(['action_reminder']);
+      expect((await stepsOf(cast.employee.id)).map((row) => row.type)).toEqual(['action_reminder']);
+      for (const type of ['task_review_requested', 'task_requested'] as const) {
+        subjects.push(escalationKey({ type, subject: { type: 'task', id } }));
       }
     });
 
