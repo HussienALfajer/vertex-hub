@@ -1,17 +1,29 @@
 import { Link } from '@tanstack/react-router';
-import type { Notification } from '@vertex-hub/contracts';
-import { Avatar, cn } from '@vertex-hub/ui';
-import { BellRingIcon } from 'lucide-react';
+import { type Notification, SNOOZE_OPTIONS } from '@vertex-hub/contracts';
+import {
+  Avatar,
+  Badge,
+  cn,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  IconButton,
+} from '@vertex-hub/ui';
+import type { TFunction } from 'i18next';
+import { AlarmClockIcon, BellRingIcon, OctagonAlertIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { formatDateTime, formatRelativeTime } from '../../lib/format';
 import { useDepartmentNames } from '../projects/project-badges';
 import { notificationLink, notificationText } from './notification-content';
-import { useMarkRead } from './notifications.queries';
+import { useMarkRead, useSnooze, useUnsnooze } from './notifications.queries';
 
 /**
  * One notification: who (or the system), the rendered text, its client and project, when, and an
- * unread dot. Opening it opens its subject and marks it read (F14 rule 15).
+ * unread dot. Opening it opens its subject and marks it read (F14 rule 15). F16: critical rows
+ * carry the red mark (screen 3), closed rows say who handled them (rule B5), and open rows can be
+ * snoozed (rule B8).
  */
 export function NotificationItem({
   notification,
@@ -28,6 +40,7 @@ export function NotificationItem({
   const departmentName = useDepartmentNames();
   const markRead = useMarkRead();
   const { text, context } = notificationText(notification, departmentName);
+  const state = resolutionText(t, notification);
 
   function open() {
     if (!notification.read) markRead.mutate(notification.id);
@@ -37,6 +50,7 @@ export function NotificationItem({
   return (
     <div
       data-unread={!notification.read || undefined}
+      data-priority={notification.priority}
       className="relative flex items-start gap-3 px-4 py-3 transition-colors duration-150 ease-out hover:bg-muted/60"
     >
       {notification.actor ? (
@@ -47,6 +61,12 @@ export function NotificationItem({
         </span>
       )}
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+        {notification.priority === 'critical' && (
+          <Badge tone="danger" className="mb-0.5">
+            <OctagonAlertIcon aria-hidden="true" />
+            {t('notifications.priorities.critical')}
+          </Badge>
+        )}
         <Link
           {...notificationLink(notification)}
           onClick={open}
@@ -58,16 +78,22 @@ export function NotificationItem({
           {text}
         </Link>
         {context && <span className="truncate text-xs text-muted-foreground">{context}</span>}
-        <time
-          dateTime={notification.updatedAt}
-          title={formatDateTime(notification.updatedAt)}
-          className="text-xs text-muted-foreground"
-        >
-          {formatRelativeTime(notification.updatedAt)}
-        </time>
+        {state && <span className="text-xs font-medium text-muted-foreground">{state}</span>}
+        <span className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
+          <time dateTime={notification.updatedAt} title={formatDateTime(notification.updatedAt)}>
+            {formatRelativeTime(notification.updatedAt)}
+          </time>
+          {notification.snoozedUntil && (
+            <span className="flex items-center gap-1">
+              <AlarmClockIcon className="size-3" aria-hidden="true" />
+              {t('notifications.snooze.until', { time: formatDateTime(notification.snoozedUntil) })}
+            </span>
+          )}
+        </span>
       </div>
       <div className="relative flex shrink-0 items-center gap-1">
         {actions}
+        <SnoozeAction notification={notification} />
         {!notification.read && (
           <span className="mt-1.5 size-2 rounded-full bg-primary">
             <span className="sr-only">{t('notifications.unread')}</span>
@@ -75,5 +101,59 @@ export function NotificationItem({
         )}
       </div>
     </div>
+  );
+}
+
+/** Rule B5: "Handled by …" for rows someone else closed, "No longer needed" for void ones. */
+function resolutionText(t: TFunction, notification: Notification): string | null {
+  const { resolution } = notification;
+  if (!resolution) return null;
+  if (resolution.outcome === 'void') return t('notifications.resolution.void');
+  if (notification.inbox === 'done') return t('notifications.resolution.byYou');
+  return resolution.by
+    ? t('notifications.resolution.handledBy', { name: resolution.by.name })
+    : t('notifications.resolution.handled');
+}
+
+/**
+ * Rule B8: any unread or "Needs you" row can wait 1 hour, 3 hours, or until the next work day at
+ * 09:00; a snoozed row can come back now.
+ */
+function SnoozeAction({ notification }: { notification: Notification }) {
+  const { t } = useTranslation();
+  const snooze = useSnooze();
+  const unsnooze = useUnsnooze();
+  if (notification.inbox === 'snoozed') {
+    return (
+      <IconButton
+        label={t('notifications.snooze.wake')}
+        disabled={unsnooze.isPending}
+        onClick={() => unsnooze.mutate(notification.id)}
+      >
+        <BellRingIcon />
+      </IconButton>
+    );
+  }
+  const snoozable =
+    !notification.resolution && (notification.inbox === 'needs_you' || !notification.read);
+  if (!snoozable) return null;
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        render={<IconButton label={t('notifications.snooze.later')} disabled={snooze.isPending} />}
+      >
+        <AlarmClockIcon />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        {SNOOZE_OPTIONS.map((option) => (
+          <DropdownMenuItem
+            key={option}
+            onClick={() => snooze.mutate({ id: notification.id, option })}
+          >
+            {t(`notifications.snooze.options.${option}`)}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

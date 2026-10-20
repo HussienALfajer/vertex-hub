@@ -129,7 +129,8 @@ function useEventToast(openBell: () => void) {
       title: text,
       description: context ?? undefined,
       type: 'info',
-      timeout: TOAST_MS,
+      // F16 rule B10: a critical notice stays until it is closed.
+      timeout: notification.priority === 'critical' ? 0 : TOAST_MS,
       actionProps: {
         children: t('notifications.open'),
         onClick: () => {

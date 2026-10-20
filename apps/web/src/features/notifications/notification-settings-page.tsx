@@ -30,9 +30,9 @@ import { pushConfigQuery } from './push.queries';
 
 /**
  * Mute the types that need no action, grouped by category (F14 screen 3, rule 3), and choose the
- * types pushed (F16 screen 5, rule A7) and emailed, and the morning digest (F14 email screen 1,
- * rules 2 and 11). Management's policy locks a channel on (`required`) or hides it
- * (`unavailable`).
+ * types pushed (F16 screen 5, rule A7) and emailed, the morning digest (F14 email screen 1,
+ * rules 2 and 11) and the morning push (F16 rule B14). Management's policy locks a channel on
+ * (`required`) or hides it (`unavailable`). Each category turns a channel on or off at once.
  */
 export function NotificationSettingsPage() {
   const { t } = useTranslation();
@@ -70,15 +70,28 @@ export function NotificationSettingsPage() {
   );
 }
 
-/** The set with `type` added or removed. */
-function toggled(set: Set<NotificationType>, type: NotificationType, on: boolean) {
+/** The set with `types` added or removed. */
+function toggled(
+  set: Set<NotificationType>,
+  types: NotificationType | NotificationType[],
+  on: boolean,
+) {
   const next = new Set(set);
-  if (on) next.add(type);
-  else next.delete(type);
+  for (const type of Array.isArray(types) ? types : [types]) {
+    if (on) next.add(type);
+    else next.delete(type);
+  }
   return [...next];
 }
 
-const PRIORITY_TONES: Record<NotificationPriority, BadgeProps['tone']> = {
+type SettingsChannel = 'app' | 'push' | 'email';
+
+/** A channel's switch the user may change: not locked by the type or the policy, nor muted away. */
+function userChoice(mode: ChannelMode, inApp: boolean) {
+  return inApp && mode !== 'required' && mode !== 'unavailable';
+}
+
+export const PRIORITY_TONES: Record<NotificationPriority, BadgeProps['tone']> = {
   critical: 'danger',
   important: 'warning',
   normal: 'neutral',
@@ -130,6 +143,7 @@ function SettingsForm({ settings }: { settings: NotificationSettings }) {
     pending?.pushTypes ?? settings.types.filter((item) => item.push).map((item) => item.type),
   );
   const digestEnabled = pending?.digestEnabled ?? settings.digestEnabled;
+  const morningPush = pending?.morningPush ?? settings.morningPush;
   // Every channel save sends both lists, so neither falls back to what the server held before.
   const channels = { pushTypes: [...pushed], emailTypes: [...emailed] };
 
@@ -157,26 +171,82 @@ function SettingsForm({ settings }: { settings: NotificationSettings }) {
             onCheckedChange={(checked) => save({ mutedTypes: [...muted], digestEnabled: checked })}
           />
         </div>
+        {pushAvailable && (
+          <div className="mt-4 flex items-center justify-between gap-4 border-t border-border pt-4">
+            <label htmlFor="morning-push" className="flex flex-col gap-0.5">
+              <span className="text-sm font-medium">{t('notifications.settings.morningPush')}</span>
+              <span className="text-xs text-muted-foreground">
+                {t('notifications.settings.morningPushHint')}
+              </span>
+            </label>
+            <Switch
+              id="morning-push"
+              checked={morningPush}
+              disabled={update.isPending}
+              onCheckedChange={(checked) => save({ mutedTypes: [...muted], morningPush: checked })}
+            />
+          </div>
+        )}
       </Card>
-      {NOTIFICATION_CATEGORIES.map((category) => (
-        <Card key={category}>
-          <CardHeader className="flex-row items-center justify-between gap-4">
-            <CardTitle>{t(`notifications.categories.${category}`)}</CardTitle>
-            <div
-              aria-hidden="true"
-              className="flex gap-4 text-xs font-medium text-muted-foreground"
-            >
-              <span className="w-10 text-center">{t('notifications.settings.app')}</span>
-              {pushAvailable && (
-                <span className="w-10 text-center">{t('notifications.settings.push')}</span>
-              )}
-              <span className="w-10 text-center">{t('notifications.settings.email')}</span>
-            </div>
-          </CardHeader>
-          <ul className="flex flex-col divide-y divide-border">
-            {settings.types
-              .filter((item) => item.category === category)
-              .map((item) => {
+      {NOTIFICATION_CATEGORIES.map((category) => {
+        const items = settings.types.filter((item) => item.category === category);
+        const categoryName = t(`notifications.categories.${category}`);
+        const inAppOf = (item: (typeof items)[number]) => !(item.mutable && muted.has(item.type));
+        // "Turn all on or off" (screen 5): the types whose switch the user may change.
+        const choices: Record<SettingsChannel, { types: NotificationType[]; on: boolean }> = {
+          app: choice(
+            items.filter((item) => item.mutable),
+            (item) => !muted.has(item.type),
+          ),
+          push: choice(
+            items.filter((item) => userChoice(item.pushMode, inAppOf(item))),
+            (item) => pushed.has(item.type),
+          ),
+          email: choice(
+            items.filter((item) => userChoice(item.emailMode, inAppOf(item))),
+            (item) => emailed.has(item.type),
+          ),
+        };
+        function setAll(channel: SettingsChannel, on: boolean) {
+          const { types } = choices[channel];
+          if (channel === 'app') save({ mutedTypes: toggled(muted, types, !on) });
+          else
+            save({
+              mutedTypes: [...muted],
+              ...channels,
+              [channel === 'push' ? 'pushTypes' : 'emailTypes']: toggled(
+                channel === 'push' ? pushed : emailed,
+                types,
+                on,
+              ),
+            });
+        }
+        const columns: SettingsChannel[] = pushAvailable
+          ? ['app', 'push', 'email']
+          : ['app', 'email'];
+        return (
+          <Card key={category}>
+            <CardHeader className="flex-row items-center justify-between gap-4">
+              <CardTitle>{categoryName}</CardTitle>
+              <div className="flex gap-4 text-xs font-medium text-muted-foreground">
+                {columns.map((channel) => (
+                  <span key={channel} className="flex w-10 flex-col items-center gap-1">
+                    <span aria-hidden="true">{t(`notifications.settings.${channel}`)}</span>
+                    <Switch
+                      aria-label={t('notifications.settings.allLabel', {
+                        channel: t(`notifications.settings.${channel}`),
+                        category: categoryName,
+                      })}
+                      checked={choices[channel].on}
+                      disabled={choices[channel].types.length === 0 || update.isPending}
+                      onCheckedChange={(checked) => setAll(channel, checked)}
+                    />
+                  </span>
+                ))}
+              </div>
+            </CardHeader>
+            <ul className="flex flex-col divide-y divide-border">
+              {items.map((item) => {
                 const name = t(`notifications.types.${item.type}`);
                 const inApp = !(item.mutable && muted.has(item.type));
                 return (
@@ -250,9 +320,18 @@ function SettingsForm({ settings }: { settings: NotificationSettings }) {
                   </li>
                 );
               })}
-          </ul>
-        </Card>
-      ))}
+            </ul>
+          </Card>
+        );
+      })}
     </div>
   );
+}
+
+/** The types a category's switch covers, and whether all of them are on. */
+function choice<Item extends { type: NotificationType }>(
+  items: Item[],
+  isOn: (item: Item) => boolean,
+) {
+  return { types: items.map((item) => item.type), on: items.length > 0 && items.every(isOn) };
 }

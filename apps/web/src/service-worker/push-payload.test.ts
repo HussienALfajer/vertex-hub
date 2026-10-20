@@ -34,9 +34,11 @@ describe('readPushPayload (F16 rule A8)', () => {
   });
 });
 
+const titles = { open: 'افتح', snooze: 'ذكّرني بعد ساعة' };
+
 describe('notificationOptions', () => {
   it('shows Arabic right to left, replaces by tag and keeps what the click needs', () => {
-    const options = notificationOptions({ ...payload, requireInteraction: true });
+    const options = notificationOptions({ ...payload, requireInteraction: true }, titles);
     expect(options).toMatchObject({
       body: payload.body,
       tag: payload.tag,
@@ -49,6 +51,15 @@ describe('notificationOptions', () => {
       deliveryId: payload.deliveryId,
       notificationId: payload.notificationId,
     });
+  });
+
+  it('offers "Open" and "Remind me in an hour" on a notification only (rule A11)', () => {
+    expect(notificationOptions(payload, titles).actions).toEqual([
+      { action: 'open', title: titles.open },
+      { action: 'snooze', title: titles.snooze },
+    ]);
+    const test = notificationOptions({ ...payload, kind: 'test', notificationId: null }, titles);
+    expect(test.actions).toBeUndefined();
   });
 
   it('ignores the data of a notification the app did not show', () => {

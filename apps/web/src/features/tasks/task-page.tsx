@@ -23,6 +23,7 @@ import { useShownWhileClosing } from '../../lib/use-shown-while-closing';
 import { ClientApprovalSection } from '../approvals/task-approval-panel';
 import { TaskShootSection } from '../calendar/task-shoot-section';
 import { TaskPostSection } from '../content/task-post-section';
+import { FollowButton } from '../notifications/follow-button';
 import { PersonName, useDepartmentNames } from '../projects/project-badges';
 import { lineName } from '../retainers/retainer-badges';
 import { TaskTemplateOrigin } from '../templates/template-runs';
@@ -211,7 +212,10 @@ function TaskHero({
             {archived && <TaskArchivedBadge />}
           </div>
         </div>
-        <TaskActions task={task} focus={focus} onArchive={onArchive} />
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          {!archived && <FollowButton target={{ subject: 'task', id: task.id }} />}
+          <TaskActions task={task} focus={focus} onArchive={onArchive} />
+        </div>
       </div>
       <dl className="grid gap-4 border-t border-border pt-5 text-sm sm:grid-cols-2 lg:grid-cols-4">
         <Fact label={t('tasks.page.assignee')}>

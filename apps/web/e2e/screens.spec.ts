@@ -90,7 +90,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await mockApi(page, { signedIn: true, notifications: [] });
       await page.goto('/');
       await page.getByRole('button', { name: ar.notifications.bell, exact: true }).click();
-      await expect(page.getByText(ar.notifications.emptyTitle)).toBeVisible();
+      await expect(page.getByText(ar.notifications.empty.needs_you.title)).toBeVisible();
       await screenshot(page, testInfo, `notification-bell-empty-${colorScheme}`);
     });
 
@@ -206,6 +206,65 @@ for (const colorScheme of ['light', 'dark'] as const) {
         await expect(page.getByText(ar.pwa.offline.hint)).toBeVisible();
         await screenshot(page, testInfo, `offline-${size}-${colorScheme}`);
         await context.setOffline(false);
+      });
+    }
+
+    for (const [width, height, size] of [
+      [1280, 900, 'desktop'],
+      [390, 844, 'phone'],
+    ] as const) {
+      // F16 screens 3–4: the bell's inboxes and the page's tabs, with snooze and "Handled by".
+      test(`notification inboxes (${size})`, async ({ page }, testInfo) => {
+        await page.setViewportSize({ width, height });
+        await mockApi(page, { signedIn: true });
+        await page.goto('/');
+        await page.getByRole('button', { name: /^الإشعارات/ }).click();
+        const panel = page.getByRole('dialog', { name: ar.notifications.title });
+        await expect(panel.getByRole('listitem').first()).toBeVisible();
+        await screenshot(page, testInfo, `notification-bell-needs-you-${size}-${colorScheme}`);
+        await panel.getByRole('tab', { name: ar.notifications.inboxes.fyi }).click();
+        await expect(panel.getByText(/تولّاه/)).toBeVisible();
+        await screenshot(page, testInfo, `notification-bell-fyi-${size}-${colorScheme}`);
+        await panel
+          .getByRole('listitem')
+          .first()
+          .getByRole('button', { name: ar.notifications.snooze.later })
+          .click();
+        await expect(page.getByRole('menuitem').first()).toBeVisible();
+        await screenshot(page, testInfo, `notification-snooze-${size}-${colorScheme}`);
+        await page.keyboard.press('Escape');
+
+        for (const inbox of ['done', 'snoozed'] as const) {
+          await page.goto(`/notifications?inbox=${inbox}`);
+          await expect(page.getByRole('main').getByRole('listitem').first()).toBeVisible();
+          await screenshot(page, testInfo, `notifications-${inbox}-${size}-${colorScheme}`);
+        }
+      });
+
+      // F16 screen 6: the channel policy and the push delivery log.
+      test(`notification policy (${size})`, async ({ page }, testInfo) => {
+        await page.setViewportSize({ width, height });
+        await mockApi(page, { signedIn: true, me: manager });
+        await page.goto('/admin/notification-policy');
+        await expect(page.getByRole('heading', { level: 1 })).toHaveText(
+          ar.notifications.policy.title,
+        );
+        await expect(page.getByRole('table').first()).toBeVisible();
+        await screenshot(page, testInfo, `notification-policy-${size}-${colorScheme}`);
+        await page.goto('/admin/notification-policy?tab=deliveries');
+        await expect(page.getByText('410 Gone')).toBeVisible();
+        await screenshot(page, testInfo, `push-deliveries-${size}-${colorScheme}`);
+      });
+
+      // F16 screen 8: the follow button on the task page.
+      test(`follow button (${size})`, async ({ page }, testInfo) => {
+        await page.setViewportSize({ width, height });
+        await mockApi(page, { signedIn: true, me: manager });
+        await page.goto(`/tasks/${seedIds.autumnMenu}`);
+        await expect(
+          page.getByRole('button', { name: new RegExp(ar.notifications.follow.follow) }),
+        ).toBeVisible();
+        await screenshot(page, testInfo, `task-follow-${size}-${colorScheme}`);
       });
     }
 

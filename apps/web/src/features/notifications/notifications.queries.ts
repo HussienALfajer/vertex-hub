@@ -6,10 +6,17 @@ import {
   useQueryClient,
 } from '@tanstack/react-query';
 import type {
+  Following,
+  FollowSubject,
+  NotificationInbox,
   NotificationPage,
+  NotificationPolicyList,
   NotificationSettings,
   NotificationStreamEvent,
+  NotificationType,
+  SnoozeOption,
   UnreadCount,
+  UpdateNotificationPolicy,
   UpdateNotificationSettings,
 } from '@vertex-hub/contracts';
 import { toast } from '@vertex-hub/ui';
@@ -23,14 +30,27 @@ export type NotificationListFilters = NonNullable<
   paths['/api/me/notifications']['get']['parameters']['query']
 >;
 
-/** The bell's dropdown: the newest notifications (F14 screen 1). */
-export const BELL_FILTERS: NotificationListFilters = { pageSize: 10 };
+/** The push delivery log's query string (rule A15). */
+export type PushDeliveryFilters = NonNullable<
+  paths['/api/push-deliveries']['get']['parameters']['query']
+>;
+
+/** The inboxes the bell shows, 10 rows each (F16 screen 3). */
+export const BELL_INBOXES = ['needs_you', 'fyi'] as const satisfies NotificationInbox[];
+
+export type BellInbox = (typeof BELL_INBOXES)[number];
+
+/** The bell's list of one inbox: its newest notifications, critical first. */
+export const bellFilters = (inbox: BellInbox): NotificationListFilters => ({ inbox, pageSize: 10 });
 
 export const notificationsKeys = {
   lists: ['notifications', 'list'] as const,
   list: (filters: NotificationListFilters) => ['notifications', 'list', filters] as const,
   unreadCount: ['notifications', 'unread-count'] as const,
   settings: ['notifications', 'settings'] as const,
+  policies: ['notifications', 'policies'] as const,
+  pushDeliveries: (filters: PushDeliveryFilters) =>
+    ['notifications', 'push-deliveries', filters] as const,
 };
 
 export const notificationListQuery = (filters: NotificationListFilters) =>
@@ -59,12 +79,13 @@ export function refreshNotifications(queryClient: QueryClient) {
 }
 
 /**
- * A pushed notification: the count and the bell's list change in place (a merged comment moves
- * to the top), other lists refetch.
+ * A pushed notification: the count and the bell's list of its inbox change in place (a merged
+ * comment moves to the top), other lists refetch.
  */
 export async function applyStreamEvent(queryClient: QueryClient, event: NotificationStreamEvent) {
   const { notification, unreadCount } = event;
-  const bellKey = notificationsKeys.list(BELL_FILTERS);
+  const inbox = notification.inbox === 'needs_you' ? 'needs_you' : 'fyi';
+  const bellKey = notificationsKeys.list(bellFilters(inbox));
   // A request that started before the event would overwrite it with older data; a cancelled
   // bell request runs again below.
   const bellFetching = queryClient.isFetching({ queryKey: bellKey, exact: true }) > 0;
@@ -88,10 +109,16 @@ export async function applyStreamEvent(queryClient: QueryClient, event: Notifica
     };
   });
   const refetchBell = bellFetching || queryClient.getQueryData(bellKey) === undefined;
-  return queryClient.invalidateQueries({
-    queryKey: notificationsKeys.lists,
-    predicate: (query) => refetchBell || JSON.stringify(query.queryKey) !== JSON.stringify(bellKey),
-  });
+  return Promise.all([
+    queryClient.invalidateQueries({
+      queryKey: notificationsKeys.lists,
+      predicate: (query) =>
+        refetchBell || JSON.stringify(query.queryKey) !== JSON.stringify(bellKey),
+    }),
+    // A new "Needs you" row changes that count too, which the event does not carry.
+    inbox === 'needs_you' &&
+      queryClient.invalidateQueries({ queryKey: notificationsKeys.unreadCount }),
+  ]);
 }
 
 /** A read-state change that failed says so: the dot and count would otherwise just stay. */
@@ -132,6 +159,35 @@ export function useMarkAllRead() {
   });
 }
 
+/** Rule B8: "Remind me later"; the row leaves its list and the count until it wakes. */
+export function useSnooze() {
+  const queryClient = useQueryClient();
+  const onError = useFailureToast();
+  return useMutation({
+    onError,
+    mutationFn: ({ id, option }: { id: string; option: SnoozeOption }) =>
+      call(
+        api.POST('/api/me/notifications/{id}/snooze', {
+          params: { path: { id } },
+          body: { for: option },
+        }),
+      ),
+    onSuccess: () => refreshNotifications(queryClient),
+  });
+}
+
+/** Rule B8: wakes a snoozed row now. */
+export function useUnsnooze() {
+  const queryClient = useQueryClient();
+  const onError = useFailureToast();
+  return useMutation({
+    onError,
+    mutationFn: (id: string) =>
+      call(api.POST('/api/me/notifications/{id}/unsnooze', { params: { path: { id } } })),
+    onSuccess: () => refreshNotifications(queryClient),
+  });
+}
+
 export function useUpdateNotificationSettings() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -139,5 +195,78 @@ export function useUpdateNotificationSettings() {
       call(api.PUT('/api/me/notification-settings', { body: input })),
     onSuccess: (settings: NotificationSettings) =>
       queryClient.setQueryData(notificationsKeys.settings, settings),
+  });
+}
+
+/* Channel policy and the push delivery log (F16 screen 6, `notifications.policy`). */
+
+export const notificationPoliciesQuery = queryOptions({
+  queryKey: notificationsKeys.policies,
+  queryFn: () => call(api.GET('/api/notification-policies')),
+});
+
+/** Rule B2: one type's modes, or back to the defaults; the user settings read the policy. */
+export function useUpdateNotificationPolicy() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ type, input }: { type: NotificationType; input: UpdateNotificationPolicy }) =>
+      call(
+        api.PUT('/api/notification-policies/{type}', {
+          params: { path: { type } },
+          body: input,
+        }),
+      ),
+    onSuccess: (policy) => {
+      queryClient.setQueryData<NotificationPolicyList>(notificationsKeys.policies, (list) =>
+        list
+          ? { items: list.items.map((item) => (item.type === policy.type ? policy : item)) }
+          : list,
+      );
+      return queryClient.invalidateQueries({ queryKey: notificationsKeys.settings });
+    },
+  });
+}
+
+export const pushDeliveryListQuery = (filters: PushDeliveryFilters) =>
+  queryOptions({
+    queryKey: notificationsKeys.pushDeliveries(filters),
+    queryFn: () => call(api.GET('/api/push-deliveries', { params: { query: filters } })),
+    placeholderData: keepPreviousData,
+  });
+
+/* Followers (F16 rule B12, screen 8). */
+
+/** A record people follow: a task or a post. */
+export type FollowTarget = { subject: FollowSubject; id: string };
+
+export const followingQuery = ({ subject, id }: FollowTarget) =>
+  queryOptions({
+    queryKey: ['notifications', 'following', subject, id] as const,
+    queryFn: () =>
+      subject === 'task'
+        ? call(api.GET('/api/tasks/{id}/following', { params: { path: { id } } }))
+        : call(api.GET('/api/content/posts/{id}/following', { params: { path: { id } } })),
+  });
+
+export function useSetFollowing(target: FollowTarget) {
+  const queryClient = useQueryClient();
+  const { subject, id } = target;
+  return useMutation({
+    mutationFn: (following: boolean) =>
+      subject === 'task'
+        ? call(
+            api.PUT('/api/tasks/{id}/following', {
+              params: { path: { id } },
+              body: { following },
+            }),
+          )
+        : call(
+            api.PUT('/api/content/posts/{id}/following', {
+              params: { path: { id } },
+              body: { following },
+            }),
+          ),
+    onSuccess: (result: Following) =>
+      queryClient.setQueryData(followingQuery(target).queryKey, result),
   });
 }
