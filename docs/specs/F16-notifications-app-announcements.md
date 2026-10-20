@@ -168,7 +168,7 @@ The actor is never notified (F14). "Opened" means the notification closes when i
 | `post_publish_today` | responsible | important | A | on | — | published, re-dated, cancelled |
 | `post_publish_overdue` | responsible + AM | critical | A | R | on | same · step 2 added |
 | `shoot_upcoming` | crew | important | I | on | — | |
-| `shoot_not_closed` | lead + creator | important | A | on | — | the shoot is closed or cancelled · step 2 added |
+| `shoot_not_closed` | lead + creator | important | A | on | — | the shoot is closed, cancelled or archived (owner, 2026-10-20) · step 2 added |
 | `meeting_upcoming` | organizer + attendees | normal | I | on | — | |
 | `client_account_manager_assigned` | new AM | important | A | on | — | opened |
 | `project_manager_assigned` | new PM | important | A | on | — | opened |
@@ -568,6 +568,15 @@ Primary key `(announcement_id, user_id)`; index `(user_id)`.
    - `approval_completed` is sent in its own `notify` call after the last answer: in the answer's call the first-match order would keep `approval_responded` only.
    - A timed reminder is still sent by a run up to 5 minutes after its send time (`TIMED_REMINDER_GRACE_MINUTES`); later, it is skipped. `task_due_shortly` leaves out approved tasks, which count as finished.
    - Deciding an over-limit revision closes `task_over_limit` and `task_over_limit_pending` on the task and sends `task_revision_decided` to the assignee.
+7. **Settled in C1b** (clients, leads, quotes, projects, templates):
+   - Archiving a scheduled shoot voids its `shoot_not_closed` (owner, 2026-10-20).
+   - A lead's follow-up reminders are `done` when a follow-up is recorded or the lead is won or lost, and `void` when the date moves or the lead is archived.
+   - `quote_expiring` is `done` when the quote is accepted, rejected or extended, and `void` when it expires. For a lead's quote, "AM" is the lead's owner.
+   - `retainer_amendment_pending` is about the retainer, so it closes once none of the retainer's amendments waits for approval: `done` after a decision, `void` after a withdrawal or cancellation.
+   - `retainer_renewal_due` is `done` when the renewal date moves and `void` when the retainer ends or is archived. Closing a cycle voids `retainer_behind`.
+   - The managers' `tasks_generated` closes per department: once that department's unassigned tasks of the run are all assigned, cancelled or archived. A manager who still has a department with unassigned tasks of the run keeps it.
+   - `contract_signed` is sent once per contract or annex: a new scan of a signed one is not a new signature.
+   - `responsibility_moved` covers the post responsible, the account manager, the project manager and the lead owner here; the campaign owner and the department manager come with C1c.
 
 ### Part D: announcements and audiences
 **Audience**

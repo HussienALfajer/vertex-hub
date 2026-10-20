@@ -17,7 +17,7 @@ import { ClientDirectory, ClientFactory } from '../clients/index.js';
 import { NotificationCenter } from '../notifications/index.js';
 import { actorOf } from './lead-access.js';
 import { LeadClosedHooks, LeadQuoteChecks } from './lead-closed-hooks.js';
-import { identity, type LeadRow, LeadsService } from './leads.service.js';
+import { followUpsClosed, identity, type LeadRow, LeadsService } from './leads.service.js';
 
 type Executor = Database | Transaction;
 
@@ -203,13 +203,19 @@ export class LeadConversionService {
       },
     });
     // Whoever got `client_account_manager_assigned` for this conversion is not told twice.
-    await this.center.notify(tx, {
-      type: 'lead_won',
-      data: { lead: ref.displayName, client: clientName },
-      recipients: told.filter((userId) => userId !== assigned),
-      actorId: actor.id,
-      subjectId: lead.id,
-    });
+    // F16 part C: the General Managers too; the follow-up reminders are done.
+    const managers = await this.users.withRole('general_manager', tx);
+    await this.center.notify(
+      tx,
+      {
+        type: 'lead_won',
+        data: { lead: ref.displayName, client: clientName },
+        recipients: [...told, ...managers].filter((userId) => userId !== assigned),
+        actorId: actor.id,
+        subjectId: lead.id,
+      },
+      [followUpsClosed(lead.id, actor, 'done')],
+    );
     return { clientId, clientName, contactId };
   }
 

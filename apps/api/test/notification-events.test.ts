@@ -105,7 +105,11 @@ describe('notification events', () => {
       expect(await typesOf(cast.otherAm.id, created.id)).toEqual([
         'client_account_manager_assigned',
       ]);
-      expect(await typesOf(cast.am.id, created.id)).toHaveLength(1);
+      // F16 part C rule 4: the previous account manager learns who holds the client now.
+      expect(await typesOf(cast.am.id, created.id)).toEqual([
+        'client_account_manager_assigned',
+        'responsibility_moved',
+      ]);
     });
 
     it('tells a new project manager about the project (F05)', async () => {

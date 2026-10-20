@@ -7,7 +7,7 @@ import {
   notificationSchema,
 } from '@vertex-hub/contracts';
 import { describe, expect, it } from 'vitest';
-import { formatAmount } from './format.js';
+import { formatAmount, formatCalendarDate } from './format.js';
 import { linkPath, notificationLink, notificationText } from './notifications.js';
 import { morningPush, notificationPush, PUSH_APP_NAME, testPush } from './push.js';
 
@@ -176,6 +176,29 @@ const SAMPLES: Record<NotificationType, unknown> = {
   shoot_starting: { shoot },
   meeting_starting: { meeting, joinUrl: 'https://meet.example.com/abc' },
   shoot_completed: { shoot },
+  responsibility_moved: { role: 'account_manager', record: 'مطعم الشام', holder: 'سامر' },
+  client_status_changed: { client: 'مطعم الشام', status: 'paused' },
+  client_healthcare_changed: { client: 'مطعم الشام', healthcare: true },
+  lead_lost: { lead: 'مقهى الياسمين' },
+  quote_expiring: { quote, validUntil: '2026-10-08' },
+  quote_expired: { quote },
+  quote_rejected: { quote },
+  project_status_changed: { project: 'إطلاق المنيو', client: 'مطعم الشام', status: 'on_hold' },
+  milestone_completed: { project: 'إطلاق المنيو', client: 'مطعم الشام', milestone: 'التصميم' },
+  extra_work_created: { title: 'منشور إضافي', engagement: 'عقد شهري', client: 'مطعم الشام' },
+  retainer_status_changed: { retainer: 'عقد شهري', client: 'مطعم الشام', status: 'ended' },
+  contract_signed: {
+    retainer: 'عقد شهري',
+    client: 'مطعم الشام',
+    contract: 'C-2026-0003',
+    annex: null,
+  },
+  contract_voided: {
+    retainer: 'عقد شهري',
+    client: 'مطعم الشام',
+    contract: 'C-2026-0003',
+    annex: 2,
+  },
   action_reminder: {
     originalType: 'task_review_requested',
     originalData: { task },
@@ -296,6 +319,53 @@ describe('notification texts', () => {
   it('writes the department of generated tasks by its current name', () => {
     const { text } = notificationText(sample('tasks_generated'), departmentName);
     expect(text).toBe('3 مهام من قالب «حملة شهرية» تنتظر الإسناد في التصميم');
+  });
+});
+
+describe('sales and engagement notices (F16 part C)', () => {
+  const render = (type: NotificationType) => notificationText(sample(type), () => '');
+
+  it('names the role a holder lost and who holds it now', () => {
+    expect(render('responsibility_moved').text).toBe('نقل رنا إدارة حساب مطعم الشام إلى سامر');
+  });
+
+  it('names the new status of a client, a project and a retainer', () => {
+    expect(render('client_status_changed').text).toBe(
+      'أُوقف التعامل مع مطعم الشام مؤقتًا بواسطة رنا',
+    );
+    expect(render('project_status_changed').text).toBe(
+      'انتقل المشروع «إطلاق المنيو» إلى «معلّق» بواسطة رنا',
+    );
+    expect(render('retainer_status_changed').text).toBe(
+      'انتقل عقد «عقد شهري» إلى «منتهٍ» بواسطة رنا',
+    );
+  });
+
+  it('names a contract or one of its annexes', () => {
+    expect(render('contract_signed').text).toBe('سجّل رنا توقيع العقد C-2026-0003');
+    expect(render('contract_voided').text).toBe('ألغى رنا الملحق 2 من العقد C-2026-0003');
+  });
+
+  it('names the last valid day of an expiring quote', () => {
+    expect(render('quote_expiring').text).toBe(
+      `ينتهي سريان Q-2026-0004 في ${formatCalendarDate('2026-10-08')}`,
+    );
+  });
+
+  it('opens the record whose holder changed, and the engagement of extra work', () => {
+    expect(
+      notificationLink(
+        sample('responsibility_moved', { subject: { type: 'lead', id: SUBJECT_ID } }),
+      ),
+    ).toEqual({
+      to: '/leads/$leadId',
+      params: { leadId: SUBJECT_ID },
+    });
+    expect(
+      notificationLink(
+        sample('extra_work_created', { subject: { type: 'retainer', id: SUBJECT_ID } }),
+      ),
+    ).toEqual({ to: '/retainers/$retainerId', params: { retainerId: SUBJECT_ID } });
   });
 });
 

@@ -303,6 +303,23 @@ describe('notification catalog of the workflow modules (F16 part C)', () => {
       expect(await rowsOf(cast.contentManager.id, 'post_progressed', post.id)).toHaveLength(1);
     });
 
+    it('tells the previous responsible who holds the post now (part C rule 4)', async () => {
+      const post = await cast.createPost(cast.contentManager.cookie, {
+        clientId,
+        responsibleId: cast.writer.id,
+      });
+      const response = await client.request('PATCH', `/api/content/posts/${post.id}`, {
+        cookie: cast.contentManager.cookie,
+        body: { responsibleId: cast.contentManager.id },
+      });
+      expect(response.status, await response.clone().text()).toBe(200);
+      expect(await oneOf(cast.writer.id, 'responsibility_moved', post.id)).toMatchObject({
+        subjectType: 'post',
+        data: { role: 'post_responsible', record: post.title, holder: cast.contentManager.name },
+      });
+      expect((await oneOf(cast.writer.id, 'post_assigned', post.id)).resolution).toBe('void');
+    });
+
     it('tells the account manager that a post was published', async () => {
       const post = await cast.postAt('published', { clientId });
       expect(await rowsOf(cast.am.id, 'post_published', post.id)).toHaveLength(1);

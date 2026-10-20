@@ -18,6 +18,7 @@ import {
   deliverableKey,
   duplicateDeliverables,
   hasPermission,
+  type NotificationResolution,
   type PendingAmendmentListQuery,
   planCycleChange,
   RETAINER_LIMITS,
@@ -349,6 +350,7 @@ export class RetainerAmendmentsService {
       });
       if (applies) await this.execute(tx, row, plan, today, actorOf(actor));
       await this.notifyDecided(tx, retainer, row, actor, { approved: true, note });
+      await this.resolvePending(tx, retainerId, 'done', actor.id);
     });
     return this.one(actor, retainerId, amendmentId);
   }
@@ -380,6 +382,7 @@ export class RetainerAmendmentsService {
         decisionNote: input.note,
       });
       await this.notifyDecided(tx, retainer, row, actor, { approved: false, note: input.note });
+      await this.resolvePending(tx, retainerId, 'done', actor.id);
     });
     return this.one(actor, retainerId, amendmentId);
   }
@@ -412,6 +415,7 @@ export class RetainerAmendmentsService {
       await this.audit(tx, actorOf(actor), 'retainer_amendment.withdrawn', row, {
         status: 'withdrawn',
       });
+      await this.resolvePending(tx, retainerId, 'void', actor.id);
     });
     return this.one(actor, retainerId, amendmentId);
   }
@@ -1210,6 +1214,28 @@ export class RetainerAmendmentsService {
     await this.audit(tx, actor, 'retainer_amendment.cancelled', row, {
       status: 'cancelled',
       cause,
+    });
+    if (row.status === 'pending_approval') {
+      await this.resolvePending(tx, row.retainerId, 'void', actor?.id ?? null);
+    }
+  }
+
+  /**
+   * F16 part C: `retainer_amendment_pending` is about the retainer, so it closes once none of its
+   * amendments waits for approval any more.
+   */
+  private async resolvePending(
+    tx: Transaction,
+    retainerId: string,
+    outcome: NotificationResolution,
+    actorId: string | null,
+  ): Promise<void> {
+    if ((await this.pendingCounts(tx, [retainerId])).get(retainerId)) return;
+    await this.notifications.resolve(tx, {
+      subject: { type: 'retainer', id: retainerId },
+      types: ['retainer_amendment_pending'],
+      outcome,
+      actorId,
     });
   }
 

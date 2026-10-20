@@ -20,6 +20,7 @@ import { changedFields, recordAudit } from '../audit/index.js';
 import { type CurrentUserInfo, UserDirectory } from '../auth/index.js';
 import { ClientDirectory, type ClientSummary } from '../clients/index.js';
 import { BillingLocks } from './billing-locks.js';
+import { EngagementNotices } from './engagement-notices.js';
 import {
   actorOf,
   assertCanEditMoney,
@@ -90,6 +91,7 @@ export class ExtraWorkService {
     private readonly users: UserDirectory,
     private readonly clients: ClientDirectory,
     private readonly locks: BillingLocks,
+    private readonly notices: EngagementNotices,
   ) {}
 
   async list(
@@ -156,6 +158,7 @@ export class ExtraWorkService {
         .returning({ id: extraWorkItems.id });
       if (!created) throw new Error('Extra work insert returned no row');
       await this.audit(tx, actor, 'extra_work.created', created.id, owner, { after: values });
+      await this.notices.extraWorkCreated(tx, { kind, id: ownerId }, values.title, actor.id);
       return created.id;
     });
     return this.one(actor, kind, ownerId, id);

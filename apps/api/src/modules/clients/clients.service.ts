@@ -347,16 +347,41 @@ export class ClientsService implements OnModuleInit {
       await audit('client.account_manager_changed', managerChange);
       await audit('client.healthcare_changed', healthcare);
       // F09 rules 18 and 19: the change applies to the client's work not yet sent.
+      const tradeName = input.tradeName ?? current.tradeName;
       if (healthcare && input.isHealthcare !== undefined) {
         await this.flagHooks.healthcareChanged(tx, {
           clientId: id,
           isHealthcare: input.isHealthcare,
           actor: actorOf(actor),
         });
+        await this.factory.notifyHealthcare(tx, actorOf(actor), {
+          id,
+          tradeName,
+          healthcare: input.isHealthcare,
+        });
       }
       if (managerChange && manager) {
-        const tradeName = input.tradeName ?? current.tradeName;
-        await this.factory.notifyManager(tx, actorOf(actor), id, manager.id, tradeName);
+        await this.factory.notifyManager(
+          tx,
+          actorOf(actor),
+          id,
+          manager,
+          tradeName,
+          current.accountManagerId,
+        );
+      }
+      if (statusChange && input.status) {
+        await this.factory.notifyStatus(
+          tx,
+          actorOf(actor),
+          {
+            id,
+            tradeName,
+            accountManagerId: manager?.id ?? current.accountManagerId,
+            status: input.status,
+          },
+          managerChange && manager ? manager.id : null,
+        );
       }
     });
     return this.detail(actor, id);

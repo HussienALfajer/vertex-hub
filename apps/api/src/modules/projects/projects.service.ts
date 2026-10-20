@@ -60,9 +60,9 @@ import {
   type UserSummary,
 } from '../auth/index.js';
 import { ClientDirectory, type ClientSummary } from '../clients/index.js';
-import { NotificationCenter } from '../notifications/index.js';
 import { BillingLocks } from './billing-locks.js';
 import { changedDepartments } from './engagement-departments.js';
+import { EngagementNotices } from './engagement-notices.js';
 import {
   actorOf,
   assertCanEditMoney,
@@ -120,8 +120,8 @@ export class ProjectsService implements OnModuleInit {
     private readonly responsibilities: ResponsibilityRegistry,
     private readonly milestones: ProjectMilestonesService,
     private readonly progress: WorkProgress,
-    private readonly notifications: NotificationCenter,
     private readonly locks: BillingLocks,
+    private readonly notices: EngagementNotices,
   ) {}
 
   /** Rule 4: a user cannot be archived while they manage an open project. */
@@ -331,7 +331,12 @@ export class ProjectsService implements OnModuleInit {
         milestones,
       },
     });
-    await this.notifyManager(tx, actor, created.id, manager.id, input.name, client.name);
+    await this.notices.managerAssigned(
+      tx,
+      { id: created.id, name: input.name, projectManagerId: manager.id, client },
+      manager,
+      actor.id,
+    );
     return created.id;
   }
 
@@ -421,7 +426,13 @@ export class ProjectsService implements OnModuleInit {
       await audit('project.money_updated', money);
       if (manager) {
         const name = input.name ?? current.name;
-        await this.notifyManager(tx, actor, id, manager.id, name, project.client.name);
+        await this.notices.managerAssigned(
+          tx,
+          { ...project, name, projectManagerId: manager.id },
+          manager,
+          actor.id,
+          current.projectManagerId,
+        );
       }
     });
     return this.detail(actor, id);
@@ -511,7 +522,13 @@ export class ProjectsService implements OnModuleInit {
           before: { projectManager: { id: project.projectManagerId, name: previous?.name ?? '' } },
           after: { projectManager: { id: manager.id, name: manager.name } },
         });
-        await this.notifyManager(tx, actor, id, manager.id, project.name, project.client.name);
+        await this.notices.managerAssigned(
+          tx,
+          { ...project, projectManagerId: manager.id },
+          manager,
+          actor.id,
+          project.projectManagerId,
+        );
       }
       await recordAudit(tx, {
         actor: actorOf(actor),
@@ -521,26 +538,15 @@ export class ProjectsService implements OnModuleInit {
         before: { status: project.status },
         after: { status: to, ...(to === 'cancelled' && { reason: change.reason }) },
       });
+      await this.notices.projectStatus(
+        tx,
+        { ...project, projectManagerId: manager?.id ?? project.projectManagerId },
+        to,
+        actor.id,
+        managerChanges && manager ? manager.id : null,
+      );
     });
     return this.detail(actor, id);
-  }
-
-  /** F14: the new project manager learns about the project. */
-  private notifyManager(
-    tx: Transaction,
-    actor: CurrentUserInfo,
-    projectId: string,
-    managerId: string,
-    name: string,
-    clientName: string,
-  ) {
-    return this.notifications.notify(tx, {
-      type: 'project_manager_assigned',
-      recipients: [managerId],
-      actorId: actor.id,
-      subjectId: projectId,
-      data: { project: name, client: clientName },
-    });
   }
 
   async archive(actor: CurrentUserInfo, id: string): Promise<ProjectDetail> {

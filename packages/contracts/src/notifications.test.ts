@@ -77,6 +77,19 @@ describe('notification catalog', () => {
         'shoot_starting',
         'meeting_starting',
         'shoot_completed',
+        // F16 part C: the new types of the sales and engagement modules.
+        'responsibility_moved',
+        'client_status_changed',
+        'client_healthcare_changed',
+        'lead_lost',
+        'quote_expired',
+        'quote_rejected',
+        'project_status_changed',
+        'milestone_completed',
+        'extra_work_created',
+        'retainer_status_changed',
+        'contract_signed',
+        'contract_voided',
       ].sort(),
     );
   });
@@ -526,6 +539,7 @@ describe('inboxes and resolution (F16 rules B5–B6)', () => {
       // F16 part C, created after the backfill.
       'task_due_shortly',
       'post_publish_shortly',
+      'quote_expiring',
     ]);
   });
 

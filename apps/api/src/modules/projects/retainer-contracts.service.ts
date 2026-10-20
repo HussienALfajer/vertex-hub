@@ -48,6 +48,7 @@ import {
 } from './contract-content.js';
 import { ContractSettingsService } from './contract-settings.service.js';
 import { ContractSources } from './contract-sources.js';
+import { EngagementNotices } from './engagement-notices.js';
 import { actorOf } from './project-access.js';
 import {
   assertRetainerNotArchived,
@@ -110,6 +111,7 @@ export class RetainerContractsService {
     private readonly sources: ContractSources,
     private readonly pdfs: ContractPdfs,
     private readonly files: GeneratedFiles,
+    private readonly notices: EngagementNotices,
   ) {}
 
   /** The retainer's contracts, newest first, with their annexes; discarded drafts left out. */
@@ -398,6 +400,13 @@ export class RetainerContractsService {
         before: { status: row.status },
         after: { retainerId, status: 'void', contractNumber: row.number, reason: input.reason },
       });
+      await this.notices.contract(
+        tx,
+        'contract_voided',
+        retainerId,
+        { contract: row.number ?? '', annex: null },
+        actor.id,
+      );
     });
     return this.get(actor, retainerId, contractId);
   }
@@ -435,6 +444,16 @@ export class RetainerContractsService {
           signedOn: input.signedOn,
         },
       });
+      // A new upload of an already signed contract is no new signature.
+      if (row.status !== 'signed') {
+        await this.notices.contract(
+          tx,
+          'contract_signed',
+          retainerId,
+          { contract: row.number ?? '', annex: null },
+          actor.id,
+        );
+      }
       return copy.preview;
     });
     if (preview) await this.files.queuePreviews();

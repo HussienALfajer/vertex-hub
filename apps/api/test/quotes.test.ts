@@ -16,7 +16,7 @@ import {
 } from '@vertex-hub/contracts';
 import { auditEntries, createDatabase, notifications, quoteSettings, quotes } from '@vertex-hub/db';
 import { testDatabaseUrl } from '@vertex-hub/db/testing';
-import { and, eq } from 'drizzle-orm';
+import { and, asc, eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { QuoteWorkflowService } from '../src/modules/quotes/quote-workflow.service.js';
 import { expectError, seedClientCast } from './client-cast.js';
@@ -606,7 +606,36 @@ describe('quotes', () => {
         'quote.approval_approved',
       ]) {
         expect(actions).toContain(expected);
-      }
+      } // F16 part C: each request closes for the General Manager: decided, withdrawn, decided.
+      const waits = await db
+        .select({ resolution: notifications.resolution })
+        .from(notifications)
+        .where(
+          and(
+            eq(notifications.subjectId, quote.id),
+            eq(notifications.recipientId, cast.gm.id),
+            eq(notifications.type, 'quote_approval_requested'),
+          ),
+        )
+        .orderBy(asc(notifications.createdAt));
+      expect(waits.map((row) => row.resolution)).toEqual(['done', 'void', 'done']);
+    });
+
+    it("voids the General Manager's request when the draft is discarded (F16 part C)", async () => {
+      const quote = await builtQuote(68000);
+      await action(`/api/quotes/${quote.id}/approval`, cast.am.cookie, { action: 'request' });
+      expect((await action(`/api/quotes/${quote.id}/archive`)).status).toBe(204);
+      const [wait] = await db
+        .select({ resolution: notifications.resolution })
+        .from(notifications)
+        .where(
+          and(
+            eq(notifications.subjectId, quote.id),
+            eq(notifications.recipientId, cast.gm.id),
+            eq(notifications.type, 'quote_approval_requested'),
+          ),
+        );
+      expect(wait?.resolution).toBe('void');
     });
   });
 

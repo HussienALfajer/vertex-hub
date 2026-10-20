@@ -33,6 +33,7 @@ import {
   leadSourceDetailMissing,
   MANUAL_LEAD_STAGES,
   manualLeadMoveRefusal,
+  type NotificationResolution,
   OPEN_LEAD_STAGES,
   type UpdateLead,
 } from '@vertex-hub/contracts';
@@ -63,7 +64,7 @@ import {
 } from '../auth/index.js';
 import { CatalogDirectory } from '../catalog/index.js';
 import { ClientDirectory } from '../clients/index.js';
-import { NotificationCenter } from '../notifications/index.js';
+import { NotificationCenter, type Resolution } from '../notifications/index.js';
 import { actorOf, coversLead, coversLeadQuotes, holdsAll, readsLead } from './lead-access.js';
 import { LeadQuoteChecks } from './lead-closed-hooks.js';
 
@@ -106,6 +107,9 @@ const interestKey = (interest: { serviceId?: string | null; packageId?: string |
 
 /** Users who may own leads: General Managers, account managers and these departments' members. */
 const OWNER_DEPARTMENTS = ['general_communication', 'marketing'] as const;
+
+/** The reminders of a lead's follow-up date (F03 A12). */
+const LEAD_FOLLOW_UP_TYPES = ['lead_follow_up_due', 'lead_follow_up_overdue'] as const;
 
 /**
  * Leads (spec F03): list, board, detail, create, edit, duplicate check and eligible owners.
@@ -296,6 +300,7 @@ export class LeadsService implements OnModuleInit {
         before.interests = currentKeys;
         after.interests = interests.map(interestKey);
       }
+      if ('nextFollowUpOn' in after) await this.resolveFollowUps(tx, actor, id, 'void');
       const onlyDate = Object.keys(after).length === 1 && 'nextFollowUpOn' in after;
       await recordAudit(tx, {
         actor: actorOf(actor),
@@ -416,15 +421,66 @@ export class LeadsService implements OnModuleInit {
     if (!access || !hasPermission(access, 'leads.manage')) throw invalidOwner();
   }
 
-  /** `lead_assigned` to a new owner who did not make the change (rule 6). */
-  async notifyAssigned(tx: Transaction, actor: CurrentUserInfo, row: LeadRow): Promise<void> {
-    await this.center.notify(tx, {
-      type: 'lead_assigned',
-      data: { lead: leadDisplayName(row) },
-      recipients: [row.ownerId],
-      actorId: actor.id,
-      subjectId: row.id,
-    });
+  /**
+   * `lead_assigned` to a new owner who did not make the change (rule 6); F16 part C rule 4: the
+   * previous owner learns who owns it now.
+   */
+  async notifyAssigned(
+    tx: Transaction,
+    actor: CurrentUserInfo,
+    row: LeadRow,
+    previousOwnerId: string | null = null,
+  ): Promise<void> {
+    const owner = (await this.users.summaries([row.ownerId], tx)).get(row.ownerId);
+    await this.center.notify(tx, [
+      {
+        type: 'lead_assigned',
+        data: { lead: leadDisplayName(row) },
+        recipients: [row.ownerId],
+        actorId: actor.id,
+        subjectId: row.id,
+      },
+      {
+        type: 'responsibility_moved',
+        data: { role: 'lead_owner', record: leadDisplayName(row), holder: owner?.name ?? '' },
+        recipients: previousOwnerId ? [previousOwnerId] : [],
+        actorId: actor.id,
+        subjectId: row.id,
+        subjectType: 'lead',
+      },
+    ]);
+  }
+
+  /** F16 part C: the owner, the General Managers and the sales managers hear the lead was lost. */
+  async notifyLost(tx: Transaction, actor: CurrentUserInfo, row: LeadRow): Promise<void> {
+    const [managers, sales] = await Promise.all([
+      this.users.withRole('general_manager', tx),
+      this.users.departmentManagers([...OWNER_DEPARTMENTS], tx),
+    ]);
+    await this.center.notify(
+      tx,
+      {
+        type: 'lead_lost',
+        data: { lead: leadDisplayName(row) },
+        recipients: [row.ownerId, ...managers, ...[...sales.values()].flat()],
+        actorId: actor.id,
+        subjectId: row.id,
+      },
+      [followUpsClosed(row.id, actor, 'done')],
+    );
+  }
+
+  /**
+   * F16 part C: closes the lead's follow-up reminders: `done` when a follow-up is recorded or the
+   * lead closes, `void` when its date moves or the lead is archived.
+   */
+  async resolveFollowUps(
+    tx: Transaction,
+    actor: CurrentUserInfo,
+    leadId: string,
+    outcome: NotificationResolution,
+  ): Promise<void> {
+    await this.center.resolve(tx, followUpsClosed(leadId, actor, outcome));
   }
 
   async toDetail(actor: CurrentUserInfo, row: LeadRow, executor: Executor = this.db) {
@@ -683,6 +739,18 @@ export class LeadsService implements OnModuleInit {
     }
   }
 }
+
+/** F16 part C: what closes the follow-up reminders of a lead. */
+export const followUpsClosed = (
+  leadId: string,
+  actor: CurrentUserInfo,
+  outcome: NotificationResolution,
+): Resolution => ({
+  subject: { type: 'lead', id: leadId },
+  types: LEAD_FOLLOW_UP_TYPES,
+  outcome,
+  actorId: actor.id,
+});
 
 const invalidOwner = () =>
   new CodedException(400, 'INVALID_LEAD_OWNER', 'The owner cannot manage leads');

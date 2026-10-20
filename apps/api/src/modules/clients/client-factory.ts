@@ -82,14 +82,18 @@ export class ClientFactory {
         isHealthcare: input.isHealthcare,
       },
     });
-    await this.notifyManager(tx, actor, created.id, manager.id, input.tradeName);
+    await this.notifyManager(tx, actor, created.id, manager, input.tradeName);
     return created.id;
   }
 
   /** An `ended` client becomes `active` (rule 8: with a valid account manager); others stay. */
   async reactivate(tx: Transaction, actor: AuditActor, clientId: string): Promise<void> {
     const [client] = await tx
-      .select({ status: clients.status, accountManagerId: clients.accountManagerId })
+      .select({
+        status: clients.status,
+        accountManagerId: clients.accountManagerId,
+        tradeName: clients.tradeName,
+      })
       .from(clients)
       .where(eq(clients.id, clientId))
       .for('update');
@@ -103,6 +107,12 @@ export class ClientFactory {
       entityId: clientId,
       before: { status: client.status },
       after: { status: 'active' },
+    });
+    await this.notifyStatus(tx, actor, {
+      id: clientId,
+      tradeName: client.tradeName,
+      accountManagerId: client.accountManagerId,
+      status: 'active',
     });
   }
 
@@ -235,20 +245,86 @@ export class ClientFactory {
     }
   }
 
-  /** F14: the new primary account manager learns about the client. */
+  /**
+   * F14: the new primary account manager learns about the client; F16 part C rule 4: the
+   * previous one learns who holds it now.
+   */
   notifyManager(
     tx: Transaction,
     actor: AuditActor | null,
     clientId: string,
-    managerId: string,
+    manager: UserSummary,
     tradeName: string,
+    previousId: string | null = null,
   ) {
-    return this.notifications.notify(tx, {
-      type: 'client_account_manager_assigned',
-      recipients: [managerId],
+    const actorId = actor?.id ?? null;
+    return this.notifications.notify(tx, [
+      {
+        type: 'client_account_manager_assigned',
+        recipients: [manager.id],
+        actorId,
+        subjectId: clientId,
+        data: { client: tradeName },
+      },
+      {
+        type: 'responsibility_moved',
+        recipients: previousId ? [previousId] : [],
+        actorId,
+        subjectId: clientId,
+        data: { role: 'account_manager', record: tradeName, holder: manager.name },
+      },
+    ]);
+  }
+
+  /**
+   * F16 part C: a client became active, paused or ended; its account manager, the General
+   * Managers, the Internal Operations managers and Finance hear about it. `assignedId`: a new
+   * account manager told of the client by the same change, who is not told twice (F14 rule 2).
+   */
+  async notifyStatus(
+    tx: Transaction,
+    actor: AuditActor | null,
+    client: { id: string; tradeName: string; accountManagerId: string; status: ClientStatus },
+    assignedId: string | null = null,
+  ): Promise<void> {
+    const [managers, finance, ops] = await Promise.all([
+      this.users.withRole('general_manager', tx),
+      this.users.withRole('finance', tx),
+      this.users.departmentManagers(['internal_operations'], tx),
+    ]);
+    await this.notifications.notify(tx, {
+      type: 'client_status_changed',
+      recipients: [
+        client.accountManagerId,
+        ...managers,
+        ...finance,
+        ...[...ops.values()].flat(),
+      ].filter((userId) => userId !== assignedId),
       actorId: actor?.id ?? null,
-      subjectId: clientId,
-      data: { client: tradeName },
+      subjectId: client.id,
+      data: { client: client.tradeName, status: client.status },
+    });
+  }
+
+  /**
+   * F16 part C: the healthcare flag changed; the Medical Consultation members and the Content
+   * Management managers hear about it.
+   */
+  async notifyHealthcare(
+    tx: Transaction,
+    actor: AuditActor,
+    client: { id: string; tradeName: string; healthcare: boolean },
+  ): Promise<void> {
+    const [members, managers] = await Promise.all([
+      this.users.activeMembers(['medical_consultation'], tx),
+      this.users.departmentManagers(['content_management'], tx),
+    ]);
+    await this.notifications.notify(tx, {
+      type: 'client_healthcare_changed',
+      recipients: [...members.map((member) => member.id), ...[...managers.values()].flat()],
+      actorId: actor.id,
+      subjectId: client.id,
+      data: { client: client.tradeName, healthcare: client.healthcare },
     });
   }
 }

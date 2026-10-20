@@ -10,6 +10,7 @@ import {
   LeadQuoteChecks,
   type LeadRef,
 } from '../leads/index.js';
+import { QuoteNotices } from './quote-notices.js';
 import { QuotePdfService } from './quote-pdf.service.js';
 import { identity } from './quote-records.js';
 
@@ -25,6 +26,7 @@ export class LeadQuotes implements OnModuleInit {
     private readonly closedHooks: LeadClosedHooks,
     private readonly checks: LeadQuoteChecks,
     private readonly pdf: QuotePdfService,
+    private readonly notices: QuoteNotices,
   ) {}
 
   onModuleInit(): void {
@@ -86,6 +88,12 @@ export class LeadQuotes implements OnModuleInit {
           byLeadLoss: true,
         },
       });
+      await this.notices.rejected(
+        tx,
+        quote,
+        { name: lead.displayName, accountManagerId: lead.ownerId },
+        loss.actor.id,
+      );
     }
     return open.map(quoteDisplayNumber);
   }

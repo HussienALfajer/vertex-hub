@@ -255,7 +255,10 @@ describe('lead conversion and quotes on leads (F03 rules 8, 10, 11, 14–16)', (
       expect(await auditOf(clientId, 'client.created')).toHaveLength(1);
       // The account manager is told once, as the new client's manager.
       expect(await notificationsOf(clientId, 'client_account_manager_assigned')).toHaveLength(1);
-      expect(await notificationsOf(lead.id, 'lead_won')).toHaveLength(0);
+      // F16 part C: the General Managers hear of the win.
+      const told = (await notificationsOf(lead.id, 'lead_won')).map((notice) => notice.recipientId);
+      expect(told).toContain(cast.gm.id);
+      expect(told).not.toContain(cast.am.id);
     });
 
     it('links an existing ended client, which becomes active and gains the contact', async () => {
@@ -281,11 +284,9 @@ describe('lead conversion and quotes on leads (F03 rules 8, 10, 11, 14–16)', (
         { status: 'ended' },
         { status: 'active' },
       ]);
-      // The owner and the client's account manager learn about the win.
-      const won_ = await notificationsOf(lead.id, 'lead_won');
-      expect(won_.map((notice) => notice.recipientId).sort()).toEqual(
-        [cast.am.id, cast.otherAm.id].sort(),
-      );
+      // The owner, the client's account manager and (F16) the General Managers learn about it.
+      const won_ = (await notificationsOf(lead.id, 'lead_won')).map((notice) => notice.recipientId);
+      expect(won_).toEqual(expect.arrayContaining([cast.am.id, cast.otherAm.id, cast.gm.id]));
     });
 
     it('rolls everything back on a refused F02 rule', async () => {

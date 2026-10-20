@@ -44,6 +44,7 @@ import { type AuditActor, recordAudit } from '../audit/index.js';
 import type { CurrentUserInfo } from '../auth/index.js';
 import { ClientDirectory } from '../clients/index.js';
 import { BillingLocks } from './billing-locks.js';
+import { EngagementNotices } from './engagement-notices.js';
 import { assertClientTakesWork, readableProject, workableProject } from './project-access.js';
 import { readableRetainer, retainerPermissions, workableRetainer } from './retainer-access.js';
 import { NO_TASKS, WorkProgress } from './work-progress.js';
@@ -154,6 +155,7 @@ export class EngagementDirectory {
     private readonly clients: ClientDirectory,
     private readonly progress: WorkProgress,
     private readonly locks: BillingLocks,
+    private readonly notices: EngagementNotices,
   ) {}
 
   /**
@@ -606,6 +608,7 @@ export class EngagementDirectory {
       entityId: created.id,
       after: { ...values, ...ownerField(input.owner) },
     });
+    await this.notices.extraWorkCreated(tx, input.owner, values.title, actor.id);
     return { ...created, title: values.title, archived: false };
   }
 

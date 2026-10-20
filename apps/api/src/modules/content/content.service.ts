@@ -405,22 +405,37 @@ export class ContentService {
         before: auditFields(diff.before),
         after: auditFields(diff.after),
       });
-      if (diff.after.responsibleId) {
-        await this.notices.follow(tx, id, [diff.after.responsibleId]);
-      }
-      // F16 part C: a new responsible or publish time closes what no longer applies.
+      const responsibleId = diff.after.responsibleId;
+      if (responsibleId) await this.notices.follow(tx, id, [responsibleId]);
+      // F16 part C: a new responsible or publish time closes what no longer applies; the
+      // previous responsible learns who holds the post now (rule 4).
+      const holder = responsibleId
+        ? (await this.users.summaries([responsibleId], tx)).get(responsibleId)
+        : undefined;
       await this.notices.sendChange(
         tx,
         post,
         actor.id,
-        diff.after.responsibleId
+        responsibleId
           ? [
               this.notices.notice(
                 { ...post, ...fields },
                 'post_assigned',
-                [diff.after.responsibleId],
+                [responsibleId],
                 actor.id,
               ),
+              {
+                type: 'responsibility_moved',
+                recipients: [post.responsibleId],
+                actorId: actor.id,
+                subjectId: id,
+                subjectType: 'post',
+                data: {
+                  role: 'post_responsible',
+                  record: fields.title ?? post.title,
+                  holder: holder?.name ?? '',
+                },
+              },
             ]
           : [],
       );

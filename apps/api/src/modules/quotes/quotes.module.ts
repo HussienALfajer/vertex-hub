@@ -15,6 +15,7 @@ import { QuoteDirectory } from './quote-directory.js';
 import { QuoteEmailsController } from './quote-emails.controller.js';
 import { QuoteEmailsService } from './quote-emails.service.js';
 import { QuoteFileOwner } from './quote-file-owner.js';
+import { QuoteNotices } from './quote-notices.js';
 import { QuotePdfService } from './quote-pdf.service.js';
 import { QuoteRecipients } from './quote-recipients.js';
 import { QuoteSettingsController } from './quote-settings.controller.js';
@@ -58,6 +59,7 @@ import { QuotesService } from './quotes.service.js';
     QuoteAcceptedHooks,
     QuoteContractServices,
     QuoteRecipients,
+    QuoteNotices,
     LeadQuotes,
   ],
   exports: [QuoteDirectory, QuoteAcceptedHooks],

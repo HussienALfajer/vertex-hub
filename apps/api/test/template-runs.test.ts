@@ -21,6 +21,7 @@ import {
   clients,
   createDatabase,
   departmentMembers,
+  notifications,
   projectMilestones,
   projects,
   retainerCycleLines,
@@ -33,7 +34,7 @@ import {
   templateRunTasks,
 } from '@vertex-hub/db';
 import { testDatabaseUrl } from '@vertex-hub/db/testing';
-import { asc, eq, inArray } from 'drizzle-orm';
+import { and, asc, eq, inArray } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { RetainerCyclesService } from '../src/modules/projects/retainer-cycles.service.js';
 import { expectError, seedClientCast } from './client-cast.js';
@@ -473,6 +474,48 @@ describe('template runs', () => {
       ]);
       const run = await applied(template.id, cast.am.cookie, body);
       expect((await runTasks(run.id))[0]?.assigneeId).toBeNull();
+    });
+
+    it("closes the managers' notice once the run's unassigned tasks are assigned or closed (F16 part C)", async () => {
+      const manager = await cast.signedIn({ departments: [{ code: 'design', manager: true }] });
+      const designer = await cast.signedIn({ departments: [{ code: 'design' }] });
+      const template = await createTemplate({
+        name: `قالب طابور ${cast.run}`,
+        kind: 'project',
+        steps: [
+          { key: 'a', title: 'Poster', department: 'design', dueDay: 2 },
+          { key: 'b', title: 'Banner', department: 'design', dueDay: 3 },
+        ],
+      });
+      const project = await cast.createProject(clientId);
+      const run = await applied(template.id, cast.am.cookie, { projectId: project.id });
+      const [first, second] = await runTasks(run.id);
+      const notice = async () => {
+        const [row] = await db
+          .select()
+          .from(notifications)
+          .where(
+            and(
+              eq(notifications.recipientId, manager.id),
+              eq(notifications.subjectId, run.id),
+              eq(notifications.type, 'tasks_generated'),
+            ),
+          );
+        return row;
+      };
+      expect(await notice()).toMatchObject({ box: 'action', resolvedAt: null });
+      const assigned = await client.request('PATCH', `/api/tasks/${first?.id}`, {
+        cookie: manager.cookie,
+        body: { assigneeId: designer.id },
+      });
+      expect(assigned.status, await assigned.clone().text()).toBe(200);
+      expect((await notice())?.resolvedAt).toBeNull();
+      const cancelled = await client.post(`/api/tasks/${second?.id}/status`, manager.cookie, {
+        status: 'cancelled',
+        note: 'لم يعد مطلوبًا',
+      });
+      expect(cancelled.status, await cancelled.clone().text()).toBe(200);
+      expect(await notice()).toMatchObject({ resolution: 'done', resolvedById: manager.id });
     });
 
     it('warns about tasks due after the project', async () => {

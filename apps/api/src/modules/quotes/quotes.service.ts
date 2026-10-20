@@ -74,6 +74,7 @@ import {
   type Recipient,
   snapshotParty,
 } from './quote-access.js';
+import { QuoteNotices } from './quote-notices.js';
 import { QuotePdfService } from './quote-pdf.service.js';
 import { QuoteRecipients } from './quote-recipients.js';
 import {
@@ -124,6 +125,7 @@ export class QuotesService {
     private readonly pdf: QuotePdfService,
     private readonly engagements: EngagementDirectory,
     private readonly recipientsOf: QuoteRecipients,
+    private readonly notices: QuoteNotices,
     usage: CatalogUsage,
   ) {
     // SERVICE_IN_USE: an item on any quote version keeps its billing.
@@ -509,6 +511,10 @@ export class QuotesService {
         before: { ...identity(quote), archived: false },
         after: { ...identity(quote), archived: true },
       });
+      // F16 part C: a discarded draft's discount approval no longer applies.
+      if (quote.discountApproval === 'pending') {
+        await this.notices.resolveApproval(tx, quote.id, 'void', actor.id);
+      }
       return quote.draftPdfObjectKey;
     });
     await this.pdf.discardPreview(previewKey);

@@ -30,9 +30,9 @@ import {
   approvesDiscounts,
   archivedError,
   assertTakesQuotes,
-  type Recipient,
   snapshotParty,
 } from './quote-access.js';
+import { QuoteNotices, quoteNotice } from './quote-notices.js';
 import { QuotePdfService } from './quote-pdf.service.js';
 import { QuoteRecipients } from './quote-recipients.js';
 import {
@@ -63,6 +63,7 @@ export class QuoteWorkflowService implements OnModuleInit {
     private readonly pdf: QuotePdfService,
     private readonly leadPipeline: LeadPipeline,
     private readonly recipients: QuoteRecipients,
+    private readonly notices: QuoteNotices,
   ) {}
 
   onModuleInit(): void {
@@ -92,6 +93,7 @@ export class QuoteWorkflowService implements OnModuleInit {
         await this.audit(tx, actor, quote, 'quote.approval_withdrawn', {
           discountApproval: 'none',
         });
+        await this.notices.resolveApproval(tx, quote.id, 'void', actor.id);
         return this.quotes.toDetail(actor, updated, client, tx);
       }
       if (!['none', 'returned'].includes(quote.discountApproval)) {
@@ -111,7 +113,7 @@ export class QuoteWorkflowService implements OnModuleInit {
       });
       await this.notifications.notify(tx, {
         type: 'quote_approval_requested',
-        data: { quote: noticeOf(quote, client) },
+        data: { quote: quoteNotice(quote, client) },
         recipients: await this.users.withRole('general_manager', tx),
         actorId: actor.id,
         subjectId: quote.id,
@@ -148,10 +150,11 @@ export class QuoteWorkflowService implements OnModuleInit {
         approved ? 'quote.approval_approved' : 'quote.approval_returned',
         { discountApproval: updated.discountApproval, ...(input.note ? { note: input.note } : {}) },
       );
+      await this.notices.resolveApproval(tx, quote.id, 'done', actor.id);
       if (quote.discountRequestedById) {
         await this.notifications.notify(tx, {
           type: 'quote_approval_decided',
-          data: { quote: noticeOf(quote, client), decision: input.decision, note: input.note },
+          data: { quote: quoteNotice(quote, client), decision: input.decision, note: input.note },
           recipients: [quote.discountRequestedById],
           actorId: actor.id,
           subjectId: quote.id,
@@ -266,6 +269,8 @@ export class QuoteWorkflowService implements OnModuleInit {
           before: { ...identity(older), status: older.status },
           after: { ...identity(older), status: 'superseded', byQuoteId: quote.id },
         });
+        // F16 part C: the older version's expiry no longer applies.
+        await this.notices.resolveExpiring(tx, older.id, actor.id, 'void');
       }
       // F03 rule 14: sending a lead quote moves the lead to Quote sent.
       if (client.kind === 'lead') {
@@ -317,6 +322,7 @@ export class QuoteWorkflowService implements OnModuleInit {
         before: { ...identity(quote), status: quote.status, validUntil: quote.validUntil },
         after: { ...identity(quote), status: 'sent', validUntil: input.validUntil },
       });
+      await this.notices.resolveExpiring(tx, quote.id, actor.id);
       return this.quotes.toDetail(actor, updated, client, tx);
     });
   }
@@ -371,6 +377,7 @@ export class QuoteWorkflowService implements OnModuleInit {
           ...(input.note ? { note: input.note } : {}),
         },
       });
+      await this.notices.rejected(tx, quote, client, actor.id);
       return this.quotes.toDetail(actor, updated, client, tx);
     });
   }
@@ -410,6 +417,7 @@ export class QuoteWorkflowService implements OnModuleInit {
             before: { ...identity(quote), status: 'sent' },
             after: { ...identity(quote), status: 'expired' },
           });
+          await this.notices.expired(tx, quote);
           expired += 1;
         });
       },
@@ -462,9 +470,3 @@ export class QuoteWorkflowService implements OnModuleInit {
     });
   }
 }
-
-const noticeOf = (quote: QuoteRow, client: Recipient) => ({
-  displayNumber: quoteDisplayNumber(quote),
-  title: quote.title,
-  client: client.name,
-});
