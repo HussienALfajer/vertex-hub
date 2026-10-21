@@ -263,6 +263,15 @@ export const AUDIT_ACTIONS = [
   'holiday.updated',
   'holiday.archived',
   'hr_settings.updated',
+  'hr_request.created',
+  'hr_request.approved',
+  'hr_request.rejected',
+  'hr_request.cancelled',
+  'hr_request.recounted',
+  'hr_opinion.created',
+  'leave_balance.adjusted',
+  'leave_balance.opening',
+  'task.leave_accepted',
 ] as const;
 
 export const auditActionSchema = z.enum(AUDIT_ACTIONS).meta({ id: 'AuditAction' });
@@ -324,6 +333,10 @@ export const AUDIT_ENTITY_TYPES = [
   'holiday',
   /** The one settings row; its id is fixed. */
   'hr_settings',
+  'hr_request',
+  'hr_opinion',
+  /** Keyed by the employee's user id. */
+  'leave_balance',
 ] as const;
 
 export const auditEntityTypeSchema = z.enum(AUDIT_ENTITY_TYPES).meta({ id: 'AuditEntityType' });

@@ -408,7 +408,11 @@ export const createTaskSchema = taskFieldsSchema
     links: z.array(createTaskLinkSchema).default([]),
   })
   .partial({ brief: true, dueTime: true, requestedByContactId: true, requestedOn: true })
-  .extend({ requestScope: requestScopeSchema.optional() })
+  .extend({
+    requestScope: requestScopeSchema.optional(),
+    /** F17 rule B17: assign despite the assignee's leave on the due date (audited). */
+    acceptLeave: z.boolean().optional(),
+  })
   .superRefine((task, ctx) => {
     const problem = taskLinkProblem(task);
     if (problem)
@@ -444,9 +448,13 @@ export type CreateTaskInput = z.input<typeof createTaskSchema>;
 /**
  * Any subset of the create fields except the type (fixed at creation, rule 11); dependencies,
  * checklist and links have their own endpoints. `assigneeId` and `department` need assign scope,
- * `requestScope` client scope. The API checks the links against the stored ones.
+ * `requestScope` client scope. The API checks the links against the stored ones. `acceptLeave`
+ * (F17 rule B17) keeps an assignee or a due date that falls on the assignee's leave.
  */
-export const updateTaskSchema = taskFieldsSchema.partial().meta({ id: 'UpdateTask' });
+export const updateTaskSchema = taskFieldsSchema
+  .partial()
+  .extend({ acceptLeave: z.boolean().optional() })
+  .meta({ id: 'UpdateTask' });
 
 export type UpdateTask = z.infer<typeof updateTaskSchema>;
 

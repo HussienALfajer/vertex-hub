@@ -495,7 +495,17 @@
     "DEFAULT_REQUIRED": "لا بد من جدول دوام افتراضي واحد. اجعل جدولًا آخر افتراضيًا أولًا.",
     "INVALID_TIMES": "أوقات الدوام غير صالحة: يجب أن ينتهي يوم العمل قبل منتصف الليل، وأن تُغلق نافذة الحضور المرن بعد فتحها.",
     "HOLIDAY_OVERLAP": "تتداخل هذه العطلة مع عطلة رسمية أخرى. عدّل تواريخها أو عدّل العطلة الأخرى.",
-    "SCHEDULE_NAME_TAKEN": "يوجد جدول دوام آخر بهذا الاسم. اختر اسمًا مختلفًا."
+    "SCHEDULE_NAME_TAKEN": "يوجد جدول دوام آخر بهذا الاسم. اختر اسمًا مختلفًا.",
+    "REQUEST_OVERLAP": "لديك طلب آخر قيد الانتظار أو معتمد في هذه الأيام. ألغِه أو اختر أيامًا أخرى.",
+    "INSUFFICIENT_BALANCE": "رصيد الإجازة السنوية لا يكفي لهذه الأيام. اطلب الباقي إجازة بلا راتب.",
+    "ON_PROBATION": "لا تُؤخذ الإجازة السنوية قبل انتهاء فترة التجربة. يمكنك طلبها بلا راتب.",
+    "PERMISSION_LIMIT": "تجاوز إذن المغادرة الحد المسموح: مدته القصوى أو عدد الأذونات في الشهر.",
+    "TOO_LATE": "فات موعد تقديم هذا الطلب.",
+    "NOT_A_WORK_DAY": "لا يوم عمل في هذا الطلب: كل أيامه عطل أو أيام راحة.",
+    "NOT_PENDING": "لم يعد هذا الطلب قيد الانتظار. حدّث الصفحة.",
+    "CERTIFICATE_MISSING": "لم يُرفق التقرير الطبي بعد. أكّد الموافقة دونه أو انتظر إرفاقه.",
+    "NOT_CANCELLABLE": "لا يمكن إلغاء هذا الطلب: بدأت الإجازة أو حُسم الطلب.",
+    "ASSIGNEE_ON_LEAVE": "المكلّف في إجازة معتمدة يوم الاستحقاق."
   },
   "users": {
     "title": "الفريق",
@@ -919,7 +929,10 @@
       "salary_change": "تغيير راتب",
       "work_schedule": "جدول دوام",
       "holiday": "عطلة رسمية",
-      "hr_settings": "إعدادات الموارد البشرية"
+      "hr_settings": "إعدادات الموارد البشرية",
+      "hr_request": "طلب إجازة أو إذن",
+      "hr_opinion": "رأي في طلب",
+      "leave_balance": "رصيد إجازات"
     },
     "actions": {
       "user": {
@@ -1048,7 +1061,8 @@
         "extra_work_moved": "نقل العمل الإضافي للطلب إلى ارتباط آخر",
         "reviewed": "راجع المهمة",
         "client_text_updated": "عدّل نص العميل",
-        "client_response_recorded": "سجّل رد العميل"
+        "client_response_recorded": "سجّل رد العميل",
+        "leave_accepted": "أسند مهمة رغم إجازة المكلّف"
       },
       "template": {
         "created": "أنشأ قالبًا",
@@ -1290,6 +1304,20 @@
       },
       "hr_settings": {
         "updated": "عدّل إعدادات الموارد البشرية"
+      },
+      "hr_request": {
+        "created": "قدّم طلبًا",
+        "approved": "وافق على طلب",
+        "rejected": "رفض طلبًا",
+        "cancelled": "ألغى طلبًا",
+        "recounted": "أعاد حساب أيام طلب"
+      },
+      "hr_opinion": {
+        "created": "أبدى رأيًا في طلب"
+      },
+      "leave_balance": {
+        "adjusted": "عدّل رصيد إجازة",
+        "opening": "سجّل رصيدًا افتتاحيًا"
       }
     },
     "fields": {
@@ -1639,7 +1667,18 @@
       "permissionsPerMonth": "أذونات المغادرة في الشهر",
       "annualNoticeWorkDays": "مهلة طلب الإجازة السنوية",
       "remoteNoticeWorkDays": "مهلة طلب العمل عن بعد",
-      "overtimeMinutesPerLeaveDay": "دقائق العمل الإضافي ليوم إجازة"
+      "overtimeMinutesPerLeaveDay": "دقائق العمل الإضافي ليوم إجازة",
+      "leaveType": "نوع الإجازة",
+      "paidDays": "الأيام المدفوعة",
+      "unpaidDays": "الأيام بلا راتب",
+      "half": "نصف اليوم",
+      "fromTime": "من الساعة",
+      "toTime": "إلى الساعة",
+      "shortNotice": "بإشعار قصير",
+      "year": "السنة",
+      "leaves": "الإجازات",
+      "recordedByApprover": "سجّله صاحب صلاحية الاعتماد",
+      "withoutCertificate": "دون تقرير طبي"
     },
     "kinds": {
       "activation": "تفعيل",
@@ -4612,7 +4651,11 @@
       "probation_ending": "اقتراب نهاية فترة تجربة موظف",
       "employee_leaving": "انتهاء خدمة موظف",
       "salary_changed": "تغيير على راتبي",
-      "holiday_changed": "تغيير على العطل الرسمية"
+      "holiday_changed": "تغيير على العطل الرسمية",
+      "hr_request_submitted": "طلب إجازة أو إذن ينتظر قراري",
+      "hr_request_decided": "قرار على طلب إجازتي أو إذني",
+      "colleague_on_leave": "إجازة زميل في قسمي",
+      "leave_balance_adjusted": "تعديل على رصيد إجازاتي"
     },
     "priorities": {
       "critical": "حرج",
@@ -5726,7 +5769,8 @@
       "milestone_due": "استحقاق المراحل",
       "renewal": "تجديد العقود",
       "invoice_due": "استحقاق الفواتير",
-      "holiday": "العطل الرسمية"
+      "holiday": "العطل الرسمية",
+      "leave": "الإجازات"
     },
     "keyDates": {
       "project_due": "استحقاق مشروع",
@@ -5737,7 +5781,8 @@
     },
     "conflicts": {
       "shoot": "{{name}}: جلسة التصوير «{{title}}»",
-      "meeting": "{{name}}: الاجتماع «{{title}}»"
+      "meeting": "{{name}}: الاجتماع «{{title}}»",
+      "leave": "{{name}}: في إجازة"
     },
     "previous": {
       "month": "الشهر السابق",

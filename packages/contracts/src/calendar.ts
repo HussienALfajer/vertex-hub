@@ -12,6 +12,7 @@ import {
   workDaysBefore,
 } from './dates.js';
 import { type DepartmentCode, departmentCodeSchema } from './departments.js';
+import { calendarLeaveSchema } from './hr.js';
 import { invoiceStatusSchema } from './invoices.js';
 import { pageQuerySchema, pageSchema, queryBooleanSchema, queryListSchema } from './lists.js';
 import { taskLinkProblem, taskStatusSchema, taskTitleSchema } from './tasks.js';
@@ -441,13 +442,18 @@ const personSchema = z.object({ id: z.uuid(), name: z.string() });
 
 const archivablePersonSchema = personSchema.extend({ archived: z.boolean() });
 
-export const CALENDAR_ITEM_KINDS = ['shoot', 'meeting'] as const;
+/** `leave`: an approved leave (F17 rules B16 and B17), never booked here. */
+export const CALENDAR_ITEM_KINDS = ['shoot', 'meeting', 'leave'] as const;
 
 export const calendarItemKindSchema = z.enum(CALENDAR_ITEM_KINDS).meta({ id: 'CalendarItemKind' });
 
 export type CalendarItemKind = z.infer<typeof calendarItemKindSchema>;
 
-/** Rule 5: one person booked elsewhere at an overlapping time. */
+/**
+ * Rule 5: one person booked elsewhere at an overlapping time. A `leave` (F17 rule B17) is the
+ * person's approved leave: its id is the request's, its title empty (the type is never shown),
+ * and it runs from the start of its first day to the end of its last.
+ */
 export const scheduleConflictSchema = z
   .object({
     user: personSchema,
@@ -718,6 +724,8 @@ export const calendarSchema = z
     /** Overlapping the range, by start; cancelled ones included, archived ones never. */
     shoots: z.array(shootSchema),
     meetings: z.array(meetingSchema),
+    /** F17 rule B16: approved leave overlapping the range, by start. */
+    leaves: z.array(calendarLeaveSchema),
     /** By date. */
     keyDates: z.array(keyDateSchema),
   })

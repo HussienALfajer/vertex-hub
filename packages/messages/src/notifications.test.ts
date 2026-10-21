@@ -243,6 +243,22 @@ const SAMPLES: Record<NotificationType, unknown> = {
     startsOn: '2027-05-16',
     endsOn: '2027-05-19',
   },
+  hr_request_submitted: {
+    employee: 'سامر',
+    kind: 'leave',
+    leaveType: 'annual',
+    startsOn: '2026-11-08',
+    endsOn: '2026-11-12',
+  },
+  hr_request_decided: {
+    decision: 'approved',
+    kind: 'leave',
+    leaveType: 'sick',
+    startsOn: '2026-11-08',
+    endsOn: '2026-11-08',
+  },
+  colleague_on_leave: { employee: 'سامر', startsOn: '2026-11-08', endsOn: '2026-11-12' },
+  leave_balance_adjusted: { leaveType: 'annual', year: 2026, days: 2.5 },
   action_reminder: {
     originalType: 'task_review_requested',
     originalData: { task },
@@ -664,5 +680,51 @@ describe('HR (F17 part A)', () => {
       'عطلة رسمية جديدة: «عيد الأضحى» 16 أيار – 19 أيار 2027',
     );
     expect(linkPath(notificationLink(sample('holiday_changed')))).toBe('/calendar?date=2027-05-16');
+  });
+});
+
+describe('HR leave (F17 part B)', () => {
+  const render = (type: NotificationType, data?: object) =>
+    notificationText(
+      data ? sample(type, { data } as Partial<Notification>) : sample(type),
+      departmentName,
+    );
+
+  it('names the request to the GM and opens it in Approvals (rule B8)', () => {
+    expect(render('hr_request_submitted').text).toBe(
+      'طلب سامر إجازة سنوية 8 تشرين الثاني – 12 تشرين الثاني 2026',
+    );
+    expect(
+      render('hr_request_submitted', {
+        employee: 'سامر',
+        kind: 'permission',
+        leaveType: null,
+        startsOn: '2026-11-08',
+        endsOn: '2026-11-08',
+      }).text,
+    ).toBe('طلب سامر إذن مغادرة يوم 8 تشرين الثاني 2026');
+    expect(linkPath(notificationLink(sample('hr_request_submitted')))).toBe(
+      `/hr/approvals?request=${SUBJECT_ID}`,
+    );
+  });
+
+  it('tells the employee the decision and opens My attendance (rules B14 and B15)', () => {
+    expect(render('hr_request_decided').text).toBe(
+      'وافقت الإدارة على طلبك: إجازة مرضية 8 تشرين الثاني 2026',
+    );
+    expect(linkPath(notificationLink(sample('hr_request_decided')))).toBe('/me/attendance');
+    expect(render('leave_balance_adjusted').text).toBe(
+      'عُدّل رصيد إجازة سنوية لعام 2026 بمقدار +2.5 يوم',
+    );
+    expect(linkPath(notificationLink(sample('leave_balance_adjusted')))).toBe('/me/attendance');
+  });
+
+  it("tells managers of a colleague's leave without its type (rules B16 and B18)", () => {
+    expect(render('colleague_on_leave').text).toBe(
+      'سامر في إجازة 8 تشرين الثاني – 12 تشرين الثاني 2026',
+    );
+    expect(linkPath(notificationLink(sample('colleague_on_leave')))).toBe(
+      '/calendar?date=2026-11-08',
+    );
   });
 });

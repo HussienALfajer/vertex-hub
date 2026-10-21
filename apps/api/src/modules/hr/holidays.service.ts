@@ -16,6 +16,7 @@ import { CodedException } from '../../core/errors/index.js';
 import { type AuditActor, changedFields, recordAudit } from '../audit/index.js';
 import { type CurrentUserInfo, UserDirectory } from '../auth/index.js';
 import { NotificationCenter } from '../notifications/index.js';
+import { HrRequestsService } from './hr-requests.service.js';
 
 type HolidayRow = typeof publicHolidays.$inferSelect;
 
@@ -33,7 +34,8 @@ const auditFields = (row: HolidayRow) => ({
 /**
  * Rule B3: public holidays, managed by `hr.manage` and read by everyone with `calendar.read`.
  * Overlapping non-archived holidays are refused under one lock, so two writes cannot both pass
- * the check. Adding, re-dating or archiving one notifies everyone (`holiday_changed`).
+ * the check. Adding, re-dating or archiving one notifies everyone (`holiday_changed`) and recounts
+ * the open leaves sharing its days (edge case 11).
  */
 @Injectable()
 export class HolidaysService {
@@ -41,6 +43,7 @@ export class HolidaysService {
     @Inject(DATABASE) private readonly db: Database,
     private readonly users: UserDirectory,
     private readonly center: NotificationCenter,
+    private readonly requests: HrRequestsService,
   ) {}
 
   /** The non-archived holidays with a day in `year`, by start date. */
@@ -66,6 +69,7 @@ export class HolidaysService {
       if (await this.overlapping(tx, input)) throw overlapError();
       const created = await this.insert(tx, actor, input);
       await this.notify(tx, actor, created, 'added');
+      await this.requests.recount(tx, actor, [created]);
       return created;
     });
     return toResponse(row);
@@ -96,6 +100,7 @@ export class HolidaysService {
       });
       if (updated.startsOn !== current.startsOn || updated.endsOn !== current.endsOn) {
         await this.notify(tx, actor, updated, 'redated');
+        await this.requests.recount(tx, actor, [current, updated]);
       }
       return updated;
     });
@@ -126,6 +131,7 @@ export class HolidaysService {
         after: { archived: true, ...auditFields(current) },
       });
       await this.notify(tx, actor, archived, 'archived');
+      await this.requests.recount(tx, actor, [archived]);
       return archived;
     });
     return toResponse(row);
@@ -157,6 +163,7 @@ export class HolidaysService {
         if (await this.overlapping(tx, copy)) continue;
         const row = await this.insert(tx, actor, copy, source.id);
         await this.notify(tx, actor, row, 'added');
+        await this.requests.recount(tx, actor, [row]);
         rows.push(row);
       }
       return rows;

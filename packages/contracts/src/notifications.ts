@@ -14,6 +14,7 @@ import {
 } from './dates.js';
 import { type DepartmentCode, departmentCodeSchema } from './departments.js';
 import { clientEmailKindSchema, SECURITY_CHANGES } from './email-basics.js';
+import { balanceLeaveTypeSchema, hrRequestKindSchema, leaveTypeSchema } from './hr.js';
 import type { InvoiceOrigin } from './invoices.js';
 import { pageQuerySchema, pageSchema, queryBooleanSchema } from './lists.js';
 import { currencySchema, minorAmountSchema, signedMinorAmountSchema } from './money.js';
@@ -152,6 +153,10 @@ export const NOTIFICATION_TYPES = [
   'salary_changed',
   // F17 part B.
   'holiday_changed',
+  'hr_request_submitted',
+  'hr_request_decided',
+  'colleague_on_leave',
+  'leave_balance_adjusted',
   'action_reminder',
   'action_escalated',
   'action_escalated_top',
@@ -203,6 +208,8 @@ export const NOTIFICATION_SUBJECTS = [
   'announcement',
   /** F17 rule B3: a public holiday, opened on the calendar at its first day. */
   'holiday',
+  /** F17 rules B8–B15: a leave or permission request. */
+  'hr_request',
 ] as const;
 
 export const notificationSubjectTypeSchema = z
@@ -360,6 +367,14 @@ const CATALOG: Record<
   salary_changed: { category: 'hr', subject: 'user', mutable: true },
   /** Rule B3: opens the calendar on the holiday. */
   holiday_changed: { category: 'hr', subject: 'holiday', mutable: true },
+  /** Rule B8: opens the request in Approvals. */
+  hr_request_submitted: { category: 'hr', subject: 'hr_request', mutable: false },
+  /** Rules B14 and B15: opens My attendance. */
+  hr_request_decided: { category: 'hr', subject: 'hr_request', mutable: true },
+  /** Rule B18: the colleague; opens the calendar on the leave's first day. */
+  colleague_on_leave: { category: 'hr', subject: 'user', mutable: true },
+  /** Rule B7: the employee; opens My attendance. */
+  leave_balance_adjusted: { category: 'hr', subject: 'user', mutable: true },
   /** F16 rule B11: the escalation steps open the original's record; its subject type is given. */
   action_reminder: { category: 'reminders', subject: 'task', mutable: false },
   action_escalated: { category: 'reminders', subject: 'task', mutable: false },
@@ -537,6 +552,10 @@ const CHANNELS: Record<NotificationType, Channels> = {
   employee_leaving: normal(),
   salary_changed: normal(),
   holiday_changed: normal(),
+  hr_request_submitted: important(),
+  hr_request_decided: important('on'),
+  colleague_on_leave: informational,
+  leave_balance_adjusted: informational,
   action_reminder: important(),
   action_escalated: important('on'),
   action_escalated_top: critical(),
@@ -757,6 +776,11 @@ const ENGINE: Record<NotificationType, Engine> = {
   employee_leaving: info,
   salary_changed: info,
   holiday_changed: info,
+  /** Rule B8: one reminder after a work day while it waits. */
+  hr_request_submitted: action({ escalation: CHAIN.slice(0, 1) }),
+  hr_request_decided: info,
+  colleague_on_leave: info,
+  leave_balance_adjusted: info,
   action_reminder: action(),
   action_escalated: action(),
   action_escalated_top: action(),
@@ -1259,6 +1283,34 @@ export const NOTIFICATION_DATA_SCHEMAS = {
     startsOn: calendarDateSchema,
     endsOn: calendarDateSchema,
   }),
+  /** Rule B8: `employee` asks for a leave (`leaveType`) or a permission (null). */
+  hr_request_submitted: z.object({
+    employee: nameSchema,
+    kind: hrRequestKindSchema,
+    leaveType: leaveTypeSchema.nullable(),
+    startsOn: calendarDateSchema,
+    endsOn: calendarDateSchema,
+  }),
+  /** Rules B14 and B15: the recipient's request was approved, rejected or cancelled by the GM. */
+  hr_request_decided: z.object({
+    decision: z.enum(['approved', 'rejected', 'cancelled']),
+    kind: hrRequestKindSchema,
+    leaveType: leaveTypeSchema.nullable(),
+    startsOn: calendarDateSchema,
+    endsOn: calendarDateSchema,
+  }),
+  /** Rule B18: `employee` is on leave from `startsOn` to `endsOn`; never the type. */
+  colleague_on_leave: z.object({
+    employee: nameSchema,
+    startsOn: calendarDateSchema,
+    endsOn: calendarDateSchema,
+  }),
+  /** Rule B7: `days` (signed) added to the recipient's balance of `year`. */
+  leave_balance_adjusted: z.object({
+    leaveType: balanceLeaveTypeSchema,
+    year: z.number().int(),
+    days: z.number(),
+  }),
   /** F16 rule B11 step 1: the original still waits on its recipients. */
   action_reminder: escalationData,
   /** Step 2: the managers of those it waits on (or the step's department or role). */
@@ -1741,6 +1793,8 @@ export const NOTIFICATION_REMINDER_KINDS = [
   'contract_ending_30',
   'contract_ending_7',
   'probation_ending',
+  /** F17 rule B18: once per leave and first day. */
+  'colleague_on_leave',
 ] as const;
 
 export type NotificationReminderKind = (typeof NOTIFICATION_REMINDER_KINDS)[number];

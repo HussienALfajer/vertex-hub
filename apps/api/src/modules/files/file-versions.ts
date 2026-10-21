@@ -330,4 +330,19 @@ export class FileVersions {
     const of = (role: string) => rows.find((row) => row.role === role)?.count ?? 0;
     return { deliverables: of('deliverable'), references: of('reference') };
   }
+
+  /** F17 rule B13: the live documents of each leave request (the sick certificate). */
+  async hrRequestDocumentCounts(
+    requestIds: readonly string[],
+    executor: Executor = this.db,
+  ): Promise<Map<string, number>> {
+    const unique = [...new Set(requestIds)];
+    if (unique.length === 0) return new Map();
+    const rows = await executor
+      .select({ requestId: fileItems.hrRequestId, count: count() })
+      .from(fileItems)
+      .where(and(inArray(fileItems.hrRequestId, unique), isNull(fileItems.archivedAt)))
+      .groupBy(fileItems.hrRequestId);
+    return new Map(rows.flatMap((row) => (row.requestId ? [[row.requestId, row.count]] : [])));
+  }
 }

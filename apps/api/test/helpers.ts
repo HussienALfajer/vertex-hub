@@ -35,11 +35,14 @@ import {
   fileItems,
   fileUploads,
   fileVersions,
+  hrOpinions,
+  hrRequests,
   invoiceLines,
   invoices,
   leadInterests,
   leadNotes,
   leads,
+  leaveLedger,
   meetingAttendees,
   meetingContacts,
   meetings,
@@ -232,12 +235,26 @@ export async function removeUsers(db: Database, ids: string[]): Promise<void> {
     .selectDistinct({ id: fileVersions.fileItemId })
     .from(fileVersions)
     .where(or(inArray(fileVersions.uploadedById, ids), inArray(fileVersions.finalMarkedById, ids)));
+  // F17 part B: their leave requests and those they decided, with what points at them.
+  const requestIds = (
+    await db
+      .select({ id: hrRequests.id })
+      .from(hrRequests)
+      .where(
+        or(
+          inArray(hrRequests.userId, ids),
+          inArray(hrRequests.createdById, ids),
+          inArray(hrRequests.decidedById, ids),
+        ),
+      )
+  ).map((row) => row.id);
   await removeFileItems(
     db,
     or(
       inArray(fileItems.createdById, ids),
-      // F17: the documents of their employee files.
+      // F17: the documents of their employee files and requests.
       inArray(fileItems.employeeId, ids),
+      inArray(fileItems.hrRequestId, requestIds),
       inArray(
         fileItems.id,
         touched.map((row) => row.id),
@@ -250,6 +267,19 @@ export async function removeUsers(db: Database, ids: string[]): Promise<void> {
     .delete(salaryChanges)
     .where(or(inArray(salaryChanges.userId, ids), inArray(salaryChanges.createdById, ids)));
   await db.delete(employeeFiles).where(inArray(employeeFiles.userId, ids));
+  await db
+    .delete(hrOpinions)
+    .where(or(inArray(hrOpinions.requestId, requestIds), inArray(hrOpinions.authorId, ids)));
+  await db
+    .delete(leaveLedger)
+    .where(
+      or(
+        inArray(leaveLedger.userId, ids),
+        inArray(leaveLedger.requestId, requestIds),
+        inArray(leaveLedger.createdById, ids),
+      ),
+    );
+  await db.delete(hrRequests).where(inArray(hrRequests.id, requestIds));
   // Announcements point at their author and who withdrew them, recipients at the user (F16).
   await removeAnnouncements(
     db,

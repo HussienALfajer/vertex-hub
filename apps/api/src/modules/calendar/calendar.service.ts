@@ -16,7 +16,7 @@ import { and, asc, eq, gt, inArray, isNull, lt, or } from 'drizzle-orm';
 import { DATABASE } from '../../core/database/database.module.js';
 import type { CurrentUserInfo } from '../auth/index.js';
 import { ClientDirectory } from '../clients/index.js';
-import { HolidayCalendar } from '../hr/index.js';
+import { HolidayCalendar, LeaveDirectory } from '../hr/index.js';
 import { InvoiceDueDates } from '../invoices/index.js';
 import { EngagementDirectory } from '../projects/index.js';
 import { MeetingsService } from './meetings.service.js';
@@ -35,19 +35,21 @@ export class CalendarService {
     private readonly clients: ClientDirectory,
     private readonly invoiceDueDates: InvoiceDueDates,
     private readonly holidays: HolidayCalendar,
+    private readonly leave: LeaveDirectory,
   ) {}
 
   /**
    * Rules 15 and 16: every non-archived shoot and meeting overlapping the Damascus days
    * `[from, to]`, cancelled ones included, and the key dates in the range. `shootType` narrows
-   * the shoots only.
+   * the shoots only. Approved leave (F17 rule B16) follows the person filter; the client and shoot
+   * type filters, which leave has none of, hide it.
    */
   async calendar(actor: CurrentUserInfo, query: CalendarQuery): Promise<Calendar> {
     const start = businessInstant(query.from, '00:00');
     const end = businessInstant(addDays(query.to, 1), '00:00');
     const wanted = (kind: CalendarKind) => !query.kinds || query.kinds.includes(kind);
     const userId = query.userId === 'me' ? actor.id : query.userId;
-    const [shootRows, meetingRows, keyDates] = await Promise.all([
+    const [shootRows, meetingRows, keyDates, leaves] = await Promise.all([
       wanted('shoot')
         ? this.db
             .select()
@@ -99,6 +101,9 @@ export class CalendarService {
             .orderBy(asc(meetings.startsAt), asc(meetings.id))
         : [],
       this.keyDates(actor, query, wanted, userId),
+      wanted('leave') && !query.clientId && !query.shootType
+        ? this.leave.calendar(actor, { from: query.from, to: query.to, userId })
+        : [],
     ]);
     const [shootItems, meetingItems, clients] = await Promise.all([
       this.shootsService.present(shootRows),
@@ -110,6 +115,7 @@ export class CalendarService {
       to: query.to,
       shoots: shootItems,
       meetings: meetingItems,
+      leaves,
       keyDates: keyDates.map(({ clientId, ...keyDate }) => ({
         ...keyDate,
         client: clientId

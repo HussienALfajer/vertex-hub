@@ -231,6 +231,16 @@ export const ERROR_CODES = [
   'INVALID_TIMES',
   'HOLIDAY_OVERLAP',
   'SCHEDULE_NAME_TAKEN',
+  'REQUEST_OVERLAP',
+  'INSUFFICIENT_BALANCE',
+  'ON_PROBATION',
+  'PERMISSION_LIMIT',
+  'TOO_LATE',
+  'NOT_A_WORK_DAY',
+  'NOT_PENDING',
+  'CERTIFICATE_MISSING',
+  'NOT_CANCELLABLE',
+  'ASSIGNEE_ON_LEAVE',
 ] as const;
 
 export const errorCodeSchema = z.enum(ERROR_CODES).meta({ id: 'ErrorCode' });

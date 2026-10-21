@@ -1,11 +1,12 @@
 import { Inject, Injectable, type OnModuleInit } from '@nestjs/common';
 import { OPEN_TASK_STATUSES, type TaskCounts } from '@vertex-hub/contracts';
 import { type Database, type Transaction, tasks } from '@vertex-hub/db';
-import { and, asc, count, eq, inArray, isNull, ne, sql } from 'drizzle-orm';
+import { and, asc, count, eq, gte, inArray, isNull, lte, ne, sql } from 'drizzle-orm';
 import type { PgColumn } from 'drizzle-orm/pg-core';
 import { DATABASE } from '../../core/database/database.module.js';
 import { type AuditActor, recordAudit } from '../audit/index.js';
 import { ResponsibilityRegistry } from '../auth/index.js';
+import { LeaveWorkSources } from '../hr/index.js';
 import { EngagementDirectory, WorkProgress } from '../projects/index.js';
 import { ClientReviewHooks } from './client-review-hooks.js';
 import { PostTaskHooks, unlinkRemovedTask } from './post-task-hooks.js';
@@ -29,7 +30,8 @@ export const cancelledColumns = {
 
 /**
  * What tasks feed into other modules (spec F06, "Links F06 fills in F05" and "Changes to F01"):
- * task counts and the project close hooks for `projects`, and open assigned tasks for `auth`.
+ * task counts and the project close hooks for `projects`, and open assigned tasks for `auth` and
+ * for `hr`'s leave decisions (F17 rule B14).
  */
 @Injectable()
 export class TaskHooksService implements OnModuleInit {
@@ -42,6 +44,7 @@ export class TaskHooksService implements OnModuleInit {
     private readonly reviewHooks: ClientReviewHooks,
     private readonly postHooks: PostTaskHooks,
     private readonly guards: TaskGuards,
+    private readonly leaveWork: LeaveWorkSources,
   ) {}
 
   onModuleInit(): void {
@@ -69,6 +72,22 @@ export class TaskHooksService implements OnModuleInit {
           .orderBy(asc(tasks.dueDate), asc(tasks.title));
         return assigned.map((task) => ({ type: 'assignee_of_open_tasks' as const, ...task }));
       },
+    });
+    // F17 rule B14: the open tasks assigned to an employee and due in a leave's days.
+    this.leaveWork.register(async (executor, userId, range) => {
+      const due = await executor
+        .select({ id: tasks.id, title: tasks.title, date: tasks.dueDate })
+        .from(tasks)
+        .where(
+          and(
+            eq(tasks.assigneeId, userId),
+            inArray(tasks.status, [...OPEN_TASK_STATUSES]),
+            isNull(tasks.archivedAt),
+            gte(tasks.dueDate, range.from),
+            lte(tasks.dueDate, range.to),
+          ),
+        );
+      return due.map((task) => ({ kind: 'task' as const, ...task, startsAt: null }));
     });
   }
 

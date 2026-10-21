@@ -32,7 +32,7 @@ const app = await NestFactory.createApplicationContext(AppModule, { logger: ['er
 try {
   const result = await app.get(HrDailyService).runDaily(date.data);
   process.stdout.write(
-    `Daily HR: ${result.reminded} reminders sent, ${result.archived} accounts archived\n`,
+    `Daily HR: ${result.reminded} reminders sent, ${result.archived} accounts archived, ${result.ledgerRows} leave ledger rows, ${result.leaveNotices} leave notices\n`,
   );
 } finally {
   await app.close();
