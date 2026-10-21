@@ -507,7 +507,19 @@
     "NOT_PENDING": "لم يعد هذا الطلب قيد الانتظار. حدّث الصفحة.",
     "CERTIFICATE_MISSING": "لم يُرفق التقرير الطبي بعد. أكّد الموافقة دونه أو انتظر إرفاقه.",
     "NOT_CANCELLABLE": "لا يمكن إلغاء هذا الطلب: بدأت الإجازة أو حُسم الطلب.",
-    "ASSIGNEE_ON_LEAVE": "المكلّف في إجازة معتمدة يوم الاستحقاق."
+    "ASSIGNEE_ON_LEAVE": "المكلّف في إجازة معتمدة يوم الاستحقاق.",
+    "EXEMPT": "لا يُطلب منك تسجيل الحضور.",
+    "NO_PASSKEY": "سجّل مفتاح الحضور على هاتفك أولًا.",
+    "INVALID_CODE": "انتهت صلاحية الرمز. امسحه من الشاشة مرة أخرى.",
+    "OFF_OFFICE_NETWORK": "اتصل بشبكة Wi‑Fi المكتب ثم أعد المحاولة.",
+    "NOT_REMOTE_DAY": "اليوم ليس يوم عمل عن بُعد لك.",
+    "NOT_ON_SHOOT": "لست ضمن طاقم هذا التصوير، أو ليس الآن وقته.",
+    "LOCATION_REQUIRED": "اسمح للتطبيق بقراءة موقعك لتسجيل الحضور.",
+    "PASSKEY_FAILED": "لم يُتحقق من مفتاح الحضور. أعد المحاولة.",
+    "TICKET_EXPIRED": "انتهت مهلة التأكيد. أعد المحاولة من البداية.",
+    "DUPLICATE_PUNCH": "سُجّلت حركتك قبل لحظات.",
+    "PENDING_EXISTS": "لديك مفتاح جديد ينتظر موافقة المدير العام.",
+    "INVALID_PAIRING_CODE": "رمز الربط غير صحيح أو انتهت صلاحيته."
   },
   "users": {
     "title": "الفريق",
@@ -934,7 +946,10 @@
       "hr_settings": "إعدادات الموارد البشرية",
       "hr_request": "طلب إجازة أو إذن",
       "hr_opinion": "رأي في طلب",
-      "leave_balance": "رصيد إجازات"
+      "leave_balance": "رصيد إجازات",
+      "attendance_passkey": "مفتاح حضور",
+      "attendance_kiosk": "شاشة مدخل",
+      "attendance": "حضور"
     },
     "actions": {
       "user": {
@@ -1320,6 +1335,20 @@
       "leave_balance": {
         "adjusted": "عدّل رصيد إجازة",
         "opening": "سجّل رصيدًا افتتاحيًا"
+      },
+      "attendance_passkey": {
+        "registered": "سجّل مفتاح حضور",
+        "activated": "فعّل مفتاح حضور بديلًا",
+        "revoked": "ألغى مفتاح حضور"
+      },
+      "attendance_kiosk": {
+        "created": "أضاف شاشة مدخل",
+        "pairing_started": "أصدر رمز ربط لشاشة مدخل",
+        "paired": "رُبطت شاشة مدخل",
+        "archived": "فصل شاشة مدخل"
+      },
+      "attendance": {
+        "punch_refused": "رُفضت محاولة تسجيل حضور"
       }
     },
     "fields": {
@@ -8503,7 +8532,8 @@
     "requests": {
       "kinds": {
         "leave": "إجازة",
-        "permission": "إذن مغادرة"
+        "permission": "إذن مغادرة",
+        "passkey_replacement": "مفتاح حضور بديل"
       },
       "statuses": {
         "pending": "قيد الانتظار",

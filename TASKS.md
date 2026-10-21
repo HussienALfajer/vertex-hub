@@ -41,3 +41,21 @@ Parts A → B → C → D, each accepted by the owner before the next starts (sp
 - [x] request page `/hr/requests/:id` (details, opinions, overlapping work, documents); `/hr` opens the first HR page the user can use; nav: My attendance, HR › Requests
 - [x] E2E: `f17-leave.spec.ts` (employee, GM, department manager), screenshots in both themes; mocks in `fixtures.ts`
 - [x] checks, reviewer, acceptance (spec step 5; owner 2026-10-22), PR with auto-merge, `docs/ROADMAP.md`
+
+## PR C1 — attendance core: contracts, db, api
+- [x] contracts: `attendance.ts` (passkey, kiosk, punch options and punch, day, my today, greeting); pure functions with unit tests: the day computation (rules C15, C16), the midnight rule and next direction, the code and window check (C5), the office address rule (IPv4 equal, IPv6 /64; C6), the greeting's part of day; `attendanceStartsOn` in `hrSettingsSchema` (C1); request kind `passkey_replacement` (texts in `messages`); error codes `EXEMPT`, `NO_PASSKEY`, `INVALID_CODE`, `OFF_OFFICE_NETWORK`, `NOT_REMOTE_DAY`, `NOT_ON_SHOOT`, `LOCATION_REQUIRED`, `PASSKEY_FAILED`, `TICKET_EXPIRED`, `DUPLICATE_PUNCH`, `PENDING_EXISTS`, `INVALID_PAIRING_CODE`; audit actions and entity types; `ar.json` keys
+- [x] db (`/db-migration`): `attendance_passkeys`, `attendance_kiosks`, `attendance_punches`, `attendance_days` (`schema/attendance.ts`, owner `hr`); `hr_settings.attendance_starts_on`; request kind `passkey_replacement` (its check compares `kind::text`: a new enum value cannot be used in its own transaction)
+- [x] api `hr`: SimpleWebAuthn dependency; passkeys register, replacement request, revoke (C3, C9); kiosks create, pairing code, archive, `/api/kiosk/pair` (rate-limited in nginx), `/api/kiosk/stream` SSE with greetings through `pg_notify` (C4, C5, C20); punch options and punch for office, remote, field and shoot (C6–C8, C11, C13) with `attendance.punch_refused`; the greeting (C20, moved here from C2: the punch returns it); days created and finalized by `hr.daily`, recomputed on punches, leave, holidays, the start date and the file's schedule, exemption, start and remote days (C14); `GET /attendance/me/today`, `GET /attendance/days`; trial mode (C1); `AttendanceShoots` registry filled by `calendar`; tests in `test/hr-attendance.test.ts`; nginx locations for the pairing and the stream
+- [x] bridge: `openapi:export`, `api:generate`; web typecheck (the settings form keeps the stored start date until C3 adds its field)
+- [x] checks, reviewer (7 findings fixed; the midnight rule C15 settled by the owner 2026-10-22: before 06:00), acceptance (API at `/api/docs`, owner 2026-10-22), PR with auto-merge
+
+## PR C2 — attendance decisions: contracts, db, api
+- [ ] contracts and db: `attendance_items`; request kinds `remote_day` and `correction`; `decideItemSchema`, item list query and page, today board; the lateness tier lookup (moved here from C1: items are its first use); error codes `INVALID_DECISION`, `NOT_FIELD`; notification types of part C
+- [ ] api `hr`: items raised by the day computation, justification, decision with the overtime credit (C17, C18); corrections and remote days (C19; an approved remote day sets the day's place and allows remote punches); field review (C12); reminders and screen offline in the F16 minute job (C21, C22), `shoot_check_in_missing`; `GET /attendance/today`; opinions on items; tests
+- [ ] bridge; checks, reviewer, acceptance, PR with auto-merge
+
+## PR C3 — attendance screens: web and E2E
+- [ ] `/kiosk` entrance screen; My attendance Today card, scanner, passkey setup, This month; HR settings: start date and Entrance screens; request dialog for remote days and corrections; the field punch's optional task or meeting (`field_task_id`, `field_meeting_id`: the columns exist, the API takes them with the picker); WebAuthn needs a domain, so local checks use `localhost`, not `127.0.0.1`
+- [ ] Today `/hr/today`; Approvals with items; employee file Attendance tab and passkey state; People passkey column
+- [ ] E2E: `f17-attendance.spec.ts`, screenshots in both themes; mocks in `fixtures.ts`
+- [ ] checks, reviewer, acceptance (spec steps 1, 3, 4, 6; on a phone after deploy), PR with auto-merge, `docs/ROADMAP.md`

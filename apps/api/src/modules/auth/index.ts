@@ -16,6 +16,7 @@ export {
   type ResponsibilityCheck,
   ResponsibilityRegistry,
 } from './responsibility-registry.js';
+export { clientIpOf } from './session-activity.js';
 export {
   type Mailbox,
   type PeopleSources,

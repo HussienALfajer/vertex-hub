@@ -112,6 +112,32 @@ server {
         gzip off;
     }
 
+    # Entrance screens (F17 rule C4): pairing is anonymous and sets the screen's cookie, so the
+    # tight limit, answered with 429.
+    location = /api/kiosk/pair {
+        limit_req zone=vhsignin burst=5 nodelay;
+        limit_req_status 429;
+        proxy_pass http://127.0.0.1:3050;
+        include snippets/vertexhub-proxy.conf;
+    }
+
+    # The entrance screen's stream (F17 rule C5): Server-Sent Events, as the notifications stream.
+    location = /api/kiosk/stream {
+        limit_conn vhstream 60;
+        proxy_pass http://127.0.0.1:3050;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header Connection "";
+        proxy_hide_header X-Powered-By;
+        proxy_buffering off;
+        proxy_cache off;
+        proxy_read_timeout 20m;
+        gzip off;
+    }
+
     # File uploads (F10, ADR 0019): up to 250 MB on this route only, streamed to the API as they
     # arrive (it hashes and stores them on the way), with timeouts for slow links. The proxy
     # snippet is not included because it sets its own read timeout; its headers are repeated.

@@ -14,6 +14,10 @@ import {
   announcementTemplates,
   approvalItems,
   approvalRequests,
+  attendanceDays,
+  attendanceKiosks,
+  attendancePasskeys,
+  attendancePunches,
   auditEntries,
   catalogPackageItems,
   catalogPackages,
@@ -37,6 +41,7 @@ import {
   fileVersions,
   hrOpinions,
   hrRequests,
+  hrSettings,
   invoiceLines,
   invoices,
   leadInterests,
@@ -262,11 +267,39 @@ export async function removeUsers(db: Database, ids: string[]): Promise<void> {
     ) as SQL,
   );
   await db.delete(fileUploads).where(inArray(fileUploads.userId, ids));
+  // F17 part C: their punches, days and passkeys, and the entrance screens they created.
+  const kioskIds = (
+    await db
+      .select({ id: attendanceKiosks.id })
+      .from(attendanceKiosks)
+      .where(inArray(attendanceKiosks.createdById, ids))
+  ).map((row) => row.id);
+  await db
+    .delete(attendancePunches)
+    .where(
+      or(
+        inArray(attendancePunches.userId, ids),
+        inArray(attendancePunches.kioskId, kioskIds),
+        inArray(attendancePunches.requestId, requestIds),
+      ),
+    );
+  await db.delete(attendanceDays).where(inArray(attendanceDays.userId, ids));
+  await db
+    .delete(attendancePasskeys)
+    .where(
+      or(inArray(attendancePasskeys.userId, ids), inArray(attendancePasskeys.decidedById, ids)),
+    );
+  await db.delete(attendanceKiosks).where(inArray(attendanceKiosks.id, kioskIds));
   // F17: the employee file and salary history of each user, and the changes they recorded.
   await db
     .delete(salaryChanges)
     .where(or(inArray(salaryChanges.userId, ids), inArray(salaryChanges.createdById, ids)));
   await db.delete(employeeFiles).where(inArray(employeeFiles.userId, ids));
+  // The HR settings remember who saved them last.
+  await db
+    .update(hrSettings)
+    .set({ updatedById: null })
+    .where(inArray(hrSettings.updatedById, ids));
   await db
     .delete(hrOpinions)
     .where(or(inArray(hrOpinions.requestId, requestIds), inArray(hrOpinions.authorId, ids)));
@@ -405,6 +438,7 @@ export async function removeShoots(db: Database, ids: string[]): Promise<void> {
   await db.delete(auditEntries).where(inArray(auditEntries.entityId, unique));
   await db.delete(notifications).where(inArray(notifications.subjectId, unique));
   await db.delete(notificationReminders).where(inArray(notificationReminders.subjectId, unique));
+  await db.delete(attendancePunches).where(inArray(attendancePunches.shootId, unique));
   await db.delete(shootShots).where(inArray(shootShots.shootId, unique));
   await db.delete(shootCrew).where(inArray(shootCrew.shootId, unique));
   await db.delete(shoots).where(inArray(shoots.id, unique));

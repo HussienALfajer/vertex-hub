@@ -1,5 +1,6 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import {
+  businessDate,
   type CreateWorkSchedule,
   scheduleTimesValid,
   type UpdateWorkSchedule,
@@ -21,6 +22,8 @@ import { DATABASE } from '../../core/database/database.module.js';
 import { CodedException } from '../../core/errors/index.js';
 import { type AuditActor, changedFields, recordAudit } from '../audit/index.js';
 import type { CurrentUserInfo } from '../auth/index.js';
+import { AttendanceDays } from './attendance-days.js';
+import { lockLeave } from './leave-ledger.js';
 
 type Executor = Database | Transaction;
 
@@ -38,7 +41,10 @@ const timeOfDay = (value: string) => value.slice(0, 5);
  */
 @Injectable()
 export class WorkSchedulesService {
-  constructor(@Inject(DATABASE) private readonly db: Database) {}
+  constructor(
+    @Inject(DATABASE) private readonly db: Database,
+    private readonly attendanceDays: AttendanceDays,
+  ) {}
 
   /** The non-archived schedules, the default first, then by name. */
   async list(): Promise<WorkScheduleList> {
@@ -79,6 +85,15 @@ export class WorkSchedulesService {
     input: UpdateWorkSchedule,
   ): Promise<WorkSchedule> {
     const row = await this.db.transaction(async (tx) => {
+      // The HR locks of the people on it before the schedule's row, as a file edit takes them.
+      const userIds = (
+        await tx
+          .select({ userId: employeeFiles.userId })
+          .from(employeeFiles)
+          .where(and(eq(employeeFiles.scheduleId, id), isNull(employeeFiles.archivedAt)))
+          .orderBy(asc(employeeFiles.userId))
+      ).map((file) => file.userId);
+      for (const userId of userIds) await lockLeave(tx, userId);
       const [current] = await tx
         .select()
         .from(workSchedules)
@@ -116,6 +131,12 @@ export class WorkSchedulesService {
       if (changes.after.days) {
         await tx.delete(workScheduleDays).where(eq(workScheduleDays.scheduleId, id));
         await this.writeDays(tx, id, changes.after.days);
+      }
+      // Rule B2 and edge case 10: today's day takes the new hours while it has no punch.
+      if (changes.after.days || changes.after.kind) {
+        for (const userId of userIds) {
+          await this.attendanceDays.refresh(tx, userId, [businessDate()], { refreeze: true });
+        }
       }
       await recordAudit(tx, {
         actor: actorOf(actor),

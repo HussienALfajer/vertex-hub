@@ -50,6 +50,8 @@ import { type AuditActor, recordAudit } from '../audit/index.js';
 import { type CurrentUserInfo, UserDirectory, UserLifecycle } from '../auth/index.js';
 import { FileVersions } from '../files/index.js';
 import { NotificationCenter } from '../notifications/index.js';
+import { AttendanceDays } from './attendance-days.js';
+import { AttendancePasskeys } from './attendance-passkeys.js';
 import { holdsAll } from './employee-access.js';
 import { HrScope, reaches } from './hr-scope.js';
 import { HrSettingsService } from './hr-settings.service.js';
@@ -133,6 +135,8 @@ export class HrRequestsService implements OnModuleInit {
     private readonly context: LeaveContext,
     private readonly ledger: LeaveLedger,
     private readonly work: LeaveWorkSources,
+    private readonly passkeys: AttendancePasskeys,
+    private readonly days: AttendanceDays,
   ) {}
 
   onModuleInit(): void {
@@ -155,6 +159,7 @@ export class HrRequestsService implements OnModuleInit {
           });
           await this.resolveSubmitted(tx, row.id, 'void', actor?.id ?? null);
         }
+        await this.passkeys.revokePending(tx, userId, actor ?? null, null);
       },
     });
   }
@@ -224,12 +229,94 @@ export class HrRequestsService implements OnModuleInit {
           after: { status: 'approved', recordedByApprover: true },
         });
         if (row.userId !== actor.id) await this.notifyDecided(tx, row, 'approved', actor.id);
+        await this.refreshDays(tx, row);
       } else {
         await this.notifySubmitted(tx, row);
       }
       return row.id;
     });
     return this.one(id);
+  }
+
+  /**
+   * Rule C9: registering a passkey while one is active asks the General Manager to approve the
+   * new one; a holder of `hr.approve` gets it approved at once ("Roles and access"). Called in
+   * the registration's transaction, under the user's lock.
+   */
+  async createPasskeyReplacement(tx: Transaction, actor: CurrentUserInfo): Promise<void> {
+    const today = businessDate();
+    const approvedAtOnce = holdsAll(actor, 'hr.approve');
+    const now = new Date();
+    const [row] = await tx
+      .insert(hrRequests)
+      .values({
+        userId: actor.id,
+        kind: 'passkey_replacement',
+        startsOn: today,
+        endsOn: today,
+        status: approvedAtOnce ? 'approved' : 'pending',
+        createdById: actor.id,
+        ...(approvedAtOnce && { decidedById: actor.id, decidedAt: now }),
+      })
+      .returning();
+    if (!row) throw new Error('Request insert returned no row');
+    await recordAudit(tx, {
+      actor: actorOf(actor),
+      action: 'hr_request.created',
+      entityType: 'hr_request',
+      entityId: row.id,
+      after: auditFields(row),
+    });
+    if (!approvedAtOnce) {
+      await this.notifySubmitted(tx, row);
+      return;
+    }
+    await this.passkeys.activatePending(tx, actor.id, actorOf(actor));
+    await recordAudit(tx, {
+      actor: actorOf(actor),
+      action: 'hr_request.approved',
+      entityType: 'hr_request',
+      entityId: row.id,
+      before: { status: 'pending' },
+      after: { status: 'approved', recordedByApprover: true },
+    });
+  }
+
+  /** `hr.approve` revoked the pending passkey: its replacement request is cancelled. */
+  async cancelPasskeyReplacement(
+    tx: Transaction,
+    userId: string,
+    actor: CurrentUserInfo,
+    note: string,
+  ): Promise<void> {
+    const pending = await tx
+      .update(hrRequests)
+      .set({
+        status: 'cancelled',
+        decidedById: actor.id,
+        decidedAt: new Date(),
+        decisionNote: note,
+      })
+      .where(
+        and(
+          eq(hrRequests.userId, userId),
+          eq(hrRequests.kind, 'passkey_replacement'),
+          eq(hrRequests.status, 'pending'),
+        ),
+      )
+      .returning();
+    for (const row of pending) {
+      await recordAudit(tx, {
+        actor: actorOf(actor),
+        action: 'hr_request.cancelled',
+        entityType: 'hr_request',
+        entityId: row.id,
+        before: { status: 'pending' },
+        after: { status: 'cancelled', note },
+      });
+      await this.resolveSubmitted(tx, row.id, 'void', actor.id);
+      await this.notifyDecided(tx, row, 'cancelled', actor.id);
+    }
   }
 
   /** `GET /requests`: one's own, and those `hr.read` covers. */
@@ -335,6 +422,9 @@ export class HrRequestsService implements OnModuleInit {
           before: { status: 'pending' },
           after: { status: 'rejected', note: input.note },
         });
+        if (current.kind === 'passkey_replacement') {
+          await this.passkeys.revokePending(tx, current.userId, actorOf(actor), input.note ?? null);
+        }
         await this.resolveSubmitted(tx, id, 'done', actor.id);
         await this.notifyDecided(tx, current, 'rejected', actor.id);
         return;
@@ -378,6 +468,10 @@ export class HrRequestsService implements OnModuleInit {
         .returning();
       if (!approved) throw new NotFoundException();
       await this.syncTaken(tx, approved, actor.id);
+      if (approved.kind === 'passkey_replacement') {
+        await this.passkeys.activatePending(tx, approved.userId, actorOf(actor));
+      }
+      await this.refreshDays(tx, approved);
       await recordAudit(tx, {
         actor: actorOf(actor),
         action: 'hr_request.approved',
@@ -428,6 +522,10 @@ export class HrRequestsService implements OnModuleInit {
       if (current.status === 'approved') {
         // The days before today were taken; the rest return to the balance.
         await this.syncTaken(tx, cancelled, actor.id, today);
+        await this.refreshDays(tx, cancelled);
+      }
+      if (current.kind === 'passkey_replacement') {
+        await this.passkeys.revokePending(tx, current.userId, actorOf(actor), input.note ?? null);
       }
       await recordAudit(tx, {
         actor: actorOf(actor),
@@ -500,9 +598,19 @@ export class HrRequestsService implements OnModuleInit {
         ),
       )
       .orderBy(asc(hrRequests.id));
+    // Every user this touches (leave owners and those with attendance days on the dates) is
+    // locked first, in user-id order, as every writer that locks several users does.
+    const dayUsers = new Map<CalendarDate[], string[]>();
+    for (const range of ranges) {
+      const dates: CalendarDate[] = [];
+      for (let date = range.startsOn; date <= range.endsOn; date = addDays(date, 1)) {
+        dates.push(date);
+      }
+      dayUsers.set(dates, await this.days.usersWithDays(tx, range.startsOn, range.endsOn));
+    }
+    const touched = new Set([...rows.map((row) => row.userId), ...[...dayUsers.values()].flat()]);
+    for (const userId of [...touched].sort()) await lockLeave(tx, userId);
     for (const found of rows) {
-      // The user's lock before the row's, as everywhere: the balances hold until commit.
-      await lockLeave(tx, found.userId);
       const row = await this.locked(tx, found.id);
       if (!row.leaveType || (row.status !== 'pending' && row.status !== 'approved')) continue;
       const counted = await this.countLeave(tx, row.userId, {
@@ -544,6 +652,10 @@ export class HrRequestsService implements OnModuleInit {
         before: { days: row.days, paidDays: row.paidDays, unpaidDays: row.unpaidDays },
         after: next,
       });
+    }
+    // Rule C14: the attendance days of those dates become holidays or work days again.
+    for (const [dates, userIds] of dayUsers) {
+      for (const userId of userIds) await this.days.refresh(tx, userId, dates);
     }
   }
 
@@ -770,6 +882,8 @@ export class HrRequestsService implements OnModuleInit {
       .where(
         and(
           eq(hrRequests.userId, userId),
+          // A passkey replacement is dated, but takes no time off.
+          inArray(hrRequests.kind, ['leave', 'permission']),
           inArray(hrRequests.status, [...LIVE_STATUSES]),
           isNull(hrRequests.archivedAt),
           lte(hrRequests.startsOn, span.endsOn),
@@ -811,6 +925,14 @@ export class HrRequestsService implements OnModuleInit {
       paid,
       actorId,
     );
+  }
+
+  /** Rule C14: the attendance days a leave or permission covers are recomputed. */
+  private async refreshDays(tx: Transaction, row: RequestRow): Promise<void> {
+    if (row.kind !== 'leave' && row.kind !== 'permission') return;
+    const dates: CalendarDate[] = [];
+    for (let date = row.startsOn; date <= row.endsOn; date = addDays(date, 1)) dates.push(date);
+    await this.days.refresh(tx, row.userId, dates);
   }
 
   /** The employee of a request, read before taking their lock; 404 when there is none. */
@@ -967,6 +1089,8 @@ export class HrRequestsService implements OnModuleInit {
 /** Rule B15. */
 function cancellable(actor: CurrentUserInfo, row: RequestRow, today: CalendarDate): boolean {
   if (row.status !== 'pending' && row.status !== 'approved') return false;
+  // Rule C9: an approved replacement has swapped the passkeys; revoking one is its own action.
+  if (row.kind === 'passkey_replacement' && row.status === 'approved') return false;
   if (holdsAll(actor, 'hr.approve')) return true;
   if (row.userId !== actor.id) return false;
   return row.status === 'pending' || row.startsOn > today;

@@ -241,6 +241,18 @@ export const ERROR_CODES = [
   'CERTIFICATE_MISSING',
   'NOT_CANCELLABLE',
   'ASSIGNEE_ON_LEAVE',
+  'EXEMPT',
+  'NO_PASSKEY',
+  'INVALID_CODE',
+  'OFF_OFFICE_NETWORK',
+  'NOT_REMOTE_DAY',
+  'NOT_ON_SHOOT',
+  'LOCATION_REQUIRED',
+  'PASSKEY_FAILED',
+  'TICKET_EXPIRED',
+  'DUPLICATE_PUNCH',
+  'PENDING_EXISTS',
+  'INVALID_PAIRING_CODE',
 ] as const;
 
 export const errorCodeSchema = z.enum(ERROR_CODES).meta({ id: 'ErrorCode' });

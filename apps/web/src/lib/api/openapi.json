@@ -8626,6 +8626,446 @@
         ]
       }
     },
+    "/api/hr/attendance/me/today": {
+      "get": {
+        "operationId": "HrAttendanceController_today",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "My day: expectations, punches, the next direction and the methods offered now",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyAttendanceToday"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "hr"
+        ]
+      }
+    },
+    "/api/hr/attendance/days": {
+      "get": {
+        "operationId": "HrAttendanceController_days",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "me",
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "me"
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "name": "month",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-(0[1-9]|1[0-2])$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A month's days with their punches: one's own, or `hr.read` in scope; 404",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttendanceDayList"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "hr"
+        ]
+      }
+    },
+    "/api/hr/attendance/punch/options": {
+      "post": {
+        "operationId": "HrAttendanceController_punchOptions",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PunchOptionsInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The place checked; the passkey challenge in a ticket valid 60 seconds",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebAuthnChallenge"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "hr"
+        ]
+      }
+    },
+    "/api/hr/attendance/punch": {
+      "post": {
+        "operationId": "HrAttendanceController_punch",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PunchInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The punch, the recomputed day and the greeting",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PunchResult"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "hr"
+        ]
+      }
+    },
+    "/api/hr/passkeys/options": {
+      "post": {
+        "operationId": "HrAttendanceController_passkeyOptions",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The registration challenge in a ticket valid 60 seconds",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebAuthnChallenge"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "hr"
+        ]
+      }
+    },
+    "/api/hr/passkeys": {
+      "post": {
+        "operationId": "HrAttendanceController_registerPasskey",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterPasskey"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The passkey: active, or pending the General Manager when one is active",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttendancePasskey"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "hr"
+        ]
+      },
+      "get": {
+        "operationId": "HrAttendanceController_passkeysOf",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A person's passkeys, newest first; empty outside the scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttendancePasskeyList"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "hr"
+        ]
+      }
+    },
+    "/api/hr/passkeys/me": {
+      "get": {
+        "operationId": "HrAttendanceController_myPasskeys",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "My passkeys, newest first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttendancePasskeyList"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "hr"
+        ]
+      }
+    },
+    "/api/hr/passkeys/{id}/revoke": {
+      "post": {
+        "operationId": "HrAttendanceController_revokePasskey",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RevokePasskey"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The revoked passkey",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttendancePasskey"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "hr"
+        ]
+      }
+    },
+    "/api/hr/kiosks": {
+      "get": {
+        "operationId": "HrAttendanceController_listKiosks",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The entrance screens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttendanceKioskList"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "hr"
+        ]
+      },
+      "post": {
+        "operationId": "HrAttendanceController_createKiosk",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAttendanceKiosk"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The new screen with its pairing code, shown once (15 minutes)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttendanceKioskPairing"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "hr"
+        ]
+      }
+    },
+    "/api/hr/kiosks/{id}/pairing-code": {
+      "post": {
+        "operationId": "HrAttendanceController_kioskPairingCode",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A new pairing code; the screen is unpaired until it is used",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttendanceKioskPairing"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "hr"
+        ]
+      }
+    },
+    "/api/hr/kiosks/{id}/archive": {
+      "post": {
+        "operationId": "HrAttendanceController_archiveKiosk",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The screen, unpaired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttendanceKiosk"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "hr"
+        ]
+      }
+    },
+    "/api/kiosk/pair": {
+      "post": {
+        "operationId": "KioskController_pair",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PairKiosk"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Paired; sets the `vh_kiosk` cookie",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PairedKiosk"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "hr"
+        ]
+      }
+    },
+    "/api/kiosk/stream": {
+      "get": {
+        "operationId": "KioskController_openStream",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "`kiosk`, `code` and `greeting` events; 401 without a paired screen",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "hr"
+        ]
+      }
+    },
     "/api/content/calendar": {
       "get": {
         "operationId": "ContentController_calendar",
@@ -18076,7 +18516,10 @@
           "hr_settings",
           "hr_request",
           "hr_opinion",
-          "leave_balance"
+          "leave_balance",
+          "attendance_passkey",
+          "attendance_kiosk",
+          "attendance"
         ]
       },
       "AuditAction": {
@@ -18349,7 +18792,15 @@
           "hr_opinion.created",
           "leave_balance.adjusted",
           "leave_balance.opening",
-          "task.leave_accepted"
+          "task.leave_accepted",
+          "attendance_passkey.registered",
+          "attendance_passkey.activated",
+          "attendance_passkey.revoked",
+          "attendance_kiosk.created",
+          "attendance_kiosk.pairing_started",
+          "attendance_kiosk.paired",
+          "attendance_kiosk.archived",
+          "attendance.punch_refused"
         ]
       },
       "AuditPage": {
@@ -43014,7 +43465,8 @@
         "type": "string",
         "enum": [
           "leave",
-          "permission"
+          "permission",
+          "passkey_replacement"
         ]
       },
       "LeaveType": {
@@ -53570,6 +54022,12 @@
       "HrSettings": {
         "type": "object",
         "properties": {
+          "attendanceStartsOn": {
+            "nullable": true,
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+          },
           "graceMinutes": {
             "type": "integer",
             "minimum": 0,
@@ -53653,6 +54111,7 @@
           }
         },
         "required": [
+          "attendanceStartsOn",
           "graceMinutes",
           "latenessTiers",
           "firstLatenessWarning",
@@ -54630,6 +55089,872 @@
           "requestId",
           "body"
         ]
+      },
+      "MyAttendanceToday": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+          },
+          "exemption": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AttendanceExemption"
+              }
+            ]
+          },
+          "trial": {
+            "type": "boolean"
+          },
+          "passkey": {
+            "type": "object",
+            "properties": {
+              "active": {
+                "type": "boolean"
+              },
+              "pending": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "active",
+              "pending"
+            ],
+            "additionalProperties": false
+          },
+          "day": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AttendanceDay"
+              }
+            ]
+          },
+          "nextDirection": {
+            "$ref": "#/components/schemas/PunchDirection"
+          },
+          "methods": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SelfPunchMethod"
+            }
+          },
+          "shoots": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PunchableShoot"
+            }
+          }
+        },
+        "required": [
+          "date",
+          "exemption",
+          "trial",
+          "passkey",
+          "day",
+          "nextDirection",
+          "methods",
+          "shoots"
+        ],
+        "additionalProperties": false
+      },
+      "AttendanceExemption": {
+        "type": "string",
+        "enum": [
+          "exempt",
+          "not_started",
+          "ended"
+        ]
+      },
+      "AttendanceDay": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "userId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "date": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/AttendanceDayKind"
+          },
+          "expectedStart": {
+            "nullable": true,
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          },
+          "latestStart": {
+            "nullable": true,
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          },
+          "expectedEnd": {
+            "nullable": true,
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          },
+          "requiredMinutes": {
+            "nullable": true,
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "place": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AttendancePlace"
+              }
+            ]
+          },
+          "leave": {
+            "$ref": "#/components/schemas/DayLeave"
+          },
+          "firstInAt": {
+            "nullable": true,
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          },
+          "lastOutAt": {
+            "nullable": true,
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          },
+          "workedMinutes": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "lateMinutes": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "earlyMinutes": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "overtimeMinutes": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "status": {
+            "$ref": "#/components/schemas/AttendanceDayStatus"
+          },
+          "punches": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AttendancePunch"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "userId",
+          "date",
+          "kind",
+          "expectedStart",
+          "latestStart",
+          "expectedEnd",
+          "requiredMinutes",
+          "place",
+          "leave",
+          "firstInAt",
+          "lastOutAt",
+          "workedMinutes",
+          "lateMinutes",
+          "earlyMinutes",
+          "overtimeMinutes",
+          "status",
+          "punches"
+        ],
+        "additionalProperties": false
+      },
+      "AttendanceDayKind": {
+        "type": "string",
+        "enum": [
+          "work",
+          "off",
+          "holiday"
+        ]
+      },
+      "AttendancePlace": {
+        "type": "string",
+        "enum": [
+          "office",
+          "remote"
+        ]
+      },
+      "DayLeave": {
+        "type": "string",
+        "enum": [
+          "none",
+          "full",
+          "first_half",
+          "second_half"
+        ]
+      },
+      "AttendanceDayStatus": {
+        "type": "string",
+        "enum": [
+          "upcoming",
+          "in_progress",
+          "present",
+          "partial",
+          "absent",
+          "leave",
+          "holiday",
+          "off",
+          "trial"
+        ]
+      },
+      "AttendancePunch": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "direction": {
+            "$ref": "#/components/schemas/PunchDirection"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          },
+          "method": {
+            "$ref": "#/components/schemas/PunchMethod"
+          },
+          "kioskName": {
+            "nullable": true,
+            "type": "string"
+          },
+          "latitude": {
+            "nullable": true,
+            "type": "number"
+          },
+          "longitude": {
+            "nullable": true,
+            "type": "number"
+          },
+          "accuracyM": {
+            "nullable": true,
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "fieldNote": {
+            "nullable": true,
+            "type": "string"
+          },
+          "shoot": {
+            "nullable": true,
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "title": {
+                "type": "string"
+              },
+              "location": {
+                "type": "string"
+              },
+              "mapUrl": {
+                "nullable": true,
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "title",
+              "location",
+              "mapUrl"
+            ],
+            "additionalProperties": false
+          },
+          "fieldReview": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/FieldReview"
+              }
+            ]
+          },
+          "archivedAt": {
+            "nullable": true,
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          }
+        },
+        "required": [
+          "id",
+          "direction",
+          "at",
+          "method",
+          "kioskName",
+          "latitude",
+          "longitude",
+          "accuracyM",
+          "fieldNote",
+          "shoot",
+          "fieldReview",
+          "archivedAt"
+        ],
+        "additionalProperties": false
+      },
+      "PunchDirection": {
+        "type": "string",
+        "enum": [
+          "in",
+          "out"
+        ]
+      },
+      "PunchMethod": {
+        "type": "string",
+        "enum": [
+          "office",
+          "remote",
+          "field",
+          "shoot",
+          "correction"
+        ]
+      },
+      "FieldReview": {
+        "type": "string",
+        "enum": [
+          "accepted",
+          "rejected"
+        ]
+      },
+      "SelfPunchMethod": {
+        "type": "string",
+        "enum": [
+          "office",
+          "remote",
+          "field",
+          "shoot"
+        ]
+      },
+      "PunchableShoot": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "title": {
+            "type": "string"
+          },
+          "startsAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          },
+          "endsAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          },
+          "location": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "startsAt",
+          "endsAt",
+          "location"
+        ],
+        "additionalProperties": false
+      },
+      "AttendanceDayList": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AttendanceDay"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "additionalProperties": false
+      },
+      "PunchOptionsInput": {
+        "type": "object",
+        "properties": {
+          "method": {
+            "$ref": "#/components/schemas/SelfPunchMethod"
+          },
+          "code": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "shootId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "latitude": {
+            "type": "number",
+            "minimum": -90,
+            "maximum": 90
+          },
+          "longitude": {
+            "type": "number",
+            "minimum": -180,
+            "maximum": 180
+          },
+          "accuracyM": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000000
+          }
+        },
+        "required": [
+          "method"
+        ]
+      },
+      "WebAuthnChallenge": {
+        "type": "object",
+        "properties": {
+          "ticket": {
+            "type": "string"
+          },
+          "options": {
+            "type": "object",
+            "additionalProperties": {}
+          }
+        },
+        "required": [
+          "ticket",
+          "options"
+        ],
+        "additionalProperties": false
+      },
+      "PunchInput": {
+        "type": "object",
+        "properties": {
+          "ticket": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          },
+          "assertion": {
+            "type": "object",
+            "additionalProperties": {}
+          },
+          "fieldNote": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "ticket",
+          "assertion"
+        ]
+      },
+      "PunchResult": {
+        "type": "object",
+        "properties": {
+          "punch": {
+            "$ref": "#/components/schemas/AttendancePunch"
+          },
+          "day": {
+            "$ref": "#/components/schemas/AttendanceDay"
+          },
+          "greeting": {
+            "$ref": "#/components/schemas/AttendanceGreeting"
+          }
+        },
+        "required": [
+          "punch",
+          "day",
+          "greeting"
+        ],
+        "additionalProperties": false
+      },
+      "AttendanceGreeting": {
+        "type": "object",
+        "properties": {
+          "direction": {
+            "$ref": "#/components/schemas/PunchDirection"
+          },
+          "firstName": {
+            "type": "string"
+          },
+          "partOfDay": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PartOfDay"
+              }
+            ]
+          },
+          "tasksDueToday": {
+            "nullable": true,
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "firstEventAt": {
+            "nullable": true,
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          },
+          "workedMinutes": {
+            "nullable": true,
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "direction",
+          "firstName",
+          "partOfDay",
+          "tasksDueToday",
+          "firstEventAt",
+          "workedMinutes"
+        ],
+        "additionalProperties": false
+      },
+      "PartOfDay": {
+        "type": "string",
+        "enum": [
+          "morning",
+          "afternoon",
+          "evening"
+        ]
+      },
+      "RegisterPasskey": {
+        "type": "object",
+        "properties": {
+          "ticket": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          },
+          "response": {
+            "type": "object",
+            "additionalProperties": {}
+          }
+        },
+        "required": [
+          "ticket",
+          "response"
+        ]
+      },
+      "AttendancePasskey": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "user": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ],
+            "additionalProperties": false
+          },
+          "deviceLabel": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/PasskeyStatus"
+          },
+          "decidedBy": {
+            "nullable": true,
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ],
+            "additionalProperties": false
+          },
+          "decidedAt": {
+            "nullable": true,
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          }
+        },
+        "required": [
+          "id",
+          "user",
+          "deviceLabel",
+          "status",
+          "decidedBy",
+          "decidedAt",
+          "createdAt"
+        ],
+        "additionalProperties": false
+      },
+      "PasskeyStatus": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "active",
+          "revoked"
+        ]
+      },
+      "AttendancePasskeyList": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AttendancePasskey"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "additionalProperties": false
+      },
+      "RevokePasskey": {
+        "type": "object",
+        "properties": {
+          "note": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "note"
+        ]
+      },
+      "AttendanceKioskList": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AttendanceKiosk"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "additionalProperties": false
+      },
+      "AttendanceKiosk": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "name": {
+            "type": "string"
+          },
+          "paired": {
+            "type": "boolean"
+          },
+          "pairingExpiresAt": {
+            "nullable": true,
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          },
+          "lastSeenAt": {
+            "nullable": true,
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          },
+          "lastIpAddress": {
+            "nullable": true,
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          },
+          "archivedAt": {
+            "nullable": true,
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "paired",
+          "pairingExpiresAt",
+          "lastSeenAt",
+          "lastIpAddress",
+          "createdAt",
+          "archivedAt"
+        ],
+        "additionalProperties": false
+      },
+      "CreateAttendanceKiosk": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "AttendanceKioskPairing": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "name": {
+            "type": "string"
+          },
+          "paired": {
+            "type": "boolean"
+          },
+          "pairingExpiresAt": {
+            "nullable": true,
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          },
+          "lastSeenAt": {
+            "nullable": true,
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          },
+          "lastIpAddress": {
+            "nullable": true,
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          },
+          "archivedAt": {
+            "nullable": true,
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          },
+          "pairingCode": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "paired",
+          "pairingExpiresAt",
+          "lastSeenAt",
+          "lastIpAddress",
+          "createdAt",
+          "archivedAt",
+          "pairingCode"
+        ],
+        "additionalProperties": false
+      },
+      "PairKiosk": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "pattern": "^[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{8}$"
+          }
+        },
+        "required": [
+          "code"
+        ]
+      },
+      "PairedKiosk": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "additionalProperties": false
       },
       "PostPlatform": {
         "type": "string",

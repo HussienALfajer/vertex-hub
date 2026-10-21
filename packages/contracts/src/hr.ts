@@ -615,6 +615,8 @@ const minutesSetting = (min: number, max: number) => z.number().int().min(min).m
 /** The HR settings, one row (spec, `hr_settings`); read with `hr.read`, set with `hr.manage`. */
 export const hrSettingsSchema = z
   .object({
+    /** Rule C1: attendance runs in trial until this date; null keeps it in trial. */
+    attendanceStartsOn: calendarDateSchema.nullable(),
     graceMinutes: minutesSetting(0, 120),
     latenessTiers: z
       .array(latenessTierSchema)
@@ -643,11 +645,11 @@ export type HrSettings = z.infer<typeof hrSettingsSchema>;
 
 /*
  * Part B: leave (rules B4–B18). Requests of kind `leave` and `permission`, the leave balance
- * ledger and the opinions on requests. Remote days, corrections and passkey replacements arrive
- * with part C.
+ * ledger and the opinions on requests. Part C adds `passkey_replacement` (rule C9: a new
+ * attendance passkey waiting for the General Manager); remote days and corrections follow.
  */
 
-export const HR_REQUEST_KINDS = ['leave', 'permission'] as const;
+export const HR_REQUEST_KINDS = ['leave', 'permission', 'passkey_replacement'] as const;
 
 export const hrRequestKindSchema = z.enum(HR_REQUEST_KINDS).meta({ id: 'HrRequestKind' });
 

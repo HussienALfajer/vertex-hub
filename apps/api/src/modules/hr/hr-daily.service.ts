@@ -1,6 +1,8 @@
 import { Inject, Injectable, Logger, type OnModuleInit } from '@nestjs/common';
 import {
+  addDays,
   businessDate,
+  businessInstant,
   type CalendarDate,
   CONTRACT_REMINDER_DAYS,
   endReminderDue,
@@ -14,8 +16,10 @@ import { DATABASE } from '../../core/database/database.module.js';
 import { JobQueue, runEach } from '../../core/jobs/index.js';
 import { AccountArchiver, UserDirectory } from '../auth/index.js';
 import { DailyReminders } from '../notifications/index.js';
+import { AttendanceDays } from './attendance-days.js';
 import { EmployeeFiles } from './employee-files.js';
 import { LeaveJobs } from './leave-jobs.js';
+import { lockLeave } from './leave-ledger.js';
 
 /** One reminder the day owes: its kind, type and end date. */
 interface DueReminder {
@@ -28,6 +32,7 @@ interface DueReminder {
  * The `hr.daily` job, part A: the contract and probation reminders to GMs and Ops (rule A7) and
  * the archiving of accounts whose last working day has passed (rule A8). Part B: the leave
  * grants, accruals and year rollover (rules B4 and B5) and `colleague_on_leave` (rule B18).
+ * Part C: yesterday's attendance days finalized and today's created (rules C2, C14).
  * Idempotent: reminders are keyed in `notification_reminders`, ledger rows by its unique keys,
  * and an archived account is left alone. `apps/worker`
  * schedules it; this process works it.
@@ -44,25 +49,31 @@ export class HrDailyService implements OnModuleInit {
     private readonly accounts: AccountArchiver,
     private readonly files: EmployeeFiles,
     private readonly leave: LeaveJobs,
+    private readonly days: AttendanceDays,
   ) {}
 
   onModuleInit(): void {
     this.jobs.work(HR_DAILY_JOB.queue, async () => {
       const result = await this.runDaily();
       this.logger.log(
-        `Daily HR: ${result.reminded} reminders sent, ${result.archived} accounts archived, ${result.ledgerRows} leave ledger rows, ${result.leaveNotices} leave notices`,
+        `Daily HR: ${result.reminded} reminders sent, ${result.archived} accounts archived, ${result.ledgerRows} leave ledger rows, ${result.leaveNotices} leave notices, ${result.attendanceUsers} attendance users`,
       );
     });
   }
 
-  async runDaily(
-    today: CalendarDate = businessDate(),
-  ): Promise<{ reminded: number; archived: number; ledgerRows: number; leaveNotices: number }> {
+  async runDaily(today: CalendarDate = businessDate()): Promise<{
+    reminded: number;
+    archived: number;
+    ledgerRows: number;
+    leaveNotices: number;
+    attendanceUsers: number;
+  }> {
     await this.files.ensureAll();
     let reminded = 0;
     let archived = 0;
     let ledgerRows = 0;
     let leaveNotices = 0;
+    let attendanceUsers = 0;
     // One step failing holds back neither the other; the run fails at the end.
     const steps: [string, () => Promise<void>][] = [
       [
@@ -89,6 +100,12 @@ export class HrDailyService implements OnModuleInit {
           leaveNotices = await this.leave.colleagueNotices(today);
         },
       ],
+      [
+        'Attendance days',
+        async () => {
+          attendanceUsers = await this.attendanceDays(today);
+        },
+      ],
     ];
     await runEach(
       steps,
@@ -96,7 +113,30 @@ export class HrDailyService implements OnModuleInit {
       ([name]) => name,
       ([, step]) => step(),
     );
-    return { reminded, archived, ledgerRows, leaveNotices };
+    return { reminded, archived, ledgerRows, leaveNotices, attendanceUsers };
+  }
+
+  /**
+   * Rules C2 and C14: yesterday's days are finalized and today's created. A run for another
+   * date (the development command) runs as at 00:10 of it.
+   */
+  private async attendanceDays(today: CalendarDate): Promise<number> {
+    const now = today === businessDate() ? new Date() : businessInstant(today, '00:10');
+    const userIds = await this.days.dailyUsers(this.db, today);
+    let done = 0;
+    await runEach(
+      userIds,
+      this.logger,
+      (userId) => `Attendance days ${userId}`,
+      async (userId) => {
+        await this.db.transaction(async (tx) => {
+          await lockLeave(tx, userId);
+          await this.days.refresh(tx, userId, [addDays(today, -1), today], { create: true, now });
+        });
+        done += 1;
+      },
+    );
+    return done;
   }
 
   /** Rule A7: live files without an end of service; once per employee, date and threshold. */

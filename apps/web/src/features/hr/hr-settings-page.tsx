@@ -209,6 +209,8 @@ function RulesForm({ settings }: { settings: HrSettings }) {
     const input = checked(
       form,
       hrSettingsSchema.safeParse({
+        // Rule C1: the start date is kept as stored; its field arrives with the attendance screens.
+        attendanceStartsOn: settings.attendanceStartsOn,
         ...Object.fromEntries(NUMBER_FIELDS.map((field) => [field, typedNumber(values[field])])),
         firstLatenessWarning: values.firstLatenessWarning,
         latenessTiers: values.latenessTiers.map((tier, index) => ({

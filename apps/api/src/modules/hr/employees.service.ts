@@ -28,8 +28,10 @@ import { CodedException } from '../../core/errors/index.js';
 import { type AuditActor, changedFields, recordAudit } from '../audit/index.js';
 import { type CurrentUserInfo, UserDirectory, type UserProfile } from '../auth/index.js';
 import { NotificationCenter } from '../notifications/index.js';
+import { AttendanceDays } from './attendance-days.js';
 import { type FileView, fileView, holdsAll } from './employee-access.js';
 import { EmployeeFiles } from './employee-files.js';
+import { lockLeave } from './leave-ledger.js';
 
 type Executor = Database | Transaction;
 
@@ -40,6 +42,9 @@ const actorOf = (user: CurrentUserInfo): AuditActor => ({ id: user.id, name: use
 /** The reminders an end date raises (rule A7), resolved when it changes or the service ends. */
 const CONTRACT_TYPES: readonly NotificationType[] = ['contract_ending'];
 const PROBATION_TYPES: readonly NotificationType[] = ['probation_ending'];
+
+/** The file fields an attendance day is computed from. */
+const ATTENDANCE_FIELDS = ['scheduleId', 'attendanceExempt', 'startDate', 'remoteWeekdays'];
 
 /** The salary rows `currentSalary` reads. */
 interface SalaryRow {
@@ -61,6 +66,7 @@ export class EmployeesService {
     private readonly users: UserDirectory,
     private readonly files: EmployeeFiles,
     private readonly center: NotificationCenter,
+    private readonly days: AttendanceDays,
   ) {}
 
   async list(actor: CurrentUserInfo, query: EmployeeListQuery): Promise<EmployeePage> {
@@ -107,6 +113,8 @@ export class EmployeesService {
     input: UpdateEmployeeFile,
   ): Promise<EmployeeFile> {
     await this.db.transaction(async (tx) => {
+      // The user's HR lock before the file's row, as the leave and attendance writers take them.
+      await lockLeave(tx, userId);
       const file = await this.lockLive(tx, userId);
       const { scheduleId, ...fields } = input;
       if (scheduleId !== undefined && scheduleId !== file.scheduleId) {
@@ -161,6 +169,17 @@ export class EmployeesService {
         outcome: 'void',
         actorId: actor.id,
       });
+      // Rule C14 and edge case 10: today follows the new schedule, exemption or remote days
+      // until it has a punch; past days keep theirs. A moved start date (rule C2) also takes the
+      // days between the two dates in or out.
+      if ('startDate' in change.after) {
+        const dates = [file.startDate, change.after.startDate ?? null].filter(
+          (date): date is string => !!date,
+        );
+        await this.days.refreshExisting(tx, userId, dates.sort()[0] ?? businessDate());
+      } else if (ATTENDANCE_FIELDS.some((key) => key in change.after)) {
+        await this.days.refresh(tx, userId, [businessDate()], { refreeze: true });
+      }
     });
     return this.read(this.db, userId, { file: true, pay: holdsAll(actor, 'salaries.read') });
   }

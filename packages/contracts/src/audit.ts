@@ -272,6 +272,14 @@ export const AUDIT_ACTIONS = [
   'leave_balance.adjusted',
   'leave_balance.opening',
   'task.leave_accepted',
+  'attendance_passkey.registered',
+  'attendance_passkey.activated',
+  'attendance_passkey.revoked',
+  'attendance_kiosk.created',
+  'attendance_kiosk.pairing_started',
+  'attendance_kiosk.paired',
+  'attendance_kiosk.archived',
+  'attendance.punch_refused',
 ] as const;
 
 export const auditActionSchema = z.enum(AUDIT_ACTIONS).meta({ id: 'AuditAction' });
@@ -337,6 +345,10 @@ export const AUDIT_ENTITY_TYPES = [
   'hr_opinion',
   /** Keyed by the employee's user id. */
   'leave_balance',
+  'attendance_passkey',
+  'attendance_kiosk',
+  /** Keyed by the employee's user id: refused punches. */
+  'attendance',
 ] as const;
 
 export const auditEntityTypeSchema = z.enum(AUDIT_ENTITY_TYPES).meta({ id: 'AuditEntityType' });

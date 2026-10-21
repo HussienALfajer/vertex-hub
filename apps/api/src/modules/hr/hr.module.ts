@@ -2,12 +2,20 @@ import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/index.js';
 import { FilesModule } from '../files/index.js';
 import { NotificationsModule } from '../notifications/index.js';
+import { AttendanceService } from './attendance.service.js';
+import { AttendanceDays } from './attendance-days.js';
+import { AttendanceKiosksService } from './attendance-kiosks.service.js';
+import { AttendancePasskeys } from './attendance-passkeys.js';
+import { AttendancePasskeysService } from './attendance-passkeys.service.js';
+import { AttendanceShoots } from './attendance-shoots.js';
+import { AttendanceWebAuthn } from './attendance-webauthn.js';
 import { EmployeeFileOwner } from './employee-file-owner.js';
 import { EmployeeFiles } from './employee-files.js';
 import { EmployeesService } from './employees.service.js';
 import { HolidayCalendar } from './holiday-calendar.js';
 import { HolidaysService } from './holidays.service.js';
 import { HrController } from './hr.controller.js';
+import { HrAttendanceController } from './hr-attendance.controller.js';
 import { HrDailyService } from './hr-daily.service.js';
 import { HrLeaveController } from './hr-leave.controller.js';
 import { HrRequestFileOwner } from './hr-request-file-owner.js';
@@ -15,6 +23,8 @@ import { HrRequestsService } from './hr-requests.service.js';
 import { HrRulesController } from './hr-rules.controller.js';
 import { HrScope } from './hr-scope.js';
 import { HrSettingsService } from './hr-settings.service.js';
+import { KioskController } from './kiosk.controller.js';
+import { KioskStream } from './kiosk-stream.js';
 import { LeaveBalancesService } from './leave-balances.service.js';
 import { LeaveContext } from './leave-context.js';
 import { LeaveDirectory } from './leave-directory.js';
@@ -34,11 +44,19 @@ import { WorkSchedulesService } from './work-schedules.service.js';
  * balance ledger and its daily steps (rules B4–B18). Exports `LeaveDirectory` (approved leave for
  * the `calendar` and `tasks` modules, rules B16 and B17) and the `LeaveWorkSources` registry they
  * fill with an employee's work (rule B14), so `hr` imports neither. Registers the `hr_request`
- * owner policy in `files` (rule B13).
+ * owner policy in `files` (rule B13). Part C: attendance passkeys (WebAuthn, ADR 0039), entrance
+ * screens and their stream, punches and the days computed from them (rules C1–C16, C20); exports
+ * the `AttendanceShoots` registry `calendar` fills for shoot check-ins (rule C13).
  */
 @Module({
   imports: [AuthModule, FilesModule, NotificationsModule],
-  controllers: [HrController, HrRulesController, HrLeaveController],
+  controllers: [
+    HrController,
+    HrRulesController,
+    HrLeaveController,
+    HrAttendanceController,
+    KioskController,
+  ],
   providers: [
     EmployeeFiles,
     EmployeesService,
@@ -58,7 +76,15 @@ import { WorkSchedulesService } from './work-schedules.service.js';
     LeaveDirectory,
     LeaveWorkSources,
     HrRequestFileOwner,
+    AttendanceWebAuthn,
+    AttendanceDays,
+    AttendancePasskeys,
+    AttendancePasskeysService,
+    AttendanceKiosksService,
+    AttendanceShoots,
+    AttendanceService,
+    KioskStream,
   ],
-  exports: [HolidayCalendar, LeaveDirectory, LeaveWorkSources],
+  exports: [HolidayCalendar, LeaveDirectory, LeaveWorkSources, AttendanceShoots],
 })
 export class HrModule {}
