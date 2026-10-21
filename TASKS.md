@@ -34,7 +34,7 @@ Parts A → B → C → D, each accepted by the owner before the next starts (sp
 - [x] db (`/db-migration`): `hr_requests`, `leave_ledger`, `hr_opinions`; `file_items` owner type `hr_request`
 - [x] api `hr`: balances and adjustments (B6, B7), requests preview/create/list/detail/decision/cancel (B8–B15), opinions; `hr.daily` gains accruals, grants, the year rollover and `colleague_on_leave` (B4, B5, B18); holiday changes recompute pending leave days (B3, edge case 11); exported `LeaveDirectory` for `tasks` and `calendar`: calendar leave items without the type (B16), `ASSIGNEE_ON_LEAVE` with `acceptLeave` on task create, assign and re-date, `leave` conflicts on shoots and meetings (B17); tests in `test/hr-leave.test.ts`; exported `LeaveWorkSources` registry (tasks, calendar) for the overlapping work (B14); `hr_request` file owner policy; archiving an account cancels its pending requests (A8)
 - [x] bridge: `openapi:export`, `api:generate`; web typecheck
-- [ ] checks, reviewer, acceptance (API at `/api/docs`), PR with auto-merge
+- [x] checks, reviewer, acceptance (API at `/api/docs`, owner 2026-10-21), PR with auto-merge
 
 ## PR B4 — leave: web and E2E
 - [ ] My attendance `/me/attendance` with Balances and Requests only (the Today card is part C), the request dialog with the preview and the certificate upload; employee file Leave tab (balances, ledger, adjustments, opening); Approvals `/hr/approvals` (requests); "On leave" on the calendar; the leave warning with "Assign anyway" in the task, shoot and meeting dialogs
