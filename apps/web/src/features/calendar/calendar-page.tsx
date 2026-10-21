@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link, useNavigate } from '@tanstack/react-router';
 import {
+  addDays,
   businessDate,
   CALENDAR_KINDS,
   type Calendar,
@@ -74,8 +75,14 @@ export function parseCalendarSearch(search: Record<string, unknown>): CalendarSe
 /** Entries a day of the month grid shows before "+n" (screen 1). */
 const DAY_LIMIT = 4;
 
-/** Rule 15: each day's key dates first, then its shoots and meetings by start time. */
-function entriesByDay(calendar: Calendar): Map<CalendarDate, CalendarEntry[]> {
+/**
+ * Rule 15: each day's key dates first, then who is on leave (F17 rule B16, on each day of the
+ * leave the range shows), then its shoots and meetings by start time.
+ */
+function entriesByDay(
+  calendar: Calendar,
+  range: { from: CalendarDate; to: CalendarDate },
+): Map<CalendarDate, CalendarEntry[]> {
   const timed = [
     ...calendar.shoots.map((shoot) => ({
       at: shoot.startsAt,
@@ -91,6 +98,11 @@ function entriesByDay(calendar: Calendar): Map<CalendarDate, CalendarEntry[]> {
   const add = (day: CalendarDate, entry: CalendarEntry) =>
     days.set(day, [...(days.get(day) ?? []), entry]);
   for (const keyDate of calendar.keyDates) add(keyDate.date, { kind: 'keyDate', keyDate });
+  for (const leave of calendar.leaves) {
+    const last = leave.endsOn < range.to ? leave.endsOn : range.to;
+    const first = leave.startsOn > range.from ? leave.startsOn : range.from;
+    for (let day = first; day <= last; day = addDays(day, 1)) add(day, { kind: 'leave', leave });
+  }
   // A booking belongs to the day it starts, also when it crosses midnight (edge case 3).
   for (const { at, entry } of timed) add(calendarDay(at), entry);
   return days;
@@ -125,7 +137,7 @@ export function CalendarPage({ search }: { search: CalendarSearch }) {
   const [openDay, setOpenDay] = useState<CalendarDate | null>(null);
   const [creatingMeeting, setCreatingMeeting] = useState(false);
   const days = daysBetween(range.from, range.to);
-  const byDay = calendar.data ? entriesByDay(calendar.data) : new Map<never, never>();
+  const byDay = calendar.data ? entriesByDay(calendar.data, range) : new Map<never, never>();
   const entriesOf = (day: CalendarDate): CalendarEntry[] => byDay.get(day) ?? [];
   // A booking that started before the range has no day here: only what the days show counts.
   const empty = days.every((day) => entriesOf(day).length === 0);
@@ -256,9 +268,8 @@ function Filters({
     ...SHOOT_TYPES.map((type) => ({ value: type, label: t(`calendar.shootTypes.${type}`) })),
   ];
   // Invoice due dates reach invoice readers only (F13); the API leaves them out for others.
-  // Leave entries (F17 rule B16) are not drawn yet; their filter comes with them.
   const kindOptions = CALENDAR_KINDS.filter(
-    (kind) => kind !== 'leave' && (kind !== 'invoice_due' || can(me, 'invoices.read')),
+    (kind) => kind !== 'invoice_due' || can(me, 'invoices.read'),
   ).map((kind) => ({
     kind,
     name: t(`calendar.kinds.${kind}`),

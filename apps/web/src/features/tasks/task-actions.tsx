@@ -1,6 +1,7 @@
 import { standardSchemaResolver } from '@hookform/resolvers/standard-schema';
 import { useQuery } from '@tanstack/react-query';
 import {
+  type AssigneeLeave,
   type CreateTask,
   type CreateTaskInput,
   createTaskSchema,
@@ -72,6 +73,7 @@ import { FormAlert } from '../../components/form-alert';
 import { errorMessage, fieldError, SCREEN_ERROR } from '../../lib/errors';
 import { useShownWhileClosing } from '../../lib/use-shown-while-closing';
 import { clientQuery } from '../clients/clients.queries';
+import { assigneeLeaves, LeaveWarningDialog } from './leave-warning';
 import { TaskStatusBadge } from './task-badges';
 import {
   ApprovalFields,
@@ -647,6 +649,11 @@ function EditTaskDialog({
       : null,
   );
   const request = task.clientRequest;
+  // F17 rule B17: the new due date falls on the assignee's leave.
+  const [leaveWarning, setLeaveWarning] = useState<{
+    leaves: AssigneeLeave[];
+    changes: UpdateTask;
+  } | null>(null);
   const form = useForm<CreateTaskInput, unknown, CreateTask>({
     resolver: standardSchemaResolver(createTaskSchema),
     // Another person's save shows here; what the user typed is kept while the dialog is open.
@@ -685,7 +692,9 @@ function EditTaskDialog({
       toast.add({ title: t('tasks.edit.saved'), type: 'success' });
       onClose();
     } catch (error) {
-      setFailure(taskFormFailure(form, t, error));
+      const leaves = assigneeLeaves(error);
+      if (leaves) setLeaveWarning({ leaves, changes });
+      else setFailure(taskFormFailure(form, t, error));
     }
   });
 
@@ -737,6 +746,17 @@ function EditTaskDialog({
             </Button>
           </DialogFooter>
         </form>
+        <LeaveWarningDialog
+          leaves={leaveWarning?.leaves ?? null}
+          onClose={() => setLeaveWarning(null)}
+          pending={update.isPending}
+          onConfirm={async () => {
+            if (!leaveWarning) return;
+            await update.mutateAsync({ ...leaveWarning.changes, acceptLeave: true });
+            toast.add({ title: t('tasks.edit.saved'), type: 'success' });
+            onClose();
+          }}
+        />
       </DialogContent>
     </Dialog>
   );
@@ -766,6 +786,11 @@ function ReassignDialog({
   const [department, setDepartment] = useState<DepartmentCode>(task.department);
   const [assigneeId, setAssigneeId] = useState<string>(task.assignee?.id ?? UNASSIGNED);
   const [failure, setFailure] = useState<string | null>(null);
+  // F17 rule B17: the new assignee is on leave on the due date.
+  const [leaveWarning, setLeaveWarning] = useState<{
+    leaves: AssigneeLeave[];
+    changes: UpdateTask;
+  } | null>(null);
   const members = useDepartmentMembers(department);
   const departmentItems = departments.map(({ code, name }) => ({ value: code, label: name }));
   const assigneeItems = [
@@ -794,7 +819,9 @@ function ReassignDialog({
       toast.add({ title: t('tasks.reassign.done'), type: 'success' });
       onClose();
     } catch (error) {
-      setFailure(errorMessage(t, error));
+      const leaves = assigneeLeaves(error);
+      if (leaves) setLeaveWarning({ leaves, changes: parsed.data });
+      else setFailure(errorMessage(t, error));
     }
   }
 
@@ -879,6 +906,17 @@ function ReassignDialog({
             </Button>
           </DialogFooter>
         </div>
+        <LeaveWarningDialog
+          leaves={leaveWarning?.leaves ?? null}
+          onClose={() => setLeaveWarning(null)}
+          pending={update.isPending}
+          onConfirm={async () => {
+            if (!leaveWarning) return;
+            await update.mutateAsync({ ...leaveWarning.changes, acceptLeave: true });
+            toast.add({ title: t('tasks.reassign.done'), type: 'success' });
+            onClose();
+          }}
+        />
       </DialogContent>
     </Dialog>
   );

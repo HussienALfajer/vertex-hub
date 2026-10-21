@@ -704,15 +704,17 @@ describe('HR leave (F17 part B)', () => {
       }).text,
     ).toBe('طلب سامر إذن مغادرة يوم 8 تشرين الثاني 2026');
     expect(linkPath(notificationLink(sample('hr_request_submitted')))).toBe(
-      `/hr/approvals?request=${SUBJECT_ID}`,
+      `/hr/requests/${SUBJECT_ID}?from=approvals`,
     );
   });
 
-  it('tells the employee the decision and opens My attendance (rules B14 and B15)', () => {
+  it('tells the employee the decision and opens the request (rules B14 and B15)', () => {
     expect(render('hr_request_decided').text).toBe(
       'وافقت الإدارة على طلبك: إجازة مرضية 8 تشرين الثاني 2026',
     );
-    expect(linkPath(notificationLink(sample('hr_request_decided')))).toBe('/me/attendance');
+    expect(linkPath(notificationLink(sample('hr_request_decided')))).toBe(
+      `/hr/requests/${SUBJECT_ID}?from=mine`,
+    );
     expect(render('leave_balance_adjusted').text).toBe(
       'عُدّل رصيد إجازة سنوية لعام 2026 بمقدار +2.5 يوم',
     );

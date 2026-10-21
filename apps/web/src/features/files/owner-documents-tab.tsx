@@ -11,15 +11,15 @@ import { FileItemCard } from './file-item-card';
 import { type FileOwnerRef, fileItemsQuery } from './files.queries';
 
 /**
- * The Documents tab of a project or a retainer (spec F10, screen 5) and of an employee file (F17):
- * its documents with their versions, the confidential lock, and upload for those who manage its
- * documents.
+ * The Documents tab of a project or a retainer (spec F10, screen 5), of an employee file and of an
+ * HR request (F17, a sick leave's certificate): its documents with their versions, the
+ * confidential lock, and upload for those who manage its documents.
  */
 export function OwnerDocumentsTab({
   owner,
   confidentialOnly,
 }: {
-  owner: FileOwnerRef & { type: 'project' | 'retainer' | 'employee' };
+  owner: FileOwnerRef & { type: 'project' | 'retainer' | 'employee' | 'hr_request' };
   /** The viewer adds confidential documents only (F17 rule A6: pay readers on a file). */
   confidentialOnly?: boolean;
 }) {

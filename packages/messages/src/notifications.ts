@@ -583,10 +583,12 @@ export function notificationLink(notification: Notification): NotificationLink {
     case 'announcement':
       return { to: '/announcements/$announcementId', params: { announcementId: subject.id } };
     case 'hr_request':
-      // F17 rules B8–B15: the request in Approvals, or the employee's own requests.
-      return notification.type === 'hr_request_submitted'
-        ? { to: '/hr/approvals', search: { request: subject.id } }
-        : { to: '/me/attendance' };
+      // F17 rules B8–B15: the request's page, back to Approvals or to the employee's requests.
+      return {
+        to: '/hr/requests/$requestId',
+        params: { requestId: subject.id },
+        search: { from: notification.type === 'hr_request_submitted' ? 'approvals' : 'mine' },
+      };
     case 'holiday':
       // F17 rule B3: the calendar on the holiday's first day.
       return notification.type === 'holiday_changed'

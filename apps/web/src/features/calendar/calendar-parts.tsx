@@ -1,5 +1,6 @@
 import { Link } from '@tanstack/react-router';
 import {
+  type CalendarLeave,
   calendarDay,
   type KeyDate,
   type KeyDateKind,
@@ -14,6 +15,7 @@ import { Avatar, Badge, cn } from '@vertex-hub/ui';
 import {
   ArchiveIcon,
   BanIcon,
+  CalendarHeartIcon,
   CalendarOffIcon,
   CameraIcon,
   FlagIcon,
@@ -146,14 +148,17 @@ export function useClientLabel() {
 export type CalendarEntry =
   | { kind: 'shoot'; shoot: Shoot }
   | { kind: 'meeting'; meeting: Meeting }
-  | { kind: 'keyDate'; keyDate: KeyDate };
+  | { kind: 'keyDate'; keyDate: KeyDate }
+  | { kind: 'leave'; leave: CalendarLeave };
 
 export const entryKey = (entry: CalendarEntry): string =>
   entry.kind === 'shoot'
     ? entry.shoot.id
     : entry.kind === 'meeting'
       ? entry.meeting.id
-      : `${entry.keyDate.kind}-${entry.keyDate.targetId}-${entry.keyDate.title}`;
+      : entry.kind === 'leave'
+        ? `leave-${entry.leave.requestId}`
+        : `${entry.keyDate.kind}-${entry.keyDate.targetId}-${entry.keyDate.title}`;
 
 const KEY_DATE_ICONS: Record<KeyDateKind, LucideIcon> = {
   project_due: FolderKanbanIcon,
@@ -263,6 +268,30 @@ function KeyDateChip({
 }
 
 /**
+ * F17 rule B16: an approved leave, "Name: on leave", on each of its days. The type shows only to
+ * those the API gives it (`hr.read` in scope, and the employee); a half day says which half.
+ */
+function LeaveChip({ leave, compact }: { leave: CalendarLeave; compact?: boolean }) {
+  const { t } = useTranslation();
+  const label = t('calendar.leave', { name: leave.user.name });
+  const detail = [
+    leave.leaveType && t(`hr.leaveTypes.${leave.leaveType}`),
+    leave.half && t(`hr.requests.halves.${leave.half}`),
+  ]
+    .filter(Boolean)
+    .join(' · ');
+  return (
+    <span
+      data-leave-id={leave.requestId}
+      className="flex min-w-0 items-center gap-1 rounded-sm bg-status-neutral px-1.5 py-0.5 text-xs font-medium text-status-neutral-foreground"
+    >
+      <CalendarHeartIcon aria-hidden="true" className="size-3.5 shrink-0" />
+      <span className="truncate">{compact || !detail ? label : `${label} (${detail})`}</span>
+    </span>
+  );
+}
+
+/**
  * An entry on a calendar day: a key date as a chip; a shoot or meeting as a card with its start
  * time first (a month cell has no room for the range; a long title is cut, never the time), its
  * client, who leads or organizes it and the conflict mark. Cancelled ones are dimmed.
@@ -271,6 +300,7 @@ export function EntryCard({ entry, me }: { entry: CalendarEntry; me: MeResponse 
   const { t } = useTranslation();
   const clientLabel = useClientLabel();
   if (entry.kind === 'keyDate') return <KeyDateChip keyDate={entry.keyDate} me={me} compact />;
+  if (entry.kind === 'leave') return <LeaveChip leave={entry.leave} compact />;
   if (entry.kind === 'meeting') {
     const { meeting } = entry;
     const cancelled = meeting.status === 'cancelled';
@@ -326,8 +356,8 @@ export function EntryCard({ entry, me }: { entry: CalendarEntry; me: MeResponse 
 }
 
 /**
- * Entries as rows: the agenda of the calendar on a phone and a day's list. Key dates first, as
- * on the grid.
+ * Entries as rows: the agenda of the calendar on a phone and a day's list. Key dates and leaves
+ * first, as on the grid.
  */
 export function EntryRows({ entries, me }: { entries: CalendarEntry[]; me: MeResponse }) {
   const { t } = useTranslation();
@@ -335,6 +365,13 @@ export function EntryRows({ entries, me }: { entries: CalendarEntry[]; me: MeRes
   return (
     <ul className="flex flex-col divide-y divide-border">
       {entries.map((entry) => {
+        if (entry.kind === 'leave') {
+          return (
+            <li key={entryKey(entry)} className="flex flex-col gap-1 px-4 py-3">
+              <LeaveChip leave={entry.leave} />
+            </li>
+          );
+        }
         if (entry.kind === 'keyDate') {
           return (
             <li key={entryKey(entry)} className="flex flex-col gap-1 px-4 py-3">

@@ -23,6 +23,7 @@ import {
   ArrowRightIcon,
   BanknoteIcon,
   BriefcaseBusinessIcon,
+  CalendarCheckIcon,
   CalendarClockIcon,
   FileTextIcon,
   IdCardIcon,
@@ -49,9 +50,11 @@ import {
   PersonalDialog,
   SalaryDialog,
 } from './employee-dialogs';
-import { employeeQuery, salaryChangesQuery, useClearEnd } from './hr.queries';
+import { employeeQuery, hrRequestListQuery, salaryChangesQuery, useClearEnd } from './hr.queries';
+import { NewRequestDialog } from './leave-dialogs';
+import { LeaveBalances, NewRequestButton, RequestRows, RequestRowsSkeleton } from './leave-parts';
 
-const FILE_TABS = ['personal', 'contract', 'pay', 'documents'] as const;
+const FILE_TABS = ['personal', 'contract', 'pay', 'leave', 'documents'] as const;
 
 type FileTab = (typeof FILE_TABS)[number];
 
@@ -120,11 +123,14 @@ function File({
   // An ended file is the record of a closed account: read-only until F01 restores the account.
   const live = file.status !== 'ended';
   const manage = !self && live && can(me, 'employees.manage');
+  // Leave: the employee's own, or `hr.read` (the API answers 404 outside its scope).
+  const leave = self || can(me, 'hr.read');
   const tabs = FILE_TABS.filter(
     (tab) =>
       (tab === 'personal' && file.personal) ||
       (tab === 'contract' && file.employment) ||
       (tab === 'pay' && file.pay) ||
+      (tab === 'leave' && leave) ||
       tab === 'documents',
   );
   const tab = tabs.find((shown) => shown === search.tab) ?? tabs[0] ?? 'documents';
@@ -161,6 +167,12 @@ function File({
               {t('hr.file.tabs.pay')}
             </TabsTrigger>
           )}
+          {leave && (
+            <TabsTrigger value="leave">
+              <CalendarCheckIcon />
+              {t('hr.file.tabs.leave')}
+            </TabsTrigger>
+          )}
           <TabsTrigger value="documents">
             <FileTextIcon />
             {t('hr.file.tabs.documents')}
@@ -179,6 +191,11 @@ function File({
         {file.pay && (
           <TabsContent value="pay">
             <PayTab file={file} self={self} live={live} />
+          </TabsContent>
+        )}
+        {leave && (
+          <TabsContent value="leave">
+            <LeaveTab file={file} self={self} live={live} />
           </TabsContent>
         )}
         <TabsContent value="documents">
@@ -642,6 +659,57 @@ function SalaryHistory({ file, self, live }: { file: EmployeeFile; self: boolean
         finalFocus={() => heading.current ?? true}
       />
     </Card>
+  );
+}
+
+/**
+ * The Leave tab: the balances and their ledger, and the employee's requests. `hr.approve` adjusts
+ * the balances (rules B6, B7) and records leave for the employee (rule B8).
+ */
+function LeaveTab({ file, self, live }: { file: EmployeeFile; self: boolean; live: boolean }) {
+  const { t } = useTranslation();
+  const me = useMe();
+  const approve = !self && live && can(me, 'hr.approve');
+  const [recording, setRecording] = useState(false);
+  const recordButton = useRef<HTMLButtonElement>(null);
+  const requests = useQuery(hrRequestListQuery({ userId: file.userId, pageSize: 10 }));
+  return (
+    <div className="flex flex-col gap-6">
+      <TabHeader title={t('hr.file.tabs.leave')} description={t('hr.file.leaveHint')} />
+      <LeaveBalances
+        userId={file.userId}
+        canAdjust={approve}
+        action={
+          approve && (
+            <NewRequestButton
+              buttonRef={recordButton}
+              onClick={() => setRecording(true)}
+              label={t('hr.requests.new.record')}
+            />
+          )
+        }
+      />
+      <section className="flex flex-col gap-3">
+        <h3 className="font-bold">{t('hr.file.recentRequests')}</h3>
+        {requests.isPending ? (
+          <RequestRowsSkeleton />
+        ) : requests.isError ? (
+          <LoadError message={t('hr.requests.listError')} onRetry={() => requests.refetch()} />
+        ) : requests.data.items.length === 0 ? (
+          <EmptyState icon={<CalendarCheckIcon />} title={t('hr.file.noRequests')} />
+        ) : (
+          <RequestRows requests={requests.data.items} from={self ? 'mine' : 'file'} />
+        )}
+      </section>
+      {approve && (
+        <NewRequestDialog
+          open={recording}
+          onClose={() => setRecording(false)}
+          finalFocus={() => recordButton.current ?? true}
+          forUser={{ id: file.userId, name: file.name }}
+        />
+      )}
+    </div>
   );
 }
 

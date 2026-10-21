@@ -354,6 +354,61 @@ for (const colorScheme of ['light', 'dark'] as const) {
         await screenshot(page, testInfo, `calendar-holiday-${size}-${colorScheme}`);
       });
 
+      // F17 part B: My attendance, the request dialog, Approvals, a request, the Leave tab of a
+      // file, "On leave" on the calendar and the leave warning on a task.
+      test(`leave (${size})`, async ({ page }, testInfo) => {
+        await page.setViewportSize({ width, height });
+        await page.clock.setFixedTime(new Date(HR_NOW));
+        const api = await mockApi(page, { signedIn: true, me: employeeMe, leave: true });
+        const r = ar.hr.requests;
+        await page.goto('/me/attendance');
+        await expect(page.locator('[data-leave-type="annual"]')).toBeVisible();
+        await screenshot(page, testInfo, `hr-my-balances-${size}-${colorScheme}`);
+        await page.getByRole('button', { name: r.new.title }).click();
+        const dialog = page.getByRole('dialog', { name: r.new.title });
+        await dialog.getByLabel(r.fields.startsOn, { exact: true }).fill('2026-10-22');
+        await dialog.getByLabel(r.fields.endsOn, { exact: true }).fill('2026-10-22');
+        await expect(dialog.getByText(r.warnings.short_notice)).toBeVisible();
+        await screenshot(page, testInfo, `hr-request-dialog-${size}-${colorScheme}`);
+        await page.keyboard.press('Escape');
+        await page.getByRole('tab', { name: ar.hr.attendance.tabs.requests }).click();
+        await expect(page.locator('[data-request-id]').first()).toBeVisible();
+        await screenshot(page, testInfo, `hr-my-requests-${size}-${colorScheme}`);
+
+        api.signInAs(manager);
+        await page.goto('/hr/approvals');
+        await expect(page.locator('[data-request-id]')).toHaveCount(3);
+        await screenshot(page, testInfo, `hr-approvals-${size}-${colorScheme}`);
+        await page.locator('[data-request-id]').last().getByRole('link').click();
+        await expect(page.getByText(r.work.title)).toBeVisible();
+        await screenshot(page, testInfo, `hr-request-${size}-${colorScheme}`);
+        await page.getByRole('button', { name: r.decide.reject }).click();
+        await expect(page.getByRole('dialog', { name: r.decide.rejectTitle })).toBeVisible();
+        await screenshot(page, testInfo, `hr-request-decision-${size}-${colorScheme}`);
+        await page.keyboard.press('Escape');
+
+        await page.goto(`/hr/people/${seedIds.karim}?tab=leave`);
+        await expect(page.locator('[data-leave-type="sick"]')).toBeVisible();
+        await screenshot(page, testInfo, `hr-file-leave-${size}-${colorScheme}`);
+
+        await page.goto('/calendar?date=2026-10-25');
+        await expect(
+          page.locator('[data-leave-id]').filter({ visible: true }).first(),
+        ).toBeVisible();
+        await screenshot(page, testInfo, `calendar-leave-${size}-${colorScheme}`);
+
+        await page.goto(`/tasks/${seedIds.dishShoot}`);
+        await page.getByRole('button', { name: ar.tasks.actions.more }).click();
+        await page.getByRole('menuitem', { name: ar.tasks.actions.edit }).click();
+        const edit = page.getByRole('dialog', { name: ar.tasks.edit.title });
+        await edit.getByLabel(ar.tasks.form.dueDate).fill('2026-10-26');
+        await edit.getByRole('button', { name: ar.common.save }).click();
+        await expect(
+          page.getByRole('alertdialog', { name: ar.tasks.leaveWarning.title }),
+        ).toBeVisible();
+        await screenshot(page, testInfo, `task-leave-warning-${size}-${colorScheme}`);
+      });
+
       // F16 screens 9–14: announcements, with the home pin and the critical dialog.
       test(`announcements (${size})`, async ({ page }, testInfo) => {
         await page.setViewportSize({ width, height });

@@ -1,11 +1,17 @@
 import { keepPreviousData, queryOptions, useMutation, useQueryClient } from '@tanstack/react-query';
 import type {
   ArchiveSalaryChange,
+  CancelHrRequest,
   CreateHoliday,
+  CreateHrOpinion,
+  CreateHrRequest,
+  CreateLeaveAdjustment,
   CreateSalaryChange,
   CreateWorkSchedule,
+  DecideHrRequest,
   EmployeeListQuery,
   EndService,
+  HrRequestListQuery,
   HrSettings,
   Payout,
   UpdateEmployeeFile,
@@ -27,7 +33,14 @@ export const hrKeys = {
   holidays: ['hr', 'holidays'] as const,
   holidayYear: (year: number) => ['hr', 'holidays', year] as const,
   settings: ['hr', 'settings'] as const,
+  balances: ['hr', 'balances'] as const,
+  balance: (userId: string, year: number) => ['hr', 'balances', userId, year] as const,
+  requests: ['hr', 'requests'] as const,
+  requestList: (filters: HrRequestListFilters) => ['hr', 'requests', 'list', filters] as const,
+  request: (id: string) => ['hr', 'requests', 'detail', id] as const,
 };
+
+export type HrRequestListFilters = Partial<HrRequestListQuery>;
 
 export const employeeListQuery = (filters: EmployeeListFilters) =>
   queryOptions({
@@ -234,5 +247,106 @@ export function useUpdateHrSettings() {
   return useMutation({
     mutationFn: (input: HrSettings) => call(api.PUT('/api/hr/settings', { body: input })),
     onSuccess: (settings) => queryClient.setQueryData(hrKeys.settings, settings),
+  });
+}
+
+// Part B: leave balances, requests and their decisions.
+
+export const leaveBalanceQuery = (userId: string, year: number) =>
+  queryOptions({
+    queryKey: hrKeys.balance(userId, year),
+    queryFn: () =>
+      call(
+        api.GET('/api/hr/balances/{userId}', {
+          params: { path: { userId }, query: { year } },
+        }),
+      ),
+    placeholderData: keepPreviousData,
+  });
+
+export const hrRequestListQuery = (filters: HrRequestListFilters) =>
+  queryOptions({
+    queryKey: hrKeys.requestList(filters),
+    queryFn: () => call(api.GET('/api/hr/requests', { params: { query: filters } })),
+    placeholderData: keepPreviousData,
+  });
+
+export const hrRequestQuery = (id: string) =>
+  queryOptions({
+    queryKey: hrKeys.request(id),
+    queryFn: () => call(api.GET('/api/hr/requests/{id}', { params: { path: { id } } })),
+  });
+
+/** What a request would be (rules B9, B12, B13), asked again as the form changes. */
+export const hrRequestPreviewQuery = (input: CreateHrRequest | null) =>
+  queryOptions({
+    queryKey: ['hr', 'requests', 'preview', input] as const,
+    queryFn: () => call(api.POST('/api/hr/requests/preview', { body: input as CreateHrRequest })),
+    enabled: !!input,
+    placeholderData: keepPreviousData,
+    retry: false,
+  });
+
+/**
+ * A request change moves the balances (pending and taken days) and the calendar's leave entries
+ * (rule B16).
+ */
+function useInvalidateRequests() {
+  const queryClient = useQueryClient();
+  return () =>
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: hrKeys.requests }),
+      queryClient.invalidateQueries({ queryKey: hrKeys.balances }),
+      queryClient.invalidateQueries({ queryKey: calendarKeys.all }),
+    ]);
+}
+
+export function useCreateHrRequest() {
+  const invalidate = useInvalidateRequests();
+  return useMutation({
+    mutationFn: (input: CreateHrRequest) => call(api.POST('/api/hr/requests', { body: input })),
+    onSuccess: invalidate,
+  });
+}
+
+/** Refreshes also on failure: `NOT_PENDING` means someone else decided it meanwhile. */
+export function useDecideHrRequest(id: string) {
+  const invalidate = useInvalidateRequests();
+  return useMutation({
+    mutationFn: (input: DecideHrRequest) =>
+      call(api.POST('/api/hr/requests/{id}/decision', { params: { path: { id } }, body: input })),
+    onSettled: invalidate,
+  });
+}
+
+export function useCancelHrRequest(id: string) {
+  const invalidate = useInvalidateRequests();
+  return useMutation({
+    mutationFn: (input: CancelHrRequest) =>
+      call(api.POST('/api/hr/requests/{id}/cancel', { params: { path: { id } }, body: input })),
+    onSettled: invalidate,
+  });
+}
+
+export function useAddHrOpinion() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: CreateHrOpinion) => call(api.POST('/api/hr/opinions', { body: input })),
+    onSettled: (_opinion, _error, input) =>
+      queryClient.invalidateQueries({ queryKey: hrKeys.request(input.requestId) }),
+  });
+}
+
+export function useAdjustLeaveBalance(userId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: CreateLeaveAdjustment) =>
+      call(
+        api.POST('/api/hr/balances/{userId}/adjustments', {
+          params: { path: { userId } },
+          body: input,
+        }),
+      ),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: hrKeys.balances }),
   });
 }

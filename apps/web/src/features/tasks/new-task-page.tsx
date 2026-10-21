@@ -1,6 +1,7 @@
 import { standardSchemaResolver } from '@hookform/resolvers/standard-schema';
 import { Link, useNavigate } from '@tanstack/react-router';
 import {
+  type AssigneeLeave,
   businessDate,
   type CreateTask,
   type CreateTaskInput,
@@ -30,6 +31,7 @@ import { UnsavedChangesGuard } from '../../components/unsaved-changes-guard';
 import { useMe } from '../../lib/auth';
 import { SCREEN_ERROR } from '../../lib/errors';
 import { idParam, oneOfParam } from '../../lib/search-params';
+import { assigneeLeaves, LeaveWarningDialog } from './leave-warning';
 import { hasClientScope, logsClientRequests, memberOf } from './task-access';
 import {
   ApprovalFields,
@@ -87,6 +89,11 @@ export function NewTaskPage({ search }: { search: NewTaskSearch }) {
   const clients = useClientOptions();
   const [mode, setMode] = useState<Mode>(search.mode ?? 'assign');
   const [failure, setFailure] = useState<string | null>(null);
+  // F17 rule B17: the assignee's leave on the due date, and the task waiting for "Assign anyway".
+  const [leaveWarning, setLeaveWarning] = useState<{
+    leaves: AssigneeLeave[];
+    input: CreateTask;
+  } | null>(null);
   const ownDepartment = me.departments.find((department) => department.isPrimary)?.code;
   const form: TaskFormMethods = useForm<CreateTaskInput, unknown, CreateTask>({
     resolver: standardSchemaResolver(createTaskSchema),
@@ -157,17 +164,22 @@ export function NewTaskPage({ search }: { search: NewTaskSearch }) {
       );
       return;
     }
+    const input = { ...values, assigneeId: mode === 'assign' ? values.assigneeId : null };
     try {
-      const task = await create.mutateAsync({
-        ...values,
-        assigneeId: mode === 'assign' ? values.assigneeId : null,
-      });
-      toast.add({ title: t('tasks.new.created'), type: 'success' });
-      await navigate({ to: '/tasks/$taskId', params: { taskId: task.id } });
+      await save(input);
     } catch (error) {
-      setFailure(taskFormFailure(form, t, error));
+      const leaves = assigneeLeaves(error);
+      if (leaves) setLeaveWarning({ leaves, input });
+      else setFailure(taskFormFailure(form, t, error));
     }
   });
+
+  async function save(input: CreateTask) {
+    const task = await create.mutateAsync(input);
+    toast.add({ title: t('tasks.new.created'), type: 'success' });
+    // Saved: "Assign anyway" runs after the submit, while the guard still sees a dirty form.
+    await navigate({ to: '/tasks/$taskId', params: { taskId: task.id }, ignoreBlocker: true });
+  }
 
   const assigneeHint = !department
     ? t('tasks.form.assigneeHintDepartment')
@@ -241,6 +253,14 @@ export function NewTaskPage({ search }: { search: NewTaskSearch }) {
         </div>
       </form>
       <UnsavedChangesGuard dirty={form.formState.isDirty && !form.formState.isSubmitting} />
+      <LeaveWarningDialog
+        leaves={leaveWarning?.leaves ?? null}
+        onClose={() => setLeaveWarning(null)}
+        pending={create.isPending}
+        onConfirm={async () => {
+          if (leaveWarning) await save({ ...leaveWarning.input, acceptLeave: true });
+        }}
+      />
     </>
   );
 }
