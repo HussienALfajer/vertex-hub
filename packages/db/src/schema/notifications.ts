@@ -148,8 +148,8 @@ export const notificationSettings = pgTable('notification_settings', {
     .references(() => users.id),
   mutedTypes: notificationTypeEnum('muted_types').array().notNull().default(sql`'{}'`),
   /**
-   * F14 email rule 2, replaced by `email_overrides` (F16); no longer read or written. Kept until
-   * the previous release no longer runs (expand, then contract), then dropped.
+   * F14 email rule 2, replaced by `email_overrides` (F16); no longer read or written. Kept: a
+   * drop breaks inserts in the previous release (owner, 2026-10-21; F16 spec, "Data").
    */
   emailTypes: notificationTypeEnum('email_types').array(),
   /** F16 rule B3: `{ type: boolean }` where the user departs from the push default. */

@@ -108,4 +108,4 @@ Split from D1b because Part D spans two new modules, seven tables and about twen
 - [x] checks, reviewer (5 findings fixed), acceptance (owner, 2026-10-21), PR with auto-merge, ROADMAP F16 done
 
 ## After the F16 deploy — contract release
-- [ ] drop `notification_settings.email_types` (expand, then contract: only once production runs a release that no longer reads it, so the single F16 deploy cannot drop it)
+- [x] drop `notification_settings.email_types`: cancelled, the column stays unused (owner, 2026-10-21; F16 spec, "Data")

@@ -21,7 +21,7 @@ Drizzle schema, migrations and the database client (ADR 0005). Data rules: ADR 0
 
 ## Changing the schema
 1. Edit `src/schema/`, then run `pnpm db:generate` and read the generated SQL.
-2. Migrations must stay backward compatible (expand, then contract): the previous release runs against the new schema during a deploy and after a rollback. Never rename or drop in the same release that stops using a column.
+2. Migrations must stay backward compatible (expand, then contract): the previous release runs against the new schema during a deploy and after a rollback. Never rename or drop in the same release that stops using a column. Drizzle names every schema column in an `INSERT`, and removing a column from the schema generates its drop, so a drop always breaks inserts into that table in the previous release: plan for it (or keep the column) before the column stops being used.
 3. Run `pnpm test` (it migrates the test database). Apply to the dev database with `pnpm db:migrate` (asks first).
 4. Never edit a migration once generated. Hand-written SQL goes in `drizzle-kit generate --custom`. Never use `drizzle-kit push`.
 
