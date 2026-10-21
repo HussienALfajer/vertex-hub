@@ -423,6 +423,25 @@ export const NOTIFICATION_TEXT = {
     redated: 'تغيّر موعد عطلة «{{name}}» إلى {{dates}}',
     archived: 'أُلغيت عطلة «{{name}}» ({{dates}})',
   },
+  /** F17 rules B7–B18: a leave names its type, except to colleagues (rule B16). */
+  hr_request_submitted: {
+    leave: 'طلب {{employee}} {{what}} {{dates}}',
+    permission: 'طلب {{employee}} إذن مغادرة يوم {{dates}}',
+  },
+  hr_request_decided: {
+    approved: 'وافقت الإدارة على طلبك: {{what}} {{dates}}',
+    rejected: 'رُفض طلبك: {{what}} {{dates}}',
+    cancelled: 'أُلغيت موافقتك على {{what}} {{dates}}',
+  },
+  colleague_on_leave: '{{employee}} في إجازة {{dates}}',
+  leave_balance_adjusted: 'عُدّل رصيد {{what}} لعام {{year}} بمقدار {{days}} يوم',
+  leaveTypes: {
+    annual: 'إجازة سنوية',
+    sick: 'إجازة مرضية',
+    emergency: 'إجازة اضطرارية',
+    unpaid: 'إجازة بلا راتب',
+  },
+  permission: 'إذن مغادرة',
   /** F16 rule B11: each escalation step wraps the original's text. */
   action_reminder: 'تذكير: {{text}}',
   action_escalated: 'تصعيد: {{text}}',
@@ -550,6 +569,11 @@ export function notificationLink(notification: Notification): NotificationLink {
       ) {
         return { to: '/team/$userId', params: { userId: subject.id } };
       }
+      // F17 rules B7 and B18: the balances on My attendance; a colleague's leave on the calendar.
+      if (notification.type === 'leave_balance_adjusted') return { to: '/me/attendance' };
+      if (notification.type === 'colleague_on_leave') {
+        return { to: '/calendar', search: { date: notification.data.startsOn } };
+      }
       // F16 rule A13 and part C rule 5: the signed-in devices and security are on My account.
       return { to: '/account' };
     case 'campaign':
@@ -558,6 +582,11 @@ export function notificationLink(notification: Notification): NotificationLink {
       return { to: '/departments/$departmentId', params: { departmentId: subject.id } };
     case 'announcement':
       return { to: '/announcements/$announcementId', params: { announcementId: subject.id } };
+    case 'hr_request':
+      // F17 rules B8–B15: the request in Approvals, or the employee's own requests.
+      return notification.type === 'hr_request_submitted'
+        ? { to: '/hr/approvals', search: { request: subject.id } }
+        : { to: '/me/attendance' };
     case 'holiday':
       // F17 rule B3: the calendar on the holiday's first day.
       return notification.type === 'holiday_changed'
@@ -604,6 +633,11 @@ export function escalatedOriginal(notification: Notification): Notification | nu
 function formatDue(due: { dueDate: string; dueTime: string | null }): string {
   const date = formatCalendarDate(due.dueDate);
   return due.dueTime ? fill(text.dueAt, { date, time: formatTimeOfDay(due.dueTime) }) : date;
+}
+
+/** One day, or a period of days. */
+function formatDays(startsOn: string, endsOn: string): string {
+  return startsOn === endsOn ? formatCalendarDate(startsOn) : formatPeriod(startsOn, endsOn);
 }
 
 function counted(forms: PluralForms, count: number, values: Record<string, string>): string {
@@ -1189,10 +1223,46 @@ export function notificationText(
     case 'holiday_changed': {
       const { change, name, startsOn, endsOn } = notification.data;
       return {
-        text: fill(text.holiday_changed[change], {
-          name,
-          dates:
-            startsOn === endsOn ? formatCalendarDate(startsOn) : formatPeriod(startsOn, endsOn),
+        text: fill(text.holiday_changed[change], { name, dates: formatDays(startsOn, endsOn) }),
+        context: null,
+      };
+    }
+    case 'hr_request_submitted': {
+      const { employee, kind, leaveType, startsOn, endsOn } = notification.data;
+      return {
+        text: fill(text.hr_request_submitted[kind], {
+          employee,
+          what: leaveType ? text.leaveTypes[leaveType] : text.permission,
+          dates: formatDays(startsOn, endsOn),
+        }),
+        context: null,
+      };
+    }
+    case 'hr_request_decided': {
+      const { decision, leaveType, startsOn, endsOn } = notification.data;
+      return {
+        text: fill(text.hr_request_decided[decision], {
+          what: leaveType ? text.leaveTypes[leaveType] : text.permission,
+          dates: formatDays(startsOn, endsOn),
+        }),
+        context: null,
+      };
+    }
+    case 'colleague_on_leave':
+      return {
+        text: fill(text.colleague_on_leave, {
+          employee: notification.data.employee,
+          dates: formatDays(notification.data.startsOn, notification.data.endsOn),
+        }),
+        context: null,
+      };
+    case 'leave_balance_adjusted': {
+      const { leaveType, year, days } = notification.data;
+      return {
+        text: fill(text.leave_balance_adjusted, {
+          what: text.leaveTypes[leaveType],
+          year: String(year),
+          days: days > 0 ? `+${days}` : String(days),
         }),
         context: null,
       };
@@ -1316,6 +1386,9 @@ type TaskNotification = Exclude<
       | 'employee_leaving'
       | 'salary_changed'
       | 'holiday_changed'
+      | `hr_request_${string}`
+      | 'colleague_on_leave'
+      | 'leave_balance_adjusted'
       | CalendarNotification['type'];
   }
 >;

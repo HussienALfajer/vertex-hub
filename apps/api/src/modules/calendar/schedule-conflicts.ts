@@ -1,5 +1,8 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, type OnModuleInit } from '@nestjs/common';
 import {
+  addDays,
+  businessDate,
+  businessInstant,
   type CalendarItemKind,
   intervalsOverlap,
   type ScheduleConflict,
@@ -16,12 +19,13 @@ import { and, eq, gt, inArray, isNull, lt } from 'drizzle-orm';
 import { DATABASE } from '../../core/database/database.module.js';
 import { CodedException } from '../../core/errors/index.js';
 import { UserDirectory } from '../auth/index.js';
+import { LeaveDirectory, LeaveWorkSources } from '../hr/index.js';
 
 type Executor = Database | Transaction;
 
 /** A shoot or meeting checked for conflicts: who is booked, and when. */
 export interface Booking {
-  kind: CalendarItemKind;
+  kind: Exclude<CalendarItemKind, 'leave'>;
   /** Null for a booking not saved yet. */
   id: string | null;
   startsAt: Date;
@@ -40,20 +44,44 @@ interface Booked {
 }
 
 /** The key of a booking in the result of `ScheduleConflicts.find`. */
-export const bookingKey = (booking: Pick<Booking, 'kind' | 'id'>) =>
+export const bookingKey = (booking: { kind: CalendarItemKind; id: string | null }) =>
   `${booking.kind}:${booking.id}`;
 
 /**
  * Rule 5: a person is in conflict when another non-archived scheduled shoot where they are team
- * crew, or a scheduled meeting they organize or attend, overlaps `[starts_at, ends_at)`. Archived
- * users are never checked.
+ * crew, or a scheduled meeting they organize or attend, overlaps `[starts_at, ends_at)`, and (F17
+ * rule B17) when their approved leave covers a day of it. Archived users are never checked. Feeds
+ * a person's shoots and meetings into `hr`'s leave decisions (F17 rule B14).
  */
 @Injectable()
-export class ScheduleConflicts {
+export class ScheduleConflicts implements OnModuleInit {
   constructor(
     @Inject(DATABASE) private readonly db: Database,
     private readonly users: UserDirectory,
+    private readonly leave: LeaveDirectory,
+    private readonly leaveWork: LeaveWorkSources,
   ) {}
+
+  onModuleInit(): void {
+    this.leaveWork.register(async (executor, userId, range) => {
+      const booked = await this.booked(
+        executor,
+        [userId],
+        businessInstant(range.from, '00:00'),
+        businessInstant(addDays(range.to, 1), '00:00'),
+        { leave: false },
+      );
+      return booked
+        .filter((item): item is Booked & { kind: 'shoot' | 'meeting' } => item.kind !== 'leave')
+        .map((item) => ({
+          kind: item.kind,
+          id: item.id,
+          title: item.title,
+          date: businessDate(item.startsAt),
+          startsAt: item.startsAt.toISOString(),
+        }));
+    });
+  }
 
   /** The conflicts of each booking, by `kind:id`, by user name then start time. */
   async find(
@@ -127,8 +155,17 @@ export class ScheduleConflicts {
     return conflicts;
   }
 
-  /** The scheduled shoots and meetings of the users overlapping `[from, to)`. */
-  private async booked(executor: Executor, userIds: string[], from: Date, to: Date) {
+  /**
+   * The scheduled shoots and meetings of the users overlapping `[from, to)`, and their approved
+   * leaves on its days, each from the start of its first day to the end of its last.
+   */
+  private async booked(
+    executor: Executor,
+    userIds: string[],
+    from: Date,
+    to: Date,
+    options: { leave: boolean } = { leave: true },
+  ): Promise<Booked[]> {
     const overlapping = <T extends typeof shoots | typeof meetings>(table: T) =>
       and(
         eq(table.status, 'scheduled'),
@@ -164,9 +201,26 @@ export class ScheduleConflicts {
         .innerJoin(meetings, eq(meetings.id, meetingAttendees.meetingId))
         .where(and(inArray(meetingAttendees.userId, userIds), overlapping(meetings))),
     ]);
+    const leaves = options.leave
+      ? await this.leave.approved(
+          { from: businessDate(from), to: businessDate(new Date(to.getTime() - 1)), userIds },
+          executor,
+        )
+      : [];
     return [
       ...crew.map((row): Booked => ({ ...row, kind: 'shoot' })),
       ...[...organized, ...attended].map((row): Booked => ({ ...row, kind: 'meeting' })),
+      ...leaves.map(
+        (leave): Booked => ({
+          kind: 'leave',
+          id: leave.requestId,
+          // The type is never shown (rule B16).
+          title: '',
+          userId: leave.userId,
+          startsAt: businessInstant(leave.startsOn, '00:00'),
+          endsAt: businessInstant(addDays(leave.endsOn, 1), '00:00'),
+        }),
+      ),
     ];
   }
 }

@@ -6,8 +6,10 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import {
+  type AssigneeLeave,
   type AuditAction,
   businessDate,
+  type CalendarDate,
   type CreateTask,
   type Following,
   isTaskOverdue,
@@ -51,6 +53,7 @@ import { changedFields, recordAudit } from '../audit/index.js';
 import { type CurrentUserInfo, lockAccessChanges, UserDirectory } from '../auth/index.js';
 import { ClientDirectory, type ClientSummary } from '../clients/index.js';
 import { FileVersions } from '../files/index.js';
+import { LeaveDirectory } from '../hr/index.js';
 import { type Notice, RecordFollowers } from '../notifications/index.js';
 import { EngagementDirectory } from '../projects/index.js';
 import { ClientReviewHooks } from './client-review-hooks.js';
@@ -120,6 +123,7 @@ export class TasksService {
     private readonly postHooks: PostTaskHooks,
     private readonly guards: TaskGuards,
     private readonly followers: RecordFollowers,
+    private readonly leave: LeaveDirectory,
   ) {}
 
   /** F16 rule B12: whether the actor follows a task they may read. */
@@ -363,7 +367,9 @@ export class TasksService {
   }
 
   async create(actor: CurrentUserInfo, input: CreateTask): Promise<TaskDetail> {
-    const id = await this.db.transaction((tx) => this.createIn(tx, actor, input));
+    const id = await this.db.transaction((tx) =>
+      this.createIn(tx, actor, input, { checkLeave: true }),
+    );
     return this.detail(actor, id);
   }
 
@@ -373,12 +379,19 @@ export class TasksService {
    * it for the system without checking the caller's assign scope: the caller checked who may be
    * the assignee (F11 rules 3 and 12, through `ShootTasks`). `inheritsLinks` takes the links as
    * copied from an existing task, so a closed cycle or a done milestone is kept (F11 edge case 6).
+   * `checkLeave` warns of the assignee's leave on the due date (F17 rule B17); template runs and
+   * automatic assignments leave it out.
    */
   async createIn(
     tx: Transaction,
     actor: CurrentUserInfo,
     input: CreateTask,
-    options: { postId?: string; onBehalf?: boolean; inheritsLinks?: boolean } = {},
+    options: {
+      postId?: string;
+      onBehalf?: boolean;
+      inheritsLinks?: boolean;
+      checkLeave?: boolean;
+    } = {},
   ): Promise<string> {
     const postId = options.postId ?? null;
     // Serialized with archiving users: an assignee must stay active (F01 change).
@@ -404,6 +417,10 @@ export class TasksService {
 
     await this.assertLinks(tx, input, client, options.inheritsLinks ? pickLinks(input) : {});
     if (input.assigneeId) await this.assertAssignee(tx, input.assigneeId, input.department);
+    const acceptedLeave =
+      options.checkLeave && input.assigneeId
+        ? await this.checkLeave(tx, input.assigneeId, input.dueDate, input.acceptLeave)
+        : [];
     if (input.dueDate < businessDate()) {
       throw new CodedException(400, 'INVALID_DATES', 'The due date is in the past');
     }
@@ -511,6 +528,16 @@ export class TasksService {
         }),
       },
     });
+    if (input.assigneeId && acceptedLeave.length > 0) {
+      await this.auditAcceptedLeave(
+        tx,
+        actor,
+        created.id,
+        input.assigneeId,
+        input.dueDate,
+        acceptedLeave,
+      );
+    }
     const task = await this.notices.load(tx, created.id);
     await this.notices.send(tx, [
       input.assigneeId
@@ -683,6 +710,12 @@ export class TasksService {
       );
       const assigneeChange = assigneeId !== task.assigneeId;
       const departmentChange = department !== task.department;
+      // F17 rule B17: a new assignee or due date on the assignee's approved leave.
+      const dueDate = input.dueDate ?? task.dueDate;
+      const acceptedLeave =
+        assigneeId && (assigneeChange || dueDate !== task.dueDate)
+          ? await this.checkLeave(tx, assigneeId, dueDate, input.acceptLeave)
+          : [];
       if (!basics && !assigneeChange && !departmentChange && !scopeGiven) return;
 
       let extraWorkItemId = task.extraWorkItemId;
@@ -771,6 +804,9 @@ export class TasksService {
           before: { extraWorkItemId: task.extraWorkItemId },
           after: { extraWorkItemId },
         });
+      }
+      if (assigneeId && acceptedLeave.length > 0) {
+        await this.auditAcceptedLeave(tx, actor, id, assigneeId, dueDate, acceptedLeave);
       }
       await this.notifyUpdate(tx, actor, task, basics);
     });
@@ -1154,6 +1190,45 @@ export class TasksService {
   }
 
   /** Rule 11: an out-of-scope request logs extra work on its project or retainer. */
+  /**
+   * F17 rule B17: `409 ASSIGNEE_ON_LEAVE` with the leaves when the due date falls on the
+   * assignee's approved leave, unless the request accepts them; returns the accepted ones.
+   */
+  private async checkLeave(
+    tx: Transaction,
+    assigneeId: string,
+    dueDate: CalendarDate,
+    accept: boolean | undefined,
+  ): Promise<AssigneeLeave[]> {
+    const leaves = await this.leave.covering(tx, assigneeId, dueDate);
+    if (leaves.length > 0 && !accept) {
+      throw new CodedException(
+        409,
+        'ASSIGNEE_ON_LEAVE',
+        'The assignee is on leave on the due date',
+        leaves,
+      );
+    }
+    return leaves;
+  }
+
+  private async auditAcceptedLeave(
+    tx: Transaction,
+    actor: CurrentUserInfo,
+    taskId: string,
+    assigneeId: string,
+    dueDate: CalendarDate,
+    leaves: readonly AssigneeLeave[],
+  ): Promise<void> {
+    await recordAudit(tx, {
+      actor: actorOf(actor),
+      action: 'task.leave_accepted',
+      entityType: 'task',
+      entityId: taskId,
+      after: { assigneeId, dueDate, leaves },
+    });
+  }
+
   private async createRequestExtraWork(
     tx: Transaction,
     actor: CurrentUserInfo,

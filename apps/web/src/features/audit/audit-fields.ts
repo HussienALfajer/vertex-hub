@@ -40,6 +40,9 @@ const REFERENCE_FIELDS = new Set([
   'editingTaskId',
   'fromPostId',
   'interests',
+  // F17 part B: an opinion's request and an adjustment's ledger row.
+  'requestId',
+  'ledgerRowId',
 ]);
 
 /** The fields an entry shows: the changed ones, without links and references to other records. */

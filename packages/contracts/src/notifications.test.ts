@@ -83,6 +83,9 @@ describe('notification catalog', () => {
         'salary_changed',
         // F17 part B.
         'holiday_changed',
+        'hr_request_decided',
+        'colleague_on_leave',
+        'leave_balance_adjusted',
         // F16 part C: the new types of the sales and engagement modules.
         'responsibility_moved',
         'client_status_changed',
@@ -398,6 +401,8 @@ describe('channels (F16 rule B3)', () => {
         'approval_responded',
         // F17 rule A7.
         'contract_ending',
+        // F17 rules B14 and B15.
+        'hr_request_decided',
         'invoice_overdue',
         'invoice_paid',
         'lead_follow_up_overdue',
@@ -612,6 +617,8 @@ describe('inboxes and resolution (F16 rules B5–B6)', () => {
       // F17 part A.
       'contract_ending',
       'probation_ending',
+      // F17 part B.
+      'hr_request_submitted',
     ]);
   });
 
@@ -673,6 +680,7 @@ describe('escalation (F16 rule B11)', () => {
       [
         'ad_budget_low',
         'campaign_end_passed',
+        'hr_request_submitted',
         'invoice_draft_created',
         'invoice_overdue',
         'member_archived_open_work',

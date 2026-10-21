@@ -256,8 +256,9 @@ function Filters({
     ...SHOOT_TYPES.map((type) => ({ value: type, label: t(`calendar.shootTypes.${type}`) })),
   ];
   // Invoice due dates reach invoice readers only (F13); the API leaves them out for others.
+  // Leave entries (F17 rule B16) are not drawn yet; their filter comes with them.
   const kindOptions = CALENDAR_KINDS.filter(
-    (kind) => kind !== 'invoice_due' || can(me, 'invoices.read'),
+    (kind) => kind !== 'leave' && (kind !== 'invoice_due' || can(me, 'invoices.read')),
   ).map((kind) => ({
     kind,
     name: t(`calendar.kinds.${kind}`),

@@ -2276,230 +2276,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/content/calendar": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["ContentController_calendar"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/me/content/summary": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["ContentController_summary"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/content/posts": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["ContentController_list"];
-        put?: never;
-        post: operations["ContentController_create"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/content/posts/{id}/following": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["ContentController_following"];
-        put: operations["ContentController_setFollowing"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/content/posts/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["ContentController_detail"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch: operations["ContentController_update"];
-        trace?: never;
-    };
-    "/api/content/posts/{id}/status": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["ContentController_changeStatus"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/content/posts/{id}/medical-review": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["ContentController_medicalReview"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/content/posts/{id}/duplicate": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["ContentController_duplicate"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/content/posts/{id}/linkable-tasks": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["ContentController_linkableTasks"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/content/posts/{id}/tasks/{taskId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put: operations["ContentController_linkTask"];
-        post?: never;
-        delete: operations["ContentController_unlinkTask"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/content/posts/{id}/tasks": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["ContentController_createTask"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/content/posts/{id}/tasks/{taskId}/return": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["ContentController_returnTask"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/content/posts/{id}/archive": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["ContentController_archive"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/content/posts/{id}/restore": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["ContentController_restore"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/hr/employees": {
         parameters: {
             query?: never;
@@ -2718,6 +2494,358 @@ export interface paths {
         get: operations["HrRulesController_getSettings"];
         put: operations["HrRulesController_updateSettings"];
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/hr/balances/{userId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["HrLeaveController_balance"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/hr/balances/{userId}/adjustments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["HrLeaveController_adjust"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/hr/requests/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["HrLeaveController_preview"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/hr/requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["HrLeaveController_list"];
+        put?: never;
+        post: operations["HrLeaveController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/hr/requests/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["HrLeaveController_detail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/hr/requests/{id}/decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["HrLeaveController_decide"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/hr/requests/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["HrLeaveController_cancel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/hr/opinions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["HrLeaveController_opine"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/content/calendar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ContentController_calendar"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/me/content/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ContentController_summary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/content/posts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ContentController_list"];
+        put?: never;
+        post: operations["ContentController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/content/posts/{id}/following": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ContentController_following"];
+        put: operations["ContentController_setFollowing"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/content/posts/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ContentController_detail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["ContentController_update"];
+        trace?: never;
+    };
+    "/api/content/posts/{id}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ContentController_changeStatus"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/content/posts/{id}/medical-review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ContentController_medicalReview"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/content/posts/{id}/duplicate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ContentController_duplicate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/content/posts/{id}/linkable-tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ContentController_linkableTasks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/content/posts/{id}/tasks/{taskId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["ContentController_linkTask"];
+        post?: never;
+        delete: operations["ContentController_unlinkTask"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/content/posts/{id}/tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ContentController_createTask"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/content/posts/{id}/tasks/{taskId}/return": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ContentController_returnTask"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/content/posts/{id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ContentController_archive"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/content/posts/{id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ContentController_restore"];
         delete?: never;
         options?: never;
         head?: never;
@@ -5305,9 +5433,9 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         /** @enum {string} */
-        AuditEntityType: "user" | "department" | "client" | "client_contact" | "client_platform_account" | "client_note" | "project" | "project_milestone" | "retainer" | "retainer_cycle" | "retainer_charge" | "retainer_term" | "retainer_amendment" | "extra_work" | "task" | "task_checklist_item" | "task_link" | "task_comment" | "template" | "template_run" | "file_item" | "approval_request" | "post" | "shoot" | "meeting" | "catalog_service" | "catalog_package" | "quote_settings" | "contract_settings" | "quote" | "invoice_settings" | "invoice" | "payment" | "project_expense" | "ad_campaign" | "ad_campaign_update" | "ad_wallet" | "ad_wallet_entry" | "lead" | "lead_note" | "client_report" | "retainer_cycle_report" | "retainer_contract" | "retainer_contract_annex" | "notification_policy" | "announcement" | "announcement_template" | "employee_file" | "salary_change" | "work_schedule" | "holiday" | "hr_settings";
+        AuditEntityType: "user" | "department" | "client" | "client_contact" | "client_platform_account" | "client_note" | "project" | "project_milestone" | "retainer" | "retainer_cycle" | "retainer_charge" | "retainer_term" | "retainer_amendment" | "extra_work" | "task" | "task_checklist_item" | "task_link" | "task_comment" | "template" | "template_run" | "file_item" | "approval_request" | "post" | "shoot" | "meeting" | "catalog_service" | "catalog_package" | "quote_settings" | "contract_settings" | "quote" | "invoice_settings" | "invoice" | "payment" | "project_expense" | "ad_campaign" | "ad_campaign_update" | "ad_wallet" | "ad_wallet_entry" | "lead" | "lead_note" | "client_report" | "retainer_cycle_report" | "retainer_contract" | "retainer_contract_annex" | "notification_policy" | "announcement" | "announcement_template" | "employee_file" | "salary_change" | "work_schedule" | "holiday" | "hr_settings" | "hr_request" | "hr_opinion" | "leave_balance";
         /** @enum {string} */
-        AuditAction: "user.created" | "user.updated" | "user.roles_changed" | "user.departments_changed" | "user.archived" | "user.restored" | "user.link_issued" | "user.password_set" | "user.password_changed" | "user.two_factor_enabled" | "user.two_factor_disabled" | "user.two_factor_reset" | "user.backup_codes_regenerated" | "user.profile_updated" | "user.session_signed_out" | "user.sessions_signed_out" | "department.updated" | "client.created" | "client.updated" | "client.status_changed" | "client.account_manager_changed" | "client.healthcare_changed" | "client.archived" | "client.restored" | "client.brand_kit_updated" | "client.emailed" | "client_contact.created" | "client_contact.updated" | "client_contact.archived" | "client_platform_account.created" | "client_platform_account.updated" | "client_platform_account.archived" | "client_note.created" | "client_note.updated" | "client_note.archived" | "project.created" | "project.updated" | "project.project_manager_changed" | "project.status_changed" | "project.money_updated" | "project.archived" | "project.restored" | "project_milestone.created" | "project_milestone.updated" | "project_milestone.reordered" | "project_milestone.completed" | "project_milestone.reopened" | "project_milestone.archived" | "retainer.created" | "retainer.updated" | "retainer.backdated" | "retainer.status_changed" | "retainer.deliverables_updated" | "retainer.money_updated" | "retainer.archived" | "retainer.restored" | "retainer_cycle.created" | "retainer_cycle.closed" | "retainer_cycle.line_updated" | "retainer_cycle.line_added" | "retainer_cycle.adjusted" | "retainer_charge.created" | "retainer_charge.amount_changed" | "retainer_charge.cancelled" | "retainer_charge.split" | "retainer_charge.settled_outside" | "retainer_term.created" | "retainer_term.updated" | "retainer_term.end_action_changed" | "retainer_term.cancelled" | "retainer_term.started" | "retainer_term.completed" | "retainer_term.renewed" | "retainer_amendment.created" | "retainer_amendment.approved" | "retainer_amendment.rejected" | "retainer_amendment.withdrawn" | "retainer_amendment.applied" | "retainer_amendment.cancelled" | "extra_work.created" | "extra_work.updated" | "extra_work.billing_changed" | "extra_work.archived" | "task.created" | "task.updated" | "task.assigned" | "task.department_changed" | "task.status_changed" | "task.dependencies_updated" | "task.archived" | "task.restored" | "task.revision_decided" | "task.request_scope_changed" | "task.extra_work_moved" | "task.reviewed" | "task.client_text_updated" | "task.client_response_recorded" | "task_checklist_item.created" | "task_checklist_item.updated" | "task_checklist_item.reordered" | "task_checklist_item.archived" | "task_link.created" | "task_link.archived" | "task_comment.created" | "task_comment.updated" | "task_comment.archived" | "template.created" | "template.updated" | "template.assignees_updated" | "template.archived" | "template.restored" | "template_run.created" | "retainer.template_changed" | "file_item.created" | "file_item.renamed" | "file_item.confidential_changed" | "file_item.archived" | "file_item.restored" | "file_version.created" | "file_version.archived" | "file_version.restored" | "file_version.final_set" | "file_version.final_cleared" | "approval_request.created" | "approval_request.link_reissued" | "approval_request.revoked" | "approval_request.emailed" | "approval_item.responded" | "approval_item.withdrawn" | "post.created" | "post.updated" | "post.status_changed" | "post.reviewed" | "post.client_response_recorded" | "post.task_linked" | "post.task_unlinked" | "post.task_returned" | "post.duplicated" | "post.archived" | "post.restored" | "shoot.created" | "shoot.updated" | "shoot.shots_changed" | "shoot.shot_ticked" | "shoot.shot_unticked" | "shoot.completed" | "shoot.cancelled" | "shoot.reopened" | "shoot.archived" | "shoot.restored" | "meeting.created" | "meeting.updated" | "meeting.cancelled" | "meeting.archived" | "meeting.restored" | "catalog_service.created" | "catalog_service.updated" | "catalog_service.archived" | "catalog_service.restored" | "catalog_package.created" | "catalog_package.updated" | "catalog_package.archived" | "catalog_package.restored" | "quote_settings.updated" | "notification_policy.updated" | "contract_settings.updated" | "contract_settings.articles_updated" | "quote.created" | "quote.updated" | "quote.approval_requested" | "quote.approval_withdrawn" | "quote.approval_approved" | "quote.approval_returned" | "quote.sent" | "quote.extended" | "quote.expired" | "quote.rejected" | "quote.accepted" | "quote.version_created" | "quote.superseded" | "quote.archived" | "quote.emailed" | "invoice_settings.updated" | "invoice.created" | "invoice.updated" | "invoice.archived" | "invoice.issued" | "invoice.due_date_changed" | "invoice.voided" | "invoice.overdue" | "invoice.services_changed" | "invoice.emailed" | "payment.recorded" | "payment.voided" | "payment.emailed" | "project_expense.created" | "project_expense.updated" | "project_expense.archived" | "ad_campaign.created" | "ad_campaign.updated" | "ad_campaign.status_changed" | "ad_campaign.archived" | "ad_campaign.restored" | "ad_campaign_update.created" | "ad_campaign_update.updated" | "ad_campaign_update.archived" | "ad_wallet.threshold_changed" | "ad_wallet.low_balance" | "ad_wallet.low_balance_cleared" | "ad_wallet_entry.recorded" | "ad_wallet_entry.voided" | "ad_wallet_entry.emailed" | "lead.created" | "lead.updated" | "lead.stage_changed" | "lead.owner_changed" | "lead.follow_up_changed" | "lead.lost" | "lead.reopened" | "lead.converted" | "lead.archived" | "lead.restored" | "lead_note.created" | "lead_note.updated" | "lead_note.archived" | "client_report.summary_changed" | "retainer_cycle_report.summary_changed" | "retainer_contract.created" | "retainer_contract.updated" | "retainer_contract.discarded" | "retainer_contract.issued" | "retainer_contract.signed" | "retainer_contract.voided" | "retainer_contract_annex.issued" | "retainer_contract_annex.signed" | "retainer_contract_annex.voided" | "announcement.sent" | "announcement.scheduled" | "announcement.schedule_cancelled" | "announcement.edited" | "announcement.withdrawn" | "announcement.archived" | "announcement_poll.closed" | "announcement_template.created" | "announcement_template.updated" | "announcement_template.archived" | "employee_file.updated" | "employee_file.payout_changed" | "employee_file.service_ended" | "employee_file.service_end_cleared" | "salary_change.created" | "salary_change.archived" | "work_schedule.created" | "work_schedule.updated" | "work_schedule.archived" | "holiday.created" | "holiday.updated" | "holiday.archived" | "hr_settings.updated";
+        AuditAction: "user.created" | "user.updated" | "user.roles_changed" | "user.departments_changed" | "user.archived" | "user.restored" | "user.link_issued" | "user.password_set" | "user.password_changed" | "user.two_factor_enabled" | "user.two_factor_disabled" | "user.two_factor_reset" | "user.backup_codes_regenerated" | "user.profile_updated" | "user.session_signed_out" | "user.sessions_signed_out" | "department.updated" | "client.created" | "client.updated" | "client.status_changed" | "client.account_manager_changed" | "client.healthcare_changed" | "client.archived" | "client.restored" | "client.brand_kit_updated" | "client.emailed" | "client_contact.created" | "client_contact.updated" | "client_contact.archived" | "client_platform_account.created" | "client_platform_account.updated" | "client_platform_account.archived" | "client_note.created" | "client_note.updated" | "client_note.archived" | "project.created" | "project.updated" | "project.project_manager_changed" | "project.status_changed" | "project.money_updated" | "project.archived" | "project.restored" | "project_milestone.created" | "project_milestone.updated" | "project_milestone.reordered" | "project_milestone.completed" | "project_milestone.reopened" | "project_milestone.archived" | "retainer.created" | "retainer.updated" | "retainer.backdated" | "retainer.status_changed" | "retainer.deliverables_updated" | "retainer.money_updated" | "retainer.archived" | "retainer.restored" | "retainer_cycle.created" | "retainer_cycle.closed" | "retainer_cycle.line_updated" | "retainer_cycle.line_added" | "retainer_cycle.adjusted" | "retainer_charge.created" | "retainer_charge.amount_changed" | "retainer_charge.cancelled" | "retainer_charge.split" | "retainer_charge.settled_outside" | "retainer_term.created" | "retainer_term.updated" | "retainer_term.end_action_changed" | "retainer_term.cancelled" | "retainer_term.started" | "retainer_term.completed" | "retainer_term.renewed" | "retainer_amendment.created" | "retainer_amendment.approved" | "retainer_amendment.rejected" | "retainer_amendment.withdrawn" | "retainer_amendment.applied" | "retainer_amendment.cancelled" | "extra_work.created" | "extra_work.updated" | "extra_work.billing_changed" | "extra_work.archived" | "task.created" | "task.updated" | "task.assigned" | "task.department_changed" | "task.status_changed" | "task.dependencies_updated" | "task.archived" | "task.restored" | "task.revision_decided" | "task.request_scope_changed" | "task.extra_work_moved" | "task.reviewed" | "task.client_text_updated" | "task.client_response_recorded" | "task_checklist_item.created" | "task_checklist_item.updated" | "task_checklist_item.reordered" | "task_checklist_item.archived" | "task_link.created" | "task_link.archived" | "task_comment.created" | "task_comment.updated" | "task_comment.archived" | "template.created" | "template.updated" | "template.assignees_updated" | "template.archived" | "template.restored" | "template_run.created" | "retainer.template_changed" | "file_item.created" | "file_item.renamed" | "file_item.confidential_changed" | "file_item.archived" | "file_item.restored" | "file_version.created" | "file_version.archived" | "file_version.restored" | "file_version.final_set" | "file_version.final_cleared" | "approval_request.created" | "approval_request.link_reissued" | "approval_request.revoked" | "approval_request.emailed" | "approval_item.responded" | "approval_item.withdrawn" | "post.created" | "post.updated" | "post.status_changed" | "post.reviewed" | "post.client_response_recorded" | "post.task_linked" | "post.task_unlinked" | "post.task_returned" | "post.duplicated" | "post.archived" | "post.restored" | "shoot.created" | "shoot.updated" | "shoot.shots_changed" | "shoot.shot_ticked" | "shoot.shot_unticked" | "shoot.completed" | "shoot.cancelled" | "shoot.reopened" | "shoot.archived" | "shoot.restored" | "meeting.created" | "meeting.updated" | "meeting.cancelled" | "meeting.archived" | "meeting.restored" | "catalog_service.created" | "catalog_service.updated" | "catalog_service.archived" | "catalog_service.restored" | "catalog_package.created" | "catalog_package.updated" | "catalog_package.archived" | "catalog_package.restored" | "quote_settings.updated" | "notification_policy.updated" | "contract_settings.updated" | "contract_settings.articles_updated" | "quote.created" | "quote.updated" | "quote.approval_requested" | "quote.approval_withdrawn" | "quote.approval_approved" | "quote.approval_returned" | "quote.sent" | "quote.extended" | "quote.expired" | "quote.rejected" | "quote.accepted" | "quote.version_created" | "quote.superseded" | "quote.archived" | "quote.emailed" | "invoice_settings.updated" | "invoice.created" | "invoice.updated" | "invoice.archived" | "invoice.issued" | "invoice.due_date_changed" | "invoice.voided" | "invoice.overdue" | "invoice.services_changed" | "invoice.emailed" | "payment.recorded" | "payment.voided" | "payment.emailed" | "project_expense.created" | "project_expense.updated" | "project_expense.archived" | "ad_campaign.created" | "ad_campaign.updated" | "ad_campaign.status_changed" | "ad_campaign.archived" | "ad_campaign.restored" | "ad_campaign_update.created" | "ad_campaign_update.updated" | "ad_campaign_update.archived" | "ad_wallet.threshold_changed" | "ad_wallet.low_balance" | "ad_wallet.low_balance_cleared" | "ad_wallet_entry.recorded" | "ad_wallet_entry.voided" | "ad_wallet_entry.emailed" | "lead.created" | "lead.updated" | "lead.stage_changed" | "lead.owner_changed" | "lead.follow_up_changed" | "lead.lost" | "lead.reopened" | "lead.converted" | "lead.archived" | "lead.restored" | "lead_note.created" | "lead_note.updated" | "lead_note.archived" | "client_report.summary_changed" | "retainer_cycle_report.summary_changed" | "retainer_contract.created" | "retainer_contract.updated" | "retainer_contract.discarded" | "retainer_contract.issued" | "retainer_contract.signed" | "retainer_contract.voided" | "retainer_contract_annex.issued" | "retainer_contract_annex.signed" | "retainer_contract_annex.voided" | "announcement.sent" | "announcement.scheduled" | "announcement.schedule_cancelled" | "announcement.edited" | "announcement.withdrawn" | "announcement.archived" | "announcement_poll.closed" | "announcement_template.created" | "announcement_template.updated" | "announcement_template.archived" | "employee_file.updated" | "employee_file.payout_changed" | "employee_file.service_ended" | "employee_file.service_end_cleared" | "salary_change.created" | "salary_change.archived" | "work_schedule.created" | "work_schedule.updated" | "work_schedule.archived" | "holiday.created" | "holiday.updated" | "holiday.archived" | "hr_settings.updated" | "hr_request.created" | "hr_request.approved" | "hr_request.rejected" | "hr_request.cancelled" | "hr_request.recounted" | "hr_opinion.created" | "leave_balance.adjusted" | "leave_balance.opening" | "task.leave_accepted";
         /** @description Audit entries, newest first */
         AuditPage: {
             items: components["schemas"]["AuditEntry"][];
@@ -11336,6 +11464,209 @@ export interface components {
             /** Format: date-time */
             updatedAt: string;
             /** @enum {string} */
+            type: "hr_request_submitted";
+            data: {
+                employee: string;
+                kind: components["schemas"]["HrRequestKind"];
+                leaveType: components["schemas"]["LeaveType"] | null;
+                /** Format: date */
+                startsOn: string;
+                /** Format: date */
+                endsOn: string;
+            };
+        } | {
+            /** Format: uuid */
+            id: string;
+            actor: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            subject: {
+                type: components["schemas"]["NotificationSubjectType"];
+                /** Format: uuid */
+                id: string;
+            };
+            count: number;
+            read: boolean;
+            /** @default normal */
+            priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
+            box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
+            inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
+            resolution: {
+                outcome: components["schemas"]["NotificationResolution"];
+                by: {
+                    /** Format: uuid */
+                    id: string;
+                    name: string;
+                } | null;
+                /** Format: date-time */
+                at: string;
+            } | null;
+            /**
+             * Format: date-time
+             * @default null
+             */
+            snoozedUntil: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @enum {string} */
+            type: "hr_request_decided";
+            data: {
+                /** @enum {string} */
+                decision: "approved" | "rejected" | "cancelled";
+                kind: components["schemas"]["HrRequestKind"];
+                leaveType: components["schemas"]["LeaveType"] | null;
+                /** Format: date */
+                startsOn: string;
+                /** Format: date */
+                endsOn: string;
+            };
+        } | {
+            /** Format: uuid */
+            id: string;
+            actor: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            subject: {
+                type: components["schemas"]["NotificationSubjectType"];
+                /** Format: uuid */
+                id: string;
+            };
+            count: number;
+            read: boolean;
+            /** @default normal */
+            priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
+            box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
+            inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
+            resolution: {
+                outcome: components["schemas"]["NotificationResolution"];
+                by: {
+                    /** Format: uuid */
+                    id: string;
+                    name: string;
+                } | null;
+                /** Format: date-time */
+                at: string;
+            } | null;
+            /**
+             * Format: date-time
+             * @default null
+             */
+            snoozedUntil: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @enum {string} */
+            type: "colleague_on_leave";
+            data: {
+                employee: string;
+                /** Format: date */
+                startsOn: string;
+                /** Format: date */
+                endsOn: string;
+            };
+        } | {
+            /** Format: uuid */
+            id: string;
+            actor: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            subject: {
+                type: components["schemas"]["NotificationSubjectType"];
+                /** Format: uuid */
+                id: string;
+            };
+            count: number;
+            read: boolean;
+            /** @default normal */
+            priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
+            box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
+            inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
+            resolution: {
+                outcome: components["schemas"]["NotificationResolution"];
+                by: {
+                    /** Format: uuid */
+                    id: string;
+                    name: string;
+                } | null;
+                /** Format: date-time */
+                at: string;
+            } | null;
+            /**
+             * Format: date-time
+             * @default null
+             */
+            snoozedUntil: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @enum {string} */
+            type: "leave_balance_adjusted";
+            data: {
+                leaveType: components["schemas"]["BalanceLeaveType"];
+                year: number;
+                days: number;
+            };
+        } | {
+            /** Format: uuid */
+            id: string;
+            actor: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            subject: {
+                type: components["schemas"]["NotificationSubjectType"];
+                /** Format: uuid */
+                id: string;
+            };
+            count: number;
+            read: boolean;
+            /** @default normal */
+            priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
+            box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
+            inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
+            resolution: {
+                outcome: components["schemas"]["NotificationResolution"];
+                by: {
+                    /** Format: uuid */
+                    id: string;
+                    name: string;
+                } | null;
+                /** Format: date-time */
+                at: string;
+            } | null;
+            /**
+             * Format: date-time
+             * @default null
+             */
+            snoozedUntil: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @enum {string} */
             type: "action_reminder";
             data: {
                 originalType: components["schemas"]["NotificationType"];
@@ -11557,7 +11888,7 @@ export interface components {
             };
         };
         /** @enum {string} */
-        NotificationSubjectType: "task" | "client" | "project" | "retainer" | "template_run" | "approval_request" | "post" | "shoot" | "meeting" | "quote" | "invoice" | "lead" | "user" | "campaign" | "department" | "announcement" | "holiday";
+        NotificationSubjectType: "task" | "client" | "project" | "retainer" | "template_run" | "approval_request" | "post" | "shoot" | "meeting" | "quote" | "invoice" | "lead" | "user" | "campaign" | "department" | "announcement" | "holiday" | "hr_request";
         /** @enum {string} */
         NotificationPriority: "critical" | "important" | "normal" | "informational";
         /** @enum {string} */
@@ -11583,7 +11914,13 @@ export interface components {
         /** @enum {string} */
         AdCampaignStatus: "planned" | "active" | "paused" | "completed" | "cancelled";
         /** @enum {string} */
-        NotificationType: "task_assigned" | "task_mentioned" | "task_returned" | "task_review_requested" | "task_medical_review_requested" | "task_awaiting_client" | "task_over_limit" | "approval_responded" | "approval_no_response" | "approval_expired" | "task_changed" | "task_commented" | "task_file_added" | "task_requested" | "tasks_generated" | "task_approved" | "task_opened" | "request_finished" | "task_delivered" | "post_returned" | "post_review_requested" | "post_medical_review_requested" | "post_awaiting_client" | "post_assigned" | "post_approved" | "post_task_ready" | "post_task_unlinked" | "shoot_booked" | "shoot_dropped" | "shoot_changed" | "meeting_invited" | "meeting_dropped" | "meeting_changed" | "task_due_soon" | "task_overdue" | "task_overdue_escalated" | "task_over_limit_pending" | "post_publish_today" | "post_publish_overdue" | "shoot_upcoming" | "shoot_not_closed" | "meeting_upcoming" | "client_account_manager_assigned" | "project_manager_assigned" | "retainer_renewal_due" | "retainer_behind" | "retainer_term_renewed" | "retainer_cycle_report_ready" | "retainer_amendment_pending" | "retainer_amendment_decided" | "quote_approval_requested" | "quote_approval_decided" | "quote_accepted" | "invoice_overdue" | "invoice_paid" | "ad_budget_low" | "email_failed" | "lead_assigned" | "lead_won" | "lead_follow_up_overdue" | "lead_follow_up_due" | "task_reopened" | "task_revision_decided" | "task_due_shortly" | "post_published" | "post_cancelled" | "post_file_added" | "post_publish_shortly" | "responsibility_moved" | "approval_opened" | "approval_completed" | "shoot_starting" | "meeting_starting" | "shoot_completed" | "client_status_changed" | "client_healthcare_changed" | "lead_lost" | "quote_expiring" | "quote_expired" | "quote_rejected" | "invoice_draft_created" | "invoice_due_soon" | "payment_recorded" | "payment_voided" | "invoice_voided" | "ad_deposit_recorded" | "project_status_changed" | "milestone_completed" | "extra_work_created" | "retainer_status_changed" | "contract_signed" | "contract_voided" | "campaign_assigned" | "campaign_status_changed" | "campaign_end_passed" | "department_manager_assigned" | "member_moved" | "member_archived_open_work" | "security_new_device" | "security_notice" | "push_device_lost" | "announcement" | "announcement_ack_reminder" | "announcement_ack_summary" | "poll_closing" | "poll_results" | "contract_ending" | "probation_ending" | "employee_leaving" | "salary_changed" | "holiday_changed" | "action_reminder" | "action_escalated" | "action_escalated_top" | "task_progressed" | "post_progressed";
+        HrRequestKind: "leave" | "permission";
+        /** @enum {string} */
+        LeaveType: "annual" | "sick" | "emergency" | "unpaid";
+        /** @enum {string} */
+        BalanceLeaveType: "annual" | "sick" | "emergency";
+        /** @enum {string} */
+        NotificationType: "task_assigned" | "task_mentioned" | "task_returned" | "task_review_requested" | "task_medical_review_requested" | "task_awaiting_client" | "task_over_limit" | "approval_responded" | "approval_no_response" | "approval_expired" | "task_changed" | "task_commented" | "task_file_added" | "task_requested" | "tasks_generated" | "task_approved" | "task_opened" | "request_finished" | "task_delivered" | "post_returned" | "post_review_requested" | "post_medical_review_requested" | "post_awaiting_client" | "post_assigned" | "post_approved" | "post_task_ready" | "post_task_unlinked" | "shoot_booked" | "shoot_dropped" | "shoot_changed" | "meeting_invited" | "meeting_dropped" | "meeting_changed" | "task_due_soon" | "task_overdue" | "task_overdue_escalated" | "task_over_limit_pending" | "post_publish_today" | "post_publish_overdue" | "shoot_upcoming" | "shoot_not_closed" | "meeting_upcoming" | "client_account_manager_assigned" | "project_manager_assigned" | "retainer_renewal_due" | "retainer_behind" | "retainer_term_renewed" | "retainer_cycle_report_ready" | "retainer_amendment_pending" | "retainer_amendment_decided" | "quote_approval_requested" | "quote_approval_decided" | "quote_accepted" | "invoice_overdue" | "invoice_paid" | "ad_budget_low" | "email_failed" | "lead_assigned" | "lead_won" | "lead_follow_up_overdue" | "lead_follow_up_due" | "task_reopened" | "task_revision_decided" | "task_due_shortly" | "post_published" | "post_cancelled" | "post_file_added" | "post_publish_shortly" | "responsibility_moved" | "approval_opened" | "approval_completed" | "shoot_starting" | "meeting_starting" | "shoot_completed" | "client_status_changed" | "client_healthcare_changed" | "lead_lost" | "quote_expiring" | "quote_expired" | "quote_rejected" | "invoice_draft_created" | "invoice_due_soon" | "payment_recorded" | "payment_voided" | "invoice_voided" | "ad_deposit_recorded" | "project_status_changed" | "milestone_completed" | "extra_work_created" | "retainer_status_changed" | "contract_signed" | "contract_voided" | "campaign_assigned" | "campaign_status_changed" | "campaign_end_passed" | "department_manager_assigned" | "member_moved" | "member_archived_open_work" | "security_new_device" | "security_notice" | "push_device_lost" | "announcement" | "announcement_ack_reminder" | "announcement_ack_summary" | "poll_closing" | "poll_results" | "contract_ending" | "probation_ending" | "employee_leaving" | "salary_changed" | "holiday_changed" | "hr_request_submitted" | "hr_request_decided" | "colleague_on_leave" | "leave_balance_adjusted" | "action_reminder" | "action_escalated" | "action_escalated_top" | "task_progressed" | "post_progressed";
         /** @enum {string} */
         TaskStatus: "new" | "in_progress" | "internal_review" | "awaiting_client" | "revisions" | "approved" | "delivered" | "cancelled";
         /** @enum {string} */
@@ -11705,7 +12042,7 @@ export interface components {
             mimeType: string;
         };
         /** @enum {string} */
-        FileOwnerType: "task" | "client" | "project" | "retainer" | "post" | "quote" | "invoice" | "ad_wallet_entry" | "retainer_contract" | "announcement" | "employee";
+        FileOwnerType: "task" | "client" | "project" | "retainer" | "post" | "quote" | "invoice" | "ad_wallet_entry" | "retainer_contract" | "announcement" | "employee" | "hr_request";
         /** @enum {string} */
         FileRole: "deliverable" | "reference" | "brand" | "document" | "attachment";
         /** @description Newest first */
@@ -13725,6 +14062,7 @@ export interface components {
             /** @default [] */
             checklist: string[];
             links?: components["schemas"]["CreateTaskLink"][];
+            acceptLeave?: boolean;
         };
         CreateTaskLink: {
             url: string;
@@ -13757,6 +14095,7 @@ export interface components {
             /** Format: date */
             requestedOn?: string;
             requestScope?: components["schemas"]["RequestScope"];
+            acceptLeave?: boolean;
         };
         TaskStatusChange: {
             status: components["schemas"]["TaskStatus"];
@@ -13833,6 +14172,485 @@ export interface components {
             canRemove: boolean;
         };
         TaskCommentInput: {
+            body: string;
+        };
+        /** @enum {string} */
+        EmployeeStatus: "active" | "leaving" | "ended";
+        /** @description Employee files sorted by name */
+        EmployeePage: {
+            items: components["schemas"]["EmployeeSummary"][];
+            total: number;
+            page: number;
+            pageSize: number;
+        };
+        EmployeeSummary: {
+            /** Format: uuid */
+            userId: string;
+            name: string;
+            title: string | null;
+            departments: components["schemas"]["UserDepartment"][];
+            status: components["schemas"]["EmployeeStatus"];
+            employment?: components["schemas"]["EmployeeEmployment"];
+            pay?: components["schemas"]["EmployeePay"];
+        };
+        EmployeeEmployment: {
+            employmentType: components["schemas"]["EmploymentType"];
+            /** Format: date */
+            startDate: string | null;
+            /** Format: date */
+            probationEndDate: string | null;
+            /** Format: date */
+            contractEndDate: string | null;
+            schedule: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            };
+            attendanceExempt: boolean;
+            remoteWeekdays: components["schemas"]["Weekday"][];
+            annualLeaveDays: number;
+            /** Format: date */
+            endedOn: string | null;
+            endReason: components["schemas"]["EndReason"] | null;
+            endNote: string | null;
+        };
+        /** @enum {string} */
+        EmploymentType: "full_time" | "part_time" | "freelance";
+        /** @enum {string} */
+        Weekday: "saturday" | "sunday" | "monday" | "tuesday" | "wednesday" | "thursday" | "friday";
+        /** @enum {string} */
+        EndReason: "resigned" | "terminated" | "contract_ended" | "other";
+        EmployeePay: {
+            payoutMethod: components["schemas"]["PayoutMethod"] | null;
+            payoutInstitution: string | null;
+            payoutAccount: string | null;
+            payoutHolder: string | null;
+            currentSalary: components["schemas"]["CurrentSalary"] | null;
+        };
+        /** @enum {string} */
+        PayoutMethod: "cash" | "bank_transfer" | "mobile_wallet";
+        CurrentSalary: {
+            amountMinor: number;
+            currency: components["schemas"]["Currency"];
+            /** Format: date */
+            effectiveOn: string;
+        };
+        EmployeeFile: {
+            /** Format: uuid */
+            userId: string;
+            name: string;
+            title: string | null;
+            departments: components["schemas"]["UserDepartment"][];
+            status: components["schemas"]["EmployeeStatus"];
+            personal?: components["schemas"]["EmployeePersonal"];
+            employment?: components["schemas"]["EmployeeEmployment"];
+            pay?: components["schemas"]["EmployeePay"];
+        };
+        EmployeePersonal: {
+            nationalId: string | null;
+            /** Format: date */
+            birthDate: string | null;
+            address: string | null;
+            emergencyName: string | null;
+            emergencyPhone: string | null;
+            emergencyRelation: string | null;
+        };
+        UpdateEmployeeFile: {
+            nationalId?: string | null;
+            /** Format: date */
+            birthDate?: string | null;
+            address?: string | null;
+            emergencyName?: string | null;
+            emergencyPhone?: string | null;
+            emergencyRelation?: string | null;
+            employmentType?: components["schemas"]["EmploymentType"];
+            /** Format: date */
+            startDate?: string | null;
+            /** Format: date */
+            probationEndDate?: string | null;
+            /** Format: date */
+            contractEndDate?: string | null;
+            /** Format: uuid */
+            scheduleId?: string;
+            attendanceExempt?: boolean;
+            remoteWeekdays?: components["schemas"]["Weekday"][];
+            annualLeaveDays?: number;
+        };
+        Payout: {
+            method: components["schemas"]["PayoutMethod"] | null;
+            institution?: string | null;
+            account?: string | null;
+            holder?: string | null;
+        };
+        EndService: {
+            /** Format: date */
+            endedOn: string;
+            reason: components["schemas"]["EndReason"];
+            note?: string | null;
+        };
+        /** @description Salary changes, latest effective date first */
+        SalaryChangeList: {
+            items: components["schemas"]["SalaryChange"][];
+        };
+        SalaryChange: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            userId: string;
+            /** Format: date */
+            effectiveOn: string;
+            amountMinor: number;
+            currency: components["schemas"]["Currency"];
+            reason: string;
+            createdBy: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            archivedAt: string | null;
+            archiveReason: string | null;
+        };
+        CreateSalaryChange: {
+            /** Format: date */
+            effectiveOn: string;
+            amountMinor: number;
+            currency: components["schemas"]["Currency"];
+            reason: string;
+        };
+        ArchiveSalaryChange: {
+            reason: string;
+        };
+        /** @description The default first, then by name */
+        WorkScheduleList: {
+            items: components["schemas"]["WorkSchedule"][];
+        };
+        WorkSchedule: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            kind: components["schemas"]["WorkScheduleKind"];
+            isDefault: boolean;
+            days: components["schemas"]["WorkScheduleDay"][];
+            employees: number;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** Format: date-time */
+            archivedAt: string | null;
+        };
+        /** @enum {string} */
+        WorkScheduleKind: "fixed" | "flexible";
+        WorkScheduleDay: {
+            weekday: components["schemas"]["Weekday"];
+            startTime: string;
+            latestStartTime: string | null;
+            requiredMinutes: number;
+        };
+        CreateWorkSchedule: {
+            name: string;
+            kind: components["schemas"]["WorkScheduleKind"];
+            days: components["schemas"]["WorkScheduleDay"][];
+            /** @default false */
+            isDefault: boolean;
+        };
+        UpdateWorkSchedule: {
+            name?: string;
+            kind?: components["schemas"]["WorkScheduleKind"];
+            days?: components["schemas"]["WorkScheduleDay"][];
+            isDefault?: boolean;
+        };
+        /** @description Non-archived holidays by start date */
+        HolidayList: {
+            items: components["schemas"]["Holiday"][];
+        };
+        Holiday: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            /** Format: date */
+            startsOn: string;
+            /** Format: date */
+            endsOn: string;
+            paid: boolean;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** Format: date-time */
+            archivedAt: string | null;
+        };
+        CreateHoliday: {
+            name: string;
+            /** Format: date */
+            startsOn: string;
+            /** Format: date */
+            endsOn: string;
+            /** @default true */
+            paid: boolean;
+        };
+        RepeatHolidays: {
+            year: number;
+        };
+        UpdateHoliday: {
+            name?: string;
+            /** Format: date */
+            startsOn?: string;
+            /** Format: date */
+            endsOn?: string;
+            paid?: boolean;
+        };
+        HrSettings: {
+            graceMinutes: number;
+            latenessTiers: components["schemas"]["LatenessTier"][];
+            firstLatenessWarning: boolean;
+            overtimeMinMinutes: number;
+            checkInReminderMinutes: number;
+            defaultAnnualLeaveDays: number;
+            carryOverMaxDays: number;
+            sickDaysPerYear: number;
+            sickCertificateAfterDays: number;
+            sickRequestWithinWorkDays: number;
+            emergencyDaysPerYear: number;
+            permissionMaxMinutes: number;
+            permissionsPerMonth: number;
+            annualNoticeWorkDays: number;
+            remoteNoticeWorkDays: number;
+            overtimeMinutesPerLeaveDay: number;
+        };
+        LatenessTier: {
+            upToMinutes: number | null;
+            /** @enum {number} */
+            fraction: 0.25 | 0.5 | 0.75 | 1;
+        };
+        LeaveBalance: {
+            /** Format: uuid */
+            userId: string;
+            year: number;
+            balances: components["schemas"]["LeaveTypeBalance"][];
+            ledger: components["schemas"]["LedgerRow"][];
+        };
+        LeaveTypeBalance: {
+            leaveType: components["schemas"]["BalanceLeaveType"];
+            balance: number;
+            pending: number;
+            available: number;
+            opening: number;
+            accrued: number;
+            carriedOver: number;
+            taken: number;
+            expired: number;
+            adjusted: number;
+        };
+        LedgerRow: {
+            /** Format: uuid */
+            id: string;
+            leaveType: components["schemas"]["BalanceLeaveType"];
+            year: number;
+            days: number;
+            entry: components["schemas"]["LedgerEntry"];
+            period: string | null;
+            /** Format: uuid */
+            requestId: string | null;
+            note: string | null;
+            createdBy: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        /** @enum {string} */
+        LedgerEntry: "opening" | "accrual" | "grant" | "carry_over" | "expiry" | "taken" | "restored" | "adjustment";
+        CreateLeaveAdjustment: {
+            leaveType: components["schemas"]["BalanceLeaveType"];
+            year: number;
+            days: number;
+            note: string;
+            /** @enum {string} */
+            entry: "adjustment" | "opening";
+        };
+        CreateHrRequest: {
+            /** @enum {string} */
+            kind: "leave";
+            /** Format: uuid */
+            userId?: string;
+            leaveType: components["schemas"]["LeaveType"];
+            /** Format: date */
+            startsOn: string;
+            /** Format: date */
+            endsOn: string;
+            /** @default null */
+            half: components["schemas"]["LeaveHalf"] | null;
+            reason?: string | null;
+        } | {
+            /** @enum {string} */
+            kind: "permission";
+            /** Format: uuid */
+            userId?: string;
+            /** Format: date */
+            date: string;
+            fromTime: string;
+            toTime: string;
+            reason?: string | null;
+        };
+        /** @enum {string} */
+        LeaveHalf: "first_half" | "second_half";
+        HrRequestPreview: {
+            days: number | null;
+            paidDays: number | null;
+            unpaidDays: number | null;
+            shortNotice: boolean;
+            warnings: components["schemas"]["HrRequestWarning"][];
+        };
+        /** @enum {string} */
+        HrRequestWarning: "short_notice" | "unpaid_days" | "certificate_required";
+        HrRequest: {
+            /** Format: uuid */
+            id: string;
+            user: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            };
+            kind: components["schemas"]["HrRequestKind"];
+            leaveType: components["schemas"]["LeaveType"] | null;
+            /** Format: date */
+            startsOn: string;
+            /** Format: date */
+            endsOn: string;
+            half: components["schemas"]["LeaveHalf"] | null;
+            fromTime: string | null;
+            toTime: string | null;
+            days: number | null;
+            paidDays: number | null;
+            unpaidDays: number | null;
+            reason: string | null;
+            shortNotice: boolean;
+            status: components["schemas"]["HrRequestStatus"];
+            certificateRequired: boolean;
+            documents: number;
+            createdBy: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            };
+            decidedBy: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            /** Format: date-time */
+            decidedAt: string | null;
+            decisionNote: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        /** @enum {string} */
+        HrRequestStatus: "pending" | "approved" | "rejected" | "cancelled";
+        /** @description Requests by submission time */
+        HrRequestPage: {
+            items: components["schemas"]["HrRequest"][];
+            total: number;
+            page: number;
+            pageSize: number;
+        };
+        HrRequestDetail: {
+            /** Format: uuid */
+            id: string;
+            user: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            };
+            kind: components["schemas"]["HrRequestKind"];
+            leaveType: components["schemas"]["LeaveType"] | null;
+            /** Format: date */
+            startsOn: string;
+            /** Format: date */
+            endsOn: string;
+            half: components["schemas"]["LeaveHalf"] | null;
+            fromTime: string | null;
+            toTime: string | null;
+            days: number | null;
+            paidDays: number | null;
+            unpaidDays: number | null;
+            reason: string | null;
+            shortNotice: boolean;
+            status: components["schemas"]["HrRequestStatus"];
+            certificateRequired: boolean;
+            documents: number;
+            createdBy: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            };
+            decidedBy: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            /** Format: date-time */
+            decidedAt: string | null;
+            decisionNote: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            opinions: components["schemas"]["HrOpinion"][];
+            overlappingWork: components["schemas"]["OverlappingWork"][] | null;
+            permissions: components["schemas"]["HrRequestPermissions"];
+        };
+        HrOpinion: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            requestId: string;
+            author: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            };
+            body: string;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        OverlappingWork: {
+            /** @enum {string} */
+            kind: "task" | "shoot" | "meeting";
+            /** Format: uuid */
+            id: string;
+            title: string;
+            /** Format: date */
+            date: string;
+            /** Format: date-time */
+            startsAt: string | null;
+        };
+        /** @description What the caller may do, for the UI */
+        HrRequestPermissions: {
+            canDecide: boolean;
+            canCancel: boolean;
+            canGiveOpinion: boolean;
+        };
+        DecideHrRequest: {
+            /** @enum {string} */
+            decision: "approve" | "reject";
+            note?: string | null;
+            /** @default false */
+            confirmMissingCertificate: boolean;
+        };
+        CancelHrRequest: {
+            note?: string | null;
+        };
+        CreateHrOpinion: {
+            /** Format: uuid */
+            requestId: string;
             body: string;
         };
         /** @enum {string} */
@@ -14214,259 +15032,7 @@ export interface components {
             note: string;
         };
         /** @enum {string} */
-        EmployeeStatus: "active" | "leaving" | "ended";
-        /** @description Employee files sorted by name */
-        EmployeePage: {
-            items: components["schemas"]["EmployeeSummary"][];
-            total: number;
-            page: number;
-            pageSize: number;
-        };
-        EmployeeSummary: {
-            /** Format: uuid */
-            userId: string;
-            name: string;
-            title: string | null;
-            departments: components["schemas"]["UserDepartment"][];
-            status: components["schemas"]["EmployeeStatus"];
-            employment?: components["schemas"]["EmployeeEmployment"];
-            pay?: components["schemas"]["EmployeePay"];
-        };
-        EmployeeEmployment: {
-            employmentType: components["schemas"]["EmploymentType"];
-            /** Format: date */
-            startDate: string | null;
-            /** Format: date */
-            probationEndDate: string | null;
-            /** Format: date */
-            contractEndDate: string | null;
-            schedule: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            };
-            attendanceExempt: boolean;
-            remoteWeekdays: components["schemas"]["Weekday"][];
-            annualLeaveDays: number;
-            /** Format: date */
-            endedOn: string | null;
-            endReason: components["schemas"]["EndReason"] | null;
-            endNote: string | null;
-        };
-        /** @enum {string} */
-        EmploymentType: "full_time" | "part_time" | "freelance";
-        /** @enum {string} */
-        Weekday: "saturday" | "sunday" | "monday" | "tuesday" | "wednesday" | "thursday" | "friday";
-        /** @enum {string} */
-        EndReason: "resigned" | "terminated" | "contract_ended" | "other";
-        EmployeePay: {
-            payoutMethod: components["schemas"]["PayoutMethod"] | null;
-            payoutInstitution: string | null;
-            payoutAccount: string | null;
-            payoutHolder: string | null;
-            currentSalary: components["schemas"]["CurrentSalary"] | null;
-        };
-        /** @enum {string} */
-        PayoutMethod: "cash" | "bank_transfer" | "mobile_wallet";
-        CurrentSalary: {
-            amountMinor: number;
-            currency: components["schemas"]["Currency"];
-            /** Format: date */
-            effectiveOn: string;
-        };
-        EmployeeFile: {
-            /** Format: uuid */
-            userId: string;
-            name: string;
-            title: string | null;
-            departments: components["schemas"]["UserDepartment"][];
-            status: components["schemas"]["EmployeeStatus"];
-            personal?: components["schemas"]["EmployeePersonal"];
-            employment?: components["schemas"]["EmployeeEmployment"];
-            pay?: components["schemas"]["EmployeePay"];
-        };
-        EmployeePersonal: {
-            nationalId: string | null;
-            /** Format: date */
-            birthDate: string | null;
-            address: string | null;
-            emergencyName: string | null;
-            emergencyPhone: string | null;
-            emergencyRelation: string | null;
-        };
-        UpdateEmployeeFile: {
-            nationalId?: string | null;
-            /** Format: date */
-            birthDate?: string | null;
-            address?: string | null;
-            emergencyName?: string | null;
-            emergencyPhone?: string | null;
-            emergencyRelation?: string | null;
-            employmentType?: components["schemas"]["EmploymentType"];
-            /** Format: date */
-            startDate?: string | null;
-            /** Format: date */
-            probationEndDate?: string | null;
-            /** Format: date */
-            contractEndDate?: string | null;
-            /** Format: uuid */
-            scheduleId?: string;
-            attendanceExempt?: boolean;
-            remoteWeekdays?: components["schemas"]["Weekday"][];
-            annualLeaveDays?: number;
-        };
-        Payout: {
-            method: components["schemas"]["PayoutMethod"] | null;
-            institution?: string | null;
-            account?: string | null;
-            holder?: string | null;
-        };
-        EndService: {
-            /** Format: date */
-            endedOn: string;
-            reason: components["schemas"]["EndReason"];
-            note?: string | null;
-        };
-        /** @description Salary changes, latest effective date first */
-        SalaryChangeList: {
-            items: components["schemas"]["SalaryChange"][];
-        };
-        SalaryChange: {
-            /** Format: uuid */
-            id: string;
-            /** Format: uuid */
-            userId: string;
-            /** Format: date */
-            effectiveOn: string;
-            amountMinor: number;
-            currency: components["schemas"]["Currency"];
-            reason: string;
-            createdBy: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            } | null;
-            /** Format: date-time */
-            createdAt: string;
-            /** Format: date-time */
-            archivedAt: string | null;
-            archiveReason: string | null;
-        };
-        CreateSalaryChange: {
-            /** Format: date */
-            effectiveOn: string;
-            amountMinor: number;
-            currency: components["schemas"]["Currency"];
-            reason: string;
-        };
-        ArchiveSalaryChange: {
-            reason: string;
-        };
-        /** @description The default first, then by name */
-        WorkScheduleList: {
-            items: components["schemas"]["WorkSchedule"][];
-        };
-        WorkSchedule: {
-            /** Format: uuid */
-            id: string;
-            name: string;
-            kind: components["schemas"]["WorkScheduleKind"];
-            isDefault: boolean;
-            days: components["schemas"]["WorkScheduleDay"][];
-            employees: number;
-            /** Format: date-time */
-            createdAt: string;
-            /** Format: date-time */
-            updatedAt: string;
-            /** Format: date-time */
-            archivedAt: string | null;
-        };
-        /** @enum {string} */
-        WorkScheduleKind: "fixed" | "flexible";
-        WorkScheduleDay: {
-            weekday: components["schemas"]["Weekday"];
-            startTime: string;
-            latestStartTime: string | null;
-            requiredMinutes: number;
-        };
-        CreateWorkSchedule: {
-            name: string;
-            kind: components["schemas"]["WorkScheduleKind"];
-            days: components["schemas"]["WorkScheduleDay"][];
-            /** @default false */
-            isDefault: boolean;
-        };
-        UpdateWorkSchedule: {
-            name?: string;
-            kind?: components["schemas"]["WorkScheduleKind"];
-            days?: components["schemas"]["WorkScheduleDay"][];
-            isDefault?: boolean;
-        };
-        /** @description Non-archived holidays by start date */
-        HolidayList: {
-            items: components["schemas"]["Holiday"][];
-        };
-        Holiday: {
-            /** Format: uuid */
-            id: string;
-            name: string;
-            /** Format: date */
-            startsOn: string;
-            /** Format: date */
-            endsOn: string;
-            paid: boolean;
-            /** Format: date-time */
-            createdAt: string;
-            /** Format: date-time */
-            updatedAt: string;
-            /** Format: date-time */
-            archivedAt: string | null;
-        };
-        CreateHoliday: {
-            name: string;
-            /** Format: date */
-            startsOn: string;
-            /** Format: date */
-            endsOn: string;
-            /** @default true */
-            paid: boolean;
-        };
-        RepeatHolidays: {
-            year: number;
-        };
-        UpdateHoliday: {
-            name?: string;
-            /** Format: date */
-            startsOn?: string;
-            /** Format: date */
-            endsOn?: string;
-            paid?: boolean;
-        };
-        HrSettings: {
-            graceMinutes: number;
-            latenessTiers: components["schemas"]["LatenessTier"][];
-            firstLatenessWarning: boolean;
-            overtimeMinMinutes: number;
-            checkInReminderMinutes: number;
-            defaultAnnualLeaveDays: number;
-            carryOverMaxDays: number;
-            sickDaysPerYear: number;
-            sickCertificateAfterDays: number;
-            sickRequestWithinWorkDays: number;
-            emergencyDaysPerYear: number;
-            permissionMaxMinutes: number;
-            permissionsPerMonth: number;
-            annualNoticeWorkDays: number;
-            remoteNoticeWorkDays: number;
-            overtimeMinutesPerLeaveDay: number;
-        };
-        LatenessTier: {
-            upToMinutes: number | null;
-            /** @enum {number} */
-            fraction: 0.25 | 0.5 | 0.75 | 1;
-        };
-        /** @enum {string} */
-        CalendarKind: "shoot" | "meeting" | "project_due" | "milestone_due" | "renewal" | "invoice_due" | "holiday";
+        CalendarKind: "shoot" | "meeting" | "leave" | "project_due" | "milestone_due" | "renewal" | "invoice_due" | "holiday";
         /** @enum {string} */
         ShootType: "product" | "video" | "event" | "people" | "other";
         Calendar: {
@@ -14476,6 +15042,7 @@ export interface components {
             to: string;
             shoots: components["schemas"]["Shoot"][];
             meetings: components["schemas"]["Meeting"][];
+            leaves: components["schemas"]["CalendarLeave"][];
             keyDates: components["schemas"]["KeyDate"][];
         };
         Shoot: {
@@ -14538,6 +15105,21 @@ export interface components {
         };
         /** @enum {string} */
         MeetingStatus: "scheduled" | "cancelled";
+        CalendarLeave: {
+            /** Format: uuid */
+            requestId: string;
+            user: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            };
+            /** Format: date */
+            startsOn: string;
+            /** Format: date */
+            endsOn: string;
+            half: components["schemas"]["LeaveHalf"] | null;
+            leaveType: components["schemas"]["LeaveType"] | null;
+        };
         KeyDate: {
             kind: components["schemas"]["KeyDateKind"];
             /** Format: date */
@@ -14577,7 +15159,7 @@ export interface components {
             endsAt: string;
         };
         /** @enum {string} */
-        CalendarItemKind: "shoot" | "meeting";
+        CalendarItemKind: "shoot" | "meeting" | "leave";
         /** @description Shoots by start time, latest first */
         ShootPage: {
             items: components["schemas"]["Shoot"][];
@@ -23476,6 +24058,707 @@ export interface operations {
             };
         };
     };
+    HrController_list: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+                search?: string;
+                departmentId?: string;
+                status?: components["schemas"]["EmployeeStatus"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description People: `employees.read` or `salaries.read`; pay only with `salaries.read` */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmployeePage"];
+                };
+            };
+        };
+    };
+    HrController_detail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description An employee file, its sections by rule A2; 404 for anyone else */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmployeeFile"];
+                };
+            };
+        };
+    };
+    HrController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateEmployeeFile"];
+            };
+        };
+        responses: {
+            /** @description The file after the change */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmployeeFile"];
+                };
+            };
+        };
+    };
+    HrController_setPayout: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Payout"];
+            };
+        };
+        responses: {
+            /** @description The file after the change */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmployeeFile"];
+                };
+            };
+        };
+    };
+    HrController_endService: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EndService"];
+            };
+        };
+        responses: {
+            /** @description The file with its end of service (rule A8) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmployeeFile"];
+                };
+            };
+        };
+    };
+    HrController_clearEnd: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The file with its end of service cleared */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmployeeFile"];
+                };
+            };
+        };
+    };
+    HrController_salaryHistory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The salary history: the employee and `salaries.read` holders; 404 otherwise */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalaryChangeList"];
+                };
+            };
+        };
+    };
+    HrController_addSalary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateSalaryChange"];
+            };
+        };
+        responses: {
+            /** @description The added salary change */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalaryChange"];
+                };
+            };
+        };
+    };
+    HrController_archiveSalary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ArchiveSalaryChange"];
+            };
+        };
+        responses: {
+            /** @description The archived salary change */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalaryChange"];
+                };
+            };
+        };
+    };
+    HrRulesController_listSchedules: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The work schedules */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkScheduleList"];
+                };
+            };
+        };
+    };
+    HrRulesController_createSchedule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateWorkSchedule"];
+            };
+        };
+        responses: {
+            /** @description The new schedule */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkSchedule"];
+                };
+            };
+        };
+    };
+    HrRulesController_updateSchedule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateWorkSchedule"];
+            };
+        };
+        responses: {
+            /** @description The schedule after the change */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkSchedule"];
+                };
+            };
+        };
+    };
+    HrRulesController_archiveSchedule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The archived schedule; not the default, nor one with employees */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkSchedule"];
+                };
+            };
+        };
+    };
+    HrRulesController_listHolidays: {
+        parameters: {
+            query: {
+                year: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The holidays of a year */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HolidayList"];
+                };
+            };
+        };
+    };
+    HrRulesController_createHoliday: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateHoliday"];
+            };
+        };
+        responses: {
+            /** @description The new holiday */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Holiday"];
+                };
+            };
+        };
+    };
+    HrRulesController_repeatHolidays: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RepeatHolidays"];
+            };
+        };
+        responses: {
+            /** @description Last year's holidays copied to the same dates, those that fit */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HolidayList"];
+                };
+            };
+        };
+    };
+    HrRulesController_updateHoliday: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateHoliday"];
+            };
+        };
+        responses: {
+            /** @description The holiday after the change */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Holiday"];
+                };
+            };
+        };
+    };
+    HrRulesController_archiveHoliday: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The archived holiday */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Holiday"];
+                };
+            };
+        };
+    };
+    HrRulesController_getSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The HR settings */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrSettings"];
+                };
+            };
+        };
+    };
+    HrRulesController_updateSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HrSettings"];
+            };
+        };
+        responses: {
+            /** @description The HR settings after the change */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrSettings"];
+                };
+            };
+        };
+    };
+    HrLeaveController_balance: {
+        parameters: {
+            query: {
+                year: number;
+            };
+            header?: never;
+            path: {
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A year's leave balances and ledger: one's own, or `hr.read` in scope; 404 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeaveBalance"];
+                };
+            };
+        };
+    };
+    HrLeaveController_adjust: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateLeaveAdjustment"];
+            };
+        };
+        responses: {
+            /** @description An opening balance or a signed adjustment; the balances of its year */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeaveBalance"];
+                };
+            };
+        };
+    };
+    HrLeaveController_preview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateHrRequest"];
+            };
+        };
+        responses: {
+            /** @description The days, split and notice of a request before it is submitted; the same errors as submitting */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrRequestPreview"];
+                };
+            };
+        };
+    };
+    HrLeaveController_list: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+                status?: components["schemas"]["HrRequestStatus"] | components["schemas"]["HrRequestStatus"][];
+                kind?: components["schemas"]["HrRequestKind"];
+                userId?: string | "me";
+                departmentId?: string;
+                month?: string;
+                order?: components["schemas"]["SortOrder"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description One's own requests, and those `hr.read` covers */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrRequestPage"];
+                };
+            };
+        };
+    };
+    HrLeaveController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateHrRequest"];
+            };
+        };
+        responses: {
+            /** @description A leave or permission request; `userId` (`hr.approve`) records one for someone, approved at once. `REQUEST_OVERLAP`, `INSUFFICIENT_BALANCE`, `ON_PROBATION`, `PERMISSION_LIMIT`, `TOO_LATE`, `NOT_A_WORK_DAY` */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrRequest"];
+                };
+            };
+        };
+    };
+    HrLeaveController_detail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A request with its opinions, and the employee's work in its days for `hr.approve` */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrRequestDetail"];
+                };
+            };
+        };
+    };
+    HrLeaveController_decide: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DecideHrRequest"];
+            };
+        };
+        responses: {
+            /** @description Approve or reject a pending request. `NOT_PENDING`, `CERTIFICATE_MISSING` */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrRequest"];
+                };
+            };
+        };
+    };
+    HrLeaveController_cancel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CancelHrRequest"];
+            };
+        };
+        responses: {
+            /** @description Cancel a request: the owner or `hr.approve` (rule B15). `NOT_CANCELLABLE` */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrRequest"];
+                };
+            };
+        };
+    };
+    HrLeaveController_opine: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateHrOpinion"];
+            };
+        };
+        responses: {
+            /** @description An opinion on someone's pending request, in `hr.read` scope. `NOT_PENDING` */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrOpinion"];
+                };
+            };
+        };
+    };
     ContentController_calendar: {
         parameters: {
             query: {
@@ -23996,482 +25279,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PostDetail"];
-                };
-            };
-        };
-    };
-    HrController_list: {
-        parameters: {
-            query?: {
-                page?: number;
-                pageSize?: number;
-                search?: string;
-                departmentId?: string;
-                status?: components["schemas"]["EmployeeStatus"];
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description People: `employees.read` or `salaries.read`; pay only with `salaries.read` */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["EmployeePage"];
-                };
-            };
-        };
-    };
-    HrController_detail: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                userId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description An employee file, its sections by rule A2; 404 for anyone else */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["EmployeeFile"];
-                };
-            };
-        };
-    };
-    HrController_update: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                userId: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["UpdateEmployeeFile"];
-            };
-        };
-        responses: {
-            /** @description The file after the change */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["EmployeeFile"];
-                };
-            };
-        };
-    };
-    HrController_setPayout: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                userId: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["Payout"];
-            };
-        };
-        responses: {
-            /** @description The file after the change */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["EmployeeFile"];
-                };
-            };
-        };
-    };
-    HrController_endService: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                userId: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["EndService"];
-            };
-        };
-        responses: {
-            /** @description The file with its end of service (rule A8) */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["EmployeeFile"];
-                };
-            };
-        };
-    };
-    HrController_clearEnd: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                userId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description The file with its end of service cleared */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["EmployeeFile"];
-                };
-            };
-        };
-    };
-    HrController_salaryHistory: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                userId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description The salary history: the employee and `salaries.read` holders; 404 otherwise */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SalaryChangeList"];
-                };
-            };
-        };
-    };
-    HrController_addSalary: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                userId: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CreateSalaryChange"];
-            };
-        };
-        responses: {
-            /** @description The added salary change */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SalaryChange"];
-                };
-            };
-        };
-    };
-    HrController_archiveSalary: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ArchiveSalaryChange"];
-            };
-        };
-        responses: {
-            /** @description The archived salary change */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SalaryChange"];
-                };
-            };
-        };
-    };
-    HrRulesController_listSchedules: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description The work schedules */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["WorkScheduleList"];
-                };
-            };
-        };
-    };
-    HrRulesController_createSchedule: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CreateWorkSchedule"];
-            };
-        };
-        responses: {
-            /** @description The new schedule */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["WorkSchedule"];
-                };
-            };
-        };
-    };
-    HrRulesController_updateSchedule: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["UpdateWorkSchedule"];
-            };
-        };
-        responses: {
-            /** @description The schedule after the change */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["WorkSchedule"];
-                };
-            };
-        };
-    };
-    HrRulesController_archiveSchedule: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description The archived schedule; not the default, nor one with employees */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["WorkSchedule"];
-                };
-            };
-        };
-    };
-    HrRulesController_listHolidays: {
-        parameters: {
-            query: {
-                year: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description The holidays of a year */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HolidayList"];
-                };
-            };
-        };
-    };
-    HrRulesController_createHoliday: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CreateHoliday"];
-            };
-        };
-        responses: {
-            /** @description The new holiday */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Holiday"];
-                };
-            };
-        };
-    };
-    HrRulesController_repeatHolidays: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["RepeatHolidays"];
-            };
-        };
-        responses: {
-            /** @description Last year's holidays copied to the same dates, those that fit */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HolidayList"];
-                };
-            };
-        };
-    };
-    HrRulesController_updateHoliday: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["UpdateHoliday"];
-            };
-        };
-        responses: {
-            /** @description The holiday after the change */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Holiday"];
-                };
-            };
-        };
-    };
-    HrRulesController_archiveHoliday: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description The archived holiday */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Holiday"];
-                };
-            };
-        };
-    };
-    HrRulesController_getSettings: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description The HR settings */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HrSettings"];
-                };
-            };
-        };
-    };
-    HrRulesController_updateSettings: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["HrSettings"];
-            };
-        };
-        responses: {
-            /** @description The HR settings after the change */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HrSettings"];
                 };
             };
         };

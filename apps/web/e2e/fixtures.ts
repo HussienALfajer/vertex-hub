@@ -11287,6 +11287,8 @@ function calendarRoutes({
       const calendar: Calendar = {
         from,
         to,
+        // F17 rule B16: no approved leave in the mocks yet.
+        leaves: [],
         shoots: shows('shoot')
           ? shoots
               .filter(

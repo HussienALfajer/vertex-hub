@@ -36,6 +36,7 @@ const OWNER_COLUMNS = {
   retainer_contract: fileItems.retainerContractId,
   announcement: fileItems.announcementId,
   employee: fileItems.employeeId,
+  hr_request: fileItems.hrRequestId,
 } as const;
 
 /** The items of one owner. `client_id` is set on every item of a client, so the type filters too. */
@@ -56,6 +57,7 @@ export function ownerValues(owner: FileOwner) {
     retainerContractId: owner.type === 'retainer_contract' ? owner.id : null,
     announcementId: owner.type === 'announcement' ? owner.id : null,
     employeeId: owner.type === 'employee' ? owner.id : null,
+    hrRequestId: owner.type === 'hr_request' ? owner.id : null,
     clientId: owner.clientId,
   };
 }
@@ -71,6 +73,7 @@ export const ownerIdOf = (item: ItemRow): string =>
     item.retainerContractId ??
     item.announcementId ??
     item.employeeId ??
+    item.hrRequestId ??
     item.clientId) as string;
 
 /**

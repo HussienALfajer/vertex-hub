@@ -3,22 +3,25 @@ import {
   addDays,
   type CalendarDate,
   calendarDateSchema,
+  calendarMonthSchema,
   daysInclusive,
+  type HolidayRange,
   instantSchema,
   lastOfMonth,
   type TimeOfDay,
   timeOfDaySchema,
+  weekday,
 } from './dates.js';
 import { userDepartmentSchema } from './departments.js';
-import { pageQuerySchema, pageSchema } from './lists.js';
+import { pageQuerySchema, pageSchema, queryListSchema, sortOrderSchema } from './lists.js';
 import { currencySchema } from './money.js';
 import { optionalText } from './text.js';
 import { phoneSchema } from './users.js';
 
 /*
  * HR (spec F17, ADR 0039). Part A: the employee file of every user, salary history, payout
- * method and the end of service. Part B: work schedules, public holidays and the HR settings;
- * leave, attendance and months follow.
+ * method and the end of service. Part B: work schedules, public holidays, the HR settings and
+ * leave; attendance and months follow.
  */
 
 /** The days of the work week, Saturday first (`WORK_WEEK`). */
@@ -637,3 +640,548 @@ export const hrSettingsSchema = z
   .meta({ id: 'HrSettings' });
 
 export type HrSettings = z.infer<typeof hrSettingsSchema>;
+
+/*
+ * Part B: leave (rules B4–B18). Requests of kind `leave` and `permission`, the leave balance
+ * ledger and the opinions on requests. Remote days, corrections and passkey replacements arrive
+ * with part C.
+ */
+
+export const HR_REQUEST_KINDS = ['leave', 'permission'] as const;
+
+export const hrRequestKindSchema = z.enum(HR_REQUEST_KINDS).meta({ id: 'HrRequestKind' });
+
+export type HrRequestKind = z.infer<typeof hrRequestKindSchema>;
+
+export const LEAVE_TYPES = ['annual', 'sick', 'emergency', 'unpaid'] as const;
+
+export const leaveTypeSchema = z.enum(LEAVE_TYPES).meta({ id: 'LeaveType' });
+
+export type LeaveType = z.infer<typeof leaveTypeSchema>;
+
+/** The leave types with a balance; unpaid leave has none. */
+export const BALANCE_LEAVE_TYPES = ['annual', 'sick', 'emergency'] as const;
+
+export const balanceLeaveTypeSchema = z.enum(BALANCE_LEAVE_TYPES).meta({ id: 'BalanceLeaveType' });
+
+export type BalanceLeaveType = z.infer<typeof balanceLeaveTypeSchema>;
+
+export const LEAVE_HALVES = ['first_half', 'second_half'] as const;
+
+export const leaveHalfSchema = z.enum(LEAVE_HALVES).meta({ id: 'LeaveHalf' });
+
+export type LeaveHalf = z.infer<typeof leaveHalfSchema>;
+
+export const HR_REQUEST_STATUSES = ['pending', 'approved', 'rejected', 'cancelled'] as const;
+
+export const hrRequestStatusSchema = z.enum(HR_REQUEST_STATUSES).meta({ id: 'HrRequestStatus' });
+
+export type HrRequestStatus = z.infer<typeof hrRequestStatusSchema>;
+
+/** What a ledger row records (spec, `leave_ledger`); `overtime_credit` arrives with part C. */
+export const LEDGER_ENTRIES = [
+  'opening',
+  'accrual',
+  'grant',
+  'carry_over',
+  'expiry',
+  'taken',
+  'restored',
+  'adjustment',
+] as const;
+
+export const ledgerEntrySchema = z.enum(LEDGER_ENTRIES).meta({ id: 'LedgerEntry' });
+
+export type LedgerEntry = z.infer<typeof ledgerEntrySchema>;
+
+export const HR_REQUEST_LIMITS = { reason: 500, note: 500, opinion: 1000, leaveDays: 60 } as const;
+
+const personRefSchema = z.object({ id: z.uuid(), name: z.string() });
+
+/** The weekday of a date (`WEEKDAYS`). */
+export function weekdayOf(date: CalendarDate): Weekday {
+  return WEEKDAYS[(weekday(date) + 1) % 7] as Weekday;
+}
+
+/** Rule B1: a work day of a user is a weekday of their schedule that is not a public holiday. */
+export function isScheduleWorkDay(
+  date: CalendarDate,
+  workWeekdays: readonly Weekday[],
+  holidays: readonly HolidayRange[],
+): boolean {
+  return (
+    workWeekdays.includes(weekdayOf(date)) &&
+    !holidays.some((holiday) => holiday.startsOn <= date && date <= holiday.endsOn)
+  );
+}
+
+/** One work day a leave covers: a whole day, or half of one. */
+export interface LeaveUnit {
+  date: CalendarDate;
+  days: 1 | 0.5;
+}
+
+/**
+ * The work days a leave covers, in order (rule B11: a single-day leave may be a half day).
+ * Holidays and off days count for nothing.
+ */
+export function leaveUnits(
+  leave: { startsOn: CalendarDate; endsOn: CalendarDate; half: LeaveHalf | null },
+  workWeekdays: readonly Weekday[],
+  holidays: readonly HolidayRange[],
+): LeaveUnit[] {
+  const units: LeaveUnit[] = [];
+  for (let date = leave.startsOn; date <= leave.endsOn; date = addDays(date, 1)) {
+    if (isScheduleWorkDay(date, workWeekdays, holidays)) {
+      units.push({ date, days: leave.half ? 0.5 : 1 });
+    }
+  }
+  return units;
+}
+
+/** Rounds down to a half day; float noise never loses half a day. */
+export function floorHalfDay(days: number): number {
+  return Math.floor(days * 2 + 1e-9) / 2;
+}
+
+/** A sum of half days, without float noise. */
+export function sumDays(values: readonly number[]): number {
+  return Math.round(values.reduce((total, value) => total + value, 0) * 2) / 2;
+}
+
+/** The days of `units`. */
+export function unitDays(units: readonly LeaveUnit[]): number {
+  return sumDays(units.map((unit) => unit.days));
+}
+
+/**
+ * The paid days of `units` by year, the first `paidDays` of them being paid (rule B12: the
+ * overflow of a sick or emergency leave is its last days). With `from`, only the days on or after
+ * it count (rule B15: the days not taken yet).
+ */
+export function paidDaysByYear(
+  units: readonly LeaveUnit[],
+  paidDays: number,
+  from?: CalendarDate,
+): Map<number, number> {
+  const result = new Map<number, number>();
+  let left = paidDays;
+  for (const unit of units) {
+    const paid = Math.min(unit.days, left);
+    left -= paid;
+    if (paid > 0 && (!from || unit.date >= from)) {
+      const year = Number(unit.date.slice(0, 4));
+      result.set(year, sumDays([result.get(year) ?? 0, paid]));
+    }
+  }
+  return result;
+}
+
+/**
+ * Rule B12: the paid and unpaid days of a leave. Annual leave is wholly paid (beyond the balance
+ * it is refused before this) and unpaid leave wholly unpaid. Sick days are paid up to the sick
+ * balance; emergency days up to both the emergency cap and the annual balance they draw on.
+ */
+export function leaveSplit(
+  leaveType: LeaveType,
+  days: number,
+  available: Record<BalanceLeaveType, number>,
+): { paidDays: number; unpaidDays: number } {
+  const limit =
+    leaveType === 'annual'
+      ? days
+      : leaveType === 'unpaid'
+        ? 0
+        : leaveType === 'sick'
+          ? available.sick
+          : Math.min(available.emergency, available.annual);
+  const paidDays = Math.max(0, Math.min(days, floorHalfDay(limit)));
+  return { paidDays, unpaidDays: sumDays([days, -paidDays]) };
+}
+
+/** The time a request covers, as rule B8 compares it. */
+export interface RequestSpan {
+  kind: HrRequestKind;
+  startsOn: CalendarDate;
+  endsOn: CalendarDate;
+  half: LeaveHalf | null;
+  fromTime: TimeOfDay | null;
+  toTime: TimeOfDay | null;
+}
+
+/**
+ * Rule B8: whether two requests of one user cover the same time. Two halves of one day fit
+ * together, and a permission fits beside a half-day leave or another permission of the day whose
+ * window it does not share.
+ */
+export function requestsOverlap(a: RequestSpan, b: RequestSpan): boolean {
+  if (a.startsOn > b.endsOn || b.startsOn > a.endsOn) return false;
+  if (a.kind === 'permission' && b.kind === 'permission') {
+    return (a.fromTime ?? '') < (b.toTime ?? '') && (b.fromTime ?? '') < (a.toTime ?? '');
+  }
+  if (a.kind === 'permission') return b.half === null;
+  if (b.kind === 'permission') return a.half === null;
+  return !(a.half && b.half && a.half !== b.half);
+}
+
+/**
+ * Rule B4: the annual accrual posted on day 1 of the month after `period` (`YYYY-MM`): a twelfth
+ * of `annualDays`, pro rata by days in the month the employee started, rounded down to a half day
+ * by carrying the remainder through the year, so a year's accruals add up to its entitlement.
+ * `accruedBefore` is what the earlier accruals of the period's year added.
+ */
+export function accrualDays(input: {
+  annualDays: number;
+  startDate: CalendarDate;
+  period: string;
+  accruedBefore: number;
+}): number {
+  const { annualDays, startDate, period } = input;
+  const year = period.slice(0, 4);
+  let exact = 0;
+  for (let month = 1; month <= Number(period.slice(5, 7)); month += 1) {
+    const first = `${year}-${String(month).padStart(2, '0')}-01`;
+    const last = lastOfMonth(first);
+    if (startDate > last) continue;
+    const worked = startDate > first ? daysInclusive(startDate, last) : daysInclusive(first, last);
+    exact += ((annualDays / 12) * worked) / daysInclusive(first, last);
+  }
+  return Math.max(0, sumDays([floorHalfDay(exact), -input.accruedBefore]));
+}
+
+/**
+ * Rule B5: at the year's end, the unused annual balance up to `carryOverMaxDays` is carried into
+ * the new year and the rest expires; a negative balance is carried as it is.
+ */
+export function rollover(
+  balance: number,
+  carryOverMaxDays: number,
+): { carried: number; expired: number } {
+  if (balance <= 0) return { carried: balance, expired: 0 };
+  const carried = Math.min(balance, carryOverMaxDays);
+  return { carried, expired: sumDays([balance, -carried]) };
+}
+
+const requestReason = optionalText(HR_REQUEST_LIMITS.reason).default(null);
+
+/** `userId`: `hr.approve` records a request for someone, approved at once (rule B8). */
+const leaveRequestSchema = z.object({
+  kind: z.literal('leave'),
+  userId: z.uuid().optional(),
+  leaveType: leaveTypeSchema,
+  startsOn: calendarDateSchema,
+  endsOn: calendarDateSchema,
+  half: leaveHalfSchema.nullable().default(null),
+  reason: requestReason,
+});
+
+const permissionRequestSchema = z.object({
+  kind: z.literal('permission'),
+  userId: z.uuid().optional(),
+  date: calendarDateSchema,
+  fromTime: timeOfDaySchema,
+  toTime: timeOfDaySchema,
+  reason: requestReason,
+});
+
+/**
+ * Rules B8–B13: a leave of up to `HR_REQUEST_LIMITS.leaveDays` days, a half day only on a single
+ * day, a reason except for annual leave; a permission with a reason and a window that ends after
+ * it starts. Balances, notice and overlaps need the database.
+ */
+export const createHrRequestSchema = z
+  .discriminatedUnion('kind', [leaveRequestSchema, permissionRequestSchema])
+  .superRefine((request, ctx) => {
+    if (request.kind === 'leave') {
+      if (request.endsOn < request.startsOn) {
+        ctx.addIssue({ code: 'custom', path: ['endsOn'], message: 'Ends on or after the start' });
+      } else if (daysInclusive(request.startsOn, request.endsOn) > HR_REQUEST_LIMITS.leaveDays) {
+        ctx.addIssue({ code: 'custom', path: ['endsOn'], message: 'Too long' });
+      }
+      if (request.half && request.startsOn !== request.endsOn) {
+        ctx.addIssue({ code: 'custom', path: ['half'], message: 'A half day is a single day' });
+      }
+      if (request.leaveType !== 'annual' && !request.reason) {
+        ctx.addIssue({ code: 'custom', path: ['reason'], message: 'Required' });
+      }
+      return;
+    }
+    if (request.toTime <= request.fromTime) {
+      ctx.addIssue({ code: 'custom', path: ['toTime'], message: 'Ends after it starts' });
+    }
+    if (!request.reason) ctx.addIssue({ code: 'custom', path: ['reason'], message: 'Required' });
+  })
+  .meta({ id: 'CreateHrRequest' });
+
+export type CreateHrRequest = z.infer<typeof createHrRequestSchema>;
+
+export type CreateHrRequestInput = z.input<typeof createHrRequestSchema>;
+
+/** The minutes of a permission's window. */
+export function permissionMinutes(window: { fromTime: TimeOfDay; toTime: TimeOfDay }): number {
+  return minutesOfDay(window.toTime) - minutesOfDay(window.fromTime);
+}
+
+export const HR_REQUEST_WARNINGS = ['short_notice', 'unpaid_days', 'certificate_required'] as const;
+
+export const hrRequestWarningSchema = z.enum(HR_REQUEST_WARNINGS).meta({ id: 'HrRequestWarning' });
+
+export type HrRequestWarning = z.infer<typeof hrRequestWarningSchema>;
+
+/** What a request would be, shown before it is submitted (rules B9, B12, B13). */
+export const hrRequestPreviewSchema = z
+  .object({
+    /** Work days a leave covers; null for a permission. */
+    days: z.number().nullable(),
+    paidDays: z.number().nullable(),
+    unpaidDays: z.number().nullable(),
+    shortNotice: z.boolean(),
+    warnings: z.array(hrRequestWarningSchema),
+  })
+  .meta({ id: 'HrRequestPreview' });
+
+export type HrRequestPreview = z.infer<typeof hrRequestPreviewSchema>;
+
+export const hrRequestSchema = z
+  .object({
+    id: z.uuid(),
+    user: personRefSchema,
+    kind: hrRequestKindSchema,
+    /** Leave only. */
+    leaveType: leaveTypeSchema.nullable(),
+    /** A permission's day is both. */
+    startsOn: calendarDateSchema,
+    endsOn: calendarDateSchema,
+    half: leaveHalfSchema.nullable(),
+    /** Permission only. */
+    fromTime: timeOfDaySchema.nullable(),
+    toTime: timeOfDaySchema.nullable(),
+    /** Leave only: the work days it covers, and their paid and unpaid split (rule B12). */
+    days: z.number().nullable(),
+    paidDays: z.number().nullable(),
+    unpaidDays: z.number().nullable(),
+    reason: z.string().nullable(),
+    shortNotice: z.boolean(),
+    status: hrRequestStatusSchema,
+    /** Rule B13: a sick leave longer than the setting needs a certificate. */
+    certificateRequired: z.boolean(),
+    /** Live documents attached to the request (F10 owner `hr_request`). */
+    documents: z.number().int().min(0),
+    createdBy: personRefSchema,
+    decidedBy: personRefSchema.nullable(),
+    decidedAt: instantSchema.nullable(),
+    decisionNote: z.string().nullable(),
+    createdAt: instantSchema,
+    updatedAt: instantSchema,
+  })
+  .meta({ id: 'HrRequest' });
+
+export type HrRequest = z.infer<typeof hrRequestSchema>;
+
+export const hrRequestListQuerySchema = pageQuerySchema.extend({
+  status: queryListSchema(hrRequestStatusSchema).optional(),
+  kind: hrRequestKindSchema.optional(),
+  /** `me` for one's own; others' requests need `hr.read` covering them. */
+  userId: z.union([z.uuid(), z.literal('me')]).optional(),
+  departmentId: z.uuid().optional(),
+  /** Requests with a day in this month. */
+  month: calendarMonthSchema.optional(),
+  /** By submission time: oldest first for the approvals inbox, newest first by default. */
+  order: sortOrderSchema.default('desc'),
+});
+
+export type HrRequestListQuery = z.infer<typeof hrRequestListQuerySchema>;
+
+export type HrRequestListQueryInput = z.input<typeof hrRequestListQuerySchema>;
+
+export const hrRequestPageSchema = pageSchema(hrRequestSchema).meta({
+  id: 'HrRequestPage',
+  description: 'Requests by submission time',
+});
+
+export type HrRequestPage = z.infer<typeof hrRequestPageSchema>;
+
+export const hrOpinionSchema = z
+  .object({
+    id: z.uuid(),
+    requestId: z.uuid(),
+    author: personRefSchema,
+    body: z.string(),
+    createdAt: instantSchema,
+  })
+  .meta({ id: 'HrOpinion' });
+
+export type HrOpinion = z.infer<typeof hrOpinionSchema>;
+
+/** Rule B14: a department manager's or Ops' comment on a pending request. */
+export const createHrOpinionSchema = z
+  .object({
+    requestId: z.uuid(),
+    body: z.string().trim().min(1).max(HR_REQUEST_LIMITS.opinion),
+  })
+  .meta({ id: 'CreateHrOpinion' });
+
+export type CreateHrOpinion = z.infer<typeof createHrOpinionSchema>;
+
+export const OVERLAPPING_WORK_KINDS = ['task', 'shoot', 'meeting'] as const;
+
+/** Rule B14: the employee's open work in a leave's period, shown before deciding. */
+export const overlappingWorkSchema = z
+  .object({
+    kind: z.enum(OVERLAPPING_WORK_KINDS),
+    id: z.uuid(),
+    title: z.string(),
+    /** A task's due date; a shoot's or meeting's first day. */
+    date: calendarDateSchema,
+    /** Shoots and meetings only. */
+    startsAt: instantSchema.nullable(),
+  })
+  .meta({ id: 'OverlappingWork' });
+
+export type OverlappingWork = z.infer<typeof overlappingWorkSchema>;
+
+export const hrRequestPermissionsSchema = z
+  .object({
+    /** `hr.approve` on a pending request. */
+    canDecide: z.boolean(),
+    /** Rule B15. */
+    canCancel: z.boolean(),
+    /** `hr.read` covering the employee, on someone else's pending request. */
+    canGiveOpinion: z.boolean(),
+  })
+  .meta({ id: 'HrRequestPermissions', description: 'What the caller may do, for the UI' });
+
+export type HrRequestPermissions = z.infer<typeof hrRequestPermissionsSchema>;
+
+export const hrRequestDetailSchema = hrRequestSchema
+  .extend({
+    /** Oldest first. */
+    opinions: z.array(hrOpinionSchema),
+    /** For `hr.approve` on a leave, by date; null otherwise. */
+    overlappingWork: z.array(overlappingWorkSchema).nullable(),
+    permissions: hrRequestPermissionsSchema,
+  })
+  .meta({ id: 'HrRequestDetail' });
+
+export type HrRequestDetail = z.infer<typeof hrRequestDetailSchema>;
+
+/** Rule B14: a note is required to reject. */
+export const decideHrRequestSchema = z
+  .object({
+    decision: z.enum(['approve', 'reject']),
+    note: optionalText(HR_REQUEST_LIMITS.note).default(null),
+    /** Rule B13: approve a sick leave without its certificate. */
+    confirmMissingCertificate: z.boolean().default(false),
+  })
+  .refine((decision) => decision.decision === 'approve' || !!decision.note, {
+    message: 'A rejection needs a note',
+    path: ['note'],
+  })
+  .meta({ id: 'DecideHrRequest' });
+
+export type DecideHrRequest = z.infer<typeof decideHrRequestSchema>;
+
+export type DecideHrRequestInput = z.input<typeof decideHrRequestSchema>;
+
+export const cancelHrRequestSchema = z
+  .object({ note: optionalText(HR_REQUEST_LIMITS.note).default(null) })
+  .meta({ id: 'CancelHrRequest' });
+
+export type CancelHrRequest = z.infer<typeof cancelHrRequestSchema>;
+
+export const leaveBalanceQuerySchema = z.object({ year: holidayYearSchema });
+
+export type LeaveBalanceQuery = z.infer<typeof leaveBalanceQuerySchema>;
+
+export const ledgerRowSchema = z
+  .object({
+    id: z.uuid(),
+    leaveType: balanceLeaveTypeSchema,
+    year: z.number().int(),
+    /** Signed. */
+    days: z.number(),
+    entry: ledgerEntrySchema,
+    /** `YYYY-MM` for an accrual. */
+    period: z.string().nullable(),
+    requestId: z.uuid().nullable(),
+    note: z.string().nullable(),
+    /** Null for the daily job. */
+    createdBy: personRefSchema.nullable(),
+    createdAt: instantSchema,
+  })
+  .meta({ id: 'LedgerRow' });
+
+export type LedgerRow = z.infer<typeof ledgerRowSchema>;
+
+/** One balance of a year: the sum of its ledger, and its parts. */
+export const leaveTypeBalanceSchema = z
+  .object({
+    leaveType: balanceLeaveTypeSchema,
+    balance: z.number(),
+    /** Days of pending requests; `available` is the balance less these. */
+    pending: z.number(),
+    available: z.number(),
+    opening: z.number(),
+    /** Accruals and grants. */
+    accrued: z.number(),
+    carriedOver: z.number(),
+    /** Taken less restored, as a positive number. */
+    taken: z.number(),
+    /** Expired at the year's end, as a positive number. */
+    expired: z.number(),
+    adjusted: z.number(),
+  })
+  .meta({ id: 'LeaveTypeBalance' });
+
+export type LeaveTypeBalance = z.infer<typeof leaveTypeBalanceSchema>;
+
+export const leaveBalanceSchema = z
+  .object({
+    userId: z.uuid(),
+    year: z.number().int(),
+    /** Annual, sick and emergency, in that order. */
+    balances: z.array(leaveTypeBalanceSchema),
+    /** The year's rows, newest first. */
+    ledger: z.array(ledgerRowSchema),
+  })
+  .meta({ id: 'LeaveBalance' });
+
+export type LeaveBalance = z.infer<typeof leaveBalanceSchema>;
+
+/** Rules B6 and B7: `hr.approve` records an opening balance or a signed adjustment. */
+export const createLeaveAdjustmentSchema = z
+  .object({
+    leaveType: balanceLeaveTypeSchema,
+    year: holidayYearSchema,
+    days: z
+      .number()
+      .min(-HR_REQUEST_LIMITS.leaveDays)
+      .max(HR_REQUEST_LIMITS.leaveDays)
+      .refine((days) => days !== 0 && Number.isInteger(days * 2), 'Whole or half days, not 0'),
+    note: z.string().trim().min(1).max(HR_REQUEST_LIMITS.note),
+    entry: z.enum(['adjustment', 'opening']),
+  })
+  .meta({ id: 'CreateLeaveAdjustment' });
+
+export type CreateLeaveAdjustment = z.infer<typeof createLeaveAdjustmentSchema>;
+
+/** Rule B16: approved leave on the company calendar; the type only for `hr.read` in scope. */
+export const calendarLeaveSchema = z
+  .object({
+    requestId: z.uuid(),
+    user: personRefSchema,
+    startsOn: calendarDateSchema,
+    endsOn: calendarDateSchema,
+    half: leaveHalfSchema.nullable(),
+    leaveType: leaveTypeSchema.nullable(),
+  })
+  .meta({ id: 'CalendarLeave' });
+
+export type CalendarLeave = z.infer<typeof calendarLeaveSchema>;
+
+/** Rule B17: a leave of the assignee covering a task's due date (`ASSIGNEE_ON_LEAVE` details). */
+export const assigneeLeaveSchema = z
+  .object({ startsOn: calendarDateSchema, endsOn: calendarDateSchema })
+  .meta({ id: 'AssigneeLeave' });
+
+export type AssigneeLeave = z.infer<typeof assigneeLeaveSchema>;

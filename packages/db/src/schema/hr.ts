@@ -1,7 +1,13 @@
 import {
+  BALANCE_LEAVE_TYPES,
   EMPLOYMENT_TYPES,
   END_REASONS,
+  HR_REQUEST_KINDS,
+  HR_REQUEST_STATUSES,
   type LatenessTier,
+  LEAVE_HALVES,
+  LEAVE_TYPES,
+  LEDGER_ENTRIES,
   PAYOUT_METHODS,
   WEEKDAYS,
   WORK_SCHEDULE_KINDS,
@@ -30,8 +36,9 @@ import { currencyEnum } from './projects.js';
 
 /*
  * HR (spec F17, ADR 0039), owned by the api `hr` module. Part A: work schedules, the employee
- * file of every user and the salary history. Part B: public holidays and the HR settings. Days
- * are Asia/Damascus calendar dates.
+ * file of every user and the salary history. Part B: public holidays, the HR settings, leave and
+ * permission requests, the leave balance ledger and the opinions on requests. Days are
+ * Asia/Damascus calendar dates.
  */
 
 export const weekdayEnum = pgEnum('weekday', WEEKDAYS);
@@ -231,5 +238,137 @@ export const hrSettings = pgTable(
   (table) => [
     index('hr_settings_updated_by_id_idx').on(table.updatedById),
     check('hr_settings_singleton_check', sql`${table.singleton}`),
+  ],
+);
+
+export const hrRequestKindEnum = pgEnum('hr_request_kind', HR_REQUEST_KINDS);
+
+export const leaveTypeEnum = pgEnum('leave_type', LEAVE_TYPES);
+
+export const balanceLeaveTypeEnum = pgEnum('balance_leave_type', BALANCE_LEAVE_TYPES);
+
+export const leaveHalfEnum = pgEnum('leave_half', LEAVE_HALVES);
+
+export const hrRequestStatusEnum = pgEnum('hr_request_status', HR_REQUEST_STATUSES);
+
+export const ledgerEntryEnum = pgEnum('ledger_entry', LEDGER_ENTRIES);
+
+/**
+ * Rules B8–B15: leave and permission requests. A permission's day is both `starts_on` and
+ * `ends_on`; `days` and the split are a leave's only. A cancelled request keeps the canceller in
+ * `decided_by_id`.
+ */
+export const hrRequests = pgTable(
+  'hr_requests',
+  {
+    id: id(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id),
+    kind: hrRequestKindEnum('kind').notNull(),
+    leaveType: leaveTypeEnum('leave_type'),
+    startsOn: date('starts_on', { mode: 'string' }).notNull(),
+    endsOn: date('ends_on', { mode: 'string' }).notNull(),
+    half: leaveHalfEnum('half'),
+    fromTime: time('from_time'),
+    toTime: time('to_time'),
+    days: leaveDays('days'),
+    paidDays: leaveDays('paid_days'),
+    unpaidDays: leaveDays('unpaid_days'),
+    reason: text('reason'),
+    shortNotice: boolean('short_notice').notNull().default(false),
+    status: hrRequestStatusEnum('status').notNull().default('pending'),
+    createdById: uuid('created_by_id')
+      .notNull()
+      .references(() => users.id),
+    decidedById: uuid('decided_by_id').references(() => users.id),
+    decidedAt: timestamp('decided_at', { withTimezone: true }),
+    decisionNote: text('decision_note'),
+    ...timestamps(),
+    archivedAt: archivedAt(),
+  },
+  (table) => [
+    index('hr_requests_user_id_idx').on(table.userId, table.startsOn),
+    index('hr_requests_created_by_id_idx').on(table.createdById),
+    index('hr_requests_decided_by_id_idx').on(table.decidedById),
+    index('hr_requests_status_idx').on(table.status, table.createdAt),
+    check('hr_requests_range_check', sql`${table.endsOn} >= ${table.startsOn}`),
+    check(
+      'hr_requests_kind_check',
+      sql`(${table.kind} = 'leave' and ${table.leaveType} is not null and ${table.fromTime} is null and ${table.toTime} is null and ${table.days} is not null)
+        or (${table.kind} = 'permission' and ${table.leaveType} is null and ${table.half} is null and ${table.startsOn} = ${table.endsOn} and ${table.fromTime} < ${table.toTime})`,
+    ),
+    check(
+      'hr_requests_half_check',
+      sql`${table.half} is null or ${table.startsOn} = ${table.endsOn}`,
+    ),
+  ],
+);
+
+/**
+ * Rules B4–B7: the signed leave balance ledger; a balance is the sum of its non-archived rows.
+ * The unique keys keep the daily job idempotent.
+ */
+export const leaveLedger = pgTable(
+  'leave_ledger',
+  {
+    id: id(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id),
+    leaveType: balanceLeaveTypeEnum('leave_type').notNull(),
+    year: integer('year').notNull(),
+    days: leaveDays('days').notNull(),
+    entry: ledgerEntryEnum('entry').notNull(),
+    /** `YYYY-MM`: the month an accrual is for. */
+    period: text('period'),
+    requestId: uuid('request_id').references(() => hrRequests.id),
+    note: text('note'),
+    createdById: uuid('created_by_id').references(() => users.id),
+    ...timestamps(),
+    archivedAt: archivedAt(),
+  },
+  (table) => [
+    index('leave_ledger_user_id_idx').on(table.userId, table.leaveType, table.year),
+    index('leave_ledger_request_id_idx').on(table.requestId),
+    index('leave_ledger_created_by_id_idx').on(table.createdById),
+    uniqueIndex('leave_ledger_accrual_key')
+      .on(table.userId, table.period)
+      .where(sql`${table.entry} = 'accrual' and ${table.archivedAt} is null`),
+    uniqueIndex('leave_ledger_yearly_key')
+      .on(table.userId, table.leaveType, table.year, table.entry)
+      .where(
+        sql`${table.entry} in ('grant', 'carry_over', 'expiry') and ${table.archivedAt} is null`,
+      ),
+    check(
+      'leave_ledger_period_check',
+      sql`(${table.entry} = 'accrual') = (${table.period} is not null)`,
+    ),
+    check(
+      'leave_ledger_note_check',
+      sql`${table.entry} not in ('adjustment', 'opening') or ${table.note} is not null`,
+    ),
+  ],
+);
+
+/** Rule B14: a department manager's or Ops' comment on a pending request. */
+export const hrOpinions = pgTable(
+  'hr_opinions',
+  {
+    id: id(),
+    requestId: uuid('request_id')
+      .notNull()
+      .references(() => hrRequests.id),
+    authorId: uuid('author_id')
+      .notNull()
+      .references(() => users.id),
+    body: text('body').notNull(),
+    ...timestamps(),
+    archivedAt: archivedAt(),
+  },
+  (table) => [
+    index('hr_opinions_request_id_idx').on(table.requestId),
+    index('hr_opinions_author_id_idx').on(table.authorId),
+    check('hr_opinions_body_check', sql`char_length(${table.body}) between 1 and 1000`),
   ],
 );

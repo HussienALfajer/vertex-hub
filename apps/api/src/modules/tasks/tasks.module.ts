@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/index.js';
 import { ClientsModule } from '../clients/index.js';
 import { FilesModule } from '../files/index.js';
+import { HrModule } from '../hr/index.js';
 import { NotificationsModule } from '../notifications/index.js';
 import { ProjectsModule } from '../projects/index.js';
 import { ClientReviewHooks } from './client-review-hooks.js';
@@ -48,9 +49,11 @@ import { TasksService } from './tasks.service.js';
  * for the `content` module, which it never imports either. Exports `ShootTasks` and the
  * `TaskGuards` registry for the `calendar` module (F11, ADR 0022), which it never imports, and
  * `TaskLinks` (task summaries) for the `campaigns` module (F12), and `TaskReports` for `reports` (F15).
+ * Warns of an assignee's approved leave through `hr`'s `LeaveDirectory` and feeds open tasks into
+ * its `LeaveWorkSources` (F17 rules B14 and B17).
  */
 @Module({
-  imports: [AuthModule, ClientsModule, ProjectsModule, NotificationsModule, FilesModule],
+  imports: [AuthModule, ClientsModule, ProjectsModule, NotificationsModule, FilesModule, HrModule],
   // The views come first: `tasks/board` and `tasks/workload` must not match `tasks/:id`.
   controllers: [
     TaskViewsController,

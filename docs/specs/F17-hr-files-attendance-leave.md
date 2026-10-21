@@ -311,6 +311,19 @@ Settled in implementation (PR B2, 2026-10-21):
 - A file's schedule is chosen in the Contract and schedule dialog of the employee file (`employees.manage`, from the schedules `hr.read` lists); HR settings show how many employees each schedule has.
 - HR settings: Rules is one form saved as a whole; the lateness tiers are edited as rows, a new tier going before the open last one. The entrance screens and the attendance start date arrive with Part C.
 
+Settled in implementation (PR B3, 2026-10-21):
+- `hr_requests` holds kinds `leave` and `permission` for now; Part C adds the other kinds and their columns. A permission's day is both `starts_on` and `ends_on`.
+- Rule B8: requests are checked under a per-user lock. Pending leaves count against the balance (`available` = balance less pending days). Two halves of one day fit together; a permission fits beside a half-day leave or another permission of the day whose window it does not share. `hr_request_submitted` is one notification per request (no merging), resolved when the request is decided or cancelled, with one reminder after a work day.
+- Rule B9: days and notice count the employee's schedule work days less holidays. Annual and unpaid leave and permissions start today or later (`TOO_LATE`); a request `hr.approve` records for someone else skips the deadlines and is never short notice.
+- Rules B10 and B12: annual leave is checked per year against each year's available balance; the sick and emergency split uses the balances of the leave's first year. The paid days are the leave's first days. An emergency leave writes its `taken` rows on both the emergency and the annual balance.
+- Rule B13: the certificate is any live document of the request (F10 owner `hr_request`). The employee and `hr.read` holders covering them read the documents; the employee and `hr.approve` holders add them.
+- Rule B14: approving recounts the days and the split as they stand. Opinions are for others' pending requests only.
+- Rule B15: `hr.approve` cancels any pending or approved request; cancelling an approved leave restores its paid days from today on. Rule A8: archiving an account cancels its pending requests.
+- Rule B3 and edge case 11: a holiday added, re-dated or archived recounts the pending and approved leaves sharing its days (`hr_request.recounted`); an approved sick or emergency leave keeps the paid days it was given, within its new count.
+- Rule B4: the job posts last month's accrual only (from its first day 1 after the start date) and the year's sick and emergency grants once the start date has come; on the first run of a year it rolls the previous year over (a `carry_over` row, possibly 0, marks it done), after December's accrual.
+- Rule B16: the calendar's `leaves` follow the person filter; the client and shoot type filters hide them. The employee sees their own leave's type. As a conflict (rule B17), a leave runs from the start of its first day to the end of its last, with an empty title.
+- Rule B18: the job sends `colleague_on_leave` for approved leaves starting after today and by the next company work day; a leave approved after that run gets none.
+
 ### Part C: attendance
 1. **Start date.** Until `attendance_starts_on`, attendance runs in **trial**: punches are recorded and days show `trial`, but no item, reminder or absence is produced (owner, 2026-10-21). `hr.manage` sets the date (today or later); leave works from the deploy regardless.
 2. **Who.** Attendance applies to non-exempt users with a `start_date` ≤ the day and no past `ended_on`. Exempt users cannot punch.
