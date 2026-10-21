@@ -73,7 +73,7 @@ describe('HR employee files (F17 part A)', () => {
       seeded.push(user.id);
       return { id: user.id, name: user.name, cookie: await client.signIn(user.email) };
     };
-    const secured = async (input: Parameters<typeof seedUser>[1]) => {
+    const secured = async (input: NonNullable<Parameters<typeof seedUser>[1]>) => {
       const user = await client.signInWithTwoFactor(db, input);
       seeded.push(user.id);
       return { id: user.id, name: user.name, cookie: user.cookie };
