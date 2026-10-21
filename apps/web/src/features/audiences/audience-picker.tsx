@@ -168,12 +168,18 @@ export function AudiencePicker({
         aria-labelledby={labelId}
         value={opened}
         onValueChange={(next: Source[]) => setSources(next)}
-        className="flex-wrap"
+        aria-invalid={invalid || undefined}
+        className="flex-wrap aria-invalid:border-destructive-text"
       >
-        {available.map((source) => {
+        {available.map((source, index) => {
           const Icon = SOURCE_ICONS[source];
           return (
-            <ToggleGroupItem key={source} value={source}>
+            // The first chip takes the focus when the audience is refused.
+            <ToggleGroupItem
+              key={source}
+              value={source}
+              aria-invalid={(invalid && index === 0) || undefined}
+            >
               <Icon />
               {t(`audiences.sources.${source}`)}
             </ToggleGroupItem>

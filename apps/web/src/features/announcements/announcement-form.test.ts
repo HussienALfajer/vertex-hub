@@ -111,16 +111,44 @@ describe('updateInput', () => {
       announcement,
     );
     expect(Object.keys(input).sort()).toEqual(
-      ['body', 'linkLabel', 'linkUrl', 'notifyAgain', 'pinnedUntil', 'title'].sort(),
+      ['body', 'linkLabel', 'linkUrl', 'notifyAgain', 'title'].sort(),
     );
     expect(updateAnnouncementSchema.safeParse(input).success).toBe(true);
   });
 
-  it('changes a sent poll only until somebody votes', () => {
+  it('sends a pin only when it changed, so an ended pin does not block an edit', () => {
+    const ended = stored({ pinnedUntil: '2026-10-01' });
+    expect(updateInput(announcementFormValues(ended), ended)).not.toHaveProperty('pinnedUntil');
+    expect(
+      updateInput({ ...announcementFormValues(ended), pinnedUntil: '2026-10-25' }, ended),
+    ).toMatchObject({ pinnedUntil: '2026-10-25' });
+  });
+
+  it('changes a sent poll only when it changed, before any vote and while open', () => {
     const open = stored({ poll: poll(0) });
-    expect(updateInput(announcementFormValues(open), open)).toHaveProperty('poll');
+    const values = announcementFormValues(open);
+    expect(updateInput(values, open)).not.toHaveProperty('poll');
+    const edited = { ...values, poll: values.poll && { ...values.poll, question: 'أي يوم؟' } };
+    expect(updateInput(edited, open)).toHaveProperty('poll');
     const voted = stored({ poll: poll(2) });
-    expect(updateInput(announcementFormValues(voted), voted)).not.toHaveProperty('poll');
+    const votedValues = announcementFormValues(voted);
+    const votedEdit = {
+      ...votedValues,
+      poll: votedValues.poll && { ...votedValues.poll, question: 'أي يوم؟' },
+    };
+    expect(updateInput(votedEdit, voted)).not.toHaveProperty('poll');
+    const closedPoll = poll(0);
+    const closed = stored({ poll: closedPoll && { ...closedPoll, closed: true } });
+    const closedValues = announcementFormValues(closed);
+    const closedEdit = {
+      ...closedValues,
+      poll: closedValues.poll && { ...closedValues.poll, question: 'أي يوم؟' },
+    };
+    expect(updateInput(closedEdit, closed)).not.toHaveProperty('poll');
+  });
+
+  it('reopens a draft as a draft, never as "Send now"', () => {
+    expect(announcementFormValues(stored({ status: 'draft', sentAt: null })).send).toBe('draft');
   });
 
   it('sends the audience of a draft and the new time of a scheduled one', () => {
@@ -135,7 +163,11 @@ describe('updateInput', () => {
     });
     const values = announcementFormValues(scheduled);
     expect(values.scheduledAt).toBe('2026-10-22T09:00');
-    expect(updateInput(values, scheduled).scheduledAt).toBe('2026-10-22T06:00:00.000Z');
+    // Unchanged, the time is not sent again: the API would check it as a new one (rule D5).
+    expect(updateInput(values, scheduled)).not.toHaveProperty('scheduledAt');
+    expect(updateInput({ ...values, scheduledAt: '2026-10-23T10:00' }, scheduled).scheduledAt).toBe(
+      '2026-10-23T07:00:00.000Z',
+    );
   });
 });
 

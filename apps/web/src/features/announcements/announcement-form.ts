@@ -91,7 +91,13 @@ export function announcementFormValues(announcement: Announcement): Announcement
       results: poll.results,
       closesAt: poll.closesAt ? toBusinessDateTimeInput(poll.closesAt) : '',
     },
-    send: announcement.status === 'scheduled' ? 'schedule' : 'now',
+    // A draft reopens as a draft: the main button must never send it by surprise.
+    send:
+      announcement.status === 'scheduled'
+        ? 'schedule'
+        : announcement.status === 'draft'
+          ? 'draft'
+          : 'now',
     scheduledAt: announcement.scheduledAt ? toBusinessDateTimeInput(announcement.scheduledAt) : '',
     notifyAgain: false,
   };
@@ -155,37 +161,46 @@ export function createInput(values: AnnouncementFormValues): CreateAnnouncementB
   } as CreateAnnouncementBody;
 }
 
+/** Whether a value differs from the stored one, compared as the API would receive both. */
+const changed = (next: unknown, stored: unknown) => JSON.stringify(next) !== JSON.stringify(stored);
+
 /**
  * A stored announcement's change (`PATCH /announcements/:id`). A sent one sends only what may
- * still change (rule D10): the poll only while nobody voted.
+ * still change (rule D10). Once scheduled or sent, the pin, the poll and the send time go only
+ * when they changed: the API checks each one it receives again (a pin that ended, a poll that
+ * closed, a send time less than 5 minutes away), and rewriting a poll gives its options new ids.
  */
 export function updateInput(
   values: AnnouncementFormValues,
   announcement: Announcement,
 ): UpdateAnnouncementBody {
-  const sent = announcement.status === 'sent';
-  const fields = {
-    ...templateFields(values),
-    pinnedUntil: orNull(values.pinnedUntil),
-  };
-  if (sent) {
-    const pollLocked = !announcement.poll || (announcement.poll.voters ?? 0) > 0;
+  const stored = announcementFormValues(announcement);
+  const draft = announcement.status === 'draft';
+  const pinnedUntil = orNull(values.pinnedUntil);
+  const poll = pollInput(values.poll);
+  const pin = (draft || changed(pinnedUntil, orNull(stored.pinnedUntil))) && { pinnedUntil };
+  if (announcement.status === 'sent') {
+    const fields = templateFields(values);
+    const pollLocked =
+      !announcement.poll || announcement.poll.closed || (announcement.poll.voters ?? 0) > 0;
     return {
       title: fields.title,
       body: fields.body,
       linkUrl: fields.linkUrl,
       linkLabel: fields.linkLabel,
-      pinnedUntil: fields.pinnedUntil,
-      ...(!pollLocked && { poll: pollInput(values.poll) }),
+      ...pin,
+      ...(!pollLocked && changed(poll, pollInput(stored.poll)) && { poll }),
       ...(values.notifyAgain && { notifyAgain: true }),
     } as UpdateAnnouncementBody;
   }
   return {
-    ...fields,
+    ...templateFields(values),
     audience: values.audience,
-    poll: pollInput(values.poll),
-    ...(announcement.status === 'scheduled' && {
-      scheduledAt: instantOrNull(values.scheduledAt) ?? undefined,
-    }),
+    ...pin,
+    ...((draft || changed(poll, pollInput(stored.poll))) && { poll }),
+    ...(announcement.status === 'scheduled' &&
+      changed(values.scheduledAt, stored.scheduledAt) && {
+        scheduledAt: instantOrNull(values.scheduledAt) ?? undefined,
+      }),
   } as UpdateAnnouncementBody;
 }

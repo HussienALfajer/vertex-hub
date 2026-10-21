@@ -50,6 +50,7 @@ import { useId, useRef, useState } from 'react';
 import {
   Controller,
   type FieldErrors,
+  type FieldError as FormFieldError,
   type Resolver,
   type UseFormReturn,
   useForm,
@@ -63,7 +64,7 @@ import { LoadError } from '../../components/load-error';
 import { UnsavedChangesGuard } from '../../components/unsaved-changes-guard';
 import { ApiError } from '../../lib/api/client';
 import { scopesOf, useMe } from '../../lib/auth';
-import { errorMessage, fieldError, SCREEN_ERROR } from '../../lib/errors';
+import { errorMessage, errorRole, fieldError, SCREEN_ERROR } from '../../lib/errors';
 import { useFocusFirstError } from '../../lib/focus-first-invalid';
 import { formatNumber, fromBusinessDateTimeInput, toBusinessDateTimeInput } from '../../lib/format';
 import { AudiencePicker } from '../audiences/audience-picker';
@@ -279,7 +280,7 @@ function AnnouncementEditor({ announcement }: { announcement: Announcement | nul
                 <AudienceField
                   value={field.value}
                   onChange={field.onChange}
-                  invalid={!!fieldState.error}
+                  error={fieldState.error}
                 />
               )}
             />
@@ -483,11 +484,11 @@ function ContentFields({ form, bodyKey }: { form: Form; bodyKey: number }) {
 function AudienceField({
   value,
   onChange,
-  invalid,
+  error,
 }: {
   value: AnnouncementFormValues['audience'];
   onChange: (next: AnnouncementFormValues['audience']) => void;
-  invalid: boolean;
+  error: FormFieldError | undefined;
 }) {
   const { t } = useTranslation();
   const labelId = useId();
@@ -496,7 +497,12 @@ function AudienceField({
       <span id={labelId} className="text-sm font-medium">
         {t('announcements.form.audienceSources')}
       </span>
-      <AudiencePicker value={value} onChange={onChange} invalid={invalid} labelId={labelId} />
+      <AudiencePicker value={value} onChange={onChange} invalid={!!error} labelId={labelId} />
+      {error && (
+        <p role={errorRole(error)} className="text-sm text-destructive-text">
+          {fieldError(error, t('announcements.form.errors.audience'))}
+        </p>
+      )}
     </div>
   );
 }

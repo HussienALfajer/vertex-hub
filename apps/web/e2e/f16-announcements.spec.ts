@@ -240,3 +240,16 @@ test('a critical announcement blocks the app until it is acknowledged', async ({
   await dialog.getByRole('button', { name: a.acknowledge }).click();
   await expect(dialog).toBeHidden();
 });
+
+test('sending without an audience says so and focuses the picker', async ({ page }) => {
+  await mockApi(page, { signedIn: true, me: employeeMe });
+  await page.goto('/announcements/new');
+  await page.getByLabel(a.form.title, { exact: true }).fill('جلسة تصوير المنيو');
+  await page.getByRole('textbox', { name: a.form.body }).fill('نصوّر يوم الثلاثاء.');
+  await page.getByRole('button', { name: a.form.submit.now }).click();
+  await expect(page.getByText(a.form.errors.audience)).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: ar.audiences.sources.everyone, exact: true }),
+  ).toBeFocused();
+  await expect(page).toHaveURL(/\/announcements\/new$/);
+});
