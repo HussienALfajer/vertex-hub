@@ -14,8 +14,15 @@ const actorOf = (user: CurrentUserInfo): AuditActor => ({ id: user.id, name: use
 
 const SETTING_KEYS = Object.keys(hrSettingsSchema.shape) as (keyof HrSettings)[];
 
-const toSettings = (row: SettingsRow): HrSettings =>
-  Object.fromEntries(SETTING_KEYS.map((key) => [key, row[key]])) as HrSettings;
+/** `jsonb` returns the tiers' keys sorted: rebuilt in the contract's order, so an unchanged save
+ * compares equal and writes no audit entry. */
+const toSettings = (row: SettingsRow): HrSettings => ({
+  ...(Object.fromEntries(SETTING_KEYS.map((key) => [key, row[key]])) as HrSettings),
+  latenessTiers: row.latenessTiers.map((tier) => ({
+    upToMinutes: tier.upToMinutes,
+    fraction: tier.fraction,
+  })),
+});
 
 /** The HR settings (spec, `hr_settings`): read with `hr.read`, replaced with `hr.manage`. */
 @Injectable()

@@ -200,9 +200,19 @@ describe('HR rules: schedules, holidays and settings (F17 part B)', () => {
       for (const person of [manager, finance, employee]) {
         expect((await client.post('/api/hr/schedules', person.cookie, body)).status).toBe(403);
       }
-      expect(
-        (await client.post(`/api/hr/schedules/${mainScheduleId}/archive`, manager.cookie)).status,
-      ).toBe(403);
+      for (const person of [manager, finance, employee]) {
+        expect(
+          (await client.post(`/api/hr/schedules/${mainScheduleId}/archive`, person.cookie)).status,
+        ).toBe(403);
+        expect(
+          (
+            await client.request('PATCH', `/api/hr/schedules/${mainScheduleId}`, {
+              cookie: person.cookie,
+              body: { name: 'x' },
+            })
+          ).status,
+        ).toBe(403);
+      }
     });
 
     it('creates fixed and flexible schedules, days in week order, audited', async () => {
@@ -356,8 +366,23 @@ describe('HR rules: schedules, holidays and settings (F17 part B)', () => {
       const response = await client.get(`/api/hr/holidays?year=${YEAR}`, employee.cookie);
       expect(response.status).toBe(200);
       const body = { name: 'x', startsOn: `${YEAR}-01-01`, endsOn: `${YEAR}-01-01` };
+      const id = '01900000-0000-7000-8000-000000000000';
       for (const person of [manager, finance, employee]) {
         expect((await client.post('/api/hr/holidays', person.cookie, body)).status).toBe(403);
+        expect(
+          (await client.post('/api/hr/holidays/repeat', person.cookie, { year: YEAR })).status,
+        ).toBe(403);
+        expect(
+          (
+            await client.request('PATCH', `/api/hr/holidays/${id}`, {
+              cookie: person.cookie,
+              body: { name: 'x' },
+            })
+          ).status,
+        ).toBe(403);
+        expect((await client.post(`/api/hr/holidays/${id}/archive`, person.cookie)).status).toBe(
+          403,
+        );
       }
     });
 
@@ -479,8 +504,15 @@ describe('HR rules: schedules, holidays and settings (F17 part B)', () => {
         `/api/audit?entityType=hr_settings&entityId=${HR_SETTINGS_ENTITY_ID}`,
         gm.cookie,
       );
-      const entry = auditPageSchema.parse(await audit.json()).items[0];
-      expect(entry?.action).toBe('hr_settings.updated');
+      const entries = auditPageSchema.parse(await audit.json());
+      expect(entries.items[0]?.action).toBe('hr_settings.updated');
+      // Saving the same settings again changes nothing and writes no entry.
+      expect((await putSettings(ops, changed)).status).toBe(200);
+      const again = await client.get(
+        `/api/audit?entityType=hr_settings&entityId=${HR_SETTINGS_ENTITY_ID}`,
+        gm.cookie,
+      );
+      expect(auditPageSchema.parse(await again.json()).total).toBe(entries.total);
     });
 
     it('gives a new file the default annual leave of the settings', async () => {
