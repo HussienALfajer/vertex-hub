@@ -1,3 +1,4 @@
+import { useQuery } from '@tanstack/react-query';
 import {
   businessDate,
   CURRENCIES,
@@ -41,6 +42,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import { MoneyInput } from '../../components/money-input';
 import { ApiError } from '../../lib/api/client';
+import { can, useMe } from '../../lib/auth';
 import { errorMessage, errorRole, fieldError, SCREEN_ERROR } from '../../lib/errors';
 import { rateInput } from '../../lib/money';
 import { ChoiceSelect } from '../quotes/choice-select';
@@ -51,6 +53,7 @@ import {
   useEndService,
   useSetPayout,
   useUpdateEmployeeFile,
+  workSchedulesQuery,
 } from './hr.queries';
 
 interface DialogProps {
@@ -64,7 +67,7 @@ interface DialogProps {
 type Issue = { path: PropertyKey[] };
 
 /** The values checked with the contract schema; the fields it refuses are marked. */
-function checked<T, V extends FieldValues>(
+export function checked<T, V extends FieldValues>(
   form: UseFormReturn<V>,
   result: { success: true; data: T } | { success: false; error: { issues: Issue[] } },
 ): T | undefined {
@@ -191,16 +194,19 @@ interface ContractValues {
   attendanceExempt: boolean;
   remoteWeekdays: Weekday[];
   annualLeaveDays: string;
+  scheduleId: string;
 }
 
 /**
- * The contract and schedule section. The schedule itself is assigned from HR settings once Part B
- * lists the schedules; until then the file keeps the default one.
+ * The contract and schedule section. The schedule is chosen among those of HR settings (rule B2),
+ * listed for `hr.read`.
  */
 export function ContractDialog({ file, open, onClose, finalFocus }: DialogProps) {
   const { t } = useTranslation();
-  const ids = { type: useId(), exempt: useId(), remote: useId() };
+  const me = useMe();
+  const ids = { type: useId(), exempt: useId(), remote: useId(), schedule: useId() };
   const update = useUpdateEmployeeFile(file.userId);
+  const schedules = useQuery({ ...workSchedulesQuery, enabled: open && can(me, 'hr.read') });
   const employment = file.employment;
   const defaults: ContractValues = {
     employmentType: employment?.employmentType ?? 'full_time',
@@ -210,6 +216,7 @@ export function ContractDialog({ file, open, onClose, finalFocus }: DialogProps)
     attendanceExempt: employment?.attendanceExempt ?? false,
     remoteWeekdays: employment?.remoteWeekdays ?? [],
     annualLeaveDays: String(employment?.annualLeaveDays ?? ''),
+    scheduleId: employment?.schedule.id ?? '',
   };
   const form = useForm<ContractValues>({ values: defaults });
   const [failure, setFailure] = useState<string | null>(null);
@@ -245,6 +252,7 @@ export function ContractDialog({ file, open, onClose, finalFocus }: DialogProps)
         remoteWeekdays: values.remoteWeekdays,
         // Arabic-Indic digits and the Arabic decimal mark are read as typed on an Arabic keyboard.
         annualLeaveDays: Number(rateInput(values.annualLeaveDays)),
+        scheduleId: values.scheduleId || undefined,
       }),
     );
     if (!input) return;
@@ -261,6 +269,12 @@ export function ContractDialog({ file, open, onClose, finalFocus }: DialogProps)
   const typeItems = EMPLOYMENT_TYPES.map((type) => ({
     value: type,
     label: t(`hr.employmentTypes.${type}`),
+  }));
+  const scheduleItems = (schedules.data?.items ?? []).map((schedule) => ({
+    value: schedule.id,
+    label: schedule.isDefault
+      ? t('hr.contract.defaultSchedule', { name: schedule.name })
+      : schedule.name,
   }));
 
   return (
@@ -324,6 +338,26 @@ export function ContractDialog({ file, open, onClose, finalFocus }: DialogProps)
           <FieldDescription>{t('hr.contract.openEndedHint')}</FieldDescription>
         </Field>
       </div>
+      {scheduleItems.length > 0 && (
+        <Controller
+          control={form.control}
+          name="scheduleId"
+          render={({ field }) => (
+            <Field>
+              <FieldLabel id={ids.schedule} render={<span />}>
+                {t('hr.fields.schedule')}
+              </FieldLabel>
+              <ChoiceSelect
+                labelledBy={ids.schedule}
+                items={scheduleItems}
+                value={field.value}
+                onChange={field.onChange}
+              />
+              <FieldDescription>{t('hr.contract.scheduleHint')}</FieldDescription>
+            </Field>
+          )}
+        />
+      )}
       <Field invalid={!!errors.annualLeaveDays}>
         <FieldLabel>{t('hr.fields.annualLeaveDays')}</FieldLabel>
         <Input

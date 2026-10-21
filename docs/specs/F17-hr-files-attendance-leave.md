@@ -306,6 +306,11 @@ Settled in implementation (PR B1, 2026-10-21):
 - New employee files take `default_annual_leave_days` from the HR settings. `attendance_starts_on` arrives with Part C (rule C1).
 - The calendar's `holiday` key dates (rule B16) ship with the HR settings screens (PR B2).
 
+Settled in implementation (PR B2, 2026-10-21):
+- Rule B16: a holiday is one `holiday` key date per day in the range, titled with its name, with no client (`client` is null on this kind only) and opening nothing. It reaches everyone whatever the calendar's client and person filters; only the kind filter hides it.
+- A file's schedule is chosen in the Contract and schedule dialog of the employee file (`employees.manage`, from the schedules `hr.read` lists); HR settings show how many employees each schedule has.
+- HR settings: Rules is one form saved as a whole; the lateness tiers are edited as rows, a new tier going before the open last one. The entrance screens and the attendance start date arrive with Part C.
+
 ### Part C: attendance
 1. **Start date.** Until `attendance_starts_on`, attendance runs in **trial**: punches are recorded and days show `trial`, but no item, reminder or absence is produced (owner, 2026-10-21). `hr.manage` sets the date (today or later); leave works from the deploy regardless.
 2. **Who.** Attendance applies to non-exempt users with a `start_date` ≤ the day and no past `ended_on`. Exempt users cannot punch.

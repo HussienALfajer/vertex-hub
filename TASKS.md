@@ -23,10 +23,11 @@ Parts A → B → C → D, each accepted by the owner before the next starts (sp
 - [x] checks, reviewer, acceptance (API at `/api/docs`, owner 2026-10-21), PR with auto-merge
 
 ## PR B2 — rules: web and E2E
-- [ ] contracts and api: the calendar's `holiday` key dates for everyone (rule B16), moved here from B1 because the calendar screen must show them in the same PR
-- [ ] HR settings `/hr/settings` (`hr.manage`): Rules (grace, tiers, leave policy; the start date stays for part C), Schedules, Holidays with "Repeat last year"; holidays on the calendar; the F08 post task form's default due date skips holidays
-- [ ] E2E: `f17-rules.spec.ts`, screenshots in both themes; mocks in `fixtures.ts`
-- [ ] checks, reviewer, acceptance (spec step 1 without the entrance screen and start date), PR with auto-merge
+- [x] contracts and api: the calendar's `holiday` key dates for everyone (rule B16), moved here from B1 because the calendar screen must show them in the same PR
+- [x] bridge: `openapi:export`, `api:generate`
+- [x] HR settings `/hr/settings` (`hr.manage`): Rules (grace, tiers, leave policy; the start date stays for part C), Schedules, Holidays with "Repeat last year"; holidays on the calendar; the F08 post task form's default due date skips holidays; a file's schedule in the contract dialog; HR nav item
+- [x] E2E: `f17-rules.spec.ts`, screenshots in both themes; mocks in `fixtures.ts`
+- [x] checks, reviewer, acceptance (spec step 1 without the entrance screen and start date; owner 2026-10-21), PR with auto-merge
 
 ## PR B3 — leave: contracts, db, api
 - [ ] contracts: requests of kind `leave` and `permission` (create, preview, list query and page, detail, decision, cancel), leave day counting, the sick and emergency split, accrual and rollover as pure functions with unit tests; `leaveBalanceSchema`, adjustments; opinions; error codes `REQUEST_OVERLAP`, `INSUFFICIENT_BALANCE`, `ON_PROBATION`, `PERMISSION_LIMIT`, `TOO_LATE`, `NOT_A_WORK_DAY`, `NOT_PENDING`, `CERTIFICATE_MISSING`, `NOT_CANCELLABLE`, `ASSIGNEE_ON_LEAVE`; notification types `hr_request_submitted`, `hr_request_decided`, `colleague_on_leave`, `leave_balance_adjusted`; F10 owner type `hr_request`; F11 item kind `leave` and conflict kind `leave`; `ar.json` keys

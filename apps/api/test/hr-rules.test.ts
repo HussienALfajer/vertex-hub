@@ -1,6 +1,7 @@
 import type { INestApplication } from '@nestjs/common';
 import {
   auditPageSchema,
+  calendarSchema,
   employeeFileSchema,
   type HrSettings,
   holidayListSchema,
@@ -410,6 +411,29 @@ describe('HR rules: schedules, holidays and settings (F17 part B)', () => {
         await (await client.get(`/api/hr/holidays?year=${YEAR + 1}`, employee.cookie)).json(),
       );
       expect(nextYear.items.map((item) => item.id)).not.toContain(holiday.id);
+    });
+
+    it('shows each day of a holiday on the calendar to everyone, whatever the filters (rule B16)', async () => {
+      const holidayDays = async (person: Person, filters = '') => {
+        const response = await client.get(
+          `/api/calendar?from=${YEAR}-05-14&to=${YEAR}-05-17${filters}`,
+          person.cookie,
+        );
+        expect(response.status, await response.clone().text()).toBe(200);
+        return calendarSchema
+          .parse(await response.json())
+          .keyDates.filter((keyDate) => keyDate.kind === 'holiday');
+      };
+      const days = await holidayDays(employee);
+      expect(days).toEqual([
+        expect.objectContaining({ date: `${YEAR}-05-16`, title: `${marker} Eid`, client: null }),
+        expect.objectContaining({ date: `${YEAR}-05-17`, title: `${marker} Eid`, client: null }),
+      ]);
+      expect(await holidayDays(finance, '&userId=me')).toHaveLength(2);
+      expect(
+        await holidayDays(manager, '&clientId=01900000-0000-7000-8000-000000000000'),
+      ).toHaveLength(2);
+      expect(await holidayDays(employee, '&kinds=shoot')).toEqual([]);
     });
 
     it('refuses more than ten days, a reversed range and an overlap', async () => {

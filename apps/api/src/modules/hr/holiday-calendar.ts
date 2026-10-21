@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import type { CalendarDate, HolidayRange } from '@vertex-hub/contracts';
 import { type Database, publicHolidays, type Transaction } from '@vertex-hub/db';
-import { and, asc, gte, isNull } from 'drizzle-orm';
+import { and, asc, gte, isNull, lte } from 'drizzle-orm';
 import { DATABASE } from '../../core/database/database.module.js';
 
 /**
@@ -21,6 +21,29 @@ export class HolidayCalendar {
       .select({ startsOn: publicHolidays.startsOn, endsOn: publicHolidays.endsOn })
       .from(publicHolidays)
       .where(and(isNull(publicHolidays.archivedAt), gte(publicHolidays.endsOn, from)))
+      .orderBy(asc(publicHolidays.startsOn));
+  }
+
+  /** Rule B16: the non-archived holidays with a day in `[from, to]`, by start date. */
+  async overlapping(
+    from: CalendarDate,
+    to: CalendarDate,
+  ): Promise<{ id: string; name: string; startsOn: CalendarDate; endsOn: CalendarDate }[]> {
+    return this.db
+      .select({
+        id: publicHolidays.id,
+        name: publicHolidays.name,
+        startsOn: publicHolidays.startsOn,
+        endsOn: publicHolidays.endsOn,
+      })
+      .from(publicHolidays)
+      .where(
+        and(
+          isNull(publicHolidays.archivedAt),
+          lte(publicHolidays.startsOn, to),
+          gte(publicHolidays.endsOn, from),
+        ),
+      )
       .orderBy(asc(publicHolidays.startsOn));
   }
 }

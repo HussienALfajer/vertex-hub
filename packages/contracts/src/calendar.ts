@@ -647,8 +647,17 @@ export type MeetingDetail = z.infer<typeof meetingDetailSchema>;
 
 // Company calendar
 
-/** `invoice_due` (F13) reaches invoice readers only, for the invoices they may read. */
-export const KEY_DATE_KINDS = ['project_due', 'milestone_due', 'renewal', 'invoice_due'] as const;
+/**
+ * `invoice_due` (F13) reaches invoice readers only, for the invoices they may read. `holiday`
+ * (F17 rule B16) reaches everyone, one key date per day of a public holiday.
+ */
+export const KEY_DATE_KINDS = [
+  'project_due',
+  'milestone_due',
+  'renewal',
+  'invoice_due',
+  'holiday',
+] as const;
 
 export const keyDateKindSchema = z.enum(KEY_DATE_KINDS).meta({ id: 'KeyDateKind' });
 
@@ -661,16 +670,20 @@ export const calendarKindSchema = z.enum(CALENDAR_KINDS).meta({ id: 'CalendarKin
 
 export type CalendarKind = z.infer<typeof calendarKindSchema>;
 
-/** A due date or renewal date read from `projects` or `invoices`, never stored (ADR 0022). */
+/**
+ * A due date or renewal date read from `projects` or `invoices`, or a day of a public holiday
+ * read from `hr`, never stored (ADR 0022).
+ */
 export const keyDateSchema = z
   .object({
     kind: keyDateKindSchema,
     date: calendarDateSchema,
-    /** The project, milestone or retainer name; the invoice number (`INV-2026-0012`). */
+    /** The project, milestone, retainer or holiday name; the invoice number (`INV-2026-0012`). */
     title: z.string(),
     /** What the chip opens: the project (also for a milestone), the retainer or the invoice. */
     targetId: z.uuid(),
-    client: archivablePersonSchema,
+    /** Null for a `holiday`, whose `targetId` is the holiday's id and opens nothing. */
+    client: archivablePersonSchema.nullable(),
     /** The invoice's status for `invoice_due` (never an amount); null for the other kinds. */
     invoiceStatus: invoiceStatusSchema.nullable(),
   })

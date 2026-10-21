@@ -14,6 +14,7 @@ import { Avatar, Badge, cn } from '@vertex-hub/ui';
 import {
   ArchiveIcon,
   BanIcon,
+  CalendarOffIcon,
   CameraIcon,
   FlagIcon,
   FolderKanbanIcon,
@@ -159,6 +160,7 @@ const KEY_DATE_ICONS: Record<KeyDateKind, LucideIcon> = {
   milestone_due: FlagIcon,
   renewal: RepeatIcon,
   invoice_due: ReceiptIcon,
+  holiday: CalendarOffIcon,
 };
 
 const cardClass =
@@ -207,9 +209,9 @@ function KeyDateLink({
 }
 
 /**
- * An all-day chip: "Project due", "Milestone due" or "Renewal", then what it is about. In a
- * month cell (`compact`) the kind is its icon, named for assistive technology, so the title
- * keeps the room.
+ * An all-day chip: "Project due", "Milestone due", "Renewal" or "Public holiday", then what it is
+ * about. In a month cell (`compact`) the kind is its icon, named for assistive technology, so the
+ * title keeps the room. A holiday opens nothing (F17 rule B16).
  */
 function KeyDateChip({
   keyDate,
@@ -236,10 +238,15 @@ function KeyDateChip({
       </span>
     </>
   );
-  const className =
-    'flex min-w-0 items-center gap-1 rounded-sm bg-status-gold px-1.5 py-0.5 text-xs font-medium text-status-gold-foreground';
+  const className = cn(
+    'flex min-w-0 items-center gap-1 rounded-sm px-1.5 py-0.5 text-xs font-medium',
+    keyDate.kind === 'holiday'
+      ? 'bg-status-info text-status-info-foreground'
+      : 'bg-status-gold text-status-gold-foreground',
+  );
   // Invoice due dates reach invoice readers only (F13 screen 8), who may open the invoice.
-  const linked = keyDate.kind === 'invoice_due' || can(me, 'projects.read');
+  const linked =
+    keyDate.kind !== 'holiday' && (keyDate.kind === 'invoice_due' || can(me, 'projects.read'));
   return linked ? (
     <KeyDateLink
       keyDate={keyDate}
@@ -332,9 +339,11 @@ export function EntryRows({ entries, me }: { entries: CalendarEntry[]; me: MeRes
           return (
             <li key={entryKey(entry)} className="flex flex-col gap-1 px-4 py-3">
               <KeyDateChip keyDate={entry.keyDate} me={me} />
-              <span className="truncate text-xs text-muted-foreground">
-                {clientLabel(entry.keyDate.client)}
-              </span>
+              {entry.keyDate.client && (
+                <span className="truncate text-xs text-muted-foreground">
+                  {clientLabel(entry.keyDate.client)}
+                </span>
+              )}
             </li>
           );
         }

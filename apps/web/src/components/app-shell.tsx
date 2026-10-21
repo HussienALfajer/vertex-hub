@@ -55,6 +55,7 @@ import { useInstallOffer } from '../features/app/install';
 import { OfflineBanner } from '../features/app/offline-banner';
 import { UpdateBanner } from '../features/app/update-banner';
 import { hasApprovalQueue } from '../features/approvals/approvals-page';
+import { managesHr } from '../features/hr/hr-settings-page';
 import { hasPeopleAccess } from '../features/hr/people-page';
 import { NotificationBell } from '../features/notifications/notification-bell';
 import { hasReports } from '../features/reports/reports-page';
@@ -103,7 +104,13 @@ interface NavItem {
 
 interface NavChild {
   to: LinkProps['to'];
-  label: 'nav.myTasks' | 'nav.taskList' | 'nav.taskBoard' | 'nav.workload' | 'nav.people';
+  label:
+    | 'nav.myTasks'
+    | 'nav.taskList'
+    | 'nav.taskBoard'
+    | 'nav.workload'
+    | 'nav.people'
+    | 'nav.hrSettings';
   /** Lists the page only for these users; others still reach it. */
   show?: (me: MeResponse) => boolean;
 }
@@ -145,13 +152,16 @@ const navItems: NavItem[] = [
   { to: '/catalog', label: 'nav.catalog', icon: PackageIcon, permission: 'catalog.read' },
   // Everyone reads templates; the people who apply or maintain them see the link (F07 screen 1).
   { to: '/templates', label: 'nav.templates', icon: LayoutTemplateIcon, show: managesTeams },
-  // HR (F17): files for `employees.read`, pay for `salaries.read`.
+  // HR (F17): files for `employees.read`, pay for `salaries.read`, settings for `hr.manage`.
   {
     to: '/hr/people',
     label: 'nav.hr',
     icon: ContactRoundIcon,
-    show: hasPeopleAccess,
-    children: [{ to: '/hr/people', label: 'nav.people' }],
+    show: (me) => hasPeopleAccess(me) || managesHr(me),
+    children: [
+      { to: '/hr/people', label: 'nav.people', show: hasPeopleAccess },
+      { to: '/hr/settings', label: 'nav.hrSettings', show: managesHr },
+    ],
   },
   { to: '/team', label: 'nav.team', icon: UsersIcon },
   { to: '/departments', label: 'nav.departments', icon: Building2Icon },

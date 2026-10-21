@@ -35,6 +35,7 @@ import { Route as AppClientsNewRouteImport } from './routes/_app/clients/new'
 import { Route as AppContentIndexRouteImport } from './routes/_app/content/index'
 import { Route as AppDepartmentsIndexRouteImport } from './routes/_app/departments/index'
 import { Route as AppDepartmentsDepartmentIdRouteImport } from './routes/_app/departments/$departmentId'
+import { Route as AppHrSettingsRouteImport } from './routes/_app/hr/settings'
 import { Route as AppInvoicesIndexRouteImport } from './routes/_app/invoices/index'
 import { Route as AppInvoicesInvoiceIdRouteImport } from './routes/_app/invoices/$invoiceId'
 import { Route as AppInvoicesSettingsRouteImport } from './routes/_app/invoices/settings'
@@ -214,6 +215,11 @@ const AppDepartmentsDepartmentIdRoute =
     path: '/departments/$departmentId',
     getParentRoute: () => AppRoute,
   } as any)
+const AppHrSettingsRoute = AppHrSettingsRouteImport.update({
+  id: '/hr/settings',
+  path: '/hr/settings',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppInvoicesIndexRoute = AppInvoicesIndexRouteImport.update({
   id: '/invoices/',
   path: '/invoices/',
@@ -477,6 +483,7 @@ export interface FileRoutesByFullPath {
   '/catalog/settings': typeof AppCatalogSettingsRoute
   '/clients/new': typeof AppClientsNewRoute
   '/departments/$departmentId': typeof AppDepartmentsDepartmentIdRoute
+  '/hr/settings': typeof AppHrSettingsRoute
   '/invoices/$invoiceId': typeof AppInvoicesInvoiceIdRoute
   '/invoices/settings': typeof AppInvoicesSettingsRoute
   '/leads/$leadId': typeof AppLeadsLeadIdRoute
@@ -551,6 +558,7 @@ export interface FileRoutesByTo {
   '/catalog/settings': typeof AppCatalogSettingsRoute
   '/clients/new': typeof AppClientsNewRoute
   '/departments/$departmentId': typeof AppDepartmentsDepartmentIdRoute
+  '/hr/settings': typeof AppHrSettingsRoute
   '/invoices/$invoiceId': typeof AppInvoicesInvoiceIdRoute
   '/invoices/settings': typeof AppInvoicesSettingsRoute
   '/leads/$leadId': typeof AppLeadsLeadIdRoute
@@ -627,6 +635,7 @@ export interface FileRoutesById {
   '/_app/catalog/settings': typeof AppCatalogSettingsRoute
   '/_app/clients/new': typeof AppClientsNewRoute
   '/_app/departments/$departmentId': typeof AppDepartmentsDepartmentIdRoute
+  '/_app/hr/settings': typeof AppHrSettingsRoute
   '/_app/invoices/$invoiceId': typeof AppInvoicesInvoiceIdRoute
   '/_app/invoices/settings': typeof AppInvoicesSettingsRoute
   '/_app/leads/$leadId': typeof AppLeadsLeadIdRoute
@@ -703,6 +712,7 @@ export interface FileRouteTypes {
     | '/catalog/settings'
     | '/clients/new'
     | '/departments/$departmentId'
+    | '/hr/settings'
     | '/invoices/$invoiceId'
     | '/invoices/settings'
     | '/leads/$leadId'
@@ -777,6 +787,7 @@ export interface FileRouteTypes {
     | '/catalog/settings'
     | '/clients/new'
     | '/departments/$departmentId'
+    | '/hr/settings'
     | '/invoices/$invoiceId'
     | '/invoices/settings'
     | '/leads/$leadId'
@@ -852,6 +863,7 @@ export interface FileRouteTypes {
     | '/_app/catalog/settings'
     | '/_app/clients/new'
     | '/_app/departments/$departmentId'
+    | '/_app/hr/settings'
     | '/_app/invoices/$invoiceId'
     | '/_app/invoices/settings'
     | '/_app/leads/$leadId'
@@ -1100,6 +1112,13 @@ declare module '@tanstack/react-router' {
       path: '/departments/$departmentId'
       fullPath: '/departments/$departmentId'
       preLoaderRoute: typeof AppDepartmentsDepartmentIdRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/hr/settings': {
+      id: '/_app/hr/settings'
+      path: '/hr/settings'
+      fullPath: '/hr/settings'
+      preLoaderRoute: typeof AppHrSettingsRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/invoices/': {
@@ -1447,6 +1466,7 @@ interface AppRouteChildren {
   AppCatalogSettingsRoute: typeof AppCatalogSettingsRoute
   AppClientsNewRoute: typeof AppClientsNewRoute
   AppDepartmentsDepartmentIdRoute: typeof AppDepartmentsDepartmentIdRoute
+  AppHrSettingsRoute: typeof AppHrSettingsRoute
   AppInvoicesInvoiceIdRoute: typeof AppInvoicesInvoiceIdRoute
   AppInvoicesSettingsRoute: typeof AppInvoicesSettingsRoute
   AppLeadsLeadIdRoute: typeof AppLeadsLeadIdRoute
@@ -1517,6 +1537,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppCatalogSettingsRoute: AppCatalogSettingsRoute,
   AppClientsNewRoute: AppClientsNewRoute,
   AppDepartmentsDepartmentIdRoute: AppDepartmentsDepartmentIdRoute,
+  AppHrSettingsRoute: AppHrSettingsRoute,
   AppInvoicesInvoiceIdRoute: AppInvoicesInvoiceIdRoute,
   AppInvoicesSettingsRoute: AppInvoicesSettingsRoute,
   AppLeadsLeadIdRoute: AppLeadsLeadIdRoute,

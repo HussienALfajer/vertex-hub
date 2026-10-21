@@ -119,6 +119,7 @@ import {
   createAnnouncementTemplateSchema,
   createCatalogPackageSchema,
   createCatalogServiceSchema,
+  createHolidaySchema,
   createInvoiceSchema,
   createLeadNoteSchema,
   createLeadSchema,
@@ -126,6 +127,7 @@ import {
   createQuoteSchema,
   createSalaryChangeSchema,
   createTemplateSchema,
+  createWorkScheduleSchema,
   currentCycleNumber,
   currentSalary,
   cycleAt,
@@ -140,6 +142,7 @@ import {
   type DepartmentResponse,
   type DeviceMatch,
   type DuplicatePost,
+  daysInclusive,
   daysInStage,
   daysOverdue,
   daysWithoutUpdate,
@@ -180,6 +183,11 @@ import {
   grantedPermissions,
   type HardwareSignals,
   type HealthResponse,
+  type Holiday,
+  type HolidayList,
+  type HrSettings,
+  holidayRangeValid,
+  hrSettingsSchema,
   type Invoice,
   type InvoiceDetail,
   type InvoiceOrigin,
@@ -349,6 +357,7 @@ import {
   renewalState,
   reopenLeadSchema,
   repeatedStepFor,
+  repeatHolidaysSchema,
   reportMonths,
   revisionSourceOf,
   type SalaryChange,
@@ -365,9 +374,11 @@ import {
   type SignedInDevice,
   type SnoozeNotification,
   type SourceInvoice,
+  scheduleTimesValid,
   sendQuoteSchema,
   serviceIssues,
   setRetainerTemplateSchema,
+  shiftedHoliday,
   shootTaskTitle,
   snoozeUntil,
   spendCountsInWallet,
@@ -425,6 +436,7 @@ import {
   updateContractSettingsSchema,
   updateCycleReportSummarySchema,
   updateEmployeeFileSchema,
+  updateHolidaySchema,
   updateInvoiceServicesSchema,
   updateInvoiceSettingsSchema,
   updateLeadNoteSchema,
@@ -432,10 +444,13 @@ import {
   updateProjectExpenseSchema,
   updateQuoteSettingsSchema,
   updateTemplateSchema,
+  updateWorkScheduleSchema,
   type VoidWalletEntry,
   voidInvoiceSchema,
   voidPaymentSchema,
   type WalletEntry,
+  type WorkSchedule,
+  type WorkScheduleList,
   walletLedger,
   weekOf,
 } from '@vertex-hub/contracts';
@@ -1290,6 +1305,8 @@ interface MockOptions {
   announcements?: boolean;
   /** Also adds Sara's unacknowledged critical announcement, which blocks everyone else. */
   criticalAnnouncement?: boolean;
+  /** Adds the public holidays of 2026 (`holidaysSeed`, F17 part B); none by default. */
+  holidays?: boolean;
 }
 
 /** A P-256 public key as `GET /api/me/push/config` sends it (fake: no private key exists). */
@@ -1382,6 +1399,7 @@ export async function mockApi(page: Page, options: MockOptions): Promise<MockedA
   const booked = options.calendar ? calendarSeed() : { shoots: [], meetings: [], tasks: [] };
   const tasks = [...tasksSeed(), ...sent.tasks, ...planned.tasks, ...booked.tasks];
   const billing = invoicesSeed();
+  const holidays = options.holidays ? holidaysSeed() : [];
   const calendarApi = calendarRoutes({
     users,
     clients,
@@ -1391,6 +1409,7 @@ export async function mockApi(page: Page, options: MockOptions): Promise<MockedA
     shoots: booked.shoots,
     meetings: booked.meetings,
     invoices: billing.invoices,
+    holidays,
     me: () => me,
   });
   const outbox = emailsSeed();
@@ -1466,7 +1485,7 @@ export async function mockApi(page: Page, options: MockOptions): Promise<MockedA
     streamed: options.streamed ?? [],
     me: () => me,
   });
-  const hrApi = hrRoutes({ users, me: () => me });
+  const hrApi = hrRoutes({ users, holidays, me: () => me });
   const announcementsApi = announcementRoutes({
     users,
     clients,
@@ -10929,6 +10948,8 @@ interface CalendarState {
   meetings: MeetingRecord[];
   /** For the `invoice_due` key dates (F13). */
   invoices: InvoiceRecord[];
+  /** For the `holiday` key dates (F17 rule B16), shared with the HR settings. */
+  holidays: Holiday[];
   me: () => MeResponse;
 }
 
@@ -10942,6 +10963,7 @@ function calendarRoutes({
   shoots,
   meetings,
   invoices,
+  holidays,
   me,
 }: CalendarState) {
   let next = 1800;
@@ -11202,6 +11224,21 @@ function calendarRoutes({
             ]
           : [],
       ),
+      // Each day of a public holiday, for everyone (F17 rule B16).
+      ...holidays
+        .filter((h) => !h.archivedAt && h.startsOn <= to && h.endsOn >= from)
+        .flatMap((h) => {
+          const first = h.startsOn < from ? from : h.startsOn;
+          const last = h.endsOn > to ? to : h.endsOn;
+          return Array.from({ length: daysInclusive(first, last) }, (_, day) => ({
+            kind: 'holiday' as const,
+            date: addDays(first, day),
+            title: h.name,
+            targetId: h.id,
+            client: null,
+            invoiceStatus: null,
+          }));
+        }),
       ...invoices.flatMap((i) => {
         const readable =
           holds('invoices.read', 'all') ||
@@ -11275,14 +11312,18 @@ function calendarRoutes({
               .sort((a, b) => a.startsAt.localeCompare(b.startsAt))
               .map(meetingSummary)
           : [],
-        keyDates: keyDates(from, to).filter(
-          (keyDate) =>
-            shows(keyDate.kind) &&
-            (!clientId || keyDate.client.id === clientId) &&
+        keyDates: keyDates(from, to).filter((keyDate) => {
+          const { client } = keyDate;
+          if (!shows(keyDate.kind)) return false;
+          // A holiday reaches everyone, whatever the filters (F17 rule B16).
+          if (!client) return true;
+          return (
+            (!clientId || client.id === clientId) &&
             (!userId ||
-              clients.find((c) => c.id === keyDate.client.id)?.accountManagerId === userId ||
-              projects.find((p) => p.id === keyDate.targetId)?.projectManagerId === userId),
-        ),
+              clients.find((c) => c.id === client.id)?.accountManagerId === userId ||
+              projects.find((p) => p.id === keyDate.targetId)?.projectManagerId === userId)
+          );
+        }),
       };
       return json(route, calendar);
     }
@@ -16356,6 +16397,90 @@ interface EmployeeRecord {
 
 const MAIN_SCHEDULE = { id: id(9801), name: 'الدوام الرئيسي' };
 
+/** The seeded schedule (Saturday to Thursday, 09:00 for 8 hours) and a flexible one. */
+function schedulesSeed(): Omit<WorkSchedule, 'employees'>[] {
+  const day = (
+    weekday: WorkSchedule['days'][number]['weekday'],
+    latestStartTime: string | null,
+  ) => ({
+    weekday,
+    startTime: '09:00',
+    latestStartTime,
+    requiredMinutes: 480,
+  });
+  const created = '2026-10-01T09:00:00.000Z';
+  return [
+    {
+      ...MAIN_SCHEDULE,
+      kind: 'fixed',
+      isDefault: true,
+      days: (['saturday', 'sunday', 'monday', 'tuesday', 'wednesday', 'thursday'] as const).map(
+        (weekday) => day(weekday, null),
+      ),
+      createdAt: created,
+      updatedAt: created,
+      archivedAt: null,
+    },
+    {
+      id: id(9802),
+      name: 'دوام مرن',
+      kind: 'flexible',
+      isDefault: false,
+      days: (['sunday', 'monday', 'tuesday', 'wednesday', 'thursday'] as const).map((weekday) =>
+        day(weekday, '10:30'),
+      ),
+      createdAt: created,
+      updatedAt: created,
+      archivedAt: null,
+    },
+  ];
+}
+
+/** The public holidays of 2026 (F17 rule B3), typed by HR. */
+export function holidaysSeed(): Holiday[] {
+  const holiday = (n: number, name: string, startsOn: string, endsOn: string, paid = true) => ({
+    id: id(n),
+    name,
+    startsOn,
+    endsOn,
+    paid,
+    createdAt: '2026-01-05T09:00:00.000Z',
+    updatedAt: '2026-01-05T09:00:00.000Z',
+    archivedAt: null,
+  });
+  return [
+    holiday(9821, 'عيد الفطر', '2026-03-20', '2026-03-22'),
+    holiday(9822, 'عيد العمال', '2026-05-01', '2026-05-01'),
+    holiday(9823, 'عيد الأضحى', '2026-05-26', '2026-05-29'),
+    holiday(9824, 'ذكرى حرب تشرين', '2026-10-06', '2026-10-06'),
+    holiday(9825, 'عيد الميلاد', '2026-12-25', '2026-12-25', false),
+  ];
+}
+
+/** The seeded HR settings: the column defaults (spec, `hr_settings`). */
+const HR_SETTINGS: HrSettings = {
+  graceMinutes: 10,
+  latenessTiers: [
+    { upToMinutes: 30, fraction: 0.25 },
+    { upToMinutes: 60, fraction: 0.5 },
+    { upToMinutes: null, fraction: 1 },
+  ],
+  firstLatenessWarning: true,
+  overtimeMinMinutes: 30,
+  checkInReminderMinutes: 15,
+  defaultAnnualLeaveDays: 14,
+  carryOverMaxDays: 5,
+  sickDaysPerYear: 14,
+  sickCertificateAfterDays: 2,
+  sickRequestWithinWorkDays: 3,
+  emergencyDaysPerYear: 3,
+  permissionMaxMinutes: 120,
+  permissionsPerMonth: 4,
+  annualNoticeWorkDays: 3,
+  remoteNoticeWorkDays: 1,
+  overtimeMinutesPerLeaveDay: 480,
+};
+
 /** The HR tests' clock (F17): the mock's "today" for current salaries and ends of service. */
 export const HR_NOW = '2026-10-21T09:00:00+03:00';
 const HR_TODAY = businessDate(new Date(HR_NOW));
@@ -16459,9 +16584,22 @@ export function employeesSeed(users: UserResponse[]): {
   };
 }
 
-/** HR, part A (F17): People, the employee file, pay and the end of service. */
-function hrRoutes({ users, me }: { users: UserResponse[]; me: () => MeResponse }) {
+/**
+ * HR (F17): People, the employee file, pay and the end of service (part A); work schedules,
+ * public holidays and the HR settings (part B).
+ */
+function hrRoutes({
+  users,
+  holidays,
+  me,
+}: {
+  users: UserResponse[];
+  holidays: Holiday[];
+  me: () => MeResponse;
+}) {
   const { files, salaries } = employeesSeed(users);
+  const schedules = schedulesSeed();
+  let settings = HR_SETTINGS;
   let next = 9850;
   const holds = (permission: Permission) =>
     me().permissions.some((granted) => granted.permission === permission);
@@ -16497,6 +16635,160 @@ function hrRoutes({ users, me }: { users: UserResponse[]; me: () => MeResponse }
     };
   };
 
+  const scheduleOf = (schedule: Omit<WorkSchedule, 'employees'>): WorkSchedule => ({
+    ...schedule,
+    employees: files.filter(
+      (f) => f.employment.schedule.id === schedule.id && statusOf(f) !== 'ended',
+    ).length,
+  });
+  const nameTaken = (name: string, except?: string) =>
+    schedules.some((s) => s.id !== except && s.name.toLowerCase() === name.toLowerCase());
+  const overlaps = (range: { startsOn: string; endsOn: string }, except?: string) =>
+    holidays.some(
+      (h) =>
+        h.id !== except &&
+        !h.archivedAt &&
+        h.startsOn <= range.endsOn &&
+        h.endsOn >= range.startsOn,
+    );
+
+  /** Part B: schedules (rule B2), holidays (rule B3) and the settings. */
+  const rulesRoute = (
+    route: Route,
+    method: string,
+    path: string,
+    q: URLSearchParams,
+    request: Request,
+  ): Promise<void> | undefined => {
+    const now = new Date().toISOString();
+    if (path === '/api/hr/schedules' && method === 'GET') {
+      if (!holds('hr.read')) return fail(route, 403, null);
+      const items = schedules
+        .filter((s) => !s.archivedAt)
+        .sort((a, b) => Number(b.isDefault) - Number(a.isDefault) || a.name.localeCompare(b.name))
+        .map(scheduleOf);
+      return json(route, { items } satisfies WorkScheduleList);
+    }
+    if (path === '/api/hr/holidays' && method === 'GET') {
+      const year = q.get('year') ?? '';
+      const items = holidays
+        .filter(
+          (h) => !h.archivedAt && h.startsOn <= `${year}-12-31` && h.endsOn >= `${year}-01-01`,
+        )
+        .sort((a, b) => a.startsOn.localeCompare(b.startsOn));
+      return json(route, { items } satisfies HolidayList);
+    }
+    if (path === '/api/hr/settings' && method === 'GET') {
+      if (!holds('hr.read')) return fail(route, 403, null);
+      return json(route, settings);
+    }
+    const isRule =
+      path === '/api/hr/settings' ||
+      path.startsWith('/api/hr/schedules') ||
+      path.startsWith('/api/hr/holidays');
+    if (!isRule) return undefined;
+    if (!holds('hr.manage')) return fail(route, 403, null);
+
+    if (path === '/api/hr/settings' && method === 'PUT') {
+      settings = hrSettingsSchema.parse(request.postDataJSON());
+      return json(route, settings);
+    }
+    if (path === '/api/hr/schedules' && method === 'POST') {
+      const body = createWorkScheduleSchema.parse(request.postDataJSON());
+      if (nameTaken(body.name)) return fail(route, 409, 'SCHEDULE_NAME_TAKEN');
+      if (!scheduleTimesValid(body.kind, body.days)) return fail(route, 400, 'INVALID_TIMES');
+      if (body.isDefault) for (const s of schedules) s.isDefault = false;
+      const schedule = {
+        id: id(next++),
+        ...body,
+        createdAt: now,
+        updatedAt: now,
+        archivedAt: null,
+      };
+      schedules.push(schedule);
+      return json(route, scheduleOf(schedule), 201);
+    }
+    const scheduleMatch = path.match(/^\/api\/hr\/schedules\/([^/]+)(\/archive)?$/);
+    if (scheduleMatch) {
+      const schedule = schedules.find((s) => s.id === scheduleMatch[1] && !s.archivedAt);
+      if (!schedule) return fail(route, 404, null);
+      if (scheduleMatch[2] && method === 'POST') {
+        if (schedule.isDefault) return fail(route, 409, 'DEFAULT_REQUIRED');
+        if (scheduleOf(schedule).employees > 0) return fail(route, 409, 'SCHEDULE_IN_USE');
+        schedule.archivedAt = now;
+        return json(route, scheduleOf(schedule));
+      }
+      if (method !== 'PATCH') return undefined;
+      const body = updateWorkScheduleSchema.parse(request.postDataJSON());
+      if (body.name !== undefined && nameTaken(body.name, schedule.id)) {
+        return fail(route, 409, 'SCHEDULE_NAME_TAKEN');
+      }
+      if (schedule.isDefault && body.isDefault === false) {
+        return fail(route, 409, 'DEFAULT_REQUIRED');
+      }
+      const kind = body.kind ?? schedule.kind;
+      if (!scheduleTimesValid(kind, body.days ?? schedule.days)) {
+        return fail(route, 400, 'INVALID_TIMES');
+      }
+      if (body.isDefault) for (const s of schedules) s.isDefault = false;
+      Object.assign(schedule, { ...body, isDefault: body.isDefault || schedule.isDefault });
+      schedule.updatedAt = now;
+      for (const f of files) {
+        if (f.employment.schedule.id === schedule.id) {
+          f.employment.schedule = { id: schedule.id, name: schedule.name };
+        }
+      }
+      return json(route, scheduleOf(schedule));
+    }
+
+    if (path === '/api/hr/holidays' && method === 'POST') {
+      const body = createHolidaySchema.parse(request.postDataJSON());
+      if (!holidayRangeValid(body)) return fail(route, 400, 'INVALID_DATES');
+      if (overlaps(body)) return fail(route, 409, 'HOLIDAY_OVERLAP');
+      const holiday = { id: id(next++), ...body, createdAt: now, updatedAt: now, archivedAt: null };
+      holidays.push(holiday);
+      return json(route, holiday, 201);
+    }
+    if (path === '/api/hr/holidays/repeat' && method === 'POST') {
+      const { year } = repeatHolidaysSchema.parse(request.postDataJSON());
+      const copies: Holiday[] = [];
+      for (const h of holidays.filter(
+        (h) => !h.archivedAt && h.startsOn.startsWith(`${year - 1}-`),
+      )) {
+        const range = shiftedHoliday(h, 1);
+        if (overlaps(range)) continue;
+        const copy = {
+          ...h,
+          id: id(next++),
+          ...range,
+          createdAt: now,
+          updatedAt: now,
+          archivedAt: null,
+        };
+        holidays.push(copy);
+        copies.push(copy);
+      }
+      return json(route, { items: copies } satisfies HolidayList, 201);
+    }
+    const holidayMatch = path.match(/^\/api\/hr\/holidays\/([^/]+)(\/archive)?$/);
+    if (holidayMatch) {
+      const holiday = holidays.find((h) => h.id === holidayMatch[1] && !h.archivedAt);
+      if (!holiday) return fail(route, 404, null);
+      if (holidayMatch[2] && method === 'POST') {
+        holiday.archivedAt = now;
+        return json(route, holiday);
+      }
+      if (method !== 'PATCH') return undefined;
+      const body = updateHolidaySchema.parse(request.postDataJSON());
+      const merged = { ...holiday, ...body };
+      if (!holidayRangeValid(merged)) return fail(route, 400, 'INVALID_DATES');
+      if (overlaps(merged, holiday.id)) return fail(route, 409, 'HOLIDAY_OVERLAP');
+      Object.assign(holiday, body, { updatedAt: now });
+      return json(route, holiday);
+    }
+    return undefined;
+  };
+
   return (route: Route, method: string, url: URL, request: Request): Promise<void> | undefined => {
     const path = url.pathname;
     const q = url.searchParams;
@@ -16519,6 +16811,9 @@ function hrRoutes({ users, me }: { users: UserResponse[]; me: () => MeResponse }
     }
 
     if (!path.startsWith('/api/hr/')) return undefined;
+
+    const rules = rulesRoute(route, method, path, q, request);
+    if (rules) return rules;
 
     if (path === '/api/hr/employees' && method === 'GET') {
       if (!holds('employees.read') && !holds('salaries.read')) return fail(route, 403, null);
@@ -16588,7 +16883,13 @@ function hrRoutes({ users, me }: { users: UserResponse[]; me: () => MeResponse }
 
     if (action === '' && method === 'PATCH') {
       const body = updateEmployeeFileSchema.parse(request.postDataJSON());
-      const { scheduleId: _scheduleId, ...changes } = body;
+      const { scheduleId, ...changes } = body;
+      if (scheduleId !== undefined && scheduleId !== file.employment.schedule.id) {
+        const schedule = schedules.find((s) => s.id === scheduleId);
+        if (!schedule) return fail(route, 404, null);
+        if (schedule.archivedAt) return fail(route, 409, 'SCHEDULE_ARCHIVED');
+        file.employment.schedule = { id: schedule.id, name: schedule.name };
+      }
       const personal = Object.fromEntries(
         Object.entries(changes).filter(([key]) => key in file.personal),
       );
