@@ -8,14 +8,14 @@ The agency keeps contracts, start dates and salaries outside the system, takes a
 F17 adds an `hr` module with four parts:
 - **Employee files:** personal details, contract, probation, schedule, payout method, salary history (General Manager and Finance only), documents through F10, the end of service, and reminders before a contract or probation ends.
 - **Rules:** named work schedules (fixed or flexible), public holidays, a grace period, lateness tiers in fractions of a day, early leave, overtime, remote days, and the leave policy, all set in the app.
-- **Attendance:** at the office, the employee scans a QR code that changes every 20 seconds on a paired **entrance screen** and confirms with a **passkey** on their own phone, from the **office network**. Remote days and field work use the passkey (field work adds GPS), and a scheduled F11 shoot counts as field work without a check-in. Lateness, early leave, absence and overtime become **items that the General Manager decides**; nothing is deducted before that. The General Manager closes each month for F19.
+- **Attendance:** at the office, the employee scans a QR code that changes every 20 seconds on a paired **entrance screen** and confirms with a **passkey** on their own phone, from the **office network**. Remote days, field work and F11 shoots use the passkey with the phone's location; the crew of a shoot checks in at its start and out at its end. Location is read only at a punch, never tracked in between. Lateness, early leave, absence and overtime become **items that the General Manager decides**; nothing is deducted before that. The General Manager closes each month for F19.
 - **Leave:** annual, sick, emergency and unpaid leave, half days and hourly permissions, with balances kept as a ledger, requests approved by the General Manager, leave on the company calendar, and warnings when work is assigned to someone on leave.
 
 ## In scope / out of scope
 - In:
   - **Part A, employee files.** The `employee_files` row of every user, salary history, payout method, documents (F10 owner type `employee`), the end of service with the account archived on its day, contract and probation reminders, four permissions and the People screens.
   - **Part B, rules and leave.** Work schedules, public holidays (also skipped by the work-day functions of F07 and F08), HR settings, the leave balance ledger with monthly accrual and the year rollover, leave and permission requests and their decisions, leave on the company calendar, leave warnings on tasks, shoots and meetings, and the approvals inbox.
-  - **Part C, attendance.** Attendance passkeys, entrance screens (kiosks) and the rotating QR code, check-in and check-out at the office, on a remote day and in the field, shoots as field time, the day computation, attendance items and justifications, correction and remote-day requests, check-in and check-out reminders, the greeting, My attendance and the Today board.
+  - **Part C, attendance.** Attendance passkeys, entrance screens (kiosks) and the rotating QR code, check-in and check-out at the office, on a remote day, in the field and at a shoot, location at every punch, the day computation, attendance items and justifications, correction and remote-day requests, check-in and check-out reminders, the greeting, My attendance and the Today board.
   - **Part D, months.** The month sheet, closing and reopening a month with its frozen summary, and the Excel files.
 - Out (later or never):
   - Payroll, money deductions, payslips, commissions and shares: F19. F17 stores deductions as fractions of a day and overtime as minutes; F19 turns them into money.
@@ -27,6 +27,7 @@ F17 adds an `hr` module with four parts:
   - Hardware fingerprint readers, NFC or Bluetooth beacons.
   - Leave types beyond the four, maternity and bereavement rules (recorded as unpaid or adjusted by hand until a later decision).
   - Employees editing their own personal details (owner, 2026-10-21: the recommended option keeps them with HR).
+  - Tracking an employee's location between punches (owner, 2026-10-21). An installed web app cannot read the location while it is closed or the phone is locked, so continuous tracking would need a native store app; the location is read at each punch only.
 
 ## Roles and access
 Eight new permissions (`packages/contracts/src/permissions.ts`):
@@ -155,14 +156,15 @@ WebAuthn credentials for attendance only (ADR 0039), not Better Auth's passkey p
 | `user_id` | uuid FK `users` | indexed with `at` |
 | `direction` | enum `in`, `out` | |
 | `at` | timestamptz | server time of the request, never the phone's |
-| `method` | enum `office`, `remote`, `field`, `correction` | |
+| `method` | enum `office`, `remote`, `field`, `shoot`, `correction` | |
 | `kiosk_id` | uuid FK, null | `office` only |
 | `ip_address` | text | |
-| `latitude`, `longitude` | numeric(9,6), null | required for `field`; recorded when the phone gives it for `office` |
+| `latitude`, `longitude` | numeric(9,6), null | required for `remote`, `field` and `shoot`; recorded when the phone gives it for `office` (rule C6a) |
 | `accuracy_m` | int, null | |
 | `field_note` | text, null | required for `field` |
 | `field_task_id` / `field_meeting_id` | uuid FK, null | optional link for `field` |
-| `field_review` | enum `accepted`, `rejected`, null | `field` starts `accepted` (rule C12) |
+| `shoot_id` | uuid FK `shoots`, null | required for `shoot` |
+| `field_review` | enum `accepted`, `rejected`, null | `field` and `shoot` start `accepted` (rule C12) |
 | `request_id` | uuid FK `hr_requests`, null | `correction` only |
 | timestamps, `archived_at` | | a rejected field punch is archived and no longer counts |
 
@@ -177,7 +179,7 @@ One row per user and work-relevant date (unique `user_id`, `date`), created by t
 | `required_minutes` | int, null | |
 | `place` | enum `office`, `remote`, null | `remote` for an approved remote day or a standing remote weekday |
 | `leave` | enum `none`, `full`, `first_half`, `second_half` | from approved leave |
-| `first_in_at`, `last_out_at` | timestamptz, null | presence, counting shoots (rule C13) |
+| `first_in_at`, `last_out_at` | timestamptz, null | presence from punches |
 | `worked_minutes`, `late_minutes`, `early_minutes`, `overtime_minutes` | int | computed |
 | `status` | enum `upcoming`, `in_progress`, `present`, `partial`, `absent`, `leave`, `holiday`, `off`, `trial` | |
 | timestamps, `archived_at` | | |
@@ -289,22 +291,23 @@ A department manager's or Ops' comment on a pending request or item: `request_id
 3. **The attendance passkey.** Each user registers one passkey from the installed app on their phone (WebAuthn, platform authenticator, user verification required, so the phone's fingerprint, face or screen lock confirms it). The first registration is `active` at once. It is never used to sign in (owner, 2026-10-21).
 4. **Entrance screens.** `hr.manage` creates a screen and gets a pairing code (8 characters, 15 minutes). On the screen's browser, `/kiosk` takes the code; the API sets a `vh_kiosk` cookie (random, `HttpOnly`, `Path=/api/kiosk`, 400 days) and stores its hash. The screen holds no user session. Archiving the screen unpairs it.
 5. **The QR code.** The screen shows a code that changes every 20 seconds: `kioskId.window.mac`, where `window` = ⌊unix seconds / 20⌋ and `mac` = HMAC-SHA-256 of both under the kiosk's secret, truncated to 16 bytes, base64url. It is computed on the screen from a per-window value the API gives over the kiosk stream, so the secret never reaches the browser. A code is accepted for its window and the previous one (up to 40 seconds). The code is a link `/attend#<code>` so a phone's camera opens the check-in page; the app's own scanner is the main path.
-6. **The office network** (owner, 2026-10-21). An office punch is accepted only when the phone's request comes from an address the paired screen used in the last 10 minutes (IPv4 equal; IPv6 the same /64), and the screen was seen in the last 2 minutes. Otherwise it is refused with `OFF_OFFICE_NETWORK` ("Connect to the office Wi‑Fi"), and the attempt is logged for the GM (`attendance.punch_refused` audit entry with the reason). This defeats a code sent by photo or video call. GPS, when the phone gives it, is recorded as extra evidence but never required at the office.
+6. **The office network** (owner, 2026-10-21). An office punch is accepted only when the phone's request comes from an address the paired screen used in the last 10 minutes (IPv4 equal; IPv6 the same /64), and the screen was seen in the last 2 minutes. Otherwise it is refused with `OFF_OFFICE_NETWORK` ("Connect to the office Wi‑Fi"), and the attempt is logged for the GM (`attendance.punch_refused` audit entry with the reason). This defeats a code sent by photo or video call.
+6a. **Location at every punch** (owner, 2026-10-21). Every punch asks the phone for its location once, at the moment of the punch. It is required for remote, field and shoot punches (`LOCATION_REQUIRED` without it) and recorded as extra evidence at the office, where the network is the proof. Nothing reads the location between punches. The GM sees each punch's point on a map in the Today board and in the day's timeline.
 7. **Office punch.** Scan → the app sends the code → the API checks it (rule 5) and the network (rule 6) and returns a WebAuthn challenge → the passkey signs → the API verifies it against the active passkey, then writes the punch. The direction is `in` when the user's last punch today is absent or `out`, else `out`. The phone and the screen both show the greeting (rule C20).
-8. **Remote punch.** On an approved remote day or a standing remote weekday, the app offers "Check in remotely": passkey only, no code, no network check, no location.
+8. **Remote punch.** On an approved remote day or a standing remote weekday, the app offers "Check in remotely": passkey and location, no code, no network check.
 9. **Replacing the passkey** (new phone). Registering again creates a `pending` passkey and a `passkey_replacement` request to the GM; until it is approved, the old one stays active (if the old phone is lost, the employee uses correction requests). Approving activates the new one and revokes the old. `hr.approve` can also revoke a passkey.
 10. **Without a suitable phone.** A user with no active passkey cannot punch and submits corrections; the Today board marks them "no passkey".
 11. **Field punch.** "Field work" asks for location (required; refused without it, `LOCATION_REQUIRED`), a reason, and optionally a task or meeting, then the passkey. It is accepted at once and appears to the GM with a map (owner, 2026-10-21).
 12. **Field review.** `hr.approve` can reject a field punch with a note: it is archived, the day recomputes, and the employee gets `field_punch_rejected`.
-13. **Shoots.** An employee in the team crew of a `scheduled` or `completed` F11 shoot is present in the field from its start to its end without punching (owner, 2026-10-20). Shoot time joins the punch intervals in rule 15.
-14. **Recomputation.** A day recomputes when a punch, leave, permission, remote day, holiday, shoot or exempt flag affecting it changes, while its month is open. Items that no longer apply become `void`; new ones are raised.
-15. **Day computation** (pure function, unit tested). Presence = union of `[in, out)` punch intervals and shoot intervals.
+13. **Shoots** (owner, 2026-10-21; replaces "counts without checking in" of 2026-10-20). Each team crew member of a `scheduled` F11 shoot checks in at its start and out at its end with a shoot punch: from 30 minutes before the start until its end, the app offers "Shoot check-in" with the shoot already chosen, and it needs the location and the passkey. The GM sees the point beside the shoot's place and map link, and can reject it as a field punch (rule 12). `shoot_check_in_missing` reminds a crew member 15 minutes after the start if they have not checked in. Without punches, shoot time does not count, and the normal lateness and absence rules apply. The shoot's place is text, so the distance is not checked automatically.
+14. **Recomputation.** A day recomputes when a punch, leave, permission, remote day, holiday or exempt flag affecting it changes, while its month is open. Items that no longer apply become `void`; new ones are raised.
+15. **Day computation** (pure function, unit tested). Presence = union of `[in, out)` punch intervals, whatever their method (an `in` at the office and an `out` at a shoot form one interval).
     - `late_minutes` = first presence − the latest allowed start (fixed: `expected_start`; flexible: `latest_start`), minus any permission window at the start, and 0 if within `grace_minutes`. A second-half leave sets no arrival; a first-half leave moves the start by half of `required_minutes`.
     - Expected end: fixed `expected_end`; flexible: actual start (not before the window opens) + `required_minutes`. Half-day leave halves the required minutes.
     - `early_minutes` = expected end − last presence, under the same grace and permission rules.
     - `overtime_minutes` = presence after the expected end, counted only if ≥ `overtime_min_minutes`. All presence on an off day or holiday is overtime.
     - An `out` punch after midnight closes the open `in` of the previous day if within 6 hours; otherwise the day has a missing `out`.
-16. **Status.** `upcoming` before the day; `in_progress` while it runs; afterwards `present` (expectations met), `partial` (late, early or missing out), `absent` (a work day with no presence, no leave, no shoot), `leave`, `holiday`, `off`.
+16. **Status.** `upcoming` before the day; `in_progress` while it runs; afterwards `present` (expectations met), `partial` (late, early or missing out), `absent` (a work day with no presence and no leave), `leave`, `holiday`, `off`.
 17. **Items.** Raised at the moment they become known (lateness at check-in; early leave at check-out, replaced if the employee checks in again; absence, missing out and overtime when the day ends). `proposed_fraction` comes from the tiers on the late or early minutes; absence proposes 1; the first lateness of the month proposes 0 (a warning) when `first_lateness_warning`. The employee gets `attendance_item_raised` and may justify the item until it is decided.
 18. **Deciding items** (`hr.approve`, owner: deductions only after approval).
     - lateness, early leave, absence: `deducted` with a fraction (0.25–1, default the proposal), `waived`, or `warned` (recorded, no deduction).
@@ -344,7 +347,8 @@ Added to `packages/contracts/src/notifications.ts`, in the F16 format. "GMs" = h
 | `attendance_check_in_missing` | rule C21 | the employee | important | A | on | — | a punch, leave or the day ends |
 | `attendance_check_out_missing` | rule C21 | the employee | normal | A | on | — | an `out` or a correction |
 | `field_punch_recorded` | a field punch | GMs | informational | I | — | — | merges per day |
-| `field_punch_rejected` | rule C12 | the employee | important | I | on | — | |
+| `field_punch_rejected` | rule C12 | the employee | important | I | on | — | also for shoot punches |
+| `shoot_check_in_missing` | rule C13 | the crew member | important | A | on | — | a shoot punch, the shoot cancelled or ended |
 | `colleague_on_leave` | rule B18 | dept managers | informational | I | — | — | |
 | `leave_balance_adjusted` | rule B7 | the employee | informational | I | — | — | |
 | `holiday_changed` | rule B3 | everyone | normal | I | on | — | |
@@ -385,7 +389,7 @@ All under `/api/hr` unless stated. Lists follow ADR 0013 (pagination, filters).
 | `POST /items/:id/decision` | `hr.approve` | `decideItemSchema` | `attendanceItemSchema` | `INVALID_DECISION`, `MONTH_CLOSED` |
 | `GET /attendance/me/today` | session | — | `myTodaySchema` (day, next action, allowed methods, greeting) | — |
 | `GET /attendance/days` | self / `hr.read` | `{ userId, month }` | `attendanceDayListSchema` (with punches) | — |
-| `POST /attendance/punch/options` | session | `{ method, code?, latitude?, longitude?, accuracyM? }` | WebAuthn assertion options + a punch ticket (60 s) | `EXEMPT`, `NO_PASSKEY`, `INVALID_CODE`, `OFF_OFFICE_NETWORK`, `NOT_REMOTE_DAY`, `LOCATION_REQUIRED`, `MONTH_CLOSED` |
+| `POST /attendance/punch/options` | session | `{ method, code?, shootId?, latitude?, longitude?, accuracyM? }` | WebAuthn assertion options + a punch ticket (60 s) | `EXEMPT`, `NO_PASSKEY`, `INVALID_CODE`, `OFF_OFFICE_NETWORK`, `NOT_REMOTE_DAY`, `NOT_ON_SHOOT` (not crew, or outside the shoot's window), `LOCATION_REQUIRED`, `MONTH_CLOSED` |
 | `POST /attendance/punch` | session | `{ ticket, assertion, fieldNote?, fieldTaskId?, fieldMeetingId? }` | `{ punch, day, greeting }` | `PASSKEY_FAILED`, `TICKET_EXPIRED`, `OFF_OFFICE_NETWORK` (checked again) |
 | `POST /attendance/punches/:id/reject` | `hr.approve` | `{ note }` | `attendanceDaySchema` | `NOT_FIELD`, `MONTH_CLOSED` |
 | `GET /attendance/today` | `hr.read` | `{ department? }` | `todayBoardSchema` | — |
@@ -414,7 +418,7 @@ All Arabic RTL, from `packages/ui`. A new **HR** section in the sidebar for `hr.
 - **People** `/hr/people`: employees with department, type, start date, schedule, passkey state, contract end; filters. Pay columns for `salaries.read` only.
 - **Employee file** `/hr/people/:userId`: tabs Personal, Contract and schedule, Pay (`salaries.read`), Documents, Leave, Attendance, with the end-of-service action. The employee sees their own file read-only at `/me/file`.
 - **Approvals** `/hr/approvals`: pending requests and items, oldest first, filters by kind and department. A request opens with its days, the split, notice, certificate, opinions and the overlapping work; an item opens with the day's timeline and the justification. Actions for `hr.approve`; department managers and Ops add an opinion. Bulk decide for items of the same proposal.
-- **Today** `/hr/today`: counts and lists of in, late, not yet in, on leave, remote, field (with a small map and an "Open in maps" link), on a shoot, exempt and "no passkey"; refusals of the day (`OFF_OFFICE_NETWORK`).
+- **Today** `/hr/today`: counts and lists of in, late, not yet in, on leave, remote, field, on a shoot (each with its punch points on a small map and an "Open in maps" link), exempt and "no passkey"; refusals of the day (`OFF_OFFICE_NETWORK`).
 - **Month** `/hr/months/:month`: the sheet (employees × days), totals, pending counts, Close or Reopen, Excel.
 - **HR settings** `/hr/settings` (`hr.manage`): Rules (grace, tiers, leave policy, start date), Schedules, Holidays (with "Repeat last year"), Entrance screens (create, pairing code, last seen, unpair).
 - **Entrance screen** `/kiosk` (no session): pairing form; then full screen with the logo, the clock, the date, the QR code with a countdown ring, and the greeting; an "offline" banner when the stream drops. Big text readable from 2 metres, landscape and portrait.
@@ -445,7 +449,8 @@ Loading, empty and error states follow F15/F16 patterns; every list has an empty
 11. **Holiday added on a day with approved leave:** the leave's day count drops and the balance is restored for that day.
 12. **A holiday in a closed month:** refused (`MONTH_CLOSED`); reopen first.
 13. **Leave spanning two years or two months:** balances split by year; days belong to their months; a closed month in the range refuses the request.
-14. **Shoot overlapping a leave:** the conflict warning (B17); if both stand, the shoot counts as presence and the leave stays (the GM decides).
+14. **Shoot overlapping a leave:** the conflict warning (B17); if both stand and the crew member punches at the shoot, the presence creates an overtime item and the leave stays (the GM decides).
+14a. **Shoot moved or cancelled after a shoot check-in:** the punch stays as field presence; the GM can reject it.
 15. **Flexible schedule arriving before the window:** counted from the window's opening for the expected end; the earlier minutes are not overtime.
 16. **Permission at day start:** the expected arrival moves to the permission's end; no lateness within it.
 17. **Employee ends service mid-month:** days after `ended_on` are not created; the month summary covers the days worked.
@@ -470,11 +475,11 @@ None block the spec. To confirm during implementation, not owner decisions:
   3. As an employee on the installed app, register the passkey; scan the entrance code on office Wi‑Fi and check in; see the greeting on the phone and the screen. Turn Wi‑Fi off and scan again: "Connect to the office Wi‑Fi".
   4. Check in late tomorrow; see the item, add a justification; as GM, decide it (quarter day or warning).
   5. Request annual leave for next week; as GM, see the employee's tasks in that week and approve; see "On leave" on the calendar; assign a task due that week and get the warning.
-  6. Request a remote day, then check in remotely; record a field punch and see it on the Today map; reject it.
+  6. Request a remote day, then check in remotely; record a field punch and see it on the Today map; reject it. As a crew member of a shoot today, do the shoot check-in and check-out and see both points beside the shoot's place.
   7. At month end, close the month after deciding everything; export the Excel file.
 - **Tests:**
   - API per endpoint: success, 401, 403, out of scope (department manager outside their departments, Finance on files without pay, an employee on another's file), and each error code.
-  - Unit: the day computation (fixed and flexible, grace, tiers, permissions, half days, shoots, midnight, off days and holidays), leave day counting, accrual and rollover, the sick and emergency split, the QR token window check, the IP rule (IPv4, IPv6 /64), `isWorkDay` with holidays and the F07 due dates.
+  - Unit: the day computation (fixed and flexible, grace, tiers, permissions, half days, mixed methods, midnight, off days and holidays), leave day counting, accrual and rollover, the sick and emergency split, the QR token window check, the IP rule (IPv4, IPv6 /64), `isWorkDay` with holidays and the F07 due dates.
   - Privacy: no salary amount in notifications, pushes, emails, audit text or responses without `salaries.read`; the leave type never in calendar responses for users without `hr.read`.
   - E2E and RTL screenshots: My attendance (each state), the scanner errors, the request dialog, Approvals, Today, the month sheet, HR settings, the employee file tabs (with and without pay), and the entrance screen. WebAuthn through Chromium's virtual authenticator.
 
