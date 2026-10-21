@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/index.js';
 import { ClientsModule } from '../clients/index.js';
+import { HrModule } from '../hr/index.js';
 import { NotificationsModule } from '../notifications/index.js';
 import { ProjectsModule } from '../projects/index.js';
 import { TasksModule } from '../tasks/index.js';
@@ -17,12 +18,13 @@ import { TemplatesService } from './templates.service.js';
  * `auth`'s `UserDirectory`, clients through `clients`' `ClientDirectory` and projects, milestones,
  * retainers and cycles through `projects`' `EngagementDirectory`; creates tasks through `tasks`'
  * `TaskGenerator` and generates each new cycle's tasks through `projects`' `CycleOpenedHooks`;
+ * skips public holidays in due dates through `hr`'s `HolidayCalendar` (F17 rule B1);
  * notifies each run's assignees and department managers through `notifications` (F14). Exports
  * `TemplateDirectory` (names, kinds, archived state) for the catalog (F04) and `TemplateRunner`
  * (project runs and monthly links inside another module's transaction) for quotes (F04 A01).
  */
 @Module({
-  imports: [AuthModule, ClientsModule, ProjectsModule, TasksModule, NotificationsModule],
+  imports: [AuthModule, ClientsModule, HrModule, ProjectsModule, TasksModule, NotificationsModule],
   controllers: [TemplatesController, TemplateRunsController, RetainerTemplatesController],
   providers: [TemplatesService, TemplateRunsService, TemplateDirectory, TemplateRunner],
   exports: [TemplateDirectory, TemplateRunner],

@@ -256,6 +256,13 @@ export const AUDIT_ACTIONS = [
   'employee_file.service_end_cleared',
   'salary_change.created',
   'salary_change.archived',
+  'work_schedule.created',
+  'work_schedule.updated',
+  'work_schedule.archived',
+  'holiday.created',
+  'holiday.updated',
+  'holiday.archived',
+  'hr_settings.updated',
 ] as const;
 
 export const auditActionSchema = z.enum(AUDIT_ACTIONS).meta({ id: 'AuditAction' });
@@ -313,6 +320,10 @@ export const AUDIT_ENTITY_TYPES = [
   /** F17: keyed by the employee's user id. */
   'employee_file',
   'salary_change',
+  'work_schedule',
+  'holiday',
+  /** The one settings row; its id is fixed. */
+  'hr_settings',
 ] as const;
 
 export const auditEntityTypeSchema = z.enum(AUDIT_ENTITY_TYPES).meta({ id: 'AuditEntityType' });

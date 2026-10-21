@@ -22,6 +22,7 @@ const UNIQUE_CODES: Record<string, ErrorCode> = {
   invoice_lines_live_milestone_idx: 'ALREADY_INVOICED',
   invoice_lines_live_retainer_charge_idx: 'ALREADY_INVOICED',
   invoice_lines_live_extra_work_item_idx: 'ALREADY_INVOICED',
+  work_schedules_name_key: 'SCHEDULE_NAME_TAKEN',
 };
 
 /** PostgreSQL codes of a write that lost a race: unique violation, deadlock, serialization. */

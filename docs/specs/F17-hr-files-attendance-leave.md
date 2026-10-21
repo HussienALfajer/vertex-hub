@@ -299,6 +299,13 @@ Settled in implementation (PR A2, 2026-10-21):
 17. **Leave warnings** (warn, never block, as F11 conflicts). Assigning a task, or changing its due date, when its due date falls on a day of the assignee's approved leave returns `409 ASSIGNEE_ON_LEAVE` with the days, unless the request carries `acceptLeave: true`. Booking a shoot or a meeting with a team member on approved leave that day adds a `leave` conflict to `SCHEDULE_CONFLICT`. Template runs and automatic assignments do not warn. Accepting is audited.
 18. The managers of the employee's departments get `colleague_on_leave` the work day before an approved leave starts.
 
+Settled in implementation (PR B1, 2026-10-21):
+- Rule B1: the work-day functions of `@vertex-hub/contracts` take an optional list of holidays; `hr` exports `HolidayCalendar` (the non-archived holidays from a date on). F07 template runs, F08 post task due dates and F08 publish reminders pass them; the other work-day callers (F03, F06, F11, F13, F14, F16 reminders) still count weekends only, as before.
+- Rule B2: schedule names are unique regardless of case, archived schedules included (`SCHEDULE_NAME_TAKEN`). A schedule's days are replaced as a whole on an edit. "Assigned" means the file of an active account; setting another schedule as the default moves it (both changes audited). Archived schedules are not listed and cannot be edited (404).
+- Rule B3: `INVALID_DATES` answers a holiday longer than 10 days or ending before it starts. "Repeat last year" copies the holidays that start in the previous year (29 February becomes 28 February), skips a copy that would overlap a holiday already there, and sends one `holiday_changed` per copy. Renaming a holiday or changing `paid` notifies nobody; re-dating and archiving do. `holiday_changed` opens the calendar on the holiday's first day. Archived holidays cannot be edited (404).
+- New employee files take `default_annual_leave_days` from the HR settings. `attendance_starts_on` arrives with Part C (rule C1).
+- The calendar's `holiday` key dates (rule B16) ship with the HR settings screens (PR B2).
+
 ### Part C: attendance
 1. **Start date.** Until `attendance_starts_on`, attendance runs in **trial**: punches are recorded and days show `trial`, but no item, reminder or absence is produced (owner, 2026-10-21). `hr.manage` sets the date (today or later); leave works from the deploy regardless.
 2. **Who.** Attendance applies to non-exempt users with a `start_date` ≤ the day and no past `ended_on`. Exempt users cannot punch.

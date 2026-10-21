@@ -383,6 +383,29 @@ describe('planTemplateRun: project runs (rules 7, 10, 13)', () => {
     expect(overridden.tasks.map((task) => task.revisionLimit)).toEqual([0, 0, 0, 0]);
   });
 
+  it('skips public holidays in the due days (F17 rule B1)', () => {
+    const withHolidays = planTemplateRun({
+      template: { stages, steps },
+      target: {
+        type: 'project',
+        startDate: '2026-10-01',
+        dueDate: '2026-12-31',
+        milestones: [],
+        earlierRuns: 0,
+      },
+      assignees: [],
+      isMember,
+      // Saturday 3 and Sunday 4 October.
+      holidays: [{ startsOn: '2026-10-03', endsOn: '2026-10-04' }],
+    });
+    expect(withHolidays.tasks.map((task) => task.dueDate)).toEqual([
+      '2026-10-01',
+      '2026-10-05',
+      '2026-10-06',
+      '2026-10-11',
+    ]);
+  });
+
   it('replaces an assignee who left the department with the queue, and warns', () => {
     expect(plan.tasks.map((task) => [task.assignee?.id ?? null, task.assigneeReplaced])).toEqual([
       [null, true],

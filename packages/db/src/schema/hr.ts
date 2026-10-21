@@ -1,6 +1,7 @@
 import {
   EMPLOYMENT_TYPES,
   END_REASONS,
+  type LatenessTier,
   PAYOUT_METHODS,
   WEEKDAYS,
   WORK_SCHEDULE_KINDS,
@@ -12,12 +13,14 @@ import {
   date,
   index,
   integer,
+  jsonb,
   numeric,
   pgEnum,
   pgTable,
   primaryKey,
   text,
   time,
+  timestamp,
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
@@ -27,10 +30,14 @@ import { currencyEnum } from './projects.js';
 
 /*
  * HR (spec F17, ADR 0039), owned by the api `hr` module. Part A: work schedules, the employee
- * file of every user and the salary history. Days are Asia/Damascus calendar dates.
+ * file of every user and the salary history. Part B: public holidays and the HR settings. Days
+ * are Asia/Damascus calendar dates.
  */
 
 export const weekdayEnum = pgEnum('weekday', WEEKDAYS);
+
+/** Leave days in half days (spec, Data). */
+const leaveDays = (name: string) => numeric(name, { precision: 5, scale: 1, mode: 'number' });
 
 export const workScheduleKindEnum = pgEnum('work_schedule_kind', WORK_SCHEDULE_KINDS);
 
@@ -165,5 +172,64 @@ export const salaryChanges = pgTable(
       'salary_changes_archive_check',
       sql`(${table.archivedAt} is null) = (${table.archiveReason} is null)`,
     ),
+  ],
+);
+
+/** Rule B3: at most ten days each; overlapping non-archived holidays are refused by the API. */
+export const publicHolidays = pgTable(
+  'public_holidays',
+  {
+    id: id(),
+    name: text('name').notNull(),
+    startsOn: date('starts_on', { mode: 'string' }).notNull(),
+    endsOn: date('ends_on', { mode: 'string' }).notNull(),
+    paid: boolean('paid').notNull().default(true),
+    ...timestamps(),
+    archivedAt: archivedAt(),
+  },
+  (table) => [
+    index('public_holidays_starts_on_idx').on(table.startsOn),
+    check(
+      'public_holidays_range_check',
+      sql`${table.endsOn} >= ${table.startsOn} and ${table.endsOn} - ${table.startsOn} < 10`,
+    ),
+  ],
+);
+
+/** The single row of HR settings; its column defaults are the spec's (owner, 2026-10-21). */
+export const hrSettings = pgTable(
+  'hr_settings',
+  {
+    /** Always true: the table holds one row. */
+    singleton: boolean('singleton').primaryKey().default(true),
+    graceMinutes: integer('grace_minutes').notNull().default(10),
+    latenessTiers: jsonb('lateness_tiers')
+      .$type<LatenessTier[]>()
+      .notNull()
+      .default([
+        { upToMinutes: 30, fraction: 0.25 },
+        { upToMinutes: 60, fraction: 0.5 },
+        { upToMinutes: null, fraction: 1 },
+      ]),
+    firstLatenessWarning: boolean('first_lateness_warning').notNull().default(true),
+    overtimeMinMinutes: integer('overtime_min_minutes').notNull().default(30),
+    checkInReminderMinutes: integer('check_in_reminder_minutes').notNull().default(15),
+    defaultAnnualLeaveDays: leaveDays('default_annual_leave_days').notNull().default(14),
+    carryOverMaxDays: leaveDays('carry_over_max_days').notNull().default(5),
+    sickDaysPerYear: leaveDays('sick_days_per_year').notNull().default(14),
+    sickCertificateAfterDays: integer('sick_certificate_after_days').notNull().default(2),
+    sickRequestWithinWorkDays: integer('sick_request_within_work_days').notNull().default(3),
+    emergencyDaysPerYear: leaveDays('emergency_days_per_year').notNull().default(3),
+    permissionMaxMinutes: integer('permission_max_minutes').notNull().default(120),
+    permissionsPerMonth: integer('permissions_per_month').notNull().default(4),
+    annualNoticeWorkDays: integer('annual_notice_work_days').notNull().default(3),
+    remoteNoticeWorkDays: integer('remote_notice_work_days').notNull().default(1),
+    overtimeMinutesPerLeaveDay: integer('overtime_minutes_per_leave_day').notNull().default(480),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedById: uuid('updated_by_id').references(() => users.id),
+  },
+  (table) => [
+    index('hr_settings_updated_by_id_idx').on(table.updatedById),
+    check('hr_settings_singleton_check', sql`${table.singleton}`),
   ],
 );

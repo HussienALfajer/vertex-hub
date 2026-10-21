@@ -417,6 +417,12 @@ export const NOTIFICATION_TEXT = {
   probation_ending: 'تنتهي فترة تجربة {{employee}} في {{date}}',
   employee_leaving: 'آخر يوم عمل لـ{{employee}} هو {{date}}',
   salary_changed: 'سُجّل تغيير على راتبك يسري من {{date}}',
+  /** F17 rule B3. */
+  holiday_changed: {
+    added: 'عطلة رسمية جديدة: «{{name}}» {{dates}}',
+    redated: 'تغيّر موعد عطلة «{{name}}» إلى {{dates}}',
+    archived: 'أُلغيت عطلة «{{name}}» ({{dates}})',
+  },
   /** F16 rule B11: each escalation step wraps the original's text. */
   action_reminder: 'تذكير: {{text}}',
   action_escalated: 'تصعيد: {{text}}',
@@ -552,6 +558,11 @@ export function notificationLink(notification: Notification): NotificationLink {
       return { to: '/departments/$departmentId', params: { departmentId: subject.id } };
     case 'announcement':
       return { to: '/announcements/$announcementId', params: { announcementId: subject.id } };
+    case 'holiday':
+      // F17 rule B3: the calendar on the holiday's first day.
+      return notification.type === 'holiday_changed'
+        ? { to: '/calendar', search: { date: notification.data.startsOn } }
+        : { to: '/calendar' };
     default:
       return { to: '/tasks/$taskId', params: { taskId: subject.id } };
   }
@@ -1175,6 +1186,17 @@ export function notificationText(
         }),
         context: null,
       };
+    case 'holiday_changed': {
+      const { change, name, startsOn, endsOn } = notification.data;
+      return {
+        text: fill(text.holiday_changed[change], {
+          name,
+          dates:
+            startsOn === endsOn ? formatCalendarDate(startsOn) : formatPeriod(startsOn, endsOn),
+        }),
+        context: null,
+      };
+    }
     case 'security_new_device':
       return {
         text: fill(text.security_new_device, { device: notification.data.device }),
@@ -1293,6 +1315,7 @@ type TaskNotification = Exclude<
       | 'probation_ending'
       | 'employee_leaving'
       | 'salary_changed'
+      | 'holiday_changed'
       | CalendarNotification['type'];
   }
 >;

@@ -117,37 +117,62 @@ export function weekOf(date: CalendarDate): { from: CalendarDate; to: CalendarDa
   return { from, to: addDays(from, 6) };
 }
 
-/** Not a weekend day of `WORK_WEEK` (no holidays in V1, ADR 0017). */
-export function isWorkDay(date: CalendarDate): boolean {
-  return !(WORK_WEEK.weekend as readonly number[]).includes(weekday(date));
+/** A public holiday's days, both inclusive (F17 rule B3). */
+export interface HolidayRange {
+  startsOn: CalendarDate;
+  endsOn: CalendarDate;
+}
+
+/**
+ * Not a weekend day of `WORK_WEEK` and not in one of `holidays`. Callers that pass no holidays
+ * count weekends only (ADR 0017); F07 template runs and F08 post work days pass the public
+ * holidays (F17 rule B1, ADR 0039).
+ */
+export function isWorkDay(date: CalendarDate, holidays: readonly HolidayRange[] = []): boolean {
+  return (
+    !(WORK_WEEK.weekend as readonly number[]).includes(weekday(date)) &&
+    !holidays.some((holiday) => holiday.startsOn <= date && date <= holiday.endsOn)
+  );
 }
 
 /** Work day `n` counted from `start`: day 1 is the first work day on or after `start`. */
-export function nthWorkDay(start: CalendarDate, n: number): CalendarDate {
+export function nthWorkDay(
+  start: CalendarDate,
+  n: number,
+  holidays: readonly HolidayRange[] = [],
+): CalendarDate {
   let date = start;
-  let count = isWorkDay(date) ? 1 : 0;
+  let count = isWorkDay(date, holidays) ? 1 : 0;
   while (count < n) {
     date = addDays(date, 1);
-    if (isWorkDay(date)) count += 1;
+    if (isWorkDay(date, holidays)) count += 1;
   }
   return date;
 }
 
 /** The work day `n` work days before `date`. */
-export function workDaysBefore(date: CalendarDate, n: number): CalendarDate {
+export function workDaysBefore(
+  date: CalendarDate,
+  n: number,
+  holidays: readonly HolidayRange[] = [],
+): CalendarDate {
   let day = date;
   for (let count = 0; count < n; ) {
     day = addDays(day, -1);
-    if (isWorkDay(day)) count += 1;
+    if (isWorkDay(day, holidays)) count += 1;
   }
   return day;
 }
 
 /** The work days in `[from, to]`, in order; empty when `to` is before `from`. */
-export function workDaysBetween(from: CalendarDate, to: CalendarDate): CalendarDate[] {
+export function workDaysBetween(
+  from: CalendarDate,
+  to: CalendarDate,
+  holidays: readonly HolidayRange[] = [],
+): CalendarDate[] {
   const days: CalendarDate[] = [];
   for (let date = from; date <= to; date = addDays(date, 1)) {
-    if (isWorkDay(date)) days.push(date);
+    if (isWorkDay(date, holidays)) days.push(date);
   }
   return days;
 }
@@ -166,6 +191,9 @@ export function businessInstant(date: CalendarDate, time: TimeOfDay): Date {
 }
 
 /** The first work day after `date`. */
-export function nextWorkDay(date: CalendarDate): CalendarDate {
-  return nthWorkDay(addDays(date, 1), 1);
+export function nextWorkDay(
+  date: CalendarDate,
+  holidays: readonly HolidayRange[] = [],
+): CalendarDate {
+  return nthWorkDay(addDays(date, 1), 1, holidays);
 }

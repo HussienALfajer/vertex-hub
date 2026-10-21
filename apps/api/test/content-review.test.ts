@@ -14,9 +14,10 @@ import {
   notifications,
   postClientResponses,
   postReviews,
+  publicHolidays,
 } from '@vertex-hub/db';
 import { testDatabaseUrl } from '@vertex-hub/db/testing';
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { PostReminders } from '../src/modules/content/post-reminders.js';
 import { expectError } from './client-cast.js';
@@ -785,6 +786,56 @@ describe('post workflow (F08 rules 1, 10–15, 17–19, 24, 26)', () => {
       await db.delete(notifications).where(eq(notifications.subjectId, late.id));
       await reminders.remind(addDays(saturday, 1));
       expect(await cast.typesOf(responsible.id, late.id)).toEqual(['post_publish_overdue']);
+    });
+
+    describe('public holidays (F17 rule B1)', () => {
+      const holidays: string[] = [];
+      const holiday = async (startsOn: string, endsOn: string) => {
+        const [row] = await db
+          .insert(publicHolidays)
+          .values({ name: `عطلة ${cast.run}`, startsOn, endsOn })
+          .returning();
+        if (row) holidays.push(row.id);
+      };
+
+      afterAll(async () => {
+        if (holidays.length > 0) {
+          await db.delete(publicHolidays).where(inArray(publicHolidays.id, holidays));
+        }
+      });
+
+      it('sends nothing on a holiday, and announces the posts of the holiday before it', async () => {
+        const later = addDays(thursday, 7);
+        const sunday = addDays(later, 3);
+        await holiday(addDays(later, 2), addDays(later, 2)); // the Saturday after `later`
+        const onHoliday = await dated(addDays(later, 2));
+        const onSunday = await dated(sunday);
+        expect(await reminders.remind(addDays(later, 2))).toBe(0);
+        await reminders.remind(later);
+        expect(await cast.typesOf(responsible.id, onHoliday.id)).toEqual(['post_publish_today']);
+        expect(await cast.typesOf(responsible.id, onSunday.id)).toEqual([]);
+      });
+
+      it('dates a requested task two work days before publishing, skipping holidays', async () => {
+        const monday = addDays(thursday, 18);
+        // Saturday and Sunday before it are a holiday: Thursday and Wednesday remain.
+        await holiday(addDays(monday, -2), addDays(monday, -1));
+        const post = await cast.createPost(cast.writer.cookie, {
+          clientId: own,
+          publishDate: monday,
+        });
+        const response = await client.post(
+          `/api/content/posts/${post.id}/tasks`,
+          cast.writer.cookie,
+          {
+            department: 'design',
+          },
+        );
+        expect(response.status, await response.clone().text()).toBe(201);
+        const [linked] = postDetailSchema.parse(await response.json()).linkedTasks;
+        const task = await cast.task.detail(linked?.id ?? '', cast.gm.cookie);
+        expect(task.dueDate).toBe(addDays(monday, -5));
+      });
     });
   });
 });

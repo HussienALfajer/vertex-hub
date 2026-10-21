@@ -70,6 +70,34 @@ describe('work days (ADR 0017)', () => {
   });
 });
 
+describe('work days with public holidays (F17 rule B1)', () => {
+  // Saturday 10 to Monday 12 October 2026.
+  const holidays = [{ startsOn: '2026-10-10', endsOn: '2026-10-12' }];
+
+  it('skips the days of a holiday, both ends included', () => {
+    expect(isWorkDay('2026-10-08', holidays)).toBe(true);
+    for (const day of ['2026-10-10', '2026-10-11', '2026-10-12']) {
+      expect(isWorkDay(day, holidays), day).toBe(false);
+    }
+    expect(isWorkDay('2026-10-13', holidays)).toBe(true);
+  });
+
+  it('moves counts past the holiday', () => {
+    expect(nthWorkDay('2026-10-08', 2, holidays)).toBe('2026-10-13'); // Thu, (Fri + holiday), Tue
+    expect(nextWorkDay('2026-10-08', holidays)).toBe('2026-10-13');
+    expect(workDaysBefore('2026-10-13', 1, holidays)).toBe('2026-10-08');
+    expect(workDaysBetween('2026-10-07', '2026-10-13', holidays)).toEqual([
+      '2026-10-07',
+      '2026-10-08',
+      '2026-10-13',
+    ]);
+  });
+
+  it('counts weekends only without holidays (ADR 0017)', () => {
+    expect(nthWorkDay('2026-10-08', 2)).toBe('2026-10-10');
+  });
+});
+
 describe('time of day', () => {
   it('accepts HH:MM only', () => {
     expect(timeOfDaySchema.safeParse('09:30').success).toBe(true);

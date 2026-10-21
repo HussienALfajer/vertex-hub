@@ -150,6 +150,8 @@ export const NOTIFICATION_TYPES = [
   'probation_ending',
   'employee_leaving',
   'salary_changed',
+  // F17 part B.
+  'holiday_changed',
   'action_reminder',
   'action_escalated',
   'action_escalated_top',
@@ -199,6 +201,8 @@ export const NOTIFICATION_SUBJECTS = [
   'department',
   /** F16 part D. */
   'announcement',
+  /** F17 rule B3: a public holiday, opened on the calendar at its first day. */
+  'holiday',
 ] as const;
 
 export const notificationSubjectTypeSchema = z
@@ -354,6 +358,8 @@ const CATALOG: Record<
   employee_leaving: { category: 'hr', subject: 'user', mutable: true },
   /** Rule A4: opens My file; never carries the amount. */
   salary_changed: { category: 'hr', subject: 'user', mutable: true },
+  /** Rule B3: opens the calendar on the holiday. */
+  holiday_changed: { category: 'hr', subject: 'holiday', mutable: true },
   /** F16 rule B11: the escalation steps open the original's record; its subject type is given. */
   action_reminder: { category: 'reminders', subject: 'task', mutable: false },
   action_escalated: { category: 'reminders', subject: 'task', mutable: false },
@@ -530,6 +536,7 @@ const CHANNELS: Record<NotificationType, Channels> = {
   probation_ending: important(),
   employee_leaving: normal(),
   salary_changed: normal(),
+  holiday_changed: normal(),
   action_reminder: important(),
   action_escalated: important('on'),
   action_escalated_top: critical(),
@@ -749,6 +756,7 @@ const ENGINE: Record<NotificationType, Engine> = {
   probation_ending: action(),
   employee_leaving: info,
   salary_changed: info,
+  holiday_changed: info,
   action_reminder: action(),
   action_escalated: action(),
   action_escalated_top: action(),
@@ -1244,6 +1252,13 @@ export const NOTIFICATION_DATA_SCHEMAS = {
   employee_leaving: z.object({ employee: nameSchema, endedOn: calendarDateSchema }),
   /** Rule A4: a salary change effective on `effectiveOn`; the amount is never in a notice. */
   salary_changed: z.object({ effectiveOn: calendarDateSchema }),
+  /** Rule B3: a holiday added, re-dated or archived; the dates are the new ones. */
+  holiday_changed: z.object({
+    change: z.enum(['added', 'redated', 'archived']),
+    name: z.string(),
+    startsOn: calendarDateSchema,
+    endsOn: calendarDateSchema,
+  }),
   /** F16 rule B11 step 1: the original still waits on its recipients. */
   action_reminder: escalationData,
   /** Step 2: the managers of those it waits on (or the step's department or role). */

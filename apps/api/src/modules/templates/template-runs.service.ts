@@ -38,6 +38,7 @@ import { CodedException } from '../../core/errors/index.js';
 import { type AuditActor, recordAudit } from '../audit/index.js';
 import { type CurrentUserInfo, lockAccessChanges, UserDirectory } from '../auth/index.js';
 import { ClientDirectory } from '../clients/index.js';
+import { HolidayCalendar } from '../hr/index.js';
 import { type Notice, NotificationCenter } from '../notifications/index.js';
 import {
   type CycleLink,
@@ -89,6 +90,7 @@ export class TemplateRunsService implements OnModuleInit {
     private readonly clients: ClientDirectory,
     private readonly notifications: NotificationCenter,
     private readonly queueHooks: TaskQueueHooks,
+    private readonly holidays: HolidayCalendar,
   ) {}
 
   onModuleInit(): void {
@@ -358,6 +360,8 @@ export class TemplateRunsService implements OnModuleInit {
       })),
       isMember: (userId, department) => pairs.has(`${userId}:${department}`),
       revisionLimit,
+      // F17 rule B1: due dates skip public holidays; tasks already generated keep theirs.
+      holidays: await this.holidays.from(target.startDate, tx),
     });
     if (target.type === 'project') {
       const total = target.milestones.length + plan.milestonesToCreate.length;
