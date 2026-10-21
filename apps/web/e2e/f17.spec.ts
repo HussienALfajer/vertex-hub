@@ -65,9 +65,15 @@ test('the General Manager keeps an employee file: personal, contract and pay', a
   await expect(contract.getByText(h.contract.errors.order)).toBeVisible();
   await contract.getByLabel(h.fields.probationEndDate).fill('2025-06-30');
   await contract.getByRole('button', { name: h.weekdays.sunday }).click();
+  // An emptied field is refused; Arabic-Indic digits are read as typed.
+  await contract.getByLabel(h.fields.annualLeaveDays).fill('');
+  await contract.getByRole('button', { name: ar.common.save }).click();
+  await expect(contract.getByText(h.contract.errors.leaveDays)).toBeVisible();
+  await contract.getByLabel(h.fields.annualLeaveDays).fill('١٥');
   await contract.getByRole('button', { name: ar.common.save }).click();
   await expect(contract).toBeHidden();
   await expect(page.getByText(`${h.weekdays.sunday} و${h.weekdays.thursday}`)).toBeVisible();
+  await expect(page.getByText(fill(h.file.days_many, { days: '15' }))).toBeVisible();
 
   // Pay: the current salary and its history; a second change on the same date is refused.
   await page.getByRole('tab', { name: h.file.tabs.pay }).click();
@@ -153,6 +159,14 @@ test('Internal Operations reads files without pay; Finance reads pay without the
   // Finance edits the payout, never the salary (`salaries.manage` is the GM's).
   await expect(page.getByRole('button', { name: h.pay.editPayout })).toBeVisible();
   await expect(page.getByRole('button', { name: h.salary.add })).toHaveCount(0);
+  // Rule A6: Finance adds confidential documents only.
+  await page.getByRole('tab', { name: h.file.tabs.documents }).click();
+  await page.getByRole('button', { name: ar.files.documents.upload }).click();
+  const confidential = page.getByRole('checkbox', {
+    name: new RegExp(ar.files.confidentialChoice),
+  });
+  await expect(confidential).toBeChecked();
+  await expect(confidential).toBeDisabled();
 });
 
 test('an employee reads their own file and no one else’s', async ({ page }) => {

@@ -42,6 +42,7 @@ import { useTranslation } from 'react-i18next';
 import { MoneyInput } from '../../components/money-input';
 import { ApiError } from '../../lib/api/client';
 import { errorMessage, errorRole, fieldError, SCREEN_ERROR } from '../../lib/errors';
+import { rateInput } from '../../lib/money';
 import { ChoiceSelect } from '../quotes/choice-select';
 import { FormDialog } from '../quotes/quote-dialogs';
 import {
@@ -243,7 +244,7 @@ export function ContractDialog({ file, open, onClose, finalFocus }: DialogProps)
         attendanceExempt: values.attendanceExempt,
         remoteWeekdays: values.remoteWeekdays,
         // Arabic-Indic digits and the Arabic decimal mark are read as typed on an Arabic keyboard.
-        annualLeaveDays: Number(values.annualLeaveDays.replace('٫', '.')),
+        annualLeaveDays: Number(rateInput(values.annualLeaveDays)),
       }),
     );
     if (!input) return;
@@ -329,7 +330,7 @@ export function ContractDialog({ file, open, onClose, finalFocus }: DialogProps)
           dir="ltr"
           inputMode="decimal"
           autoComplete="off"
-          {...form.register('annualLeaveDays')}
+          {...form.register('annualLeaveDays', { validate: (text) => text.trim().length > 0 })}
         />
         <FieldError match={!!errors.annualLeaveDays}>
           {t('hr.contract.errors.leaveDays')}

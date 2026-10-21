@@ -182,7 +182,11 @@ function File({
           </TabsContent>
         )}
         <TabsContent value="documents">
-          <OwnerDocumentsTab owner={{ type: 'employee', id: file.userId }} />
+          <OwnerDocumentsTab
+            owner={{ type: 'employee', id: file.userId }}
+            // Rule A6: a pay reader without the file (Finance) adds confidential documents only.
+            confidentialOnly={!self && !file.employment}
+          />
         </TabsContent>
       </Tabs>
     </>
@@ -229,6 +233,8 @@ function Notices({ file }: { file: EmployeeFile }) {
   const { t } = useTranslation();
   const employment = file.employment;
   if (file.status === 'ended') {
+    // Edge case 18 needs the employment section: a pay reader only sees that the account ended.
+    const noEnd = employment && !employment.endedOn;
     return (
       <Callout
         tone="neutral"
@@ -236,9 +242,11 @@ function Notices({ file }: { file: EmployeeFile }) {
         title={
           employment?.endedOn
             ? t('hr.file.endedNotice', { date: formatDate(employment.endedOn) })
-            : t('hr.file.archivedNotice')
+            : noEnd
+              ? t('hr.file.archivedNotice')
+              : t('hr.file.accountArchived')
         }
-        description={employment && !employment.endedOn ? t('hr.file.archivedHint') : undefined}
+        description={noEnd ? t('hr.file.archivedHint') : undefined}
       />
     );
   }

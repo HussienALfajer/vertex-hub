@@ -17,8 +17,11 @@ import { type FileOwnerRef, fileItemsQuery } from './files.queries';
  */
 export function OwnerDocumentsTab({
   owner,
+  confidentialOnly,
 }: {
   owner: FileOwnerRef & { type: 'project' | 'retainer' | 'employee' };
+  /** The viewer adds confidential documents only (F17 rule A6: pay readers on a file). */
+  confidentialOnly?: boolean;
 }) {
   const { t } = useTranslation();
   const showRemovedId = useId();
@@ -101,6 +104,7 @@ export function OwnerDocumentsTab({
           withNote
           allowLink
           withConfidential={rights?.canSetConfidential}
+          confidentialOnly={confidentialOnly}
           onClose={() => setAdding(false)}
           finalFocus={() => uploadButton.current ?? heading.current ?? true}
         />
