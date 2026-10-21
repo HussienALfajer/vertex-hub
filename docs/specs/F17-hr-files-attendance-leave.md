@@ -274,6 +274,11 @@ Settled in implementation (PR A1, 2026-10-21):
 - Rule A8: `ALREADY_ENDED` answers a second end while one is set (clear it first to change the date). The day after `ended_on`, the job archives the account as the system, under F01's archive rules. While the user still holds responsibilities that block archiving (F01 rule 9), the archive is refused and retried daily, and the job logs the failure.
 - Notification links: `contract_ending` and `probation_ending` open the file in HR; `employee_leaving` opens the member's profile, which department managers can read; `salary_changed` opens My file.
 
+Settled in implementation (PR A2, 2026-10-21):
+- The HR sidebar section lists People for `employees.read` or `salaries.read` holders; Part B and C add Approvals, Today, Month and HR settings to it. My file opens from the account menu.
+- The employee file shows the tabs its sections allow (rule A2): Finance opens on Pay. Its schedule shows read-only until Part B lists the schedules to assign one. The Leave and Attendance tabs arrive with parts B and C.
+- An ended file (archived account) is read-only; one archived without an end of service says so (edge case 18).
+
 ### Part B: rules and leave
 1. **Work days.** A work day of a user is a weekday in their schedule that is not a public holiday. `isWorkDay(date, holidays)` replaces the holiday-less check used by F07 template due dates and F08 publish reminders (ADR 0039 amends ADR 0017): new runs skip holidays; tasks already generated keep their dates.
 2. **Schedules** are created, edited and archived by `hr.manage`. Exactly one is the default. Editing a schedule changes days not yet created and today's day if it has no punch.

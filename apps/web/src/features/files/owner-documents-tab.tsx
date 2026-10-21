@@ -11,13 +11,17 @@ import { FileItemCard } from './file-item-card';
 import { type FileOwnerRef, fileItemsQuery } from './files.queries';
 
 /**
- * The Documents tab of a project or a retainer (spec F10, screen 5): its documents with their
- * versions, the confidential lock, and upload for those who manage its documents.
+ * The Documents tab of a project or a retainer (spec F10, screen 5) and of an employee file (F17):
+ * its documents with their versions, the confidential lock, and upload for those who manage its
+ * documents.
  */
 export function OwnerDocumentsTab({
   owner,
+  confidentialOnly,
 }: {
-  owner: FileOwnerRef & { type: 'project' | 'retainer' };
+  owner: FileOwnerRef & { type: 'project' | 'retainer' | 'employee' };
+  /** The viewer adds confidential documents only (F17 rule A6: pay readers on a file). */
+  confidentialOnly?: boolean;
 }) {
   const { t } = useTranslation();
   const showRemovedId = useId();
@@ -100,6 +104,7 @@ export function OwnerDocumentsTab({
           withNote
           allowLink
           withConfidential={rights?.canSetConfidential}
+          confidentialOnly={confidentialOnly}
           onClose={() => setAdding(false)}
           finalFocus={() => uploadButton.current ?? heading.current ?? true}
         />

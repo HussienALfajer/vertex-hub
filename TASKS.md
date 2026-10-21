@@ -11,6 +11,6 @@ Parts A → B → C → D, each accepted by the owner before the next starts (sp
 - [x] checks, reviewer, acceptance (API at `/api/docs`, owner 2026-10-21), PR with auto-merge
 
 ## PR A2 — employee files: web and E2E
-- [ ] HR nav section, People `/hr/people`, employee file `/hr/people/:userId` (tabs Personal, Contract and schedule, Pay, Documents; end of service), `/me/file`
-- [ ] E2E: `f17.spec.ts` (with and without pay, roles), screenshots in both themes; mocks in `fixtures.ts`
-- [ ] checks, reviewer, acceptance (spec steps 2 and the file part of 1), PR with auto-merge, `docs/ROADMAP.md`
+- [x] HR nav section, People `/hr/people`, employee file `/hr/people/:userId` (tabs Personal, Contract and schedule, Pay, Documents; end of service), `/me/file`
+- [x] E2E: `f17.spec.ts` (with and without pay, roles), screenshots in both themes; mocks in `fixtures.ts`
+- [x] checks, reviewer, acceptance (spec steps 2 and the file part of 1), PR with auto-merge, `docs/ROADMAP.md`

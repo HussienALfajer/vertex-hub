@@ -132,6 +132,7 @@ export function AddFilesDialog({
   withNote,
   allowLink,
   withConfidential,
+  confidentialOnly,
   onClose,
   finalFocus,
 }: {
@@ -142,6 +143,8 @@ export function AddFilesDialog({
   withNote?: boolean;
   allowLink?: boolean;
   withConfidential?: boolean;
+  /** Every document is confidential: a pay reader on an employee file (F17 rule A6). */
+  confidentialOnly?: boolean;
   onClose: () => void;
   /** Where the focus goes when it closes, when the button that opened it may be gone. */
   finalFocus?: ComponentProps<typeof DialogContent>['finalFocus'];
@@ -151,7 +154,7 @@ export function AddFilesDialog({
   const create = useCreateFileItem(owner);
   const [note, setNote] = useState('');
   const [brandKind, setBrandKind] = useState<BrandFileKind>('logo');
-  const [confidential, setConfidential] = useState(false);
+  const [confidential, setConfidential] = useState(confidentialOnly ?? false);
   const onAttach = (source: FileSource, name?: string) =>
     create.mutateAsync({
       role: fileRole,
@@ -182,6 +185,7 @@ export function AddFilesDialog({
             <Checkbox
               id={confidentialId}
               checked={confidential}
+              disabled={confidentialOnly}
               onCheckedChange={(value) => setConfidential(value)}
             />
             <span className="flex flex-col gap-0.5">

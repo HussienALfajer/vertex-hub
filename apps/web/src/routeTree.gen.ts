@@ -40,6 +40,7 @@ import { Route as AppInvoicesInvoiceIdRouteImport } from './routes/_app/invoices
 import { Route as AppInvoicesSettingsRouteImport } from './routes/_app/invoices/settings'
 import { Route as AppLeadsIndexRouteImport } from './routes/_app/leads/index'
 import { Route as AppLeadsLeadIdRouteImport } from './routes/_app/leads/$leadId'
+import { Route as AppMeFileRouteImport } from './routes/_app/me/file'
 import { Route as AppMeetingsMeetingIdRouteImport } from './routes/_app/meetings/$meetingId'
 import { Route as AppNotificationsIndexRouteImport } from './routes/_app/notifications/index'
 import { Route as AppNotificationsSettingsRouteImport } from './routes/_app/notifications/settings'
@@ -74,6 +75,8 @@ import { Route as AppApprovalsRequestsRequestIdRouteImport } from './routes/_app
 import { Route as AppClientsClientIdIndexRouteImport } from './routes/_app/clients/$clientId/index'
 import { Route as AppClientsClientIdReportRouteImport } from './routes/_app/clients/$clientId/report'
 import { Route as AppContentPostsPostIdRouteImport } from './routes/_app/content/posts/$postId'
+import { Route as AppHrPeopleIndexRouteImport } from './routes/_app/hr/people/index'
+import { Route as AppHrPeopleUserIdRouteImport } from './routes/_app/hr/people/$userId'
 import { Route as AppRetainersRetainerIdIndexRouteImport } from './routes/_app/retainers/$retainerId/index'
 import { Route as AppShootsShootIdIndexRouteImport } from './routes/_app/shoots/$shootId/index'
 import { Route as AppShootsShootIdEditRouteImport } from './routes/_app/shoots/$shootId/edit'
@@ -234,6 +237,11 @@ const AppLeadsIndexRoute = AppLeadsIndexRouteImport.update({
 const AppLeadsLeadIdRoute = AppLeadsLeadIdRouteImport.update({
   id: '/leads/$leadId',
   path: '/leads/$leadId',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppMeFileRoute = AppMeFileRouteImport.update({
+  id: '/me/file',
+  path: '/me/file',
   getParentRoute: () => AppRoute,
 } as any)
 const AppMeetingsMeetingIdRoute = AppMeetingsMeetingIdRouteImport.update({
@@ -412,6 +420,16 @@ const AppContentPostsPostIdRoute = AppContentPostsPostIdRouteImport.update({
   path: '/content/posts/$postId',
   getParentRoute: () => AppRoute,
 } as any)
+const AppHrPeopleIndexRoute = AppHrPeopleIndexRouteImport.update({
+  id: '/hr/people/',
+  path: '/hr/people/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppHrPeopleUserIdRoute = AppHrPeopleUserIdRouteImport.update({
+  id: '/hr/people/$userId',
+  path: '/hr/people/$userId',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppRetainersRetainerIdIndexRoute =
   AppRetainersRetainerIdIndexRouteImport.update({
     id: '/retainers/$retainerId/',
@@ -462,6 +480,7 @@ export interface FileRoutesByFullPath {
   '/invoices/$invoiceId': typeof AppInvoicesInvoiceIdRoute
   '/invoices/settings': typeof AppInvoicesSettingsRoute
   '/leads/$leadId': typeof AppLeadsLeadIdRoute
+  '/me/file': typeof AppMeFileRoute
   '/meetings/$meetingId': typeof AppMeetingsMeetingIdRoute
   '/notifications/settings': typeof AppNotificationsSettingsRoute
   '/projects/$projectId': typeof AppProjectsProjectIdRoute
@@ -504,9 +523,11 @@ export interface FileRoutesByFullPath {
   '/approvals/requests/$requestId': typeof AppApprovalsRequestsRequestIdRoute
   '/clients/$clientId/report': typeof AppClientsClientIdReportRoute
   '/content/posts/$postId': typeof AppContentPostsPostIdRoute
+  '/hr/people/$userId': typeof AppHrPeopleUserIdRoute
   '/shoots/$shootId/edit': typeof AppShootsShootIdEditRoute
   '/announcements/$announcementId/': typeof AppAnnouncementsAnnouncementIdIndexRoute
   '/clients/$clientId/': typeof AppClientsClientIdIndexRoute
+  '/hr/people/': typeof AppHrPeopleIndexRoute
   '/retainers/$retainerId/': typeof AppRetainersRetainerIdIndexRoute
   '/shoots/$shootId/': typeof AppShootsShootIdIndexRoute
   '/retainers/$retainerId/contracts/$contractId': typeof AppRetainersRetainerIdContractsContractIdRoute
@@ -533,6 +554,7 @@ export interface FileRoutesByTo {
   '/invoices/$invoiceId': typeof AppInvoicesInvoiceIdRoute
   '/invoices/settings': typeof AppInvoicesSettingsRoute
   '/leads/$leadId': typeof AppLeadsLeadIdRoute
+  '/me/file': typeof AppMeFileRoute
   '/meetings/$meetingId': typeof AppMeetingsMeetingIdRoute
   '/notifications/settings': typeof AppNotificationsSettingsRoute
   '/projects/$projectId': typeof AppProjectsProjectIdRoute
@@ -575,9 +597,11 @@ export interface FileRoutesByTo {
   '/approvals/requests/$requestId': typeof AppApprovalsRequestsRequestIdRoute
   '/clients/$clientId/report': typeof AppClientsClientIdReportRoute
   '/content/posts/$postId': typeof AppContentPostsPostIdRoute
+  '/hr/people/$userId': typeof AppHrPeopleUserIdRoute
   '/shoots/$shootId/edit': typeof AppShootsShootIdEditRoute
   '/announcements/$announcementId': typeof AppAnnouncementsAnnouncementIdIndexRoute
   '/clients/$clientId': typeof AppClientsClientIdIndexRoute
+  '/hr/people': typeof AppHrPeopleIndexRoute
   '/retainers/$retainerId': typeof AppRetainersRetainerIdIndexRoute
   '/shoots/$shootId': typeof AppShootsShootIdIndexRoute
   '/retainers/$retainerId/contracts/$contractId': typeof AppRetainersRetainerIdContractsContractIdRoute
@@ -606,6 +630,7 @@ export interface FileRoutesById {
   '/_app/invoices/$invoiceId': typeof AppInvoicesInvoiceIdRoute
   '/_app/invoices/settings': typeof AppInvoicesSettingsRoute
   '/_app/leads/$leadId': typeof AppLeadsLeadIdRoute
+  '/_app/me/file': typeof AppMeFileRoute
   '/_app/meetings/$meetingId': typeof AppMeetingsMeetingIdRoute
   '/_app/notifications/settings': typeof AppNotificationsSettingsRoute
   '/_app/projects/$projectId': typeof AppProjectsProjectIdRoute
@@ -648,9 +673,11 @@ export interface FileRoutesById {
   '/_app/approvals/requests/$requestId': typeof AppApprovalsRequestsRequestIdRoute
   '/_app/clients/$clientId/report': typeof AppClientsClientIdReportRoute
   '/_app/content/posts/$postId': typeof AppContentPostsPostIdRoute
+  '/_app/hr/people/$userId': typeof AppHrPeopleUserIdRoute
   '/_app/shoots/$shootId/edit': typeof AppShootsShootIdEditRoute
   '/_app/announcements/$announcementId/': typeof AppAnnouncementsAnnouncementIdIndexRoute
   '/_app/clients/$clientId/': typeof AppClientsClientIdIndexRoute
+  '/_app/hr/people/': typeof AppHrPeopleIndexRoute
   '/_app/retainers/$retainerId/': typeof AppRetainersRetainerIdIndexRoute
   '/_app/shoots/$shootId/': typeof AppShootsShootIdIndexRoute
   '/_app/retainers/$retainerId/contracts/$contractId': typeof AppRetainersRetainerIdContractsContractIdRoute
@@ -679,6 +706,7 @@ export interface FileRouteTypes {
     | '/invoices/$invoiceId'
     | '/invoices/settings'
     | '/leads/$leadId'
+    | '/me/file'
     | '/meetings/$meetingId'
     | '/notifications/settings'
     | '/projects/$projectId'
@@ -721,9 +749,11 @@ export interface FileRouteTypes {
     | '/approvals/requests/$requestId'
     | '/clients/$clientId/report'
     | '/content/posts/$postId'
+    | '/hr/people/$userId'
     | '/shoots/$shootId/edit'
     | '/announcements/$announcementId/'
     | '/clients/$clientId/'
+    | '/hr/people/'
     | '/retainers/$retainerId/'
     | '/shoots/$shootId/'
     | '/retainers/$retainerId/contracts/$contractId'
@@ -750,6 +780,7 @@ export interface FileRouteTypes {
     | '/invoices/$invoiceId'
     | '/invoices/settings'
     | '/leads/$leadId'
+    | '/me/file'
     | '/meetings/$meetingId'
     | '/notifications/settings'
     | '/projects/$projectId'
@@ -792,9 +823,11 @@ export interface FileRouteTypes {
     | '/approvals/requests/$requestId'
     | '/clients/$clientId/report'
     | '/content/posts/$postId'
+    | '/hr/people/$userId'
     | '/shoots/$shootId/edit'
     | '/announcements/$announcementId'
     | '/clients/$clientId'
+    | '/hr/people'
     | '/retainers/$retainerId'
     | '/shoots/$shootId'
     | '/retainers/$retainerId/contracts/$contractId'
@@ -822,6 +855,7 @@ export interface FileRouteTypes {
     | '/_app/invoices/$invoiceId'
     | '/_app/invoices/settings'
     | '/_app/leads/$leadId'
+    | '/_app/me/file'
     | '/_app/meetings/$meetingId'
     | '/_app/notifications/settings'
     | '/_app/projects/$projectId'
@@ -864,9 +898,11 @@ export interface FileRouteTypes {
     | '/_app/approvals/requests/$requestId'
     | '/_app/clients/$clientId/report'
     | '/_app/content/posts/$postId'
+    | '/_app/hr/people/$userId'
     | '/_app/shoots/$shootId/edit'
     | '/_app/announcements/$announcementId/'
     | '/_app/clients/$clientId/'
+    | '/_app/hr/people/'
     | '/_app/retainers/$retainerId/'
     | '/_app/shoots/$shootId/'
     | '/_app/retainers/$retainerId/contracts/$contractId'
@@ -1099,6 +1135,13 @@ declare module '@tanstack/react-router' {
       path: '/leads/$leadId'
       fullPath: '/leads/$leadId'
       preLoaderRoute: typeof AppLeadsLeadIdRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/me/file': {
+      id: '/_app/me/file'
+      path: '/me/file'
+      fullPath: '/me/file'
+      preLoaderRoute: typeof AppMeFileRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/meetings/$meetingId': {
@@ -1339,6 +1382,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppContentPostsPostIdRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/hr/people/': {
+      id: '/_app/hr/people/'
+      path: '/hr/people'
+      fullPath: '/hr/people/'
+      preLoaderRoute: typeof AppHrPeopleIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/hr/people/$userId': {
+      id: '/_app/hr/people/$userId'
+      path: '/hr/people/$userId'
+      fullPath: '/hr/people/$userId'
+      preLoaderRoute: typeof AppHrPeopleUserIdRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/retainers/$retainerId/': {
       id: '/_app/retainers/$retainerId/'
       path: '/retainers/$retainerId'
@@ -1393,6 +1450,7 @@ interface AppRouteChildren {
   AppInvoicesInvoiceIdRoute: typeof AppInvoicesInvoiceIdRoute
   AppInvoicesSettingsRoute: typeof AppInvoicesSettingsRoute
   AppLeadsLeadIdRoute: typeof AppLeadsLeadIdRoute
+  AppMeFileRoute: typeof AppMeFileRoute
   AppMeetingsMeetingIdRoute: typeof AppMeetingsMeetingIdRoute
   AppNotificationsSettingsRoute: typeof AppNotificationsSettingsRoute
   AppProjectsProjectIdRoute: typeof AppProjectsProjectIdRoute
@@ -1435,9 +1493,11 @@ interface AppRouteChildren {
   AppApprovalsRequestsRequestIdRoute: typeof AppApprovalsRequestsRequestIdRoute
   AppClientsClientIdReportRoute: typeof AppClientsClientIdReportRoute
   AppContentPostsPostIdRoute: typeof AppContentPostsPostIdRoute
+  AppHrPeopleUserIdRoute: typeof AppHrPeopleUserIdRoute
   AppShootsShootIdEditRoute: typeof AppShootsShootIdEditRoute
   AppAnnouncementsAnnouncementIdIndexRoute: typeof AppAnnouncementsAnnouncementIdIndexRoute
   AppClientsClientIdIndexRoute: typeof AppClientsClientIdIndexRoute
+  AppHrPeopleIndexRoute: typeof AppHrPeopleIndexRoute
   AppRetainersRetainerIdIndexRoute: typeof AppRetainersRetainerIdIndexRoute
   AppShootsShootIdIndexRoute: typeof AppShootsShootIdIndexRoute
   AppRetainersRetainerIdContractsContractIdRoute: typeof AppRetainersRetainerIdContractsContractIdRoute
@@ -1460,6 +1520,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppInvoicesInvoiceIdRoute: AppInvoicesInvoiceIdRoute,
   AppInvoicesSettingsRoute: AppInvoicesSettingsRoute,
   AppLeadsLeadIdRoute: AppLeadsLeadIdRoute,
+  AppMeFileRoute: AppMeFileRoute,
   AppMeetingsMeetingIdRoute: AppMeetingsMeetingIdRoute,
   AppNotificationsSettingsRoute: AppNotificationsSettingsRoute,
   AppProjectsProjectIdRoute: AppProjectsProjectIdRoute,
@@ -1503,10 +1564,12 @@ const AppRouteChildren: AppRouteChildren = {
   AppApprovalsRequestsRequestIdRoute: AppApprovalsRequestsRequestIdRoute,
   AppClientsClientIdReportRoute: AppClientsClientIdReportRoute,
   AppContentPostsPostIdRoute: AppContentPostsPostIdRoute,
+  AppHrPeopleUserIdRoute: AppHrPeopleUserIdRoute,
   AppShootsShootIdEditRoute: AppShootsShootIdEditRoute,
   AppAnnouncementsAnnouncementIdIndexRoute:
     AppAnnouncementsAnnouncementIdIndexRoute,
   AppClientsClientIdIndexRoute: AppClientsClientIdIndexRoute,
+  AppHrPeopleIndexRoute: AppHrPeopleIndexRoute,
   AppRetainersRetainerIdIndexRoute: AppRetainersRetainerIdIndexRoute,
   AppShootsShootIdIndexRoute: AppShootsShootIdIndexRoute,
   AppRetainersRetainerIdContractsContractIdRoute:

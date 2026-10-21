@@ -26,10 +26,12 @@ import {
   ChartNoAxesCombinedIcon,
   ChevronDownIcon,
   CircleUserIcon,
+  ContactRoundIcon,
   DownloadIcon,
   FileTextIcon,
   FolderKanbanIcon,
   HouseIcon,
+  IdCardIcon,
   LayoutTemplateIcon,
   ListTodoIcon,
   LogOutIcon,
@@ -53,6 +55,7 @@ import { useInstallOffer } from '../features/app/install';
 import { OfflineBanner } from '../features/app/offline-banner';
 import { UpdateBanner } from '../features/app/update-banner';
 import { hasApprovalQueue } from '../features/approvals/approvals-page';
+import { hasPeopleAccess } from '../features/hr/people-page';
 import { NotificationBell } from '../features/notifications/notification-bell';
 import { hasReports } from '../features/reports/reports-page';
 import { managesTeams } from '../features/tasks/task-access';
@@ -80,6 +83,7 @@ interface NavItem {
     | 'nav.campaigns'
     | 'nav.catalog'
     | 'nav.templates'
+    | 'nav.hr'
     | 'nav.team'
     | 'nav.departments'
     | 'nav.audit'
@@ -99,7 +103,7 @@ interface NavItem {
 
 interface NavChild {
   to: LinkProps['to'];
-  label: 'nav.myTasks' | 'nav.taskList' | 'nav.taskBoard' | 'nav.workload';
+  label: 'nav.myTasks' | 'nav.taskList' | 'nav.taskBoard' | 'nav.workload' | 'nav.people';
   /** Lists the page only for these users; others still reach it. */
   show?: (me: MeResponse) => boolean;
 }
@@ -141,6 +145,14 @@ const navItems: NavItem[] = [
   { to: '/catalog', label: 'nav.catalog', icon: PackageIcon, permission: 'catalog.read' },
   // Everyone reads templates; the people who apply or maintain them see the link (F07 screen 1).
   { to: '/templates', label: 'nav.templates', icon: LayoutTemplateIcon, show: managesTeams },
+  // HR (F17): files for `employees.read`, pay for `salaries.read`.
+  {
+    to: '/hr/people',
+    label: 'nav.hr',
+    icon: ContactRoundIcon,
+    show: hasPeopleAccess,
+    children: [{ to: '/hr/people', label: 'nav.people' }],
+  },
   { to: '/team', label: 'nav.team', icon: UsersIcon },
   { to: '/departments', label: 'nav.departments', icon: Building2Icon },
   { to: '/audit', label: 'nav.audit', icon: ScrollTextIcon, permission: 'audit.read' },
@@ -324,6 +336,10 @@ function UserMenu({ me }: { me: MeResponse }) {
         <DropdownMenuItem render={<Link to="/account" />}>
           <CircleUserIcon />
           {t('user.account')}
+        </DropdownMenuItem>
+        <DropdownMenuItem render={<Link to="/me/file" />}>
+          <IdCardIcon />
+          {t('user.myFile')}
         </DropdownMenuItem>
         {/* F16 rule A3: the browser's own offer, or the guide on iPhone. */}
         {offer === 'prompt' && (
