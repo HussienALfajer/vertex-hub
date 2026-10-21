@@ -1,6 +1,6 @@
 # 0039 — HR: one module, attendance proved by a rotating code, a passkey and the office network, leave as a ledger
 
-Status: Proposed · Date: 2026-10-21
+Status: Accepted · Date: 2026-10-21
 
 ## Context
 F17 (`docs/specs/F17-hr-files-attendance-leave.md`) adds employee files, attendance and leave. The owner decided (2026-10-20, 2026-10-21):

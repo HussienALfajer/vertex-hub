@@ -1,6 +1,6 @@
 # F17 — HR: employee files, attendance and leave
 
-Status: Draft · Date: 2026-10-21 · Scope: `docs/product/v2-scope.md` §F17 (and §2) · ADRs: 0006, 0013, 0014, 0017, 0018, 0019, 0022, 0032, 0036, 0037, 0039
+Status: Approved · Date: 2026-10-21 · Scope: `docs/product/v2-scope.md` §F17 (and §2) · ADRs: 0006, 0013, 0014, 0017, 0018, 0019, 0022, 0032, 0036, 0037, 0039
 
 ## Summary
 The agency keeps contracts, start dates and salaries outside the system, takes attendance by trust, and handles leave by message. Nobody can say who is in today, who is on leave next week, or how many days someone has left, and a task can be assigned to a person who is away.

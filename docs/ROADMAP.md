@@ -67,7 +67,7 @@ Build order (owner, 2026-09-30): F10 → F09 → F08 → F11. F09 approves exact
 Order and directions: `docs/product/v2-scope.md` §3–4. Each feature starts with a `/spec` session: full analysis, every possible feature, the owner's questions, then the spec.
 - [x] F16 Notifications 2.0, installable app and announcements (spec `docs/specs/F16-notifications-app-announcements.md`, ADRs 0036–0038): Web Push, sessions of 30 days and priorities in the catalog (A1); the installable app, offline cache, install guide and device push (A2); the engine: channel policy, inboxes, self-resolving notifications, snooze, followers, escalation and the minute job (B1, B2); the full catalog across the modules (C1, C1b, C1c, C2); announcements, audiences, polls and templates (D1, D1b) and their screens with the rich-text editor and the audience picker (D2); owner acceptance passed
 - [ ] Production deploy of F16 (once, after every part is merged; VAPID keys in the server's `.env`), then the contract release that drops `notification_settings.email_types`
-- [~] F17 HR: employee files, attendance and leave (spec: `docs/specs/F17-hr-files-attendance-leave.md`, ADR 0039; draft 2026-10-21, awaiting the owner's approval; parts A files, B rules and leave, C attendance, D months)
+- [~] F17 HR: employee files, attendance and leave (spec: `docs/specs/F17-hr-files-attendance-leave.md`, ADR 0039): spec approved (2026-10-21); parts A files, B rules and leave, C attendance, D months
 - [ ] F18 Accounting through Vertex Mizan: integration, purchases for clients, profitability (starts when Mizan's posting API is stable, ADR 0035; Q17)
 - [ ] F19 HR: payroll, commissions and profit shares (Q15, Q16)
 - [ ] F20 Client portal (with client conversations)
