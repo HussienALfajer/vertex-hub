@@ -2628,6 +2628,214 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/hr/attendance/me/today": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["HrAttendanceController_today"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/hr/attendance/days": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["HrAttendanceController_days"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/hr/attendance/punch/options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["HrAttendanceController_punchOptions"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/hr/attendance/punch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["HrAttendanceController_punch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/hr/passkeys/options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["HrAttendanceController_passkeyOptions"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/hr/passkeys": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["HrAttendanceController_passkeysOf"];
+        put?: never;
+        post: operations["HrAttendanceController_registerPasskey"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/hr/passkeys/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["HrAttendanceController_myPasskeys"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/hr/passkeys/{id}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["HrAttendanceController_revokePasskey"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/hr/kiosks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["HrAttendanceController_listKiosks"];
+        put?: never;
+        post: operations["HrAttendanceController_createKiosk"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/hr/kiosks/{id}/pairing-code": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["HrAttendanceController_kioskPairingCode"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/hr/kiosks/{id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["HrAttendanceController_archiveKiosk"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/kiosk/pair": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["KioskController_pair"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/kiosk/stream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["KioskController_openStream"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/content/calendar": {
         parameters: {
             query?: never;
@@ -5433,9 +5641,9 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         /** @enum {string} */
-        AuditEntityType: "user" | "department" | "client" | "client_contact" | "client_platform_account" | "client_note" | "project" | "project_milestone" | "retainer" | "retainer_cycle" | "retainer_charge" | "retainer_term" | "retainer_amendment" | "extra_work" | "task" | "task_checklist_item" | "task_link" | "task_comment" | "template" | "template_run" | "file_item" | "approval_request" | "post" | "shoot" | "meeting" | "catalog_service" | "catalog_package" | "quote_settings" | "contract_settings" | "quote" | "invoice_settings" | "invoice" | "payment" | "project_expense" | "ad_campaign" | "ad_campaign_update" | "ad_wallet" | "ad_wallet_entry" | "lead" | "lead_note" | "client_report" | "retainer_cycle_report" | "retainer_contract" | "retainer_contract_annex" | "notification_policy" | "announcement" | "announcement_template" | "employee_file" | "salary_change" | "work_schedule" | "holiday" | "hr_settings" | "hr_request" | "hr_opinion" | "leave_balance";
+        AuditEntityType: "user" | "department" | "client" | "client_contact" | "client_platform_account" | "client_note" | "project" | "project_milestone" | "retainer" | "retainer_cycle" | "retainer_charge" | "retainer_term" | "retainer_amendment" | "extra_work" | "task" | "task_checklist_item" | "task_link" | "task_comment" | "template" | "template_run" | "file_item" | "approval_request" | "post" | "shoot" | "meeting" | "catalog_service" | "catalog_package" | "quote_settings" | "contract_settings" | "quote" | "invoice_settings" | "invoice" | "payment" | "project_expense" | "ad_campaign" | "ad_campaign_update" | "ad_wallet" | "ad_wallet_entry" | "lead" | "lead_note" | "client_report" | "retainer_cycle_report" | "retainer_contract" | "retainer_contract_annex" | "notification_policy" | "announcement" | "announcement_template" | "employee_file" | "salary_change" | "work_schedule" | "holiday" | "hr_settings" | "hr_request" | "hr_opinion" | "leave_balance" | "attendance_passkey" | "attendance_kiosk" | "attendance";
         /** @enum {string} */
-        AuditAction: "user.created" | "user.updated" | "user.roles_changed" | "user.departments_changed" | "user.archived" | "user.restored" | "user.link_issued" | "user.password_set" | "user.password_changed" | "user.two_factor_enabled" | "user.two_factor_disabled" | "user.two_factor_reset" | "user.backup_codes_regenerated" | "user.profile_updated" | "user.session_signed_out" | "user.sessions_signed_out" | "department.updated" | "client.created" | "client.updated" | "client.status_changed" | "client.account_manager_changed" | "client.healthcare_changed" | "client.archived" | "client.restored" | "client.brand_kit_updated" | "client.emailed" | "client_contact.created" | "client_contact.updated" | "client_contact.archived" | "client_platform_account.created" | "client_platform_account.updated" | "client_platform_account.archived" | "client_note.created" | "client_note.updated" | "client_note.archived" | "project.created" | "project.updated" | "project.project_manager_changed" | "project.status_changed" | "project.money_updated" | "project.archived" | "project.restored" | "project_milestone.created" | "project_milestone.updated" | "project_milestone.reordered" | "project_milestone.completed" | "project_milestone.reopened" | "project_milestone.archived" | "retainer.created" | "retainer.updated" | "retainer.backdated" | "retainer.status_changed" | "retainer.deliverables_updated" | "retainer.money_updated" | "retainer.archived" | "retainer.restored" | "retainer_cycle.created" | "retainer_cycle.closed" | "retainer_cycle.line_updated" | "retainer_cycle.line_added" | "retainer_cycle.adjusted" | "retainer_charge.created" | "retainer_charge.amount_changed" | "retainer_charge.cancelled" | "retainer_charge.split" | "retainer_charge.settled_outside" | "retainer_term.created" | "retainer_term.updated" | "retainer_term.end_action_changed" | "retainer_term.cancelled" | "retainer_term.started" | "retainer_term.completed" | "retainer_term.renewed" | "retainer_amendment.created" | "retainer_amendment.approved" | "retainer_amendment.rejected" | "retainer_amendment.withdrawn" | "retainer_amendment.applied" | "retainer_amendment.cancelled" | "extra_work.created" | "extra_work.updated" | "extra_work.billing_changed" | "extra_work.archived" | "task.created" | "task.updated" | "task.assigned" | "task.department_changed" | "task.status_changed" | "task.dependencies_updated" | "task.archived" | "task.restored" | "task.revision_decided" | "task.request_scope_changed" | "task.extra_work_moved" | "task.reviewed" | "task.client_text_updated" | "task.client_response_recorded" | "task_checklist_item.created" | "task_checklist_item.updated" | "task_checklist_item.reordered" | "task_checklist_item.archived" | "task_link.created" | "task_link.archived" | "task_comment.created" | "task_comment.updated" | "task_comment.archived" | "template.created" | "template.updated" | "template.assignees_updated" | "template.archived" | "template.restored" | "template_run.created" | "retainer.template_changed" | "file_item.created" | "file_item.renamed" | "file_item.confidential_changed" | "file_item.archived" | "file_item.restored" | "file_version.created" | "file_version.archived" | "file_version.restored" | "file_version.final_set" | "file_version.final_cleared" | "approval_request.created" | "approval_request.link_reissued" | "approval_request.revoked" | "approval_request.emailed" | "approval_item.responded" | "approval_item.withdrawn" | "post.created" | "post.updated" | "post.status_changed" | "post.reviewed" | "post.client_response_recorded" | "post.task_linked" | "post.task_unlinked" | "post.task_returned" | "post.duplicated" | "post.archived" | "post.restored" | "shoot.created" | "shoot.updated" | "shoot.shots_changed" | "shoot.shot_ticked" | "shoot.shot_unticked" | "shoot.completed" | "shoot.cancelled" | "shoot.reopened" | "shoot.archived" | "shoot.restored" | "meeting.created" | "meeting.updated" | "meeting.cancelled" | "meeting.archived" | "meeting.restored" | "catalog_service.created" | "catalog_service.updated" | "catalog_service.archived" | "catalog_service.restored" | "catalog_package.created" | "catalog_package.updated" | "catalog_package.archived" | "catalog_package.restored" | "quote_settings.updated" | "notification_policy.updated" | "contract_settings.updated" | "contract_settings.articles_updated" | "quote.created" | "quote.updated" | "quote.approval_requested" | "quote.approval_withdrawn" | "quote.approval_approved" | "quote.approval_returned" | "quote.sent" | "quote.extended" | "quote.expired" | "quote.rejected" | "quote.accepted" | "quote.version_created" | "quote.superseded" | "quote.archived" | "quote.emailed" | "invoice_settings.updated" | "invoice.created" | "invoice.updated" | "invoice.archived" | "invoice.issued" | "invoice.due_date_changed" | "invoice.voided" | "invoice.overdue" | "invoice.services_changed" | "invoice.emailed" | "payment.recorded" | "payment.voided" | "payment.emailed" | "project_expense.created" | "project_expense.updated" | "project_expense.archived" | "ad_campaign.created" | "ad_campaign.updated" | "ad_campaign.status_changed" | "ad_campaign.archived" | "ad_campaign.restored" | "ad_campaign_update.created" | "ad_campaign_update.updated" | "ad_campaign_update.archived" | "ad_wallet.threshold_changed" | "ad_wallet.low_balance" | "ad_wallet.low_balance_cleared" | "ad_wallet_entry.recorded" | "ad_wallet_entry.voided" | "ad_wallet_entry.emailed" | "lead.created" | "lead.updated" | "lead.stage_changed" | "lead.owner_changed" | "lead.follow_up_changed" | "lead.lost" | "lead.reopened" | "lead.converted" | "lead.archived" | "lead.restored" | "lead_note.created" | "lead_note.updated" | "lead_note.archived" | "client_report.summary_changed" | "retainer_cycle_report.summary_changed" | "retainer_contract.created" | "retainer_contract.updated" | "retainer_contract.discarded" | "retainer_contract.issued" | "retainer_contract.signed" | "retainer_contract.voided" | "retainer_contract_annex.issued" | "retainer_contract_annex.signed" | "retainer_contract_annex.voided" | "announcement.sent" | "announcement.scheduled" | "announcement.schedule_cancelled" | "announcement.edited" | "announcement.withdrawn" | "announcement.archived" | "announcement_poll.closed" | "announcement_template.created" | "announcement_template.updated" | "announcement_template.archived" | "employee_file.updated" | "employee_file.payout_changed" | "employee_file.service_ended" | "employee_file.service_end_cleared" | "salary_change.created" | "salary_change.archived" | "work_schedule.created" | "work_schedule.updated" | "work_schedule.archived" | "holiday.created" | "holiday.updated" | "holiday.archived" | "hr_settings.updated" | "hr_request.created" | "hr_request.approved" | "hr_request.rejected" | "hr_request.cancelled" | "hr_request.recounted" | "hr_opinion.created" | "leave_balance.adjusted" | "leave_balance.opening" | "task.leave_accepted";
+        AuditAction: "user.created" | "user.updated" | "user.roles_changed" | "user.departments_changed" | "user.archived" | "user.restored" | "user.link_issued" | "user.password_set" | "user.password_changed" | "user.two_factor_enabled" | "user.two_factor_disabled" | "user.two_factor_reset" | "user.backup_codes_regenerated" | "user.profile_updated" | "user.session_signed_out" | "user.sessions_signed_out" | "department.updated" | "client.created" | "client.updated" | "client.status_changed" | "client.account_manager_changed" | "client.healthcare_changed" | "client.archived" | "client.restored" | "client.brand_kit_updated" | "client.emailed" | "client_contact.created" | "client_contact.updated" | "client_contact.archived" | "client_platform_account.created" | "client_platform_account.updated" | "client_platform_account.archived" | "client_note.created" | "client_note.updated" | "client_note.archived" | "project.created" | "project.updated" | "project.project_manager_changed" | "project.status_changed" | "project.money_updated" | "project.archived" | "project.restored" | "project_milestone.created" | "project_milestone.updated" | "project_milestone.reordered" | "project_milestone.completed" | "project_milestone.reopened" | "project_milestone.archived" | "retainer.created" | "retainer.updated" | "retainer.backdated" | "retainer.status_changed" | "retainer.deliverables_updated" | "retainer.money_updated" | "retainer.archived" | "retainer.restored" | "retainer_cycle.created" | "retainer_cycle.closed" | "retainer_cycle.line_updated" | "retainer_cycle.line_added" | "retainer_cycle.adjusted" | "retainer_charge.created" | "retainer_charge.amount_changed" | "retainer_charge.cancelled" | "retainer_charge.split" | "retainer_charge.settled_outside" | "retainer_term.created" | "retainer_term.updated" | "retainer_term.end_action_changed" | "retainer_term.cancelled" | "retainer_term.started" | "retainer_term.completed" | "retainer_term.renewed" | "retainer_amendment.created" | "retainer_amendment.approved" | "retainer_amendment.rejected" | "retainer_amendment.withdrawn" | "retainer_amendment.applied" | "retainer_amendment.cancelled" | "extra_work.created" | "extra_work.updated" | "extra_work.billing_changed" | "extra_work.archived" | "task.created" | "task.updated" | "task.assigned" | "task.department_changed" | "task.status_changed" | "task.dependencies_updated" | "task.archived" | "task.restored" | "task.revision_decided" | "task.request_scope_changed" | "task.extra_work_moved" | "task.reviewed" | "task.client_text_updated" | "task.client_response_recorded" | "task_checklist_item.created" | "task_checklist_item.updated" | "task_checklist_item.reordered" | "task_checklist_item.archived" | "task_link.created" | "task_link.archived" | "task_comment.created" | "task_comment.updated" | "task_comment.archived" | "template.created" | "template.updated" | "template.assignees_updated" | "template.archived" | "template.restored" | "template_run.created" | "retainer.template_changed" | "file_item.created" | "file_item.renamed" | "file_item.confidential_changed" | "file_item.archived" | "file_item.restored" | "file_version.created" | "file_version.archived" | "file_version.restored" | "file_version.final_set" | "file_version.final_cleared" | "approval_request.created" | "approval_request.link_reissued" | "approval_request.revoked" | "approval_request.emailed" | "approval_item.responded" | "approval_item.withdrawn" | "post.created" | "post.updated" | "post.status_changed" | "post.reviewed" | "post.client_response_recorded" | "post.task_linked" | "post.task_unlinked" | "post.task_returned" | "post.duplicated" | "post.archived" | "post.restored" | "shoot.created" | "shoot.updated" | "shoot.shots_changed" | "shoot.shot_ticked" | "shoot.shot_unticked" | "shoot.completed" | "shoot.cancelled" | "shoot.reopened" | "shoot.archived" | "shoot.restored" | "meeting.created" | "meeting.updated" | "meeting.cancelled" | "meeting.archived" | "meeting.restored" | "catalog_service.created" | "catalog_service.updated" | "catalog_service.archived" | "catalog_service.restored" | "catalog_package.created" | "catalog_package.updated" | "catalog_package.archived" | "catalog_package.restored" | "quote_settings.updated" | "notification_policy.updated" | "contract_settings.updated" | "contract_settings.articles_updated" | "quote.created" | "quote.updated" | "quote.approval_requested" | "quote.approval_withdrawn" | "quote.approval_approved" | "quote.approval_returned" | "quote.sent" | "quote.extended" | "quote.expired" | "quote.rejected" | "quote.accepted" | "quote.version_created" | "quote.superseded" | "quote.archived" | "quote.emailed" | "invoice_settings.updated" | "invoice.created" | "invoice.updated" | "invoice.archived" | "invoice.issued" | "invoice.due_date_changed" | "invoice.voided" | "invoice.overdue" | "invoice.services_changed" | "invoice.emailed" | "payment.recorded" | "payment.voided" | "payment.emailed" | "project_expense.created" | "project_expense.updated" | "project_expense.archived" | "ad_campaign.created" | "ad_campaign.updated" | "ad_campaign.status_changed" | "ad_campaign.archived" | "ad_campaign.restored" | "ad_campaign_update.created" | "ad_campaign_update.updated" | "ad_campaign_update.archived" | "ad_wallet.threshold_changed" | "ad_wallet.low_balance" | "ad_wallet.low_balance_cleared" | "ad_wallet_entry.recorded" | "ad_wallet_entry.voided" | "ad_wallet_entry.emailed" | "lead.created" | "lead.updated" | "lead.stage_changed" | "lead.owner_changed" | "lead.follow_up_changed" | "lead.lost" | "lead.reopened" | "lead.converted" | "lead.archived" | "lead.restored" | "lead_note.created" | "lead_note.updated" | "lead_note.archived" | "client_report.summary_changed" | "retainer_cycle_report.summary_changed" | "retainer_contract.created" | "retainer_contract.updated" | "retainer_contract.discarded" | "retainer_contract.issued" | "retainer_contract.signed" | "retainer_contract.voided" | "retainer_contract_annex.issued" | "retainer_contract_annex.signed" | "retainer_contract_annex.voided" | "announcement.sent" | "announcement.scheduled" | "announcement.schedule_cancelled" | "announcement.edited" | "announcement.withdrawn" | "announcement.archived" | "announcement_poll.closed" | "announcement_template.created" | "announcement_template.updated" | "announcement_template.archived" | "employee_file.updated" | "employee_file.payout_changed" | "employee_file.service_ended" | "employee_file.service_end_cleared" | "salary_change.created" | "salary_change.archived" | "work_schedule.created" | "work_schedule.updated" | "work_schedule.archived" | "holiday.created" | "holiday.updated" | "holiday.archived" | "hr_settings.updated" | "hr_request.created" | "hr_request.approved" | "hr_request.rejected" | "hr_request.cancelled" | "hr_request.recounted" | "hr_opinion.created" | "leave_balance.adjusted" | "leave_balance.opening" | "task.leave_accepted" | "attendance_passkey.registered" | "attendance_passkey.activated" | "attendance_passkey.revoked" | "attendance_kiosk.created" | "attendance_kiosk.pairing_started" | "attendance_kiosk.paired" | "attendance_kiosk.archived" | "attendance.punch_refused";
         /** @description Audit entries, newest first */
         AuditPage: {
             items: components["schemas"]["AuditEntry"][];
@@ -11914,7 +12122,7 @@ export interface components {
         /** @enum {string} */
         AdCampaignStatus: "planned" | "active" | "paused" | "completed" | "cancelled";
         /** @enum {string} */
-        HrRequestKind: "leave" | "permission";
+        HrRequestKind: "leave" | "permission" | "passkey_replacement";
         /** @enum {string} */
         LeaveType: "annual" | "sick" | "emergency" | "unpaid";
         /** @enum {string} */
@@ -14404,6 +14612,8 @@ export interface components {
             paid?: boolean;
         };
         HrSettings: {
+            /** Format: date */
+            attendanceStartsOn: string | null;
             graceMinutes: number;
             latenessTiers: components["schemas"]["LatenessTier"][];
             firstLatenessWarning: boolean;
@@ -14652,6 +14862,219 @@ export interface components {
             /** Format: uuid */
             requestId: string;
             body: string;
+        };
+        MyAttendanceToday: {
+            /** Format: date */
+            date: string;
+            exemption: components["schemas"]["AttendanceExemption"] | null;
+            trial: boolean;
+            passkey: {
+                active: boolean;
+                pending: boolean;
+            };
+            day: components["schemas"]["AttendanceDay"] | null;
+            nextDirection: components["schemas"]["PunchDirection"];
+            methods: components["schemas"]["SelfPunchMethod"][];
+            shoots: components["schemas"]["PunchableShoot"][];
+        };
+        /** @enum {string} */
+        AttendanceExemption: "exempt" | "not_started" | "ended";
+        AttendanceDay: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            userId: string;
+            /** Format: date */
+            date: string;
+            kind: components["schemas"]["AttendanceDayKind"];
+            /** Format: date-time */
+            expectedStart: string | null;
+            /** Format: date-time */
+            latestStart: string | null;
+            /** Format: date-time */
+            expectedEnd: string | null;
+            requiredMinutes: number | null;
+            place: components["schemas"]["AttendancePlace"] | null;
+            leave: components["schemas"]["DayLeave"];
+            /** Format: date-time */
+            firstInAt: string | null;
+            /** Format: date-time */
+            lastOutAt: string | null;
+            workedMinutes: number;
+            lateMinutes: number;
+            earlyMinutes: number;
+            overtimeMinutes: number;
+            status: components["schemas"]["AttendanceDayStatus"];
+            punches: components["schemas"]["AttendancePunch"][];
+        };
+        /** @enum {string} */
+        AttendanceDayKind: "work" | "off" | "holiday";
+        /** @enum {string} */
+        AttendancePlace: "office" | "remote";
+        /** @enum {string} */
+        DayLeave: "none" | "full" | "first_half" | "second_half";
+        /** @enum {string} */
+        AttendanceDayStatus: "upcoming" | "in_progress" | "present" | "partial" | "absent" | "leave" | "holiday" | "off" | "trial";
+        AttendancePunch: {
+            /** Format: uuid */
+            id: string;
+            direction: components["schemas"]["PunchDirection"];
+            /** Format: date-time */
+            at: string;
+            method: components["schemas"]["PunchMethod"];
+            kioskName: string | null;
+            latitude: number | null;
+            longitude: number | null;
+            accuracyM: number | null;
+            fieldNote: string | null;
+            shoot: {
+                /** Format: uuid */
+                id: string;
+                title: string;
+                location: string;
+                mapUrl: string | null;
+            } | null;
+            fieldReview: components["schemas"]["FieldReview"] | null;
+            /** Format: date-time */
+            archivedAt: string | null;
+        };
+        /** @enum {string} */
+        PunchDirection: "in" | "out";
+        /** @enum {string} */
+        PunchMethod: "office" | "remote" | "field" | "shoot" | "correction";
+        /** @enum {string} */
+        FieldReview: "accepted" | "rejected";
+        /** @enum {string} */
+        SelfPunchMethod: "office" | "remote" | "field" | "shoot";
+        PunchableShoot: {
+            /** Format: uuid */
+            id: string;
+            title: string;
+            /** Format: date-time */
+            startsAt: string;
+            /** Format: date-time */
+            endsAt: string;
+            location: string;
+        };
+        AttendanceDayList: {
+            items: components["schemas"]["AttendanceDay"][];
+        };
+        PunchOptionsInput: {
+            method: components["schemas"]["SelfPunchMethod"];
+            code?: string;
+            /** Format: uuid */
+            shootId?: string;
+            latitude?: number;
+            longitude?: number;
+            accuracyM?: number;
+        };
+        WebAuthnChallenge: {
+            ticket: string;
+            options: {
+                [key: string]: unknown;
+            };
+        };
+        PunchInput: {
+            ticket: string;
+            assertion: {
+                [key: string]: unknown;
+            };
+            fieldNote?: string;
+        };
+        PunchResult: {
+            punch: components["schemas"]["AttendancePunch"];
+            day: components["schemas"]["AttendanceDay"];
+            greeting: components["schemas"]["AttendanceGreeting"];
+        };
+        AttendanceGreeting: {
+            direction: components["schemas"]["PunchDirection"];
+            firstName: string;
+            partOfDay: components["schemas"]["PartOfDay"] | null;
+            tasksDueToday: number | null;
+            /** Format: date-time */
+            firstEventAt: string | null;
+            workedMinutes: number | null;
+        };
+        /** @enum {string} */
+        PartOfDay: "morning" | "afternoon" | "evening";
+        RegisterPasskey: {
+            ticket: string;
+            response: {
+                [key: string]: unknown;
+            };
+        };
+        AttendancePasskey: {
+            /** Format: uuid */
+            id: string;
+            user: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            };
+            deviceLabel: string;
+            status: components["schemas"]["PasskeyStatus"];
+            decidedBy: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            /** Format: date-time */
+            decidedAt: string | null;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        /** @enum {string} */
+        PasskeyStatus: "pending" | "active" | "revoked";
+        AttendancePasskeyList: {
+            items: components["schemas"]["AttendancePasskey"][];
+        };
+        RevokePasskey: {
+            note: string;
+        };
+        AttendanceKioskList: {
+            items: components["schemas"]["AttendanceKiosk"][];
+        };
+        AttendanceKiosk: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            paired: boolean;
+            /** Format: date-time */
+            pairingExpiresAt: string | null;
+            /** Format: date-time */
+            lastSeenAt: string | null;
+            lastIpAddress: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            archivedAt: string | null;
+        };
+        CreateAttendanceKiosk: {
+            name: string;
+        };
+        AttendanceKioskPairing: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            paired: boolean;
+            /** Format: date-time */
+            pairingExpiresAt: string | null;
+            /** Format: date-time */
+            lastSeenAt: string | null;
+            lastIpAddress: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            archivedAt: string | null;
+            pairingCode: string;
+        };
+        PairKiosk: {
+            code: string;
+        };
+        PairedKiosk: {
+            /** Format: uuid */
+            id: string;
+            name: string;
         };
         /** @enum {string} */
         PostPlatform: "instagram" | "facebook" | "tiktok" | "x" | "linkedin" | "youtube" | "snapchat" | "google_business";
@@ -24755,6 +25178,341 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HrOpinion"];
+                };
+            };
+        };
+    };
+    HrAttendanceController_today: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description My day: expectations, punches, the next direction and the methods offered now */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyAttendanceToday"];
+                };
+            };
+        };
+    };
+    HrAttendanceController_days: {
+        parameters: {
+            query: {
+                userId?: string | "me";
+                month: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A month's days with their punches: one's own, or `hr.read` in scope; 404 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttendanceDayList"];
+                };
+            };
+        };
+    };
+    HrAttendanceController_punchOptions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PunchOptionsInput"];
+            };
+        };
+        responses: {
+            /** @description The place checked; the passkey challenge in a ticket valid 60 seconds */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebAuthnChallenge"];
+                };
+            };
+        };
+    };
+    HrAttendanceController_punch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PunchInput"];
+            };
+        };
+        responses: {
+            /** @description The punch, the recomputed day and the greeting */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PunchResult"];
+                };
+            };
+        };
+    };
+    HrAttendanceController_passkeyOptions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The registration challenge in a ticket valid 60 seconds */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebAuthnChallenge"];
+                };
+            };
+        };
+    };
+    HrAttendanceController_passkeysOf: {
+        parameters: {
+            query: {
+                userId: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A person's passkeys, newest first; empty outside the scope */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttendancePasskeyList"];
+                };
+            };
+        };
+    };
+    HrAttendanceController_registerPasskey: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegisterPasskey"];
+            };
+        };
+        responses: {
+            /** @description The passkey: active, or pending the General Manager when one is active */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttendancePasskey"];
+                };
+            };
+        };
+    };
+    HrAttendanceController_myPasskeys: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description My passkeys, newest first */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttendancePasskeyList"];
+                };
+            };
+        };
+    };
+    HrAttendanceController_revokePasskey: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RevokePasskey"];
+            };
+        };
+        responses: {
+            /** @description The revoked passkey */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttendancePasskey"];
+                };
+            };
+        };
+    };
+    HrAttendanceController_listKiosks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The entrance screens */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttendanceKioskList"];
+                };
+            };
+        };
+    };
+    HrAttendanceController_createKiosk: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateAttendanceKiosk"];
+            };
+        };
+        responses: {
+            /** @description The new screen with its pairing code, shown once (15 minutes) */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttendanceKioskPairing"];
+                };
+            };
+        };
+    };
+    HrAttendanceController_kioskPairingCode: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A new pairing code; the screen is unpaired until it is used */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttendanceKioskPairing"];
+                };
+            };
+        };
+    };
+    HrAttendanceController_archiveKiosk: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The screen, unpaired */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttendanceKiosk"];
+                };
+            };
+        };
+    };
+    KioskController_pair: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PairKiosk"];
+            };
+        };
+        responses: {
+            /** @description Paired; sets the `vh_kiosk` cookie */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PairedKiosk"];
+                };
+            };
+        };
+    };
+    KioskController_openStream: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description `kiosk`, `code` and `greeting` events; 401 without a paired screen */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": string;
                 };
             };
         };

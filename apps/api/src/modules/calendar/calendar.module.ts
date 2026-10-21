@@ -6,6 +6,7 @@ import { InvoicesModule } from '../invoices/index.js';
 import { NotificationsModule } from '../notifications/index.js';
 import { ProjectsModule } from '../projects/index.js';
 import { TasksModule } from '../tasks/index.js';
+import { AttendanceShootSource } from './attendance-shoot-source.js';
 import { CalendarController } from './calendar.controller.js';
 import { CalendarService } from './calendar.service.js';
 import { CalendarReminders } from './calendar-reminders.js';
@@ -25,7 +26,7 @@ import { ShootsService } from './shoots.service.js';
  * cancels shoot tasks and creates editing tasks through `tasks`' `ShootTasks`, and registers into
  * its `TaskGuards` so a scheduled shoot holds its task; reads users through `auth`'s
  * `UserDirectory` (and registers into its `ResponsibilityRegistry`), clients through
- * `ClientDirectory` and key dates through `projects`' `EngagementDirectory`, `invoices`' `InvoiceDueDates` and `hr`'s `HolidayCalendar`; approved leave (entries and conflicts) through `hr`'s `LeaveDirectory`, and feeds shoots and meetings into its `LeaveWorkSources` (F17); sends the calendar
+ * `ClientDirectory` and key dates through `projects`' `EngagementDirectory`, `invoices`' `InvoiceDueDates` and `hr`'s `HolidayCalendar`; approved leave (entries and conflicts) through `hr`'s `LeaveDirectory`, and feeds shoots and meetings into its `LeaveWorkSources` and shoot check-ins into its `AttendanceShoots` (F17); sends the calendar
  * notifications through `notifications` and registers its reminder sources in the daily job. Exports
  * the read-only `ShootReports` for `reports` (F15). `tasks`, `clients`, `projects` and `auth` never
  * import it.
@@ -51,6 +52,7 @@ import { ShootsService } from './shoots.service.js';
     MeetingNotices,
     CalendarReminders,
     ShootReports,
+    AttendanceShootSource,
   ],
   exports: [ShootReports],
 })

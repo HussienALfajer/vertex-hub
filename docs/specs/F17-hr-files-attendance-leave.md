@@ -139,7 +139,7 @@ WebAuthn credentials for attendance only (ADR 0039), not Better Auth's passkey p
 |---|---|---|
 | `user_id` | uuid FK `users` | indexed |
 | `credential_id` | text, unique | base64url |
-| `public_key` | bytea | |
+| `public_key` | text | the COSE key, base64url |
 | `counter` | bigint | |
 | `transports` | text[] | |
 | `device_label` | text | e.g. "Safari · iPhone", from the registering session (F01B) |
@@ -354,7 +354,7 @@ Settled in implementation (PR B4, 2026-10-22):
     - Expected end: fixed `expected_end`; flexible: actual start (not before the window opens) + `required_minutes`. Half-day leave halves the required minutes.
     - `early_minutes` = expected end − last presence, under the same grace and permission rules.
     - `overtime_minutes` = presence after the expected end, counted only if ≥ `overtime_min_minutes`. All presence on an off day or holiday is overtime.
-    - An `out` punch after midnight closes the open `in` of the previous day if within 6 hours; otherwise the day has a missing `out`.
+    - An `out` punch after midnight and before 06:00 closes the open `in` of the previous day (owner, 2026-10-22: 6 hours after midnight, however long the day); otherwise the day has a missing `out`.
 16. **Status.** `upcoming` before the day; `in_progress` while it runs; afterwards `present` (expectations met), `partial` (late, early or missing out), `absent` (a work day with no presence and no leave), `leave`, `holiday`, `off`.
 17. **Items.** Raised at the moment they become known (lateness at check-in; early leave at check-out, replaced if the employee checks in again; absence, missing out and overtime when the day ends). `proposed_fraction` comes from the tiers on the late or early minutes; absence proposes 1; the first lateness of the month proposes 0 (a warning) when `first_lateness_warning`. The employee gets `attendance_item_raised` and may justify the item until it is decided.
 18. **Deciding items** (`hr.approve`, owner: deductions only after approval).

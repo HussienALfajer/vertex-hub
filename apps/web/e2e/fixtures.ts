@@ -16525,6 +16525,7 @@ export function holidaysSeed(): Holiday[] {
 
 /** The seeded HR settings: the column defaults (spec, `hr_settings`). */
 const HR_SETTINGS: HrSettings = {
+  attendanceStartsOn: null,
   graceMinutes: 10,
   latenessTiers: [
     { upToMinutes: 30, fraction: 0.25 },

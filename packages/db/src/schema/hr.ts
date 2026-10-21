@@ -209,6 +209,8 @@ export const hrSettings = pgTable(
   {
     /** Always true: the table holds one row. */
     singleton: boolean('singleton').primaryKey().default(true),
+    /** Rule C1: null keeps attendance in trial. */
+    attendanceStartsOn: date('attendance_starts_on', { mode: 'string' }),
     graceMinutes: integer('grace_minutes').notNull().default(10),
     latenessTiers: jsonb('lateness_tiers')
       .$type<LatenessTier[]>()
@@ -255,8 +257,8 @@ export const ledgerEntryEnum = pgEnum('ledger_entry', LEDGER_ENTRIES);
 
 /**
  * Rules B8–B15: leave and permission requests. A permission's day is both `starts_on` and
- * `ends_on`; `days` and the split are a leave's only. A cancelled request keeps the canceller in
- * `decided_by_id`.
+ * `ends_on`; `days` and the split are a leave's only. A `passkey_replacement` (rule C9) is dated the
+ * day it was asked. A cancelled request keeps the canceller in `decided_by_id`.
  */
 export const hrRequests = pgTable(
   'hr_requests',
@@ -296,7 +298,8 @@ export const hrRequests = pgTable(
     check(
       'hr_requests_kind_check',
       sql`(${table.kind} = 'leave' and ${table.leaveType} is not null and ${table.fromTime} is null and ${table.toTime} is null and ${table.days} is not null)
-        or (${table.kind} = 'permission' and ${table.leaveType} is null and ${table.half} is null and ${table.startsOn} = ${table.endsOn} and ${table.fromTime} < ${table.toTime})`,
+        or (${table.kind} = 'permission' and ${table.leaveType} is null and ${table.half} is null and ${table.startsOn} = ${table.endsOn} and ${table.fromTime} < ${table.toTime})
+        or (${table.kind}::text = 'passkey_replacement' and ${table.leaveType} is null and ${table.half} is null and ${table.fromTime} is null and ${table.toTime} is null and ${table.days} is null and ${table.startsOn} = ${table.endsOn})`,
     ),
     check(
       'hr_requests_half_check',

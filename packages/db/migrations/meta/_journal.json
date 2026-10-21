@@ -561,6 +561,13 @@
       "when": 1792604427250,
       "tag": "0079_brown_micromax",
       "breakpoints": true
+    },
+    {
+      "idx": 80,
+      "version": "7",
+      "when": 1792620891146,
+      "tag": "0080_lethal_scorpion",
+      "breakpoints": true
     }
   ]
 }

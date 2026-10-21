@@ -25,6 +25,7 @@
     "@nestjs/core": "^12.1.0",
     "@nestjs/platform-express": "^12.1.0",
     "@nestjs/swagger": "^12.0.2",
+    "@simplewebauthn/server": "^14.0.3",
     "@thallesp/nestjs-better-auth": "^2.8.0",
     "@vertex-hub/contracts": "workspace:*",
     "@vertex-hub/db": "workspace:*",

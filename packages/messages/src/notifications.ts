@@ -427,6 +427,7 @@ export const NOTIFICATION_TEXT = {
   hr_request_submitted: {
     leave: 'طلب {{employee}} {{what}} {{dates}}',
     permission: 'طلب {{employee}} إذن مغادرة يوم {{dates}}',
+    passkey_replacement: 'طلب {{employee}} اعتماد مفتاح حضور على جهاز جديد',
   },
   hr_request_decided: {
     approved: 'وافقت الإدارة على طلبك: {{what}} {{dates}}',
@@ -442,6 +443,7 @@ export const NOTIFICATION_TEXT = {
     unpaid: 'إجازة بلا راتب',
   },
   permission: 'إذن مغادرة',
+  passkey: 'مفتاح الحضور الجديد',
   /** F16 rule B11: each escalation step wraps the original's text. */
   action_reminder: 'تذكير: {{text}}',
   action_escalated: 'تصعيد: {{text}}',
@@ -1235,18 +1237,19 @@ export function notificationText(
         text: fill(text.hr_request_submitted[kind], {
           employee,
           what: leaveType ? text.leaveTypes[leaveType] : text.permission,
-          dates: formatDays(startsOn, endsOn),
+          dates: kind === 'passkey_replacement' ? '' : formatDays(startsOn, endsOn),
         }),
         context: null,
       };
     }
     case 'hr_request_decided': {
-      const { decision, leaveType, startsOn, endsOn } = notification.data;
+      const { decision, kind, leaveType, startsOn, endsOn } = notification.data;
+      const passkey = kind === 'passkey_replacement';
       return {
         text: fill(text.hr_request_decided[decision], {
-          what: leaveType ? text.leaveTypes[leaveType] : text.permission,
-          dates: formatDays(startsOn, endsOn),
-        }),
+          what: leaveType ? text.leaveTypes[leaveType] : passkey ? text.passkey : text.permission,
+          dates: passkey ? '' : formatDays(startsOn, endsOn),
+        }).trim(),
         context: null,
       };
     }

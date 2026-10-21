@@ -303,6 +303,7 @@ describe('module boundaries', () => {
   const TABLE_OWNERS: Record<string, string | null> = {
     announcements: 'announcements',
     approvals: 'approvals',
+    attendance: 'hr',
     audit: 'audit',
     auth: 'auth',
     calendar: 'calendar',

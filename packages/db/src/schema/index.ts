@@ -1,5 +1,6 @@
 export * from './announcements.js';
 export * from './approvals.js';
+export * from './attendance.js';
 export * from './audit.js';
 export * from './auth.js';
 export * from './calendar.js';

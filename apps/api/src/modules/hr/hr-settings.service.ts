@@ -1,9 +1,11 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { type HrSettings, hrSettingsSchema } from '@vertex-hub/contracts';
+import { businessDate, type HrSettings, hrSettingsSchema } from '@vertex-hub/contracts';
 import { type Database, hrSettings, type Transaction } from '@vertex-hub/db';
 import { DATABASE } from '../../core/database/database.module.js';
+import { CodedException } from '../../core/errors/index.js';
 import { type AuditActor, changedFields, recordAudit } from '../audit/index.js';
 import type { CurrentUserInfo } from '../auth/index.js';
+import { AttendanceDays } from './attendance-days.js';
 
 type SettingsRow = typeof hrSettings.$inferSelect;
 
@@ -24,10 +26,16 @@ const toSettings = (row: SettingsRow): HrSettings => ({
   })),
 });
 
-/** The HR settings (spec, `hr_settings`): read with `hr.read`, replaced with `hr.manage`. */
+/**
+ * The HR settings (spec, `hr_settings`): read with `hr.read`, replaced with `hr.manage`. Moving
+ * the attendance start date (rule C1) recomputes the days it moves in or out of the trial.
+ */
 @Injectable()
 export class HrSettingsService {
-  constructor(@Inject(DATABASE) private readonly db: Database) {}
+  constructor(
+    @Inject(DATABASE) private readonly db: Database,
+    private readonly days: AttendanceDays,
+  ) {}
 
   /** The settings row, seeded by its migration; `forUpdate` locks it. */
   async row(
@@ -49,6 +57,11 @@ export class HrSettingsService {
       const current = await this.row(tx, { forUpdate: true });
       const changes = changedFields(toSettings(current), input);
       if (!changes) return current;
+      const startMoved = 'attendanceStartsOn' in changes.after;
+      // Rule C1: the start date is set to today or later.
+      if (startMoved && input.attendanceStartsOn && input.attendanceStartsOn < businessDate()) {
+        throw new CodedException(400, 'INVALID_DATES', 'Attendance starts today or later');
+      }
       const [updated] = await tx
         .update(hrSettings)
         .set({ ...changes.after, updatedAt: new Date(), updatedById: actor.id })
@@ -61,6 +74,12 @@ export class HrSettingsService {
         before: changes.before,
         after: changes.after,
       });
+      // Days on and after the earlier of the two dates leave or enter the trial.
+      const moved = [current.attendanceStartsOn, input.attendanceStartsOn].filter(
+        (date): date is string => !!date,
+      );
+      const from = moved.sort()[0];
+      if (startMoved && from) await this.days.refreshFrom(tx, from);
       return updated ?? current;
     });
     return toSettings(row);

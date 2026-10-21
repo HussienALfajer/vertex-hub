@@ -236,6 +236,7 @@ describe('public holidays (rule B3)', () => {
 
 describe('HR settings', () => {
   const defaults = {
+    attendanceStartsOn: null,
     graceMinutes: 10,
     latenessTiers: [
       { upToMinutes: 30, fraction: 0.25 },
