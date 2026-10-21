@@ -42,6 +42,7 @@ Short records of decisions that shape the system. Each has a status: **Accepted*
 | [0036](0036-installable-app-and-web-push.md) | Installable app and Web Push: a service worker, one subscription per session, sent by the worker | Accepted |
 | [0037](0037-notification-engine-2.md) | Notification engine 2.0: priorities, channel policy, self-resolving rows, escalation and a minute job | Accepted |
 | [0038](0038-announcements-and-audiences.md) | Announcements and one audience resolver | Accepted |
+| [0039](0039-hr-attendance-proof-and-leave-ledger.md) | HR: one module, attendance proved by a rotating code, a passkey and the office network, leave as a ledger | Accepted |
 
 Template:
 
