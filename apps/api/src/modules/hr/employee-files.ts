@@ -1,8 +1,9 @@
 import { Inject, Injectable, type OnModuleInit } from '@nestjs/common';
-import { DEFAULT_ANNUAL_LEAVE_DAYS } from '@vertex-hub/contracts';
+import { businessDate, DEFAULT_ANNUAL_LEAVE_DAYS } from '@vertex-hub/contracts';
 import { type Database, employeeFiles, type Transaction, workSchedules } from '@vertex-hub/db';
 import { and, eq, isNull } from 'drizzle-orm';
 import { DATABASE } from '../../core/database/database.module.js';
+import { recordAudit } from '../audit/index.js';
 import { UserDirectory, UserLifecycle, type UserProfile } from '../auth/index.js';
 
 type Executor = Database | Transaction;
@@ -31,11 +32,31 @@ export class EmployeeFiles implements OnModuleInit {
           .set({ archivedAt: new Date() })
           .where(and(eq(employeeFiles.userId, userId), isNull(employeeFiles.archivedAt)));
       },
-      restored: async (tx, userId) => {
-        await tx
+      restored: async (tx, userId, actor) => {
+        const [file] = await tx
           .update(employeeFiles)
           .set({ archivedAt: null })
-          .where(eq(employeeFiles.userId, userId));
+          .where(eq(employeeFiles.userId, userId))
+          .returning();
+        // An end of service up to today belongs to the archived account: a restored
+        // (rehired) user starts without it, so the daily job does not archive them again.
+        if (file?.endedOn && file.endedOn <= businessDate()) {
+          const before = {
+            endedOn: file.endedOn,
+            endReason: file.endReason,
+            endNote: file.endNote,
+          };
+          const cleared = { endedOn: null, endReason: null, endNote: null };
+          await tx.update(employeeFiles).set(cleared).where(eq(employeeFiles.id, file.id));
+          await recordAudit(tx, {
+            actor,
+            action: 'employee_file.service_end_cleared',
+            entityType: 'employee_file',
+            entityId: userId,
+            before,
+            after: cleared,
+          });
+        }
       },
     });
   }

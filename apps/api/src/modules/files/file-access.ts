@@ -137,12 +137,12 @@ export function assertVisible(owner: FileOwner, item: ItemRow): void {
 export function canEdit(owner: FileOwner, item: ItemRow): boolean {
   if (item.role === 'deliverable') return owner.rights.addDeliverable;
   if (item.role === 'reference') return false;
-  return managesDocument(owner, item);
+  return managesDocument(owner);
 }
 
-/** The manage right over one document; a confidential-only manager's covers confidential ones. */
-const managesDocument = (owner: FileOwner, item: ItemRow) =>
-  owner.rights.manageDocuments && (!owner.rights.confidentialOnly || item.confidential);
+/** The manage right over one document; a confidential-only actor only adds documents. */
+const managesDocument = (owner: FileOwner) =>
+  owner.rights.manageDocuments && !owner.rights.confidentialOnly;
 
 export function canRemoveItem(actor: CurrentUserInfo, owner: FileOwner, item: ItemRow): boolean {
   const { rights } = owner;
@@ -152,7 +152,7 @@ export function canRemoveItem(actor: CurrentUserInfo, owner: FileOwner, item: It
     case 'reference':
       return rights.manageTask || item.createdById === actor.id;
     default:
-      return managesDocument(owner, item);
+      return managesDocument(owner);
   }
 }
 
@@ -170,7 +170,7 @@ export function canRemoveVersionBy(
     case 'reference':
       return false;
     default:
-      return managesDocument(owner, item);
+      return managesDocument(owner);
   }
 }
 

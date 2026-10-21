@@ -24,8 +24,9 @@ export interface FileOwnerRights {
   /** Sees and flags confidential documents of the owner's client. */
   confidentialReader: boolean;
   /**
-   * Sees confidential documents only, and `manageDocuments` covers them only: what this actor
-   * adds is confidential (F17 rule A6: `salaries.read` holders without `employees.read`).
+   * Sees confidential documents only, and `manageDocuments` lets them add confidential documents
+   * only, never rename, version or remove one (F17 rule A6: `salaries.read` holders without
+   * `employees.manage`).
    */
   confidentialOnly?: boolean;
   /** Scope `all` of the owner's manage permission: sees removed files and restores them. */

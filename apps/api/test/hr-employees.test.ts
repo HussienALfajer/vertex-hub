@@ -115,6 +115,9 @@ describe('HR employee files (F17 part A)', () => {
     expect((await client.post(`/api/hr/employees/${id}/salaries`, undefined, {})).status).toBe(401);
     expect((await client.post(`/api/hr/employees/${id}/end`, undefined, {})).status).toBe(401);
     expect((await client.request('DELETE', `/api/hr/employees/${id}/end`)).status).toBe(401);
+    expect(
+      (await client.post('/api/hr/salaries/01900000-0000-7000-8000-000000000000/archive')).status,
+    ).toBe(401);
   });
 
   describe('People and the file (rule A2)', () => {
@@ -403,7 +406,20 @@ describe('HR employee files (F17 part A)', () => {
       expect((await create(finance, 'صورة الهوية', false)).status).toBe(403);
       const confidential = await create(finance, 'كشف الراتب', true);
       expect(confidential.status, await confidential.clone().text()).toBe(201);
-      expect(fileItemSchema.parse(await confidential.json()).confidential).toBe(true);
+      const added = fileItemSchema.parse(await confidential.json());
+      expect(added.confidential).toBe(true);
+      // Archiving and renaming stay with employees.manage.
+      expect(
+        (await client.post(`/api/files/items/${added.id}/archive`, finance.cookie)).status,
+      ).toBe(403);
+      expect(
+        (
+          await client.request('PATCH', `/api/files/items/${added.id}`, {
+            cookie: finance.cookie,
+            body: { name: 'كشف' },
+          })
+        ).status,
+      ).toBe(403);
       expect((await create(employee, 'شهادة', false)).status).toBe(403);
     });
 
@@ -468,6 +484,22 @@ describe('HR employee files (F17 part A)', () => {
       );
       expect((await end(finance, { endedOn: today, reason: 'resigned' })).status).toBe(403);
       expect((await end(employee, { endedOn: today, reason: 'resigned' })).status).toBe(403);
+      for (const person of [finance, employee]) {
+        const response = await client.request('DELETE', `/api/hr/employees/${employee.id}/end`, {
+          cookie: person.cookie,
+        });
+        expect(response.status).toBe(403);
+      }
+    });
+
+    it('refuses a last day before the start date', async () => {
+      expect((await patch(ops, employee.id, { startDate: addDays(today, 10) })).status).toBe(200);
+      await expectError(
+        await end(ops, { endedOn: addDays(today, 3), reason: 'resigned' }),
+        400,
+        'INVALID_DATES',
+      );
+      expect((await patch(ops, employee.id, { startDate: null })).status).toBe(200);
     });
 
     it('sets the last day, tells GMs, Ops and the department managers, and can be undone', async () => {
@@ -515,6 +547,16 @@ describe('HR employee files (F17 part A)', () => {
       expect((await file(gm, employee.id)).status).toBe('ended');
       expect((await daily.runDaily(addDays(today, 2))).archived).toBe(0);
       await expectError(await patch(ops, employee.id, { address: 'حمص' }), 409, 'USER_ARCHIVED');
+    });
+
+    it('clears a passed end of service when the account is restored (a rehire)', async () => {
+      expect((await client.post(`/api/users/${employee.id}/restore`, gm.cookie)).status).toBe(200);
+      const restored = await file(gm, employee.id);
+      expect(restored.status).toBe('active');
+      expect(restored.employment).toMatchObject({ endedOn: null, endReason: null });
+      expect((await daily.runDaily(addDays(today, 3))).archived).toBe(0);
+      const [account] = await db.select().from(users).where(eq(users.id, employee.id));
+      expect(account?.archivedAt).toBeNull();
     });
   });
 

@@ -6,10 +6,9 @@ import {
   auditListQuerySchema,
   auditPageSchema,
   hasPermission,
+  type UserAccess,
 } from '@vertex-hub/contracts';
 import { RequirePermissions } from '../../core/access/index.js';
-// A type only: `auth` imports this module, so nothing of it is loaded here.
-import type { RequestWithUser } from '../auth/current-user.decorator.js';
 import { AuditService } from './audit.service.js';
 
 @ApiTags('audit')
@@ -23,7 +22,8 @@ export class AuditController {
   @ApiOkResponse({ description: 'Audit entries, newest first', standardSchema: auditPageSchema })
   list(
     @Query({ schema: auditListQuerySchema }) query: AuditListQuery,
-    @Req() request: RequestWithUser,
+    // The permissions guard's user; `audit` does not depend on `auth` (docs/architecture.md).
+    @Req() request: { currentUser?: { access: UserAccess } },
   ): Promise<AuditPage> {
     // F17: salary amounts and payout details are for `salaries.read` holders only.
     const access = request.currentUser?.access;

@@ -199,7 +199,7 @@ export class UsersService {
       if (roles.length > 0) {
         await tx.insert(userRoles).values(roles.map((role) => ({ userId: id, role })));
       }
-      await this.lifecycle.run('created', tx, id);
+      await this.lifecycle.run('created', tx, id, actorOf(actor));
       await recordAudit(tx, {
         actor: actorOf(actor),
         action: 'user.created',
@@ -296,7 +296,7 @@ export class UsersService {
     await this.links.revoke(tx, id);
     // F14 email edge case 6: the only email an archived user gets.
     await this.emails.securityNotice(tx, id, 'archived', actor?.name ?? SYSTEM_ACTOR);
-    await this.lifecycle.run('archived', tx, id);
+    await this.lifecycle.run('archived', tx, id, actor);
     await recordAudit(tx, {
       actor,
       action: 'user.archived',
@@ -316,7 +316,7 @@ export class UsersService {
         throw new CodedException(409, 'USER_NOT_ARCHIVED', 'The user is not archived');
       }
       await tx.update(users).set({ archivedAt: null }).where(eq(users.id, id));
-      await this.lifecycle.run('restored', tx, id);
+      await this.lifecycle.run('restored', tx, id, actorOf(actor));
       // The user sets a new password through the activation link.
       await tx
         .delete(accounts)
