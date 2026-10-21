@@ -66,7 +66,8 @@ Build order (owner, 2026-09-30): F10 → F09 → F08 → F11. F09 approves exact
 ## V2 — Hub track
 Order and directions: `docs/product/v2-scope.md` §3–4. Each feature starts with a `/spec` session: full analysis, every possible feature, the owner's questions, then the spec.
 - [x] F16 Notifications 2.0, installable app and announcements (spec `docs/specs/F16-notifications-app-announcements.md`, ADRs 0036–0038): Web Push, sessions of 30 days and priorities in the catalog (A1); the installable app, offline cache, install guide and device push (A2); the engine: channel policy, inboxes, self-resolving notifications, snooze, followers, escalation and the minute job (B1, B2); the full catalog across the modules (C1, C1b, C1c, C2); announcements, audiences, polls and templates (D1, D1b) and their screens with the rich-text editor and the audience picker (D2); owner acceptance passed
-- [ ] Production deploy of F16 (once, after every part is merged; VAPID keys in the server's `.env`), then the contract release that drops `notification_settings.email_types`
+- [x] Production deploy of F16 (once, after every part is merged; VAPID keys in the server's `.env`): deployed 2026-10-21 (48e3084), migrations 0066–0074
+- [ ] F16 contract release: drop `notification_settings.email_types`
 - [ ] F17 HR: employee files, attendance and leave
 - [ ] F18 Accounting through Vertex Mizan: integration, purchases for clients, profitability (starts when Mizan's posting API is stable, ADR 0035; Q17)
 - [ ] F19 HR: payroll, commissions and profit shares (Q15, Q16)
