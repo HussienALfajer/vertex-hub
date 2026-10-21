@@ -21,6 +21,8 @@ export const FILE_OWNER_TYPES = [
   'retainer_contract',
   /** F16 part D. */
   'announcement',
+  /** F17: an employee file's documents, keyed by the user id. */
+  'employee',
 ] as const;
 
 export const fileOwnerTypeSchema = z.enum(FILE_OWNER_TYPES).meta({ id: 'FileOwnerType' });
@@ -45,6 +47,7 @@ export const FILE_ROLES_BY_OWNER: Record<FileOwnerType, readonly FileRole[]> = {
   ad_wallet_entry: ['document'],
   retainer_contract: ['document'],
   announcement: ['attachment'],
+  employee: ['document'],
 };
 
 export const brandFileKindSchema = z.enum(BRAND_FILE_KINDS).meta({ id: 'BrandFileKind' });

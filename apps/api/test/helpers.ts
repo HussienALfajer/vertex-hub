@@ -30,6 +30,7 @@ import {
   departments,
   emailDigests,
   emailMessages,
+  employeeFiles,
   extraWorkItems,
   fileItems,
   fileUploads,
@@ -71,6 +72,7 @@ import {
   retainers,
   retainerTemplates,
   retainerTerms,
+  salaryChanges,
   shootCrew,
   shootShots,
   shoots,
@@ -234,6 +236,8 @@ export async function removeUsers(db: Database, ids: string[]): Promise<void> {
     db,
     or(
       inArray(fileItems.createdById, ids),
+      // F17: the documents of their employee files.
+      inArray(fileItems.employeeId, ids),
       inArray(
         fileItems.id,
         touched.map((row) => row.id),
@@ -241,6 +245,11 @@ export async function removeUsers(db: Database, ids: string[]): Promise<void> {
     ) as SQL,
   );
   await db.delete(fileUploads).where(inArray(fileUploads.userId, ids));
+  // F17: the employee file and salary history of each user, and the changes they recorded.
+  await db
+    .delete(salaryChanges)
+    .where(or(inArray(salaryChanges.userId, ids), inArray(salaryChanges.createdById, ids)));
+  await db.delete(employeeFiles).where(inArray(employeeFiles.userId, ids));
   // Announcements point at their author and who withdrew them, recipients at the user (F16).
   await removeAnnouncements(
     db,

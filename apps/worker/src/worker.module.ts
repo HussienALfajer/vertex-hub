@@ -13,6 +13,7 @@ import { EmailPurgeJob } from './jobs/email-purge.job.js';
 import { EmailSendJob } from './jobs/email-send.job.js';
 import { FilesPurgeUploadsJob } from './jobs/files-purge-uploads.job.js';
 import { HeartbeatJob } from './jobs/heartbeat.job.js';
+import { HrDailyJob } from './jobs/hr-daily.job.js';
 import { InvoicesDailyJob } from './jobs/invoices-daily.job.js';
 import { InvoicesPdfJob } from './jobs/invoices-pdf.job.js';
 import { NotificationsDailyJob } from './jobs/notifications-daily.job.js';
@@ -50,6 +51,7 @@ import { PushSender } from './push/push-sender.js';
     ApprovalsRemindersJob,
     QuotesDailyJob,
     InvoicesDailyJob,
+    HrDailyJob,
     PdfRenderer,
     QuotesPdfJob,
     InvoicesPdfJob,

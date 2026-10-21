@@ -25,6 +25,7 @@ import {
   userRoles,
   users,
 } from '@vertex-hub/db';
+import { SYSTEM_ACTOR } from '@vertex-hub/messages';
 import {
   and,
   asc,
@@ -48,6 +49,7 @@ import type { CurrentUserInfo } from './current-user.decorator.js';
 import { resetTwoFactor } from './reset-two-factor.js';
 import { ResponsibilityRegistry } from './responsibility-registry.js';
 import { UserDirectory } from './user-directory.js';
+import { UserLifecycle } from './user-lifecycle.js';
 import { UserLinksService } from './user-links.service.js';
 import { hasPassword, lockAccessChanges, statusOf } from './user-status.js';
 
@@ -88,6 +90,7 @@ export class UsersService {
     private readonly emails: AccountEmails,
     private readonly notices: AccountNotices,
     private readonly directory: UserDirectory,
+    private readonly lifecycle: UserLifecycle,
   ) {}
 
   async list(actor: CurrentUserInfo, query: UserListQuery): Promise<UserPage> {
@@ -196,6 +199,7 @@ export class UsersService {
       if (roles.length > 0) {
         await tx.insert(userRoles).values(roles.map((role) => ({ userId: id, role })));
       }
+      await this.lifecycle.run('created', tx, id);
       await recordAudit(tx, {
         actor: actorOf(actor),
         action: 'user.created',
@@ -256,27 +260,52 @@ export class UsersService {
       if (id === actor.id) {
         throw new CodedException(409, 'CANNOT_ARCHIVE_SELF', 'You cannot archive yourself');
       }
-      if (user.roles.includes('general_manager') && user.status === 'active') {
-        await this.assertAnotherActiveGeneralManager(tx, id);
-      }
-      this.assertNoResponsibilities(await this.responsibilitiesOf(tx, id));
-      const openWork = await this.responsibilities.openWork(tx, id);
-      await tx.update(users).set({ archivedAt: new Date() }).where(eq(users.id, id));
-      await tx.delete(sessions).where(eq(sessions.userId, id));
-      await this.links.revoke(tx, id);
-      // F14 email edge case 6: the only email an archived user gets.
-      await this.emails.securityNotice(tx, id, 'archived', actor.name);
-      await recordAudit(tx, {
-        actor: actorOf(actor),
-        action: 'user.archived',
-        entityType: 'user',
-        entityId: id,
-        before: { status: user.status },
-        after: { status: 'archived' },
-      });
-      if (openWork > 0) await this.notifyOpenWork(tx, actor, user, openWork);
+      await this.archiveLoaded(tx, actorOf(actor), user);
     });
     return this.detail(actor, id);
+  }
+
+  /**
+   * F17 rule A8: the daily job archives an account whose service ended, as the system. Returns
+   * false when it was already archived.
+   */
+  async archiveBySystem(tx: Transaction, id: string): Promise<boolean> {
+    await lockAccessChanges(tx);
+    await tx.select({ id: users.id }).from(users).where(eq(users.id, id)).for('update');
+    const user = (await this.load(tx, [id])).get(id);
+    if (!user) throw new NotFoundException();
+    if (user.status === 'archived') return false;
+    await this.archiveLoaded(tx, null, user);
+    return true;
+  }
+
+  /** F01 rule 9 and F16 part C: the archive itself, once the actor's rights are checked. */
+  private async archiveLoaded(
+    tx: Transaction,
+    actor: AuditActor | null,
+    user: LoadedUser,
+  ): Promise<void> {
+    const { id } = user;
+    if (user.roles.includes('general_manager') && user.status === 'active') {
+      await this.assertAnotherActiveGeneralManager(tx, id);
+    }
+    this.assertNoResponsibilities(await this.responsibilitiesOf(tx, id));
+    const openWork = await this.responsibilities.openWork(tx, id);
+    await tx.update(users).set({ archivedAt: new Date() }).where(eq(users.id, id));
+    await tx.delete(sessions).where(eq(sessions.userId, id));
+    await this.links.revoke(tx, id);
+    // F14 email edge case 6: the only email an archived user gets.
+    await this.emails.securityNotice(tx, id, 'archived', actor?.name ?? SYSTEM_ACTOR);
+    await this.lifecycle.run('archived', tx, id);
+    await recordAudit(tx, {
+      actor,
+      action: 'user.archived',
+      entityType: 'user',
+      entityId: id,
+      before: { status: user.status },
+      after: { status: 'archived' },
+    });
+    if (openWork > 0) await this.notifyOpenWork(tx, actor?.id ?? null, user, openWork);
   }
 
   /** Restores an archived user as invited, with a new activation link (F01 rule 11). */
@@ -287,6 +316,7 @@ export class UsersService {
         throw new CodedException(409, 'USER_NOT_ARCHIVED', 'The user is not archived');
       }
       await tx.update(users).set({ archivedAt: null }).where(eq(users.id, id));
+      await this.lifecycle.run('restored', tx, id);
       // The user sets a new password through the activation link.
       await tx
         .delete(accounts)
@@ -617,7 +647,7 @@ export class UsersService {
    */
   private async notifyOpenWork(
     tx: Transaction,
-    actor: CurrentUserInfo,
+    actorId: string | null,
     member: LoadedUser,
     count: number,
   ): Promise<void> {
@@ -632,7 +662,7 @@ export class UsersService {
         type: 'member_archived_open_work',
         recipients:
           managers.length > 0 ? managers : await this.directory.withRole('general_manager', tx),
-        actorId: actor.id,
+        actorId,
         subjectId: member.id,
         data: { member: member.name, count },
       },

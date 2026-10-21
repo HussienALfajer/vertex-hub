@@ -23,6 +23,11 @@ export interface FileOwnerRights {
   manageDocuments: boolean;
   /** Sees and flags confidential documents of the owner's client. */
   confidentialReader: boolean;
+  /**
+   * Sees confidential documents only, and `manageDocuments` covers them only: what this actor
+   * adds is confidential (F17 rule A6: `salaries.read` holders without `employees.read`).
+   */
+  confidentialOnly?: boolean;
   /** Scope `all` of the owner's manage permission: sees removed files and restores them. */
   scopeAll: boolean;
 }
@@ -45,6 +50,7 @@ export interface FileOwner {
     | 'RETAINER_ARCHIVED'
     | 'POST_ARCHIVED'
     | 'QUOTE_LOCKED'
+    | 'USER_ARCHIVED'
   > | null;
   /** For tasks: the status (rule 5) and what the `task_file_added` notification needs. */
   task: {

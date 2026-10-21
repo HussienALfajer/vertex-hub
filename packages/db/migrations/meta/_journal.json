@@ -526,6 +526,20 @@
       "when": 1792534316958,
       "tag": "0074_chilly_gauntlet",
       "breakpoints": true
+    },
+    {
+      "idx": 75,
+      "version": "7",
+      "when": 1792581690274,
+      "tag": "0075_groovy_vanisher",
+      "breakpoints": true
+    },
+    {
+      "idx": 76,
+      "version": "7",
+      "when": 1792581716730,
+      "tag": "0076_f17_hr_backfill",
+      "breakpoints": true
     }
   ]
 }

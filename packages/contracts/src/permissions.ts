@@ -48,6 +48,14 @@ export const PERMISSIONS = [
   'audit.read',
   'notifications.policy',
   'announcements.manage',
+  'employees.read',
+  'employees.manage',
+  'salaries.read',
+  'salaries.manage',
+  'payouts.manage',
+  'hr.read',
+  'hr.manage',
+  'hr.approve',
 ] as const;
 
 export const permissionSchema = z.enum(PERMISSIONS).meta({ id: 'Permission' });
@@ -85,6 +93,8 @@ export const PERMISSION_MAP: Readonly<Record<Role, Grants>> = {
     'reports.read': 'department',
     // F16 part D: critical and pinned announcements to the members of their departments.
     'announcements.manage': 'department',
+    // F17: the attendance and leave of the members of their departments.
+    'hr.read': 'department',
   },
   employee: {
     'users.read': 'all',
@@ -132,6 +142,9 @@ export const PERMISSION_MAP: Readonly<Record<Role, Grants>> = {
     'payments.manage': 'all',
     'expenses.manage': 'all',
     'reports.finance': 'all',
+    // F17: salaries and payout methods.
+    'salaries.read': 'all',
+    'payouts.manage': 'all',
   },
 };
 
@@ -172,6 +185,11 @@ export const DEPARTMENT_CAPABILITIES: Readonly<
       'expenses.manage': 'all',
       'reports.read': 'all',
       'reports.finance': 'all',
+      // F17: employee files without pay, attendance, leave and the HR rules.
+      'employees.read': 'all',
+      'employees.manage': 'all',
+      'hr.read': 'all',
+      'hr.manage': 'all',
     },
   },
   content_management: {

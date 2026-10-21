@@ -601,3 +601,39 @@ describe('catalog and quotes (F04)', () => {
     }
   });
 });
+
+describe('HR (F17)', () => {
+  const opsManager = access(['employee'], [{ code: 'internal_operations', isManager: true }]);
+  const designManager = access(
+    ['employee', 'department_manager'],
+    [{ code: 'design', isManager: true }],
+  );
+
+  it('gives employee files without pay to the General Manager and the Operations manager', () => {
+    for (const permission of [
+      'employees.read',
+      'employees.manage',
+      'hr.read',
+      'hr.manage',
+    ] as const) {
+      expect(permissionScopes(opsManager, permission)).toEqual(['all']);
+    }
+    expect(hasPermission(opsManager, 'salaries.read')).toBe(false);
+    expect(hasPermission(opsManager, 'payouts.manage')).toBe(false);
+  });
+
+  it('gives salaries and payout methods to Finance, and salary changes to the General Manager only', () => {
+    expect(permissionScopes(access(['finance']), 'salaries.read')).toEqual(['all']);
+    expect(permissionScopes(access(['finance']), 'payouts.manage')).toEqual(['all']);
+    expect(hasPermission(access(['finance']), 'employees.read')).toBe(false);
+    const others = ROLES.filter((role) => role !== 'general_manager');
+    expect(hasPermission(access(others), 'salaries.manage')).toBe(false);
+    expect(hasPermission(access(others), 'hr.approve')).toBe(false);
+  });
+
+  it('lets department managers read the attendance and leave of their departments only', () => {
+    expect(permissionScopes(designManager, 'hr.read')).toEqual(['department']);
+    expect(hasPermission(designManager, 'employees.read')).toBe(false);
+    expect(hasPermission(access(['employee']), 'hr.read')).toBe(false);
+  });
+});

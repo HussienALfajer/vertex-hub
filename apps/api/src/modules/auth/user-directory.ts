@@ -1,5 +1,11 @@
 import { Inject, Injectable } from '@nestjs/common';
-import type { AudienceMember, DepartmentCode, Role, UserAccess } from '@vertex-hub/contracts';
+import type {
+  AudienceMember,
+  DepartmentCode,
+  Role,
+  UserAccess,
+  UserDepartment,
+} from '@vertex-hub/contracts';
 import {
   type Database,
   departmentMembers,
@@ -9,7 +15,20 @@ import {
   userRoles,
   users,
 } from '@vertex-hub/db';
-import { and, asc, eq, gt, inArray, isNotNull, isNull, or, type SQL } from 'drizzle-orm';
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  gt,
+  ilike,
+  inArray,
+  isNotNull,
+  isNull,
+  or,
+  type SQL,
+  sql,
+} from 'drizzle-orm';
 import { DATABASE } from '../../core/database/database.module.js';
 import { resolveAccess } from './resolve-access.js';
 import { hasPassword } from './user-status.js';
@@ -43,6 +62,23 @@ export interface UserSummary {
   archived: boolean;
 }
 
+const escapeLike = (value: string) => value.replace(/[\\%_]/g, (char) => `\\${char}`);
+
+/** A user as an HR file shows them (F17): name, title and departments, primary first. */
+export interface UserProfile extends UserSummary {
+  title: string | null;
+  departments: UserDepartment[];
+}
+
+/** Which users `profiles` returns; every filter given must match. */
+export interface ProfileFilter {
+  ids?: readonly string[];
+  /** Matches the name or the email. */
+  search?: string;
+  departmentId?: string;
+  archived?: boolean;
+}
+
 /** Users as other modules may see them: names, status and roles, never the tables. */
 @Injectable()
 export class UserDirectory {
@@ -59,6 +95,69 @@ export class UserDirectory {
     return new Map<string, UserSummary>(
       rows.map((row) => [row.id, { id: row.id, name: row.name, archived: !!row.archivedAt }]),
     );
+  }
+
+  /** The matching users, archived ones included unless filtered, sorted by name. */
+  async profiles(
+    filter: ProfileFilter,
+    executor: Database | Transaction = this.db,
+  ): Promise<UserProfile[]> {
+    if (filter.ids?.length === 0) return [];
+    const filters: SQL[] = [];
+    if (filter.ids) filters.push(inArray(users.id, [...filter.ids]));
+    if (filter.search) {
+      const pattern = `%${escapeLike(filter.search)}%`;
+      filters.push(or(ilike(users.name, pattern), ilike(users.email, pattern)) as SQL);
+    }
+    if (filter.departmentId) {
+      filters.push(sql`exists (select 1 from ${departmentMembers}
+        where ${departmentMembers.userId} = ${users.id}
+          and ${departmentMembers.departmentId} = ${filter.departmentId})`);
+    }
+    if (filter.archived !== undefined) {
+      filters.push(filter.archived ? isNotNull(users.archivedAt) : isNull(users.archivedAt));
+    }
+    const rows = await executor
+      .select({
+        id: users.id,
+        name: users.name,
+        title: users.title,
+        archivedAt: users.archivedAt,
+      })
+      .from(users)
+      .where(and(...filters))
+      .orderBy(asc(users.name), asc(users.id));
+    if (rows.length === 0) return [];
+    const memberships = await executor
+      .select({
+        userId: departmentMembers.userId,
+        id: departments.id,
+        code: departments.code,
+        name: departments.name,
+        isPrimary: departmentMembers.isPrimary,
+        managerId: departments.managerId,
+      })
+      .from(departmentMembers)
+      .innerJoin(departments, eq(departments.id, departmentMembers.departmentId))
+      .where(
+        inArray(
+          departmentMembers.userId,
+          rows.map((row) => row.id),
+        ),
+      )
+      .orderBy(desc(departmentMembers.isPrimary), asc(departments.name));
+    return rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      title: row.title,
+      archived: !!row.archivedAt,
+      departments: memberships
+        .filter((m) => m.userId === row.id)
+        .map(({ userId, managerId, ...department }) => ({
+          ...department,
+          isManager: managerId === userId,
+        })),
+    }));
   }
 
   /** The signature of a user, archived or not; null when there is no such user. */
