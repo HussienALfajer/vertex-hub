@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/index.js';
 import { ClientsModule } from '../clients/index.js';
+import { HrModule } from '../hr/index.js';
 import { InvoicesModule } from '../invoices/index.js';
 import { NotificationsModule } from '../notifications/index.js';
 import { ProjectsModule } from '../projects/index.js';
@@ -24,7 +25,7 @@ import { ShootsService } from './shoots.service.js';
  * cancels shoot tasks and creates editing tasks through `tasks`' `ShootTasks`, and registers into
  * its `TaskGuards` so a scheduled shoot holds its task; reads users through `auth`'s
  * `UserDirectory` (and registers into its `ResponsibilityRegistry`), clients through
- * `ClientDirectory` and key dates through `projects`' `EngagementDirectory` and `invoices`' `InvoiceDueDates`; sends the calendar
+ * `ClientDirectory` and key dates through `projects`' `EngagementDirectory`, `invoices`' `InvoiceDueDates` and `hr`'s `HolidayCalendar`; sends the calendar
  * notifications through `notifications` and registers its reminder sources in the daily job. Exports
  * the read-only `ShootReports` for `reports` (F15). `tasks`, `clients`, `projects` and `auth` never
  * import it.
@@ -33,6 +34,7 @@ import { ShootsService } from './shoots.service.js';
   imports: [
     AuthModule,
     ClientsModule,
+    HrModule,
     InvoicesModule,
     NotificationsModule,
     ProjectsModule,

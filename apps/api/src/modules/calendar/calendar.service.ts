@@ -7,6 +7,7 @@ import {
   type CalendarQuery,
   type ConflictList,
   type ConflictQuery,
+  daysInclusive,
   KEY_DATE_KINDS,
   type KeyDate,
 } from '@vertex-hub/contracts';
@@ -15,6 +16,7 @@ import { and, asc, eq, gt, inArray, isNull, lt, or } from 'drizzle-orm';
 import { DATABASE } from '../../core/database/database.module.js';
 import type { CurrentUserInfo } from '../auth/index.js';
 import { ClientDirectory } from '../clients/index.js';
+import { HolidayCalendar } from '../hr/index.js';
 import { InvoiceDueDates } from '../invoices/index.js';
 import { EngagementDirectory } from '../projects/index.js';
 import { MeetingsService } from './meetings.service.js';
@@ -32,6 +34,7 @@ export class CalendarService {
     private readonly engagements: EngagementDirectory,
     private readonly clients: ClientDirectory,
     private readonly invoiceDueDates: InvoiceDueDates,
+    private readonly holidays: HolidayCalendar,
   ) {}
 
   /**
@@ -100,7 +103,7 @@ export class CalendarService {
     const [shootItems, meetingItems, clients] = await Promise.all([
       this.shootsService.present(shootRows),
       this.meetingsService.present(meetingRows),
-      this.clients.summaries(keyDates.map((keyDate) => keyDate.clientId)),
+      this.clients.summaries(keyDates.flatMap((keyDate) => keyDate.clientId ?? [])),
     ]);
     return {
       from: query.from,
@@ -109,33 +112,50 @@ export class CalendarService {
       meetings: meetingItems,
       keyDates: keyDates.map(({ clientId, ...keyDate }) => ({
         ...keyDate,
-        client: {
-          id: clientId,
-          name: clients.get(clientId)?.name ?? '',
-          archived: clients.get(clientId)?.archived ?? false,
-        },
+        client: clientId
+          ? {
+              id: clientId,
+              name: clients.get(clientId)?.name ?? '',
+              archived: clients.get(clientId)?.archived ?? false,
+            }
+          : null,
       })),
     };
   }
 
   /**
-   * Rule 15's key dates by date: those of projects and retainers, and the due dates of the open
-   * invoices the actor may read (F13).
+   * Rule 15's key dates by date: those of projects and retainers, the due dates of the open
+   * invoices the actor may read (F13), and each day of a public holiday (F17 rule B16), which
+   * reaches everyone whatever the client and person filters.
    */
   private async keyDates(
     actor: CurrentUserInfo,
     query: CalendarQuery,
     wanted: (kind: CalendarKind) => boolean,
     userId: string | undefined,
-  ): Promise<(Omit<KeyDate, 'client'> & { clientId: string })[]> {
+  ): Promise<(Omit<KeyDate, 'client'> & { clientId: string | null })[]> {
     const range = { from: query.from, to: query.to, clientId: query.clientId, userId };
-    const [engagementDates, invoiceDates] = await Promise.all([
+    const [engagementDates, invoiceDates, holidays] = await Promise.all([
       this.engagements.keyDates({ ...range, kinds: KEY_DATE_KINDS.filter(wanted) }),
       wanted('invoice_due') ? this.invoiceDueDates.keyDates(actor, range) : [],
+      wanted('holiday') ? this.holidays.overlapping(query.from, query.to) : [],
     ]);
+    const holidayDates = holidays.flatMap((holiday) => {
+      const first = holiday.startsOn < query.from ? query.from : holiday.startsOn;
+      const last = holiday.endsOn > query.to ? query.to : holiday.endsOn;
+      return Array.from({ length: daysInclusive(first, last) }, (_, day) => ({
+        kind: 'holiday' as const,
+        date: addDays(first, day),
+        title: holiday.name,
+        targetId: holiday.id,
+        clientId: null,
+        invoiceStatus: null,
+      }));
+    });
     return [
       ...engagementDates.map((keyDate) => ({ ...keyDate, invoiceStatus: null })),
       ...invoiceDates,
+      ...holidayDates,
     ].sort(
       (a, b) =>
         a.date.localeCompare(b.date) ||

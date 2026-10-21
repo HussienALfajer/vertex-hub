@@ -323,6 +323,37 @@ for (const colorScheme of ['light', 'dark'] as const) {
         await screenshot(page, testInfo, `hr-my-file-${size}-${colorScheme}`);
       });
 
+      // F17 part B: HR settings (rules, schedules, holidays) and holidays on the calendar.
+      test(`HR settings (${size})`, async ({ page }, testInfo) => {
+        await page.setViewportSize({ width, height });
+        await page.clock.setFixedTime(new Date(HR_NOW));
+        const api = await mockApi(page, { signedIn: true, me: manager, holidays: true });
+        await page.goto('/hr/settings');
+        await expect(page.getByLabel(ar.hr.settings.fields.graceMinutes)).toHaveValue('10');
+        await screenshot(page, testInfo, `hr-settings-rules-${size}-${colorScheme}`);
+
+        await page.getByRole('tab', { name: ar.hr.settings.tabs.schedules }).click();
+        await expect(page.locator('[data-schedule="دوام مرن"]')).toBeVisible();
+        await screenshot(page, testInfo, `hr-schedules-${size}-${colorScheme}`);
+        await page.getByRole('button', { name: ar.hr.schedules.add }).click();
+        await expect(page.getByRole('dialog', { name: ar.hr.schedules.addTitle })).toBeVisible();
+        await screenshot(page, testInfo, `hr-schedule-dialog-${size}-${colorScheme}`);
+        await page.keyboard.press('Escape');
+
+        await page.getByRole('tab', { name: ar.hr.settings.tabs.holidays }).click();
+        await expect(page.locator('[data-holiday="عيد الأضحى"]')).toBeVisible();
+        await screenshot(page, testInfo, `hr-holidays-${size}-${colorScheme}`);
+        await page.getByRole('button', { name: ar.hr.holidays.add }).click();
+        await expect(page.getByRole('dialog', { name: ar.hr.holidays.addTitle })).toBeVisible();
+        await screenshot(page, testInfo, `hr-holiday-dialog-${size}-${colorScheme}`);
+        await page.keyboard.press('Escape');
+
+        api.signInAs(employeeMe);
+        await page.goto('/calendar?date=2026-05-26');
+        await expect(page.getByText('عيد الأضحى').filter({ visible: true }).first()).toBeVisible();
+        await screenshot(page, testInfo, `calendar-holiday-${size}-${colorScheme}`);
+      });
+
       // F16 screens 9–14: announcements, with the home pin and the critical dialog.
       test(`announcements (${size})`, async ({ page }, testInfo) => {
         await page.setViewportSize({ width, height });

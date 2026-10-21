@@ -7,6 +7,7 @@ import {
   type CreatePostTaskInput,
   createPostTaskSchema,
   type DepartmentCode,
+  type HolidayRange,
   isPostContentEditable,
   isPostOpen,
   POST_LIMITS,
@@ -70,6 +71,7 @@ import { formatNumber } from '../../lib/format';
 import { ALL } from '../../lib/search-params';
 import { useDebouncedValue } from '../../lib/use-search-text';
 import { useShownWhileClosing } from '../../lib/use-shown-while-closing';
+import { holidaysQuery } from '../hr/hr.queries';
 import { PersonName, useDepartmentNames } from '../projects/project-badges';
 import { lineName } from '../retainers/retainer-badges';
 import { formatDue, TaskStatusBadge } from '../tasks/task-badges';
@@ -387,7 +389,7 @@ function LinkTaskDialog({
             <ExistingTasks post={post} onDone={onClose} onRequest={() => setTab('request')} />
           </TabsContent>
           <TabsContent value="request">
-            <RequestTask post={post} onDone={onClose} />
+            <RequestTaskWithHolidays post={post} onDone={onClose} />
           </TabsContent>
         </Tabs>
       </DialogContent>
@@ -530,11 +532,36 @@ function ExistingTasks({
 const NO_LINE = 'none';
 
 /**
+ * The public holidays around the publish date, which the default due date skips (F17 rule B1):
+ * those of its year and of the year before, two work days back. Without them (a failed read) the
+ * default counts weekends only, and the API keeps the date the form sends.
+ */
+function RequestTaskWithHolidays({ post, onDone }: { post: PostDetail; onDone: () => void }) {
+  const year = Number(post.publishDate.slice(0, 4));
+  const thisYear = useQuery(holidaysQuery(year));
+  const lastYear = useQuery(holidaysQuery(year - 1));
+  if (thisYear.isPending || lastYear.isPending) return <Skeleton className="h-96" />;
+  const holidays: HolidayRange[] = [
+    ...(lastYear.data?.items ?? []),
+    ...(thisYear.data?.items ?? []),
+  ];
+  return <RequestTask post={post} onDone={onDone} holidays={holidays} />;
+}
+
+/**
  * Rule 9: a new task in a department's queue, linked to the post. The defaults are the API's:
  * the title from the post, the due date two work days before publishing, the brief from the
  * post's notes and caption.
  */
-function RequestTask({ post, onDone }: { post: PostDetail; onDone: () => void }) {
+function RequestTask({
+  post,
+  onDone,
+  holidays,
+}: {
+  post: PostDetail;
+  onDone: () => void;
+  holidays: readonly HolidayRange[];
+}) {
   const { t } = useTranslation();
   const ids = { department: useId(), line: useId() };
   const departments = useDepartments();
@@ -547,7 +574,7 @@ function RequestTask({ post, onDone }: { post: PostDetail; onDone: () => void })
       department: postTaskDepartment(post.type),
       title: postTaskTitle(post.type, post.title),
       brief: '',
-      dueDate: postTaskDueDate(post.publishDate),
+      dueDate: postTaskDueDate(post.publishDate, undefined, holidays),
       cycleLineId: null,
     },
   });

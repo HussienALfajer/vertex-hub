@@ -14466,7 +14466,7 @@ export interface components {
             fraction: 0.25 | 0.5 | 0.75 | 1;
         };
         /** @enum {string} */
-        CalendarKind: "shoot" | "meeting" | "project_due" | "milestone_due" | "renewal" | "invoice_due";
+        CalendarKind: "shoot" | "meeting" | "project_due" | "milestone_due" | "renewal" | "invoice_due" | "holiday";
         /** @enum {string} */
         ShootType: "product" | "video" | "event" | "people" | "other";
         Calendar: {
@@ -14550,11 +14550,11 @@ export interface components {
                 id: string;
                 name: string;
                 archived: boolean;
-            };
+            } | null;
             invoiceStatus: components["schemas"]["InvoiceStatus"] | null;
         };
         /** @enum {string} */
-        KeyDateKind: "project_due" | "milestone_due" | "renewal" | "invoice_due";
+        KeyDateKind: "project_due" | "milestone_due" | "renewal" | "invoice_due" | "holiday";
         /** @enum {string} */
         InvoiceStatus: "draft" | "sent" | "partially_paid" | "paid" | "overdue" | "void";
         /** @description By user, then start time */
