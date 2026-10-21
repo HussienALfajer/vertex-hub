@@ -3,6 +3,7 @@ import {
   addDays,
   type CalendarDate,
   calendarDateSchema,
+  type HolidayRange,
   isWorkDay,
   nthWorkDay,
   workDaysBetween,
@@ -471,6 +472,8 @@ export interface PlanInput {
   isMember: (userId: string, department: DepartmentCode) => boolean;
   /** Replaces every step's revision limit (F04 A4: project runs from an accepted quote). */
   revisionLimit?: number;
+  /** The public holidays from the start on, skipped by the due dates (F17 rule B1). */
+  holidays?: readonly HolidayRange[];
 }
 
 const sameName = (a: string, b: string) =>
@@ -492,19 +495,28 @@ export function repeatedStepFor<T extends Pick<TemplateStep, 'repeatKind' | 'rep
  * Rule 8: the last work day on or before the period end, or the period end when the run starts
  * after it; never before the start, so no task is due before the run.
  */
-export function cycleLastWorkDay(start: CalendarDate, periodEnd: CalendarDate): CalendarDate {
+export function cycleLastWorkDay(
+  start: CalendarDate,
+  periodEnd: CalendarDate,
+  holidays: readonly HolidayRange[] = [],
+): CalendarDate {
   if (start > periodEnd) return start;
   let last = periodEnd;
-  while (!isWorkDay(last) && last > start) last = addDays(last, -1);
-  return isWorkDay(last) ? last : periodEnd;
+  while (!isWorkDay(last, holidays) && last > start) last = addDays(last, -1);
+  return isWorkDay(last, holidays) ? last : periodEnd;
 }
 
 /**
  * Rule 9: `n` due dates spread over the work days from `from` to `last` (or `last` alone when that
  * range is empty); instance i falls on D[⌈i·W/n⌉ − 1], so the last one is on `last`.
  */
-export function spreadDueDates(from: CalendarDate, last: CalendarDate, n: number): CalendarDate[] {
-  const range = workDaysBetween(from, last);
+export function spreadDueDates(
+  from: CalendarDate,
+  last: CalendarDate,
+  n: number,
+  holidays: readonly HolidayRange[] = [],
+): CalendarDate[] {
+  const range = workDaysBetween(from, last, holidays);
   const days = range.length > 0 ? range : [last];
   const w = days.length;
   return Array.from({ length: n }, (_, k) => days[Math.ceil(((k + 1) * w) / n) - 1] as string);
@@ -529,7 +541,7 @@ type TaskFields = Pick<
  * creates it. The caller checks the target (rules 15–18) and resolves the start date (rule 6).
  */
 export function planTemplateRun(input: PlanInput): TemplateRunPlan {
-  const { template, target } = input;
+  const { template, target, holidays = [] } = input;
   const start = target.startDate;
   const replaced = new Map<DepartmentCode, number>();
   const chosen = new Map(input.assignees.map((a) => [a.department, a.user]));
@@ -577,7 +589,7 @@ export function planTemplateRun(input: PlanInput): TemplateRunPlan {
         taskOf(step, {
           key: step.id,
           title: step.title,
-          dueDate: nthWorkDay(start, step.dueDay ?? 1),
+          dueDate: nthWorkDay(start, step.dueDay ?? 1, holidays),
           milestone: step.stageId ? (milestoneOf.get(step.stageId) ?? null) : null,
           cycleLineId: null,
           instance: null,
@@ -600,7 +612,7 @@ export function planTemplateRun(input: PlanInput): TemplateRunPlan {
       warnings.push({ type: 'applied_before', department: null, count: target.earlierRuns });
     }
   } else {
-    const last = cycleLastWorkDay(start, target.periodEnd);
+    const last = cycleLastWorkDay(start, target.periodEnd, holidays);
     let skipped = 0;
     /** Adds up to `n` instances of a repeated step within the cap (rule 14). */
     const addInstances = (
@@ -611,7 +623,7 @@ export function planTemplateRun(input: PlanInput): TemplateRunPlan {
       firstNumber: number,
       dependsOn: string[],
     ) => {
-      const dates = spreadDueDates(from, last, n);
+      const dates = spreadDueDates(from, last, n, holidays);
       const kept = Math.min(n, TEMPLATE_LIMITS.runTasks - tasks.length);
       skipped += n - kept;
       for (let k = 0; k < kept; k += 1) {
@@ -633,7 +645,7 @@ export function planTemplateRun(input: PlanInput): TemplateRunPlan {
 
     if (target.type === 'cycle') {
       for (const step of template.steps.filter((s) => s.repeatKind === null)) {
-        const due = nthWorkDay(start, step.dueDay ?? 1);
+        const due = nthWorkDay(start, step.dueDay ?? 1, holidays);
         tasks.push(
           taskOf(step, {
             key: step.id,
@@ -649,7 +661,7 @@ export function planTemplateRun(input: PlanInput): TemplateRunPlan {
       for (const step of template.steps.filter((s) => s.repeatKind !== null)) {
         const line = target.lines.find((l) => repeatedStepFor([step], l));
         if (!line || line.committed <= 0) continue;
-        const from = nthWorkDay(start, step.spreadFromDay ?? 1);
+        const from = nthWorkDay(start, step.spreadFromDay ?? 1, holidays);
         addInstances(step, line, line.committed, from, 1, step.dependsOn);
       }
     } else {

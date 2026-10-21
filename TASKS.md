@@ -16,14 +16,15 @@ Parts A → B → C → D, each accepted by the owner before the next starts (sp
 - [x] checks, reviewer, acceptance (spec steps 2 and the file part of 1), PR with auto-merge, `docs/ROADMAP.md`
 
 ## PR B1 — rules: contracts, db, api
-- [ ] contracts: schedules (`workScheduleSchema`, create/update, `INVALID_TIMES`), holidays (`holidaySchema`, `{ year }` repeat, at most 10 days), `hrSettingsSchema` (tiers ascending, fractions, last tier open); `isWorkDay(date, holidays)` and the work-day helpers taking holidays; error codes `SCHEDULE_IN_USE`, `DEFAULT_REQUIRED`, `INVALID_TIMES`, `HOLIDAY_OVERLAP`; audit actions and entity types; notification type `holiday_changed` (text in `messages`); F11 key date kind `holiday`; unit tests; `ar.json` keys
-- [ ] db (`/db-migration`): `public_holidays`, `hr_settings` (one seeded row with the defaults)
-- [ ] api `hr`: schedules list/create/update/archive (rule B2), holidays list/create/update/archive/repeat (rule B3, `holiday_changed`), settings get/put; an exported holiday service; F07 template due dates and F08 publish reminders (and the other work-day callers ADR 0039 names) skip holidays (rule B1); calendar holiday key dates; tests in `test/hr-rules.test.ts`
-- [ ] bridge: `openapi:export`, `api:generate`; web typecheck
+- [x] contracts: schedules (`workScheduleSchema`, create/update, `INVALID_TIMES`), holidays (`holidaySchema`, `{ year }` repeat, at most 10 days), `hrSettingsSchema` (tiers ascending, fractions, last tier open; the start date stays for part C); `isWorkDay(date, holidays)` and the work-day helpers taking holidays (F07 `planTemplateRun`, F08 `postTaskDueDate`); error codes `SCHEDULE_IN_USE`, `DEFAULT_REQUIRED`, `INVALID_TIMES`, `HOLIDAY_OVERLAP`; audit actions and entity types; notification type `holiday_changed` and subject `holiday` (text and link in `messages`); unit tests; `ar.json` keys
+- [x] db (`/db-migration`): `public_holidays`, `hr_settings` (one seeded row with the defaults); notification subject `holiday`
+- [x] api `hr`: schedules list/create/update/archive (rule B2), holidays list/create/update/archive/repeat (rule B3, `holiday_changed`), settings get/put, new files take `defaultAnnualLeaveDays`; an exported `HolidayCalendar`; F07 template runs, F08 post task due dates and publish reminders skip holidays (rule B1); tests in `test/hr-rules.test.ts`; error code `SCHEDULE_NAME_TAKEN` (names are unique, spec Data)
+- [x] bridge: `openapi:export`, `api:generate`; web typecheck
 - [ ] checks, reviewer, acceptance (API at `/api/docs`), PR with auto-merge
 
 ## PR B2 — rules: web and E2E
-- [ ] HR settings `/hr/settings` (`hr.manage`): Rules (grace, tiers, leave policy; the start date stays for part C), Schedules, Holidays with "Repeat last year"; holidays on the calendar
+- [ ] contracts and api: the calendar's `holiday` key dates for everyone (rule B16), moved here from B1 because the calendar screen must show them in the same PR
+- [ ] HR settings `/hr/settings` (`hr.manage`): Rules (grace, tiers, leave policy; the start date stays for part C), Schedules, Holidays with "Repeat last year"; holidays on the calendar; the F08 post task form's default due date skips holidays
 - [ ] E2E: `f17-rules.spec.ts`, screenshots in both themes; mocks in `fixtures.ts`
 - [ ] checks, reviewer, acceptance (spec step 1 without the entrance screen and start date), PR with auto-merge
 

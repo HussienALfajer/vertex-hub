@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/index.js';
 import { ClientsModule } from '../clients/index.js';
 import { FilesModule } from '../files/index.js';
+import { HrModule } from '../hr/index.js';
 import { NotificationsModule } from '../notifications/index.js';
 import { ProjectsModule } from '../projects/index.js';
 import { TasksModule } from '../tasks/index.js';
@@ -30,7 +31,8 @@ import { PostWorkflowService } from './post-workflow.service.js';
  * Links tasks to posts through `tasks`' `PostTasks` and registers into its `PostTaskHooks`
  * (a linked task approved, cancelled or archived). Exports `PostApprovals` and the
  * `PostReviewHooks` registry for the `approvals` module, which it never imports, and the
- * read-only `ContentReports` for `reports` (F15).
+ * read-only `ContentReports` for `reports` (F15). Skips public holidays in post task due dates and
+ * publish reminders through `hr`'s `HolidayCalendar` (F17 rule B1).
  */
 @Module({
   imports: [
@@ -39,6 +41,7 @@ import { PostWorkflowService } from './post-workflow.service.js';
     ProjectsModule,
     NotificationsModule,
     FilesModule,
+    HrModule,
     TasksModule,
   ],
   controllers: [ContentController],

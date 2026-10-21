@@ -1,6 +1,12 @@
 import { Inject, Injectable, type OnModuleInit } from '@nestjs/common';
-import { businessDate, DEFAULT_ANNUAL_LEAVE_DAYS } from '@vertex-hub/contracts';
-import { type Database, employeeFiles, type Transaction, workSchedules } from '@vertex-hub/db';
+import { businessDate } from '@vertex-hub/contracts';
+import {
+  type Database,
+  employeeFiles,
+  hrSettings,
+  type Transaction,
+  workSchedules,
+} from '@vertex-hub/db';
 import { and, eq, isNull } from 'drizzle-orm';
 import { DATABASE } from '../../core/database/database.module.js';
 import { recordAudit } from '../audit/index.js';
@@ -9,8 +15,8 @@ import { UserDirectory, UserLifecycle, type UserProfile } from '../auth/index.js
 type Executor = Database | Transaction;
 
 /**
- * Rule A1: one employee file per user, created with the account on the default schedule,
- * archived and restored with it (F01). Users created outside `UsersService` (the `user:create`
+ * Rule A1: one employee file per user, created with the account on the default schedule and
+ * the settings' default annual leave, archived and restored with it (F01). Users created outside `UsersService` (the `user:create`
  * command, the seed) get theirs when HR first reads them.
  */
 @Injectable()
@@ -84,6 +90,10 @@ export class EmployeeFiles implements OnModuleInit {
       .from(workSchedules)
       .where(eq(workSchedules.isDefault, true));
     if (!schedule) throw new Error('No default work schedule');
+    const [settings] = await executor
+      .select({ annualLeaveDays: hrSettings.defaultAnnualLeaveDays })
+      .from(hrSettings);
+    if (!settings) throw new Error('No HR settings');
     const now = new Date();
     await executor
       .insert(employeeFiles)
@@ -91,7 +101,7 @@ export class EmployeeFiles implements OnModuleInit {
         profiles.map((profile) => ({
           userId: profile.id,
           scheduleId: schedule.id,
-          annualLeaveDays: DEFAULT_ANNUAL_LEAVE_DAYS,
+          annualLeaveDays: settings.annualLeaveDays,
           archivedAt: profile.archived ? now : null,
         })),
       )

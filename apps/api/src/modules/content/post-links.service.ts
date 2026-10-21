@@ -1,5 +1,6 @@
 import { ForbiddenException, Inject, Injectable, type OnModuleInit } from '@nestjs/common';
 import {
+  businessDate,
   type CreatePostTask,
   isPostContentEditable,
   type LinkableTaskList,
@@ -16,6 +17,7 @@ import { CodedException } from '../../core/errors/index.js';
 import { type AuditActor, recordAudit } from '../audit/index.js';
 import type { CurrentUserInfo } from '../auth/index.js';
 import { ClientDirectory } from '../clients/index.js';
+import { HolidayCalendar } from '../hr/index.js';
 import { type LinkedTask, PostTaskHooks, PostTasks } from '../tasks/index.js';
 import { ContentService } from './content.service.js';
 import {
@@ -47,6 +49,7 @@ export class PostLinksService implements OnModuleInit {
     private readonly notices: PostNotices,
     private readonly tasks: PostTasks,
     private readonly taskHooks: PostTaskHooks,
+    private readonly holidays: HolidayCalendar,
   ) {}
 
   onModuleInit(): void {
@@ -119,6 +122,7 @@ export class PostLinksService implements OnModuleInit {
       await this.clients.summary(clientId, tx, { forUpdate: true });
       const post = await this.editablePost(tx, actor, id);
       const brief = [post.notes, post.caption].filter(Boolean).join('\n\n').slice(0, BRIEF_MAX);
+      const today = businessDate();
       const task = await this.tasks.create(
         tx,
         post,
@@ -126,7 +130,9 @@ export class PostLinksService implements OnModuleInit {
           department: input.department,
           title: input.title ?? postTaskTitle(post.type, post.title),
           brief: input.brief ?? (brief || null),
-          dueDate: input.dueDate ?? postTaskDueDate(post.publishDate),
+          dueDate:
+            input.dueDate ??
+            postTaskDueDate(post.publishDate, today, await this.holidays.from(today, tx)),
           cycleLineId: input.cycleLineId,
         },
         actor,

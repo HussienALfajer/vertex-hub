@@ -5,6 +5,7 @@ import {
   type CalendarDate,
   calendarDateSchema,
   daysInclusive,
+  type HolidayRange,
   instantSchema,
   timeOfDaySchema,
   workDaysBefore,
@@ -255,12 +256,16 @@ export const postTaskTitle = (type: PostType, title: string): string =>
 export const postTaskDepartment = (type: PostType): DepartmentCode =>
   type === 'reel' ? 'photography' : 'design';
 
-/** Rule 9: two work days before the publish date, never before today. */
+/**
+ * Rule 9: two work days before the publish date, never before today; public holidays are not
+ * work days (F17 rule B1).
+ */
 export function postTaskDueDate(
   publishDate: CalendarDate,
   today: CalendarDate = businessDate(),
+  holidays: readonly HolidayRange[] = [],
 ): CalendarDate {
-  const due = workDaysBefore(publishDate, 2);
+  const due = workDaysBefore(publishDate, 2, holidays);
   return due < today ? today : due;
 }
 

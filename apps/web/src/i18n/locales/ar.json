@@ -489,7 +489,12 @@
     "REMINDER_NOT_DUE": "لم يحن وقت التذكير بعد: يُتاح بعد 48 ساعة دون رد.",
     "SCHEDULE_ARCHIVED": "جدول الدوام هذا مؤرشف. اختر جدولًا آخر.",
     "DUPLICATE_EFFECTIVE_DATE": "يوجد تغيير راتب آخر يسري من التاريخ نفسه. أرشفه أولًا أو اختر تاريخًا آخر.",
-    "ALREADY_ENDED": "سُجّل إنهاء خدمة هذا الموظف من قبل. ألغِه أولًا لتغيير تاريخه."
+    "ALREADY_ENDED": "سُجّل إنهاء خدمة هذا الموظف من قبل. ألغِه أولًا لتغيير تاريخه.",
+    "SCHEDULE_IN_USE": "جدول الدوام هذا مسند إلى موظفين. انقلهم إلى جدول آخر قبل أرشفته.",
+    "DEFAULT_REQUIRED": "لا بد من جدول دوام افتراضي واحد. اجعل جدولًا آخر افتراضيًا أولًا.",
+    "INVALID_TIMES": "أوقات الدوام غير صالحة: يجب أن ينتهي يوم العمل قبل منتصف الليل، وأن تُغلق نافذة الحضور المرن بعد فتحها.",
+    "HOLIDAY_OVERLAP": "تتداخل هذه العطلة مع عطلة رسمية أخرى. عدّل تواريخها أو عدّل العطلة الأخرى.",
+    "SCHEDULE_NAME_TAKEN": "يوجد جدول دوام آخر بهذا الاسم. اختر اسمًا مختلفًا."
   },
   "users": {
     "title": "الفريق",
@@ -910,7 +915,10 @@
       "announcement": "إعلان",
       "announcement_template": "قالب إعلان",
       "employee_file": "ملف موظف",
-      "salary_change": "تغيير راتب"
+      "salary_change": "تغيير راتب",
+      "work_schedule": "جدول دوام",
+      "holiday": "عطلة رسمية",
+      "hr_settings": "إعدادات الموارد البشرية"
     },
     "actions": {
       "user": {
@@ -1268,6 +1276,19 @@
       "salary_change": {
         "created": "أضاف تغيير راتب",
         "archived": "أرشف تغيير راتب"
+      },
+      "work_schedule": {
+        "created": "أنشأ جدول دوام",
+        "updated": "عدّل جدول دوام",
+        "archived": "أرشف جدول دوام"
+      },
+      "holiday": {
+        "created": "أضاف عطلة رسمية",
+        "updated": "عدّل عطلة رسمية",
+        "archived": "أرشف عطلة رسمية"
+      },
+      "hr_settings": {
+        "updated": "عدّل إعدادات الموارد البشرية"
       }
     },
     "fields": {
@@ -1598,7 +1619,26 @@
       "endReason": "سبب إنهاء الخدمة",
       "endNote": "ملاحظة إنهاء الخدمة",
       "effectiveOn": "يسري من",
-      "archiveReason": "سبب الأرشفة"
+      "archiveReason": "سبب الأرشفة",
+      "isDefault": "الجدول الافتراضي",
+      "days": "أيام الدوام",
+      "paid": "مدفوعة",
+      "graceMinutes": "دقائق السماح",
+      "latenessTiers": "شرائح التأخير",
+      "firstLatenessWarning": "إنذار عن أول تأخير",
+      "overtimeMinMinutes": "أقل عمل إضافي يُحتسب",
+      "checkInReminderMinutes": "تذكير الحضور قبل",
+      "defaultAnnualLeaveDays": "الإجازة السنوية الافتراضية",
+      "carryOverMaxDays": "أقصى أيام تُرحّل",
+      "sickDaysPerYear": "أيام الإجازة المرضية في السنة",
+      "sickCertificateAfterDays": "التقرير الطبي بعد",
+      "sickRequestWithinWorkDays": "مهلة طلب الإجازة المرضية",
+      "emergencyDaysPerYear": "أيام الإجازة الطارئة في السنة",
+      "permissionMaxMinutes": "أطول إذن مغادرة",
+      "permissionsPerMonth": "أذونات المغادرة في الشهر",
+      "annualNoticeWorkDays": "مهلة طلب الإجازة السنوية",
+      "remoteNoticeWorkDays": "مهلة طلب العمل عن بعد",
+      "overtimeMinutesPerLeaveDay": "دقائق العمل الإضافي ليوم إجازة"
     },
     "kinds": {
       "activation": "تفعيل",
@@ -4570,7 +4610,8 @@
       "contract_ending": "اقتراب نهاية عقد موظف",
       "probation_ending": "اقتراب نهاية فترة تجربة موظف",
       "employee_leaving": "انتهاء خدمة موظف",
-      "salary_changed": "تغيير على راتبي"
+      "salary_changed": "تغيير على راتبي",
+      "holiday_changed": "تغيير على العطل الرسمية"
     },
     "priorities": {
       "critical": "حرج",

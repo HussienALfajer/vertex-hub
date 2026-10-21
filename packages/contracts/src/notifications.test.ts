@@ -81,6 +81,8 @@ describe('notification catalog', () => {
         // F17 part A: the information notices.
         'employee_leaving',
         'salary_changed',
+        // F17 part B.
+        'holiday_changed',
         // F16 part C: the new types of the sales and engagement modules.
         'responsibility_moved',
         'client_status_changed',

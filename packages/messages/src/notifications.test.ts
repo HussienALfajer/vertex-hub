@@ -237,6 +237,12 @@ const SAMPLES: Record<NotificationType, unknown> = {
   probation_ending: { employee: 'سامر', endsOn: '2026-11-04' },
   employee_leaving: { employee: 'سامر', endedOn: '2026-10-31' },
   salary_changed: { effectiveOn: '2026-11-01' },
+  holiday_changed: {
+    change: 'added',
+    name: 'عيد الأضحى',
+    startsOn: '2027-05-16',
+    endsOn: '2027-05-19',
+  },
   action_reminder: {
     originalType: 'task_review_requested',
     originalData: { task },
@@ -651,5 +657,12 @@ describe('HR (F17 part A)', () => {
   it('tells the employee of a salary change without its amount (rule A4)', () => {
     expect(render('salary_changed').text).toBe('سُجّل تغيير على راتبك يسري من 1 تشرين الثاني 2026');
     expect(linkPath(notificationLink(sample('salary_changed')))).toBe('/me/file');
+  });
+
+  it('names a changed holiday and its days, and opens the calendar on it (rule B3)', () => {
+    expect(render('holiday_changed').text).toBe(
+      'عطلة رسمية جديدة: «عيد الأضحى» 16 أيار – 19 أيار 2027',
+    );
+    expect(linkPath(notificationLink(sample('holiday_changed')))).toBe('/calendar?date=2027-05-16');
   });
 });

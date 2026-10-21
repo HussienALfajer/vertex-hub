@@ -226,6 +226,11 @@ export const ERROR_CODES = [
   'SCHEDULE_ARCHIVED',
   'DUPLICATE_EFFECTIVE_DATE',
   'ALREADY_ENDED',
+  'SCHEDULE_IN_USE',
+  'DEFAULT_REQUIRED',
+  'INVALID_TIMES',
+  'HOLIDAY_OVERLAP',
+  'SCHEDULE_NAME_TAKEN',
 ] as const;
 
 export const errorCodeSchema = z.enum(ERROR_CODES).meta({ id: 'ErrorCode' });

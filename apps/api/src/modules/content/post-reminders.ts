@@ -3,6 +3,7 @@ import {
   businessDate,
   businessInstant,
   type CalendarDate,
+  type HolidayRange,
   isWorkDay,
   type NotificationReminderKind,
   nextWorkDay,
@@ -13,6 +14,7 @@ import { and, asc, between, eq, gte, inArray, isNotNull, lt, type SQL } from 'dr
 import { DATABASE } from '../../core/database/database.module.js';
 import { runEach } from '../../core/jobs/index.js';
 import { ClientDirectory } from '../clients/index.js';
+import { HolidayCalendar } from '../hr/index.js';
 import { DailyReminders, type Notice, TimedNotifications } from '../notifications/index.js';
 import { ContentService } from './content.service.js';
 import type { PostAccess } from './post-access.js';
@@ -34,6 +36,7 @@ export class PostReminders implements OnModuleInit {
     private readonly notices: PostNotices,
     private readonly reminders: DailyReminders,
     private readonly timed: TimedNotifications,
+    private readonly holidays: HolidayCalendar,
   ) {}
 
   onModuleInit(): void {
@@ -87,12 +90,14 @@ export class PostReminders implements OnModuleInit {
     return sent;
   }
 
+  /** F17 rule B1: public holidays are not work days. */
   async remind(today: CalendarDate): Promise<number> {
-    if (!isWorkDay(today)) return 0;
+    const holidays = await this.holidays.from(today);
+    if (!isWorkDay(today, holidays)) return 0;
     let sent = 0;
     // The two kinds run independently: one failing does not hold back the other.
     const kinds: [string, () => Promise<number>][] = [
-      ['Publish-today reminders', () => this.publishToday(today)],
+      ['Publish-today reminders', () => this.publishToday(today, holidays)],
       ['Publish-overdue reminders', () => this.publishOverdue(today)],
     ];
     await runEach(
@@ -107,10 +112,10 @@ export class PostReminders implements OnModuleInit {
   }
 
   /** Posts to publish today, or on a later day before the next work day (Friday, on Thursday). */
-  private publishToday(today: CalendarDate): Promise<number> {
+  private publishToday(today: CalendarDate, holidays: readonly HolidayRange[]): Promise<number> {
     const filters = [
       gte(contentPosts.publishDate, today),
-      lt(contentPosts.publishDate, nextWorkDay(today)),
+      lt(contentPosts.publishDate, nextWorkDay(today, holidays)),
     ];
     return this.send(today, 'post_publish_today', filters, (post) =>
       this.notices.notice(post, 'post_publish_today', [post.responsibleId], null),

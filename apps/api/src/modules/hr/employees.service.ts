@@ -113,7 +113,9 @@ export class EmployeesService {
         const [schedule] = await tx
           .select({ archivedAt: workSchedules.archivedAt })
           .from(workSchedules)
-          .where(eq(workSchedules.id, scheduleId));
+          .where(eq(workSchedules.id, scheduleId))
+          // Holds off archiving it until the assignment commits (rule B2).
+          .for('share');
         if (!schedule) throw new NotFoundException('Unknown schedule');
         if (schedule.archivedAt) {
           throw new CodedException(409, 'SCHEDULE_ARCHIVED', 'The schedule is archived');

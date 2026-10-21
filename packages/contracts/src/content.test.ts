@@ -257,6 +257,12 @@ describe('tasks requested from a post (rule 9)', () => {
     expect(postTaskDueDate('2026-10-05', '2026-10-06')).toBe('2026-10-06');
   });
 
+  it('skips public holidays in the two work days (F17 rule B1)', () => {
+    // A holiday on Monday 12 and Tuesday 13: Sunday 11 and Saturday 10 come before Wednesday 14.
+    const holidays = [{ startsOn: '2026-10-12', endsOn: '2026-10-13' }];
+    expect(postTaskDueDate('2026-10-14', '2026-10-01', holidays)).toBe('2026-10-10');
+  });
+
   it('needs a department only, and no line unless given', () => {
     expect(createPostTaskSchema.parse({ department: 'design' })).toEqual({
       department: 'design',
