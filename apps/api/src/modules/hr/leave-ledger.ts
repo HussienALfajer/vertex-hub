@@ -10,7 +10,7 @@ import {
   sumDays,
 } from '@vertex-hub/contracts';
 import { type Database, leaveLedger, type Transaction } from '@vertex-hub/db';
-import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { DATABASE } from '../../core/database/database.module.js';
 import { type AuditActor, recordAudit } from '../audit/index.js';
 import { type CurrentUserInfo, UserDirectory } from '../auth/index.js';
@@ -21,6 +21,17 @@ type Executor = Database | Transaction;
 export type Balances = Record<BalanceLeaveType, number>;
 
 export const noBalances = (): Balances => ({ annual: 0, sick: 0, emergency: 0 });
+
+/**
+ * Serializes what reads or changes one user's leave: request checks (overlap, balances, monthly
+ * permissions), decisions, cancellations, recounts and adjustments. Taken before any request row
+ * lock, so two writers never wait on each other in turn.
+ */
+export async function lockLeave(tx: Transaction, userId: string): Promise<void> {
+  await tx.execute(
+    sql`select pg_advisory_xact_lock(hashtextextended(${`hr.requests:${userId}`}, 0))`,
+  );
+}
 
 /**
  * The balances a leave type draws on (rule B12): emergency days count against both the emergency
@@ -204,6 +215,7 @@ export class LeaveLedger {
     input: CreateLeaveAdjustment,
   ): Promise<void> {
     await this.db.transaction(async (tx) => {
+      await lockLeave(tx, userId);
       const [profile] = await this.users.profiles({ ids: [userId] }, tx);
       if (!profile) throw new NotFoundException();
       const [row] = await tx

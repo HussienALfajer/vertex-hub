@@ -579,6 +579,25 @@ describe('HR leave: balances, requests and decisions (F17 part B)', () => {
       expect(await noticesOf('hr_request_submitted', recorded.id)).toEqual([]);
       const [decided] = await noticesOf('hr_request_decided', recorded.id);
       expect(decided?.recipientId).toBe(employee.id);
+      // After the fact: no deadline, and never short notice (settled note on rule B9).
+      const thisYear = Number(businessDate().slice(0, 4));
+      const yesterday = addDays(businessDate(), -1);
+      expect(
+        (
+          await client.post(`/api/hr/balances/${employee.id}/adjustments`, gm.cookie, {
+            leaveType: 'annual',
+            year: thisYear,
+            days: 10,
+            note: 'رصيد افتتاحي',
+            entry: 'opening',
+          })
+        ).status,
+      ).toBe(201);
+      const late = await request(gm, {
+        ...annual(yesterday, addDays(yesterday, 3)),
+        userId: employee.id,
+      });
+      expect(late).toMatchObject({ status: 'approved', shortNotice: false });
       const own = await request(gm, {
         kind: 'leave',
         leaveType: 'unpaid',

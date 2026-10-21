@@ -54,7 +54,7 @@ import { holdsAll } from './employee-access.js';
 import { HrScope, reaches } from './hr-scope.js';
 import { HrSettingsService } from './hr-settings.service.js';
 import { LeaveContext, type LeaveSubject } from './leave-context.js';
-import { type Balances, drawsOn, LeaveLedger, noBalances } from './leave-ledger.js';
+import { type Balances, drawsOn, LeaveLedger, lockLeave, noBalances } from './leave-ledger.js';
 import { LeaveWorkSources } from './leave-work-sources.js';
 
 type Executor = Database | Transaction;
@@ -180,7 +180,7 @@ export class HrRequestsService implements OnModuleInit {
   /** `POST /requests` (rule B8). */
   async create(actor: CurrentUserInfo, input: CreateHrRequest): Promise<HrRequest> {
     const id = await this.db.transaction(async (tx) => {
-      await lockUser(tx, input.userId ?? actor.id);
+      await lockLeave(tx, input.userId ?? actor.id);
       const evaluated = await this.evaluate(tx, actor, input);
       const now = new Date();
       const [row] = await tx
@@ -314,6 +314,7 @@ export class HrRequestsService implements OnModuleInit {
   /** `POST /requests/:id/decision` (rules B13 and B14). */
   async decide(actor: CurrentUserInfo, id: string, input: DecideHrRequest): Promise<HrRequest> {
     await this.db.transaction(async (tx) => {
+      await lockLeave(tx, await this.ownerOf(tx, id));
       const current = await this.locked(tx, id);
       if (current.status !== 'pending') throw notPending();
       if (input.decision === 'reject') {
@@ -407,6 +408,7 @@ export class HrRequestsService implements OnModuleInit {
    */
   async cancel(actor: CurrentUserInfo, id: string, input: CancelHrRequest): Promise<HrRequest> {
     await this.db.transaction(async (tx) => {
+      await lockLeave(tx, await this.ownerOf(tx, id));
       const current = await this.locked(tx, id, actor);
       const today = businessDate();
       if (!cancellable(actor, current, today)) {
@@ -497,10 +499,12 @@ export class HrRequestsService implements OnModuleInit {
           )})`,
         ),
       )
-      .orderBy(asc(hrRequests.id))
-      .for('update');
-    for (const row of rows) {
-      if (!row.leaveType) continue;
+      .orderBy(asc(hrRequests.id));
+    for (const found of rows) {
+      // The user's lock before the row's, as everywhere: the balances hold until commit.
+      await lockLeave(tx, found.userId);
+      const row = await this.locked(tx, found.id);
+      if (!row.leaveType || (row.status !== 'pending' && row.status !== 'approved')) continue;
       const counted = await this.countLeave(tx, row.userId, {
         leaveType: row.leaveType,
         startsOn: row.startsOn,
@@ -567,7 +571,11 @@ export class HrRequestsService implements OnModuleInit {
     const result = noBalances();
     if (rows.length === 0) return result;
     const subject = await this.context.subject(userId, executor);
-    const holidays = await this.context.holidaysFrom(`${year}-01-01`, executor);
+    // From the earliest start: a leave crossing into `year` counted its days from its own start.
+    const holidays = await this.context.holidaysFrom(
+      rows.reduce((from, row) => (row.startsOn < from ? row.startsOn : from), `${year}-01-01`),
+      executor,
+    );
     for (const row of rows) {
       if (!row.leaveType || !subject) continue;
       const paid = paidDaysByYear(
@@ -694,6 +702,7 @@ export class HrRequestsService implements OnModuleInit {
         paidDays: counted.paidDays,
         unpaidDays: counted.unpaidDays,
         shortNotice:
+          deadlines &&
           input.leaveType === 'annual' &&
           countWorkDays(today, input.startsOn, subject, holidays) < settings.annualNoticeWorkDays,
         certificateRequired:
@@ -802,6 +811,16 @@ export class HrRequestsService implements OnModuleInit {
       paid,
       actorId,
     );
+  }
+
+  /** The employee of a request, read before taking their lock; 404 when there is none. */
+  private async ownerOf(tx: Transaction, id: string): Promise<string> {
+    const [row] = await tx
+      .select({ userId: hrRequests.userId })
+      .from(hrRequests)
+      .where(eq(hrRequests.id, id));
+    if (!row) throw new NotFoundException();
+    return row.userId;
   }
 
   /** The request, locked; 404 unless the actor may act on it (owner or `hr.approve`). */
@@ -943,13 +962,6 @@ export class HrRequestsService implements OnModuleInit {
       actorId,
     });
   }
-}
-
-/** Serializes one user's request checks (overlap, balances, monthly permissions). */
-async function lockUser(tx: Transaction, userId: string): Promise<void> {
-  await tx.execute(
-    sql`select pg_advisory_xact_lock(hashtextextended(${`hr.requests:${userId}`}, 0))`,
-  );
 }
 
 /** Rule B15. */
