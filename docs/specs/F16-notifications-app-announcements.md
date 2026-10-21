@@ -314,7 +314,7 @@ The escalation snapshot of an `action_*` row is its `data` (`originalType`, `ori
 | `email_overrides` | jsonb | required, default `{}`; replaces `email_types`. The migration turns each saved `email_types` into overrides against the defaults, so saved choices are kept |
 | `morning_push` | boolean | required, default true |
 
-`email_types` is no longer read or written from A1 and is dropped in the first release after the F16 deploy (expand, then contract: the previous release still reads it during a deploy or a rollback, and F16 reaches production in one deploy).
+`email_types` is no longer read or written from A1 and stays as an unused, nullable column (owner, 2026-10-21). It is not dropped: Drizzle names every schema column in an `INSERT`, so once the column is gone, a rollback to a release that still maps it fails every settings save; and removing the column from the schema generates its drop in the same migration, so the two cannot ship in separate releases.
 
 ### `notification_policies`
 One row per type that management changed. No row means the catalog default. Audited (`notification_policy.updated`).
@@ -871,7 +871,7 @@ None. Decisions made in this interview (owner, 2026-10-20):
     - announcement editor, page, receipts, poll, home pin and critical dialog;
     - the offline banner (Playwright offline mode);
     - service worker registration and a push delivered through the `log` transport, displayed via the service worker in Chromium.
-- **Delivery** (owner, 2026-10-20: in this order). F16 is deployed to production once, after every part (A–D) is merged, not part by part (owner, 2026-10-20). The drop of `notification_settings.email_types` follows in the first release after that deploy:
+- **Delivery** (owner, 2026-10-20: in this order). F16 is deployed to production once, after every part (A–D) is merged, not part by part (owner, 2026-10-20). `notification_settings.email_types` is kept (see "Data"):
   - **A1:** contracts, db, API and worker (push, sessions, priorities in the catalog, push switches).
   - **A2:** the web (manifest, service worker, icons, install, offline, badge, device rows, settings column) and E2E.
   - **B1, B2:** the engine, API then web.
