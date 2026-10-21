@@ -34,7 +34,12 @@ describe('isOfflineQuery (F16 rule A5)', () => {
     expect(isOfflineQuery(['approvals', 'public', 'token'])).toBe(false);
   });
 
+  it('keeps announcements but not their home answer, whose critical dialog needs a connection', () => {
+    expect(isOfflineQuery(['announcements', 'list', {}])).toBe(true);
+    expect(isOfflineQuery(['announcements', 'home'])).toBe(false);
+  });
+
   it('leaves out a module nobody listed', () => {
-    expect(isOfflineQuery(['announcements', 'list'])).toBe(false);
+    expect(isOfflineQuery(['chat', 'threads'])).toBe(false);
   });
 });
