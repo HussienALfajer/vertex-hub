@@ -8,7 +8,7 @@ Parts A → B → C → D, each accepted by the owner before the next starts (sp
 - [x] db (`/db-migration`): `work_schedules`, `work_schedule_days` (seeded "Main schedule"), `employee_files` (one per existing user), `salary_changes`; `file_items` owner type `employee`; `TABLE_OWNERS`
 - [x] api `hr` module: employees list, detail (rule A2 visibility), update, payout, salaries list/add/archive, end of service and undo; F01 hooks (create, archive, restore the file); F10 documents on `employee` with the confidential rule (A6); `hr.daily` (reminders A7, end-of-service archive A8) and `hr:run-daily`; `test/hr-employees.test.ts`
 - [x] bridge: `openapi:export`, `api:generate`; web typecheck
-- [ ] checks, reviewer, acceptance (API at `/api/docs`), PR with auto-merge
+- [x] checks, reviewer, acceptance (API at `/api/docs`, owner 2026-10-21), PR with auto-merge
 
 ## PR A2 — employee files: web and E2E
 - [ ] HR nav section, People `/hr/people`, employee file `/hr/people/:userId` (tabs Personal, Contract and schedule, Pay, Documents; end of service), `/me/file`
