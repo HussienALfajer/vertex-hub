@@ -2,6 +2,7 @@ import { createFileRoute, Outlet, redirect } from '@tanstack/react-router';
 import { useEffect } from 'react';
 import { AppShell } from '../components/app-shell';
 import { reportHardware } from '../features/account/devices.queries';
+import { CriticalAnnouncementDialog } from '../features/announcements/critical-announcement-dialog';
 import { useInstalledApp } from '../features/app/use-installed-app';
 import { loadMe, needsTwoFactorSetup } from '../lib/auth';
 
@@ -27,6 +28,7 @@ function AppLayout() {
   return (
     <AppShell>
       <Outlet />
+      <CriticalAnnouncementDialog />
     </AppShell>
   );
 }

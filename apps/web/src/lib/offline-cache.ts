@@ -21,6 +21,9 @@ const OFFLINE_QUERIES: readonly (readonly string[])[] = [
   ['approvals', 'requests'],
   ['approvals', 'request'],
   ['approvals', 'client'],
+  // Not the home answer: the critical dialog must not ask for an acknowledgement offline.
+  ['announcements', 'list'],
+  ['announcements', 'detail'],
   ['calendar'],
   ['clients'],
   ['content'],

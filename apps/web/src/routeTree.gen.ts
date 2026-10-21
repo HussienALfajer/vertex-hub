@@ -22,6 +22,8 @@ import { Route as AppEmailsRouteImport } from './routes/_app/emails'
 import { Route as AppInstallRouteImport } from './routes/_app/install'
 import { Route as ATokenRouteImport } from './routes/a.$token'
 import { Route as AppAdminNotificationPolicyRouteImport } from './routes/_app/admin/notification-policy'
+import { Route as AppAnnouncementsIndexRouteImport } from './routes/_app/announcements/index'
+import { Route as AppAnnouncementsNewRouteImport } from './routes/_app/announcements/new'
 import { Route as AppApprovalsIndexRouteImport } from './routes/_app/approvals/index'
 import { Route as AppCalendarIndexRouteImport } from './routes/_app/calendar/index'
 import { Route as AppCampaignsIndexRouteImport } from './routes/_app/campaigns/index'
@@ -66,6 +68,8 @@ import { Route as AppTeamNewRouteImport } from './routes/_app/team/new'
 import { Route as AppTemplatesIndexRouteImport } from './routes/_app/templates/index'
 import { Route as AppTemplatesTemplateIdRouteImport } from './routes/_app/templates/$templateId'
 import { Route as AppTemplatesNewRouteImport } from './routes/_app/templates/new'
+import { Route as AppAnnouncementsAnnouncementIdIndexRouteImport } from './routes/_app/announcements/$announcementId/index'
+import { Route as AppAnnouncementsAnnouncementIdEditRouteImport } from './routes/_app/announcements/$announcementId/edit'
 import { Route as AppApprovalsRequestsRequestIdRouteImport } from './routes/_app/approvals/requests/$requestId'
 import { Route as AppClientsClientIdIndexRouteImport } from './routes/_app/clients/$clientId/index'
 import { Route as AppClientsClientIdReportRouteImport } from './routes/_app/clients/$clientId/report'
@@ -141,6 +145,16 @@ const AppAdminNotificationPolicyRoute =
     path: '/admin/notification-policy',
     getParentRoute: () => AppRoute,
   } as any)
+const AppAnnouncementsIndexRoute = AppAnnouncementsIndexRouteImport.update({
+  id: '/announcements/',
+  path: '/announcements/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppAnnouncementsNewRoute = AppAnnouncementsNewRouteImport.update({
+  id: '/announcements/new',
+  path: '/announcements/new',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppApprovalsIndexRoute = AppApprovalsIndexRouteImport.update({
   id: '/approvals/',
   path: '/approvals/',
@@ -364,6 +378,18 @@ const AppTemplatesNewRoute = AppTemplatesNewRouteImport.update({
   path: '/templates/new',
   getParentRoute: () => AppRoute,
 } as any)
+const AppAnnouncementsAnnouncementIdIndexRoute =
+  AppAnnouncementsAnnouncementIdIndexRouteImport.update({
+    id: '/announcements/$announcementId/',
+    path: '/announcements/$announcementId/',
+    getParentRoute: () => AppRoute,
+  } as any)
+const AppAnnouncementsAnnouncementIdEditRoute =
+  AppAnnouncementsAnnouncementIdEditRouteImport.update({
+    id: '/announcements/$announcementId/edit',
+    path: '/announcements/$announcementId/edit',
+    getParentRoute: () => AppRoute,
+  } as any)
 const AppApprovalsRequestsRequestIdRoute =
   AppApprovalsRequestsRequestIdRouteImport.update({
     id: '/approvals/requests/$requestId',
@@ -428,6 +454,7 @@ export interface FileRoutesByFullPath {
   '/install': typeof AppInstallRoute
   '/a/$token': typeof ATokenRoute
   '/admin/notification-policy': typeof AppAdminNotificationPolicyRoute
+  '/announcements/new': typeof AppAnnouncementsNewRoute
   '/campaigns/$campaignId': typeof AppCampaignsCampaignIdRoute
   '/catalog/settings': typeof AppCatalogSettingsRoute
   '/clients/new': typeof AppClientsNewRoute
@@ -455,6 +482,7 @@ export interface FileRoutesByFullPath {
   '/team/new': typeof AppTeamNewRoute
   '/templates/$templateId': typeof AppTemplatesTemplateIdRoute
   '/templates/new': typeof AppTemplatesNewRoute
+  '/announcements/': typeof AppAnnouncementsIndexRoute
   '/approvals/': typeof AppApprovalsIndexRoute
   '/calendar/': typeof AppCalendarIndexRoute
   '/campaigns/': typeof AppCampaignsIndexRoute
@@ -472,10 +500,12 @@ export interface FileRoutesByFullPath {
   '/tasks/': typeof AppTasksIndexRoute
   '/team/': typeof AppTeamIndexRoute
   '/templates/': typeof AppTemplatesIndexRoute
+  '/announcements/$announcementId/edit': typeof AppAnnouncementsAnnouncementIdEditRoute
   '/approvals/requests/$requestId': typeof AppApprovalsRequestsRequestIdRoute
   '/clients/$clientId/report': typeof AppClientsClientIdReportRoute
   '/content/posts/$postId': typeof AppContentPostsPostIdRoute
   '/shoots/$shootId/edit': typeof AppShootsShootIdEditRoute
+  '/announcements/$announcementId/': typeof AppAnnouncementsAnnouncementIdIndexRoute
   '/clients/$clientId/': typeof AppClientsClientIdIndexRoute
   '/retainers/$retainerId/': typeof AppRetainersRetainerIdIndexRoute
   '/shoots/$shootId/': typeof AppShootsShootIdIndexRoute
@@ -495,6 +525,7 @@ export interface FileRoutesByTo {
   '/a/$token': typeof ATokenRoute
   '/': typeof AppIndexRoute
   '/admin/notification-policy': typeof AppAdminNotificationPolicyRoute
+  '/announcements/new': typeof AppAnnouncementsNewRoute
   '/campaigns/$campaignId': typeof AppCampaignsCampaignIdRoute
   '/catalog/settings': typeof AppCatalogSettingsRoute
   '/clients/new': typeof AppClientsNewRoute
@@ -522,6 +553,7 @@ export interface FileRoutesByTo {
   '/team/new': typeof AppTeamNewRoute
   '/templates/$templateId': typeof AppTemplatesTemplateIdRoute
   '/templates/new': typeof AppTemplatesNewRoute
+  '/announcements': typeof AppAnnouncementsIndexRoute
   '/approvals': typeof AppApprovalsIndexRoute
   '/calendar': typeof AppCalendarIndexRoute
   '/campaigns': typeof AppCampaignsIndexRoute
@@ -539,10 +571,12 @@ export interface FileRoutesByTo {
   '/tasks': typeof AppTasksIndexRoute
   '/team': typeof AppTeamIndexRoute
   '/templates': typeof AppTemplatesIndexRoute
+  '/announcements/$announcementId/edit': typeof AppAnnouncementsAnnouncementIdEditRoute
   '/approvals/requests/$requestId': typeof AppApprovalsRequestsRequestIdRoute
   '/clients/$clientId/report': typeof AppClientsClientIdReportRoute
   '/content/posts/$postId': typeof AppContentPostsPostIdRoute
   '/shoots/$shootId/edit': typeof AppShootsShootIdEditRoute
+  '/announcements/$announcementId': typeof AppAnnouncementsAnnouncementIdIndexRoute
   '/clients/$clientId': typeof AppClientsClientIdIndexRoute
   '/retainers/$retainerId': typeof AppRetainersRetainerIdIndexRoute
   '/shoots/$shootId': typeof AppShootsShootIdIndexRoute
@@ -564,6 +598,7 @@ export interface FileRoutesById {
   '/a/$token': typeof ATokenRoute
   '/_app/': typeof AppIndexRoute
   '/_app/admin/notification-policy': typeof AppAdminNotificationPolicyRoute
+  '/_app/announcements/new': typeof AppAnnouncementsNewRoute
   '/_app/campaigns/$campaignId': typeof AppCampaignsCampaignIdRoute
   '/_app/catalog/settings': typeof AppCatalogSettingsRoute
   '/_app/clients/new': typeof AppClientsNewRoute
@@ -591,6 +626,7 @@ export interface FileRoutesById {
   '/_app/team/new': typeof AppTeamNewRoute
   '/_app/templates/$templateId': typeof AppTemplatesTemplateIdRoute
   '/_app/templates/new': typeof AppTemplatesNewRoute
+  '/_app/announcements/': typeof AppAnnouncementsIndexRoute
   '/_app/approvals/': typeof AppApprovalsIndexRoute
   '/_app/calendar/': typeof AppCalendarIndexRoute
   '/_app/campaigns/': typeof AppCampaignsIndexRoute
@@ -608,10 +644,12 @@ export interface FileRoutesById {
   '/_app/tasks/': typeof AppTasksIndexRoute
   '/_app/team/': typeof AppTeamIndexRoute
   '/_app/templates/': typeof AppTemplatesIndexRoute
+  '/_app/announcements/$announcementId/edit': typeof AppAnnouncementsAnnouncementIdEditRoute
   '/_app/approvals/requests/$requestId': typeof AppApprovalsRequestsRequestIdRoute
   '/_app/clients/$clientId/report': typeof AppClientsClientIdReportRoute
   '/_app/content/posts/$postId': typeof AppContentPostsPostIdRoute
   '/_app/shoots/$shootId/edit': typeof AppShootsShootIdEditRoute
+  '/_app/announcements/$announcementId/': typeof AppAnnouncementsAnnouncementIdIndexRoute
   '/_app/clients/$clientId/': typeof AppClientsClientIdIndexRoute
   '/_app/retainers/$retainerId/': typeof AppRetainersRetainerIdIndexRoute
   '/_app/shoots/$shootId/': typeof AppShootsShootIdIndexRoute
@@ -633,6 +671,7 @@ export interface FileRouteTypes {
     | '/install'
     | '/a/$token'
     | '/admin/notification-policy'
+    | '/announcements/new'
     | '/campaigns/$campaignId'
     | '/catalog/settings'
     | '/clients/new'
@@ -660,6 +699,7 @@ export interface FileRouteTypes {
     | '/team/new'
     | '/templates/$templateId'
     | '/templates/new'
+    | '/announcements/'
     | '/approvals/'
     | '/calendar/'
     | '/campaigns/'
@@ -677,10 +717,12 @@ export interface FileRouteTypes {
     | '/tasks/'
     | '/team/'
     | '/templates/'
+    | '/announcements/$announcementId/edit'
     | '/approvals/requests/$requestId'
     | '/clients/$clientId/report'
     | '/content/posts/$postId'
     | '/shoots/$shootId/edit'
+    | '/announcements/$announcementId/'
     | '/clients/$clientId/'
     | '/retainers/$retainerId/'
     | '/shoots/$shootId/'
@@ -700,6 +742,7 @@ export interface FileRouteTypes {
     | '/a/$token'
     | '/'
     | '/admin/notification-policy'
+    | '/announcements/new'
     | '/campaigns/$campaignId'
     | '/catalog/settings'
     | '/clients/new'
@@ -727,6 +770,7 @@ export interface FileRouteTypes {
     | '/team/new'
     | '/templates/$templateId'
     | '/templates/new'
+    | '/announcements'
     | '/approvals'
     | '/calendar'
     | '/campaigns'
@@ -744,10 +788,12 @@ export interface FileRouteTypes {
     | '/tasks'
     | '/team'
     | '/templates'
+    | '/announcements/$announcementId/edit'
     | '/approvals/requests/$requestId'
     | '/clients/$clientId/report'
     | '/content/posts/$postId'
     | '/shoots/$shootId/edit'
+    | '/announcements/$announcementId'
     | '/clients/$clientId'
     | '/retainers/$retainerId'
     | '/shoots/$shootId'
@@ -768,6 +814,7 @@ export interface FileRouteTypes {
     | '/a/$token'
     | '/_app/'
     | '/_app/admin/notification-policy'
+    | '/_app/announcements/new'
     | '/_app/campaigns/$campaignId'
     | '/_app/catalog/settings'
     | '/_app/clients/new'
@@ -795,6 +842,7 @@ export interface FileRouteTypes {
     | '/_app/team/new'
     | '/_app/templates/$templateId'
     | '/_app/templates/new'
+    | '/_app/announcements/'
     | '/_app/approvals/'
     | '/_app/calendar/'
     | '/_app/campaigns/'
@@ -812,10 +860,12 @@ export interface FileRouteTypes {
     | '/_app/tasks/'
     | '/_app/team/'
     | '/_app/templates/'
+    | '/_app/announcements/$announcementId/edit'
     | '/_app/approvals/requests/$requestId'
     | '/_app/clients/$clientId/report'
     | '/_app/content/posts/$postId'
     | '/_app/shoots/$shootId/edit'
+    | '/_app/announcements/$announcementId/'
     | '/_app/clients/$clientId/'
     | '/_app/retainers/$retainerId/'
     | '/_app/shoots/$shootId/'
@@ -923,6 +973,20 @@ declare module '@tanstack/react-router' {
       path: '/admin/notification-policy'
       fullPath: '/admin/notification-policy'
       preLoaderRoute: typeof AppAdminNotificationPolicyRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/announcements/': {
+      id: '/_app/announcements/'
+      path: '/announcements'
+      fullPath: '/announcements/'
+      preLoaderRoute: typeof AppAnnouncementsIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/announcements/new': {
+      id: '/_app/announcements/new'
+      path: '/announcements/new'
+      fullPath: '/announcements/new'
+      preLoaderRoute: typeof AppAnnouncementsNewRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/approvals/': {
@@ -1233,6 +1297,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppTemplatesNewRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/announcements/$announcementId/': {
+      id: '/_app/announcements/$announcementId/'
+      path: '/announcements/$announcementId'
+      fullPath: '/announcements/$announcementId/'
+      preLoaderRoute: typeof AppAnnouncementsAnnouncementIdIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/announcements/$announcementId/edit': {
+      id: '/_app/announcements/$announcementId/edit'
+      path: '/announcements/$announcementId/edit'
+      fullPath: '/announcements/$announcementId/edit'
+      preLoaderRoute: typeof AppAnnouncementsAnnouncementIdEditRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/approvals/requests/$requestId': {
       id: '/_app/approvals/requests/$requestId'
       path: '/approvals/requests/$requestId'
@@ -1307,6 +1385,7 @@ interface AppRouteChildren {
   AppInstallRoute: typeof AppInstallRoute
   AppIndexRoute: typeof AppIndexRoute
   AppAdminNotificationPolicyRoute: typeof AppAdminNotificationPolicyRoute
+  AppAnnouncementsNewRoute: typeof AppAnnouncementsNewRoute
   AppCampaignsCampaignIdRoute: typeof AppCampaignsCampaignIdRoute
   AppCatalogSettingsRoute: typeof AppCatalogSettingsRoute
   AppClientsNewRoute: typeof AppClientsNewRoute
@@ -1334,6 +1413,7 @@ interface AppRouteChildren {
   AppTeamNewRoute: typeof AppTeamNewRoute
   AppTemplatesTemplateIdRoute: typeof AppTemplatesTemplateIdRoute
   AppTemplatesNewRoute: typeof AppTemplatesNewRoute
+  AppAnnouncementsIndexRoute: typeof AppAnnouncementsIndexRoute
   AppApprovalsIndexRoute: typeof AppApprovalsIndexRoute
   AppCalendarIndexRoute: typeof AppCalendarIndexRoute
   AppCampaignsIndexRoute: typeof AppCampaignsIndexRoute
@@ -1351,10 +1431,12 @@ interface AppRouteChildren {
   AppTasksIndexRoute: typeof AppTasksIndexRoute
   AppTeamIndexRoute: typeof AppTeamIndexRoute
   AppTemplatesIndexRoute: typeof AppTemplatesIndexRoute
+  AppAnnouncementsAnnouncementIdEditRoute: typeof AppAnnouncementsAnnouncementIdEditRoute
   AppApprovalsRequestsRequestIdRoute: typeof AppApprovalsRequestsRequestIdRoute
   AppClientsClientIdReportRoute: typeof AppClientsClientIdReportRoute
   AppContentPostsPostIdRoute: typeof AppContentPostsPostIdRoute
   AppShootsShootIdEditRoute: typeof AppShootsShootIdEditRoute
+  AppAnnouncementsAnnouncementIdIndexRoute: typeof AppAnnouncementsAnnouncementIdIndexRoute
   AppClientsClientIdIndexRoute: typeof AppClientsClientIdIndexRoute
   AppRetainersRetainerIdIndexRoute: typeof AppRetainersRetainerIdIndexRoute
   AppShootsShootIdIndexRoute: typeof AppShootsShootIdIndexRoute
@@ -1370,6 +1452,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppInstallRoute: AppInstallRoute,
   AppIndexRoute: AppIndexRoute,
   AppAdminNotificationPolicyRoute: AppAdminNotificationPolicyRoute,
+  AppAnnouncementsNewRoute: AppAnnouncementsNewRoute,
   AppCampaignsCampaignIdRoute: AppCampaignsCampaignIdRoute,
   AppCatalogSettingsRoute: AppCatalogSettingsRoute,
   AppClientsNewRoute: AppClientsNewRoute,
@@ -1397,6 +1480,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppTeamNewRoute: AppTeamNewRoute,
   AppTemplatesTemplateIdRoute: AppTemplatesTemplateIdRoute,
   AppTemplatesNewRoute: AppTemplatesNewRoute,
+  AppAnnouncementsIndexRoute: AppAnnouncementsIndexRoute,
   AppApprovalsIndexRoute: AppApprovalsIndexRoute,
   AppCalendarIndexRoute: AppCalendarIndexRoute,
   AppCampaignsIndexRoute: AppCampaignsIndexRoute,
@@ -1414,10 +1498,14 @@ const AppRouteChildren: AppRouteChildren = {
   AppTasksIndexRoute: AppTasksIndexRoute,
   AppTeamIndexRoute: AppTeamIndexRoute,
   AppTemplatesIndexRoute: AppTemplatesIndexRoute,
+  AppAnnouncementsAnnouncementIdEditRoute:
+    AppAnnouncementsAnnouncementIdEditRoute,
   AppApprovalsRequestsRequestIdRoute: AppApprovalsRequestsRequestIdRoute,
   AppClientsClientIdReportRoute: AppClientsClientIdReportRoute,
   AppContentPostsPostIdRoute: AppContentPostsPostIdRoute,
   AppShootsShootIdEditRoute: AppShootsShootIdEditRoute,
+  AppAnnouncementsAnnouncementIdIndexRoute:
+    AppAnnouncementsAnnouncementIdIndexRoute,
   AppClientsClientIdIndexRoute: AppClientsClientIdIndexRoute,
   AppRetainersRetainerIdIndexRoute: AppRetainersRetainerIdIndexRoute,
   AppShootsShootIdIndexRoute: AppShootsShootIdIndexRoute,

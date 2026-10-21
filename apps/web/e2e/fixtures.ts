@@ -9,6 +9,17 @@ import {
   type AdWallet,
   type AdWalletEntryKind,
   type Amendment,
+  type Announcement,
+  type AnnouncementBody,
+  type AnnouncementHome,
+  type AnnouncementPage,
+  type AnnouncementPoll,
+  type AnnouncementReceipts,
+  type AnnouncementStatus,
+  type AnnouncementSummary,
+  type AnnouncementTemplate,
+  type AnnouncementTemplateList,
+  type AnnouncementTotals,
   APPROVAL_LIMITS,
   type ApprovalItem,
   type ApprovalItemStatus,
@@ -16,6 +27,9 @@ import {
   type ApprovalRequest,
   type ApprovalRequestDetail,
   type ApprovalWithdrawnReason,
+  AUDIENCE_PREVIEW_MAX,
+  type Audience,
+  type AudiencePreview,
   type AuditEntry,
   absentContractBlocks,
   acceptQuoteSchema,
@@ -26,8 +40,10 @@ import {
   agingBucket,
   allowedPostTransitions,
   allowedTaskTransitions,
+  announcementExcerpt,
   applyPayment,
   approvalRequestState,
+  audienceSchema,
   type BillableItems,
   BOARD_LIMITS,
   BOARD_STATUSES,
@@ -99,6 +115,8 @@ import {
   conversionRate,
   convertLeadSchema,
   costPerResult,
+  createAnnouncementSchema,
+  createAnnouncementTemplateSchema,
   createCatalogPackageSchema,
   createCatalogServiceSchema,
   createInvoiceSchema,
@@ -127,6 +145,7 @@ import {
   deliveryRate,
   deviceMatch,
   deviceOf,
+  EMPHASIS_MARK,
   type EmailLogItem,
   type EmailRecordType,
   type EmailSummary,
@@ -136,6 +155,7 @@ import {
   type ExtraWorkBillingChange,
   extendQuoteSchema,
   type FileItem,
+  type FileItemList,
   type FileOwnerType,
   type FileRole,
   type FileUpload,
@@ -221,6 +241,7 @@ import {
   type Notification,
   type NotificationContent,
   type NotificationPolicy,
+  type NotificationPriority,
   type NotificationSettings,
   type NotificationType,
   needsDiscountApproval,
@@ -239,6 +260,9 @@ import {
   type PlatformAccount,
   POST_LIMITS,
   POST_STATUSES,
+  type PollInput,
+  type PollResultsVisibility,
+  type PollVote,
   type Post,
   type PostClientResponse,
   type PostDetail,
@@ -285,6 +309,7 @@ import {
   quoteDraftSchema,
   quoteTotals,
   type RecordWalletEntry,
+  type RemindAnnouncementResult,
   type ReopenShoot,
   type RequestScope,
   type RescheduleTerm,
@@ -315,6 +340,8 @@ import {
   reportMonths,
   revisionSourceOf,
   type ScheduleConflict,
+  SENT_ANNOUNCEMENT_FIELDS,
+  type SendAnnouncement,
   type SharedDeviceUser,
   type Shoot,
   type ShootDetail,
@@ -375,6 +402,8 @@ import {
   type UpdateWalletThreshold,
   type UserResponse,
   unknownPlaceholders,
+  updateAnnouncementSchema,
+  updateAnnouncementTemplateSchema,
   updateCatalogPackageSchema,
   updateCatalogServiceSchema,
   updateClientReportSummarySchema,
@@ -1242,6 +1271,10 @@ interface MockOptions {
   calendar?: boolean;
   /** F16 rule A16: the server has VAPID keys; true by default. */
   pushAvailable?: boolean;
+  /** Adds the announcements of `announcementsSeed` (F16 part D); none by default. */
+  announcements?: boolean;
+  /** Also adds Sara's unacknowledged critical announcement, which blocks everyone else. */
+  criticalAnnouncement?: boolean;
 }
 
 /** A P-256 public key as `GET /api/me/push/config` sends it (fake: no private key exists). */
@@ -1416,6 +1449,17 @@ export async function mockApi(page: Page, options: MockOptions): Promise<MockedA
   const notificationsApi = notificationRoutes({
     notifications: options.notifications ?? notificationsSeed(),
     streamed: options.streamed ?? [],
+    me: () => me,
+  });
+  const announcementsApi = announcementRoutes({
+    users,
+    clients,
+    projects,
+    announcements:
+      options.announcements || options.criticalAnnouncement
+        ? announcementsSeed({ critical: options.criticalAnnouncement })
+        : [],
+    templates: announcementTemplatesSeed(),
     me: () => me,
   });
   const templateRunsApi = templateRunRoutes({
@@ -1713,6 +1757,10 @@ export async function mockApi(page: Page, options: MockOptions): Promise<MockedA
       }
       return json(route, departmentDetail(department));
     }
+
+    // Announcements and audiences (F16 part D), with the files of an announcement.
+    const announced = announcementsApi(route, method, url);
+    if (announced) return announced;
 
     // Emails (F14 email), ahead of the documents' own routes.
     const emailed = emailsApi(route, method, url);
@@ -9517,6 +9565,807 @@ function notificationRoutes({
     return undefined;
   };
 }
+// Announcements and audiences (F16 part D)
+
+/** The instant the announcement specs and screenshots freeze the browser's clock on. */
+export const ANNOUNCEMENTS_NOW = '2026-10-20T09:00:00+03:00';
+
+const announcementsHoursBefore = (hours: number) =>
+  new Date(new Date(ANNOUNCEMENTS_NOW).getTime() - hours * 3_600_000).toISOString();
+
+interface AnnouncementRecipientRecord {
+  userId: string;
+  openedAt: string | null;
+  acknowledgedAt: string | null;
+  remindersSent: number;
+}
+
+interface AnnouncementPollRecord {
+  question: string;
+  multiple: boolean;
+  anonymous: boolean;
+  results: PollResultsVisibility;
+  closesAt: string | null;
+  closedAt: string | null;
+  options: { id: string; label: string }[];
+  votes: { optionId: string; userId: string }[];
+}
+
+export interface AnnouncementRecord {
+  id: string;
+  authorId: string;
+  title: string;
+  body: AnnouncementBody;
+  linkUrl: string | null;
+  linkLabel: string | null;
+  priority: NotificationPriority;
+  requiresAck: boolean;
+  audience: Audience;
+  status: AnnouncementStatus;
+  scheduledAt: string | null;
+  sentAt: string | null;
+  pinnedUntil: string | null;
+  editedAt: string | null;
+  renotifiedAt: string | null;
+  unsentAt: string | null;
+  withdrawnAt: string | null;
+  withdrawnById: string | null;
+  archivedAt: string | null;
+  remindedAt: string | null;
+  createdAt: string;
+  recipients: AnnouncementRecipientRecord[];
+  poll: AnnouncementPollRecord | null;
+}
+
+/** A body of plain paragraphs, one per line. */
+export const paragraphs = (...lines: string[]): AnnouncementBody => ({
+  type: 'doc',
+  content: lines.map((text) => ({ type: 'paragraph', content: [{ type: 'text', text }] })),
+});
+
+const receipt = (
+  userId: string,
+  opened: number | null,
+  acknowledged: number | null = null,
+  remindersSent = 0,
+): AnnouncementRecipientRecord => ({
+  userId,
+  openedAt: opened === null ? null : announcementsHoursBefore(opened),
+  acknowledgedAt: acknowledged === null ? null : announcementsHoursBefore(acknowledged),
+  remindersSent,
+});
+
+const announcementBase = (
+  n: number,
+  fields: Partial<AnnouncementRecord> &
+    Pick<AnnouncementRecord, 'authorId' | 'title' | 'body' | 'audience'>,
+): AnnouncementRecord => ({
+  id: id(3000 + n),
+  linkUrl: null,
+  linkLabel: null,
+  priority: 'normal',
+  requiresAck: false,
+  status: 'sent',
+  scheduledAt: null,
+  sentAt: announcementsHoursBefore(24),
+  pinnedUntil: null,
+  editedAt: null,
+  renotifiedAt: null,
+  unsentAt: null,
+  withdrawnAt: null,
+  withdrawnById: null,
+  archivedAt: null,
+  remindedAt: null,
+  createdAt: announcementsHoursBefore(26),
+  recipients: [],
+  poll: null,
+  ...fields,
+});
+
+export const announcementIds = {
+  ramadan: id(3001),
+  design: id(3002),
+  draft: id(3003),
+  scheduled: id(3004),
+  withdrawn: id(3005),
+  critical: id(3006),
+};
+
+/**
+ * Sara's pinned announcement to everyone with an acknowledgement and a named poll; Layan's
+ * note to Design; Karim's draft; a scheduled and a withdrawn one. `critical` adds Sara's
+ * unacknowledged critical announcement, which opens the blocking dialog for everyone else.
+ */
+export function announcementsSeed({ critical = false } = {}): AnnouncementRecord[] {
+  const records = [
+    announcementBase(1, {
+      authorId: id(1),
+      title: 'مواعيد الدوام في رمضان',
+      body: {
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [
+              { type: 'text', text: 'يبدأ الدوام في رمضان ' },
+              { type: 'text', text: 'الساعة العاشرة صباحًا', marks: [{ type: 'bold' }] },
+              { type: 'text', text: ' وينتهي في الرابعة.' },
+            ],
+          },
+          { type: 'heading', attrs: { level: 3 }, content: [{ type: 'text', text: 'ما يتغيّر' }] },
+          {
+            type: 'bulletList',
+            content: [
+              {
+                type: 'listItem',
+                content: [
+                  {
+                    type: 'paragraph',
+                    content: [{ type: 'text', text: 'اجتماع الإثنين في الحادية عشرة.' }],
+                  },
+                ],
+              },
+              {
+                type: 'listItem',
+                content: [
+                  {
+                    type: 'paragraph',
+                    content: [
+                      { type: 'text', text: 'جلسات التصوير ' },
+                      { type: 'text', text: 'بعد الإفطار', marks: [{ type: EMPHASIS_MARK }] },
+                      { type: 'text', text: ' عند الحاجة.' },
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      linkUrl: 'https://vertex.example/ramadan',
+      linkLabel: 'جدول الدوام',
+      priority: 'important',
+      requiresAck: true,
+      audience: { everyone: true },
+      pinnedUntil: addDays(ANNOUNCEMENTS_NOW.slice(0, 10), 7),
+      recipients: [
+        receipt(id(2), 20, 19),
+        receipt(id(3), 22, 21),
+        receipt(id(4), null, null, 1),
+        receipt(id(8), 5),
+      ],
+      poll: {
+        question: 'أي موعد يناسبكم لإفطار الفريق؟',
+        multiple: false,
+        anonymous: false,
+        results: 'everyone_after_voting',
+        closesAt: announcementsHoursBefore(-72),
+        closedAt: null,
+        options: [
+          { id: id(3101), label: 'الخميس الأول' },
+          { id: id(3102), label: 'الخميس الثاني' },
+          { id: id(3103), label: 'آخر أسبوع' },
+        ],
+        votes: [
+          { optionId: id(3101), userId: id(2) },
+          { optionId: id(3102), userId: id(3) },
+        ],
+      },
+    }),
+    announcementBase(2, {
+      authorId: id(3),
+      title: 'تسليم هوية مطعم الياسمين',
+      body: paragraphs('نسلّم ملفات الهوية يوم الخميس. راجعوا الملاحظات قبل الأربعاء.'),
+      audience: { departments: ['design'] },
+      sentAt: announcementsHoursBefore(48),
+      createdAt: announcementsHoursBefore(48),
+      recipients: [receipt(id(1), 40)],
+    }),
+    announcementBase(3, {
+      authorId: id(4),
+      title: 'معدات التصوير الجديدة',
+      body: paragraphs('وصلت عدسات جديدة. احجزوها من الجدول قبل الجلسة.'),
+      audience: { departments: ['photography', 'design'] },
+      status: 'draft',
+      sentAt: null,
+      createdAt: announcementsHoursBefore(3),
+    }),
+    announcementBase(4, {
+      authorId: id(1),
+      title: 'اجتماع الشركة الشهري',
+      body: paragraphs('اجتماع الشركة يوم الأحد في القاعة الكبيرة.'),
+      audience: { everyone: true },
+      status: 'scheduled',
+      sentAt: null,
+      scheduledAt: announcementsHoursBefore(-48),
+      createdAt: announcementsHoursBefore(2),
+    }),
+    announcementBase(5, {
+      authorId: id(1),
+      title: 'تغيير مكان الاجتماع',
+      body: paragraphs('ينتقل الاجتماع إلى الطابق الثاني.'),
+      audience: { everyone: true },
+      status: 'withdrawn',
+      sentAt: announcementsHoursBefore(72),
+      withdrawnAt: announcementsHoursBefore(70),
+      withdrawnById: id(1),
+      archivedAt: announcementsHoursBefore(70),
+      createdAt: announcementsHoursBefore(72),
+      recipients: [
+        receipt(id(2), 71),
+        receipt(id(3), null),
+        receipt(id(4), null),
+        receipt(id(8), null),
+      ],
+    }),
+  ];
+  if (critical) {
+    records.push(
+      announcementBase(6, {
+        authorId: id(1),
+        title: 'إخلاء المكتب للصيانة غدًا',
+        body: paragraphs(
+          'يُغلق المكتب غدًا للصيانة الكهربائية. يعمل الجميع من المنزل.',
+          'احفظوا ملفاتكم على الخادم قبل المغادرة اليوم.',
+        ),
+        priority: 'critical',
+        requiresAck: true,
+        audience: { everyone: true },
+        sentAt: announcementsHoursBefore(1),
+        createdAt: announcementsHoursBefore(1),
+        recipients: [
+          receipt(id(2), null),
+          receipt(id(3), null),
+          receipt(id(4), null),
+          receipt(id(8), null),
+        ],
+      }),
+    );
+  }
+  return records;
+}
+
+export function announcementTemplatesSeed(): AnnouncementTemplate[] {
+  return [
+    {
+      id: id(3201),
+      name: 'إجازة رسمية',
+      title: 'عطلة رسمية',
+      body: paragraphs('تُغلق الشركة يوم العطلة الرسمية، ويعود الدوام في اليوم التالي.'),
+      priority: 'important',
+      requiresAck: false,
+      linkUrl: null,
+      linkLabel: null,
+      shared: true,
+      editable: false,
+      createdAt: '2026-09-01T08:00:00.000Z',
+      updatedAt: '2026-09-01T08:00:00.000Z',
+    },
+    {
+      id: id(3202),
+      name: 'تذكير بالتسليم',
+      title: 'تذكير: موعد التسليم',
+      body: paragraphs('نذكّر بموعد التسليم. أرسلوا الملفات قبل الظهر.'),
+      priority: 'normal',
+      requiresAck: true,
+      linkUrl: null,
+      linkLabel: null,
+      shared: false,
+      editable: true,
+      createdAt: '2026-09-10T08:00:00.000Z',
+      updatedAt: '2026-09-10T08:00:00.000Z',
+    },
+  ];
+}
+
+/** The audiences and announcements APIs over the in-memory records (rules D1–D12). */
+function announcementRoutes({
+  users,
+  clients,
+  projects,
+  announcements,
+  templates,
+  me,
+}: {
+  users: UserResponse[];
+  clients: ClientRecord[];
+  projects: ProjectRecord[];
+  announcements: AnnouncementRecord[];
+  templates: AnnouncementTemplate[];
+  me: () => MeResponse;
+}) {
+  let next = 3500;
+  const person = (userId: string) => ({
+    id: userId,
+    name: users.find((u) => u.id === userId)?.name ?? '',
+  });
+  const scopes = () =>
+    me().permissions.find((granted) => granted.permission === 'announcements.manage')?.scopes ?? [];
+  const managesAll = () => scopes().includes('all');
+  const active = users.filter((u) => u.status === 'active');
+  const managedDepartments = () =>
+    me()
+      .departments.filter((d) => d.isManager)
+      .map((d) => d.code);
+
+  /** Rule D1, over the seeded team. */
+  const resolve = (audience: Audience): UserResponse[] => {
+    const ids = new Set<string>();
+    if (audience.everyone) for (const u of active) ids.add(u.id);
+    for (const code of audience.departments ?? []) {
+      for (const u of active) if (u.departments.some((d) => d.code === code)) ids.add(u.id);
+    }
+    for (const role of audience.roles ?? []) {
+      for (const u of active) {
+        const holds =
+          role === 'employee' ||
+          (role === 'department_manager' && u.departments.some((d) => d.isManager)) ||
+          (u.roles ?? []).includes(role as never);
+        if (holds) ids.add(u.id);
+      }
+    }
+    for (const userId of audience.users ?? []) ids.add(userId);
+    for (const projectId of audience.projects ?? []) {
+      const project = projects.find((p) => p.id === projectId);
+      if (!project) continue;
+      ids.add(project.projectManagerId);
+      const client = clients.find((c) => c.id === project.clientId);
+      if (client) ids.add(client.accountManagerId);
+    }
+    for (const clientId of audience.clients ?? []) {
+      const client = clients.find((c) => c.id === clientId);
+      if (client) ids.add(client.accountManagerId);
+      for (const p of projects) if (p.clientId === clientId) ids.add(p.projectManagerId);
+    }
+    for (const userId of audience.exclude ?? []) ids.delete(userId);
+    return active.filter((u) => ids.has(u.id)).sort((a, b) => a.name.localeCompare(b.name, 'ar'));
+  };
+
+  /** Rules D3, D7: critical and pinning need `announcements.manage` over every recipient. */
+  const reaches = (recipients: UserResponse[]) =>
+    managesAll() ||
+    (scopes().includes('department') &&
+      recipients.every((u) => u.departments.some((d) => managedDepartments().includes(d.code))));
+
+  const receiptOf = (record: AnnouncementRecord) =>
+    record.recipients.find((r) => r.userId === me().user.id) ?? null;
+  const isAuthor = (record: AnnouncementRecord) => record.authorId === me().user.id;
+  const wasSent = (record: AnnouncementRecord) =>
+    record.status === 'sent' || record.status === 'withdrawn';
+  const readable = (record: AnnouncementRecord) => {
+    if (record.archivedAt && record.status !== 'withdrawn') return false;
+    if (isAuthor(record)) return true;
+    if (receiptOf(record) && record.status === 'sent') return true;
+    return managesAll() && wasSent(record);
+  };
+  const totals = (record: AnnouncementRecord): AnnouncementTotals => ({
+    recipients: record.recipients.length,
+    opened: record.recipients.filter((r) => r.openedAt).length,
+    acknowledged: record.recipients.filter((r) => r.acknowledgedAt).length,
+  });
+
+  const summary = (record: AnnouncementRecord): AnnouncementSummary => {
+    const own = receiptOf(record);
+    return {
+      id: record.id,
+      author: person(record.authorId),
+      title: record.title,
+      excerpt: announcementExcerpt(record.body),
+      priority: record.priority,
+      requiresAck: record.requiresAck,
+      status: record.status,
+      scheduledAt: record.scheduledAt,
+      sentAt: record.sentAt,
+      pinnedUntil: record.pinnedUntil,
+      editedAt: record.editedAt,
+      unsentAt: record.unsentAt,
+      withdrawnAt: record.withdrawnAt,
+      receipt: own && { openedAt: own.openedAt, acknowledgedAt: own.acknowledgedAt },
+      totals: wasSent(record) && (isAuthor(record) || managesAll()) ? totals(record) : null,
+      createdAt: record.createdAt,
+    };
+  };
+
+  const pollOf = (record: AnnouncementRecord): AnnouncementPoll | null => {
+    const poll = record.poll;
+    if (!poll) return null;
+    const own = receiptOf(record);
+    const closed =
+      poll.closedAt !== null ||
+      (!!poll.closesAt && poll.closesAt <= new Date(ANNOUNCEMENTS_NOW).toISOString());
+    const myVote = poll.votes.filter((v) => v.userId === me().user.id).map((v) => v.optionId);
+    const owner = isAuthor(record) || managesAll();
+    const sees =
+      owner || (poll.results === 'everyone_after_voting' && (myVote.length > 0 || closed));
+    const names = owner && !poll.anonymous;
+    const voters = new Set(poll.votes.map((v) => v.userId)).size;
+    return {
+      question: poll.question,
+      multiple: poll.multiple,
+      anonymous: poll.anonymous,
+      results: poll.results,
+      closesAt: poll.closesAt,
+      closedAt: poll.closedAt,
+      closed,
+      options: poll.options.map((option) => {
+        const votes = poll.votes.filter((v) => v.optionId === option.id);
+        return {
+          id: option.id,
+          label: option.label,
+          votes: sees ? votes.length : null,
+          voters: names ? votes.map((v) => person(v.userId)) : null,
+        };
+      }),
+      voters: sees ? voters : null,
+      myVote,
+      rights: {
+        vote: !!own && record.status === 'sent' && !closed,
+        close: isAuthor(record) && record.status === 'sent' && !closed,
+      },
+    };
+  };
+
+  const detail = (record: AnnouncementRecord): Announcement => {
+    const own = receiptOf(record);
+    const author = isAuthor(record);
+    return {
+      ...summary(record),
+      body: record.body,
+      linkUrl: record.linkUrl,
+      linkLabel: record.linkLabel,
+      audience: author || managesAll() ? record.audience : null,
+      renotifiedAt: record.renotifiedAt,
+      withdrawnBy: record.withdrawnById ? person(record.withdrawnById) : null,
+      poll: pollOf(record),
+      rights: {
+        edit: author && record.status !== 'withdrawn',
+        withdraw: record.status === 'sent' && (author || managesAll()),
+        receipts: wasSent(record) && (author || managesAll()),
+        acknowledge:
+          !!own && record.status === 'sent' && record.requiresAck && own.acknowledgedAt === null,
+      },
+    };
+  };
+
+  const pollRecord = (input: PollInput | null, previous: AnnouncementPollRecord | null) =>
+    input && {
+      question: input.question,
+      multiple: input.multiple,
+      anonymous: input.anonymous,
+      results: input.results,
+      closesAt: input.closesAt,
+      closedAt: previous?.closedAt ?? null,
+      options: input.options.map((label) => ({
+        id: previous?.options.find((o) => o.label === label)?.id ?? id(next++),
+        label,
+      })),
+      votes: [],
+    };
+
+  /** Sends now (rule D3); answers why it cannot instead. */
+  const deliver = (record: AnnouncementRecord, route: Route) => {
+    const recipients = resolve(record.audience).filter((u) => u.id !== record.authorId);
+    if (recipients.length === 0) return fail(route, 409, 'EMPTY_AUDIENCE');
+    if ((record.priority === 'critical' || record.pinnedUntil) && !reaches(recipients)) {
+      return fail(route, 403, 'FORBIDDEN_AUDIENCE');
+    }
+    record.status = 'sent';
+    record.sentAt = new Date().toISOString();
+    record.scheduledAt = null;
+    record.unsentAt = null;
+    record.recipients = recipients.map((u) => ({
+      userId: u.id,
+      openedAt: null,
+      acknowledgedAt: null,
+      remindersSent: 0,
+    }));
+    return undefined;
+  };
+
+  const ownTemplates = new Map<string, string>([[id(3202), id(1)]]);
+  const templateOf = (template: AnnouncementTemplate): AnnouncementTemplate => ({
+    ...template,
+    editable: template.shared ? managesAll() : ownTemplates.get(template.id) === me().user.id,
+  });
+  const visibleTemplates = () =>
+    templates.filter((t) => t.shared || ownTemplates.get(t.id) === me().user.id);
+
+  return (route: Route, method: string, url: URL) => {
+    const path = url.pathname;
+    const body = () => route.request().postDataJSON();
+
+    if (path === '/api/audiences/preview' && method === 'POST') {
+      const parsed = audienceSchema.safeParse(body());
+      if (!parsed.success) return fail(route, 400, null);
+      const resolved = resolve(parsed.data);
+      return json(route, {
+        count: resolved.length,
+        users: resolved.slice(0, AUDIENCE_PREVIEW_MAX).map((u) => ({
+          id: u.id,
+          name: u.name,
+          image: null,
+          department: u.departments.find((d) => d.isPrimary)?.code ?? null,
+        })),
+      } satisfies AudiencePreview);
+    }
+
+    // Files of an announcement (F10 owner type `announcement`): none seeded.
+    if (
+      path === '/api/files/items' &&
+      method === 'GET' &&
+      url.searchParams.get('ownerType') === 'announcement'
+    ) {
+      const record = announcements.find((a) => a.id === url.searchParams.get('ownerId'));
+      if (!record || !readable(record)) return fail(route, 404, null);
+      return json(route, {
+        items: [],
+        rights: {
+          canAddDeliverable: false,
+          canAddReference: false,
+          canManageDocuments: isAuthor(record) && record.status !== 'withdrawn',
+          canSetConfidential: false,
+          canSeeRemoved: false,
+        },
+      } satisfies FileItemList);
+    }
+
+    if (path === '/api/announcements/home' && method === 'GET') {
+      const today = businessDate(new Date(ANNOUNCEMENTS_NOW));
+      const mine = announcements.filter((a) => a.status === 'sent' && receiptOf(a));
+      return json(route, {
+        pinned: mine
+          .filter((a) => a.pinnedUntil && a.pinnedUntil >= today)
+          .sort((a, b) => (b.sentAt ?? '').localeCompare(a.sentAt ?? ''))
+          .map(summary),
+        critical: mine
+          .filter((a) => a.priority === 'critical' && !receiptOf(a)?.acknowledgedAt)
+          .sort((a, b) => (a.sentAt ?? '').localeCompare(b.sentAt ?? ''))
+          .map(detail),
+      } satisfies AnnouncementHome);
+    }
+
+    if (path === '/api/announcements' && method === 'GET') {
+      const view = url.searchParams.get('view') ?? 'received';
+      if (view === 'all' && !managesAll()) return fail(route, 403, null);
+      const statuses = url.searchParams.getAll('status');
+      const search = url.searchParams.get('search');
+      const items = announcements
+        .filter((a) =>
+          view === 'received'
+            ? a.status === 'sent' && !!receiptOf(a)
+            : view === 'sent'
+              ? isAuthor(a) && (!a.archivedAt || a.status === 'withdrawn')
+              : wasSent(a),
+        )
+        .filter((a) => statuses.length === 0 || statuses.includes(a.status))
+        .filter((a) => !search || a.title.includes(search))
+        .sort((a, b) =>
+          (b.sentAt ?? b.scheduledAt ?? b.createdAt).localeCompare(
+            a.sentAt ?? a.scheduledAt ?? a.createdAt,
+          ),
+        )
+        .map(summary);
+      return json(route, {
+        items,
+        total: items.length,
+        page: 1,
+        pageSize: 20,
+      } satisfies AnnouncementPage);
+    }
+
+    if (path === '/api/announcements' && method === 'POST') {
+      const parsed = createAnnouncementSchema.safeParse(body());
+      if (!parsed.success) return fail(route, 400, null);
+      const input = parsed.data;
+      const now = new Date().toISOString();
+      const record: AnnouncementRecord = {
+        id: id(next++),
+        authorId: me().user.id,
+        title: input.title,
+        body: input.body,
+        linkUrl: input.linkUrl ?? null,
+        linkLabel: input.linkLabel ?? null,
+        priority: input.priority,
+        requiresAck: input.requiresAck,
+        audience: input.audience,
+        status: input.send === 'schedule' ? 'scheduled' : 'draft',
+        scheduledAt: input.send === 'schedule' ? (input.scheduledAt ?? null) : null,
+        sentAt: null,
+        pinnedUntil: input.pinnedUntil ?? null,
+        editedAt: null,
+        renotifiedAt: null,
+        unsentAt: null,
+        withdrawnAt: null,
+        withdrawnById: null,
+        archivedAt: null,
+        remindedAt: null,
+        createdAt: now,
+        recipients: [],
+        poll: pollRecord(input.poll ?? null, null),
+      };
+      if (input.send === 'now') {
+        const refused = deliver(record, route);
+        if (refused) return refused;
+      }
+      announcements.push(record);
+      return json(route, detail(record), 201);
+    }
+
+    const templatesPath = path.match(/^\/api\/announcement-templates(?:\/([^/]+))?(\/archive)?$/);
+    if (templatesPath) {
+      const [, templateId, archive] = templatesPath;
+      if (!templateId && method === 'GET') {
+        const items = visibleTemplates()
+          .map(templateOf)
+          .sort(
+            (a, b) => Number(a.shared) - Number(b.shared) || a.name.localeCompare(b.name, 'ar'),
+          );
+        return json(route, { items } satisfies AnnouncementTemplateList);
+      }
+      if (!templateId && method === 'POST') {
+        const parsed = createAnnouncementTemplateSchema.safeParse(body());
+        if (!parsed.success) return fail(route, 400, null);
+        if (parsed.data.shared && !managesAll()) return fail(route, 403, null);
+        const now = new Date().toISOString();
+        const { shared, ...fields } = parsed.data;
+        const template: AnnouncementTemplate = {
+          id: id(next++),
+          ...fields,
+          linkUrl: fields.linkUrl ?? null,
+          linkLabel: fields.linkLabel ?? null,
+          shared,
+          editable: true,
+          createdAt: now,
+          updatedAt: now,
+        };
+        templates.push(template);
+        if (!shared) ownTemplates.set(template.id, me().user.id);
+        return json(route, templateOf(template), 201);
+      }
+      const template = visibleTemplates().find((t) => t.id === templateId);
+      if (!template) return fail(route, 404, null);
+      if (!templateOf(template).editable) return fail(route, 403, null);
+      if (archive && method === 'POST') {
+        templates.splice(templates.indexOf(template), 1);
+        return json(route, templateOf(template));
+      }
+      if (method === 'PATCH') {
+        const parsed = updateAnnouncementTemplateSchema.safeParse(body());
+        if (!parsed.success) return fail(route, 400, null);
+        Object.assign(template, parsed.data, { updatedAt: new Date().toISOString() });
+        return json(route, templateOf(template));
+      }
+    }
+
+    const match = path.match(/^\/api\/announcements\/([^/]+)(?:\/(.+))?$/);
+    if (!match) return undefined;
+    const [, announcementId, action] = match;
+    const record = announcements.find((a) => a.id === announcementId);
+    if (!record || !readable(record)) return fail(route, 404, null);
+    const own = receiptOf(record);
+
+    if (!action && method === 'GET') {
+      // Rule D4: reading opens it.
+      if (own && record.status === 'sent' && !own.openedAt) own.openedAt = new Date().toISOString();
+      return json(route, detail(record));
+    }
+    if (!action && method === 'PATCH') {
+      if (!isAuthor(record)) return fail(route, 403, null);
+      const parsed = updateAnnouncementSchema.safeParse(body());
+      if (!parsed.success) return fail(route, 400, null);
+      const input = parsed.data;
+      if (record.status === 'sent') {
+        const locked = Object.keys(input).some(
+          (key) => !(SENT_ANNOUNCEMENT_FIELDS as readonly string[]).includes(key),
+        );
+        if (locked || (input.poll !== undefined && (record.poll?.votes.length ?? 0) > 0)) {
+          return fail(route, 409, 'LOCKED_FIELD');
+        }
+        record.editedAt = new Date().toISOString();
+        if (input.notifyAgain) {
+          record.renotifiedAt = record.editedAt;
+          for (const r of record.recipients) r.acknowledgedAt = null;
+        }
+      }
+      const { poll, notifyAgain: _notifyAgain, ...fields } = input;
+      Object.assign(record, fields);
+      if (poll !== undefined) record.poll = pollRecord(poll, record.poll);
+      return json(route, detail(record));
+    }
+    if (action === 'send' && method === 'POST') {
+      if (!isAuthor(record)) return fail(route, 403, null);
+      if (record.status !== 'draft') return fail(route, 409, 'NOT_DRAFT');
+      const { scheduledAt } = body() as SendAnnouncement;
+      if (scheduledAt) {
+        record.status = 'scheduled';
+        record.scheduledAt = scheduledAt;
+      } else {
+        const refused = deliver(record, route);
+        if (refused) return refused;
+      }
+      return json(route, detail(record));
+    }
+    if (action === 'cancel-schedule' && method === 'POST') {
+      if (!isAuthor(record)) return fail(route, 403, null);
+      if (record.status !== 'scheduled') return fail(route, 409, 'NOT_SCHEDULED');
+      record.status = 'draft';
+      record.scheduledAt = null;
+      return json(route, detail(record));
+    }
+    if (action === 'withdraw' && method === 'POST') {
+      if (!isAuthor(record) && !managesAll()) return fail(route, 403, null);
+      if (record.status === 'withdrawn') return fail(route, 409, 'ALREADY_WITHDRAWN');
+      record.status = 'withdrawn';
+      record.withdrawnAt = new Date().toISOString();
+      record.withdrawnById = me().user.id;
+      record.archivedAt = record.withdrawnAt;
+      return json(route, detail(record));
+    }
+    if (action === 'archive' && method === 'POST') {
+      if (!isAuthor(record)) return fail(route, 403, null);
+      if (record.status !== 'draft') return fail(route, 409, 'NOT_DRAFT');
+      record.archivedAt = new Date().toISOString();
+      return route.fulfill({ status: 204 });
+    }
+    if (action === 'acknowledge' && method === 'POST') {
+      if (!own || record.status !== 'sent') return fail(route, 404, null);
+      if (!record.requiresAck) return fail(route, 409, 'NO_ACK_REQUIRED');
+      const now = new Date().toISOString();
+      own.acknowledgedAt ??= now;
+      own.openedAt ??= now;
+      return route.fulfill({ status: 204 });
+    }
+    if (action === 'remind' && method === 'POST') {
+      if (!isAuthor(record)) return fail(route, 403, null);
+      if (!record.requiresAck) return fail(route, 409, 'NO_ACK_REQUIRED');
+      if (record.remindedAt) return fail(route, 429, null);
+      record.remindedAt = new Date().toISOString();
+      return json(route, {
+        reminded: record.recipients.filter((r) => !r.acknowledgedAt).length,
+      } satisfies RemindAnnouncementResult);
+    }
+    if (action === 'receipts' && method === 'GET') {
+      if (!isAuthor(record) && !managesAll()) return fail(route, 403, null);
+      const filter = url.searchParams.get('filter') ?? 'all';
+      const items = record.recipients
+        .filter(
+          (r) =>
+            filter === 'all' ||
+            (filter === 'not_opened' && !r.openedAt) ||
+            (filter === 'not_acknowledged' && !r.acknowledgedAt),
+        )
+        .map((r) => ({
+          user: { ...person(r.userId), image: null, archived: false },
+          openedAt: r.openedAt,
+          acknowledgedAt: r.acknowledgedAt,
+          remindersSent: r.remindersSent,
+        }));
+      return json(route, { totals: totals(record), items } satisfies AnnouncementReceipts);
+    }
+    if (action === 'poll/vote' && method === 'PUT') {
+      const poll = record.poll;
+      if (!poll || !own) return fail(route, 404, null);
+      if (pollOf(record)?.closed) return fail(route, 409, 'POLL_CLOSED');
+      const { optionIds } = body() as PollVote;
+      if (!poll.multiple && optionIds.length > 1) return fail(route, 400, 'SINGLE_CHOICE');
+      poll.votes = [
+        ...poll.votes.filter((v) => v.userId !== me().user.id),
+        ...optionIds.map((optionId) => ({ optionId, userId: me().user.id })),
+      ];
+      return json(route, pollOf(record));
+    }
+    if (action === 'poll/close' && method === 'POST') {
+      const poll = record.poll;
+      if (!poll) return fail(route, 404, null);
+      if (!isAuthor(record)) return fail(route, 403, null);
+      if (pollOf(record)?.closed) return fail(route, 409, 'POLL_CLOSED');
+      poll.closedAt = new Date().toISOString();
+      return json(route, pollOf(record));
+    }
+    return undefined;
+  };
+}
+
 // Email (F14 email)
 
 /** An email of the mock outbox, with the invoice whose history shows a receipt, and its month. */

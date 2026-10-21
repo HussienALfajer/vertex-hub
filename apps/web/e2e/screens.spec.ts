@@ -1,6 +1,8 @@
 import ar from '../src/i18n/locales/ar.json' with { type: 'json' };
 import {
+  ANNOUNCEMENTS_NOW,
   accountManagerMe,
+  announcementIds,
   CONTENT_LINK_TOKEN,
   catalogNotificationsSeed,
   DEVICES_NOW,
@@ -104,6 +106,8 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await screenshot(page, testInfo, `design-system-${colorScheme}`);
       await page.getByRole('heading', { name: ar.designSystem.calendar }).scrollIntoViewIfNeeded();
       await screenshot(page, testInfo, `design-system-calendar-${colorScheme}`);
+      await page.getByRole('heading', { name: ar.designSystem.richText }).scrollIntoViewIfNeeded();
+      await screenshot(page, testInfo, `design-system-rich-text-${colorScheme}`);
 
       await page.getByRole('button', { name: ar.designSystem.openMenu }).click();
       await expect(page.getByRole('menuitem', { name: ar.designSystem.menuEdit })).toBeVisible();
@@ -275,6 +279,77 @@ for (const colorScheme of ['light', 'dark'] as const) {
           page.getByRole('button', { name: new RegExp(ar.notifications.follow.follow) }),
         ).toBeVisible();
         await screenshot(page, testInfo, `task-follow-${size}-${colorScheme}`);
+      });
+
+      // F16 screens 9–14: announcements, with the home pin and the critical dialog.
+      test(`announcements (${size})`, async ({ page }, testInfo) => {
+        await page.setViewportSize({ width, height });
+        await page.clock.setFixedTime(new Date(ANNOUNCEMENTS_NOW));
+        const api = await mockApi(page, { signedIn: true, me: employeeMe, announcements: true });
+        await page.goto('/');
+        const pinned = page.getByRole('region', { name: ar.announcements.home.title });
+        await expect(pinned).toContainText('مواعيد الدوام في رمضان');
+        await pinned.scrollIntoViewIfNeeded();
+        await screenshot(page, testInfo, `announcements-home-pin-${size}-${colorScheme}`);
+
+        await page.goto('/announcements');
+        await expect(page.getByRole('link', { name: 'مواعيد الدوام في رمضان' })).toBeVisible();
+        await screenshot(page, testInfo, `announcements-list-${size}-${colorScheme}`);
+
+        await page.goto(`/announcements/${announcementIds.ramadan}`);
+        await expect(page.getByText('الساعة العاشرة صباحًا')).toBeVisible();
+        await screenshot(page, testInfo, `announcement-page-${size}-${colorScheme}`);
+        const poll = page.getByRole('region', { name: 'أي موعد يناسبكم لإفطار الفريق؟' });
+        await poll.scrollIntoViewIfNeeded();
+        await screenshot(page, testInfo, `announcement-poll-${size}-${colorScheme}`);
+
+        // The author's view: receipts, then the editor with the audience and a poll.
+        api.signInAs(manager);
+        await page.goto(`/announcements/${announcementIds.ramadan}`);
+        const receipts = page.getByRole('heading', { name: ar.announcements.receipts.title });
+        await receipts.scrollIntoViewIfNeeded();
+        await expect(page.getByRole('row', { name: /كريم الزين/ })).toBeVisible();
+        await screenshot(page, testInfo, `announcement-receipts-${size}-${colorScheme}`);
+
+        await page.goto('/announcements/new');
+        await page
+          .getByLabel(ar.announcements.form.title, { exact: true })
+          .fill('جلسة تصوير المنيو');
+        await page
+          .getByRole('textbox', { name: ar.announcements.form.body })
+          .fill('نصوّر منيو الخريف يوم الثلاثاء في الاستوديو.');
+        await screenshot(page, testInfo, `announcement-editor-${size}-${colorScheme}`);
+        await page
+          .getByRole('button', { name: ar.audiences.sources.departments, exact: true })
+          .click();
+        await page
+          .getByRole('combobox', { name: ar.audiences.sources.departments })
+          .fill('التصميم');
+        await page.getByRole('option', { name: 'التصميم' }).click();
+        await expect(page.getByText(ar.audiences.count_one)).toBeVisible();
+        await page
+          .getByRole('heading', { name: ar.announcements.form.audience, exact: true })
+          .evaluate((heading) => heading.scrollIntoView({ block: 'start' }));
+        await screenshot(page, testInfo, `announcement-audience-${size}-${colorScheme}`);
+        await page.getByRole('switch', { name: ar.announcements.form.addPoll }).click();
+        await page.getByLabel(ar.announcements.form.pollQuestion).scrollIntoViewIfNeeded();
+        await screenshot(page, testInfo, `announcement-poll-builder-${size}-${colorScheme}`);
+        await page.getByRole('button', { name: ar.announcements.templates.start }).click();
+        await expect(
+          page.getByRole('dialog', { name: ar.announcements.templates.title }),
+        ).toContainText('إجازة رسمية');
+        await screenshot(page, testInfo, `announcement-templates-${size}-${colorScheme}`);
+      });
+
+      test(`critical announcement (${size})`, async ({ page }, testInfo) => {
+        await page.setViewportSize({ width, height });
+        await page.clock.setFixedTime(new Date(ANNOUNCEMENTS_NOW));
+        await mockApi(page, { signedIn: true, me: employeeMe, criticalAnnouncement: true });
+        await page.goto('/');
+        await expect(
+          page.getByRole('alertdialog', { name: 'إخلاء المكتب للصيانة غدًا' }),
+        ).toBeVisible();
+        await screenshot(page, testInfo, `announcement-critical-${size}-${colorScheme}`);
       });
     }
 

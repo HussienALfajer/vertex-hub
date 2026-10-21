@@ -74,6 +74,11 @@ export default defineConfig({
             url: '/notifications',
             icons: [{ src: '/icon-192.png', sizes: '192x192' }],
           },
+          {
+            name: ar.announcements.new,
+            url: '/announcements/new',
+            icons: [{ src: '/icon-192.png', sizes: '192x192' }],
+          },
         ],
       },
       // `pnpm dev` runs the service worker too, so push can be tried locally.
