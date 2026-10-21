@@ -324,6 +324,15 @@ Settled in implementation (PR B3, 2026-10-21):
 - Rule B16: the calendar's `leaves` follow the person filter; the client and shoot type filters hide them. The employee sees their own leave's type. As a conflict (rule B17), a leave runs from the start of its first day to the end of its last, with an empty title.
 - Rule B18: the job sends `colleague_on_leave` for approved leaves starting after today and by the next company work day; a leave approved after that run gets none.
 
+Settled in implementation (PR B4, 2026-10-22):
+- A request opens on its own page `/hr/requests/:id`, for its employee and the `hr.read` holders covering them (others get "not found"): the days, the split, notice, the reason, the decision, the opinions, the employee's work in the period (`hr.approve`, rule B14) and its documents. Approvals and My attendance list requests and link to it.
+- Rule B13: the certificate is attached on the request page. Submitting a sick leave that needs one opens that page; the preview warns before submitting.
+- The request dialog asks the preview as the days change, before the reason is typed (the reason changes nothing it shows). A refusal (`INSUFFICIENT_BALANCE`, `REQUEST_OVERLAP`, `TOO_LATE`, ...) shows in the preview.
+- `hr.approve` records leave for an employee from the file's Leave tab ("Record leave", approved at once) and adjusts the balances there; the employee sees the same tab read-only at `/me/file`. Department managers, who have no file access, use Approvals.
+- The HR section opens `/hr`, which goes to the first HR page the user can use (People, Approvals, then HR settings).
+- Rule B16: the calendar shows a leave on every day of its range, off days included; the type and the half day show in the agenda and a day's list, not in a month cell.
+- Rule B17: shoots and meetings already show `leave` conflicts through their F11 conflict list; the task form, the edit dialog and the reassign dialog show the leave days with "Assign anyway".
+
 ### Part C: attendance
 1. **Start date.** Until `attendance_starts_on`, attendance runs in **trial**: punches are recorded and days show `trial`, but no item, reminder or absence is produced (owner, 2026-10-21). `hr.manage` sets the date (today or later); leave works from the deploy regardless.
 2. **Who.** Attendance applies to non-exempt users with a `start_date` ≤ the day and no past `ended_on`. Exempt users cannot punch.

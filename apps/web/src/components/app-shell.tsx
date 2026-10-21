@@ -21,6 +21,7 @@ import {
   BellRingIcon,
   BriefcaseBusinessIcon,
   Building2Icon,
+  CalendarCheckIcon,
   CalendarDaysIcon,
   CalendarRangeIcon,
   ChartNoAxesCombinedIcon,
@@ -55,6 +56,7 @@ import { useInstallOffer } from '../features/app/install';
 import { OfflineBanner } from '../features/app/offline-banner';
 import { UpdateBanner } from '../features/app/update-banner';
 import { hasApprovalQueue } from '../features/approvals/approvals-page';
+import { readsHr } from '../features/hr/hr-approvals-page';
 import { managesHr } from '../features/hr/hr-settings-page';
 import { hasPeopleAccess } from '../features/hr/people-page';
 import { NotificationBell } from '../features/notifications/notification-bell';
@@ -84,6 +86,7 @@ interface NavItem {
     | 'nav.campaigns'
     | 'nav.catalog'
     | 'nav.templates'
+    | 'nav.myAttendance'
     | 'nav.hr'
     | 'nav.team'
     | 'nav.departments'
@@ -110,6 +113,7 @@ interface NavChild {
     | 'nav.taskBoard'
     | 'nav.workload'
     | 'nav.people'
+    | 'nav.hrApprovals'
     | 'nav.hrSettings';
   /** Lists the page only for these users; others still reach it. */
   show?: (me: MeResponse) => boolean;
@@ -152,14 +156,18 @@ const navItems: NavItem[] = [
   { to: '/catalog', label: 'nav.catalog', icon: PackageIcon, permission: 'catalog.read' },
   // Everyone reads templates; the people who apply or maintain them see the link (F07 screen 1).
   { to: '/templates', label: 'nav.templates', icon: LayoutTemplateIcon, show: managesTeams },
-  // HR (F17): files for `employees.read`, pay for `salaries.read`, settings for `hr.manage`.
+  // Everyone's own leave, and attendance with part C (F17 screen "My attendance").
+  { to: '/me/attendance', label: 'nav.myAttendance', icon: CalendarCheckIcon },
+  // HR (F17): files for `employees.read`, pay for `salaries.read`, requests for `hr.read`,
+  // settings for `hr.manage`.
   {
-    to: '/hr/people',
+    to: '/hr',
     label: 'nav.hr',
     icon: ContactRoundIcon,
-    show: (me) => hasPeopleAccess(me) || managesHr(me),
+    show: (me) => hasPeopleAccess(me) || readsHr(me) || managesHr(me),
     children: [
       { to: '/hr/people', label: 'nav.people', show: hasPeopleAccess },
+      { to: '/hr/approvals', label: 'nav.hrApprovals', show: readsHr },
       { to: '/hr/settings', label: 'nav.hrSettings', show: managesHr },
     ],
   },

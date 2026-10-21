@@ -1,0 +1,130 @@
+import { useQuery } from '@tanstack/react-query';
+import { useNavigate } from '@tanstack/react-router';
+import { HR_REQUEST_KINDS, type HrRequestKind, type MeResponse } from '@vertex-hub/contracts';
+import { EmptyState, PageHeader, Pagination } from '@vertex-hub/ui';
+import { StampIcon } from 'lucide-react';
+import { useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
+import { LoadError } from '../../components/load-error';
+import { can } from '../../lib/auth';
+import { formatNumber } from '../../lib/format';
+import { ALL, idParam, oneOfParam, pageParam } from '../../lib/search-params';
+import { usePageInRange } from '../../lib/use-page-in-range';
+import { departmentListQuery } from '../departments/departments.queries';
+import { ChoiceSelect } from '../quotes/choice-select';
+import { hrRequestListQuery } from './hr.queries';
+import { RequestRows, RequestRowsSkeleton } from './leave-parts';
+
+/** Approvals reach `hr.read` holders: the GM decides, managers and Ops give opinions (B14). */
+export const readsHr = (me: MeResponse) => can(me, 'hr.read');
+
+export interface HrApprovalsSearch {
+  kind?: HrRequestKind;
+  departmentId?: string;
+  page?: number;
+}
+
+export function parseHrApprovalsSearch(search: Record<string, unknown>): HrApprovalsSearch {
+  return {
+    kind: oneOfParam(HR_REQUEST_KINDS, search.kind),
+    departmentId: idParam(search.departmentId),
+    page: pageParam(search.page),
+  };
+}
+
+const PAGE_SIZE = 25;
+
+/**
+ * Approvals `/hr/approvals` (spec F17): the pending requests in the viewer's scope, oldest first,
+ * filtered by kind and department. Attendance items join them in part C.
+ */
+export function HrApprovalsPage({ search }: { search: HrApprovalsSearch }) {
+  const { t } = useTranslation();
+  const navigate = useNavigate({ from: '/hr/approvals' });
+  const page = search.page ?? 1;
+  const departments = useQuery(departmentListQuery);
+  const requests = useQuery(
+    hrRequestListQuery({
+      status: ['pending'],
+      kind: search.kind,
+      departmentId: search.departmentId,
+      order: 'asc',
+      page,
+      pageSize: PAGE_SIZE,
+    }),
+  );
+  usePageInRange(
+    page,
+    requests.data?.total,
+    PAGE_SIZE,
+    useCallback(
+      (next: number | undefined) =>
+        navigate({ search: (previous) => ({ ...previous, page: next }), replace: true }),
+      [navigate],
+    ),
+  );
+  const setFilter = (next: Partial<HrApprovalsSearch>) =>
+    navigate({ search: (previous) => ({ ...previous, ...next, page: undefined }), replace: true });
+
+  const kindItems = [
+    { value: ALL, label: t('hr.approvals.allKinds') },
+    ...HR_REQUEST_KINDS.map((kind) => ({ value: kind, label: t(`hr.requests.kinds.${kind}`) })),
+  ];
+  const departmentItems = [
+    { value: ALL, label: t('users.allDepartments') },
+    ...(departments.data?.items ?? []).map((d) => ({ value: d.id, label: d.name })),
+  ];
+
+  return (
+    <>
+      <PageHeader title={t('hr.approvals.title')} description={t('hr.approvals.subtitle')} />
+      <div className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-3 md:flex-row md:items-center">
+        <ChoiceSelect
+          label={t('hr.approvals.kind')}
+          items={kindItems}
+          value={search.kind ?? ALL}
+          onChange={(value) =>
+            setFilter({ kind: value === ALL ? undefined : (value as HrRequestKind) })
+          }
+          className="md:w-48"
+        />
+        <ChoiceSelect
+          label={t('users.department')}
+          items={departmentItems}
+          value={search.departmentId ?? ALL}
+          onChange={(value) => setFilter({ departmentId: value === ALL ? undefined : value })}
+          className="md:w-48"
+        />
+      </div>
+      {requests.isPending ? (
+        <RequestRowsSkeleton />
+      ) : requests.isError ? (
+        <LoadError message={t('hr.requests.listError')} onRetry={() => requests.refetch()} />
+      ) : requests.data.items.length === 0 ? (
+        <EmptyState
+          icon={<StampIcon />}
+          title={t('hr.approvals.emptyTitle')}
+          description={t('hr.approvals.emptyHint')}
+        />
+      ) : (
+        <div className="flex flex-col gap-4">
+          <RequestRows requests={requests.data.items} showUser from="approvals" />
+          <Pagination
+            page={page}
+            pageCount={Math.ceil(requests.data.total / PAGE_SIZE)}
+            onPageChange={(next) =>
+              navigate({ search: (previous) => ({ ...previous, page: next }) })
+            }
+            summary={t('common.pageSummary', {
+              from: formatNumber((page - 1) * PAGE_SIZE + 1),
+              to: formatNumber((page - 1) * PAGE_SIZE + requests.data.items.length),
+              total: formatNumber(requests.data.total),
+            })}
+            previousLabel={t('common.previous')}
+            nextLabel={t('common.next')}
+          />
+        </div>
+      )}
+    </>
+  );
+}

@@ -37,6 +37,7 @@ Parts A → B → C → D, each accepted by the owner before the next starts (sp
 - [x] checks, reviewer, acceptance (API at `/api/docs`, owner 2026-10-21), PR with auto-merge
 
 ## PR B4 — leave: web and E2E
-- [ ] My attendance `/me/attendance` with Balances and Requests only (the Today card is part C), the request dialog with the preview and the certificate upload; employee file Leave tab (balances, ledger, adjustments, opening); Approvals `/hr/approvals` (requests); "On leave" on the calendar; the leave warning with "Assign anyway" in the task, shoot and meeting dialogs
-- [ ] E2E: `f17-leave.spec.ts` (employee, GM, department manager), screenshots in both themes; mocks in `fixtures.ts`
-- [ ] checks, reviewer, acceptance (spec step 5), PR with auto-merge, `docs/ROADMAP.md`
+- [x] My attendance `/me/attendance` with Balances and Requests only (the Today card is part C), the request dialog with the preview and the certificate upload; employee file Leave tab (balances, ledger, adjustments, opening); Approvals `/hr/approvals` (requests); "On leave" on the calendar; the leave warning with "Assign anyway" in the task, shoot and meeting dialogs
+- [x] request page `/hr/requests/:id` (details, opinions, overlapping work, documents); `/hr` opens the first HR page the user can use; nav: My attendance, HR › Requests
+- [x] E2E: `f17-leave.spec.ts` (employee, GM, department manager), screenshots in both themes; mocks in `fixtures.ts`
+- [x] checks, reviewer, acceptance (spec step 5; owner 2026-10-22), PR with auto-merge, `docs/ROADMAP.md`

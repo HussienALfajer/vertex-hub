@@ -146,7 +146,7 @@ export function uploadFile(
 /**
  * A change to an owner's files, refreshing also on failure: a 403 or 409 after the owner changed
  * (edge case 14) reloads the section with its current actions. A task's page also shows its file
- * counts, a post's page its media.
+ * counts, a post's page its media, an HR request whether its certificate is there.
  */
 function useFilesMutation<Input, Output>(
   owner: FileOwnerRef,
@@ -157,6 +157,8 @@ function useFilesMutation<Input, Output>(
   if (owner.type === 'task') refreshes.push(tasksKeys.detail(owner.id));
   // A post's files are its media and part of its content token (F08 rules 5 and 11).
   if (owner.type === 'post') refreshes.push(['content']);
+  // A request counts its documents: a sick leave's certificate (F17 rule B13).
+  if (owner.type === 'hr_request') refreshes.push(['hr', 'requests']);
   return useMutation({
     mutationFn,
     onSettled: () =>

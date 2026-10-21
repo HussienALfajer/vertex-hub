@@ -27,6 +27,7 @@ import {
   type ApprovalRequest,
   type ApprovalRequestDetail,
   type ApprovalWithdrawnReason,
+  type AssigneeLeave,
   AUDIENCE_PREVIEW_MAX,
   type Audience,
   type AudiencePreview,
@@ -44,6 +45,8 @@ import {
   applyPayment,
   approvalRequestState,
   audienceSchema,
+  BALANCE_LEAVE_TYPES,
+  type BalanceLeaveType,
   type BillableItems,
   BOARD_LIMITS,
   BOARD_STATUSES,
@@ -53,6 +56,7 @@ import {
   businessDate,
   CAMPAIGN_LIMITS,
   type Calendar,
+  type CalendarLeave,
   type Campaign,
   type CampaignDetail,
   type CampaignStatusChange,
@@ -91,6 +95,7 @@ import {
   type CreateCycleAdjustment,
   type CreateCycleLine,
   type CreateExtraWork,
+  type CreateHrRequest,
   type CreateMeeting,
   type CreateMilestone,
   type CreatePost,
@@ -120,9 +125,12 @@ import {
   createCatalogPackageSchema,
   createCatalogServiceSchema,
   createHolidaySchema,
+  createHrOpinionSchema,
+  createHrRequestSchema,
   createInvoiceSchema,
   createLeadNoteSchema,
   createLeadSchema,
+  createLeaveAdjustmentSchema,
   createProjectExpenseSchema,
   createQuoteSchema,
   createSalaryChangeSchema,
@@ -146,6 +154,7 @@ import {
   daysInStage,
   daysOverdue,
   daysWithoutUpdate,
+  decideHrRequestSchema,
   defaultInstallmentMilestones,
   deliveryRate,
   deviceMatch,
@@ -185,6 +194,12 @@ import {
   type HealthResponse,
   type Holiday,
   type HolidayList,
+  type HrOpinion,
+  type HrRequest,
+  type HrRequestDetail,
+  type HrRequestPage,
+  type HrRequestPreview,
+  type HrRequestWarning,
   type HrSettings,
   holidayRangeValid,
   hrSettingsSchema,
@@ -230,6 +245,8 @@ import {
   type LeadQuotes,
   type LeadSource,
   type LeadStage,
+  type LeaveBalance,
+  type LedgerRow,
   type LinkableTask,
   leadDisplayName,
   leadDuplicateQuerySchema,
@@ -237,6 +254,8 @@ import {
   leadOwnerChangeSchema,
   leadSourceDetailMissing,
   leadStageChangeSchema,
+  leaveSplit,
+  leaveUnits,
   loseLeadSchema,
   lossRejectionReason,
   MANUAL_LEAD_STAGES,
@@ -313,6 +332,7 @@ import {
   payoutSchema,
   periodInOneMonth,
   periodsOverlap,
+  permissionMinutes,
   planTemplateRun,
   postMove,
   postTaskDueDate,
@@ -359,6 +379,7 @@ import {
   repeatedStepFor,
   repeatHolidaysSchema,
   reportMonths,
+  requestsOverlap,
   revisionSourceOf,
   type SalaryChange,
   type SalaryChangeList,
@@ -384,6 +405,7 @@ import {
   spendCountsInWallet,
   splitEvenly,
   statementRows,
+  sumDays,
   TASK_PRIORITIES,
   type Task,
   type TaskBoard,
@@ -426,6 +448,7 @@ import {
   type UpdateTaskInput,
   type UpdateWalletThreshold,
   type UserResponse,
+  unitDays,
   unknownPlaceholders,
   updateAnnouncementSchema,
   updateAnnouncementTemplateSchema,
@@ -449,6 +472,7 @@ import {
   voidInvoiceSchema,
   voidPaymentSchema,
   type WalletEntry,
+  type Weekday,
   type WorkSchedule,
   type WorkScheduleList,
   walletLedger,
@@ -1307,6 +1331,8 @@ interface MockOptions {
   criticalAnnouncement?: boolean;
   /** Adds the public holidays of 2026 (`holidaysSeed`, F17 part B); none by default. */
   holidays?: boolean;
+  /** Adds the leave requests of `leaveSeed` (F17 part B); none by default. */
+  leave?: boolean;
 }
 
 /** A P-256 public key as `GET /api/me/push/config` sends it (fake: no private key exists). */
@@ -1400,6 +1426,7 @@ export async function mockApi(page: Page, options: MockOptions): Promise<MockedA
   const tasks = [...tasksSeed(), ...sent.tasks, ...planned.tasks, ...booked.tasks];
   const billing = invoicesSeed();
   const holidays = options.holidays ? holidaysSeed() : [];
+  const leave: LeaveState = options.leave ? leaveSeed(users) : { requests: [], ledger: [] };
   const calendarApi = calendarRoutes({
     users,
     clients,
@@ -1410,6 +1437,7 @@ export async function mockApi(page: Page, options: MockOptions): Promise<MockedA
     meetings: booked.meetings,
     invoices: billing.invoices,
     holidays,
+    leave,
     me: () => me,
   });
   const outbox = emailsSeed();
@@ -1423,6 +1451,7 @@ export async function mockApi(page: Page, options: MockOptions): Promise<MockedA
     files: [...sent.files, ...planned.files],
     requests: [...sent.requests, ...planned.requests],
     outbox,
+    leave,
     me: () => me,
   });
   const reportsApi = reportRoutes({
@@ -1486,6 +1515,7 @@ export async function mockApi(page: Page, options: MockOptions): Promise<MockedA
     me: () => me,
   });
   const hrApi = hrRoutes({ users, holidays, me: () => me });
+  const leaveApi = leaveRoutes({ users, holidays, leave, me: () => me });
   const announcementsApi = announcementRoutes({
     users,
     clients,
@@ -1793,7 +1823,9 @@ export async function mockApi(page: Page, options: MockOptions): Promise<MockedA
       return json(route, departmentDetail(department));
     }
 
-    // HR (F17), with the documents of an employee file.
+    // HR (F17), with the documents of an employee file and of a request.
+    const onLeave = leaveApi(route, method, url, request);
+    if (onLeave) return onLeave;
     const staffed = hrApi(route, method, url, request);
     if (staffed) return staffed;
 
@@ -5006,6 +5038,8 @@ interface TaskState {
   requests: ApprovalRequestRecord[];
   /** The email outbox, where an approval link asked to be emailed goes (F14 email rule 19). */
   outbox?: EmailRecord[];
+  /** Approved leaves, for `ASSIGNEE_ON_LEAVE` (F17 rule B17). */
+  leave?: LeaveState;
   me: () => MeResponse;
 }
 
@@ -5025,6 +5059,7 @@ function taskRoutes({
   files,
   requests,
   outbox = [],
+  leave = { requests: [], ledger: [] },
   me,
 }: TaskState) {
   const holds = (permission: string, scope: string) =>
@@ -5763,6 +5798,12 @@ function taskRoutes({
       const r = rights(created);
       const self = created.assigneeId === me().user.id;
       if (created.assigneeId && !self && !r.assign) return fail(route, 403, null);
+      const onLeave = created.assigneeId
+        ? assigneeLeavesOn(leave, created.assigneeId, created.dueDate)
+        : [];
+      if (onLeave.length > 0 && !input.acceptLeave) {
+        return fail(route, 409, 'ASSIGNEE_ON_LEAVE', onLeave);
+      }
       if (input.type === 'client_request') {
         if (!r.client) return fail(route, 403, null);
         const scope = input.requestScope ?? 'in_scope';
@@ -6208,7 +6249,22 @@ function taskRoutes({
       if ((input.assigneeId !== undefined || input.department) && !can.canAssign) {
         return fail(route, 403, null);
       }
-      const { requestedByContactId, requestedOn, requestScope, retainerCycleId, ...fields } = input;
+      const {
+        requestedByContactId,
+        requestedOn,
+        requestScope,
+        retainerCycleId,
+        acceptLeave,
+        ...fields
+      } = input;
+      // F17 rule B17: a new assignee or due date on the assignee's approved leave.
+      const assigneeId = input.assigneeId !== undefined ? input.assigneeId : task.assigneeId;
+      const dueDate = input.dueDate ?? task.dueDate;
+      const moved = assigneeId !== task.assigneeId || dueDate !== task.dueDate;
+      const onLeave = assigneeId && moved ? assigneeLeavesOn(leave, assigneeId, dueDate) : [];
+      if (onLeave.length > 0 && !acceptLeave) {
+        return fail(route, 409, 'ASSIGNEE_ON_LEAVE', onLeave);
+      }
       Object.assign(task, fields);
       if (retainerCycleId !== undefined) {
         task.cycleId = retainerCycleId;
@@ -10950,6 +11006,8 @@ interface CalendarState {
   invoices: InvoiceRecord[];
   /** For the `holiday` key dates (F17 rule B16), shared with the HR settings. */
   holidays: Holiday[];
+  /** Approved leaves (F17 rule B16), shared with the HR requests. */
+  leave: LeaveState;
   me: () => MeResponse;
 }
 
@@ -10964,6 +11022,7 @@ function calendarRoutes({
   meetings,
   invoices,
   holidays,
+  leave,
   me,
 }: CalendarState) {
   let next = 1800;
@@ -11287,8 +11346,13 @@ function calendarRoutes({
       const calendar: Calendar = {
         from,
         to,
-        // F17 rule B16: no approved leave in the mocks yet.
-        leaves: [],
+        // F17 rule B16: the person filter applies; the client and shoot type filters hide them.
+        leaves:
+          shows('leave') && !clientId && !q.get('shootType')
+            ? calendarLeaves(leave, { from, to }, me()).filter(
+                (l) => !userId || l.user.id === userId,
+              )
+            : [],
         shoots: shows('shoot')
           ? shoots
               .filter(
@@ -16947,6 +17011,584 @@ function hrRoutes({
       };
       salaries.push(change);
       return json(route, change, 201);
+    }
+    return undefined;
+  };
+}
+// F17 part B: leave balances, requests, decisions and opinions.
+
+/** A request as the mock keeps it: the response shape and its owner's opinions. */
+type HrRequestRecord = HrRequest & { opinions: HrOpinion[] };
+
+export interface LeaveState {
+  requests: HrRequestRecord[];
+  /** Extra ledger rows (adjustments, openings, taken days) on top of each user's base rows. */
+  ledger: (LedgerRow & { userId: string })[];
+}
+
+/** The main schedule's work days (`schedulesSeed`): Saturday to Thursday. */
+const LEAVE_WEEKDAYS: Weekday[] = [
+  'saturday',
+  'sunday',
+  'monday',
+  'tuesday',
+  'wednesday',
+  'thursday',
+];
+
+/**
+ * Basel's sick leave and Layan's and Karim's annual leaves wait for the GM; Karim's annual leave
+ * next week is approved (on the calendar, rule B16).
+ */
+export function leaveSeed(users: UserResponse[]): LeaveState {
+  const person = (userId: string) => ({
+    id: userId,
+    name: users.find((u) => u.id === userId)?.name ?? '',
+  });
+  const request = (
+    n: number,
+    userId: string,
+    fields: Partial<HrRequest> &
+      Pick<HrRequest, 'leaveType' | 'startsOn' | 'endsOn' | 'days' | 'status'>,
+    createdAt: string,
+  ): HrRequestRecord => ({
+    id: id(n),
+    user: person(userId),
+    kind: 'leave',
+    half: null,
+    fromTime: null,
+    toTime: null,
+    paidDays: fields.leaveType === 'unpaid' ? 0 : fields.days,
+    unpaidDays: fields.leaveType === 'unpaid' ? fields.days : 0,
+    reason: null,
+    shortNotice: false,
+    certificateRequired: false,
+    documents: 0,
+    createdBy: person(userId),
+    decidedBy: null,
+    decidedAt: null,
+    decisionNote: null,
+    createdAt,
+    updatedAt: createdAt,
+    opinions: [],
+    ...fields,
+  });
+  const sara = id(1);
+  return {
+    requests: [
+      request(
+        9861,
+        id(6),
+        {
+          leaveType: 'sick',
+          startsOn: '2026-10-19',
+          endsOn: '2026-10-21',
+          days: 3,
+          status: 'pending',
+          reason: 'إنفلونزا',
+          certificateRequired: true,
+        },
+        '2026-10-19T08:00:00.000Z',
+      ),
+      request(
+        9862,
+        id(3),
+        {
+          leaveType: 'annual',
+          startsOn: '2026-11-15',
+          endsOn: '2026-11-16',
+          days: 2,
+          status: 'pending',
+        },
+        '2026-10-20T08:00:00.000Z',
+      ),
+      request(
+        9863,
+        id(4),
+        {
+          leaveType: 'annual',
+          startsOn: '2026-10-25',
+          endsOn: '2026-10-26',
+          days: 2,
+          status: 'approved',
+          decidedBy: person(sara),
+          decidedAt: '2026-10-15T10:00:00.000Z',
+        },
+        '2026-10-14T08:00:00.000Z',
+      ),
+      request(
+        9864,
+        id(4),
+        {
+          leaveType: 'annual',
+          startsOn: '2026-11-08',
+          endsOn: '2026-11-09',
+          days: 2,
+          status: 'pending',
+        },
+        '2026-10-21T05:00:00.000Z',
+      ),
+    ],
+    // The days of Karim's approved leave, taken from his annual balance.
+    ledger: [
+      {
+        id: id(9865),
+        userId: id(4),
+        leaveType: 'annual',
+        year: 2026,
+        days: -2,
+        entry: 'taken',
+        period: null,
+        requestId: id(9863),
+        note: null,
+        createdBy: person(sara),
+        createdAt: '2026-10-15T10:00:00.000Z',
+      },
+    ],
+  };
+}
+
+/** The approved leaves of the calendar range (rule B16), the type only for `hr.read` or self. */
+function calendarLeaves(
+  leave: LeaveState,
+  range: { from: string; to: string },
+  me: MeResponse,
+): CalendarLeave[] {
+  const readsHr = me.permissions.some((g) => g.permission === 'hr.read');
+  return leave.requests
+    .filter(
+      (r) =>
+        r.kind === 'leave' &&
+        r.status === 'approved' &&
+        r.startsOn <= range.to &&
+        r.endsOn >= range.from,
+    )
+    .map((r) => ({
+      requestId: r.id,
+      user: r.user,
+      startsOn: r.startsOn,
+      endsOn: r.endsOn,
+      half: r.half,
+      leaveType: readsHr || r.user.id === me.user.id ? r.leaveType : null,
+    }));
+}
+
+/** Rule B17: the assignee's approved leaves covering a due date. */
+export function assigneeLeavesOn(leave: LeaveState, userId: string, date: string): AssigneeLeave[] {
+  return leave.requests
+    .filter(
+      (r) =>
+        r.user.id === userId &&
+        r.kind === 'leave' &&
+        r.status === 'approved' &&
+        r.startsOn <= date &&
+        date <= r.endsOn,
+    )
+    .map((r) => ({ startsOn: r.startsOn, endsOn: r.endsOn }));
+}
+
+function leaveRoutes({
+  users,
+  holidays,
+  leave,
+  me,
+}: {
+  users: UserResponse[];
+  holidays: Holiday[];
+  leave: LeaveState;
+  me: () => MeResponse;
+}) {
+  let next = 9870;
+  const now = () => new Date(HR_NOW).toISOString();
+  const person = (userId: string) => ({
+    id: userId,
+    name: users.find((u) => u.id === userId)?.name ?? '',
+  });
+  const scopesOf = (permission: Permission) =>
+    me().permissions.find((g) => g.permission === permission)?.scopes ?? [];
+  const approver = () => scopesOf('hr.approve').length > 0;
+  /** `hr.read` covering the user: everyone, or the members of the departments one manages. */
+  const covers = (userId: string) => {
+    const scopes = scopesOf('hr.read');
+    if (scopes.includes('all')) return true;
+    if (!scopes.includes('department')) return false;
+    const managed = me()
+      .departments.filter((d) => d.isManager)
+      .map((d) => d.id);
+    return !!users.find((u) => u.id === userId)?.departments.some((d) => managed.includes(d.id));
+  };
+  const readable = (r: HrRequestRecord) => r.user.id === me().user.id || covers(r.user.id);
+  const live = (r: HrRequestRecord) => r.status === 'pending' || r.status === 'approved';
+  const plain = ({ opinions: _opinions, ...r }: HrRequestRecord): HrRequest => r;
+
+  /** Accruals and grants of the year, then the rows the requests and adjustments added. */
+  const ledgerOf = (userId: string, year: number): LedgerRow[] => {
+    const base: LedgerRow[] =
+      year === 2026
+        ? [
+            ...Array.from({ length: 9 }, (_, month) => ({
+              id: id(20_000 + Number(userId.slice(-4)) * 20 + month),
+              leaveType: 'annual' as const,
+              year,
+              days: 1,
+              entry: 'accrual' as const,
+              period: `2026-${String(month + 1).padStart(2, '0')}`,
+              requestId: null,
+              note: null,
+              createdBy: null,
+              createdAt: `2026-${String(month + 2).padStart(2, '0')}-01T00:10:00.000Z`,
+            })),
+            ...(['sick', 'emergency'] as const).map((leaveType, index) => ({
+              id: id(20_000 + Number(userId.slice(-4)) * 20 + 10 + index),
+              leaveType,
+              year,
+              days: leaveType === 'sick' ? 14 : 3,
+              entry: 'grant' as const,
+              period: null,
+              requestId: null,
+              note: null,
+              createdBy: null,
+              createdAt: '2026-01-01T00:10:00.000Z',
+            })),
+          ]
+        : [];
+    const extra = leave.ledger
+      .filter((row) => row.userId === userId && row.year === year)
+      .map(({ userId: _userId, ...row }) => row);
+    return [...base, ...extra].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  };
+  const pendingDays = (userId: string, type: BalanceLeaveType) =>
+    sumDays(
+      leave.requests
+        .filter(
+          (r) =>
+            r.user.id === userId &&
+            r.status === 'pending' &&
+            (r.leaveType === type || (type === 'annual' && r.leaveType === 'emergency')),
+        )
+        .map((r) => r.paidDays ?? 0),
+    );
+  const balanceOf = (userId: string, year: number): LeaveBalance => {
+    const ledger = ledgerOf(userId, year);
+    const sum = (type: BalanceLeaveType, entries: LedgerRow['entry'][]) =>
+      sumDays(
+        ledger.filter((r) => r.leaveType === type && entries.includes(r.entry)).map((r) => r.days),
+      );
+    return {
+      userId,
+      year,
+      balances: BALANCE_LEAVE_TYPES.map((leaveType) => {
+        const balance = sumDays(ledger.filter((r) => r.leaveType === leaveType).map((r) => r.days));
+        const pending = year === 2026 ? pendingDays(userId, leaveType) : 0;
+        return {
+          leaveType,
+          balance,
+          pending,
+          available: sumDays([balance, -pending]),
+          opening: sum(leaveType, ['opening']),
+          accrued: sum(leaveType, ['accrual', 'grant']),
+          carriedOver: sum(leaveType, ['carry_over']),
+          taken: -sum(leaveType, ['taken', 'restored']),
+          expired: -sum(leaveType, ['expiry']),
+          adjusted: sum(leaveType, ['adjustment']),
+        };
+      }),
+      ledger,
+    };
+  };
+  const available = (userId: string) =>
+    Object.fromEntries(
+      balanceOf(userId, 2026).balances.map((b) => [b.leaveType, b.available]),
+    ) as Record<BalanceLeaveType, number>;
+
+  type Evaluated =
+    | { error: [number, ErrorCode | null] }
+    | { fields: Omit<HrRequest, 'id' | 'createdAt' | 'updatedAt'>; preview: HrRequestPreview };
+
+  /** Rules B8–B13 as far as the screens need them; the API tests cover the rest. */
+  const evaluate = (input: CreateHrRequest): Evaluated => {
+    const userId = input.userId ?? me().user.id;
+    const forOther = userId !== me().user.id;
+    if (forOther && !approver()) return { error: [403, null] };
+    const span =
+      input.kind === 'leave'
+        ? { startsOn: input.startsOn, endsOn: input.endsOn, half: input.half }
+        : { startsOn: input.date, endsOn: input.date, half: null };
+    const overlap = leave.requests.some(
+      (r) =>
+        r.user.id === userId &&
+        live(r) &&
+        requestsOverlap(r, {
+          kind: input.kind,
+          ...span,
+          fromTime: input.kind === 'permission' ? input.fromTime : null,
+          toTime: input.kind === 'permission' ? input.toTime : null,
+        }),
+    );
+    if (overlap) return { error: [409, 'REQUEST_OVERLAP'] };
+    const late =
+      !forOther &&
+      span.startsOn < HR_TODAY &&
+      (input.kind === 'permission' || input.leaveType === 'annual' || input.leaveType === 'unpaid');
+    if (late) return { error: [409, 'TOO_LATE'] };
+    const units = leaveUnits(span, LEAVE_WEEKDAYS, holidays);
+    if (units.length === 0) return { error: [400, 'NOT_A_WORK_DAY'] };
+    const base = {
+      user: person(userId),
+      kind: input.kind,
+      startsOn: span.startsOn,
+      endsOn: span.endsOn,
+      half: span.half,
+      reason: input.reason,
+      status: approver() ? ('approved' as const) : ('pending' as const),
+      documents: 0,
+      createdBy: person(me().user.id),
+      decidedBy: approver() ? person(me().user.id) : null,
+      decidedAt: approver() ? now() : null,
+      decisionNote: null,
+    };
+    if (input.kind === 'permission') {
+      if (permissionMinutes(input) > 120) return { error: [409, 'PERMISSION_LIMIT'] };
+      const fields = {
+        ...base,
+        leaveType: null,
+        fromTime: input.fromTime,
+        toTime: input.toTime,
+        days: null,
+        paidDays: null,
+        unpaidDays: null,
+        shortNotice: false,
+        certificateRequired: false,
+      };
+      return {
+        fields,
+        preview: { days: null, paidDays: null, unpaidDays: null, shortNotice: false, warnings: [] },
+      };
+    }
+    const days = unitDays(units);
+    const balance = available(userId);
+    if (input.leaveType === 'annual' && days > balance.annual) {
+      return { error: [409, 'INSUFFICIENT_BALANCE'] };
+    }
+    const split = leaveSplit(input.leaveType, days, balance);
+    const shortNotice =
+      !forOther && input.leaveType === 'annual' && span.startsOn < addDays(HR_TODAY, 3);
+    const certificateRequired = input.leaveType === 'sick' && days > 2;
+    const warnings: HrRequestWarning[] = [];
+    if (shortNotice) warnings.push('short_notice');
+    if (split.unpaidDays > 0 && input.leaveType !== 'unpaid') warnings.push('unpaid_days');
+    if (certificateRequired) warnings.push('certificate_required');
+    return {
+      fields: {
+        ...base,
+        leaveType: input.leaveType,
+        fromTime: null,
+        toTime: null,
+        days,
+        ...split,
+        shortNotice,
+        certificateRequired,
+      },
+      preview: { days, ...split, shortNotice, warnings },
+    };
+  };
+
+  /** Approving writes the paid days as `taken` (rule B14); cancelling restores them (B15). */
+  const writeTaken = (r: HrRequestRecord, sign: 1 | -1) => {
+    if (r.kind !== 'leave' || !r.leaveType || r.leaveType === 'unpaid' || !r.paidDays) return;
+    const types: BalanceLeaveType[] =
+      r.leaveType === 'emergency' ? ['emergency', 'annual'] : [r.leaveType];
+    for (const leaveType of types) {
+      leave.ledger.push({
+        id: id(next++),
+        userId: r.user.id,
+        leaveType,
+        year: Number(r.startsOn.slice(0, 4)),
+        days: -sign * r.paidDays,
+        entry: sign === 1 ? 'taken' : 'restored',
+        period: null,
+        requestId: r.id,
+        note: null,
+        createdBy: person(me().user.id),
+        createdAt: now(),
+      });
+    }
+  };
+
+  const detailOf = (r: HrRequestRecord): HrRequestDetail => ({
+    ...plain(r),
+    opinions: r.opinions,
+    overlappingWork:
+      approver() && r.kind === 'leave'
+        ? r.user.id === id(4)
+          ? [
+              {
+                kind: 'task',
+                id: id(9890),
+                title: 'تعديل صور قائمة الطعام',
+                date: r.startsOn,
+                startsAt: null,
+              },
+            ]
+          : []
+        : null,
+    permissions: {
+      canDecide: approver() && r.status === 'pending',
+      canCancel:
+        live(r) &&
+        (approver() ||
+          (r.user.id === me().user.id && (r.status === 'pending' || r.startsOn > HR_TODAY))),
+      canGiveOpinion: covers(r.user.id) && r.user.id !== me().user.id && r.status === 'pending',
+    },
+  });
+
+  return (route: Route, method: string, url: URL, request: Request): Promise<void> | undefined => {
+    const path = url.pathname;
+    const q = url.searchParams;
+
+    // A request's documents (rule B13): none seeded; its employee and approvers add them.
+    if (path === '/api/files/items' && method === 'GET' && q.get('ownerType') === 'hr_request') {
+      const r = leave.requests.find((x) => x.id === q.get('ownerId'));
+      if (!r || !readable(r)) return fail(route, 404, null);
+      return json(route, {
+        items: [],
+        rights: {
+          canAddDeliverable: false,
+          canAddReference: false,
+          canManageDocuments: r.user.id === me().user.id || approver(),
+          canSetConfidential: false,
+          canSeeRemoved: false,
+        },
+      } satisfies FileItemList);
+    }
+
+    const balance = path.match(/^\/api\/hr\/balances\/([^/]+)(\/adjustments)?$/);
+    if (balance) {
+      const userId = balance[1] ?? '';
+      if (userId !== me().user.id && !covers(userId)) return fail(route, 404, null);
+      if (!balance[2] && method === 'GET') {
+        return json(route, balanceOf(userId, Number(q.get('year') ?? 2026)));
+      }
+      if (balance[2] && method === 'POST') {
+        if (!approver()) return fail(route, 403, null);
+        const body = createLeaveAdjustmentSchema.parse(request.postDataJSON());
+        leave.ledger.push({
+          id: id(next++),
+          userId,
+          leaveType: body.leaveType,
+          year: body.year,
+          days: body.days,
+          entry: body.entry,
+          period: null,
+          requestId: null,
+          note: body.note,
+          createdBy: person(me().user.id),
+          createdAt: now(),
+        });
+        return json(route, balanceOf(userId, body.year), 201);
+      }
+    }
+
+    if (path === '/api/hr/requests/preview' && method === 'POST') {
+      const evaluated = evaluate(createHrRequestSchema.parse(request.postDataJSON()));
+      if ('error' in evaluated) return fail(route, ...evaluated.error);
+      return json(route, evaluated.preview);
+    }
+    if (path === '/api/hr/requests' && method === 'POST') {
+      const evaluated = evaluate(createHrRequestSchema.parse(request.postDataJSON()));
+      if ('error' in evaluated) return fail(route, ...evaluated.error);
+      const created: HrRequestRecord = {
+        id: id(next++),
+        ...evaluated.fields,
+        createdAt: now(),
+        updatedAt: now(),
+        opinions: [],
+      };
+      leave.requests.push(created);
+      if (created.status === 'approved') writeTaken(created, 1);
+      return json(route, plain(created), 201);
+    }
+    if (path === '/api/hr/requests' && method === 'GET') {
+      const userId = q.get('userId') === 'me' ? me().user.id : q.get('userId');
+      const statuses = q.getAll('status');
+      const departmentId = q.get('departmentId');
+      const page = Number(q.get('page') ?? 1);
+      const pageSize = Number(q.get('pageSize') ?? 25);
+      const order = q.get('order') === 'asc' ? 1 : -1;
+      const rows = leave.requests
+        .filter(
+          (r) =>
+            (userId ? r.user.id === userId && readable(r) : readable(r)) &&
+            (statuses.length === 0 || statuses.includes(r.status)) &&
+            (!q.get('kind') || r.kind === q.get('kind')) &&
+            (!departmentId ||
+              users
+                .find((u) => u.id === r.user.id)
+                ?.departments.some((d) => d.id === departmentId)),
+        )
+        .sort((a, b) => order * a.createdAt.localeCompare(b.createdAt))
+        .map(plain);
+      return json(route, {
+        items: rows.slice((page - 1) * pageSize, page * pageSize),
+        total: rows.length,
+        page,
+        pageSize,
+      } satisfies HrRequestPage);
+    }
+    const one = path.match(/^\/api\/hr\/requests\/([^/]+)(\/decision|\/cancel)?$/);
+    if (one) {
+      const r = leave.requests.find((x) => x.id === one[1]);
+      if (!r || !readable(r)) return fail(route, 404, null);
+      if (!one[2] && method === 'GET') return json(route, detailOf(r));
+      if (one[2] === '/decision' && method === 'POST') {
+        if (!approver()) return fail(route, 403, null);
+        if (r.status !== 'pending') return fail(route, 409, 'NOT_PENDING');
+        const body = decideHrRequestSchema.parse(request.postDataJSON());
+        if (
+          body.decision === 'approve' &&
+          r.certificateRequired &&
+          r.documents === 0 &&
+          !body.confirmMissingCertificate
+        ) {
+          return fail(route, 409, 'CERTIFICATE_MISSING');
+        }
+        const approved = body.decision === 'approve';
+        Object.assign(r, {
+          status: approved ? 'approved' : 'rejected',
+          decidedBy: person(me().user.id),
+          decidedAt: now(),
+          decisionNote: body.note,
+          updatedAt: now(),
+        });
+        if (approved) writeTaken(r, 1);
+        return json(route, plain(r));
+      }
+      if (one[2] === '/cancel' && method === 'POST') {
+        if (!detailOf(r).permissions.canCancel) return fail(route, 409, 'NOT_CANCELLABLE');
+        if (r.status === 'approved') writeTaken(r, -1);
+        Object.assign(r, {
+          status: 'cancelled',
+          decidedBy: person(me().user.id),
+          decidedAt: now(),
+          updatedAt: now(),
+        });
+        return json(route, plain(r));
+      }
+    }
+    if (path === '/api/hr/opinions' && method === 'POST') {
+      const body = createHrOpinionSchema.parse(request.postDataJSON());
+      const r = leave.requests.find((x) => x.id === body.requestId);
+      if (!r || !covers(r.user.id)) return fail(route, 404, null);
+      if (r.status !== 'pending') return fail(route, 409, 'NOT_PENDING');
+      const opinion: HrOpinion = {
+        id: id(next++),
+        requestId: r.id,
+        author: person(me().user.id),
+        body: body.body,
+        createdAt: now(),
+      };
+      r.opinions.push(opinion);
+      return json(route, opinion, 201);
     }
     return undefined;
   };
