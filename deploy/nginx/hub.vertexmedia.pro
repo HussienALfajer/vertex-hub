@@ -174,6 +174,16 @@ server {
         access_log off;
     }
 
+    # The app manifest (F16 rule A1): nginx's mime.types has no entry for .webmanifest, so it
+    # would go out as application/octet-stream. Revalidated like index.html.
+    location = /manifest.webmanifest {
+        try_files $uri =404;
+        types { }
+        default_type application/manifest+json;
+        include snippets/vertexhub-headers.conf;
+        add_header Cache-Control "no-cache" always;
+    }
+
     # The client page of an approval link (F09 rule 23): the SPA, but the address holds the
     # link's token, so it is never sent as a referrer. The headers are listed here instead of
     # including the standard set, which carries its own Referrer-Policy.
