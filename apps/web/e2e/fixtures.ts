@@ -124,8 +124,10 @@ import {
   createLeadSchema,
   createProjectExpenseSchema,
   createQuoteSchema,
+  createSalaryChangeSchema,
   createTemplateSchema,
   currentCycleNumber,
+  currentSalary,
   cycleAt,
   cycleDaysLeft,
   cyclePeriod,
@@ -149,10 +151,18 @@ import {
   type EmailLogItem,
   type EmailRecordType,
   type EmailSummary,
+  type EmployeeEmployment,
+  type EmployeeFile,
+  type EmployeePage,
+  type EmployeePay,
+  type EmployeePersonal,
+  type EmployeeStatus,
   type ErrorCode,
   type ExtraWork,
   type ExtraWorkBilling,
   type ExtraWorkBillingChange,
+  employeeStatus,
+  endServiceSchema,
   extendQuoteSchema,
   type FileItem,
   type FileItemList,
@@ -161,6 +171,7 @@ import {
   type FileUpload,
   type FileVersion,
   type FinanceDashboard,
+  fileDatesValid,
   fileTypeOf,
   fillContractValues,
   followUpDateInRange,
@@ -291,6 +302,7 @@ import {
   type PushDelivery,
   type PushSubscriptionInput,
   packageIssues,
+  payoutSchema,
   periodInOneMonth,
   periodsOverlap,
   planTemplateRun,
@@ -339,6 +351,8 @@ import {
   repeatedStepFor,
   reportMonths,
   revisionSourceOf,
+  type SalaryChange,
+  type SalaryChangeList,
   type ScheduleConflict,
   SENT_ANNOUNCEMENT_FIELDS,
   type SendAnnouncement,
@@ -410,6 +424,7 @@ import {
   updateContractArticlesSchema,
   updateContractSettingsSchema,
   updateCycleReportSummarySchema,
+  updateEmployeeFileSchema,
   updateInvoiceServicesSchema,
   updateInvoiceSettingsSchema,
   updateLeadNoteSchema,
@@ -1451,6 +1466,7 @@ export async function mockApi(page: Page, options: MockOptions): Promise<MockedA
     streamed: options.streamed ?? [],
     me: () => me,
   });
+  const hrApi = hrRoutes({ users, me: () => me });
   const announcementsApi = announcementRoutes({
     users,
     clients,
@@ -1757,6 +1773,10 @@ export async function mockApi(page: Page, options: MockOptions): Promise<MockedA
       }
       return json(route, departmentDetail(department));
     }
+
+    // HR (F17), with the documents of an employee file.
+    const staffed = hrApi(route, method, url, request);
+    if (staffed) return staffed;
 
     // Announcements and audiences (F16 part D), with the files of an announcement.
     const announced = announcementsApi(route, method, url);
@@ -16324,4 +16344,307 @@ export async function screenshot(page: Page, testInfo: TestInfo, name: string): 
   const path = testInfo.outputPath(`${name}.png`);
   await page.screenshot({ path, animations: 'disabled' });
   await testInfo.attach(name, { path, contentType: 'image/png' });
+}
+
+/** An employee file as the HR mock keeps it (F17 part A): every section, cut by rule A2. */
+interface EmployeeRecord {
+  userId: string;
+  personal: EmployeePersonal;
+  employment: EmployeeEmployment;
+  payout: Omit<EmployeePay, 'currentSalary'>;
+}
+
+const MAIN_SCHEDULE = { id: id(9801), name: 'الدوام الرئيسي' };
+
+/** The HR tests' clock (F17): the mock's "today" for current salaries and ends of service. */
+export const HR_NOW = '2026-10-21T09:00:00+03:00';
+const HR_TODAY = businessDate(new Date(HR_NOW));
+
+/** The files of the team: Karim's is complete, the others as a fresh migration leaves them. */
+export function employeesSeed(users: UserResponse[]): {
+  files: EmployeeRecord[];
+  salaries: SalaryChange[];
+} {
+  const blank = (userId: string): EmployeeRecord => ({
+    userId,
+    personal: {
+      nationalId: null,
+      birthDate: null,
+      address: null,
+      emergencyName: null,
+      emergencyPhone: null,
+      emergencyRelation: null,
+    },
+    employment: {
+      employmentType: 'full_time',
+      startDate: null,
+      probationEndDate: null,
+      contractEndDate: null,
+      schedule: MAIN_SCHEDULE,
+      attendanceExempt: false,
+      remoteWeekdays: [],
+      annualLeaveDays: 14,
+      endedOn: null,
+      endReason: null,
+      endNote: null,
+    },
+    payout: {
+      payoutMethod: null,
+      payoutInstitution: null,
+      payoutAccount: null,
+      payoutHolder: null,
+    },
+  });
+  const files = users.map((u) => blank(u.id));
+  const karim = files.find((f) => f.userId === id(4));
+  if (karim) {
+    karim.personal = {
+      nationalId: '01020304050',
+      birthDate: '1996-04-12',
+      address: 'دمشق، المزة، شارع الجلاء',
+      emergencyName: 'منى الزين',
+      emergencyPhone: '+963944555666',
+      emergencyRelation: 'أخت',
+    };
+    karim.employment = {
+      ...karim.employment,
+      startDate: '2025-03-01',
+      probationEndDate: '2025-05-31',
+      contractEndDate: '2026-12-31',
+      remoteWeekdays: ['thursday'],
+    };
+    karim.payout = {
+      payoutMethod: 'bank_transfer',
+      payoutInstitution: 'بنك سورية الدولي الإسلامي',
+      payoutAccount: 'SY21 0123 4567 8901 2345',
+      payoutHolder: 'كريم الزين',
+    };
+  }
+  const layan = files.find((f) => f.userId === id(3));
+  if (layan) {
+    layan.employment = {
+      ...layan.employment,
+      employmentType: 'part_time',
+      startDate: '2024-09-15',
+      endedOn: '2026-11-30',
+      endReason: 'resigned',
+      endNote: 'انتقال إلى مدينة أخرى',
+    };
+  }
+  const salary = (
+    n: number,
+    effectiveOn: string,
+    amountMinor: number,
+    reason: string,
+    archived?: string,
+  ): SalaryChange => ({
+    id: id(n),
+    userId: id(4),
+    effectiveOn,
+    amountMinor,
+    currency: 'USD',
+    reason,
+    createdBy: { id: id(1), name: 'سارة الخطيب' },
+    createdAt: `${effectiveOn}T09:00:00.000Z`,
+    archivedAt: archived ? `${effectiveOn}T10:00:00.000Z` : null,
+    archiveReason: archived ?? null,
+  });
+  return {
+    files,
+    salaries: [
+      salary(9811, '2026-03-01', 75_000, 'زيادة سنوية'),
+      salary(9812, '2026-02-01', 70_000, 'زيادة سنوية', 'أُدخل المبلغ خطأً'),
+      salary(9813, '2025-03-01', 60_000, 'راتب البداية'),
+    ],
+  };
+}
+
+/** HR, part A (F17): People, the employee file, pay and the end of service. */
+function hrRoutes({ users, me }: { users: UserResponse[]; me: () => MeResponse }) {
+  const { files, salaries } = employeesSeed(users);
+  let next = 9850;
+  const holds = (permission: Permission) =>
+    me().permissions.some((granted) => granted.permission === permission);
+  const statusOf = (file: EmployeeRecord): EmployeeStatus =>
+    employeeStatus({
+      archived: users.find((u) => u.id === file.userId)?.status === 'archived',
+      endedOn: file.employment.endedOn,
+    });
+  /** Rule A2: the sections the caller sees, or undefined for a 404. */
+  const view = (file: EmployeeRecord): EmployeeFile | undefined => {
+    const self = file.userId === me().user.id;
+    const showFile = self || holds('employees.read');
+    const showPay = self || holds('salaries.read');
+    if (!showFile && !showPay) return undefined;
+    const user = users.find((u) => u.id === file.userId);
+    const changes = salaries.filter((s) => s.userId === file.userId);
+    return {
+      userId: file.userId,
+      name: user?.name ?? '',
+      title: user?.title ?? null,
+      departments: user?.departments ?? [],
+      status: statusOf(file),
+      ...(showFile && { personal: file.personal, employment: file.employment }),
+      ...(showPay && {
+        pay: {
+          ...file.payout,
+          currentSalary: currentSalary(
+            changes.map((s) => ({ ...s, archived: s.archivedAt !== null })),
+            HR_TODAY,
+          ),
+        },
+      }),
+    };
+  };
+
+  return (route: Route, method: string, url: URL, request: Request): Promise<void> | undefined => {
+    const path = url.pathname;
+    const q = url.searchParams;
+
+    // Documents of an employee file (rule A6): none seeded.
+    if (path === '/api/files/items' && method === 'GET' && q.get('ownerType') === 'employee') {
+      const file = files.find((f) => f.userId === q.get('ownerId'));
+      if (!file || !view(file)) return fail(route, 404, null);
+      const live = statusOf(file) !== 'ended';
+      return json(route, {
+        items: [],
+        rights: {
+          canAddDeliverable: false,
+          canAddReference: false,
+          canManageDocuments: live && (holds('employees.manage') || holds('salaries.read')),
+          canSetConfidential: live && holds('salaries.read'),
+          canSeeRemoved: holds('employees.manage'),
+        },
+      } satisfies FileItemList);
+    }
+
+    if (!path.startsWith('/api/hr/')) return undefined;
+
+    if (path === '/api/hr/employees' && method === 'GET') {
+      if (!holds('employees.read') && !holds('salaries.read')) return fail(route, 403, null);
+      const search = q.get('search')?.toLowerCase();
+      const status = (q.get('status') as EmployeeStatus | null) ?? 'active';
+      const page = Number(q.get('page') ?? 1);
+      const pageSize = Number(q.get('pageSize') ?? 25);
+      const rows = files
+        .map(view)
+        .filter((row): row is EmployeeFile => !!row)
+        .filter(
+          (row) =>
+            (status === 'ended' ? row.status === 'ended' : row.status !== 'ended') &&
+            (!q.get('departmentId') ||
+              row.departments.some((d) => d.id === q.get('departmentId'))) &&
+            (!search ||
+              row.name.toLowerCase().includes(search) ||
+              (users.find((u) => u.id === row.userId)?.email ?? '').includes(search)),
+        )
+        .sort((a, b) => a.name.localeCompare(b.name, 'ar'))
+        .map(({ personal: _personal, ...row }) => row);
+      return json(route, {
+        items: rows.slice((page - 1) * pageSize, page * pageSize),
+        total: rows.length,
+        page,
+        pageSize,
+      } satisfies EmployeePage);
+    }
+
+    const archiveMatch = path.match(/^\/api\/hr\/salaries\/([^/]+)\/archive$/);
+    if (archiveMatch && method === 'POST') {
+      if (!holds('salaries.manage')) return fail(route, 403, null);
+      const change = salaries.find((s) => s.id === archiveMatch[1]);
+      if (!change) return fail(route, 404, null);
+      const body = request.postDataJSON() as { reason: string };
+      change.archivedAt = new Date().toISOString();
+      change.archiveReason = body.reason;
+      return json(route, change);
+    }
+
+    const match = path.match(/^\/api\/hr\/employees\/([^/]+)(\/[a-z]+)?$/);
+    if (!match) return undefined;
+    const file = files.find((f) => f.userId === match[1]);
+    if (!file) return fail(route, 404, null);
+    const action = match[2] ?? '';
+
+    if (action === '' && method === 'GET') {
+      const shown = view(file);
+      return shown ? json(route, shown) : fail(route, 404, null);
+    }
+    if (action === '/salaries' && method === 'GET') {
+      if (file.userId !== me().user.id && !holds('salaries.read')) return fail(route, 404, null);
+      const items = salaries
+        .filter((s) => s.userId === file.userId)
+        .sort((a, b) => b.effectiveOn.localeCompare(a.effectiveOn));
+      return json(route, { items } satisfies SalaryChangeList);
+    }
+
+    const permission: Permission =
+      action === '/payout'
+        ? 'payouts.manage'
+        : action === '/salaries'
+          ? 'salaries.manage'
+          : 'employees.manage';
+    if (!holds(permission)) return fail(route, 403, null);
+    if (statusOf(file) === 'ended') return fail(route, 409, 'USER_ARCHIVED');
+
+    if (action === '' && method === 'PATCH') {
+      const body = updateEmployeeFileSchema.parse(request.postDataJSON());
+      const { scheduleId: _scheduleId, ...changes } = body;
+      const personal = Object.fromEntries(
+        Object.entries(changes).filter(([key]) => key in file.personal),
+      );
+      const employment = Object.fromEntries(
+        Object.entries(changes).filter(([key]) => key in file.employment),
+      );
+      const updated = { ...file.employment, ...employment };
+      if (!fileDatesValid(updated)) return fail(route, 400, 'INVALID_DATES');
+      file.personal = { ...file.personal, ...personal };
+      file.employment = updated;
+      return json(route, view(file));
+    }
+    if (action === '/payout' && method === 'PUT') {
+      const body = payoutSchema.parse(request.postDataJSON());
+      file.payout = {
+        payoutMethod: body.method,
+        payoutInstitution: body.institution,
+        payoutAccount: body.account,
+        payoutHolder: body.holder,
+      };
+      return json(route, view(file));
+    }
+    if (action === '/end' && method === 'POST') {
+      if (file.employment.endedOn) return fail(route, 409, 'ALREADY_ENDED');
+      const body = endServiceSchema.parse(request.postDataJSON());
+      if (body.endedOn < HR_TODAY) return fail(route, 400, 'INVALID_DATES');
+      file.employment = {
+        ...file.employment,
+        endedOn: body.endedOn,
+        endReason: body.reason,
+        endNote: body.note ?? null,
+      };
+      return json(route, view(file));
+    }
+    if (action === '/end' && method === 'DELETE') {
+      file.employment = { ...file.employment, endedOn: null, endReason: null, endNote: null };
+      return json(route, view(file));
+    }
+    if (action === '/salaries' && method === 'POST') {
+      const body = createSalaryChangeSchema.parse(request.postDataJSON());
+      const taken = salaries.some(
+        (s) => s.userId === file.userId && !s.archivedAt && s.effectiveOn === body.effectiveOn,
+      );
+      if (taken) return fail(route, 409, 'DUPLICATE_EFFECTIVE_DATE');
+      const change: SalaryChange = {
+        id: id(next++),
+        userId: file.userId,
+        ...body,
+        createdBy: { id: me().user.id, name: me().user.name },
+        createdAt: new Date().toISOString(),
+        archivedAt: null,
+        archiveReason: null,
+      };
+      salaries.push(change);
+      return json(route, change, 201);
+    }
+    return undefined;
+  };
 }

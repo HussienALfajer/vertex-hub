@@ -11,12 +11,14 @@ import {
   employeeMe,
   financeMe,
   financeWithoutTwoFactor,
+  HR_NOW,
   manager,
   managerWithoutMoney,
   medicalReviewerMe,
   mockApi,
   notificationFor,
   OPEN_LINK_TOKEN,
+  operationsManagerMe,
   PROJECTS_TODAY,
   plainAccountManagerMe,
   screenshot,
@@ -279,6 +281,46 @@ for (const colorScheme of ['light', 'dark'] as const) {
           page.getByRole('button', { name: new RegExp(ar.notifications.follow.follow) }),
         ).toBeVisible();
         await screenshot(page, testInfo, `task-follow-${size}-${colorScheme}`);
+      });
+
+      // F17 part A: People, the employee file tabs with and without pay, and My file.
+      test(`employee files (${size})`, async ({ page }, testInfo) => {
+        await page.setViewportSize({ width, height });
+        await page.clock.setFixedTime(new Date(HR_NOW));
+        const api = await mockApi(page, { signedIn: true, me: manager });
+        await page.goto('/hr/people');
+        await expect(page.getByRole('link', { name: /كريم الزين/ })).toBeVisible();
+        await screenshot(page, testInfo, `hr-people-${size}-${colorScheme}`);
+
+        await page.goto(`/hr/people/${seedIds.karim}`);
+        await expect(page.getByText('01020304050')).toBeVisible();
+        await screenshot(page, testInfo, `hr-file-personal-${size}-${colorScheme}`);
+        await page.getByRole('tab', { name: ar.hr.file.tabs.contract }).click();
+        await expect(page.getByText(ar.hr.fields.remoteWeekdays)).toBeVisible();
+        await screenshot(page, testInfo, `hr-file-contract-${size}-${colorScheme}`);
+        await page.getByRole('tab', { name: ar.hr.file.tabs.pay }).click();
+        await expect(page.getByText(ar.hr.salary.history)).toBeVisible();
+        await screenshot(page, testInfo, `hr-file-pay-${size}-${colorScheme}`);
+        await page.getByRole('button', { name: ar.hr.salary.add }).click();
+        await expect(page.getByRole('dialog', { name: ar.hr.salary.addTitle })).toBeVisible();
+        await screenshot(page, testInfo, `hr-salary-dialog-${size}-${colorScheme}`);
+        await page.keyboard.press('Escape');
+
+        await page.goto(`/hr/people/${seedIds.layan}`);
+        await expect(page.getByText(/آخر يوم عمل/)).toBeVisible();
+        await screenshot(page, testInfo, `hr-file-leaving-${size}-${colorScheme}`);
+
+        // Without pay: the Internal Operations manager.
+        api.signInAs(operationsManagerMe);
+        await page.goto(`/hr/people/${seedIds.karim}`);
+        await expect(page.getByRole('tab', { name: ar.hr.file.tabs.personal })).toBeVisible();
+        await expect(page.getByRole('tab', { name: ar.hr.file.tabs.pay })).toHaveCount(0);
+        await screenshot(page, testInfo, `hr-file-no-pay-${size}-${colorScheme}`);
+
+        api.signInAs(employeeMe);
+        await page.goto('/me/file?tab=pay');
+        await expect(page.getByText(ar.hr.salary.history)).toBeVisible();
+        await screenshot(page, testInfo, `hr-my-file-${size}-${colorScheme}`);
       });
 
       // F16 screens 9–14: announcements, with the home pin and the critical dialog.
