@@ -69,6 +69,8 @@ export const fileItems = pgTable(
     ),
     /** F16 part D: an announcement's attachment; no client. */
     announcementId: uuid('announcement_id').references((): AnyPgColumn => announcements.id),
+    /** F17: an employee file's document, keyed by the employee's user; no client. */
+    employeeId: uuid('employee_id').references(() => users.id),
     /** The owner's client; the owner itself for `client`; null for a task without a client. */
     clientId: uuid('client_id').references(() => clients.id),
     role: fileRoleEnum('role').notNull(),
@@ -91,6 +93,7 @@ export const fileItems = pgTable(
     index('file_items_ad_wallet_entry_id_idx').on(table.adWalletEntryId),
     index('file_items_retainer_contract_id_idx').on(table.retainerContractId),
     index('file_items_announcement_id_idx').on(table.announcementId),
+    index('file_items_employee_id_idx').on(table.employeeId),
     index('file_items_client_id_idx').on(table.clientId, table.role),
     index('file_items_created_by_id_idx').on(table.createdById),
     /** Names are unique per owner and role among live items, except references. */
@@ -98,18 +101,18 @@ export const fileItems = pgTable(
       .on(
         table.ownerType,
         table.role,
-        sql`coalesce(${table.taskId}, ${table.projectId}, ${table.retainerId}, ${table.postId}, ${table.quoteId}, ${table.invoiceId}, ${table.adWalletEntryId}, ${table.retainerContractId}, ${table.announcementId}, ${table.clientId})`,
+        sql`coalesce(${table.taskId}, ${table.projectId}, ${table.retainerId}, ${table.postId}, ${table.quoteId}, ${table.invoiceId}, ${table.adWalletEntryId}, ${table.retainerContractId}, ${table.announcementId}, ${table.employeeId}, ${table.clientId})`,
         sql`lower(${table.name})`,
       )
       .where(sql`${table.archivedAt} is null and ${table.role} <> 'reference'`),
-    // `post`, `quote`, `invoice`, `ad_wallet_entry`, `retainer_contract` and `announcement` (and
-    // the `attachment` role) are compared as text: their enum values were added in the same
-    // migration as these checks (F08, F04, F13, F12, F05C, F16).
+    // `post`, `quote`, `invoice`, `ad_wallet_entry`, `retainer_contract`, `announcement` and
+    // `employee` (and the `attachment` role) are compared as text: their enum values were added
+    // in the same migration as these checks (F08, F04, F13, F12, F05C, F16, F17).
     check(
       'file_items_owner_check',
-      sql`num_nonnulls(${table.taskId}, ${table.projectId}, ${table.retainerId}, ${table.postId}, ${table.quoteId}, ${table.invoiceId}, ${table.adWalletEntryId}, ${table.retainerContractId}, ${table.announcementId}) <= 1 and (
+      sql`num_nonnulls(${table.taskId}, ${table.projectId}, ${table.retainerId}, ${table.postId}, ${table.quoteId}, ${table.invoiceId}, ${table.adWalletEntryId}, ${table.retainerContractId}, ${table.announcementId}, ${table.employeeId}) <= 1 and (
         (${table.ownerType} = 'task' and ${table.taskId} is not null)
-        or (${table.ownerType} = 'client' and ${table.clientId} is not null and num_nonnulls(${table.taskId}, ${table.projectId}, ${table.retainerId}, ${table.postId}, ${table.quoteId}, ${table.invoiceId}, ${table.adWalletEntryId}, ${table.retainerContractId}, ${table.announcementId}) = 0)
+        or (${table.ownerType} = 'client' and ${table.clientId} is not null and num_nonnulls(${table.taskId}, ${table.projectId}, ${table.retainerId}, ${table.postId}, ${table.quoteId}, ${table.invoiceId}, ${table.adWalletEntryId}, ${table.retainerContractId}, ${table.announcementId}, ${table.employeeId}) = 0)
         or (${table.ownerType} = 'project' and ${table.projectId} is not null and ${table.clientId} is not null)
         or (${table.ownerType} = 'retainer' and ${table.retainerId} is not null and ${table.clientId} is not null)
         or (${table.ownerType}::text = 'post' and ${table.postId} is not null and ${table.clientId} is not null)
@@ -117,7 +120,8 @@ export const fileItems = pgTable(
         or (${table.ownerType}::text = 'invoice' and ${table.invoiceId} is not null and ${table.clientId} is not null)
         or (${table.ownerType}::text = 'ad_wallet_entry' and ${table.adWalletEntryId} is not null and ${table.clientId} is not null)
         or (${table.ownerType}::text = 'retainer_contract' and ${table.retainerContractId} is not null and ${table.clientId} is not null)
-        or (${table.ownerType}::text = 'announcement' and ${table.announcementId} is not null and ${table.clientId} is null))`,
+        or (${table.ownerType}::text = 'announcement' and ${table.announcementId} is not null and ${table.clientId} is null)
+        or (${table.ownerType}::text = 'employee' and ${table.employeeId} is not null and ${table.clientId} is null))`,
     ),
     check(
       'file_items_role_check',
@@ -127,7 +131,8 @@ export const fileItems = pgTable(
         or (${table.ownerType}::text = 'post' and ${table.role} = 'deliverable')
         or (${table.ownerType}::text = 'quote' and ${table.role} = 'document')
         or (${table.ownerType}::text in ('invoice', 'ad_wallet_entry', 'retainer_contract') and ${table.role} = 'document')
-        or (${table.ownerType}::text = 'announcement' and ${table.role}::text = 'attachment')`,
+        or (${table.ownerType}::text = 'announcement' and ${table.role}::text = 'attachment')
+        or (${table.ownerType}::text = 'employee' and ${table.role} = 'document')`,
     ),
     check(
       'file_items_brand_kind_check',

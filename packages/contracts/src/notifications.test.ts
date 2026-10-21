@@ -78,6 +78,9 @@ describe('notification catalog', () => {
         'shoot_starting',
         'meeting_starting',
         'shoot_completed',
+        // F17 part A: the information notices.
+        'employee_leaving',
+        'salary_changed',
         // F16 part C: the new types of the sales and engagement modules.
         'responsibility_moved',
         'client_status_changed',
@@ -113,6 +116,7 @@ describe('notification catalog', () => {
       ...notificationTypesOf('clients_projects'),
       ...notificationTypesOf('account'),
       ...notificationTypesOf('announcements'),
+      ...notificationTypesOf('hr'),
     ];
     expect(all.sort()).toEqual([...NOTIFICATION_TYPES].sort());
     expect(NOTIFICATION_CATALOG.tasks_generated.subject).toBe('template_run');
@@ -390,6 +394,8 @@ describe('channels (F16 rule B3)', () => {
         'action_escalated',
         'action_escalated_top',
         'approval_responded',
+        // F17 rule A7.
+        'contract_ending',
         'invoice_overdue',
         'invoice_paid',
         'lead_follow_up_overdue',
@@ -601,6 +607,9 @@ describe('inboxes and resolution (F16 rules B5–B6)', () => {
       // F16 part D (an announcement that asks for an acknowledgement is "action" by its data).
       'announcement_ack_reminder',
       'poll_closing',
+      // F17 part A.
+      'contract_ending',
+      'probation_ending',
     ]);
   });
 

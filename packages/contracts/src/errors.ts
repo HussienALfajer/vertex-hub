@@ -223,6 +223,9 @@ export const ERROR_CODES = [
   'CONTACT_NO_EMAIL',
   'ATTACHMENT_TOO_LARGE',
   'REMINDER_NOT_DUE',
+  'SCHEDULE_ARCHIVED',
+  'DUPLICATE_EFFECTIVE_DATE',
+  'ALREADY_ENDED',
 ] as const;
 
 export const errorCodeSchema = z.enum(ERROR_CODES).meta({ id: 'ErrorCode' });

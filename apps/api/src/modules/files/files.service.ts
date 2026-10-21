@@ -101,6 +101,7 @@ export class FilesService {
           query.role ? eq(fileItems.role, query.role) : undefined,
           includeArchived ? undefined : isNull(fileItems.archivedAt),
           owner.rights.confidentialReader ? undefined : eq(fileItems.confidential, false),
+          owner.rights.confidentialOnly ? eq(fileItems.confidential, true) : undefined,
         ),
       )
       .orderBy(desc(fileItems.createdAt), desc(fileItems.id));
@@ -123,6 +124,7 @@ export class FilesService {
           'Only confidential readers flag documents',
         );
       }
+      if (owner.rights.confidentialOnly && !input.confidential) throw new ForbiddenException();
       assertWritable(owner);
       assertSourceAllowed(input.role, input.source);
       await this.assertItemLimit(tx, owner, input.role);
@@ -188,7 +190,9 @@ export class FilesService {
         if (item.role !== 'document') {
           throw new BadRequestException('Only documents can be confidential');
         }
-        if (!owner.rights.manageDocuments) throw new ForbiddenException();
+        if (!owner.rights.manageDocuments || owner.rights.confidentialOnly) {
+          throw new ForbiddenException();
+        }
         if (!canSetConfidential(owner)) {
           throw new CodedException(
             403,
@@ -654,7 +658,7 @@ export class FilesService {
 }
 
 /** The owner id of an item row, in SQL. */
-const ownerIdSql = sql<string>`coalesce(${fileItems.taskId}, ${fileItems.projectId}, ${fileItems.retainerId}, ${fileItems.postId}, ${fileItems.quoteId}, ${fileItems.invoiceId}, ${fileItems.adWalletEntryId}, ${fileItems.announcementId}, ${fileItems.clientId})`;
+const ownerIdSql = sql<string>`coalesce(${fileItems.taskId}, ${fileItems.projectId}, ${fileItems.retainerId}, ${fileItems.postId}, ${fileItems.quoteId}, ${fileItems.invoiceId}, ${fileItems.adWalletEntryId}, ${fileItems.announcementId}, ${fileItems.employeeId}, ${fileItems.clientId})`;
 
 export const NOT_FINAL = {
   isFinal: false,

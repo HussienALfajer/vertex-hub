@@ -28,6 +28,16 @@ export const RETAINER_CYCLES_JOB = {
 } as const;
 
 /**
+ * F17: the HR day at 00:10. Part A: the contract and probation reminders (rule A7) and the
+ * archiving of accounts whose service ended (rule A8); parts B–D add days, accruals and items.
+ */
+export const HR_DAILY_JOB = {
+  queue: 'hr.daily',
+  cron: '10 0 * * *',
+  tz: BUSINESS_TIME_ZONE,
+} as const;
+
+/**
  * F14 rule 8: due-soon, overdue and renewal reminders, then the purge of old read notifications,
  * at 09:00 on work days (Saturday to Thursday).
  */

@@ -412,6 +412,11 @@ export const NOTIFICATION_TEXT = {
     many: 'أُغلق استطلاع إعلانك «{{title}}» بـ{{n}} صوتًا',
     other: 'أُغلق استطلاع إعلانك «{{title}}» بـ{{n}} صوت',
   },
+  /** F17 part A: never a salary amount (rule A4). */
+  contract_ending: 'ينتهي عقد {{employee}} في {{date}}',
+  probation_ending: 'تنتهي فترة تجربة {{employee}} في {{date}}',
+  employee_leaving: 'آخر يوم عمل لـ{{employee}} هو {{date}}',
+  salary_changed: 'سُجّل تغيير على راتبك يسري من {{date}}',
   /** F16 rule B11: each escalation step wraps the original's text. */
   action_reminder: 'تذكير: {{text}}',
   action_escalated: 'تصعيد: {{text}}',
@@ -525,10 +530,17 @@ export function notificationLink(notification: Notification): NotificationLink {
     case 'lead':
       return { to: '/leads/$leadId', params: { leadId: subject.id } };
     case 'user':
-      // F16 part C: a member's notices open their profile.
+      // F17 rules A4 and A7: the employee's own file, or their file in HR.
+      if (notification.type === 'salary_changed') return { to: '/me/file' };
+      if (notification.type === 'contract_ending' || notification.type === 'probation_ending') {
+        return { to: '/hr/people/$userId', params: { userId: subject.id } };
+      }
+      // F16 part C: a member's notices open their profile (F17: also `employee_leaving`, which
+      // department managers get without reading HR files).
       if (
         notification.type === 'member_moved' ||
-        notification.type === 'member_archived_open_work'
+        notification.type === 'member_archived_open_work' ||
+        notification.type === 'employee_leaving'
       ) {
         return { to: '/team/$userId', params: { userId: subject.id } };
       }
@@ -1139,6 +1151,30 @@ export function notificationText(
         }),
         context: null,
       };
+    case 'contract_ending':
+    case 'probation_ending':
+      return {
+        text: fill(text[notification.type], {
+          employee: notification.data.employee,
+          date: formatCalendarDate(notification.data.endsOn),
+        }),
+        context: null,
+      };
+    case 'employee_leaving':
+      return {
+        text: fill(text.employee_leaving, {
+          employee: notification.data.employee,
+          date: formatCalendarDate(notification.data.endedOn),
+        }),
+        context: null,
+      };
+    case 'salary_changed':
+      return {
+        text: fill(text.salary_changed, {
+          date: formatCalendarDate(notification.data.effectiveOn),
+        }),
+        context: null,
+      };
     case 'security_new_device':
       return {
         text: fill(text.security_new_device, { device: notification.data.device }),
@@ -1254,6 +1290,9 @@ type TaskNotification = Exclude<
       | 'department_manager_assigned'
       | `member_${string}`
       | `security_${string}`
+      | 'probation_ending'
+      | 'employee_leaving'
+      | 'salary_changed'
       | CalendarNotification['type'];
   }
 >;

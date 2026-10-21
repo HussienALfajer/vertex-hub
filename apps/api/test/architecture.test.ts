@@ -314,6 +314,7 @@ describe('module boundaries', () => {
     deliverables: 'projects',
     email: 'email',
     files: 'files',
+    hr: 'hr',
     invoices: 'invoices',
     leads: 'leads',
     notifications: 'notifications',

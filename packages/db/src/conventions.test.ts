@@ -58,6 +58,8 @@ const NOT_BUSINESS_RECORDS: Record<string, string> = {
   notification_policies:
     'One row per changed type, removed on reset to the catalog default; audited (F16 rule B2)',
   record_followers: 'Personal: who follows a task or post, never archived (F16 rule B12)',
+  work_schedule_days:
+    'Part of its schedule, replaced as a whole when the schedule is saved, audited on the schedule (F17)',
   timed_reminders: 'Idempotency keys of the minute job, purged after 30 days (F16 rule B13)',
   announcement_polls: 'Part of its announcement, audited with it (F16 rule D11)',
   announcement_poll_options: 'Part of its poll, replaced while nobody has voted (F16 rule D11)',

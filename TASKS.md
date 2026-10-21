@@ -1,111 +1,16 @@
-# TASKS — F16 Notifications 2.0, installable app and announcements
+# TASKS — F17 HR: employee files, attendance and leave
 
-Spec: `docs/specs/F16-notifications-app-announcements.md` (Approved 2026-10-20) · ADRs 0036, 0037, 0038.
-PR order fixed by the spec's "Delivery" (owner, 2026-10-20). F16 is deployed to production once, after all parts (A–D) are merged, not part by part (owner, 2026-10-20). One session per PR.
+Spec: `docs/specs/F17-hr-files-attendance-leave.md` (Approved 2026-10-21) · ADR 0039 (and 0006, 0013, 0014, 0017, 0018, 0019, 0022, 0032, 0036, 0037).
+Parts A → B → C → D, each accepted by the owner before the next starts (spec, "Parts and PRs"). One session per PR. Parts B–D are planned when they start.
 
-## PR A1 — push: contracts, db, api, worker (branch `feat/f16-a1-push-api`)
-- [x] contracts: `notificationPrioritySchema`, `channelModeSchema`; `NOTIFICATION_CATALOG` gains `priority`, `push`, `email` defaults (`emailByDefault` goes); `push_device_lost` type; push schemas (config, subscription, delivery, delivery page), `PUSH_LIMITS`; `notifications.policy` permission and grants (delivery log); error codes `PUSH_UNAVAILABLE`, `NO_SUBSCRIPTION`; queues `push.send`, `push.result` in `jobs.ts`; effective push channel (rule B3 without policies yet) and unit tests; `ar.json` keys (type label, errors)
-- [x] db (`/db-migration`): `push_subscriptions`, `push_deliveries`; `notifications.priority` (backfilled from the catalog); `notification_settings.push_overrides`, `email_overrides` (backfilled from `email_types`, which stays unused until the contract release drops it); conventions exceptions; `TABLE_OWNERS`
-- [x] messages: push texts without amounts (`ad_budget_low`, `retainer_amendment_pending`; the payment types arrive with C1) + test that no push text holds an amount; 140-char cut, payload < 3 KB
-- [x] api auth: sessions 30 days (`expiresIn`, `updateAge`); `GET /api/me/sessions` push state per device
-- [x] api notifications: `GET /me/push/config`, `PUT`/`DELETE /me/push/subscription`, `POST /me/push/test` (1/min), `POST /me/push/deliveries/:id/click`; `notify` queues `push.send` in the transaction when push is on (close list, unread count); `push.result` handler (gone → delete + `push_device_lost`, 10 failures → delete); `GET /api/push-deliveries` (`notifications.policy`); settings `push` per type; purge of `push_deliveries` after 30 days; `test/` cases (success, 401, 403, own rows)
-- [x] worker: `push.send` with `web-push` (VAPID, urgency/TTL by priority, retry 3) and the `log` transport to `.data/push/`; tests against a fake push service (201, 404, 410, 500)
-- [x] env: `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `PUSH_TRANSPORT` in config validation and `docs/deployment.md`
+## PR A1 — employee files: contracts, db, api
+- [x] contracts: `hr.ts` (employee file, list query and page, update, payout, salary change, end of service, `WEEKDAYS`, enums); the eight permissions and grants + `permissions.test.ts`; error codes `INVALID_DATES`, `SCHEDULE_ARCHIVED`, `DUPLICATE_EFFECTIVE_DATE`, `ALREADY_ENDED`; audit actions and entity types; F10 owner type `employee`; notification types `contract_ending`, `probation_ending`, `employee_leaving`, `salary_changed` (texts in `messages`, no amount); `hr.daily` job; unit tests; `ar.json` keys
+- [x] db (`/db-migration`): `work_schedules`, `work_schedule_days` (seeded "Main schedule"), `employee_files` (one per existing user), `salary_changes`; `file_items` owner type `employee`; `TABLE_OWNERS`
+- [x] api `hr` module: employees list, detail (rule A2 visibility), update, payout, salaries list/add/archive, end of service and undo; F01 hooks (create, archive, restore the file); F10 documents on `employee` with the confidential rule (A6); `hr.daily` (reminders A7, end-of-service archive A8) and `hr:run-daily`; `test/hr-employees.test.ts`
 - [x] bridge: `openapi:export`, `api:generate`; web typecheck
-- [x] checks, reviewer, acceptance (API at `/api/docs`), PR with auto-merge (#139, merged)
+- [x] checks, reviewer, acceptance (API at `/api/docs`, owner 2026-10-21), PR with auto-merge
 
-## PR A2 — the app: web and E2E (branch `feat/f16-a2-push-web`)
-- [x] `.env.example`: the push lines as placeholders (owner); local VAPID keys in `.env` (owner)
-- [x] icons in `brand/logo/app/` (192, 512, maskable 512, badge 96) and square `png/icon-192.png`, `png/apple-touch-icon.png`, from `vertex-mark.svg`; `publicDir` copies them
-- [x] manifest and service worker (vite-plugin-pwa 2.0 `injectManifest`, `src/service-worker/`): precache, app-shell navigation, `push`, `notificationclick`, no `/api/` caching; own `tsconfig.sw.json`
-- [x] install card (home), user-menu item, `/install` guide, update banner, icon badge
-- [x] offline: query cache in IndexedDB for 7 days (allowlist without money), cleared on sign-out, refusal and another user; banner, read-only shell, "Not available offline" in `LoadError`
-- [x] device push: card (settings, home invite), device rows (state, test, turn off), settings push column with priority chips and policy locks, silent re-subscribe after sign-in, closing read pushes on open and focus
-- [x] E2E: `f16.spec.ts`, `f16-push.spec.ts` (service worker push via CDP), screenshots (install card and guide, offline, desktop and phone, both themes); mocks for the push endpoints; Playwright blocks service workers elsewhere
-- [x] checks, reviewer, acceptance (owner: computer steps in Chrome; phone steps A1–A4 after the F16 deploy), PR with auto-merge
-
-## PR B1 — engine: contracts, db, api (branch `claude/zen-goodall-q35u6l`)
-- [x] contracts: catalog `box`, `opened`, `merges`, `escalation` per type; `action_reminder`, `action_escalated`, `action_escalated_top`; inboxes, resolutions, snooze options; policy-aware channel modes; policy, following, snooze and settings (`morningPush`) schemas; `unreadCount.needsYou`; `ALREADY_RESOLVED`; `notification_policy.updated`; `escalation_1..3` reminder kinds; `notifications.timed` job; unit tests
-- [x] messages: texts and links of the escalation steps (original's text, who it waits on); morning push text; no amount in a step's push
-- [x] db (`/db-migration`): `notifications` box, resolution columns, `snoozed_until` and indexes; `notification_settings.morning_push`; `notification_policies`, `record_followers`; backfill of `box` and `resolution_type`
-- [x] api: `NotificationCenter.resolve`, box and resolution type on insert, grouping (`merges`, unresolved rows), "opened" types resolve on read; inbox list and counts (critical first); snooze and unsnooze; policy API with audit, settings and `notify` read the policy; followers API on tasks and posts; escalation chain in the daily job; `notifications.timed` (snooze wake-ups) worked by the API, scheduled by the worker; morning push with the digest; critical email at any hour; purge of resolved rows; `test/` cases
-- [x] bridge: `ar.json` keys (types, errors, audit), `openapi:export`, `api:generate`, fixtures; web typecheck
-- [x] checks, reviewer, acceptance (API at `/api/docs`), PR with auto-merge
-
-## PR B2 — engine: web (branch `claude/busy-gauss-n0tl8z`)
-- [x] bell inboxes and snooze, notifications page tabs, settings (policy locks, morning push, "turn all on or off" per category and channel), policy page + delivery log tab, follow button, SW action buttons "Open" and "Remind me in an hour" (rule A11); critical toasts stay until closed (B10)
-- [x] E2E (`f16-engine.spec.ts`, F14 bell test on the tabs, screenshots: inboxes, snooze, Done and Snoozed, policy, delivery log, follow button, desktop and phone, both themes); mocks for inboxes, snooze, policy, deliveries and following
-- [x] checks, reviewer, PR with auto-merge (the owner tests B5 after the merge, at their request; B6's "Handled by" needs the C1 `resolve` calls)
-- [x] owner acceptance after the merge: all B5 steps pass (owner, 2026-10-20)
-
-## PR C1 — catalog: workflow modules api (branch `claude/vigilant-hamilton-t49k8y`)
-Split from C1b because the catalog touches twelve modules: C1 holds tasks, content, approvals, calendar and files, with the engine pieces they need.
-- [x] contracts: new types `task_reopened`, `task_delivered`, `task_revision_decided`, `task_progressed`, `task_due_shortly`, `post_published`, `post_cancelled`, `post_file_added`, `post_progressed`, `post_publish_shortly`, `approval_opened`, `approval_completed`, `shoot_starting`, `meeting_starting`, `shoot_completed` (catalog, order, snapshots); `timed_reminders` kinds; task and post resolution rules (pure, unit tests); messages texts and links; `ar.json` type labels
-- [x] db (`/db-migration`): enum values, `timed_reminders`, `approval_requests.first_opened_at`; `TABLE_OWNERS`, conventions exception
-- [x] api engine: rows resolved in the transaction that created them send no push or toast (edge case 9); automatic following and follower recipients with read access (rule B12)
-- [x] api tasks: `resolve` on every status, assignee and due change, mention reply, revision decision; new task types; followers on create, assign, comment, mention, file
-- [x] api content and files: `resolve` on post changes; new post types; post followers (creator, responsible, file adders)
-- [x] api approvals: `first_opened_at` + `approval_opened`, `approval_completed`, resolves (included in a request, responses, reissue, revoke)
-- [x] api calendar: `shoot_completed`, `shoot_not_closed` resolve
-- [x] timed sources in the minute job (`task_due_shortly`, `post_publish_shortly`, `shoot_starting`, `meeting_starting`) with `timed_reminders` and its purge
-- [x] bridge: `openapi:export`, `api:generate`, fixtures; web typecheck
-- [x] checks, reviewer, acceptance (owner, 2026-10-20), PR with auto-merge
-
-## PR C1b — catalog: sales and engagement modules api (branch `claude/stoic-allen-1amzb7`)
-Split from C1c because the remaining catalog still spans eight modules: C1b holds clients, leads, quotes, projects (projects, milestones, extra work, retainers, contracts) and templates, plus the post responsible's `responsibility_moved` (content).
-- [x] ask the owner: should archiving a scheduled shoot void `shoot_not_closed`? Yes (owner, 2026-10-20); calendar archive voids it
-- [x] contracts: new types `client_status_changed`, `client_healthcare_changed`, `lead_lost`, `quote_expiring`, `quote_expired`, `quote_rejected`, `project_status_changed`, `milestone_completed`, `extra_work_created`, `retainer_status_changed`, `contract_signed`, `contract_voided`, `responsibility_moved` (catalog, order, snapshots); `quote_expiring` daily kind; messages texts and links; `ar.json` type labels; unit tests
-- [x] db (`/db-migration`): enum values
-- [x] api clients: status and healthcare types; `responsibility_moved` for the AM
-- [x] api leads: `lead_lost`, `lead_won` + GMs, owner `responsibility_moved`; `lead_follow_up_due`/`_overdue` resolve on follow-up, date move, close
-- [x] api quotes: `quote_accepted` + Finance, `quote_rejected` (also when the lead is lost), `quote_expired`, `quote_expiring` in the daily job; `quote_approval_requested` resolve on decide or withdraw
-- [x] api projects: `project_status_changed`, `milestone_completed`, `extra_work_created`, `retainer_status_changed`, `contract_signed`, `contract_voided`, PM `responsibility_moved`; resolves of `retainer_renewal_due`, `retainer_behind`, `retainer_amendment_pending`
-- [x] api templates: `tasks_generated` managers' notice resolves when the run's unassigned tasks in that department are assigned or closed
-- [x] bridge: `openapi:export`, `api:generate`, fixtures; web typecheck
-- [x] checks, reviewer, acceptance (owner, 2026-10-20), PR with auto-merge
-
-## PR C1c — catalog: finance, campaigns and people modules api (branch `claude/sleepy-ramanujan-ealgys`)
-- [x] ask the owner: archiving stays blocked by open tasks, posts, leads and managed departments, so `member_archived_open_work` covers what stays open (campaigns)? Yes, keep the blocks (owner, 2026-10-20)
-- [x] contracts: new types `invoice_draft_created`, `invoice_due_soon`, `payment_recorded`, `payment_voided`, `invoice_voided`, `ad_deposit_recorded`, `campaign_assigned`, `campaign_status_changed`, `campaign_end_passed`, `department_manager_assigned`, `member_moved`, `member_archived_open_work`, `security_new_device`, `security_notice` (catalog, order, snapshots); subjects `campaign`, `department`; roles `campaign_owner`, `department_manager`; daily kinds `invoice_due_soon`, `campaign_end_passed`; messages texts and links (payment push texts without amounts); `ar.json` type labels; unit tests
-- [x] db (`/db-migration`): enum values
-- [x] api engine: `resolve` matches a snapshot field (`email_failed` per kind); the mailer's queued and sent hooks
-- [x] api invoices: `invoice_draft_created` (+ resolves on issue and archive), `invoice_due_soon` daily, `payment_recorded`, `payment_voided`, `invoice_voided`; `invoice_overdue` resolves on paid and void
-- [x] api campaigns: `campaign_assigned`, `campaign_status_changed`, owner `responsibility_moved`, `campaign_end_passed` daily (+ resolves), `ad_deposit_recorded`, `ad_budget_low` resolves; open campaigns as open work of an archived owner
-- [x] api auth: `department_manager_assigned` + manager `responsibility_moved`, `member_moved`, `member_archived_open_work` (+ daily resolution in notifications); security copies from the account emails; `email_failed` resolves on a later successful email
-- [x] bridge: `openapi:export`, `api:generate`, fixtures; web typecheck
-- [x] checks, reviewer, acceptance (owner, 2026-10-20), PR with auto-merge
-
-## PR C2 — catalog: web texts and links (branch `claude/brave-sagan-9nen5d`)
-The texts, type labels and most links arrived with C1–C1c (`packages/messages` tests every type); C2 closes what the web still lacked.
-- [x] messages links: `contract_signed`, `contract_voided` open the retainer's Contract tab; `extra_work_created` opens the Extra work tab of its project or retainer; unit tests
-- [x] web: "Join" on a `meeting_starting` row with a link (bell and page, spec "with a Join link"); `ar.json` key
-- [x] E2E: `f16-catalog.spec.ts` (acceptance C7's types and the other new records render their text and open their record, one test per type; the Join link); rows in `catalogNotificationsSeed()`; RTL screenshots of the catalog rows in both themes
-- [x] checks, reviewer, acceptance (owner, 2026-10-20), PR with auto-merge
-
-## PR D1 — announcements and audiences: contracts, db, api (branch `claude/zealous-franklin-paqwgx`)
-Split from D1b because Part D spans two new modules, seven tables and about twenty routes: D1 holds audiences and announcements with receipts, reminders, scheduling, pinning and attachments; D1b adds polls and templates.
-- [x] contracts: `audiences.ts` (`audienceSchema`, preview); `announcements.ts` (statuses, `announcementBodySchema` with the TipTap whitelist and its plain-text excerpt, create/update/list/detail/receipts/home schemas, limits); `announcements.manage` permission and grants (department scope); error codes `EMPTY_AUDIENCE`, `FORBIDDEN_AUDIENCE`, `LOCKED_FIELD`, `NOT_DRAFT`, `NOT_SCHEDULED`, `ALREADY_WITHDRAWN`, `NO_ACK_REQUIRED`; audit actions and entity type; notification types `announcement`, `announcement_ack_reminder`, `announcement_ack_summary` (category `announcements`, subject `announcement`, priority, box and push by the announcement); reminder kind `ack_reminder`; F10 owner type `announcement`; unit tests (body sanitizing, audience, channel by priority); messages texts and links; `ar.json` keys
-- [x] db (`/db-migration`): `announcements`, `announcement_recipients`; enum values; `file_items.announcement_id` and its check; `TABLE_OWNERS`
-- [x] api audiences: `AudienceResolver.resolve` (every source, through the exported services of `auth`, `projects`, `tasks`, `content`, `clients`), `POST /api/audiences/preview`; `test/audiences.test.ts`
-- [x] api announcements: create (draft, now, schedule), send, cancel schedule, edit (+ notify again), withdraw, archive, read (opened), acknowledge, remind (1/h), receipts, list (received, sent, all), home; critical and pin checked per recipient; `NotificationCenter` reopen for "Notify again"; F10 owner type; `test/announcements.test.ts`
-- [x] jobs: acknowledgement reminders and the author's summary in the daily job; scheduled sending in the minute job (author archived or empty audience → back to draft)
-- [x] bridge: `openapi:export`, `api:generate`; web typecheck (no fixture changes needed)
-- [x] checks, reviewer, acceptance (owner, 2026-10-20), PR with auto-merge
-
-## PR D1b — polls and templates: contracts, db, api (branch `claude/optimistic-dirac-p6hjsp`)
-- [x] contracts: poll input, vote and response schemas, `POLL_LIMITS`, close-time and closing-reminder rules; `poll` on create, update and the announcement; template schemas (`announcement-templates.ts`); error codes `POLL_CLOSED`, `SINGLE_CHOICE`; audit actions `announcement_poll.closed`, `announcement_template.*` and entity type; notification types `poll_closing`, `poll_results`; reminder kind `poll_closing`; unit tests; messages texts; `ar.json` keys
-- [x] db (`/db-migration`): `announcement_polls`, `announcement_poll_options`, `announcement_poll_votes`, `announcement_templates`; enum values; conventions exceptions
-- [x] api polls: written with the announcement (locked once voted), close time checked on send and schedule, vote, close, results as allowed (anonymous never named), `poll_closing` and closing in the minute job, `poll_results`; withdraw voids `poll_closing`; `test/announcement-polls.test.ts`
-- [x] api templates: personal and shared (`announcements.manage` `all`, audited), list, create, update, archive; `test/announcement-templates.test.ts`
-- [x] bridge: `openapi:export`, `api:generate`; web typecheck (no fixture changes needed)
-- [x] checks, reviewer, acceptance (owner, 2026-10-20), PR with auto-merge
-
-## PR D2 — announcements: web (branch `claude/gracious-rubin-pgjou2`)
-- [x] ui: `RichTextEditor` and `RichTextView` (TipTap 3, the body schema's nodes and marks only; emphasis shown as a highlight, never slanted); design-system section
-- [x] web audiences: `AudiencePicker` (source chips, search, live count and names, exclude and restore) and `audiencePreviewQuery`
-- [x] web announcements: queries; list (Received, Sent by me, All; search, status chips, unread and acknowledgement markers); page (body, link, attachments, "I have read this", poll, receipts with "Remind now", Edit, Withdraw); editor (new, draft, scheduled, sent: locked fields, notify again, schedule, cancel schedule, discard, poll builder, pin, priority with reasons, unsaved-changes guard); templates dialog (use, rename, archive) and "Save as template"; home pin; critical dialog; nav item; manifest shortcut "New announcement"; offline allowlist (list and detail); `ar.json`; unit tests of the form model
-- [x] E2E: mocks in `fixtures.ts`, `f16-announcements.spec.ts` (editor and audience preview, send, page with ack and poll, receipts, templates, home pin, critical dialog, role differences), screenshots in both themes (editor, page, receipts, list, home pin, critical dialog, desktop and phone)
-- [x] checks, reviewer (5 findings fixed), acceptance (owner, 2026-10-21), PR with auto-merge, ROADMAP F16 done
-
-## After the F16 deploy — contract release
-- [x] drop `notification_settings.email_types`: cancelled, the column stays unused (owner, 2026-10-21; F16 spec, "Data")
+## PR A2 — employee files: web and E2E
+- [ ] HR nav section, People `/hr/people`, employee file `/hr/people/:userId` (tabs Personal, Contract and schedule, Pay, Documents; end of service), `/me/file`
+- [ ] E2E: `f17.spec.ts` (with and without pay, roles), screenshots in both themes; mocks in `fixtures.ts`
+- [ ] checks, reviewer, acceptance (spec steps 2 and the file part of 1), PR with auto-merge, `docs/ROADMAP.md`

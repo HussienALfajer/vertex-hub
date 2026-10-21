@@ -1,4 +1,5 @@
 // Public surface of the auth module. Code outside this folder imports from here only.
+export { AccountArchiver } from './account-archiver.js';
 export {
   type AccountNotice,
   type AccountNoticeSink,
@@ -18,8 +19,11 @@ export {
 export {
   type Mailbox,
   type PeopleSources,
+  type ProfileFilter,
   type Signature,
   UserDirectory,
+  type UserProfile,
   type UserSummary,
 } from './user-directory.js';
+export { UserLifecycle, type UserLifecycleHook } from './user-lifecycle.js';
 export { lockAccessChanges } from './user-status.js';

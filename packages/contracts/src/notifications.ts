@@ -145,6 +145,11 @@ export const NOTIFICATION_TYPES = [
   'announcement_ack_summary',
   'poll_closing',
   'poll_results',
+  // F17 part A.
+  'contract_ending',
+  'probation_ending',
+  'employee_leaving',
+  'salary_changed',
   'action_reminder',
   'action_escalated',
   'action_escalated_top',
@@ -164,6 +169,7 @@ export const NOTIFICATION_CATEGORIES = [
   'clients_projects',
   'account',
   'announcements',
+  'hr',
 ] as const;
 
 export const notificationCategorySchema = z
@@ -341,6 +347,13 @@ const CATALOG: Record<
   announcement_ack_summary: { category: 'announcements', subject: 'announcement', mutable: true },
   poll_closing: { category: 'announcements', subject: 'announcement', mutable: true },
   poll_results: { category: 'announcements', subject: 'announcement', mutable: true },
+  /** F17 rule A7: open the employee file; the subject is the employee's user. */
+  contract_ending: { category: 'hr', subject: 'user', mutable: false },
+  probation_ending: { category: 'hr', subject: 'user', mutable: false },
+  /** Rule A8: opens the member's profile, which department managers can read too. */
+  employee_leaving: { category: 'hr', subject: 'user', mutable: true },
+  /** Rule A4: opens My file; never carries the amount. */
+  salary_changed: { category: 'hr', subject: 'user', mutable: true },
   /** F16 rule B11: the escalation steps open the original's record; its subject type is given. */
   action_reminder: { category: 'reminders', subject: 'task', mutable: false },
   action_escalated: { category: 'reminders', subject: 'task', mutable: false },
@@ -513,6 +526,10 @@ const CHANNELS: Record<NotificationType, Channels> = {
   announcement_ack_summary: normal(),
   poll_closing: normal(),
   poll_results: informational,
+  contract_ending: important('on'),
+  probation_ending: important(),
+  employee_leaving: normal(),
+  salary_changed: normal(),
   action_reminder: important(),
   action_escalated: important('on'),
   action_escalated_top: critical(),
@@ -727,6 +744,11 @@ const ENGINE: Record<NotificationType, Engine> = {
   /** Rule D11: closed by a vote, or void when the poll closes. */
   poll_closing: action(),
   poll_results: info,
+  /** Rule A7: resolved when the date changes or the service ends. */
+  contract_ending: action(),
+  probation_ending: action(),
+  employee_leaving: info,
+  salary_changed: info,
   action_reminder: action(),
   action_escalated: action(),
   action_escalated_top: action(),
@@ -1215,6 +1237,13 @@ export const NOTIFICATION_DATA_SCHEMAS = {
   poll_closing: announcementData.extend({ closesAt: z.iso.datetime() }),
   /** Rule D11: the poll closed with `voters` people having voted. */
   poll_results: announcementData.extend({ voters: z.number().int().min(0) }),
+  /** F17 rule A7: `employee`'s contract or probation ends on `endsOn`. */
+  contract_ending: z.object({ employee: nameSchema, endsOn: calendarDateSchema }),
+  probation_ending: z.object({ employee: nameSchema, endsOn: calendarDateSchema }),
+  /** Rule A8: `employee`'s last working day is `endedOn`. */
+  employee_leaving: z.object({ employee: nameSchema, endedOn: calendarDateSchema }),
+  /** Rule A4: a salary change effective on `effectiveOn`; the amount is never in a notice. */
+  salary_changed: z.object({ effectiveOn: calendarDateSchema }),
   /** F16 rule B11 step 1: the original still waits on its recipients. */
   action_reminder: escalationData,
   /** Step 2: the managers of those it waits on (or the step's department or role). */
@@ -1693,6 +1722,10 @@ export const NOTIFICATION_REMINDER_KINDS = [
   'ack_summary',
   /** F16 rule D11: once per poll and closing date. */
   'poll_closing',
+  /** F17 rule A7: once per employee, end date and threshold. */
+  'contract_ending_30',
+  'contract_ending_7',
+  'probation_ending',
 ] as const;
 
 export type NotificationReminderKind = (typeof NOTIFICATION_REMINDER_KINDS)[number];

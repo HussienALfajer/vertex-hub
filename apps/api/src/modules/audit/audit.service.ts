@@ -4,12 +4,27 @@ import { auditEntries, type Database } from '@vertex-hub/db';
 import { and, count, desc, eq, gte, lte, type SQL } from 'drizzle-orm';
 import { DATABASE } from '../../core/database/database.module.js';
 
+/** F17: the pay fields of HR entries, left out for readers without `salaries.read`. */
+const PAY_FIELDS: Readonly<Record<string, readonly string[]>> = {
+  salary_change: ['amountMinor'],
+  employee_file: ['payoutMethod', 'payoutInstitution', 'payoutAccount', 'payoutHolder'],
+};
+
+function withoutPay(
+  entityType: string,
+  fields: Record<string, unknown> | null,
+): Record<string, unknown> | null {
+  const hidden = PAY_FIELDS[entityType];
+  if (!fields || !hidden) return fields;
+  return Object.fromEntries(Object.entries(fields).filter(([key]) => !hidden.includes(key)));
+}
+
 @Injectable()
 export class AuditService {
   constructor(@Inject(DATABASE) private readonly db: Database) {}
 
   /** Entries matching the filters, newest first (ids are UUIDv7, so they sort by time too). */
-  async list(query: AuditListQuery): Promise<AuditPage> {
+  async list(query: AuditListQuery, options: { showsPay: boolean }): Promise<AuditPage> {
     const filters: SQL[] = [];
     if (query.entityType) filters.push(eq(auditEntries.entityType, query.entityType));
     if (query.entityId) filters.push(eq(auditEntries.entityId, query.entityId));
@@ -40,8 +55,8 @@ export class AuditService {
         action: row.action as AuditPage['items'][number]['action'],
         entityType: row.entityType as AuditPage['items'][number]['entityType'],
         entityId: row.entityId,
-        before: row.before,
-        after: row.after,
+        before: options.showsPay ? row.before : withoutPay(row.entityType, row.before),
+        after: options.showsPay ? row.after : withoutPay(row.entityType, row.after),
       })),
       total: total?.value ?? 0,
       page: query.page,

@@ -233,6 +233,10 @@ const SAMPLES: Record<NotificationType, unknown> = {
   announcement_ack_summary: { title: 'دوام رمضان', pending: 4 },
   poll_closing: { title: 'دوام رمضان', closesAt: '2026-10-22T09:00:00.000Z' },
   poll_results: { title: 'دوام رمضان', voters: 12 },
+  contract_ending: { employee: 'سامر', endsOn: '2026-11-20' },
+  probation_ending: { employee: 'سامر', endsOn: '2026-11-04' },
+  employee_leaving: { employee: 'سامر', endedOn: '2026-10-31' },
+  salary_changed: { effectiveOn: '2026-11-01' },
   action_reminder: {
     originalType: 'task_review_requested',
     originalData: { task },
@@ -627,5 +631,25 @@ describe('announcements (F16 part D)', () => {
       title: 'دوام رمضان',
       body: 'يبدأ الدوام في رمضان الساعة العاشرة',
     });
+  });
+});
+
+describe('HR (F17 part A)', () => {
+  const render = (type: NotificationType) => notificationText(sample(type), departmentName);
+
+  it('names the employee and the date, and opens the file in HR', () => {
+    expect(render('contract_ending').text).toBe('ينتهي عقد سامر في 20 تشرين الثاني 2026');
+    expect(render('probation_ending').text).toBe('تنتهي فترة تجربة سامر في 4 تشرين الثاني 2026');
+    expect(linkPath(notificationLink(sample('contract_ending')))).toBe(`/hr/people/${SUBJECT_ID}`);
+  });
+
+  it("opens a leaving employee's profile, which department managers can read", () => {
+    expect(render('employee_leaving').text).toBe('آخر يوم عمل لـسامر هو 31 تشرين الأول 2026');
+    expect(linkPath(notificationLink(sample('employee_leaving')))).toBe(`/team/${SUBJECT_ID}`);
+  });
+
+  it('tells the employee of a salary change without its amount (rule A4)', () => {
+    expect(render('salary_changed').text).toBe('سُجّل تغيير على راتبك يسري من 1 تشرين الثاني 2026');
+    expect(linkPath(notificationLink(sample('salary_changed')))).toBe('/me/file');
   });
 });

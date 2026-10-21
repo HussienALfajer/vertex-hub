@@ -250,6 +250,12 @@ export const AUDIT_ACTIONS = [
   'announcement_template.created',
   'announcement_template.updated',
   'announcement_template.archived',
+  'employee_file.updated',
+  'employee_file.payout_changed',
+  'employee_file.service_ended',
+  'employee_file.service_end_cleared',
+  'salary_change.created',
+  'salary_change.archived',
 ] as const;
 
 export const auditActionSchema = z.enum(AUDIT_ACTIONS).meta({ id: 'AuditAction' });
@@ -304,6 +310,9 @@ export const AUDIT_ENTITY_TYPES = [
   'notification_policy',
   'announcement',
   'announcement_template',
+  /** F17: keyed by the employee's user id. */
+  'employee_file',
+  'salary_change',
 ] as const;
 
 export const auditEntityTypeSchema = z.enum(AUDIT_ENTITY_TYPES).meta({ id: 'AuditEntityType' });

@@ -483,7 +483,10 @@
     "INVALID_RECIPIENT": "أحد المستلمين لم يعد جهة اتصال لهذا العميل أو ليس له بريد. حدّث القائمة واختر من جديد.",
     "CONTACT_NO_EMAIL": "ليس لجهة الاتصال بريد إلكتروني. أضفه في بطاقة العميل أولًا.",
     "ATTACHMENT_TOO_LARGE": "المرفقات أكبر من 10 ميغابايت، فلا تُرسل بالبريد.",
-    "REMINDER_NOT_DUE": "لم يحن وقت التذكير بعد: يُتاح بعد 48 ساعة دون رد."
+    "REMINDER_NOT_DUE": "لم يحن وقت التذكير بعد: يُتاح بعد 48 ساعة دون رد.",
+    "SCHEDULE_ARCHIVED": "جدول الدوام هذا مؤرشف. اختر جدولًا آخر.",
+    "DUPLICATE_EFFECTIVE_DATE": "يوجد تغيير راتب آخر يسري من التاريخ نفسه. أرشفه أولًا أو اختر تاريخًا آخر.",
+    "ALREADY_ENDED": "سُجّل إنهاء خدمة هذا الموظف من قبل. ألغِه أولًا لتغيير تاريخه."
   },
   "users": {
     "title": "الفريق",
@@ -902,7 +905,9 @@
       "retainer_contract_annex": "ملحق عقد",
       "notification_policy": "سياسة قنوات الإشعارات",
       "announcement": "إعلان",
-      "announcement_template": "قالب إعلان"
+      "announcement_template": "قالب إعلان",
+      "employee_file": "ملف موظف",
+      "salary_change": "تغيير راتب"
     },
     "actions": {
       "user": {
@@ -1250,6 +1255,16 @@
         "created": "أنشأ قالب إعلان مشتركًا",
         "updated": "عدّل قالب إعلان مشتركًا",
         "archived": "أرشف قالب إعلان مشتركًا"
+      },
+      "employee_file": {
+        "updated": "عدّل ملف موظف",
+        "payout_changed": "غيّر طريقة صرف الراتب",
+        "service_ended": "سجّل إنهاء خدمة",
+        "service_end_cleared": "ألغى إنهاء خدمة"
+      },
+      "salary_change": {
+        "created": "أضاف تغيير راتب",
+        "archived": "أرشف تغيير راتب"
       }
     },
     "fields": {
@@ -1560,7 +1575,27 @@
       "notifyAgain": "إشعار من جديد",
       "poll": "الاستطلاع",
       "closed": "مغلق",
-      "voters": "المصوّتون"
+      "voters": "المصوّتون",
+      "employmentType": "نوع التوظيف",
+      "probationEndDate": "نهاية فترة التجربة",
+      "contractEndDate": "نهاية العقد",
+      "scheduleId": "جدول الدوام",
+      "attendanceExempt": "معفى من الحضور",
+      "remoteWeekdays": "أيام العمل عن بعد",
+      "annualLeaveDays": "أيام الإجازة السنوية",
+      "birthDate": "تاريخ الميلاد",
+      "emergencyName": "جهة الطوارئ",
+      "emergencyPhone": "هاتف الطوارئ",
+      "emergencyRelation": "صلة القرابة",
+      "payoutMethod": "طريقة الصرف",
+      "payoutInstitution": "المصرف أو مزوّد المحفظة",
+      "payoutAccount": "رقم الحساب",
+      "payoutHolder": "اسم صاحب الحساب",
+      "endedOn": "آخر يوم عمل",
+      "endReason": "سبب إنهاء الخدمة",
+      "endNote": "ملاحظة إنهاء الخدمة",
+      "effectiveOn": "يسري من",
+      "archiveReason": "سبب الأرشفة"
     },
     "kinds": {
       "activation": "تفعيل",
@@ -4392,7 +4427,8 @@
       "calendar": "التقويم",
       "clients_projects": "العملاء والمشاريع",
       "account": "الحساب",
-      "announcements": "الإعلانات"
+      "announcements": "الإعلانات",
+      "hr": "الموارد البشرية"
     },
     "settings": {
       "title": "إعدادات الإشعارات",
@@ -4526,7 +4562,11 @@
       "poll_results": "إغلاق استطلاع في إعلاني",
       "action_reminder": "تذكير بعمل ما زال ينتظر",
       "action_escalated": "تصعيد عمل متأخر إليّ",
-      "action_escalated_top": "تصعيد عمل متأخر إلى الإدارة"
+      "action_escalated_top": "تصعيد عمل متأخر إلى الإدارة",
+      "contract_ending": "اقتراب نهاية عقد موظف",
+      "probation_ending": "اقتراب نهاية فترة تجربة موظف",
+      "employee_leaving": "انتهاء خدمة موظف",
+      "salary_changed": "تغيير على راتبي"
     },
     "priorities": {
       "critical": "حرج",

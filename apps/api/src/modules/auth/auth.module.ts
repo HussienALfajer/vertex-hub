@@ -6,6 +6,7 @@ import { ENV, type Env } from '../../core/config/env.js';
 import { DATABASE } from '../../core/database/database.module.js';
 import { EmailModule, Mailer } from '../email/index.js';
 import { AccessService } from './access.service.js';
+import { AccountArchiver } from './account-archiver.js';
 import { AccountEmails } from './account-emails.js';
 import { AccountNotices } from './account-notices.js';
 import { createAuth } from './auth.config.js';
@@ -21,6 +22,7 @@ import { SessionActivity } from './session-activity.js';
 import { SignedInDevicesController } from './signed-in-devices.controller.js';
 import { SignedInDevicesService } from './signed-in-devices.service.js';
 import { UserDirectory } from './user-directory.js';
+import { UserLifecycle } from './user-lifecycle.js';
 import { UserLinksService } from './user-links.service.js';
 import { UsersController } from './users.controller.js';
 import { UsersService } from './users.service.js';
@@ -54,6 +56,8 @@ import { UsersService } from './users.service.js';
     AccessService,
     AccountNotices,
     UsersService,
+    UserLifecycle,
+    AccountArchiver,
     UserLinksService,
     AccountEmails,
     DepartmentsService,
@@ -65,6 +69,13 @@ import { UsersService } from './users.service.js';
     SignedInDevicesService,
     { provide: APP_GUARD, useClass: PermissionsGuard },
   ],
-  exports: [ResponsibilityRegistry, DevicePushStates, UserDirectory, AccountNotices],
+  exports: [
+    ResponsibilityRegistry,
+    DevicePushStates,
+    UserDirectory,
+    AccountNotices,
+    UserLifecycle,
+    AccountArchiver,
+  ],
 })
 export class AuthModule {}

@@ -35,6 +35,7 @@ const OWNER_COLUMNS = {
   ad_wallet_entry: fileItems.adWalletEntryId,
   retainer_contract: fileItems.retainerContractId,
   announcement: fileItems.announcementId,
+  employee: fileItems.employeeId,
 } as const;
 
 /** The items of one owner. `client_id` is set on every item of a client, so the type filters too. */
@@ -54,6 +55,7 @@ export function ownerValues(owner: FileOwner) {
     adWalletEntryId: owner.type === 'ad_wallet_entry' ? owner.id : null,
     retainerContractId: owner.type === 'retainer_contract' ? owner.id : null,
     announcementId: owner.type === 'announcement' ? owner.id : null,
+    employeeId: owner.type === 'employee' ? owner.id : null,
     clientId: owner.clientId,
   };
 }
@@ -68,6 +70,7 @@ export const ownerIdOf = (item: ItemRow): string =>
     item.adWalletEntryId ??
     item.retainerContractId ??
     item.announcementId ??
+    item.employeeId ??
     item.clientId) as string;
 
 /**
@@ -122,6 +125,7 @@ export function assertNotSent(owner: FileOwner, versionIds: readonly string[]): 
 /** Rule 15 and "Who reads": confidential items for their readers, removed ones for scope all. */
 export const canSee = (owner: FileOwner, item: ItemRow) =>
   (!item.confidential || owner.rights.confidentialReader) &&
+  (item.confidential || !owner.rights.confidentialOnly) &&
   (!item.archivedAt || owner.rights.scopeAll);
 
 /** Loads nothing itself: answers 404 for an item the actor may not see. */
@@ -133,8 +137,12 @@ export function assertVisible(owner: FileOwner, item: ItemRow): void {
 export function canEdit(owner: FileOwner, item: ItemRow): boolean {
   if (item.role === 'deliverable') return owner.rights.addDeliverable;
   if (item.role === 'reference') return false;
-  return owner.rights.manageDocuments;
+  return managesDocument(owner);
 }
+
+/** The manage right over one document; a confidential-only actor only adds documents. */
+const managesDocument = (owner: FileOwner) =>
+  owner.rights.manageDocuments && !owner.rights.confidentialOnly;
 
 export function canRemoveItem(actor: CurrentUserInfo, owner: FileOwner, item: ItemRow): boolean {
   const { rights } = owner;
@@ -144,7 +152,7 @@ export function canRemoveItem(actor: CurrentUserInfo, owner: FileOwner, item: It
     case 'reference':
       return rights.manageTask || item.createdById === actor.id;
     default:
-      return rights.manageDocuments;
+      return managesDocument(owner);
   }
 }
 
@@ -162,7 +170,7 @@ export function canRemoveVersionBy(
     case 'reference':
       return false;
     default:
-      return rights.manageDocuments;
+      return managesDocument(owner);
   }
 }
 

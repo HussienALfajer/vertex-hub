@@ -10,6 +10,7 @@ export * from './content.js';
 export * from './deliverables.js';
 export * from './email.js';
 export * from './files.js';
+export * from './hr.js';
 export * from './invoices.js';
 export * from './leads.js';
 export * from './notifications.js';
