@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { punchDirectionSchema } from './attendance.js';
 import {
   addDays,
   type CalendarDate,
@@ -646,10 +647,16 @@ export type HrSettings = z.infer<typeof hrSettingsSchema>;
 /*
  * Part B: leave (rules B4–B18). Requests of kind `leave` and `permission`, the leave balance
  * ledger and the opinions on requests. Part C adds `passkey_replacement` (rule C9: a new
- * attendance passkey waiting for the General Manager); remote days and corrections follow.
+ * attendance passkey waiting for the General Manager), remote days and corrections (rule C19).
  */
 
-export const HR_REQUEST_KINDS = ['leave', 'permission', 'passkey_replacement'] as const;
+export const HR_REQUEST_KINDS = [
+  'leave',
+  'permission',
+  'passkey_replacement',
+  'remote_day',
+  'correction',
+] as const;
 
 export const hrRequestKindSchema = z.enum(HR_REQUEST_KINDS).meta({ id: 'HrRequestKind' });
 
@@ -680,7 +687,7 @@ export const hrRequestStatusSchema = z.enum(HR_REQUEST_STATUSES).meta({ id: 'HrR
 
 export type HrRequestStatus = z.infer<typeof hrRequestStatusSchema>;
 
-/** What a ledger row records (spec, `leave_ledger`); `overtime_credit` arrives with part C. */
+/** What a ledger row records (spec, `leave_ledger`); `overtime_credit` is rule C18's time off. */
 export const LEDGER_ENTRIES = [
   'opening',
   'accrual',
@@ -690,15 +697,22 @@ export const LEDGER_ENTRIES = [
   'taken',
   'restored',
   'adjustment',
+  'overtime_credit',
 ] as const;
 
 export const ledgerEntrySchema = z.enum(LEDGER_ENTRIES).meta({ id: 'LedgerEntry' });
 
 export type LedgerEntry = z.infer<typeof ledgerEntrySchema>;
 
-export const HR_REQUEST_LIMITS = { reason: 500, note: 500, opinion: 1000, leaveDays: 60 } as const;
+export const HR_REQUEST_LIMITS = {
+  reason: 500,
+  note: 500,
+  opinion: 1000,
+  leaveDays: 60,
+  remoteDays: 31,
+} as const;
 
-const personRefSchema = z.object({ id: z.uuid(), name: z.string() });
+export const personRefSchema = z.object({ id: z.uuid(), name: z.string() });
 
 /** The weekday of a date (`WEEKDAYS`). */
 export function weekdayOf(date: CalendarDate): Weekday {
@@ -814,10 +828,12 @@ export interface RequestSpan {
 /**
  * Rule B8: whether two requests of one user cover the same time. Two halves of one day fit
  * together, and a permission fits beside a half-day leave or another permission of the day whose
- * window it does not share.
+ * window it does not share. A remote day (rule C19) meets only another remote day: it says where
+ * the day is worked, so leave and permissions fit beside it.
  */
 export function requestsOverlap(a: RequestSpan, b: RequestSpan): boolean {
   if (a.startsOn > b.endsOn || b.startsOn > a.endsOn) return false;
+  if (a.kind === 'remote_day' || b.kind === 'remote_day') return a.kind === b.kind;
   if (a.kind === 'permission' && b.kind === 'permission') {
     return (a.fromTime ?? '') < (b.toTime ?? '') && (b.fromTime ?? '') < (a.toTime ?? '');
   }
@@ -886,14 +902,51 @@ const permissionRequestSchema = z.object({
   reason: requestReason,
 });
 
+/** Rule C19: days worked remotely, up to `HR_REQUEST_LIMITS.remoteDays` days. */
+const remoteDayRequestSchema = z.object({
+  kind: z.literal('remote_day'),
+  userId: z.uuid().optional(),
+  startsOn: calendarDateSchema,
+  endsOn: calendarDateSchema,
+  reason: requestReason,
+});
+
+/** Rule C19: a forgotten punch, `direction` at `time` on `date`. */
+const correctionRequestSchema = z.object({
+  kind: z.literal('correction'),
+  userId: z.uuid().optional(),
+  date: calendarDateSchema,
+  direction: punchDirectionSchema,
+  time: timeOfDaySchema,
+  reason: requestReason,
+});
+
 /**
- * Rules B8–B13: a leave of up to `HR_REQUEST_LIMITS.leaveDays` days, a half day only on a single
- * day, a reason except for annual leave; a permission with a reason and a window that ends after
- * it starts. Balances, notice and overlaps need the database.
+ * Rules B8–B13 and C19: a leave of up to `HR_REQUEST_LIMITS.leaveDays` days, a half day only on a
+ * single day, a reason except for annual leave; a permission with a reason and a window that ends
+ * after it starts; remote days and corrections with a reason. Balances, notice, overlaps and the
+ * correction's moment need the database and the clock.
  */
 export const createHrRequestSchema = z
-  .discriminatedUnion('kind', [leaveRequestSchema, permissionRequestSchema])
+  .discriminatedUnion('kind', [
+    leaveRequestSchema,
+    permissionRequestSchema,
+    remoteDayRequestSchema,
+    correctionRequestSchema,
+  ])
   .superRefine((request, ctx) => {
+    if (request.kind === 'remote_day' || request.kind === 'correction') {
+      if (!request.reason) ctx.addIssue({ code: 'custom', path: ['reason'], message: 'Required' });
+    }
+    if (request.kind === 'correction') return;
+    if (request.kind === 'remote_day') {
+      if (request.endsOn < request.startsOn) {
+        ctx.addIssue({ code: 'custom', path: ['endsOn'], message: 'Ends on or after the start' });
+      } else if (daysInclusive(request.startsOn, request.endsOn) > HR_REQUEST_LIMITS.remoteDays) {
+        ctx.addIssue({ code: 'custom', path: ['endsOn'], message: 'Too long' });
+      }
+      return;
+    }
     if (request.kind === 'leave') {
       if (request.endsOn < request.startsOn) {
         ctx.addIssue({ code: 'custom', path: ['endsOn'], message: 'Ends on or after the start' });
@@ -933,7 +986,7 @@ export type HrRequestWarning = z.infer<typeof hrRequestWarningSchema>;
 /** What a request would be, shown before it is submitted (rules B9, B12, B13). */
 export const hrRequestPreviewSchema = z
   .object({
-    /** Work days a leave covers; null for a permission. */
+    /** Work days a leave or remote days cover; null for a permission or a correction. */
     days: z.number().nullable(),
     paidDays: z.number().nullable(),
     unpaidDays: z.number().nullable(),
@@ -951,14 +1004,19 @@ export const hrRequestSchema = z
     kind: hrRequestKindSchema,
     /** Leave only. */
     leaveType: leaveTypeSchema.nullable(),
-    /** A permission's day is both. */
+    /** A permission's or a correction's day is both. */
     startsOn: calendarDateSchema,
     endsOn: calendarDateSchema,
     half: leaveHalfSchema.nullable(),
-    /** Permission only. */
+    /** Permission: its window; correction: `fromTime` is the punch's time. */
     fromTime: timeOfDaySchema.nullable(),
     toTime: timeOfDaySchema.nullable(),
-    /** Leave only: the work days it covers, and their paid and unpaid split (rule B12). */
+    /** Correction only (rule C19). */
+    correctionDirection: punchDirectionSchema.nullable(),
+    /**
+     * Leave: the work days it covers, and their paid and unpaid split (rule B12); remote days:
+     * the work days they cover.
+     */
     days: z.number().nullable(),
     paidDays: z.number().nullable(),
     unpaidDays: z.number().nullable(),
@@ -1003,10 +1061,12 @@ export const hrRequestPageSchema = pageSchema(hrRequestSchema).meta({
 
 export type HrRequestPage = z.infer<typeof hrRequestPageSchema>;
 
+/** On a request, or on an attendance item (rule C17). */
 export const hrOpinionSchema = z
   .object({
     id: z.uuid(),
-    requestId: z.uuid(),
+    requestId: z.uuid().nullable(),
+    itemId: z.uuid().nullable(),
     author: personRefSchema,
     body: z.string(),
     createdAt: instantSchema,
@@ -1015,11 +1075,16 @@ export const hrOpinionSchema = z
 
 export type HrOpinion = z.infer<typeof hrOpinionSchema>;
 
-/** Rule B14: a department manager's or Ops' comment on a pending request. */
+/** Rule B14: a department manager's or Ops' comment on a pending request or item. */
 export const createHrOpinionSchema = z
   .object({
-    requestId: z.uuid(),
+    requestId: z.uuid().optional(),
+    itemId: z.uuid().optional(),
     body: z.string().trim().min(1).max(HR_REQUEST_LIMITS.opinion),
+  })
+  .refine((opinion) => !opinion.requestId !== !opinion.itemId, {
+    message: 'A request or an item',
+    path: ['itemId'],
   })
   .meta({ id: 'CreateHrOpinion' });
 
@@ -1106,6 +1171,8 @@ export const ledgerRowSchema = z
     /** `YYYY-MM` for an accrual. */
     period: z.string().nullable(),
     requestId: z.uuid().nullable(),
+    /** `overtime_credit`: the overtime item it credits or gives back (rule C18). */
+    itemId: z.uuid().nullable(),
     note: z.string().nullable(),
     /** Null for the daily job. */
     createdBy: personRefSchema.nullable(),

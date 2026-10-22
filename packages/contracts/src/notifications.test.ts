@@ -86,6 +86,10 @@ describe('notification catalog', () => {
         'hr_request_decided',
         'colleague_on_leave',
         'leave_balance_adjusted',
+        // F17 part C.
+        'attendance_item_decided',
+        'field_punch_recorded',
+        'field_punch_rejected',
         // F16 part C: the new types of the sales and engagement modules.
         'responsibility_moved',
         'client_status_changed',
@@ -619,6 +623,13 @@ describe('inboxes and resolution (F16 rules B5–B6)', () => {
       'probation_ending',
       // F17 part B.
       'hr_request_submitted',
+      // F17 part C.
+      'attendance_item_raised',
+      'attendance_items_pending',
+      'attendance_check_in_missing',
+      'attendance_check_out_missing',
+      'shoot_check_in_missing',
+      'kiosk_offline',
     ]);
   });
 

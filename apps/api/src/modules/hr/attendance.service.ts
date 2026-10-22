@@ -7,6 +7,7 @@ import {
   type AttendanceGreeting,
   type AttendancePunch,
   addDays,
+  attendanceDateSubjectId,
   businessDate,
   businessInstant,
   businessTimeOfDay,
@@ -14,16 +15,22 @@ import {
   DUPLICATE_PUNCH_SECONDS,
   type MyAttendanceToday,
   nextPunchDirection,
+  PUNCH_REFUSALS,
   type PunchInput,
   type PunchOptionsInput,
+  type PunchRefusal,
   type PunchResult,
   partOfDay,
   punchDates,
+  type RejectPunch,
   type SelfPunchMethod,
+  type TodayBoard,
+  type TodayBoardQuery,
+  type TodayState,
   type WebAuthnChallenge,
-  weekdayOf,
 } from '@vertex-hub/contracts';
 import {
+  attendanceDays,
   attendanceKiosks,
   attendancePasskeys,
   attendancePunches,
@@ -34,8 +41,9 @@ import {
 import { and, asc, desc, eq, gte, inArray, isNull, lt } from 'drizzle-orm';
 import { DATABASE } from '../../core/database/database.module.js';
 import { CodedException } from '../../core/errors/index.js';
-import { recordAudit } from '../audit/index.js';
-import type { CurrentUserInfo } from '../auth/index.js';
+import { AuditService, recordAudit } from '../audit/index.js';
+import { type CurrentUserInfo, UserDirectory } from '../auth/index.js';
+import { NotificationCenter } from '../notifications/index.js';
 import { AttendanceDays, type DayRow } from './attendance-days.js';
 import { AttendanceKiosksService, OfficeRefused } from './attendance-kiosks.service.js';
 import { AttendancePasskeys, type PasskeyRow } from './attendance-passkeys.js';
@@ -111,6 +119,9 @@ export class AttendanceService {
     private readonly settings: HrSettingsService,
     private readonly stream: KioskStream,
     private readonly work: LeaveWorkSources,
+    private readonly users: UserDirectory,
+    private readonly center: NotificationCenter,
+    private readonly audit: AuditService,
   ) {}
 
   /** `GET /attendance/me/today`. */
@@ -131,11 +142,12 @@ export class AttendanceService {
         await lockLeave(tx, actor.id);
         return (await this.days.refresh(tx, actor.id, [today], { create: true, now })).get(today);
       });
-      day = row ? ((await this.present(this.db, actor.id, [row]))[0] ?? null) : null;
+      day = row ? ((await this.presentDays(this.db, actor.id, [row]))[0] ?? null) : null;
       shoots = await this.shoots.punchable(this.db, actor.id, now);
       methods = [
         'office',
-        ...(file?.remoteWeekdays.includes(weekdayOf(today)) ? (['remote'] as const) : []),
+        // Rules C8 and C19: a standing remote weekday or an approved remote day.
+        ...(row?.place === 'remote' ? (['remote'] as const) : []),
         'field',
         ...(shoots.length > 0 ? (['shoot'] as const) : []),
       ];
@@ -170,7 +182,7 @@ export class AttendanceService {
     } else {
       if (
         input.method === 'remote' &&
-        !file?.remoteWeekdays.includes(weekdayOf(businessDate(now)))
+        !(file && (await this.days.remoteOn(this.db, file, businessDate(now))))
       ) {
         throw new CodedException(409, 'NOT_REMOTE_DAY', 'Today is not a remote day');
       }
@@ -269,14 +281,194 @@ export class AttendanceService {
           ? refreshed.get(addDays(today, -1))
           : refreshed.get(today);
       if (!day) throw new Error('The punch has no attendance day');
+      if (ticket.method === 'field') {
+        // Rule C11: accepted at once; the GMs see it, merged per date.
+        await this.center.notify(tx, {
+          type: 'field_punch_recorded',
+          data: { employee: actor.name, direction, at: now.toISOString() },
+          recipients: await this.users.withRole('general_manager', tx),
+          actorId: actor.id,
+          subjectId: attendanceDateSubjectId(today),
+        });
+      }
+      if (ticket.method === 'shoot' && ticket.shootId && direction === 'in') {
+        await this.center.resolve(tx, {
+          subject: { type: 'shoot', id: ticket.shootId },
+          types: ['shoot_check_in_missing'],
+          outcome: 'done',
+          actorId: actor.id,
+          recipients: [actor.id],
+        });
+      }
       const greeting = await this.greeting(tx, actor, direction, day, now);
       if (kiosk) await this.stream.publish(tx, kiosk.id, greeting);
       return { punch, day, greeting };
     });
-    const [day] = await this.present(this.db, actor.id, [result.day]);
+    const [day] = await this.presentDays(this.db, actor.id, [result.day]);
     const [punch] = await this.presentPunches(this.db, [result.punch]);
     if (!day || !punch) throw new NotFoundException();
     return { punch, day, greeting: result.greeting };
+  }
+
+  /**
+   * `POST /attendance/punches/:id/reject` (rule C12): `hr.approve` rejects a field or shoot
+   * punch with a note; it is archived, its day recomputes and the employee is told.
+   */
+  async rejectPunch(
+    actor: CurrentUserInfo,
+    id: string,
+    input: RejectPunch,
+    now = new Date(),
+  ): Promise<AttendanceDay> {
+    const result = await this.db.transaction(async (tx) => {
+      const [found] = await tx
+        .select({ userId: attendancePunches.userId })
+        .from(attendancePunches)
+        .where(eq(attendancePunches.id, id));
+      if (!found) throw new NotFoundException();
+      await lockLeave(tx, found.userId);
+      const [punch] = await tx
+        .select()
+        .from(attendancePunches)
+        .where(eq(attendancePunches.id, id))
+        .for('update');
+      if (!punch) throw new NotFoundException();
+      if ((punch.method !== 'field' && punch.method !== 'shoot') || punch.archivedAt) {
+        throw new CodedException(409, 'NOT_FIELD', 'Only a live field or shoot punch is rejected');
+      }
+      // The date the punch counted for (rule C15), read before it stops counting.
+      const date = await this.punchDate(tx, punch);
+      await tx
+        .update(attendancePunches)
+        .set({ fieldReview: 'rejected', archivedAt: now })
+        .where(eq(attendancePunches.id, id));
+      await recordAudit(tx, {
+        actor: { id: actor.id, name: actor.name },
+        action: 'attendance_punch.rejected',
+        entityType: 'attendance_punch',
+        entityId: id,
+        before: { fieldReview: punch.fieldReview },
+        after: { fieldReview: 'rejected', note: input.note, userId: punch.userId },
+      });
+      const days = await this.days.refresh(tx, punch.userId, [date], { now });
+      if (punch.userId !== actor.id) {
+        await this.center.notify(tx, {
+          type: 'field_punch_rejected',
+          data: { method: punch.method, direction: punch.direction, at: punch.at.toISOString() },
+          recipients: [punch.userId],
+          actorId: actor.id,
+          subjectId: punch.userId,
+        });
+      }
+      const day = days.get(date);
+      if (!day) throw new NotFoundException();
+      return { userId: punch.userId, day };
+    });
+    const [day] = await this.presentDays(this.db, result.userId, [result.day]);
+    if (!day) throw new NotFoundException();
+    return day;
+  }
+
+  /**
+   * `GET /attendance/today` (spec, Screens): everyone `hr.read` covers, where they stand today,
+   * and the office punches refused today (rule C6).
+   */
+  async board(
+    actor: CurrentUserInfo,
+    query: TodayBoardQuery,
+    now = new Date(),
+  ): Promise<TodayBoard> {
+    const today = businessDate(now);
+    const reach = await this.scope.reach(actor);
+    if (!reach) throw new NotFoundException();
+    const profiles = (
+      await this.users.profiles({ departmentId: query.departmentId, archived: false })
+    ).filter((profile) => reach.all || reach.userIds.has(profile.id));
+    const ids = profiles.map((profile) => profile.id);
+    if (ids.length === 0) return { date: today, rows: [], refusals: [] };
+    const [files, dayRows, passkeys, punches] = await Promise.all([
+      this.db.select().from(employeeFiles).where(inArray(employeeFiles.userId, ids)),
+      this.db
+        .select()
+        .from(attendanceDays)
+        .where(
+          and(
+            inArray(attendanceDays.userId, ids),
+            eq(attendanceDays.date, today),
+            isNull(attendanceDays.archivedAt),
+          ),
+        ),
+      this.db
+        .select({ userId: attendancePasskeys.userId })
+        .from(attendancePasskeys)
+        .where(
+          and(inArray(attendancePasskeys.userId, ids), eq(attendancePasskeys.status, 'active')),
+        ),
+      this.db
+        .select({ userId: attendancePunches.userId, method: attendancePunches.method })
+        .from(attendancePunches)
+        .where(
+          and(
+            inArray(attendancePunches.userId, ids),
+            isNull(attendancePunches.archivedAt),
+            gte(attendancePunches.at, dayStart(today)),
+          ),
+        )
+        .orderBy(asc(attendancePunches.at), asc(attendancePunches.id)),
+    ]);
+    const fileOf = new Map(files.map((file) => [file.userId, file]));
+    const dayOf = new Map(dayRows.map((row) => [row.userId, row]));
+    const withPasskey = new Set(passkeys.map((row) => row.userId));
+    const lastMethod = new Map(punches.map((row) => [row.userId, row.method]));
+    const presented = new Map<string, AttendanceDay>();
+    for (const row of dayRows) {
+      const [day] = await this.presentDays(this.db, row.userId, [row]);
+      if (day) presented.set(row.userId, day);
+    }
+    const rows = profiles.flatMap((profile) => {
+      const exemption = exemptionOf(fileOf.get(profile.id), today);
+      // Not started or already gone: not part of today.
+      if (exemption === 'not_started' || exemption === 'ended') return [];
+      const row = dayOf.get(profile.id);
+      return [
+        {
+          user: { id: profile.id, name: profile.name },
+          state: exemption ? 'exempt' : stateOf(row),
+          late: (row?.lateMinutes ?? 0) > 0,
+          method: lastMethod.get(profile.id) ?? null,
+          noPasskey: !exemption && !withPasskey.has(profile.id),
+          day: presented.get(profile.id) ?? null,
+        },
+      ];
+    });
+    const audit = await this.audit.list(
+      {
+        action: 'attendance.punch_refused',
+        from: dayStart(today).toISOString(),
+        page: 1,
+        pageSize: 100,
+      },
+      { showsPay: false },
+    );
+    const names = new Map(profiles.map((profile) => [profile.id, profile.name]));
+    const refusals: PunchRefusal[] = audit.items.flatMap((entry) => {
+      const after = (entry.after ?? {}) as { reason?: string; ipAddress?: string | null };
+      const reason = PUNCH_REFUSALS.find((value) => value === after.reason);
+      if (!reason || !names.has(entry.entityId)) return [];
+      return [
+        {
+          user: { id: entry.entityId, name: names.get(entry.entityId) ?? '' },
+          at: entry.occurredAt,
+          reason,
+          ipAddress: after.ipAddress ?? null,
+        },
+      ];
+    });
+    return {
+      date: today,
+      rows: rows.sort((a, b) => a.user.name.localeCompare(b.user.name, 'ar')),
+      refusals,
+    };
   }
 
   /** `GET /attendance/days`: one's own month, or one `hr.read` covers; 404 otherwise. */
@@ -286,7 +478,25 @@ export class AttendanceService {
       throw new NotFoundException();
     }
     const rows = await this.days.month(this.db, userId, query.month);
-    return { items: await this.present(this.db, userId, rows) };
+    return { items: await this.presentDays(this.db, userId, rows) };
+  }
+
+  /** The date a punch counts for: its own, or the day before for an early `out` (rule C15). */
+  private async punchDate(tx: Transaction, punch: PunchRow): Promise<CalendarDate> {
+    const own = businessDate(punch.at);
+    const around = await tx
+      .select()
+      .from(attendancePunches)
+      .where(
+        and(
+          eq(attendancePunches.userId, punch.userId),
+          isNull(attendancePunches.archivedAt),
+          gte(attendancePunches.at, dayStart(addDays(own, -1))),
+          lt(attendancePunches.at, dayStart(addDays(own, 1))),
+        ),
+      )
+      .orderBy(asc(attendancePunches.at), asc(attendancePunches.id));
+    return punchDates(around).get(around.find((row) => row.id === punch.id) ?? punch) ?? own;
   }
 
   /** Rules C5 and C6, with a refused attempt audited for the GM. */
@@ -388,7 +598,7 @@ export class AttendanceService {
   }
 
   /** Days with their punches (rejected ones included), by date. */
-  private async present(
+  async presentDays(
     executor: Executor,
     userId: string,
     rows: readonly DayRow[],
@@ -473,3 +683,13 @@ export class AttendanceService {
 }
 
 const dayStart = (date: CalendarDate) => businessInstant(date, '00:00');
+
+/** Where someone attendance applies to stands today, from their day (none yet: not in). */
+function stateOf(day: DayRow | undefined): TodayState {
+  if (!day) return 'not_in';
+  if (day.kind === 'holiday') return 'holiday';
+  if (day.leave === 'full') return 'on_leave';
+  if (day.firstInAt && !day.lastOutAt) return 'in';
+  if (day.lastOutAt) return 'out';
+  return day.kind === 'off' ? 'off' : 'not_in';
+}

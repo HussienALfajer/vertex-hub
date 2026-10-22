@@ -1,5 +1,7 @@
 import { z } from 'zod';
 import { CLIENT_DECISIONS } from './approvals.js';
+import { punchDirectionSchema } from './attendance.js';
+import { attendanceItemKindSchema, itemDecisionSchema } from './attendance-items.js';
 import { adCampaignStatusSchema } from './campaign-values.js';
 import { clientStatusSchema } from './clients.js';
 import {
@@ -157,6 +159,16 @@ export const NOTIFICATION_TYPES = [
   'hr_request_decided',
   'colleague_on_leave',
   'leave_balance_adjusted',
+  // F17 part C.
+  'attendance_item_raised',
+  'attendance_items_pending',
+  'attendance_item_decided',
+  'attendance_check_in_missing',
+  'attendance_check_out_missing',
+  'field_punch_recorded',
+  'field_punch_rejected',
+  'shoot_check_in_missing',
+  'kiosk_offline',
   'action_reminder',
   'action_escalated',
   'action_escalated_top',
@@ -210,6 +222,13 @@ export const NOTIFICATION_SUBJECTS = [
   'holiday',
   /** F17 rules B8–B15: a leave or permission request. */
   'hr_request',
+  /** F17 part C: an employee's attendance day (rule C21), and an item of one (rule C17). */
+  'attendance_day',
+  'attendance_item',
+  /** The General Managers' notices of one date (`attendanceDateSubjectId`). */
+  'attendance_date',
+  /** Rule C22: an entrance screen. */
+  'kiosk',
 ] as const;
 
 export const notificationSubjectTypeSchema = z
@@ -375,6 +394,22 @@ const CATALOG: Record<
   colleague_on_leave: { category: 'hr', subject: 'user', mutable: true },
   /** Rule B7: the employee; opens My attendance. */
   leave_balance_adjusted: { category: 'hr', subject: 'user', mutable: true },
+  /** Rules C17 and C18: the employee's item; opens My attendance. */
+  attendance_item_raised: { category: 'hr', subject: 'attendance_item', mutable: false },
+  /** The GMs' items to decide, merged per date; opens Approvals. */
+  attendance_items_pending: { category: 'hr', subject: 'attendance_date', mutable: false },
+  attendance_item_decided: { category: 'hr', subject: 'attendance_item', mutable: true },
+  /** Rule C21: the employee's day; opens My attendance. */
+  attendance_check_in_missing: { category: 'hr', subject: 'attendance_day', mutable: false },
+  attendance_check_out_missing: { category: 'hr', subject: 'attendance_day', mutable: false },
+  /** Rule C11: the GMs' field punches, merged per date; opens Today. */
+  field_punch_recorded: { category: 'hr', subject: 'attendance_date', mutable: true },
+  /** Rule C12: the employee; opens My attendance. */
+  field_punch_rejected: { category: 'hr', subject: 'user', mutable: true },
+  /** Rule C13: the crew member; opens My attendance. */
+  shoot_check_in_missing: { category: 'hr', subject: 'shoot', mutable: false },
+  /** Rule C22: opens the entrance screens in HR settings. */
+  kiosk_offline: { category: 'hr', subject: 'kiosk', mutable: false },
   /** F16 rule B11: the escalation steps open the original's record; its subject type is given. */
   action_reminder: { category: 'reminders', subject: 'task', mutable: false },
   action_escalated: { category: 'reminders', subject: 'task', mutable: false },
@@ -556,6 +591,16 @@ const CHANNELS: Record<NotificationType, Channels> = {
   hr_request_decided: important('on'),
   colleague_on_leave: informational,
   leave_balance_adjusted: informational,
+  attendance_item_raised: normal(),
+  /** F16 rule B3 pushes every type above informational; merged, it pushes once per update. */
+  attendance_items_pending: normal(),
+  attendance_item_decided: normal(),
+  attendance_check_in_missing: important(),
+  attendance_check_out_missing: normal(),
+  field_punch_recorded: informational,
+  field_punch_rejected: important(),
+  shoot_check_in_missing: important(),
+  kiosk_offline: important(),
   action_reminder: important(),
   action_escalated: important('on'),
   action_escalated_top: critical(),
@@ -781,6 +826,20 @@ const ENGINE: Record<NotificationType, Engine> = {
   hr_request_decided: info,
   colleague_on_leave: info,
   leave_balance_adjusted: info,
+  /** Rule C17: resolved when justified, decided or void. */
+  attendance_item_raised: action(),
+  /** Merges per date; resolved when that date's items are all decided or void. */
+  attendance_items_pending: action({ merges: true }),
+  attendance_item_decided: info,
+  /** Rule C21: resolved by a punch, leave, a correction or the day's end. */
+  attendance_check_in_missing: action(),
+  attendance_check_out_missing: action(),
+  field_punch_recorded: merged,
+  field_punch_rejected: info,
+  /** Rule C13: resolved by a shoot punch, or void when the shoot is cancelled or ends. */
+  shoot_check_in_missing: action(),
+  /** Rule C22: resolved when the screen is seen again. */
+  kiosk_offline: action(),
   action_reminder: action(),
   action_escalated: action(),
   action_escalated_top: action(),
@@ -1311,6 +1370,43 @@ export const NOTIFICATION_DATA_SCHEMAS = {
     year: z.number().int(),
     days: z.number(),
   }),
+  /** Rule C17: an item of the recipient's day; the minutes, never a deduction. */
+  attendance_item_raised: z.object({
+    kind: attendanceItemKindSchema,
+    date: calendarDateSchema,
+    minutes: z.number().int(),
+  }),
+  /** The latest item of the date's merged notice; the count says how many. */
+  attendance_items_pending: z.object({
+    employee: nameSchema,
+    kind: attendanceItemKindSchema,
+    date: calendarDateSchema,
+  }),
+  /** Rule C18: never the fraction or the minutes. */
+  attendance_item_decided: z.object({
+    kind: attendanceItemKindSchema,
+    date: calendarDateSchema,
+    decision: itemDecisionSchema,
+  }),
+  /** Rule C21. */
+  attendance_check_in_missing: z.object({ date: calendarDateSchema }),
+  attendance_check_out_missing: z.object({ date: calendarDateSchema }),
+  /** Rule C11: the latest field punch of the date's merged notice. */
+  field_punch_recorded: z.object({
+    employee: nameSchema,
+    direction: punchDirectionSchema,
+    at: z.iso.datetime(),
+  }),
+  /** Rule C12: a field or shoot punch of the recipient's. */
+  field_punch_rejected: z.object({
+    method: z.enum(['field', 'shoot']),
+    direction: punchDirectionSchema,
+    at: z.iso.datetime(),
+  }),
+  /** Rule C13. */
+  shoot_check_in_missing: shootData,
+  /** Rule C22. */
+  kiosk_offline: z.object({ name: nameSchema, lastSeenAt: z.iso.datetime() }),
   /** F16 rule B11 step 1: the original still waits on its recipients. */
   action_reminder: escalationData,
   /** Step 2: the managers of those it waits on (or the step's department or role). */
@@ -1795,6 +1891,9 @@ export const NOTIFICATION_REMINDER_KINDS = [
   'probation_ending',
   /** F17 rule B18: once per leave and first day. */
   'colleague_on_leave',
+  /** F17 rule C21: once per attendance day each. */
+  'attendance_check_in',
+  'attendance_check_out',
 ] as const;
 
 export type NotificationReminderKind = (typeof NOTIFICATION_REMINDER_KINDS)[number];
@@ -1804,18 +1903,30 @@ export const NOTIFICATION_EMAIL_STATES = ['pending', 'sent', 'skipped'] as const
 
 export type NotificationEmailState = (typeof NOTIFICATION_EMAIL_STATES)[number];
 
-/** F16 rule B13: the timed sources of the minute job, keyed in `timed_reminders`. */
-export const TIMED_REMINDER_KINDS = [
+/** F16 rule B13: the timed reminders sent a set time before their moment. */
+export const LEAD_REMINDER_KINDS = [
   'task_due_shortly',
   'post_publish_shortly',
   'shoot_starting',
   'meeting_starting',
 ] as const;
 
+export type LeadReminderKind = (typeof LEAD_REMINDER_KINDS)[number];
+
+/**
+ * The timed sources of the minute job, keyed in `timed_reminders`; F17 adds the shoot check-in
+ * (rule C13, per crew member and start) and the offline screen (rule C22, per last sighting).
+ */
+export const TIMED_REMINDER_KINDS = [
+  ...LEAD_REMINDER_KINDS,
+  'shoot_check_in',
+  'kiosk_offline',
+] as const;
+
 export type TimedReminderKind = (typeof TIMED_REMINDER_KINDS)[number];
 
 /** How long before its moment each timed reminder is sent. */
-export const TIMED_REMINDER_LEAD_MINUTES: Record<TimedReminderKind, number> = {
+export const TIMED_REMINDER_LEAD_MINUTES: Record<LeadReminderKind, number> = {
   task_due_shortly: 120,
   post_publish_shortly: 120,
   shoot_starting: 120,
@@ -1837,7 +1948,7 @@ const MINUTE_MS = 60 * 1000;
  * Rule B13: the moments a run at `now` sends reminders of `kind` for: after `from`, up to `to`.
  * A moment whose send time is more than the grace before `now` has passed and is skipped.
  */
-export function timedReminderWindow(kind: TimedReminderKind, now: Date): { from: Date; to: Date } {
+export function timedReminderWindow(kind: LeadReminderKind, now: Date): { from: Date; to: Date } {
   const lead = TIMED_REMINDER_LEAD_MINUTES[kind] * MINUTE_MS;
   return {
     from: new Date(now.getTime() + lead - TIMED_REMINDER_GRACE_MINUTES * MINUTE_MS),

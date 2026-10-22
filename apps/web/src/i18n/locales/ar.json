@@ -519,7 +519,10 @@
     "TICKET_EXPIRED": "انتهت مهلة التأكيد. أعد المحاولة من البداية.",
     "DUPLICATE_PUNCH": "سُجّلت حركتك قبل لحظات.",
     "PENDING_EXISTS": "لديك مفتاح جديد ينتظر موافقة المدير العام.",
-    "INVALID_PAIRING_CODE": "رمز الربط غير صحيح أو انتهت صلاحيته."
+    "INVALID_PAIRING_CODE": "رمز الربط غير صحيح أو انتهت صلاحيته.",
+    "INVALID_DECISION": "هذا القرار لا يناسب هذا البند.",
+    "NOT_FIELD": "يُرفض التسجيل الميداني أو تسجيل التصوير فقط.",
+    "NOT_YET": "لم يحن هذا الوقت بعد؛ التصحيح لوقت مضى."
   },
   "users": {
     "title": "الفريق",
@@ -949,7 +952,9 @@
       "leave_balance": "رصيد إجازات",
       "attendance_passkey": "مفتاح حضور",
       "attendance_kiosk": "شاشة مدخل",
-      "attendance": "حضور"
+      "attendance": "حضور",
+      "attendance_item": "بند حضور",
+      "attendance_punch": "تسجيل حضور"
     },
     "actions": {
       "user": {
@@ -1349,6 +1354,14 @@
       },
       "attendance": {
         "punch_refused": "رُفضت محاولة تسجيل حضور"
+      },
+      "attendance_item": {
+        "justified": "برّر بند حضور",
+        "decided": "قرّر في بند حضور",
+        "voided": "أُلغي بند حضور"
+      },
+      "attendance_punch": {
+        "rejected": "رفض تسجيلًا ميدانيًا"
       }
     },
     "fields": {
@@ -4692,7 +4705,16 @@
       "hr_request_submitted": "طلب إجازة أو إذن ينتظر قراري",
       "hr_request_decided": "قرار على طلب إجازتي أو إذني",
       "colleague_on_leave": "إجازة زميل في قسمي",
-      "leave_balance_adjusted": "تعديل على رصيد إجازاتي"
+      "leave_balance_adjusted": "تعديل على رصيد إجازاتي",
+      "attendance_item_raised": "بند حضور مسجّل عليّ",
+      "attendance_items_pending": "بنود حضور تنتظر قراري",
+      "attendance_item_decided": "قرار على بند حضوري",
+      "attendance_check_in_missing": "تذكير بتسجيل الحضور",
+      "attendance_check_out_missing": "تذكير بتسجيل الانصراف",
+      "field_punch_recorded": "تسجيلات حضور ميدانية",
+      "field_punch_rejected": "رفض تسجيلي الميداني",
+      "shoot_check_in_missing": "تذكير بتسجيل الحضور في جلسة تصوير",
+      "kiosk_offline": "انقطاع شاشة مدخل"
     },
     "priorities": {
       "critical": "حرج",
@@ -8512,7 +8534,8 @@
         "expiry": "انتهاء",
         "taken": "مأخوذ",
         "restored": "مُستعاد",
-        "adjustment": "تعديل"
+        "adjustment": "تعديل",
+        "overtime_credit": "رصيد عمل إضافي"
       },
       "adjustTitle": "عدّل رصيد {{year}}",
       "adjustHint": "سجّل الرصيد الافتتاحي أو تعديلًا بسبب واضح. يصل الموظفَ إشعار بالتعديل.",
@@ -8533,7 +8556,9 @@
       "kinds": {
         "leave": "إجازة",
         "permission": "إذن مغادرة",
-        "passkey_replacement": "مفتاح حضور بديل"
+        "passkey_replacement": "مفتاح حضور بديل",
+        "remote_day": "عمل عن بُعد",
+        "correction": "تصحيح تسجيل"
       },
       "statuses": {
         "pending": "قيد الانتظار",

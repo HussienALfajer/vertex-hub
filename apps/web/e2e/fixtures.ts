@@ -17059,6 +17059,7 @@ export function leaveSeed(users: UserResponse[]): LeaveState {
     half: null,
     fromTime: null,
     toTime: null,
+    correctionDirection: null,
     paidDays: fields.leaveType === 'unpaid' ? 0 : fields.days,
     unpaidDays: fields.leaveType === 'unpaid' ? fields.days : 0,
     reason: null,
@@ -17141,6 +17142,7 @@ export function leaveSeed(users: UserResponse[]): LeaveState {
         entry: 'taken',
         period: null,
         requestId: id(9863),
+        itemId: null,
         note: null,
         createdBy: person(sara),
         createdAt: '2026-10-15T10:00:00.000Z',
@@ -17235,6 +17237,7 @@ function leaveRoutes({
               entry: 'accrual' as const,
               period: `2026-${String(month + 1).padStart(2, '0')}`,
               requestId: null,
+              itemId: null,
               note: null,
               createdBy: null,
               createdAt: `2026-${String(month + 2).padStart(2, '0')}-01T00:10:00.000Z`,
@@ -17247,6 +17250,7 @@ function leaveRoutes({
               entry: 'grant' as const,
               period: null,
               requestId: null,
+              itemId: null,
               note: null,
               createdBy: null,
               createdAt: '2026-01-01T00:10:00.000Z',
@@ -17311,6 +17315,8 @@ function leaveRoutes({
     const userId = input.userId ?? me().user.id;
     const forOther = userId !== me().user.id;
     if (forOther && !approver()) return { error: [403, null] };
+    // Remote days and corrections (rule C19) arrive with their screens in part C.
+    if (input.kind === 'remote_day' || input.kind === 'correction') return { error: [400, null] };
     const span =
       input.kind === 'leave'
         ? { startsOn: input.startsOn, endsOn: input.endsOn, half: input.half }
@@ -17340,6 +17346,7 @@ function leaveRoutes({
       startsOn: span.startsOn,
       endsOn: span.endsOn,
       half: span.half,
+      correctionDirection: null,
       reason: input.reason,
       status: approver() ? ('approved' as const) : ('pending' as const),
       documents: 0,
@@ -17409,6 +17416,7 @@ function leaveRoutes({
         entry: sign === 1 ? 'taken' : 'restored',
         period: null,
         requestId: r.id,
+        itemId: null,
         note: null,
         createdBy: person(me().user.id),
         createdAt: now(),
@@ -17482,6 +17490,7 @@ function leaveRoutes({
           entry: body.entry,
           period: null,
           requestId: null,
+          itemId: null,
           note: body.note,
           createdBy: person(me().user.id),
           createdAt: now(),
@@ -17584,6 +17593,7 @@ function leaveRoutes({
       const opinion: HrOpinion = {
         id: id(next++),
         requestId: r.id,
+        itemId: null,
         author: person(me().user.id),
         body: body.body,
         createdAt: now(),

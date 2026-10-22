@@ -280,6 +280,10 @@ export const AUDIT_ACTIONS = [
   'attendance_kiosk.paired',
   'attendance_kiosk.archived',
   'attendance.punch_refused',
+  'attendance_item.justified',
+  'attendance_item.decided',
+  'attendance_item.voided',
+  'attendance_punch.rejected',
 ] as const;
 
 export const auditActionSchema = z.enum(AUDIT_ACTIONS).meta({ id: 'AuditAction' });
@@ -349,6 +353,8 @@ export const AUDIT_ENTITY_TYPES = [
   'attendance_kiosk',
   /** Keyed by the employee's user id: refused punches. */
   'attendance',
+  'attendance_item',
+  'attendance_punch',
 ] as const;
 
 export const auditEntityTypeSchema = z.enum(AUDIT_ENTITY_TYPES).meta({ id: 'AuditEntityType' });

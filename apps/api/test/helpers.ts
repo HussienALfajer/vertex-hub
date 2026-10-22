@@ -15,6 +15,7 @@ import {
   approvalItems,
   approvalRequests,
   attendanceDays,
+  attendanceItems,
   attendanceKiosks,
   attendancePasskeys,
   attendancePunches,
@@ -283,6 +284,27 @@ export async function removeUsers(db: Database, ids: string[]): Promise<void> {
         inArray(attendancePunches.requestId, requestIds),
       ),
     );
+  // Their attendance items and those they decided, with the opinions and reminders on them.
+  const itemIds = (
+    await db
+      .select({ id: attendanceItems.id })
+      .from(attendanceItems)
+      .where(or(inArray(attendanceItems.userId, ids), inArray(attendanceItems.decidedById, ids)))
+  ).map((row) => row.id);
+  await db
+    .delete(hrOpinions)
+    .where(or(inArray(hrOpinions.itemId, itemIds), inArray(hrOpinions.authorId, ids)));
+  await db.delete(notifications).where(inArray(notifications.subjectId, itemIds));
+  await db.delete(leaveLedger).where(inArray(leaveLedger.itemId, itemIds));
+  await db.delete(attendanceItems).where(inArray(attendanceItems.id, itemIds));
+  const dayIds = (
+    await db
+      .select({ id: attendanceDays.id })
+      .from(attendanceDays)
+      .where(inArray(attendanceDays.userId, ids))
+  ).map((row) => row.id);
+  await db.delete(notifications).where(inArray(notifications.subjectId, dayIds));
+  await db.delete(notificationReminders).where(inArray(notificationReminders.subjectId, dayIds));
   await db.delete(attendanceDays).where(inArray(attendanceDays.userId, ids));
   await db
     .delete(attendancePasskeys)

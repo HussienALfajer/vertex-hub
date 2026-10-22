@@ -40,6 +40,7 @@ import {
 } from '@vertex-hub/contracts';
 import { RequirePermissions, RequireSession } from '../../core/access/index.js';
 import { CurrentUser, type CurrentUserInfo } from '../auth/index.js';
+import { AttendanceItemsService } from './attendance-items.service.js';
 import { HrRequestsService } from './hr-requests.service.js';
 import { LeaveBalancesService } from './leave-balances.service.js';
 
@@ -50,6 +51,7 @@ export class HrLeaveController {
   constructor(
     private readonly balances: LeaveBalancesService,
     private readonly requests: HrRequestsService,
+    private readonly items: AttendanceItemsService,
   ) {}
 
   @Get('balances/:userId')
@@ -178,13 +180,14 @@ export class HrLeaveController {
   @RequirePermissions('hr.read')
   @SerializeOptions({ schema: hrOpinionSchema })
   @ApiCreatedResponse({
-    description: "An opinion on someone's pending request, in `hr.read` scope. `NOT_PENDING`",
+    description:
+      "An opinion on someone's pending request or attendance item, in `hr.read` scope. `NOT_PENDING`",
     standardSchema: hrOpinionSchema,
   })
   opine(
     @CurrentUser() actor: CurrentUserInfo,
     @Body({ schema: createHrOpinionSchema }) input: CreateHrOpinion,
   ): Promise<HrOpinion> {
-    return this.requests.opine(actor, input);
+    return input.itemId ? this.items.opine(actor, input) : this.requests.opine(actor, input);
   }
 }

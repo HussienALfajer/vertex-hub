@@ -51,6 +51,8 @@ export interface LedgerInsert {
   entry: LedgerEntry;
   period?: string | null;
   requestId?: string | null;
+  /** `overtime_credit` only (rule C18). */
+  itemId?: string | null;
   note?: string | null;
   createdById?: string | null;
 }
@@ -196,6 +198,7 @@ export class LeaveLedger {
         entry: row.entry,
         period: row.period,
         requestId: row.requestId,
+        itemId: row.itemId,
         note: row.note,
         createdBy: row.createdById
           ? { id: row.createdById, name: people.get(row.createdById)?.name ?? '' }
