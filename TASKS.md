@@ -74,6 +74,6 @@ Parts A → B → C → D, each accepted by the owner before the next starts (sp
 - [x] checks, reviewer (3 findings fixed: items raised by the closing's recompute kept, the holiday lock in closing, guard tests), acceptance (owner 2026-10-22: Finance reads and exports the month sheet), PR with auto-merge
 
 ## PR D2 — months: web and the full E2E pass
-- [ ] Month `/hr/months/:month` (sheet employees × days, totals, pending counts, Close with the pending list, Reopen with a reason, Excel); month navigation; links from Today and the file's Attendance tab; "Excel" on My attendance's This month; `MONTH_CLOSED` and the other new errors in `ar.json`; HR nav item
-- [ ] E2E: `f17-months.spec.ts`, screenshots in both themes; mocks in `fixtures.ts`; the full F17 E2E pass (spec acceptance, Tests)
-- [ ] checks, reviewer, acceptance (spec step 7), PR with auto-merge, `docs/ROADMAP.md` (F17 done)
+- [x] Month `/hr/months/:month` (sheet employees × days, totals, pending counts, Close with the pending list, Reopen with a reason, Excel); month navigation; links from Today and the file's Attendance tab; "Excel" on My attendance's This month; `MONTH_CLOSED` and the other new errors in `ar.json`; HR nav item
+- [x] E2E: `f17-months.spec.ts`, screenshots in both themes; mocks in `fixtures.ts`; the full F17 E2E pass (spec acceptance, Tests)
+- [x] checks, reviewer (1 finding fixed: the pending list dialog's close button and focus), acceptance (spec step 7; owner 2026-10-22), PR with auto-merge, `docs/ROADMAP.md` (F17 done)

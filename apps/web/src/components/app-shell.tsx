@@ -57,6 +57,7 @@ import { OfflineBanner } from '../features/app/offline-banner';
 import { UpdateBanner } from '../features/app/update-banner';
 import { hasApprovalQueue } from '../features/approvals/approvals-page';
 import { readsHr } from '../features/hr/hr-approvals-page';
+import { readsMonths } from '../features/hr/hr-month-page';
 import { managesHr } from '../features/hr/hr-settings-page';
 import { hasPeopleAccess } from '../features/hr/people-page';
 import { NotificationBell } from '../features/notifications/notification-bell';
@@ -115,6 +116,7 @@ interface NavChild {
     | 'nav.people'
     | 'nav.hrToday'
     | 'nav.hrApprovals'
+    | 'nav.hrMonths'
     | 'nav.hrSettings';
   /** Lists the page only for these users; others still reach it. */
   show?: (me: MeResponse) => boolean;
@@ -160,7 +162,7 @@ const navItems: NavItem[] = [
   // Everyone's own leave, and attendance with part C (F17 screen "My attendance").
   { to: '/me/attendance', label: 'nav.myAttendance', icon: CalendarCheckIcon },
   // HR (F17): files for `employees.read`, pay for `salaries.read`, requests for `hr.read`,
-  // settings for `hr.manage`.
+  // months for `hr.read` and `salaries.read`, settings for `hr.manage`.
   {
     to: '/hr',
     label: 'nav.hr',
@@ -170,6 +172,7 @@ const navItems: NavItem[] = [
       { to: '/hr/people', label: 'nav.people', show: hasPeopleAccess },
       { to: '/hr/today', label: 'nav.hrToday', show: readsHr },
       { to: '/hr/approvals', label: 'nav.hrApprovals', show: readsHr },
+      { to: '/hr/months', label: 'nav.hrMonths', show: readsMonths },
       { to: '/hr/settings', label: 'nav.hrSettings', show: managesHr },
     ],
   },

@@ -28,6 +28,7 @@ import { CalendarClockIcon, ChevronLeftIcon, ChevronRightIcon } from 'lucide-rea
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LoadError } from '../../components/load-error';
+import { useMe } from '../../lib/auth';
 import { errorMessage } from '../../lib/errors';
 import {
   formatCalendarDate,
@@ -40,8 +41,15 @@ import {
 import { DayDialog } from '../content/calendar-toolbar';
 import { calendarRange, daysBetween, sameMonth } from '../content/content-dates';
 import { FormDialog } from '../quotes/quote-dialogs';
+import { ExportButton } from '../reports/report-parts';
 import { DayStatusBadge, durationText, ItemStatusBadge, PunchTimeline } from './attendance-parts';
-import { attendanceDaysQuery, attendanceItemListQuery, useJustifyItem } from './hr.queries';
+import {
+  attendanceDaysQuery,
+  attendanceItemListQuery,
+  monthExportUrls,
+  useJustifyItem,
+} from './hr.queries';
+import { readsMonths } from './hr-month-page';
 
 /** `YYYY-MM` of a date. */
 export const monthOf = (date: CalendarDate) => date.slice(0, 7);
@@ -70,7 +78,8 @@ export function itemSummary(t: TFunction, item: AttendanceItem): string {
 
 /**
  * A month of attendance (spec screen "My attendance", This month; the file's Attendance tab):
- * the days in a calendar coloured by status, each opening its punches, then the month's items.
+ * the days in a calendar coloured by status, each opening its punches, then the month's items,
+ * with the month's Excel file (rule D5) and, for HR, the way to the month sheet.
  * `self`: the employee's own, who may justify a pending item (rule C17). `punchAction` adds a
  * button per punch (the GM's "Reject" on a field punch, rule C12).
  */
@@ -88,6 +97,7 @@ export function AttendanceMonth({
   punchAction?: (punch: AttendanceDay['punches'][number], day: AttendanceDay) => ReactNode;
 }) {
   const { t } = useTranslation();
+  const me = useMe();
   const today = businessDate();
   const first = `${month}-01`;
   const days = useQuery(attendanceDaysQuery(userId, month));
@@ -122,6 +132,19 @@ export function AttendanceMonth({
         <h2 className="text-lg font-bold" aria-live="polite">
           {formatMonth(first)}
         </h2>
+        <div className="flex flex-wrap items-center gap-2 sm:ms-auto">
+          {!self && readsMonths(me) && (
+            <Button
+              variant="outline"
+              render={<Link to="/hr/months/$month" params={{ month }} search={{}} />}
+            >
+              {t('hr.months.sheet')}
+            </Button>
+          )}
+          <ExportButton
+            href={monthExportUrls.employee(userId === 'me' ? me.user.id : userId, month)}
+          />
+        </div>
       </div>
 
       {days.isPending ? (

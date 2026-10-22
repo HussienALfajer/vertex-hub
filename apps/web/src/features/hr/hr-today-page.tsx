@@ -1,9 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
-import { useNavigate } from '@tanstack/react-router';
+import { Link, useNavigate } from '@tanstack/react-router';
 import {
   ATTENDANCE_ITEM_LIMITS,
   type AttendanceDay,
   type AttendancePunch,
+  businessDate,
   type TodayBoardRow,
 } from '@vertex-hub/contracts';
 import {
@@ -85,6 +86,20 @@ export function HrTodayPage({ search }: { search: HrTodaySearch }) {
       <PageHeader
         title={t('hr.today.title')}
         description={board.data ? formatWeekdayDate(board.data.date) : t('hr.today.subtitle')}
+        actions={
+          <Button
+            variant="outline"
+            render={
+              <Link
+                to="/hr/months/$month"
+                params={{ month: (board.data?.date ?? businessDate()).slice(0, 7) }}
+                search={{ departmentId: search.departmentId }}
+              />
+            }
+          >
+            {t('hr.months.sheet')}
+          </Button>
+        }
       />
       <div className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-3 md:flex-row md:items-center">
         <ChoiceSelect

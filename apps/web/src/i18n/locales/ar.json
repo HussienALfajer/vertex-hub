@@ -75,7 +75,8 @@
     "hrSettings": "الإعدادات",
     "myAttendance": "حضوري وإجازاتي",
     "hrApprovals": "الطلبات",
-    "hrToday": "اليوم"
+    "hrToday": "اليوم",
+    "hrMonths": "حضور الشهر"
   },
   "theme": {
     "toDark": "فعّل الوضع الداكن",
@@ -8947,6 +8948,76 @@
       "loadError": "تعذّر تحميل شاشات المدخل.",
       "emptyTitle": "لا شاشات مدخل بعد",
       "emptyHint": "أنشئ شاشة واربطها بمتصفح الشاشة في المكتب ليبدأ تسجيل الحضور بالرمز."
+    },
+    "months": {
+      "title": "دوام {{month}}",
+      "subtitle": "أيام الموظفين ومجاميعهم في الشهر، وما بقي معلّقًا قبل إغلاقه.",
+      "loadError": "تعذّر تحميل جدول الشهر.",
+      "emptyTitle": "لا أيام دوام في هذا الشهر",
+      "emptyHint": "يظهر هنا كل موظف له يوم دوام في الشهر، بعد بدء تسجيل الحضور.",
+      "statuses": {
+        "open": "مفتوح",
+        "closed": "مُغلق"
+      },
+      "closedBy": "أغلقه {{name}} في {{date}}",
+      "reopenedBy": "أعاد فتحه {{name}} في {{date}}: {{reason}}",
+      "close": "أغلق الشهر",
+      "notEnded": "يُغلق الشهر بعد انتهاء آخر يوم فيه.",
+      "closeTitle": "إغلاق {{month}}",
+      "closeBody": "يُعاد حساب أيام الشهر ويُحفظ ملخص كل موظف للرواتب، ويصل الإشعار إلى المالية. بعد الإغلاق لا تُقبل تسجيلات ولا طلبات ولا قرارات في هذا الشهر حتى يُعاد فتحه.",
+      "closed": "أُغلق {{month}}.",
+      "reopen": "أعد فتح الشهر",
+      "reopenTitle": "إعادة فتح {{month}}",
+      "reopenHint": "تبقى الملخصات المحفوظة، وتُكتب من جديد عند الإغلاق التالي.",
+      "reopenReason": "السبب",
+      "reopenReasonRequired": "اكتب سبب إعادة الفتح.",
+      "reopened": "أُعيد فتح {{month}}.",
+      "pendingTitle": "ما يمنع الإغلاق",
+      "pendingKinds": {
+        "request": "طلب",
+        "item": "بند حضور"
+      },
+      "openPending": "افتح",
+      "pendingCounts": "طلبات معلّقة: {{requests}} · بنود معلّقة: {{items}}",
+      "pendingHint": "لا يُغلق الشهر قبل البتّ فيها كلها.",
+      "toApprovals": "افتح الطلبات",
+      "pendingCell": "{{requests}} طلب · {{items}} بند",
+      "pendingMark": "بند لم يُبتّ فيه",
+      "totalsLive": "المجاميع حتى الآن",
+      "totalsFrozen": "الملخص المحفوظ عند الإغلاق",
+      "employee": "الموظف",
+      "days": "الأيام",
+      "legend": "دليل الرموز",
+      "fieldDay": "عمل ميداني",
+      "leaveOf": "{{type}} {{days}}",
+      "columns": {
+        "workDays": "أيام العمل",
+        "presentDays": "الحضور",
+        "remoteDays": "عن بُعد",
+        "fieldDays": "ميداني",
+        "absentDays": "الغياب",
+        "leave": "الإجازات",
+        "unpaidLeaveDays": "بلا راتب",
+        "holidayDays": "العطل الرسمية",
+        "lateCount": "مرات التأخر",
+        "deductedDays": "أيام الخصم",
+        "overtimePaid": "إضافي مدفوع",
+        "overtimeTimeOff": "إضافي إجازةً",
+        "worked": "ساعات العمل",
+        "pending": "المعلّق"
+      },
+      "codes": {
+        "upcoming": "–",
+        "in_progress": "ج",
+        "present": "ح",
+        "partial": "ن",
+        "absent": "غ",
+        "leave": "إ",
+        "holiday": "ر",
+        "off": "ع",
+        "trial": "ت"
+      },
+      "sheet": "جدول الشهر"
     },
     "today": {
       "title": "حضور اليوم",

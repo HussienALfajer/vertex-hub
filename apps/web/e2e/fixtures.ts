@@ -37,6 +37,7 @@ import {
   type AttendanceKiosk,
   type AttendanceKioskList,
   type AttendanceKioskPairing,
+  type AttendanceMonth,
   type AttendancePasskey,
   type AttendancePasskeyList,
   type AttendancePunch,
@@ -288,6 +289,9 @@ import {
   type MeResponse,
   type Milestone,
   type MilestoneStatus,
+  type MonthPending,
+  type MonthSheet,
+  type MonthSheetRow,
   type MyAttendanceToday,
   type MyClientsDashboard,
   type MyContentSummary,
@@ -295,7 +299,10 @@ import {
   manualLeadMoveRefusal,
   mentionedUserIds,
   mergeDeliverableLines,
+  monthEnded,
   monthPeriod,
+  monthRange,
+  monthTotals,
   NOTIFICATION_CATALOG,
   NOTIFICATION_TYPES,
   type Note,
@@ -411,6 +418,7 @@ import {
   rejectQuoteSchema,
   renewalState,
   reopenLeadSchema,
+  reopenMonthSchema,
   repeatedStepFor,
   repeatHolidaysSchema,
   reportMonths,
@@ -1564,6 +1572,7 @@ export async function mockApi(page: Page, options: MockOptions): Promise<MockedA
     settings: hrSettings,
     holidays,
     kiosk: options.kiosk ?? { paired: false },
+    leave,
     me: () => me,
   });
   const hrApi = hrRoutes({
@@ -17800,6 +17809,7 @@ function attendanceRoutes({
   settings,
   holidays,
   kiosk,
+  leave,
   me,
 }: {
   users: UserResponse[];
@@ -17807,6 +17817,7 @@ function attendanceRoutes({
   settings: { current: HrSettings };
   holidays: Holiday[];
   kiosk: KioskMock;
+  leave: LeaveState;
   me: () => MeResponse;
 }) {
   let next = 9960;
@@ -18448,7 +18459,142 @@ function attendanceRoutes({
       });
       return json(route, pairing(found));
     }
+
+    // Months (rules D1–D4): the sheet, closing with its frozen totals, reopening.
+    const monthMatch = path.match(/^\/api\/hr\/months\/(\d{4}-\d{2})(\/close|\/reopen)?$/);
+    if (monthMatch) {
+      const month = monthMatch[1] ?? '';
+      const state = monthOf(month);
+      if (!monthMatch[2] && method === 'GET') {
+        if (!holds('hr.read') && !holds('salaries.read')) return fail(route, 403, null);
+        const { from, to } = monthRange(month);
+        return json(route, {
+          month: shownMonth(state),
+          from,
+          to,
+          rows: sheetRows(month, q.get('departmentId')).map((row) => ({
+            ...row,
+            totals: state.frozen.get(row.user.id) ?? row.totals,
+          })),
+        } satisfies MonthSheet);
+      }
+      if (!holds('hr.approve')) return fail(route, 403, null);
+      if (monthMatch[2] === '/close' && method === 'POST') {
+        if (!monthEnded(month, HR_TODAY)) return fail(route, 409, 'MONTH_NOT_ENDED');
+        const pending = pendingOf(month);
+        if (pending.length > 0) return fail(route, 409, 'MONTH_HAS_PENDING', { pending });
+        const rows = sheetRows(month, null);
+        state.frozen = new Map(rows.map((row) => [row.user.id, row.totals]));
+        Object.assign(state, { status: 'closed', closedBy: person(userId), closedAt: now() });
+        return json(route, shownMonth(state));
+      }
+      if (monthMatch[2] === '/reopen' && method === 'POST') {
+        const body = reopenMonthSchema.safeParse(request.postDataJSON());
+        if (!body.success) return fail(route, 400, null);
+        if (state.status !== 'closed') return fail(route, 409, 'NOT_CLOSED');
+        Object.assign(state, {
+          status: 'open',
+          reopenedBy: person(userId),
+          reopenedAt: now(),
+          reopenReason: body.data.reason,
+        });
+        return json(route, shownMonth(state));
+      }
+    }
     return undefined;
+  };
+
+  const months = new Map<
+    string,
+    AttendanceMonth & { frozen: Map<string, MonthSheetRow['totals']> }
+  >();
+  const monthOf = (month: string) => {
+    const known = months.get(month);
+    if (known) return known;
+    const created = {
+      month,
+      status: 'open' as const,
+      closedBy: null,
+      closedAt: null,
+      reopenedBy: null,
+      reopenedAt: null,
+      reopenReason: null,
+      frozen: new Map<string, MonthSheetRow['totals']>(),
+    };
+    months.set(month, created);
+    return created;
+  };
+  const shownMonth = ({ frozen: _frozen, ...shown }: ReturnType<typeof monthOf>): AttendanceMonth =>
+    shown;
+  /** Requests touching the month and items of its days, still pending (rule D2). */
+  const pendingOf = (month: string, only?: string): MonthPending[] => {
+    const { from, to } = monthRange(month);
+    return [
+      ...leave.requests
+        .filter((r) => r.status === 'pending' && r.startsOn <= to && r.endsOn >= from)
+        .map((r) => ({ kind: 'request' as const, id: r.id, user: r.user, date: r.startsOn })),
+      ...items
+        .filter((i) => i.status === 'pending' && i.date.startsWith(month))
+        .map((i) => ({ kind: 'item' as const, id: i.id, user: i.user, date: i.date })),
+    ].filter((entry) => !only || entry.user.id === only);
+  };
+  /** The live sheet: every employee with attendance, their days and totals (rules D1, D3). */
+  const sheetRows = (month: string, departmentId: string | null): MonthSheetRow[] => {
+    const { from, to } = monthRange(month);
+    return files
+      .filter((f) => {
+        const user = users.find((u) => u.id === f.userId);
+        return (
+          !f.employment.attendanceExempt &&
+          user?.status !== 'archived' &&
+          (!departmentId || user?.departments.some((d) => d.id === departmentId))
+        );
+      })
+      .map((f) => {
+        const days: AttendanceDay[] = [];
+        // Days are stored up to today (the daily job creates each one), so later dates stay empty.
+        for (let date = from; date <= to && date <= HR_TODAY; date = addDays(date, 1)) {
+          days.push(dayOf(f.userId, date));
+        }
+        const own = items.filter((i) => i.user.id === f.userId && i.date.startsWith(month));
+        const pending = pendingOf(month, f.userId);
+        return {
+          user: person(f.userId),
+          days: days.map((day) => ({
+            date: day.date,
+            kind: day.kind,
+            status: day.status,
+            place: day.place,
+            leave: day.leave,
+            workedMinutes: day.workedMinutes,
+            lateMinutes: day.lateMinutes,
+            earlyMinutes: day.earlyMinutes,
+            overtimeMinutes: day.overtimeMinutes,
+            field: day.punches.some(
+              (p) => !p.archivedAt && (p.method === 'field' || p.method === 'shoot'),
+            ),
+            pendingItems: own.filter((i) => i.date === day.date && i.status === 'pending').length,
+          })),
+          totals: monthTotals(
+            days.map((day) => ({
+              kind: day.kind,
+              status: day.status,
+              place: day.place,
+              leave: day.leave,
+              checkedIn: day.firstInAt !== null,
+              workedMinutes: day.workedMinutes,
+              field: day.punches.some(
+                (p) => !p.archivedAt && (p.method === 'field' || p.method === 'shoot'),
+              ),
+            })),
+            [],
+            own,
+          ),
+          pendingRequests: pending.filter((p) => p.kind === 'request').length,
+          pendingItems: pending.filter((p) => p.kind === 'item').length,
+        };
+      })
+      .sort((a, b) => a.user.name.localeCompare(b.user.name, 'ar'));
   };
 
   return { route, passkeyOf };
