@@ -5,6 +5,7 @@ import { FilesModule } from '../files/index.js';
 import { NotificationsModule } from '../notifications/index.js';
 import { AttendanceService } from './attendance.service.js';
 import { AttendanceDays } from './attendance-days.js';
+import { AttendanceFieldWork } from './attendance-field-work.js';
 import { AttendanceItems } from './attendance-items.js';
 import { AttendanceItemsService } from './attendance-items.service.js';
 import { AttendanceKiosksService } from './attendance-kiosks.service.js';
@@ -51,7 +52,8 @@ import { WorkSchedulesService } from './work-schedules.service.js';
  * fill with an employee's work (rule B14), so `hr` imports neither. Registers the `hr_request`
  * owner policy in `files` (rule B13). Part C: attendance passkeys (WebAuthn, ADR 0039), entrance
  * screens and their stream, punches and the days computed from them (rules C1–C16, C20); exports
- * the `AttendanceShoots` registry `calendar` fills for shoot check-ins (rule C13). Attendance
+ * the `AttendanceShoots` registry `calendar` fills for shoot check-ins (rule C13), and the
+ * `AttendanceFieldWork` registry `tasks` and `calendar` fill with titles (rule C11). Attendance
  * items, their justification and decision, remote days and corrections, field punch review, the
  * Today board and the minute job's attendance reminders (rules C12, C13, C17–C19, C21, C22).
  */
@@ -90,12 +92,19 @@ import { WorkSchedulesService } from './work-schedules.service.js';
     AttendancePasskeysService,
     AttendanceKiosksService,
     AttendanceShoots,
+    AttendanceFieldWork,
     AttendanceService,
     AttendanceItems,
     AttendanceItemsService,
     AttendanceReminders,
     KioskStream,
   ],
-  exports: [HolidayCalendar, LeaveDirectory, LeaveWorkSources, AttendanceShoots],
+  exports: [
+    HolidayCalendar,
+    LeaveDirectory,
+    LeaveWorkSources,
+    AttendanceShoots,
+    AttendanceFieldWork,
+  ],
 })
 export class HrModule {}

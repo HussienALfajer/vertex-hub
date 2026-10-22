@@ -138,10 +138,9 @@ grep -q '^GEOIP_DB_PATH=' "$env_file" ||
 chmod 600 "$env_file"
 
 step "nginx"
-# The site relies on the server's shared security headers and its perip connection zone, which
-# this folder does not install: refuse to go on without them, rather than serve without HSTS.
-grep -q 'Strict-Transport-Security' /etc/nginx/snippets/security-headers.conf 2>/dev/null ||
-  { echo "/etc/nginx/snippets/security-headers.conf with HSTS is missing" >&2; exit 1; }
+# The site sends its own copy of the server's security headers (vertexhub-headers.conf: the
+# camera and the location stay on for attendance) but relies on the server's perip connection
+# zone, which this folder does not install: refuse to go on without it.
 for zone in 'zone=perip:'; do
   nginx -T 2>/dev/null | grep -q "$zone" ||
     { echo "the nginx ${zone%:} zone the site uses is not defined" >&2; exit 1; }

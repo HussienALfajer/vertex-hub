@@ -459,6 +459,13 @@ export const attendancePasskeySchema = z
 
 export type AttendancePasskey = z.infer<typeof attendancePasskeySchema>;
 
+/** Whether a user has an active passkey, and a replacement waiting for the GM (rule C9). */
+export const passkeyStateSchema = z
+  .object({ active: z.boolean(), pending: z.boolean() })
+  .meta({ id: 'PasskeyState' });
+
+export type PasskeyState = z.infer<typeof passkeyStateSchema>;
+
 export const attendancePasskeyListSchema = z
   .object({ items: z.array(attendancePasskeySchema) })
   .meta({ id: 'AttendancePasskeyList' });
@@ -616,12 +623,34 @@ export const punchOptionsInputSchema = z
 
 export type PunchOptionsInput = z.infer<typeof punchOptionsInputSchema>;
 
+/** Rule C11: a field punch may name the task or meeting it is for. */
+export const FIELD_WORK_KINDS = ['task', 'meeting'] as const;
+
+export const fieldWorkKindSchema = z.enum(FIELD_WORK_KINDS).meta({ id: 'FieldWorkKind' });
+
+export type FieldWorkKind = z.infer<typeof fieldWorkKindSchema>;
+
+export const fieldWorkRefSchema = z
+  .object({ kind: fieldWorkKindSchema, id: z.uuid() })
+  .meta({ id: 'FieldWorkRef' });
+
+export type FieldWorkRef = z.infer<typeof fieldWorkRefSchema>;
+
+/** A task due today or a meeting today, offered with a field punch. */
+export const fieldWorkSchema = fieldWorkRefSchema
+  .extend({ title: z.string(), startsAt: instantSchema.nullable() })
+  .meta({ id: 'FieldWork' });
+
+export type FieldWork = z.infer<typeof fieldWorkSchema>;
+
 export const punchInputSchema = z
   .object({
     ticket: z.string().min(1).max(4000),
     assertion: webAuthnJsonSchema,
     /** Field only: where and why (rule C11). */
     fieldNote: z.string().trim().min(1).max(ATTENDANCE_LIMITS.fieldNote).optional(),
+    /** Field only, optional: one of today's `fieldWork` (rule C11). */
+    fieldWork: fieldWorkRefSchema.optional(),
   })
   .meta({ id: 'PunchInput' });
 
@@ -639,6 +668,8 @@ export const attendancePunchSchema = z
     longitude: z.number().nullable(),
     accuracyM: z.number().int().nullable(),
     fieldNote: z.string().nullable(),
+    /** Field only: the task or meeting named with it; null when it no longer exists. */
+    fieldWork: fieldWorkRefSchema.extend({ title: z.string() }).nullable(),
     shoot: z
       .object({
         id: z.uuid(),
@@ -736,12 +767,14 @@ export const myAttendanceTodaySchema = z
     exemption: attendanceExemptionSchema.nullable(),
     /** Rule C1: before the start date. */
     trial: z.boolean(),
-    passkey: z.object({ active: z.boolean(), pending: z.boolean() }),
+    passkey: passkeyStateSchema,
     /** Null when attendance does not apply today. */
     day: attendanceDaySchema.nullable(),
     nextDirection: punchDirectionSchema,
     methods: z.array(selfPunchMethodSchema),
     shoots: z.array(punchableShootSchema),
+    /** Rule C11: the open tasks due today and the meetings today, for a field punch. */
+    fieldWork: z.array(fieldWorkSchema),
   })
   .meta({ id: 'MyAttendanceToday' });
 

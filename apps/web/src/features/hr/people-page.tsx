@@ -33,7 +33,7 @@ import { useSearchText } from '../../lib/use-search-text';
 import { departmentListQuery } from '../departments/departments.queries';
 import { ChoiceSelect } from '../quotes/choice-select';
 import { DepartmentChips } from '../users/user-badges';
-import { EmployeeStatusBadge } from './employee-badges';
+import { EmployeeStatusBadge, PasskeyStateBadge } from './employee-badges';
 import { employeeListQuery } from './hr.queries';
 
 /** People lists the files for `employees.read` and the pay for `salaries.read` (spec F17). */
@@ -212,6 +212,7 @@ function PeopleTable({
           {files && <TableHead>{t('hr.people.columns.startDate')}</TableHead>}
           {files && <TableHead>{t('hr.people.columns.schedule')}</TableHead>}
           {files && <TableHead>{t('hr.people.columns.contractEnd')}</TableHead>}
+          {files && <TableHead>{t('hr.people.columns.passkey')}</TableHead>}
           {pay && <TableHead>{t('hr.people.columns.salary')}</TableHead>}
           {pay && <TableHead>{t('hr.people.columns.payout')}</TableHead>}
           <TableHead>{t('hr.people.status')}</TableHead>
@@ -264,6 +265,17 @@ function PeopleTable({
                     : employment
                       ? t('hr.file.openEnded')
                       : none}
+                </TableCell>
+              )}
+              {files && (
+                <TableCell>
+                  {!employment ? (
+                    none
+                  ) : employment.attendanceExempt ? (
+                    <span className="text-muted-foreground">{t('hr.file.exempt')}</span>
+                  ) : (
+                    <PasskeyStateBadge passkey={employment.passkey} />
+                  )}
                 </TableCell>
               )}
               {pay && (

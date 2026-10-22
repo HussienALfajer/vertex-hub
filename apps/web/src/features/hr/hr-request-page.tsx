@@ -3,6 +3,7 @@ import { Link } from '@tanstack/react-router';
 import {
   createHrOpinionSchema,
   HR_REQUEST_LIMITS,
+  type HrOpinion,
   type HrRequestDetail,
   type OverlappingWork,
 } from '@vertex-hub/contracts';
@@ -239,7 +240,11 @@ function Request({ request }: { request: HrRequestDetail }) {
             )}
           </dl>
         </Card>
-        <Opinions request={request} canGiveOpinion={canGiveOpinion} />
+        <Opinions
+          target={{ requestId: request.id }}
+          opinions={request.opinions}
+          canGiveOpinion={canGiveOpinion}
+        />
       </div>
 
       {request.overlappingWork && <OverlappingWorkCard work={request.overlappingWork} />}
@@ -266,7 +271,7 @@ function Request({ request }: { request: HrRequestDetail }) {
   );
 }
 
-function Detail({ label, children }: { label: string; children: ReactNode }) {
+export function Detail({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex items-start justify-between gap-3">
       <dt className="shrink-0 text-muted-foreground">{label}</dt>
@@ -275,12 +280,17 @@ function Detail({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-/** Rule B14: the department managers' and Ops' opinions, and the form for one more. */
-function Opinions({
-  request,
+/**
+ * Rule B14: the department managers' and Ops' opinions on a request or an attendance item, and
+ * the form for one more.
+ */
+export function Opinions({
+  target,
+  opinions,
   canGiveOpinion,
 }: {
-  request: HrRequestDetail;
+  target: { requestId: string } | { itemId: string };
+  opinions: readonly HrOpinion[];
   canGiveOpinion: boolean;
 }) {
   const { t } = useTranslation();
@@ -293,7 +303,7 @@ function Opinions({
   async function submit(event: FormEvent) {
     event.preventDefault();
     setFailure(null);
-    const input = createHrOpinionSchema.safeParse({ requestId: request.id, body });
+    const input = createHrOpinionSchema.safeParse({ ...target, body });
     if (!input.success) {
       setInvalid(true);
       field.current?.focus();
@@ -316,11 +326,11 @@ function Opinions({
           {t('hr.requests.opinions.title')}
         </CardTitle>
       </CardHeader>
-      {request.opinions.length === 0 ? (
+      {opinions.length === 0 ? (
         <p className="text-sm text-muted-foreground">{t('hr.requests.opinions.empty')}</p>
       ) : (
         <ul className="flex flex-col gap-3">
-          {request.opinions.map((opinion) => (
+          {opinions.map((opinion) => (
             <li key={opinion.id} className="flex flex-col gap-1 rounded-md bg-muted p-3 text-sm">
               <span className="flex flex-wrap items-center gap-2">
                 <span className="font-medium">{opinion.author.name}</span>

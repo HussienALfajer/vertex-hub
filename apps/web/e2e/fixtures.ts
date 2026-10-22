@@ -28,6 +28,18 @@ import {
   type ApprovalRequestDetail,
   type ApprovalWithdrawnReason,
   type AssigneeLeave,
+  type AttendanceDay,
+  type AttendanceDayList,
+  type AttendanceGreeting,
+  type AttendanceItem,
+  type AttendanceItemDetail,
+  type AttendanceItemPage,
+  type AttendanceKiosk,
+  type AttendanceKioskList,
+  type AttendanceKioskPairing,
+  type AttendancePasskey,
+  type AttendancePasskeyList,
+  type AttendancePunch,
   AUDIENCE_PREVIEW_MAX,
   type Audience,
   type AudiencePreview,
@@ -44,6 +56,8 @@ import {
   announcementExcerpt,
   applyPayment,
   approvalRequestState,
+  attendanceCodeWindow,
+  attendanceCodeWindowEnd,
   audienceSchema,
   BALANCE_LEAVE_TYPES,
   type BalanceLeaveType,
@@ -54,6 +68,8 @@ import {
   type BrandKit,
   budgetUsed,
   businessDate,
+  businessInstant,
+  businessTimeOfDay,
   CAMPAIGN_LIMITS,
   type Calendar,
   type CalendarLeave,
@@ -117,11 +133,13 @@ import {
   calendarDay,
   canChangeCampaignStatus,
   changeInvoiceDueDateSchema,
+  computeDay,
   conversionRate,
   convertLeadSchema,
   costPerResult,
   createAnnouncementSchema,
   createAnnouncementTemplateSchema,
+  createAttendanceKioskSchema,
   createCatalogPackageSchema,
   createCatalogServiceSchema,
   createHolidaySchema,
@@ -155,6 +173,7 @@ import {
   daysOverdue,
   daysWithoutUpdate,
   decideHrRequestSchema,
+  decideItemSchema,
   defaultInstallmentMilestones,
   deliveryRate,
   deviceMatch,
@@ -176,6 +195,7 @@ import {
   employeeStatus,
   endServiceSchema,
   extendQuoteSchema,
+  type FieldWork,
   type FileItem,
   type FileItemList,
   type FileOwnerType,
@@ -232,7 +252,10 @@ import {
   isTaskFinished,
   isTaskOpen,
   isTaskOverdue,
+  itemOutcome,
+  justifyItemSchema,
   type KeyDate,
+  type KioskCodeEvent,
   LEAD_LIMITS,
   type LEAD_SORTS,
   LEAD_STAGES,
@@ -265,6 +288,7 @@ import {
   type MeResponse,
   type Milestone,
   type MilestoneStatus,
+  type MyAttendanceToday,
   type MyClientsDashboard,
   type MyContentSummary,
   type MyTaskSummary,
@@ -283,6 +307,7 @@ import {
   type NotificationSettings,
   type NotificationType,
   needsDiscountApproval,
+  nextPunchDirection,
   notificationBox,
   notificationInbox,
   notificationPriority,
@@ -292,6 +317,7 @@ import {
   OPEN_TASK_STATUSES,
   type OverdueInvoicesReport,
   onTimeRate,
+  type PasskeyState,
   type PatchCampaignUpdate,
   type Payment,
   type Permission,
@@ -326,9 +352,14 @@ import {
   type PublicApproveAll,
   type PublicResponse,
   type PublishedLink,
+  type PunchRefusal,
+  type PunchResult,
   type PushDelivery,
   type PushSubscriptionInput,
   packageIssues,
+  pairKioskSchema,
+  parseAttendanceCode,
+  partOfDay,
   payoutSchema,
   periodInOneMonth,
   periodsOverlap,
@@ -337,6 +368,8 @@ import {
   postMove,
   postTaskDueDate,
   postTaskTitle,
+  punchInputSchema,
+  punchOptionsInputSchema,
   QUOTE_LIMITS,
   type Quote,
   type QuoteDetail,
@@ -373,6 +406,8 @@ import {
   deliveryRate as rateOf,
   receiptDisplayNumber,
   recordPaymentSchema,
+  registerPasskeySchema,
+  rejectPunchSchema,
   rejectQuoteSchema,
   renewalState,
   reopenLeadSchema,
@@ -381,6 +416,7 @@ import {
   reportMonths,
   requestsOverlap,
   revisionSourceOf,
+  revokePasskeySchema,
   type SalaryChange,
   type SalaryChangeList,
   type ScheduleConflict,
@@ -431,6 +467,8 @@ import {
   type TemplateStep,
   type TermEndAction,
   type TermStatus,
+  type TodayBoard,
+  type TodayBoardRow,
   taskMove,
   templateRunInputSchema,
   termEndDate,
@@ -472,6 +510,8 @@ import {
   voidInvoiceSchema,
   voidPaymentSchema,
   type WalletEntry,
+  WEEKDAYS,
+  type WebAuthnChallenge,
   type Weekday,
   type WorkSchedule,
   type WorkScheduleList,
@@ -1333,6 +1373,8 @@ interface MockOptions {
   holidays?: boolean;
   /** Adds the leave requests of `leaveSeed` (F17 part B); none by default. */
   leave?: boolean;
+  /** The entrance screen this browser is (F17 part C); unpaired by default. */
+  kiosk?: KioskMock;
 }
 
 /** A P-256 public key as `GET /api/me/push/config` sends it (fake: no private key exists). */
@@ -1514,7 +1556,24 @@ export async function mockApi(page: Page, options: MockOptions): Promise<MockedA
     streamed: options.streamed ?? [],
     me: () => me,
   });
-  const hrApi = hrRoutes({ users, holidays, me: () => me });
+  const staff = employeesSeed(users);
+  const hrSettings = { current: HR_SETTINGS };
+  const attendanceApi = attendanceRoutes({
+    users,
+    files: staff.files,
+    settings: hrSettings,
+    holidays,
+    kiosk: options.kiosk ?? { paired: false },
+    me: () => me,
+  });
+  const hrApi = hrRoutes({
+    users,
+    holidays,
+    staff,
+    settings: hrSettings,
+    passkeyOf: attendanceApi.passkeyOf,
+    me: () => me,
+  });
   const leaveApi = leaveRoutes({ users, holidays, leave, me: () => me });
   const announcementsApi = announcementRoutes({
     users,
@@ -1644,6 +1703,11 @@ export async function mockApi(page: Page, options: MockOptions): Promise<MockedA
     if (path.startsWith('/api/public/')) {
       const shown = tasksApi(route, method, url, request);
       if (shown) return shown;
+    }
+    // The entrance screen (F17 rule C4) holds no user session.
+    if (path.startsWith('/api/kiosk/')) {
+      const screen = attendanceApi.route(route, method, url, request);
+      if (screen) return screen;
     }
     if (!signedIn || !sessionOpen()) return fail(route, 401, null);
 
@@ -1823,7 +1887,9 @@ export async function mockApi(page: Page, options: MockOptions): Promise<MockedA
       return json(route, departmentDetail(department));
     }
 
-    // HR (F17), with the documents of an employee file and of a request.
+    // HR (F17), with the documents of an employee file and of a request, and the entrance screen.
+    const attended = attendanceApi.route(route, method, url, request);
+    if (attended) return attended;
     const onLeave = leaveApi(route, method, url, request);
     if (onLeave) return onLeave;
     const staffed = hrApi(route, method, url, request);
@@ -16368,6 +16434,7 @@ export const seedIds = {
   layan: id(3),
   design: design.id,
   karim: id(4),
+  nour: id(5),
   basel: id(6),
   jasmine: id(601),
   shifa: id(602),
@@ -16457,7 +16524,8 @@ export async function screenshot(page: Page, testInfo: TestInfo, name: string): 
 interface EmployeeRecord {
   userId: string;
   personal: EmployeePersonal;
-  employment: EmployeeEmployment;
+  /** The passkey's state comes from the attendance mocks. */
+  employment: Omit<EmployeeEmployment, 'passkey'>;
   payout: Omit<EmployeePay, 'currentSalary'>;
 }
 
@@ -16525,7 +16593,8 @@ export function holidaysSeed(): Holiday[] {
 
 /** The seeded HR settings: the column defaults (spec, `hr_settings`). */
 const HR_SETTINGS: HrSettings = {
-  attendanceStartsOn: null,
+  // Attendance counts from October (rule C1), so the month shows real statuses and items.
+  attendanceStartsOn: '2026-10-01',
   graceMinutes: 10,
   latenessTiers: [
     { upToMinutes: 30, fraction: 0.25 },
@@ -16658,15 +16727,20 @@ export function employeesSeed(users: UserResponse[]): {
 function hrRoutes({
   users,
   holidays,
+  staff,
+  settings: shared,
+  passkeyOf,
   me,
 }: {
   users: UserResponse[];
   holidays: Holiday[];
+  staff: ReturnType<typeof employeesSeed>;
+  settings: { current: HrSettings };
+  passkeyOf: (userId: string) => PasskeyState;
   me: () => MeResponse;
 }) {
-  const { files, salaries } = employeesSeed(users);
+  const { files, salaries } = staff;
   const schedules = schedulesSeed();
-  let settings = HR_SETTINGS;
   let next = 9850;
   const holds = (permission: Permission) =>
     me().permissions.some((granted) => granted.permission === permission);
@@ -16689,7 +16763,10 @@ function hrRoutes({
       title: user?.title ?? null,
       departments: user?.departments ?? [],
       status: statusOf(file),
-      ...(showFile && { personal: file.personal, employment: file.employment }),
+      ...(showFile && {
+        personal: file.personal,
+        employment: { ...file.employment, passkey: passkeyOf(file.userId) },
+      }),
       ...(showPay && {
         pay: {
           ...file.payout,
@@ -16747,7 +16824,7 @@ function hrRoutes({
     }
     if (path === '/api/hr/settings' && method === 'GET') {
       if (!holds('hr.read')) return fail(route, 403, null);
-      return json(route, settings);
+      return json(route, shared.current);
     }
     const isRule =
       path === '/api/hr/settings' ||
@@ -16757,8 +16834,8 @@ function hrRoutes({
     if (!holds('hr.manage')) return fail(route, 403, null);
 
     if (path === '/api/hr/settings' && method === 'PUT') {
-      settings = hrSettingsSchema.parse(request.postDataJSON());
-      return json(route, settings);
+      shared.current = hrSettingsSchema.parse(request.postDataJSON());
+      return json(route, shared.current);
     }
     if (path === '/api/hr/schedules' && method === 'POST') {
       const body = createWorkScheduleSchema.parse(request.postDataJSON());
@@ -17310,13 +17387,82 @@ function leaveRoutes({
     | { error: [number, ErrorCode | null] }
     | { fields: Omit<HrRequest, 'id' | 'createdAt' | 'updatedAt'>; preview: HrRequestPreview };
 
+  /** Rule C19 as far as the screens need it: a remote day's work days, a correction's moment. */
+  const evaluateAttendanceRequest = (
+    input: Extract<CreateHrRequest, { kind: 'remote_day' | 'correction' }>,
+    userId: string,
+  ): Evaluated => {
+    const base = {
+      user: person(userId),
+      leaveType: null,
+      half: null,
+      reason: input.reason,
+      status: approver() ? ('approved' as const) : ('pending' as const),
+      documents: 0,
+      certificateRequired: false,
+      paidDays: null,
+      unpaidDays: null,
+      createdBy: person(me().user.id),
+      decidedBy: approver() ? person(me().user.id) : null,
+      decidedAt: approver() ? now() : null,
+      decisionNote: null,
+    };
+    if (input.kind === 'correction') {
+      if (`${input.date}T${input.time}` > HR_NOW.slice(0, 16)) return { error: [400, 'NOT_YET'] };
+      return {
+        fields: {
+          ...base,
+          kind: 'correction',
+          startsOn: input.date,
+          endsOn: input.date,
+          fromTime: input.time,
+          toTime: null,
+          correctionDirection: input.direction,
+          days: null,
+          shortNotice: false,
+        },
+        preview: { days: null, paidDays: null, unpaidDays: null, shortNotice: false, warnings: [] },
+      };
+    }
+    const units = leaveUnits(
+      { startsOn: input.startsOn, endsOn: input.endsOn, half: null },
+      LEAVE_WEEKDAYS,
+      holidays,
+    );
+    if (units.length === 0) return { error: [400, 'NOT_A_WORK_DAY'] };
+    const days = unitDays(units);
+    // `remoteNoticeWorkDays` is 1: a remote day asked for today is short notice.
+    const shortNotice = input.startsOn <= HR_TODAY;
+    return {
+      fields: {
+        ...base,
+        kind: 'remote_day',
+        startsOn: input.startsOn,
+        endsOn: input.endsOn,
+        fromTime: null,
+        toTime: null,
+        correctionDirection: null,
+        days,
+        shortNotice,
+      },
+      preview: {
+        days,
+        paidDays: null,
+        unpaidDays: null,
+        shortNotice,
+        warnings: shortNotice ? ['short_notice'] : [],
+      },
+    };
+  };
+
   /** Rules B8–B13 as far as the screens need them; the API tests cover the rest. */
   const evaluate = (input: CreateHrRequest): Evaluated => {
     const userId = input.userId ?? me().user.id;
     const forOther = userId !== me().user.id;
     if (forOther && !approver()) return { error: [403, null] };
-    // Remote days and corrections (rule C19) arrive with their screens in part C.
-    if (input.kind === 'remote_day' || input.kind === 'correction') return { error: [400, null] };
+    if (input.kind === 'remote_day' || input.kind === 'correction') {
+      return evaluateAttendanceRequest(input, userId);
+    }
     const span =
       input.kind === 'leave'
         ? { startsOn: input.startsOn, endsOn: input.endsOn, half: input.half }
@@ -17603,4 +17749,707 @@ function leaveRoutes({
     }
     return undefined;
   };
+}
+
+/** The entrance screen of the attendance mocks (F17 part C). */
+const KIOSK_ID = id(9950);
+
+/** A code's MAC the mock reads as "from outside the office network" (rule C6). */
+export const OFF_NETWORK_MAC = 'OffNetworkOffNetworkOf';
+
+/** A code's MAC the mock reads as expired (rule C5). */
+export const EXPIRED_MAC = 'ExpiredExpiredExpiredE';
+
+/** An entrance code as the screen shows it, for the HR clock's window. */
+export function attendanceCode(mac = 'A'.repeat(22)): string {
+  return `${KIOSK_ID}.${attendanceCodeWindow(new Date(HR_NOW))}.${mac}`;
+}
+
+/** The entrance screen in the mocks: unpaired until `/api/kiosk/pair`, or paired from the start. */
+export interface KioskMock {
+  paired: boolean;
+  /** Sent once, on the first stream after pairing: the greeting after an office punch. */
+  greeting?: AttendanceGreeting;
+  /** The stream answers 503: the screen shows "offline". */
+  offline?: boolean;
+}
+
+/** Today's work a field punch may name (rule C11), for every employee. */
+const FIELD_WORK: FieldWork[] = [
+  { kind: 'task', id: id(9890), title: 'تصوير منتجات المطعم', startsAt: null },
+  {
+    kind: 'meeting',
+    id: id(9891),
+    title: 'اجتماع خطة نوفمبر',
+    startsAt: '2026-10-21T10:00:00.000Z',
+  },
+];
+
+interface PunchRecord extends AttendancePunch {
+  userId: string;
+}
+
+/**
+ * Attendance (F17 part C): passkeys, entrance screens and their stream, punches, the days computed
+ * from them with the contracts' `computeDay`, items and their decisions, and the Today board. The
+ * clock is \`HR_NOW\`: a punch today lands four hours after the previous one.
+ */
+function attendanceRoutes({
+  users,
+  files,
+  settings,
+  holidays,
+  kiosk,
+  me,
+}: {
+  users: UserResponse[];
+  files: EmployeeRecord[];
+  settings: { current: HrSettings };
+  holidays: Holiday[];
+  kiosk: KioskMock;
+  me: () => MeResponse;
+}) {
+  let next = 9960;
+  const now = () => new Date(HR_NOW).toISOString();
+  const holds = (permission: Permission) =>
+    me().permissions.some((granted) => granted.permission === permission);
+  const person = (userId: string) => ({
+    id: userId,
+    name: users.find((u) => u.id === userId)?.name ?? '',
+  });
+  const fileOf = (userId: string) => files.find((f) => f.userId === userId);
+
+  const passkeys: (AttendancePasskey & { credentialId: string | null })[] = [
+    [id(2), 9901],
+    [id(5), 9902],
+  ].map(([userId, n]) => ({
+    id: id(n as number),
+    user: person(userId as string),
+    deviceLabel: 'Chrome · Android',
+    status: 'active',
+    decidedBy: null,
+    decidedAt: null,
+    createdAt: '2026-10-01T06:00:00.000Z',
+    credentialId: null,
+  }));
+  const passkeyOf = (userId: string): PasskeyState => ({
+    active: passkeys.some((p) => p.user.id === userId && p.status === 'active'),
+    pending: passkeys.some((p) => p.user.id === userId && p.status === 'pending'),
+  });
+
+  const kiosks: (AttendanceKiosk & { pairingCode: string | null })[] = [
+    {
+      id: KIOSK_ID,
+      name: 'المدخل الرئيسي',
+      paired: true,
+      pairingExpiresAt: null,
+      lastSeenAt: new Date(Date.parse(HR_NOW) - 30_000).toISOString(),
+      lastIpAddress: '192.168.1.20',
+      createdAt: '2026-10-01T06:00:00.000Z',
+      archivedAt: null,
+      pairingCode: null,
+    },
+  ];
+  /** The pairing code of the screen `/kiosk` pairs as (rule C4). */
+  const SCREEN_PAIRING_CODE = 'K7PX4MQ2';
+  let screenGreeting = kiosk.greeting;
+
+  // Punches: a full October for everyone, with Karim late twice, Nour absent once and staying
+  // late once, and today's first punches: Omar at the office, Nour in the field.
+  const punches: PunchRecord[] = [];
+  const at = (date: string, time: string) => businessInstant(date, time).toISOString();
+  const addPunch = (
+    userId: string,
+    direction: 'in' | 'out',
+    instant: string,
+    extra: Partial<AttendancePunch> = {},
+  ) => {
+    const punch: PunchRecord = {
+      id: id(next++),
+      userId,
+      direction,
+      at: instant,
+      method: 'office',
+      kioskName: 'المدخل الرئيسي',
+      latitude: null,
+      longitude: null,
+      accuracyM: null,
+      fieldNote: null,
+      fieldWork: null,
+      shoot: null,
+      fieldReview: null,
+      archivedAt: null,
+      ...extra,
+    };
+    punches.push(punch);
+    return punch;
+  };
+  const kindOf = (date: string): AttendanceDay['kind'] => {
+    if (holidays.some((h) => !h.archivedAt && h.startsOn <= date && h.endsOn >= date)) {
+      return 'holiday';
+    }
+    return new Date(`${date}T12:00:00Z`).getUTCDay() === 5 ? 'off' : 'work';
+  };
+  for (const file of files) {
+    if (file.employment.attendanceExempt) continue;
+    for (let date = '2026-10-01'; date < HR_TODAY; date = addDays(date, 1)) {
+      if (kindOf(date) !== 'work') continue;
+      if (file.userId === id(5) && date === '2026-10-15') continue;
+      const start =
+        file.userId === id(4) && date === '2026-10-14'
+          ? '09:25'
+          : file.userId === id(4) && date === '2026-10-19'
+            ? '09:40'
+            : '08:55';
+      const end = file.userId === id(5) && date === '2026-10-12' ? '18:25' : '17:05';
+      addPunch(file.userId, 'in', at(date, start));
+      addPunch(file.userId, 'out', at(date, end));
+    }
+  }
+  addPunch(id(2), 'in', at(HR_TODAY, '08:05'));
+  addPunch(id(5), 'in', at(HR_TODAY, '08:50'), {
+    method: 'field',
+    kioskName: null,
+    latitude: 33.5138,
+    longitude: 36.2765,
+    accuracyM: 15,
+    fieldNote: 'تصوير في موقع العميل',
+    fieldWork: { kind: 'task', id: id(9890), title: 'تصوير منتجات المطعم' },
+    fieldReview: 'accepted',
+  });
+  const refusals: PunchRefusal[] = [
+    {
+      user: person(id(8)),
+      at: at(HR_TODAY, '08:40'),
+      reason: 'OFF_OFFICE_NETWORK',
+      ipAddress: '89.39.12.7',
+    },
+  ];
+
+  const dayOf = (userId: string, date: string): AttendanceDay => {
+    const kind = kindOf(date);
+    const work = kind === 'work';
+    const expectedStart = work ? businessInstant(date, '09:00') : null;
+    const expectedEnd = work ? businessInstant(date, '17:00') : null;
+    const own = punches
+      .filter((p) => p.userId === userId && businessDate(new Date(p.at)) === date)
+      .sort((a, b) => a.at.localeCompare(b.at));
+    const live = own.filter((p) => !p.archivedAt);
+    const startsOn = settings.current.attendanceStartsOn;
+    const weekday = WEEKDAYS[(new Date(`${date}T12:00:00Z`).getUTCDay() + 1) % 7];
+    const result = computeDay({
+      kind,
+      expectedStart,
+      latestStart: null,
+      expectedEnd,
+      requiredMinutes: work ? 480 : null,
+      leave: 'none',
+      permissions: [],
+      punches: live.map((p) => ({ direction: p.direction, at: new Date(p.at) })),
+      graceMinutes: settings.current.graceMinutes,
+      overtimeMinMinutes: settings.current.overtimeMinMinutes,
+      phase: date < HR_TODAY ? 'after' : date === HR_TODAY ? 'during' : 'before',
+      trial: !startsOn || date < startsOn,
+    });
+    return {
+      id: id(30_000 + Number(userId.slice(-4)) * 40 + Number(date.slice(8))),
+      userId,
+      date,
+      kind,
+      expectedStart: expectedStart?.toISOString() ?? null,
+      latestStart: null,
+      expectedEnd: expectedEnd?.toISOString() ?? null,
+      requiredMinutes: work ? 480 : null,
+      place: work
+        ? fileOf(userId)?.employment.remoteWeekdays.includes(weekday as never)
+          ? 'remote'
+          : 'office'
+        : null,
+      leave: 'none',
+      firstInAt: result.firstInAt?.toISOString() ?? null,
+      lastOutAt: result.lastOutAt?.toISOString() ?? null,
+      workedMinutes: result.workedMinutes,
+      lateMinutes: result.lateMinutes,
+      earlyMinutes: result.earlyMinutes,
+      overtimeMinutes: result.overtimeMinutes,
+      status: result.status,
+      punches: own.map(({ userId: _userId, ...p }) => p),
+    };
+  };
+  const exemptionOf = (userId: string): MyAttendanceToday['exemption'] => {
+    const file = fileOf(userId);
+    if (!file || file.employment.attendanceExempt) return 'exempt';
+    if (file.employment.startDate && file.employment.startDate > HR_TODAY) return 'not_started';
+    if (file.employment.endedOn && file.employment.endedOn < HR_TODAY) return 'ended';
+    return null;
+  };
+
+  const item = (
+    n: number,
+    userId: string,
+    date: string,
+    kind: AttendanceItem['kind'],
+    minutes: number,
+    proposedFraction: number,
+    justification: string | null = null,
+  ): AttendanceItem & { opinions: HrOpinion[] } => ({
+    id: id(n),
+    user: person(userId),
+    dayId: dayOf(userId, date).id,
+    date,
+    kind,
+    minutes,
+    proposedFraction,
+    justification,
+    justifiedAt: justification ? `${date}T12:00:00.000Z` : null,
+    status: 'pending',
+    decidedFraction: null,
+    decidedMinutes: null,
+    creditedDays: null,
+    decidedBy: null,
+    decidedAt: null,
+    decisionNote: null,
+    createdAt: `${date}T07:00:00.000Z`,
+    updatedAt: `${date}T07:00:00.000Z`,
+    opinions: [],
+  });
+  const items = [
+    item(9931, id(4), '2026-10-14', 'lateness', 25, 0),
+    item(9932, id(5), '2026-10-12', 'overtime', 85, 0),
+    item(9933, id(5), '2026-10-15', 'absence', 0, 1),
+    item(9934, id(4), '2026-10-19', 'lateness', 40, 0.5, 'ازدحام على طريق المزة'),
+  ];
+  const plainItem = ({ opinions: _opinions, ...rest }: (typeof items)[number]): AttendanceItem =>
+    rest;
+  const readable = (userId: string) => userId === me().user.id || holds('hr.read');
+
+  /** WebAuthn options the browser (Chromium's virtual authenticator in the specs) accepts. */
+  const challenge = () => Buffer.from(`challenge-${next++}-${Date.now()}`).toString('base64url');
+  const ticketOf = (data: unknown) => Buffer.from(JSON.stringify(data)).toString('base64url');
+  const fromTicket = <T>(ticket: string) =>
+    JSON.parse(Buffer.from(ticket, 'base64url').toString()) as T;
+
+  const route = (
+    route: Route,
+    method: string,
+    url: URL,
+    request: Request,
+  ): Promise<void> | undefined => {
+    const path = url.pathname;
+    const q = url.searchParams;
+    const userId = me().user.id;
+    const rpId = new URL(request.url()).hostname;
+
+    // The entrance screen (rules C4, C5, C20): no session.
+    if (path === '/api/kiosk/pair' && method === 'POST') {
+      const body = pairKioskSchema.safeParse(request.postDataJSON());
+      if (!body.success || body.data.code !== SCREEN_PAIRING_CODE) {
+        return fail(route, 400, 'INVALID_PAIRING_CODE');
+      }
+      kiosk.paired = true;
+      return json(route, { id: KIOSK_ID, name: 'المدخل الرئيسي' });
+    }
+    if (path === '/api/kiosk/stream' && method === 'GET') {
+      if (!kiosk.paired) return fail(route, 401, null);
+      if (kiosk.offline) return route.fulfill({ status: 503, body: '' });
+      const window = attendanceCodeWindow(new Date(HR_NOW));
+      const code: KioskCodeEvent = {
+        code: attendanceCode(),
+        window,
+        expiresAt: attendanceCodeWindowEnd(window).toISOString(),
+      };
+      const events = [
+        `event: kiosk\ndata: ${JSON.stringify({ id: KIOSK_ID, name: 'المدخل الرئيسي' })}\n\n`,
+        `event: code\ndata: ${JSON.stringify(code)}\n\n`,
+        ...(screenGreeting ? [`event: greeting\ndata: ${JSON.stringify(screenGreeting)}\n\n`] : []),
+      ];
+      screenGreeting = undefined;
+      return route.fulfill({
+        status: 200,
+        headers: { 'content-type': 'text/event-stream; charset=utf-8' },
+        body: events.join(''),
+      });
+    }
+
+    if (!path.startsWith('/api/hr/')) return undefined;
+
+    if (path === '/api/hr/attendance/me/today' && method === 'GET') {
+      const exemption = exemptionOf(userId);
+      const day = exemption ? null : dayOf(userId, HR_TODAY);
+      const last = punches
+        .filter((p) => p.userId === userId && !p.archivedAt)
+        .sort((a, b) => a.at.localeCompare(b.at))
+        .at(-1);
+      const startsOn = settings.current.attendanceStartsOn;
+      return json(route, {
+        date: HR_TODAY,
+        exemption,
+        trial: !startsOn || HR_TODAY < startsOn,
+        passkey: passkeyOf(userId),
+        day,
+        nextDirection: nextPunchDirection(
+          last ? { direction: last.direction, at: new Date(last.at) } : null,
+          new Date(HR_NOW),
+        ),
+        methods: exemption
+          ? []
+          : ['office', ...(day?.place === 'remote' ? (['remote'] as const) : []), 'field'],
+        shoots: [],
+        fieldWork: exemption ? [] : FIELD_WORK,
+      } satisfies MyAttendanceToday);
+    }
+    if (path === '/api/hr/attendance/days' && method === 'GET') {
+      const target =
+        q.get('userId') === 'me' || !q.get('userId') ? userId : (q.get('userId') ?? '');
+      if (!readable(target)) return fail(route, 404, null);
+      if (exemptionOf(target) === 'exempt')
+        return json(route, { items: [] } satisfies AttendanceDayList);
+      const month = q.get('month') ?? HR_TODAY.slice(0, 7);
+      const days: AttendanceDay[] = [];
+      for (let date = `${month}-01`; date.startsWith(month); date = addDays(date, 1)) {
+        days.push(dayOf(target, date));
+      }
+      return json(route, { items: days } satisfies AttendanceDayList);
+    }
+
+    // Passkeys (rules C3, C9).
+    if (path === '/api/hr/passkeys/options' && method === 'POST') {
+      if (exemptionOf(userId) === 'exempt') return fail(route, 409, 'EXEMPT');
+      if (passkeyOf(userId).pending) return fail(route, 409, 'PENDING_EXISTS');
+      const options = {
+        challenge: challenge(),
+        rp: { name: 'Vertex Hub', id: rpId },
+        user: {
+          id: Buffer.from(userId).toString('base64url'),
+          name: me().user.email,
+          displayName: me().user.name,
+        },
+        pubKeyCredParams: [
+          { type: 'public-key', alg: -7 },
+          { type: 'public-key', alg: -257 },
+        ],
+        timeout: 60_000,
+        attestation: 'none',
+        excludeCredentials: [],
+        authenticatorSelection: {
+          authenticatorAttachment: 'platform',
+          residentKey: 'preferred',
+          userVerification: 'required',
+        },
+      };
+      return json(route, {
+        ticket: ticketOf({ register: userId }),
+        options,
+      } satisfies WebAuthnChallenge);
+    }
+    if (path === '/api/hr/passkeys' && method === 'POST') {
+      const body = registerPasskeySchema.parse(request.postDataJSON());
+      const replacing = passkeyOf(userId).active;
+      const passkey = {
+        id: id(next++),
+        user: person(userId),
+        deviceLabel: 'Chrome · Windows',
+        status: replacing ? ('pending' as const) : ('active' as const),
+        decidedBy: null,
+        decidedAt: null,
+        createdAt: now(),
+        credentialId: String(body.response.id ?? ''),
+      };
+      passkeys.push(passkey);
+      const { credentialId: _credentialId, ...shown } = passkey;
+      return json(route, shown satisfies AttendancePasskey, 201);
+    }
+    if ((path === '/api/hr/passkeys/me' || path === '/api/hr/passkeys') && method === 'GET') {
+      const target = path.endsWith('/me') ? userId : (q.get('userId') ?? '');
+      if (target !== userId && !holds('hr.read')) return fail(route, 403, null);
+      const items = passkeys
+        .filter((p) => p.user.id === target)
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+        .map(({ credentialId: _credentialId, ...p }) => p);
+      return json(route, { items } satisfies AttendancePasskeyList);
+    }
+    const revoking = path.match(/^\/api\/hr\/passkeys\/([^/]+)\/revoke$/);
+    if (revoking && method === 'POST') {
+      if (!holds('hr.approve')) return fail(route, 403, null);
+      revokePasskeySchema.parse(request.postDataJSON());
+      const passkey = passkeys.find((p) => p.id === revoking[1]);
+      if (!passkey) return fail(route, 404, null);
+      Object.assign(passkey, { status: 'revoked', decidedBy: person(userId), decidedAt: now() });
+      const { credentialId: _credentialId, ...shown } = passkey;
+      return json(route, shown satisfies AttendancePasskey);
+    }
+
+    // Punches (rules C5–C13).
+    if (path === '/api/hr/attendance/punch/options' && method === 'POST') {
+      const input = punchOptionsInputSchema.parse(request.postDataJSON());
+      if (exemptionOf(userId)) return fail(route, 409, 'EXEMPT');
+      const passkey = passkeys.find((p) => p.user.id === userId && p.status === 'active');
+      if (!passkey) return fail(route, 409, 'NO_PASSKEY');
+      if (input.method === 'office') {
+        const code = parseAttendanceCode(input.code ?? '');
+        if (!code || code.kioskId !== KIOSK_ID || code.mac === EXPIRED_MAC) {
+          return fail(route, 400, 'INVALID_CODE');
+        }
+        if (code.mac === OFF_NETWORK_MAC) {
+          refusals.unshift({
+            user: person(userId),
+            at: now(),
+            reason: 'OFF_OFFICE_NETWORK',
+            ipAddress: '89.39.12.7',
+          });
+          return fail(route, 403, 'OFF_OFFICE_NETWORK');
+        }
+      } else if (input.latitude === undefined) {
+        return fail(route, 400, 'LOCATION_REQUIRED');
+      }
+      const options = {
+        challenge: challenge(),
+        rpId,
+        timeout: 60_000,
+        userVerification: 'required',
+        allowCredentials: passkey.credentialId
+          ? [{ id: passkey.credentialId, type: 'public-key', transports: ['internal'] }]
+          : [],
+      };
+      return json(route, { ticket: ticketOf(input), options } satisfies WebAuthnChallenge);
+    }
+    if (path === '/api/hr/attendance/punch' && method === 'POST') {
+      const body = punchInputSchema.parse(request.postDataJSON());
+      const input = fromTicket<{
+        method: AttendancePunch['method'];
+        latitude?: number;
+        longitude?: number;
+        accuracyM?: number;
+      }>(body.ticket);
+      if (input.method === 'field' && !body.fieldNote) return fail(route, 400, null);
+      const today = punches.filter(
+        (p) => p.userId === userId && !p.archivedAt && businessDate(new Date(p.at)) === HR_TODAY,
+      );
+      const last = today.at(-1);
+      const direction = last?.direction === 'in' ? 'out' : 'in';
+      const instant = new Date(Date.parse(HR_NOW) + today.length * 4 * 3_600_000).toISOString();
+      const named = body.fieldWork && FIELD_WORK.find((w) => w.id === body.fieldWork?.id);
+      const punch = addPunch(userId, direction, instant, {
+        method: input.method,
+        kioskName: input.method === 'office' ? 'المدخل الرئيسي' : null,
+        latitude: input.latitude ?? null,
+        longitude: input.longitude ?? null,
+        accuracyM: input.accuracyM ?? null,
+        fieldNote: input.method === 'field' ? (body.fieldNote ?? null) : null,
+        fieldWork: named ? { kind: named.kind, id: named.id, title: named.title } : null,
+        fieldReview: input.method === 'field' || input.method === 'shoot' ? 'accepted' : null,
+      });
+      const day = dayOf(userId, HR_TODAY);
+      const firstName = me().user.name.split(' ')[0] ?? '';
+      const greeting: AttendanceGreeting =
+        direction === 'in'
+          ? {
+              direction,
+              firstName,
+              partOfDay: partOfDay(businessTimeOfDay(new Date(instant))),
+              tasksDueToday: 2,
+              firstEventAt: FIELD_WORK[1]?.startsAt ?? null,
+              workedMinutes: null,
+            }
+          : {
+              direction,
+              firstName,
+              partOfDay: null,
+              tasksDueToday: null,
+              firstEventAt: null,
+              workedMinutes: day.workedMinutes,
+            };
+      const { userId: _userId, ...shown } = punch;
+      return json(route, { punch: shown, day, greeting } satisfies PunchResult, 201);
+    }
+    const rejecting = path.match(/^\/api\/hr\/attendance\/punches\/([^/]+)\/reject$/);
+    if (rejecting && method === 'POST') {
+      if (!holds('hr.approve')) return fail(route, 403, null);
+      rejectPunchSchema.parse(request.postDataJSON());
+      const punch = punches.find((p) => p.id === rejecting[1]);
+      if (!punch) return fail(route, 404, null);
+      if (punch.archivedAt || (punch.method !== 'field' && punch.method !== 'shoot')) {
+        return fail(route, 409, 'NOT_FIELD');
+      }
+      Object.assign(punch, { archivedAt: now(), fieldReview: 'rejected' });
+      return json(route, dayOf(punch.userId, businessDate(new Date(punch.at))));
+    }
+    if (path === '/api/hr/attendance/today' && method === 'GET') {
+      if (!holds('hr.read')) return fail(route, 403, null);
+      const departmentId = q.get('departmentId');
+      const rows: TodayBoardRow[] = files
+        .filter((f) => {
+          const user = users.find((u) => u.id === f.userId);
+          return (
+            user?.status !== 'archived' &&
+            (!departmentId || user?.departments.some((d) => d.id === departmentId))
+          );
+        })
+        .map((f) => {
+          const exemption = exemptionOf(f.userId);
+          const day = exemption ? null : dayOf(f.userId, HR_TODAY);
+          const live = day?.punches.filter((p) => !p.archivedAt) ?? [];
+          const state: TodayBoardRow['state'] = exemption
+            ? 'exempt'
+            : day?.kind === 'holiday'
+              ? 'holiday'
+              : day?.firstInAt && !day.lastOutAt
+                ? 'in'
+                : day?.lastOutAt
+                  ? 'out'
+                  : day?.kind === 'off'
+                    ? 'off'
+                    : 'not_in';
+          return {
+            user: person(f.userId),
+            state,
+            late: (day?.lateMinutes ?? 0) > 0,
+            method: live.at(-1)?.method ?? null,
+            noPasskey: !passkeyOf(f.userId).active,
+            day,
+          };
+        })
+        .sort((a, b) => a.user.name.localeCompare(b.user.name, 'ar'));
+      return json(route, { date: HR_TODAY, rows, refusals } satisfies TodayBoard);
+    }
+
+    // Items (rules C17, C18).
+    if (path === '/api/hr/items' && method === 'GET') {
+      const target = q.get('userId') === 'me' ? userId : q.get('userId');
+      if (target ? !readable(target) : !holds('hr.read')) return fail(route, 403, null);
+      const statuses = q.getAll('status').flatMap((s) => s.split(','));
+      const departmentId = q.get('departmentId');
+      const month = q.get('month');
+      const rows = items
+        .filter(
+          (i) =>
+            (!target || i.user.id === target) &&
+            (target || holds('hr.read')) &&
+            (statuses.length === 0 || statuses.includes(i.status)) &&
+            (!q.get('kind') || i.kind === q.get('kind')) &&
+            (!month || i.date.startsWith(month)) &&
+            (!departmentId ||
+              users
+                .find((u) => u.id === i.user.id)
+                ?.departments.some((d) => d.id === departmentId)),
+        )
+        .sort((a, b) =>
+          q.get('order') === 'asc' ? a.date.localeCompare(b.date) : b.date.localeCompare(a.date),
+        );
+      const page = Number(q.get('page') ?? 1);
+      const pageSize = Number(q.get('pageSize') ?? 25);
+      return json(route, {
+        items: rows.slice((page - 1) * pageSize, page * pageSize).map(plainItem),
+        total: rows.length,
+        page,
+        pageSize,
+      } satisfies AttendanceItemPage);
+    }
+    const itemMatch = path.match(/^\/api\/hr\/items\/([^/]+)(\/justification|\/decision)?$/);
+    if (itemMatch) {
+      const found = items.find((i) => i.id === itemMatch[1]);
+      if (!found || !readable(found.user.id)) return fail(route, 404, null);
+      const own = found.user.id === userId;
+      if (!itemMatch[2] && method === 'GET') {
+        return json(route, {
+          ...plainItem(found),
+          day: dayOf(found.user.id, found.date),
+          opinions: found.opinions,
+          permissions: {
+            canDecide: holds('hr.approve') && found.status !== 'void',
+            canJustify: own && found.status === 'pending',
+            canGiveOpinion: !own && holds('hr.read') && found.status === 'pending',
+          },
+        } satisfies AttendanceItemDetail);
+      }
+      if (itemMatch[2] === '/justification' && method === 'POST') {
+        if (!own) return fail(route, 404, null);
+        if (found.status !== 'pending') return fail(route, 409, 'NOT_PENDING');
+        const body = justifyItemSchema.parse(request.postDataJSON());
+        Object.assign(found, { justification: body.text, justifiedAt: now(), updatedAt: now() });
+        return json(route, plainItem(found));
+      }
+      if (itemMatch[2] === '/decision' && method === 'POST') {
+        if (!holds('hr.approve')) return fail(route, 403, null);
+        const body = decideItemSchema.parse(request.postDataJSON());
+        const outcome = itemOutcome(found, body);
+        if (!outcome) return fail(route, 400, 'INVALID_DECISION');
+        Object.assign(found, outcome, {
+          creditedDays:
+            outcome.status === 'time_off'
+              ? Math.floor(((outcome.decidedMinutes ?? 0) / 480) * 2) / 2
+              : null,
+          decidedBy: person(userId),
+          decidedAt: now(),
+          decisionNote: body.note,
+          updatedAt: now(),
+        });
+        return json(route, plainItem(found));
+      }
+      return undefined;
+    }
+    if (path === '/api/hr/opinions' && method === 'POST') {
+      const body = createHrOpinionSchema.parse(request.postDataJSON());
+      if (!body.itemId) return undefined;
+      const found = items.find((i) => i.id === body.itemId);
+      if (!found || !holds('hr.read')) return fail(route, 404, null);
+      if (found.status !== 'pending') return fail(route, 409, 'NOT_PENDING');
+      const opinion: HrOpinion = {
+        id: id(next++),
+        requestId: null,
+        itemId: found.id,
+        author: person(userId),
+        body: body.body,
+        createdAt: now(),
+      };
+      found.opinions.push(opinion);
+      return json(route, opinion, 201);
+    }
+
+    // Entrance screens (rule C4).
+    if (path.startsWith('/api/hr/kiosks')) {
+      if (!holds('hr.manage')) return fail(route, 403, null);
+      const shown = ({ pairingCode: _pairingCode, ...k }: (typeof kiosks)[number]) => k;
+      if (path === '/api/hr/kiosks' && method === 'GET') {
+        return json(route, { items: kiosks.map(shown) } satisfies AttendanceKioskList);
+      }
+      const pairing = (k: (typeof kiosks)[number]): AttendanceKioskPairing => ({
+        ...shown(k),
+        pairingCode: k.pairingCode ?? '',
+      });
+      if (path === '/api/hr/kiosks' && method === 'POST') {
+        const body = createAttendanceKioskSchema.parse(request.postDataJSON());
+        const created = {
+          id: id(next++),
+          name: body.name,
+          paired: false,
+          pairingExpiresAt: new Date(Date.parse(HR_NOW) + 15 * 60_000).toISOString(),
+          lastSeenAt: null,
+          lastIpAddress: null,
+          createdAt: now(),
+          archivedAt: null,
+          pairingCode: SCREEN_PAIRING_CODE,
+        };
+        kiosks.push(created);
+        return json(route, pairing(created), 201);
+      }
+      const kioskMatch = path.match(/^\/api\/hr\/kiosks\/([^/]+)\/(pairing-code|archive)$/);
+      const found = kioskMatch && kiosks.find((k) => k.id === kioskMatch[1] && !k.archivedAt);
+      if (!kioskMatch || method !== 'POST') return undefined;
+      if (!found) return fail(route, 404, null);
+      if (kioskMatch[2] === 'archive') {
+        Object.assign(found, { archivedAt: now(), paired: false });
+        return json(route, shown(found));
+      }
+      Object.assign(found, {
+        paired: false,
+        pairingCode: SCREEN_PAIRING_CODE,
+        pairingExpiresAt: new Date(Date.parse(HR_NOW) + 15 * 60_000).toISOString(),
+      });
+      return json(route, pairing(found));
+    }
+    return undefined;
+  };
+
+  return { route, passkeyOf };
 }

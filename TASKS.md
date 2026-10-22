@@ -58,7 +58,10 @@ Parts A → B → C → D, each accepted by the owner before the next starts (sp
 - [x] acceptance (API at `/api/docs`, owner 2026-10-22), PR with auto-merge
 
 ## PR C3 — attendance screens: web and E2E
-- [ ] `/kiosk` entrance screen; My attendance Today card, scanner, passkey setup, This month; HR settings: start date and Entrance screens; request dialog for remote days and corrections; the field punch's optional task or meeting (`field_task_id`, `field_meeting_id`: the columns exist, the API takes them with the picker); WebAuthn needs a domain, so local checks use `localhost`, not `127.0.0.1`
-- [ ] Today `/hr/today`; Approvals with items; employee file Attendance tab and passkey state; People passkey column
-- [ ] E2E: `f17-attendance.spec.ts`, screenshots in both themes; mocks in `fixtures.ts`
-- [ ] checks, reviewer, acceptance (spec steps 1, 3, 4, 6; on a phone after deploy), PR with auto-merge, `docs/ROADMAP.md`
+- [x] contracts and api: `fieldWork` on the punch (rule C11: an open task due today or a meeting today, from `LeaveWorkSources`; titles through the new `AttendanceFieldWork` registry filled by `tasks` and `calendar`); `passkey` state on the file's employment (People, the file); tests in `test/hr-attendance.test.ts`
+- [x] bridge: `openapi:export`, `api:generate`
+- [x] deploy: the hub's own copy of the standard headers with `camera=(self)` and `geolocation=(self)` (the server's `security-headers.conf` turns both off); installed by `provision.sh` after merge
+- [x] `/kiosk` entrance screen; My attendance Today card, scanner, passkey setup, This month; HR settings: start date and Entrance screens; request dialog for remote days and corrections; the field punch's optional task or meeting (`field_task_id`, `field_meeting_id`: the columns exist, the API takes them with the picker); WebAuthn needs a domain, so local checks use `localhost`, not `127.0.0.1`
+- [x] Today `/hr/today`; Approvals with items (item page `/hr/items/:id`, bulk apply of a proposal); employee file Attendance tab and passkey state; People passkey column; `/attend#<code>` for a phone camera; the punch in two taps (prepare, then the passkey prompt)
+- [x] E2E: `f17-attendance.spec.ts` (WebAuthn through Chromium's virtual authenticator on `localhost`), screenshots in both themes; mocks in `fixtures.ts`
+- [x] checks (full run; HR screens pass with 2 workers, time out under full load), reviewer (5 findings fixed: the kiosk stream watchdog, HSTS `includeSubDomains`, passkey registration in two taps, the pairing code as a field error, stale docs), acceptance (in the browser, owner 2026-10-22; the phone at the office after deploy), PR with auto-merge, `docs/ROADMAP.md`

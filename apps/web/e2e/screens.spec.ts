@@ -3,6 +3,7 @@ import {
   ANNOUNCEMENTS_NOW,
   accountManagerMe,
   announcementIds,
+  attendanceCode,
   CONTENT_LINK_TOKEN,
   catalogNotificationsSeed,
   DEVICES_NOW,
@@ -361,7 +362,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
         await page.clock.setFixedTime(new Date(HR_NOW));
         const api = await mockApi(page, { signedIn: true, me: employeeMe, leave: true });
         const r = ar.hr.requests;
-        await page.goto('/me/attendance');
+        await page.goto('/me/attendance?tab=balances');
         await expect(page.locator('[data-leave-type="annual"]')).toBeVisible();
         await screenshot(page, testInfo, `hr-my-balances-${size}-${colorScheme}`);
         await page.getByRole('button', { name: r.new.title }).click();
@@ -407,6 +408,93 @@ for (const colorScheme of ['light', 'dark'] as const) {
           page.getByRole('alertdialog', { name: ar.tasks.leaveWarning.title }),
         ).toBeVisible();
         await screenshot(page, testInfo, `task-leave-warning-${size}-${colorScheme}`);
+      });
+
+      // F17 part C: My attendance (Today, the month), the entrance code's page, the Today board,
+      // items in Approvals, an item and its decision, the file's Attendance tab, the entrance
+      // screens in HR settings, and the entrance screen itself.
+      test(`attendance (${size})`, async ({ page }, testInfo) => {
+        await page.setViewportSize({ width, height });
+        await page.clock.setFixedTime(new Date(HR_NOW));
+        const api = await mockApi(page, { signedIn: true, me: employeeMe });
+        const a = ar.hr.attendance;
+        await page.goto('/me/attendance');
+        await expect(page.getByTestId('today-card').getByTestId('today-notice')).toBeVisible();
+        await expect(page.getByTestId('passkey-card')).toBeVisible();
+        await screenshot(page, testInfo, `hr-my-today-${size}-${colorScheme}`);
+        await page.goto('/me/attendance?tab=month');
+        await expect(page.locator('[data-item]').first()).toBeVisible();
+        await screenshot(page, testInfo, `hr-my-month-${size}-${colorScheme}`);
+        const r = ar.hr.requests;
+        await page.getByRole('button', { name: r.new.title }).first().click();
+        const dialog = page.getByRole('dialog', { name: r.new.title });
+        await dialog.getByRole('button', { name: r.kinds.correction }).click();
+        await dialog.getByLabel(r.fields.date).fill('2026-10-20');
+        await dialog.getByLabel(r.fields.time).fill('17:10');
+        await expect(dialog.getByText(r.preview.ok.correction)).toBeVisible();
+        await screenshot(page, testInfo, `hr-request-correction-${size}-${colorScheme}`);
+        await page.keyboard.press('Escape');
+        await page.goto(`/attend#${attendanceCode()}`);
+        await expect(page.getByRole('button', { name: a.attend.confirm })).toBeVisible();
+        await screenshot(page, testInfo, `hr-attend-${size}-${colorScheme}`);
+
+        api.signInAs(manager);
+        await page.goto('/hr/today');
+        await expect(page.getByRole('region', { name: ar.hr.today.groups.field })).toBeVisible();
+        await screenshot(page, testInfo, `hr-today-${size}-${colorScheme}`);
+        await page.goto('/hr/approvals?view=items');
+        await expect(page.locator('[data-item]')).toHaveCount(4);
+        await screenshot(page, testInfo, `hr-approvals-items-${size}-${colorScheme}`);
+        await page.locator('[data-item]').last().getByRole('link').click();
+        await expect(page.getByText('ازدحام على طريق المزة')).toBeVisible();
+        await screenshot(page, testInfo, `hr-item-${size}-${colorScheme}`);
+        await page.getByRole('button', { name: ar.hr.items.decide }).click();
+        await expect(page.getByRole('dialog', { name: ar.hr.items.decideTitle })).toBeVisible();
+        await screenshot(page, testInfo, `hr-item-decision-${size}-${colorScheme}`);
+        await page.keyboard.press('Escape');
+        await page.goto(`/hr/people/${seedIds.nour}?tab=attendance`);
+        await expect(page.getByText('Chrome · Android')).toBeVisible();
+        await screenshot(page, testInfo, `hr-file-attendance-${size}-${colorScheme}`);
+        await page.goto('/hr/settings?tab=screens');
+        await expect(page.locator('[data-kiosk="المدخل الرئيسي"]')).toBeVisible();
+        await screenshot(page, testInfo, `hr-settings-screens-${size}-${colorScheme}`);
+        await page.getByRole('button', { name: ar.hr.kiosks.add }).click();
+        const create = page.getByRole('dialog', { name: ar.hr.kiosks.addTitle });
+        await create.getByLabel(ar.hr.kiosks.name).fill('مدخل الاستوديو');
+        await create.getByRole('button', { name: ar.hr.kiosks.create }).click();
+        await expect(page.getByTestId('pairing-code')).toBeVisible();
+        await screenshot(page, testInfo, `hr-kiosk-pairing-code-${size}-${colorScheme}`);
+      });
+
+      test(`entrance screen (${size})`, async ({ page }, testInfo) => {
+        await page.setViewportSize({ width, height });
+        await page.clock.setFixedTime(new Date(HR_NOW));
+        await mockApi(page, { signedIn: false });
+        await page.goto('/kiosk');
+        await expect(page.getByLabel(ar.hr.kiosk.pairingCode)).toBeVisible();
+        await screenshot(page, testInfo, `kiosk-pair-${size}-${colorScheme}`);
+        await page.getByLabel(ar.hr.kiosk.pairingCode).fill('K7PX4MQ2');
+        await page.getByRole('button', { name: ar.hr.kiosk.pair }).click();
+        await expect(page.getByTestId('kiosk-code')).toBeVisible();
+        await screenshot(page, testInfo, `kiosk-code-${size}-${colorScheme}`);
+
+        await mockApi(page, {
+          signedIn: false,
+          kiosk: {
+            paired: true,
+            greeting: {
+              direction: 'in',
+              firstName: 'كريم',
+              partOfDay: 'morning',
+              tasksDueToday: 2,
+              firstEventAt: '2026-10-21T10:00:00.000Z',
+              workedMinutes: null,
+            },
+          },
+        });
+        await page.goto('/kiosk');
+        await expect(page.getByTestId('attendance-greeting')).toBeVisible();
+        await screenshot(page, testInfo, `kiosk-greeting-${size}-${colorScheme}`);
       });
 
       // F16 screens 9–14: announcements, with the home pin and the critical dialog.

@@ -25,6 +25,7 @@ import {
   BriefcaseBusinessIcon,
   CalendarCheckIcon,
   CalendarClockIcon,
+  ClockIcon,
   FileTextIcon,
   IdCardIcon,
   PencilIcon,
@@ -40,8 +41,10 @@ import { TabHeader } from '../../components/tab-header';
 import { can, useMe } from '../../lib/auth';
 import { formatDate, formatList, formatNumber } from '../../lib/format';
 import { formatMoney } from '../../lib/money';
+import { monthParam } from '../../lib/search-params';
 import { OwnerDocumentsTab } from '../files/owner-documents-tab';
-import { EmployeeStatusBadge } from './employee-badges';
+import { AttendanceTab } from './attendance-tab';
+import { EmployeeStatusBadge, PasskeyStateBadge } from './employee-badges';
 import {
   ArchiveSalaryDialog,
   ContractDialog,
@@ -54,17 +57,19 @@ import { employeeQuery, hrRequestListQuery, salaryChangesQuery, useClearEnd } fr
 import { NewRequestDialog } from './leave-dialogs';
 import { LeaveBalances, NewRequestButton, RequestRows, RequestRowsSkeleton } from './leave-parts';
 
-const FILE_TABS = ['personal', 'contract', 'pay', 'leave', 'documents'] as const;
+const FILE_TABS = ['personal', 'contract', 'pay', 'leave', 'attendance', 'documents'] as const;
 
 type FileTab = (typeof FILE_TABS)[number];
 
 export interface EmployeeFileSearch {
   /** Unset means the first tab the viewer can see. */
   tab?: FileTab;
+  /** The Attendance tab's month, `YYYY-MM`; unset means this month. */
+  month?: string;
 }
 
 export function parseEmployeeFileSearch(search: Record<string, unknown>): EmployeeFileSearch {
-  return { tab: FILE_TABS.find((tab) => tab === search.tab) };
+  return { tab: FILE_TABS.find((tab) => tab === search.tab), month: monthParam(search.month) };
 }
 
 /**
@@ -131,6 +136,7 @@ function File({
       (tab === 'contract' && file.employment) ||
       (tab === 'pay' && file.pay) ||
       (tab === 'leave' && leave) ||
+      (tab === 'attendance' && leave) ||
       tab === 'documents',
   );
   const tab = tabs.find((shown) => shown === search.tab) ?? tabs[0] ?? 'documents';
@@ -173,6 +179,12 @@ function File({
               {t('hr.file.tabs.leave')}
             </TabsTrigger>
           )}
+          {leave && (
+            <TabsTrigger value="attendance">
+              <ClockIcon />
+              {t('hr.file.tabs.attendance')}
+            </TabsTrigger>
+          )}
           <TabsTrigger value="documents">
             <FileTextIcon />
             {t('hr.file.tabs.documents')}
@@ -196,6 +208,22 @@ function File({
         {leave && (
           <TabsContent value="leave">
             <LeaveTab file={file} self={self} live={live} />
+          </TabsContent>
+        )}
+        {leave && (
+          <TabsContent value="attendance">
+            <AttendanceTab
+              file={file}
+              self={self}
+              month={search.month}
+              onMonthChange={(month) =>
+                navigate({
+                  to: '.',
+                  search: { tab: 'attendance', month },
+                  replace: true,
+                })
+              }
+            />
           </TabsContent>
         )}
         <TabsContent value="documents">
@@ -479,6 +507,12 @@ function ContractTab({ file, manage }: { file: EmployeeFile; manage: boolean }) 
                   : t('hr.file.noRemoteDays')
               }
             />
+            {!employment.attendanceExempt && (
+              <Detail
+                label={t('hr.attendance.passkey.title')}
+                value={<PasskeyStateBadge passkey={employment.passkey} />}
+              />
+            )}
           </Details>
         </Card>
       </div>
@@ -723,7 +757,8 @@ function Detail({
   ltr,
 }: {
   label: string;
-  value: string | null | undefined;
+  /** Text, or a badge (the passkey's state). */
+  value: ReactNode;
   /** Shown with `dir="ltr"`: a phone, an account number. */
   ltr?: boolean;
 }) {

@@ -14960,6 +14960,7 @@ export interface components {
             };
             attendanceExempt: boolean;
             remoteWeekdays: components["schemas"]["Weekday"][];
+            passkey: components["schemas"]["PasskeyState"];
             annualLeaveDays: number;
             /** Format: date */
             endedOn: string | null;
@@ -14970,6 +14971,10 @@ export interface components {
         EmploymentType: "full_time" | "part_time" | "freelance";
         /** @enum {string} */
         Weekday: "saturday" | "sunday" | "monday" | "tuesday" | "wednesday" | "thursday" | "friday";
+        PasskeyState: {
+            active: boolean;
+            pending: boolean;
+        };
         /** @enum {string} */
         EndReason: "resigned" | "terminated" | "contract_ended" | "other";
         EmployeePay: {
@@ -15440,14 +15445,12 @@ export interface components {
             date: string;
             exemption: components["schemas"]["AttendanceExemption"] | null;
             trial: boolean;
-            passkey: {
-                active: boolean;
-                pending: boolean;
-            };
+            passkey: components["schemas"]["PasskeyState"];
             day: components["schemas"]["AttendanceDay"] | null;
             nextDirection: components["schemas"]["PunchDirection"];
             methods: components["schemas"]["SelfPunchMethod"][];
             shoots: components["schemas"]["PunchableShoot"][];
+            fieldWork: components["schemas"]["FieldWork"][];
         };
         /** @enum {string} */
         AttendanceExemption: "exempt" | "not_started" | "ended";
@@ -15499,6 +15502,12 @@ export interface components {
             longitude: number | null;
             accuracyM: number | null;
             fieldNote: string | null;
+            fieldWork: {
+                kind: components["schemas"]["FieldWorkKind"];
+                /** Format: uuid */
+                id: string;
+                title: string;
+            } | null;
             shoot: {
                 /** Format: uuid */
                 id: string;
@@ -15513,6 +15522,8 @@ export interface components {
         /** @enum {string} */
         PunchMethod: "office" | "remote" | "field" | "shoot" | "correction";
         /** @enum {string} */
+        FieldWorkKind: "task" | "meeting";
+        /** @enum {string} */
         FieldReview: "accepted" | "rejected";
         /** @enum {string} */
         SelfPunchMethod: "office" | "remote" | "field" | "shoot";
@@ -15525,6 +15536,14 @@ export interface components {
             /** Format: date-time */
             endsAt: string;
             location: string;
+        };
+        FieldWork: {
+            kind: components["schemas"]["FieldWorkKind"];
+            /** Format: uuid */
+            id: string;
+            title: string;
+            /** Format: date-time */
+            startsAt: string | null;
         };
         AttendanceDayList: {
             items: components["schemas"]["AttendanceDay"][];
@@ -15550,6 +15569,12 @@ export interface components {
                 [key: string]: unknown;
             };
             fieldNote?: string;
+            fieldWork?: components["schemas"]["FieldWorkRef"];
+        };
+        FieldWorkRef: {
+            kind: components["schemas"]["FieldWorkKind"];
+            /** Format: uuid */
+            id: string;
         };
         PunchResult: {
             punch: components["schemas"]["AttendancePunch"];
