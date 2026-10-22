@@ -27,6 +27,7 @@ import { type CurrentUserInfo, UserDirectory } from '../auth/index.js';
 import { NotificationCenter } from '../notifications/index.js';
 import { AttendanceService } from './attendance.service.js';
 import { AttendanceItems, type ItemRow } from './attendance-items.js';
+import { assertMonthsOpen } from './closed-months.js';
 import { holdsAll } from './employee-access.js';
 import { toOpinion } from './hr-requests.service.js';
 import { HrScope, reaches } from './hr-scope.js';
@@ -183,6 +184,7 @@ export class AttendanceItemsService {
         throw new CodedException(400, 'INVALID_DECISION', 'This decision does not fit this item');
       }
       const date = await this.dateOf(tx, item);
+      await assertMonthsOpen(tx, date);
       await this.items.reverseCredit(tx, item, date, actor.id);
       let creditedDays: number | null = null;
       if (outcome.status === 'time_off' && outcome.decidedMinutes) {

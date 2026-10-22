@@ -2900,6 +2900,86 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/hr/months/{month}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["HrMonthsController_sheet"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/hr/months/{month}/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["HrMonthsController_close"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/hr/months/{month}/reopen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["HrMonthsController_reopen"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/hr/months/{month}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["HrMonthsController_sheetExport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/hr/employees/{userId}/months/{month}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["HrMonthsController_employeeExport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/kiosk/pair": {
         parameters: {
             query?: never;
@@ -5737,9 +5817,9 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         /** @enum {string} */
-        AuditEntityType: "user" | "department" | "client" | "client_contact" | "client_platform_account" | "client_note" | "project" | "project_milestone" | "retainer" | "retainer_cycle" | "retainer_charge" | "retainer_term" | "retainer_amendment" | "extra_work" | "task" | "task_checklist_item" | "task_link" | "task_comment" | "template" | "template_run" | "file_item" | "approval_request" | "post" | "shoot" | "meeting" | "catalog_service" | "catalog_package" | "quote_settings" | "contract_settings" | "quote" | "invoice_settings" | "invoice" | "payment" | "project_expense" | "ad_campaign" | "ad_campaign_update" | "ad_wallet" | "ad_wallet_entry" | "lead" | "lead_note" | "client_report" | "retainer_cycle_report" | "retainer_contract" | "retainer_contract_annex" | "notification_policy" | "announcement" | "announcement_template" | "employee_file" | "salary_change" | "work_schedule" | "holiday" | "hr_settings" | "hr_request" | "hr_opinion" | "leave_balance" | "attendance_passkey" | "attendance_kiosk" | "attendance" | "attendance_item" | "attendance_punch";
+        AuditEntityType: "user" | "department" | "client" | "client_contact" | "client_platform_account" | "client_note" | "project" | "project_milestone" | "retainer" | "retainer_cycle" | "retainer_charge" | "retainer_term" | "retainer_amendment" | "extra_work" | "task" | "task_checklist_item" | "task_link" | "task_comment" | "template" | "template_run" | "file_item" | "approval_request" | "post" | "shoot" | "meeting" | "catalog_service" | "catalog_package" | "quote_settings" | "contract_settings" | "quote" | "invoice_settings" | "invoice" | "payment" | "project_expense" | "ad_campaign" | "ad_campaign_update" | "ad_wallet" | "ad_wallet_entry" | "lead" | "lead_note" | "client_report" | "retainer_cycle_report" | "retainer_contract" | "retainer_contract_annex" | "notification_policy" | "announcement" | "announcement_template" | "employee_file" | "salary_change" | "work_schedule" | "holiday" | "hr_settings" | "hr_request" | "hr_opinion" | "leave_balance" | "attendance_passkey" | "attendance_kiosk" | "attendance" | "attendance_item" | "attendance_punch" | "attendance_month";
         /** @enum {string} */
-        AuditAction: "user.created" | "user.updated" | "user.roles_changed" | "user.departments_changed" | "user.archived" | "user.restored" | "user.link_issued" | "user.password_set" | "user.password_changed" | "user.two_factor_enabled" | "user.two_factor_disabled" | "user.two_factor_reset" | "user.backup_codes_regenerated" | "user.profile_updated" | "user.session_signed_out" | "user.sessions_signed_out" | "department.updated" | "client.created" | "client.updated" | "client.status_changed" | "client.account_manager_changed" | "client.healthcare_changed" | "client.archived" | "client.restored" | "client.brand_kit_updated" | "client.emailed" | "client_contact.created" | "client_contact.updated" | "client_contact.archived" | "client_platform_account.created" | "client_platform_account.updated" | "client_platform_account.archived" | "client_note.created" | "client_note.updated" | "client_note.archived" | "project.created" | "project.updated" | "project.project_manager_changed" | "project.status_changed" | "project.money_updated" | "project.archived" | "project.restored" | "project_milestone.created" | "project_milestone.updated" | "project_milestone.reordered" | "project_milestone.completed" | "project_milestone.reopened" | "project_milestone.archived" | "retainer.created" | "retainer.updated" | "retainer.backdated" | "retainer.status_changed" | "retainer.deliverables_updated" | "retainer.money_updated" | "retainer.archived" | "retainer.restored" | "retainer_cycle.created" | "retainer_cycle.closed" | "retainer_cycle.line_updated" | "retainer_cycle.line_added" | "retainer_cycle.adjusted" | "retainer_charge.created" | "retainer_charge.amount_changed" | "retainer_charge.cancelled" | "retainer_charge.split" | "retainer_charge.settled_outside" | "retainer_term.created" | "retainer_term.updated" | "retainer_term.end_action_changed" | "retainer_term.cancelled" | "retainer_term.started" | "retainer_term.completed" | "retainer_term.renewed" | "retainer_amendment.created" | "retainer_amendment.approved" | "retainer_amendment.rejected" | "retainer_amendment.withdrawn" | "retainer_amendment.applied" | "retainer_amendment.cancelled" | "extra_work.created" | "extra_work.updated" | "extra_work.billing_changed" | "extra_work.archived" | "task.created" | "task.updated" | "task.assigned" | "task.department_changed" | "task.status_changed" | "task.dependencies_updated" | "task.archived" | "task.restored" | "task.revision_decided" | "task.request_scope_changed" | "task.extra_work_moved" | "task.reviewed" | "task.client_text_updated" | "task.client_response_recorded" | "task_checklist_item.created" | "task_checklist_item.updated" | "task_checklist_item.reordered" | "task_checklist_item.archived" | "task_link.created" | "task_link.archived" | "task_comment.created" | "task_comment.updated" | "task_comment.archived" | "template.created" | "template.updated" | "template.assignees_updated" | "template.archived" | "template.restored" | "template_run.created" | "retainer.template_changed" | "file_item.created" | "file_item.renamed" | "file_item.confidential_changed" | "file_item.archived" | "file_item.restored" | "file_version.created" | "file_version.archived" | "file_version.restored" | "file_version.final_set" | "file_version.final_cleared" | "approval_request.created" | "approval_request.link_reissued" | "approval_request.revoked" | "approval_request.emailed" | "approval_item.responded" | "approval_item.withdrawn" | "post.created" | "post.updated" | "post.status_changed" | "post.reviewed" | "post.client_response_recorded" | "post.task_linked" | "post.task_unlinked" | "post.task_returned" | "post.duplicated" | "post.archived" | "post.restored" | "shoot.created" | "shoot.updated" | "shoot.shots_changed" | "shoot.shot_ticked" | "shoot.shot_unticked" | "shoot.completed" | "shoot.cancelled" | "shoot.reopened" | "shoot.archived" | "shoot.restored" | "meeting.created" | "meeting.updated" | "meeting.cancelled" | "meeting.archived" | "meeting.restored" | "catalog_service.created" | "catalog_service.updated" | "catalog_service.archived" | "catalog_service.restored" | "catalog_package.created" | "catalog_package.updated" | "catalog_package.archived" | "catalog_package.restored" | "quote_settings.updated" | "notification_policy.updated" | "contract_settings.updated" | "contract_settings.articles_updated" | "quote.created" | "quote.updated" | "quote.approval_requested" | "quote.approval_withdrawn" | "quote.approval_approved" | "quote.approval_returned" | "quote.sent" | "quote.extended" | "quote.expired" | "quote.rejected" | "quote.accepted" | "quote.version_created" | "quote.superseded" | "quote.archived" | "quote.emailed" | "invoice_settings.updated" | "invoice.created" | "invoice.updated" | "invoice.archived" | "invoice.issued" | "invoice.due_date_changed" | "invoice.voided" | "invoice.overdue" | "invoice.services_changed" | "invoice.emailed" | "payment.recorded" | "payment.voided" | "payment.emailed" | "project_expense.created" | "project_expense.updated" | "project_expense.archived" | "ad_campaign.created" | "ad_campaign.updated" | "ad_campaign.status_changed" | "ad_campaign.archived" | "ad_campaign.restored" | "ad_campaign_update.created" | "ad_campaign_update.updated" | "ad_campaign_update.archived" | "ad_wallet.threshold_changed" | "ad_wallet.low_balance" | "ad_wallet.low_balance_cleared" | "ad_wallet_entry.recorded" | "ad_wallet_entry.voided" | "ad_wallet_entry.emailed" | "lead.created" | "lead.updated" | "lead.stage_changed" | "lead.owner_changed" | "lead.follow_up_changed" | "lead.lost" | "lead.reopened" | "lead.converted" | "lead.archived" | "lead.restored" | "lead_note.created" | "lead_note.updated" | "lead_note.archived" | "client_report.summary_changed" | "retainer_cycle_report.summary_changed" | "retainer_contract.created" | "retainer_contract.updated" | "retainer_contract.discarded" | "retainer_contract.issued" | "retainer_contract.signed" | "retainer_contract.voided" | "retainer_contract_annex.issued" | "retainer_contract_annex.signed" | "retainer_contract_annex.voided" | "announcement.sent" | "announcement.scheduled" | "announcement.schedule_cancelled" | "announcement.edited" | "announcement.withdrawn" | "announcement.archived" | "announcement_poll.closed" | "announcement_template.created" | "announcement_template.updated" | "announcement_template.archived" | "employee_file.updated" | "employee_file.payout_changed" | "employee_file.service_ended" | "employee_file.service_end_cleared" | "salary_change.created" | "salary_change.archived" | "work_schedule.created" | "work_schedule.updated" | "work_schedule.archived" | "holiday.created" | "holiday.updated" | "holiday.archived" | "hr_settings.updated" | "hr_request.created" | "hr_request.approved" | "hr_request.rejected" | "hr_request.cancelled" | "hr_request.recounted" | "hr_opinion.created" | "leave_balance.adjusted" | "leave_balance.opening" | "task.leave_accepted" | "attendance_passkey.registered" | "attendance_passkey.activated" | "attendance_passkey.revoked" | "attendance_kiosk.created" | "attendance_kiosk.pairing_started" | "attendance_kiosk.paired" | "attendance_kiosk.archived" | "attendance.punch_refused" | "attendance_item.justified" | "attendance_item.decided" | "attendance_item.voided" | "attendance_punch.rejected";
+        AuditAction: "user.created" | "user.updated" | "user.roles_changed" | "user.departments_changed" | "user.archived" | "user.restored" | "user.link_issued" | "user.password_set" | "user.password_changed" | "user.two_factor_enabled" | "user.two_factor_disabled" | "user.two_factor_reset" | "user.backup_codes_regenerated" | "user.profile_updated" | "user.session_signed_out" | "user.sessions_signed_out" | "department.updated" | "client.created" | "client.updated" | "client.status_changed" | "client.account_manager_changed" | "client.healthcare_changed" | "client.archived" | "client.restored" | "client.brand_kit_updated" | "client.emailed" | "client_contact.created" | "client_contact.updated" | "client_contact.archived" | "client_platform_account.created" | "client_platform_account.updated" | "client_platform_account.archived" | "client_note.created" | "client_note.updated" | "client_note.archived" | "project.created" | "project.updated" | "project.project_manager_changed" | "project.status_changed" | "project.money_updated" | "project.archived" | "project.restored" | "project_milestone.created" | "project_milestone.updated" | "project_milestone.reordered" | "project_milestone.completed" | "project_milestone.reopened" | "project_milestone.archived" | "retainer.created" | "retainer.updated" | "retainer.backdated" | "retainer.status_changed" | "retainer.deliverables_updated" | "retainer.money_updated" | "retainer.archived" | "retainer.restored" | "retainer_cycle.created" | "retainer_cycle.closed" | "retainer_cycle.line_updated" | "retainer_cycle.line_added" | "retainer_cycle.adjusted" | "retainer_charge.created" | "retainer_charge.amount_changed" | "retainer_charge.cancelled" | "retainer_charge.split" | "retainer_charge.settled_outside" | "retainer_term.created" | "retainer_term.updated" | "retainer_term.end_action_changed" | "retainer_term.cancelled" | "retainer_term.started" | "retainer_term.completed" | "retainer_term.renewed" | "retainer_amendment.created" | "retainer_amendment.approved" | "retainer_amendment.rejected" | "retainer_amendment.withdrawn" | "retainer_amendment.applied" | "retainer_amendment.cancelled" | "extra_work.created" | "extra_work.updated" | "extra_work.billing_changed" | "extra_work.archived" | "task.created" | "task.updated" | "task.assigned" | "task.department_changed" | "task.status_changed" | "task.dependencies_updated" | "task.archived" | "task.restored" | "task.revision_decided" | "task.request_scope_changed" | "task.extra_work_moved" | "task.reviewed" | "task.client_text_updated" | "task.client_response_recorded" | "task_checklist_item.created" | "task_checklist_item.updated" | "task_checklist_item.reordered" | "task_checklist_item.archived" | "task_link.created" | "task_link.archived" | "task_comment.created" | "task_comment.updated" | "task_comment.archived" | "template.created" | "template.updated" | "template.assignees_updated" | "template.archived" | "template.restored" | "template_run.created" | "retainer.template_changed" | "file_item.created" | "file_item.renamed" | "file_item.confidential_changed" | "file_item.archived" | "file_item.restored" | "file_version.created" | "file_version.archived" | "file_version.restored" | "file_version.final_set" | "file_version.final_cleared" | "approval_request.created" | "approval_request.link_reissued" | "approval_request.revoked" | "approval_request.emailed" | "approval_item.responded" | "approval_item.withdrawn" | "post.created" | "post.updated" | "post.status_changed" | "post.reviewed" | "post.client_response_recorded" | "post.task_linked" | "post.task_unlinked" | "post.task_returned" | "post.duplicated" | "post.archived" | "post.restored" | "shoot.created" | "shoot.updated" | "shoot.shots_changed" | "shoot.shot_ticked" | "shoot.shot_unticked" | "shoot.completed" | "shoot.cancelled" | "shoot.reopened" | "shoot.archived" | "shoot.restored" | "meeting.created" | "meeting.updated" | "meeting.cancelled" | "meeting.archived" | "meeting.restored" | "catalog_service.created" | "catalog_service.updated" | "catalog_service.archived" | "catalog_service.restored" | "catalog_package.created" | "catalog_package.updated" | "catalog_package.archived" | "catalog_package.restored" | "quote_settings.updated" | "notification_policy.updated" | "contract_settings.updated" | "contract_settings.articles_updated" | "quote.created" | "quote.updated" | "quote.approval_requested" | "quote.approval_withdrawn" | "quote.approval_approved" | "quote.approval_returned" | "quote.sent" | "quote.extended" | "quote.expired" | "quote.rejected" | "quote.accepted" | "quote.version_created" | "quote.superseded" | "quote.archived" | "quote.emailed" | "invoice_settings.updated" | "invoice.created" | "invoice.updated" | "invoice.archived" | "invoice.issued" | "invoice.due_date_changed" | "invoice.voided" | "invoice.overdue" | "invoice.services_changed" | "invoice.emailed" | "payment.recorded" | "payment.voided" | "payment.emailed" | "project_expense.created" | "project_expense.updated" | "project_expense.archived" | "ad_campaign.created" | "ad_campaign.updated" | "ad_campaign.status_changed" | "ad_campaign.archived" | "ad_campaign.restored" | "ad_campaign_update.created" | "ad_campaign_update.updated" | "ad_campaign_update.archived" | "ad_wallet.threshold_changed" | "ad_wallet.low_balance" | "ad_wallet.low_balance_cleared" | "ad_wallet_entry.recorded" | "ad_wallet_entry.voided" | "ad_wallet_entry.emailed" | "lead.created" | "lead.updated" | "lead.stage_changed" | "lead.owner_changed" | "lead.follow_up_changed" | "lead.lost" | "lead.reopened" | "lead.converted" | "lead.archived" | "lead.restored" | "lead_note.created" | "lead_note.updated" | "lead_note.archived" | "client_report.summary_changed" | "retainer_cycle_report.summary_changed" | "retainer_contract.created" | "retainer_contract.updated" | "retainer_contract.discarded" | "retainer_contract.issued" | "retainer_contract.signed" | "retainer_contract.voided" | "retainer_contract_annex.issued" | "retainer_contract_annex.signed" | "retainer_contract_annex.voided" | "announcement.sent" | "announcement.scheduled" | "announcement.schedule_cancelled" | "announcement.edited" | "announcement.withdrawn" | "announcement.archived" | "announcement_poll.closed" | "announcement_template.created" | "announcement_template.updated" | "announcement_template.archived" | "employee_file.updated" | "employee_file.payout_changed" | "employee_file.service_ended" | "employee_file.service_end_cleared" | "salary_change.created" | "salary_change.archived" | "work_schedule.created" | "work_schedule.updated" | "work_schedule.archived" | "holiday.created" | "holiday.updated" | "holiday.archived" | "hr_settings.updated" | "hr_request.created" | "hr_request.approved" | "hr_request.rejected" | "hr_request.cancelled" | "hr_request.recounted" | "hr_opinion.created" | "leave_balance.adjusted" | "leave_balance.opening" | "task.leave_accepted" | "attendance_passkey.registered" | "attendance_passkey.activated" | "attendance_passkey.revoked" | "attendance_kiosk.created" | "attendance_kiosk.pairing_started" | "attendance_kiosk.paired" | "attendance_kiosk.archived" | "attendance.punch_refused" | "attendance_item.justified" | "attendance_item.decided" | "attendance_item.voided" | "attendance_punch.rejected" | "attendance_month.closed" | "attendance_month.reopened";
         /** @description Audit entries, newest first */
         AuditPage: {
             items: components["schemas"]["AuditEntry"][];
@@ -12413,6 +12493,52 @@ export interface components {
             /** Format: date-time */
             updatedAt: string;
             /** @enum {string} */
+            type: "attendance_month_closed";
+            data: {
+                month: string;
+            };
+        } | {
+            /** Format: uuid */
+            id: string;
+            actor: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            subject: {
+                type: components["schemas"]["NotificationSubjectType"];
+                /** Format: uuid */
+                id: string;
+            };
+            count: number;
+            read: boolean;
+            /** @default normal */
+            priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
+            box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
+            inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
+            resolution: {
+                outcome: components["schemas"]["NotificationResolution"];
+                by: {
+                    /** Format: uuid */
+                    id: string;
+                    name: string;
+                } | null;
+                /** Format: date-time */
+                at: string;
+            } | null;
+            /**
+             * Format: date-time
+             * @default null
+             */
+            snoozedUntil: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @enum {string} */
             type: "action_reminder";
             data: {
                 originalType: components["schemas"]["NotificationType"];
@@ -12634,7 +12760,7 @@ export interface components {
             };
         };
         /** @enum {string} */
-        NotificationSubjectType: "task" | "client" | "project" | "retainer" | "template_run" | "approval_request" | "post" | "shoot" | "meeting" | "quote" | "invoice" | "lead" | "user" | "campaign" | "department" | "announcement" | "holiday" | "hr_request" | "attendance_day" | "attendance_item" | "attendance_date" | "kiosk";
+        NotificationSubjectType: "task" | "client" | "project" | "retainer" | "template_run" | "approval_request" | "post" | "shoot" | "meeting" | "quote" | "invoice" | "lead" | "user" | "campaign" | "department" | "announcement" | "holiday" | "hr_request" | "attendance_day" | "attendance_item" | "attendance_date" | "kiosk" | "attendance_month";
         /** @enum {string} */
         NotificationPriority: "critical" | "important" | "normal" | "informational";
         /** @enum {string} */
@@ -12672,7 +12798,7 @@ export interface components {
         /** @enum {string} */
         PunchDirection: "in" | "out";
         /** @enum {string} */
-        NotificationType: "task_assigned" | "task_mentioned" | "task_returned" | "task_review_requested" | "task_medical_review_requested" | "task_awaiting_client" | "task_over_limit" | "approval_responded" | "approval_no_response" | "approval_expired" | "task_changed" | "task_commented" | "task_file_added" | "task_requested" | "tasks_generated" | "task_approved" | "task_opened" | "request_finished" | "task_delivered" | "post_returned" | "post_review_requested" | "post_medical_review_requested" | "post_awaiting_client" | "post_assigned" | "post_approved" | "post_task_ready" | "post_task_unlinked" | "shoot_booked" | "shoot_dropped" | "shoot_changed" | "meeting_invited" | "meeting_dropped" | "meeting_changed" | "task_due_soon" | "task_overdue" | "task_overdue_escalated" | "task_over_limit_pending" | "post_publish_today" | "post_publish_overdue" | "shoot_upcoming" | "shoot_not_closed" | "meeting_upcoming" | "client_account_manager_assigned" | "project_manager_assigned" | "retainer_renewal_due" | "retainer_behind" | "retainer_term_renewed" | "retainer_cycle_report_ready" | "retainer_amendment_pending" | "retainer_amendment_decided" | "quote_approval_requested" | "quote_approval_decided" | "quote_accepted" | "invoice_overdue" | "invoice_paid" | "ad_budget_low" | "email_failed" | "lead_assigned" | "lead_won" | "lead_follow_up_overdue" | "lead_follow_up_due" | "task_reopened" | "task_revision_decided" | "task_due_shortly" | "post_published" | "post_cancelled" | "post_file_added" | "post_publish_shortly" | "responsibility_moved" | "approval_opened" | "approval_completed" | "shoot_starting" | "meeting_starting" | "shoot_completed" | "client_status_changed" | "client_healthcare_changed" | "lead_lost" | "quote_expiring" | "quote_expired" | "quote_rejected" | "invoice_draft_created" | "invoice_due_soon" | "payment_recorded" | "payment_voided" | "invoice_voided" | "ad_deposit_recorded" | "project_status_changed" | "milestone_completed" | "extra_work_created" | "retainer_status_changed" | "contract_signed" | "contract_voided" | "campaign_assigned" | "campaign_status_changed" | "campaign_end_passed" | "department_manager_assigned" | "member_moved" | "member_archived_open_work" | "security_new_device" | "security_notice" | "push_device_lost" | "announcement" | "announcement_ack_reminder" | "announcement_ack_summary" | "poll_closing" | "poll_results" | "contract_ending" | "probation_ending" | "employee_leaving" | "salary_changed" | "holiday_changed" | "hr_request_submitted" | "hr_request_decided" | "colleague_on_leave" | "leave_balance_adjusted" | "attendance_item_raised" | "attendance_items_pending" | "attendance_item_decided" | "attendance_check_in_missing" | "attendance_check_out_missing" | "field_punch_recorded" | "field_punch_rejected" | "shoot_check_in_missing" | "kiosk_offline" | "action_reminder" | "action_escalated" | "action_escalated_top" | "task_progressed" | "post_progressed";
+        NotificationType: "task_assigned" | "task_mentioned" | "task_returned" | "task_review_requested" | "task_medical_review_requested" | "task_awaiting_client" | "task_over_limit" | "approval_responded" | "approval_no_response" | "approval_expired" | "task_changed" | "task_commented" | "task_file_added" | "task_requested" | "tasks_generated" | "task_approved" | "task_opened" | "request_finished" | "task_delivered" | "post_returned" | "post_review_requested" | "post_medical_review_requested" | "post_awaiting_client" | "post_assigned" | "post_approved" | "post_task_ready" | "post_task_unlinked" | "shoot_booked" | "shoot_dropped" | "shoot_changed" | "meeting_invited" | "meeting_dropped" | "meeting_changed" | "task_due_soon" | "task_overdue" | "task_overdue_escalated" | "task_over_limit_pending" | "post_publish_today" | "post_publish_overdue" | "shoot_upcoming" | "shoot_not_closed" | "meeting_upcoming" | "client_account_manager_assigned" | "project_manager_assigned" | "retainer_renewal_due" | "retainer_behind" | "retainer_term_renewed" | "retainer_cycle_report_ready" | "retainer_amendment_pending" | "retainer_amendment_decided" | "quote_approval_requested" | "quote_approval_decided" | "quote_accepted" | "invoice_overdue" | "invoice_paid" | "ad_budget_low" | "email_failed" | "lead_assigned" | "lead_won" | "lead_follow_up_overdue" | "lead_follow_up_due" | "task_reopened" | "task_revision_decided" | "task_due_shortly" | "post_published" | "post_cancelled" | "post_file_added" | "post_publish_shortly" | "responsibility_moved" | "approval_opened" | "approval_completed" | "shoot_starting" | "meeting_starting" | "shoot_completed" | "client_status_changed" | "client_healthcare_changed" | "lead_lost" | "quote_expiring" | "quote_expired" | "quote_rejected" | "invoice_draft_created" | "invoice_due_soon" | "payment_recorded" | "payment_voided" | "invoice_voided" | "ad_deposit_recorded" | "project_status_changed" | "milestone_completed" | "extra_work_created" | "retainer_status_changed" | "contract_signed" | "contract_voided" | "campaign_assigned" | "campaign_status_changed" | "campaign_end_passed" | "department_manager_assigned" | "member_moved" | "member_archived_open_work" | "security_new_device" | "security_notice" | "push_device_lost" | "announcement" | "announcement_ack_reminder" | "announcement_ack_summary" | "poll_closing" | "poll_results" | "contract_ending" | "probation_ending" | "employee_leaving" | "salary_changed" | "holiday_changed" | "hr_request_submitted" | "hr_request_decided" | "colleague_on_leave" | "leave_balance_adjusted" | "attendance_item_raised" | "attendance_items_pending" | "attendance_item_decided" | "attendance_check_in_missing" | "attendance_check_out_missing" | "field_punch_recorded" | "field_punch_rejected" | "shoot_check_in_missing" | "kiosk_offline" | "attendance_month_closed" | "action_reminder" | "action_escalated" | "action_escalated_top" | "task_progressed" | "post_progressed";
         /** @enum {string} */
         TaskStatus: "new" | "in_progress" | "internal_review" | "awaiting_client" | "revisions" | "approved" | "delivered" | "cancelled";
         /** @enum {string} */
@@ -15795,6 +15921,80 @@ export interface components {
             /** @enum {string} */
             reason: "INVALID_CODE" | "OFF_OFFICE_NETWORK";
             ipAddress: string | null;
+        };
+        MonthSheet: {
+            month: components["schemas"]["AttendanceMonth"];
+            /** Format: date */
+            from: string;
+            /** Format: date */
+            to: string;
+            rows: components["schemas"]["MonthSheetRow"][];
+        };
+        AttendanceMonth: {
+            month: string;
+            status: components["schemas"]["AttendanceMonthStatus"];
+            closedBy: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            /** Format: date-time */
+            closedAt: string | null;
+            reopenedBy: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            /** Format: date-time */
+            reopenedAt: string | null;
+            reopenReason: string | null;
+        };
+        /** @enum {string} */
+        AttendanceMonthStatus: "open" | "closed";
+        MonthSheetRow: {
+            user: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            };
+            days: components["schemas"]["MonthSheetDay"][];
+            totals: components["schemas"]["AttendanceMonthTotals"];
+            pendingRequests: number;
+            pendingItems: number;
+        };
+        MonthSheetDay: {
+            /** Format: date */
+            date: string;
+            kind: components["schemas"]["AttendanceDayKind"];
+            status: components["schemas"]["AttendanceDayStatus"];
+            place: components["schemas"]["AttendancePlace"] | null;
+            leave: components["schemas"]["DayLeave"];
+            workedMinutes: number;
+            lateMinutes: number;
+            earlyMinutes: number;
+            overtimeMinutes: number;
+            field: boolean;
+            pendingItems: number;
+        };
+        AttendanceMonthTotals: {
+            workDays: number;
+            presentDays: number;
+            remoteDays: number;
+            fieldDays: number;
+            absentDays: number;
+            leaveDays: {
+                [key: string]: number;
+            };
+            unpaidLeaveDays: number;
+            holidayDays: number;
+            lateCount: number;
+            deductedDays: number;
+            overtimePaidMinutes: number;
+            overtimeTimeOffMinutes: number;
+            workedMinutes: number;
+        };
+        ReopenMonth: {
+            reason: string;
         };
         PairKiosk: {
             code: string;
@@ -25558,7 +25758,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description The new holiday */
+            /** @description The new holiday. `HOLIDAY_OVERLAP`, `MONTH_CLOSED` */
             201: {
                 headers: {
                     [name: string]: unknown;
@@ -25608,7 +25808,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description The holiday after the change */
+            /** @description The holiday after the change. `MONTH_CLOSED` */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -25630,7 +25830,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description The archived holiday */
+            /** @description The archived holiday. `MONTH_CLOSED` */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -25849,7 +26049,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Approve or reject a pending request. `NOT_PENDING`, `CERTIFICATE_MISSING` */
+            /** @description Approve or reject a pending request. `NOT_PENDING`, `CERTIFICATE_MISSING`, `MONTH_CLOSED` */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -25875,7 +26075,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Cancel a request: the owner or `hr.approve` (rule B15). `NOT_CANCELLABLE` */
+            /** @description Cancel a request: the owner or `hr.approve` (rule B15). `NOT_CANCELLABLE`, `MONTH_CLOSED` */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -26293,7 +26493,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Decides an item, or changes its decision. `INVALID_DECISION`, `NOT_PENDING` */
+            /** @description Decides an item, or changes its decision. `INVALID_DECISION`, `NOT_PENDING`, `MONTH_CLOSED` */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -26319,7 +26519,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Rejects a field or shoot punch; returns its recomputed day. `NOT_FIELD` */
+            /** @description Rejects a field or shoot punch; returns its recomputed day. `NOT_FIELD`, `MONTH_CLOSED` */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -26349,6 +26549,121 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["TodayBoard"];
                 };
+            };
+        };
+    };
+    HrMonthsController_sheet: {
+        parameters: {
+            query?: {
+                departmentId?: string;
+            };
+            header?: never;
+            path: {
+                month: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The month's days and totals of the employees in scope (`hr.read`; all for `salaries.read`), with pending counts */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MonthSheet"];
+                };
+            };
+        };
+    };
+    HrMonthsController_close: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                month: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Closes an ended month and writes its summaries. `MONTH_NOT_ENDED`, `MONTH_HAS_PENDING` (details: `pending`, `MonthPending[]`) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttendanceMonth"];
+                };
+            };
+        };
+    };
+    HrMonthsController_reopen: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                month: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReopenMonth"];
+            };
+        };
+        responses: {
+            /** @description Reopens a closed month with a reason; its summaries stay. `NOT_CLOSED` */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttendanceMonth"];
+                };
+            };
+        };
+    };
+    HrMonthsController_sheetExport: {
+        parameters: {
+            query?: {
+                departmentId?: string;
+            };
+            header?: never;
+            path: {
+                month: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The month sheet as an Excel file: one row per employee */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    HrMonthsController_employeeExport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: string;
+                month: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description An employee's month as an Excel file, one row per day: one's own, or `hr.read` */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

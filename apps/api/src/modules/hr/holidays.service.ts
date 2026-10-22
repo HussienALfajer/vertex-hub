@@ -16,6 +16,7 @@ import { CodedException } from '../../core/errors/index.js';
 import { type AuditActor, changedFields, recordAudit } from '../audit/index.js';
 import { type CurrentUserInfo, UserDirectory } from '../auth/index.js';
 import { NotificationCenter } from '../notifications/index.js';
+import { assertMonthsOpen } from './closed-months.js';
 import { HrRequestsService } from './hr-requests.service.js';
 
 type HolidayRow = typeof publicHolidays.$inferSelect;
@@ -66,6 +67,8 @@ export class HolidaysService {
     checkRange(input);
     const row = await this.db.transaction(async (tx) => {
       await lockHolidays(tx);
+      // Edge case 12: a holiday in a closed month is refused; reopen first.
+      await assertMonthsOpen(tx, input.startsOn, input.endsOn);
       if (await this.overlapping(tx, input)) throw overlapError();
       const created = await this.insert(tx, actor, input);
       await this.notify(tx, actor, created, 'added');
@@ -83,6 +86,8 @@ export class HolidaysService {
       checkRange(merged);
       const changes = changedFields(auditFields(current), input);
       if (!changes) return current;
+      await assertMonthsOpen(tx, current.startsOn, current.endsOn);
+      await assertMonthsOpen(tx, merged.startsOn, merged.endsOn);
       if (await this.overlapping(tx, merged, id)) throw overlapError();
       const [updated] = await tx
         .update(publicHolidays)
@@ -109,6 +114,7 @@ export class HolidaysService {
 
   async archive(actor: CurrentUserInfo, id: string): Promise<Holiday> {
     const row = await this.db.transaction(async (tx) => {
+      await lockHolidays(tx);
       const [current] = await tx
         .select()
         .from(publicHolidays)
@@ -116,6 +122,7 @@ export class HolidaysService {
         .for('update');
       if (!current) throw new NotFoundException();
       if (current.archivedAt) return current;
+      await assertMonthsOpen(tx, current.startsOn, current.endsOn);
       const [archived] = await tx
         .update(publicHolidays)
         .set({ archivedAt: new Date() })
@@ -161,6 +168,7 @@ export class HolidaysService {
         const copy = { name: source.name, paid: source.paid, ...shiftedHoliday(source, 1) };
         // Each copy is inserted before the next check, so copies never overlap each other.
         if (await this.overlapping(tx, copy)) continue;
+        await assertMonthsOpen(tx, copy.startsOn, copy.endsOn);
         const row = await this.insert(tx, actor, copy, source.id);
         await this.notify(tx, actor, row, 'added');
         await this.requests.recount(tx, actor, [row]);
@@ -236,8 +244,11 @@ export class HolidaysService {
   }
 }
 
-/** Serializes the holiday writes, so the overlap check holds. */
-async function lockHolidays(tx: Transaction): Promise<void> {
+/**
+ * Serializes the holiday writes, so the overlap check holds; closing a month takes it too, before
+ * any user lock, so a holiday never lands in a month closing beside it (edge case 12).
+ */
+export async function lockHolidays(tx: Transaction): Promise<void> {
   await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended('hr.public_holidays', 0))`);
 }
 

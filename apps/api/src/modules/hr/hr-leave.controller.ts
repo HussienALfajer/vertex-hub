@@ -149,7 +149,8 @@ export class HrLeaveController {
   @RequirePermissions('hr.approve')
   @SerializeOptions({ schema: hrRequestSchema })
   @ApiOkResponse({
-    description: 'Approve or reject a pending request. `NOT_PENDING`, `CERTIFICATE_MISSING`',
+    description:
+      'Approve or reject a pending request. `NOT_PENDING`, `CERTIFICATE_MISSING`, `MONTH_CLOSED`',
     standardSchema: hrRequestSchema,
   })
   decide(
@@ -165,7 +166,8 @@ export class HrLeaveController {
   @RequireSession()
   @SerializeOptions({ schema: hrRequestSchema })
   @ApiOkResponse({
-    description: 'Cancel a request: the owner or `hr.approve` (rule B15). `NOT_CANCELLABLE`',
+    description:
+      'Cancel a request: the owner or `hr.approve` (rule B15). `NOT_CANCELLABLE`, `MONTH_CLOSED`',
     standardSchema: hrRequestSchema,
   })
   cancel(

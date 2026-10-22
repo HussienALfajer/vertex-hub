@@ -60,6 +60,7 @@ import { FileVersions } from '../files/index.js';
 import { NotificationCenter } from '../notifications/index.js';
 import { AttendanceDays } from './attendance-days.js';
 import { AttendancePasskeys } from './attendance-passkeys.js';
+import { assertMonthsOpen } from './closed-months.js';
 import { holdsAll } from './employee-access.js';
 import { HrScope, reaches } from './hr-scope.js';
 import { HrSettingsService } from './hr-settings.service.js';
@@ -417,6 +418,9 @@ export class HrRequestsService implements OnModuleInit {
       await lockLeave(tx, await this.ownerOf(tx, id));
       const current = await this.locked(tx, id);
       if (current.status !== 'pending') throw notPending();
+      if (current.kind !== 'passkey_replacement') {
+        await assertMonthsOpen(tx, current.startsOn, current.endsOn);
+      }
       if (input.decision === 'reject') {
         await tx
           .update(hrRequests)
@@ -519,6 +523,9 @@ export class HrRequestsService implements OnModuleInit {
       await lockLeave(tx, await this.ownerOf(tx, id));
       const current = await this.locked(tx, id, actor);
       const today = businessDate();
+      if (current.kind !== 'passkey_replacement') {
+        await assertMonthsOpen(tx, current.startsOn, current.endsOn);
+      }
       if (!cancellable(actor, current, today)) {
         throw new CodedException(409, 'NOT_CANCELLABLE', 'This request can no longer be cancelled');
       }
@@ -738,6 +745,8 @@ export class HrRequestsService implements OnModuleInit {
     // waive (rule B8: a leave recorded after the fact).
     const deadlines = !(approver && userId !== actor.id);
     const span = spanOfInput(input);
+    // Rule D2 and edge case 13: nothing new is dated in a closed month.
+    await assertMonthsOpen(executor, span.startsOn, span.endsOn);
     const holidays = await this.context.holidaysFrom(
       span.startsOn < today ? span.startsOn : today,
       executor,

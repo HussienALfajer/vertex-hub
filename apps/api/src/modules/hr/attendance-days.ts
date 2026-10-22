@@ -26,6 +26,7 @@ import {
 } from '@vertex-hub/db';
 import { and, asc, eq, gte, inArray, isNull, lt, lte } from 'drizzle-orm';
 import { AttendanceItems } from './attendance-items.js';
+import { closedMonths } from './closed-months.js';
 import { HolidayCalendar } from './holiday-calendar.js';
 import { lockLeave } from './leave-ledger.js';
 
@@ -84,7 +85,15 @@ export class AttendanceDays {
     options: { create?: boolean; refreeze?: boolean; now?: Date } = {},
   ): Promise<Map<CalendarDate, DayRow>> {
     const result = new Map<CalendarDate, DayRow>();
-    const unique = [...new Set(dates)].sort();
+    const requested = [...new Set(dates)].sort();
+    if (requested.length === 0) return result;
+    // Rule D2: the days of a closed month keep what its summary froze.
+    const closed = await closedMonths(
+      executor,
+      requested[0] as CalendarDate,
+      requested.at(-1) as CalendarDate,
+    );
+    const unique = requested.filter((date) => !closed.has(date.slice(0, 7)));
     const first = unique[0];
     const last = unique.at(-1);
     if (!first || !last) return result;

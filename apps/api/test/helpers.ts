@@ -17,6 +17,8 @@ import {
   attendanceDays,
   attendanceItems,
   attendanceKiosks,
+  attendanceMonthSummaries,
+  attendanceMonths,
   attendancePasskeys,
   attendancePunches,
   auditEntries,
@@ -303,6 +305,25 @@ export async function removeUsers(db: Database, ids: string[]): Promise<void> {
       .from(attendanceDays)
       .where(inArray(attendanceDays.userId, ids))
   ).map((row) => row.id);
+  // F17 part D: the months they closed or reopened with their summaries, and their own summaries.
+  const monthIds = (
+    await db
+      .select({ id: attendanceMonths.id })
+      .from(attendanceMonths)
+      .where(
+        or(inArray(attendanceMonths.closedById, ids), inArray(attendanceMonths.reopenedById, ids)),
+      )
+  ).map((row) => row.id);
+  await db
+    .delete(attendanceMonthSummaries)
+    .where(
+      or(
+        inArray(attendanceMonthSummaries.userId, ids),
+        inArray(attendanceMonthSummaries.monthId, monthIds),
+      ),
+    );
+  await db.delete(notifications).where(inArray(notifications.subjectId, monthIds));
+  await db.delete(attendanceMonths).where(inArray(attendanceMonths.id, monthIds));
   await db.delete(notifications).where(inArray(notifications.subjectId, dayIds));
   await db.delete(notificationReminders).where(inArray(notificationReminders.subjectId, dayIds));
   await db.delete(attendanceDays).where(inArray(attendanceDays.userId, ids));

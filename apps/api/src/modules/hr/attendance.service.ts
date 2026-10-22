@@ -51,6 +51,7 @@ import { AttendanceKiosksService, OfficeRefused } from './attendance-kiosks.serv
 import { AttendancePasskeys, type PasskeyRow } from './attendance-passkeys.js';
 import { AttendanceShoots } from './attendance-shoots.js';
 import { AttendanceWebAuthn, type StoredCredential } from './attendance-webauthn.js';
+import { assertMonthsOpen } from './closed-months.js';
 import { HrScope } from './hr-scope.js';
 import { HrSettingsService } from './hr-settings.service.js';
 import { KioskStream } from './kiosk-stream.js';
@@ -196,6 +197,8 @@ export class AttendanceService {
     const passkey = await this.passkeys.current(this.db, actor.id, 'active');
     if (!passkey) throw noPasskey();
     await this.refuseDuplicate(this.db, actor.id, now);
+    // Rule D2: an out after midnight (rule C15) would land in yesterday, maybe a closed month.
+    await this.refuseClosedOut(this.db, actor.id, now);
     let kioskId: string | null = null;
     if (input.method === 'office') {
       kioskId = (await this.officeKiosk(actor, input.code ?? '', ipAddress, now)).id;
@@ -280,6 +283,7 @@ export class AttendanceService {
         .set({ counter })
         .where(eq(attendancePasskeys.id, passkey.id));
       await this.refuseDuplicate(tx, actor.id, now);
+      await this.refuseClosedOut(tx, actor.id, now);
       const direction = nextPunchDirection(await this.lastPunch(tx, actor.id), now);
       const field = ticket.method === 'field' || ticket.method === 'shoot';
       const [punch] = await tx
@@ -370,6 +374,7 @@ export class AttendanceService {
       }
       // The date the punch counted for (rule C15), read before it stops counting.
       const date = await this.punchDate(tx, punch);
+      await assertMonthsOpen(tx, date);
       await tx
         .update(attendancePunches)
         .set({ fieldReview: 'rejected', archivedAt: now })
@@ -573,6 +578,14 @@ export class AttendanceService {
     const last = await this.lastPunch(executor, userId);
     if (last && now.getTime() - last.at.getTime() < DUPLICATE_PUNCH_SECONDS * 1000) {
       throw duplicatePunch();
+    }
+  }
+
+  /** Rule D2: refuses an `out` that would count for a day of a closed month (rule C15). */
+  private async refuseClosedOut(executor: Executor, userId: string, now: Date): Promise<void> {
+    const last = await this.lastPunch(executor, userId);
+    if (last && nextPunchDirection(last, now) === 'out') {
+      await assertMonthsOpen(executor, businessDate(last.at));
     }
   }
 

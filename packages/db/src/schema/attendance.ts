@@ -3,6 +3,7 @@ import {
   ATTENDANCE_DAY_STATUSES,
   ATTENDANCE_ITEM_KINDS,
   ATTENDANCE_ITEM_STATUSES,
+  ATTENDANCE_MONTH_STATUSES,
   ATTENDANCE_PLACES,
   DAY_LEAVES,
   FIELD_REVIEWS,
@@ -349,5 +350,80 @@ export const hrOpinions = pgTable(
       'hr_opinions_subject_check',
       sql`(${table.requestId} is null) <> (${table.itemId} is null)`,
     ),
+  ],
+);
+
+export const attendanceMonthStatusEnum = pgEnum(
+  'attendance_month_status',
+  ATTENDANCE_MONTH_STATUSES,
+);
+
+/**
+ * Rules D2 and D4: a month closed by the General Manager, or reopened with a reason. A month
+ * without a row is open.
+ */
+export const attendanceMonths = pgTable(
+  'attendance_months',
+  {
+    id: id(),
+    /** `YYYY-MM`. */
+    month: text('month').notNull(),
+    status: attendanceMonthStatusEnum('status').notNull(),
+    closedById: uuid('closed_by_id').references(() => users.id),
+    closedAt: timestamp('closed_at', { withTimezone: true }),
+    reopenedById: uuid('reopened_by_id').references(() => users.id),
+    reopenedAt: timestamp('reopened_at', { withTimezone: true }),
+    reopenReason: text('reopen_reason'),
+    ...timestamps(),
+    archivedAt: archivedAt(),
+  },
+  (table) => [
+    uniqueIndex('attendance_months_month_key').on(table.month),
+    index('attendance_months_closed_by_id_idx').on(table.closedById),
+    index('attendance_months_reopened_by_id_idx').on(table.reopenedById),
+    check('attendance_months_month_check', sql`${table.month} ~ '^[0-9]{4}-(0[1-9]|1[0-2])$'`),
+    check(
+      'attendance_months_closed_check',
+      sql`${table.status} = 'open' or (${table.closedById} is not null and ${table.closedAt} is not null)`,
+    ),
+  ],
+);
+
+const days = (name: string) => numeric(name, { precision: 5, scale: 1, mode: 'number' });
+
+/**
+ * Rule D3: an employee's month as written at its closing, the only rows F19 reads. A later
+ * closing rewrites them; a user without days at that closing has theirs archived.
+ */
+export const attendanceMonthSummaries = pgTable(
+  'attendance_month_summaries',
+  {
+    id: id(),
+    monthId: uuid('month_id')
+      .notNull()
+      .references(() => attendanceMonths.id),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id),
+    workDays: integer('work_days').notNull(),
+    presentDays: integer('present_days').notNull(),
+    remoteDays: integer('remote_days').notNull(),
+    fieldDays: integer('field_days').notNull(),
+    absentDays: days('absent_days').notNull(),
+    /** By leave type, in days. */
+    leaveDays: jsonb('leave_days').$type<Record<string, number>>().notNull(),
+    unpaidLeaveDays: days('unpaid_leave_days').notNull(),
+    holidayDays: integer('holiday_days').notNull(),
+    lateCount: integer('late_count').notNull(),
+    deductedDays: numeric('deducted_days', { precision: 5, scale: 2, mode: 'number' }).notNull(),
+    overtimePaidMinutes: integer('overtime_paid_minutes').notNull(),
+    overtimeTimeOffMinutes: integer('overtime_time_off_minutes').notNull(),
+    workedMinutes: integer('worked_minutes').notNull(),
+    ...timestamps(),
+    archivedAt: archivedAt(),
+  },
+  (table) => [
+    uniqueIndex('attendance_month_summaries_month_id_user_id_key').on(table.monthId, table.userId),
+    index('attendance_month_summaries_user_id_idx').on(table.userId),
   ],
 );

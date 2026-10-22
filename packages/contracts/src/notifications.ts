@@ -10,6 +10,7 @@ import {
   businessInstant,
   type CalendarDate,
   calendarDateSchema,
+  calendarMonthSchema,
   nextWorkDay,
   timeOfDaySchema,
   workDaysBetween,
@@ -169,6 +170,8 @@ export const NOTIFICATION_TYPES = [
   'field_punch_rejected',
   'shoot_check_in_missing',
   'kiosk_offline',
+  // F17 part D.
+  'attendance_month_closed',
   'action_reminder',
   'action_escalated',
   'action_escalated_top',
@@ -229,6 +232,8 @@ export const NOTIFICATION_SUBJECTS = [
   'attendance_date',
   /** Rule C22: an entrance screen. */
   'kiosk',
+  /** F17 part D: an attendance month, opened at its month sheet. */
+  'attendance_month',
 ] as const;
 
 export const notificationSubjectTypeSchema = z
@@ -410,6 +415,8 @@ const CATALOG: Record<
   shoot_check_in_missing: { category: 'hr', subject: 'shoot', mutable: false },
   /** Rule C22: opens the entrance screens in HR settings. */
   kiosk_offline: { category: 'hr', subject: 'kiosk', mutable: false },
+  /** Rule D3: Finance; opens the month sheet. */
+  attendance_month_closed: { category: 'hr', subject: 'attendance_month', mutable: true },
   /** F16 rule B11: the escalation steps open the original's record; its subject type is given. */
   action_reminder: { category: 'reminders', subject: 'task', mutable: false },
   action_escalated: { category: 'reminders', subject: 'task', mutable: false },
@@ -601,6 +608,7 @@ const CHANNELS: Record<NotificationType, Channels> = {
   field_punch_rejected: important(),
   shoot_check_in_missing: important(),
   kiosk_offline: important(),
+  attendance_month_closed: informational,
   action_reminder: important(),
   action_escalated: important('on'),
   action_escalated_top: critical(),
@@ -840,6 +848,7 @@ const ENGINE: Record<NotificationType, Engine> = {
   shoot_check_in_missing: action(),
   /** Rule C22: resolved when the screen is seen again. */
   kiosk_offline: action(),
+  attendance_month_closed: info,
   action_reminder: action(),
   action_escalated: action(),
   action_escalated_top: action(),
@@ -1407,6 +1416,8 @@ export const NOTIFICATION_DATA_SCHEMAS = {
   shoot_check_in_missing: shootData,
   /** Rule C22. */
   kiosk_offline: z.object({ name: nameSchema, lastSeenAt: z.iso.datetime() }),
+  /** Rule D3. */
+  attendance_month_closed: z.object({ month: calendarMonthSchema }),
   /** F16 rule B11 step 1: the original still waits on its recipients. */
   action_reminder: escalationData,
   /** Step 2: the managers of those it waits on (or the step's department or role). */

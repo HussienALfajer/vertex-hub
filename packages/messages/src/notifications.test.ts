@@ -268,6 +268,7 @@ const SAMPLES: Record<NotificationType, unknown> = {
   field_punch_rejected: { method: 'shoot', direction: 'out', at: '2026-10-22T14:00:00.000Z' },
   shoot_check_in_missing: { shoot },
   kiosk_offline: { name: 'المدخل', lastSeenAt: '2026-10-22T06:00:00.000Z' },
+  attendance_month_closed: { month: '2026-10' },
   action_reminder: {
     originalType: 'task_review_requested',
     originalData: { task },
@@ -777,5 +778,9 @@ describe('HR attendance (F17 part C)', () => {
     expect(linkPath(notificationLink(sample('field_punch_rejected')))).toBe('/me/attendance');
     expect(render('kiosk_offline').text).toContain('شاشة الدخول «المدخل» غير متصلة منذ');
     expect(linkPath(notificationLink(sample('kiosk_offline')))).toBe('/hr/settings?tab=screens');
+    expect(render('attendance_month_closed').text).toContain('أُغلق حضور شهر');
+    expect(linkPath(notificationLink(sample('attendance_month_closed')))).toBe(
+      '/hr/months/2026-10',
+    );
   });
 });

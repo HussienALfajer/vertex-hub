@@ -88,6 +88,7 @@ describe('notification catalog', () => {
         'leave_balance_adjusted',
         // F17 part C.
         'attendance_item_decided',
+        'attendance_month_closed',
         'field_punch_recorded',
         'field_punch_rejected',
         // F16 part C: the new types of the sales and engagement modules.
