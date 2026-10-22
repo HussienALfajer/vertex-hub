@@ -256,6 +256,10 @@ export const ERROR_CODES = [
   'INVALID_DECISION',
   'NOT_FIELD',
   'NOT_YET',
+  'MONTH_CLOSED',
+  'MONTH_NOT_ENDED',
+  'MONTH_HAS_PENDING',
+  'NOT_CLOSED',
 ] as const;
 
 export const errorCodeSchema = z.enum(ERROR_CODES).meta({ id: 'ErrorCode' });

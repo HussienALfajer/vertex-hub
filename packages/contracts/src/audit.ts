@@ -284,6 +284,8 @@ export const AUDIT_ACTIONS = [
   'attendance_item.decided',
   'attendance_item.voided',
   'attendance_punch.rejected',
+  'attendance_month.closed',
+  'attendance_month.reopened',
 ] as const;
 
 export const auditActionSchema = z.enum(AUDIT_ACTIONS).meta({ id: 'AuditAction' });
@@ -355,6 +357,7 @@ export const AUDIT_ENTITY_TYPES = [
   'attendance',
   'attendance_item',
   'attendance_punch',
+  'attendance_month',
 ] as const;
 
 export const auditEntityTypeSchema = z.enum(AUDIT_ENTITY_TYPES).meta({ id: 'AuditEntityType' });

@@ -9,6 +9,7 @@ import { AttendanceFieldWork } from './attendance-field-work.js';
 import { AttendanceItems } from './attendance-items.js';
 import { AttendanceItemsService } from './attendance-items.service.js';
 import { AttendanceKiosksService } from './attendance-kiosks.service.js';
+import { AttendanceMonthsService } from './attendance-months.service.js';
 import { AttendancePasskeys } from './attendance-passkeys.js';
 import { AttendancePasskeysService } from './attendance-passkeys.service.js';
 import { AttendanceReminders } from './attendance-reminders.js';
@@ -24,6 +25,7 @@ import { HrAttendanceController } from './hr-attendance.controller.js';
 import { HrDailyService } from './hr-daily.service.js';
 import { HrItemsController } from './hr-items.controller.js';
 import { HrLeaveController } from './hr-leave.controller.js';
+import { HrMonthsController } from './hr-months.controller.js';
 import { HrRequestFileOwner } from './hr-request-file-owner.js';
 import { HrRequestsService } from './hr-requests.service.js';
 import { HrRulesController } from './hr-rules.controller.js';
@@ -55,7 +57,8 @@ import { WorkSchedulesService } from './work-schedules.service.js';
  * the `AttendanceShoots` registry `calendar` fills for shoot check-ins (rule C13), and the
  * `AttendanceFieldWork` registry `tasks` and `calendar` fill with titles (rule C11). Attendance
  * items, their justification and decision, remote days and corrections, field punch review, the
- * Today board and the minute job's attendance reminders (rules C12, C13, C17–C19, C21, C22).
+ * Today board and the minute job's attendance reminders (rules C12, C13, C17–C19, C21, C22). Part D:
+ * the month sheet, closing and reopening a month with its summaries, and the Excel files (D1–D5).
  */
 @Module({
   imports: [AuditModule, AuthModule, FilesModule, NotificationsModule],
@@ -65,6 +68,7 @@ import { WorkSchedulesService } from './work-schedules.service.js';
     HrLeaveController,
     HrAttendanceController,
     HrItemsController,
+    HrMonthsController,
     KioskController,
   ],
   providers: [
@@ -97,6 +101,7 @@ import { WorkSchedulesService } from './work-schedules.service.js';
     AttendanceItems,
     AttendanceItemsService,
     AttendanceReminders,
+    AttendanceMonthsService,
     KioskStream,
   ],
   exports: [

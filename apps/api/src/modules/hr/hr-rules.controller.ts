@@ -114,7 +114,10 @@ export class HrRulesController {
   @Post('holidays')
   @RequirePermissions('hr.manage')
   @SerializeOptions({ schema: holidaySchema })
-  @ApiCreatedResponse({ description: 'The new holiday', standardSchema: holidaySchema })
+  @ApiCreatedResponse({
+    description: 'The new holiday. `HOLIDAY_OVERLAP`, `MONTH_CLOSED`',
+    standardSchema: holidaySchema,
+  })
   createHoliday(
     @CurrentUser() actor: CurrentUserInfo,
     @Body({ schema: createHolidaySchema }) input: CreateHoliday,
@@ -139,7 +142,10 @@ export class HrRulesController {
   @Patch('holidays/:id')
   @RequirePermissions('hr.manage')
   @SerializeOptions({ schema: holidaySchema })
-  @ApiOkResponse({ description: 'The holiday after the change', standardSchema: holidaySchema })
+  @ApiOkResponse({
+    description: 'The holiday after the change. `MONTH_CLOSED`',
+    standardSchema: holidaySchema,
+  })
   updateHoliday(
     @CurrentUser() actor: CurrentUserInfo,
     @Param('id', ParseUUIDPipe) id: string,
@@ -152,7 +158,10 @@ export class HrRulesController {
   @HttpCode(200)
   @RequirePermissions('hr.manage')
   @SerializeOptions({ schema: holidaySchema })
-  @ApiOkResponse({ description: 'The archived holiday', standardSchema: holidaySchema })
+  @ApiOkResponse({
+    description: 'The archived holiday. `MONTH_CLOSED`',
+    standardSchema: holidaySchema,
+  })
   archiveHoliday(
     @CurrentUser() actor: CurrentUserInfo,
     @Param('id', ParseUUIDPipe) id: string,

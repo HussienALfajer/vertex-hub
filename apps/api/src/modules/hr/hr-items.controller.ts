@@ -98,7 +98,8 @@ export class HrItemsController {
   @RequirePermissions('hr.approve')
   @SerializeOptions({ schema: attendanceItemSchema })
   @ApiOkResponse({
-    description: 'Decides an item, or changes its decision. `INVALID_DECISION`, `NOT_PENDING`',
+    description:
+      'Decides an item, or changes its decision. `INVALID_DECISION`, `NOT_PENDING`, `MONTH_CLOSED`',
     standardSchema: attendanceItemSchema,
   })
   decide(
@@ -114,7 +115,8 @@ export class HrItemsController {
   @RequirePermissions('hr.approve')
   @SerializeOptions({ schema: attendanceDaySchema })
   @ApiOkResponse({
-    description: 'Rejects a field or shoot punch; returns its recomputed day. `NOT_FIELD`',
+    description:
+      'Rejects a field or shoot punch; returns its recomputed day. `NOT_FIELD`, `MONTH_CLOSED`',
     standardSchema: attendanceDaySchema,
   })
   rejectPunch(

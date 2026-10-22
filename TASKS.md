@@ -65,3 +65,15 @@ Parts A → B → C → D, each accepted by the owner before the next starts (sp
 - [x] Today `/hr/today`; Approvals with items (item page `/hr/items/:id`, bulk apply of a proposal); employee file Attendance tab and passkey state; People passkey column; `/attend#<code>` for a phone camera; the punch in two taps (prepare, then the passkey prompt)
 - [x] E2E: `f17-attendance.spec.ts` (WebAuthn through Chromium's virtual authenticator on `localhost`), screenshots in both themes; mocks in `fixtures.ts`
 - [x] checks (full run; HR screens pass with 2 workers, time out under full load), reviewer (5 findings fixed: the kiosk stream watchdog, HSTS `includeSubDomains`, passkey registration in two taps, the pairing code as a field error, stale docs), acceptance (in the browser, owner 2026-10-22; the phone at the office after deploy), PR with auto-merge, `docs/ROADMAP.md`
+
+## PR D1 — months: contracts, db, api
+- [x] contracts: `attendanceMonthSchema`, `monthSheetSchema` (employees × days, totals, pending counts), `attendanceMonthSummarySchema`; the month summary as a pure function with unit tests (rule D3: work, present, remote, field, absent, leave by type, unpaid, holidays, late count, deducted days, overtime paid and time off, worked minutes); error codes `MONTH_CLOSED`, `MONTH_NOT_ENDED`, `MONTH_HAS_PENDING` (with the list), `NOT_CLOSED`; audit actions `attendance_month.closed` / `reopened` and entity type; notification type `attendance_month_closed` (Finance, informational; text in `messages`); `ar.json` keys
+- [x] db (`/db-migration`): `attendance_months`, `attendance_month_summaries` (unique `month_id`, `user_id`) in `schema/attendance.ts`; notification type
+- [x] api `hr`: `GET /months/:month` in scope (D1); close (D2, D3: summaries in the transaction, `attendance_month_closed`) and reopen with a reason (D4); one `MONTH_CLOSED` guard used by punches and punch options, punch reject, corrections and every request create, decision and cancel, item decisions, holidays (create, update, archive, repeat; edge case 12) and the day recomputation (closed days are not recomputed); Excel exports for the month sheet and an employee's month (D5, exceljs as F15, self or `hr.read`); tests in `test/hr-months.test.ts`
+- [x] bridge: `openapi:export`, `api:generate`; web typecheck
+- [x] checks, reviewer (3 findings fixed: items raised by the closing's recompute kept, the holiday lock in closing, guard tests), acceptance (owner 2026-10-22: Finance reads and exports the month sheet), PR with auto-merge
+
+## PR D2 — months: web and the full E2E pass
+- [ ] Month `/hr/months/:month` (sheet employees × days, totals, pending counts, Close with the pending list, Reopen with a reason, Excel); month navigation; links from Today and the file's Attendance tab; "Excel" on My attendance's This month; `MONTH_CLOSED` and the other new errors in `ar.json`; HR nav item
+- [ ] E2E: `f17-months.spec.ts`, screenshots in both themes; mocks in `fixtures.ts`; the full F17 E2E pass (spec acceptance, Tests)
+- [ ] checks, reviewer, acceptance (spec step 7), PR with auto-merge, `docs/ROADMAP.md` (F17 done)

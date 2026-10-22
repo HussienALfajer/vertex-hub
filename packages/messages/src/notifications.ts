@@ -504,6 +504,7 @@ export const NOTIFICATION_TEXT = {
   },
   directions: { in: 'الحضور', out: 'الانصراف' },
   kiosk_offline: 'شاشة الدخول «{{name}}» غير متصلة منذ {{when}}',
+  attendance_month_closed: 'أُغلق حضور شهر {{month}} وملخّصه جاهز',
   /** F16 rule B11: each escalation step wraps the original's text. */
   action_reminder: 'تذكير: {{text}}',
   action_escalated: 'تصعيد: {{text}}',
@@ -677,6 +678,11 @@ export function notificationLink(notification: Notification): NotificationLink {
     case 'kiosk':
       // Rule C22: the entrance screens in HR settings.
       return { to: '/hr/settings', search: { tab: 'screens' } };
+    case 'attendance_month':
+      // Rule D3: the month sheet.
+      return notification.type === 'attendance_month_closed'
+        ? { to: '/hr/months/$month', params: { month: notification.data.month } }
+        : { to: '/hr/today' };
     default:
       return { to: '/tasks/$taskId', params: { taskId: subject.id } };
   }
@@ -1419,6 +1425,11 @@ export function notificationText(
         }),
         context: null,
       };
+    case 'attendance_month_closed':
+      return {
+        text: fill(text.attendance_month_closed, { month: formatMonth(notification.data.month) }),
+        context: null,
+      };
     case 'colleague_on_leave':
       return {
         text: fill(text.colleague_on_leave, {
@@ -1563,6 +1574,7 @@ type TaskNotification = Exclude<
       | `attendance_${string}`
       | `field_punch_${string}`
       | 'kiosk_offline'
+      | 'attendance_month_closed'
       | CalendarNotification['type'];
   }
 >;

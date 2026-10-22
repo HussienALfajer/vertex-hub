@@ -523,7 +523,11 @@
     "INVALID_PAIRING_CODE": "رمز الربط غير صحيح أو انتهت صلاحيته.",
     "INVALID_DECISION": "هذا القرار لا يناسب هذا البند.",
     "NOT_FIELD": "يُرفض التسجيل الميداني أو تسجيل التصوير فقط.",
-    "NOT_YET": "لم يحن هذا الوقت بعد؛ التصحيح لوقت مضى."
+    "NOT_YET": "لم يحن هذا الوقت بعد؛ التصحيح لوقت مضى.",
+    "MONTH_CLOSED": "هذا الشهر مُغلق. يعيد المدير العام فتحه أولًا.",
+    "MONTH_NOT_ENDED": "لا يُغلق الشهر قبل انتهاء آخر يوم فيه.",
+    "MONTH_HAS_PENDING": "في هذا الشهر طلبات أو بنود حضور لم يُبتّ فيها بعد.",
+    "NOT_CLOSED": "هذا الشهر غير مُغلق."
   },
   "users": {
     "title": "الفريق",
@@ -955,7 +959,8 @@
       "attendance_kiosk": "شاشة مدخل",
       "attendance": "حضور",
       "attendance_item": "بند حضور",
-      "attendance_punch": "تسجيل حضور"
+      "attendance_punch": "تسجيل حضور",
+      "attendance_month": "شهر حضور"
     },
     "actions": {
       "user": {
@@ -1363,6 +1368,10 @@
       },
       "attendance_punch": {
         "rejected": "رفض تسجيلًا ميدانيًا"
+      },
+      "attendance_month": {
+        "closed": "أغلق شهر حضور",
+        "reopened": "أعاد فتح شهر حضور"
       }
     },
     "fields": {
@@ -4715,7 +4724,8 @@
       "field_punch_recorded": "تسجيلات حضور ميدانية",
       "field_punch_rejected": "رفض تسجيلي الميداني",
       "shoot_check_in_missing": "تذكير بتسجيل الحضور في جلسة تصوير",
-      "kiosk_offline": "انقطاع شاشة مدخل"
+      "kiosk_offline": "انقطاع شاشة مدخل",
+      "attendance_month_closed": "إغلاق شهر حضور"
     },
     "priorities": {
       "critical": "حرج",

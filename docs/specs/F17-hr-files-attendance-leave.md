@@ -36,7 +36,7 @@ Eight new permissions (`packages/contracts/src/permissions.ts`):
 |---|---|---|
 | `employees.read` | General Manager: `all` · Internal Operations manager: `all` | Employee files without pay: personal, contract, schedule, documents not marked confidential, end of service |
 | `employees.manage` | General Manager: `all` · Internal Operations manager: `all` | Edit those files, end a service, upload documents |
-| `salaries.read` | General Manager: `all` · Finance: `all` | Salary history, payout method, confidential employee documents |
+| `salaries.read` | General Manager: `all` · Finance: `all` | Salary history, payout method, confidential employee documents; the month sheet and its Excel file (owner, 2026-10-22) |
 | `salaries.manage` | General Manager: `all` | Add or archive a salary change |
 | `payouts.manage` | General Manager: `all` · Finance: `all` | Edit the payout method |
 | `hr.read` | General Manager: `all` · Internal Operations manager: `all` · Department Manager: `department` | Attendance, leave (with its type), balances, requests and items; `department` = members of the departments they manage |
@@ -385,10 +385,10 @@ Settled in implementation (PR C3, 2026-10-22):
 - People and the file show the passkey's state (`employment.passkey`: active, a replacement pending).
 
 ### Part D: months
-1. **The month sheet** shows each employee's days and totals, with pending requests and items counted. `hr.read` holders see it in scope.
-2. **Closing** (`hr.approve`) needs the month to have ended and no pending request or item dated in it (`MONTH_HAS_PENDING`, with the list). Closed months reject new punches, corrections, requests, decisions and recomputation dated in them (`MONTH_CLOSED`).
+1. **The month sheet** shows each employee's days and totals, with pending requests and items counted. `hr.read` holders see it in scope. `salaries.read` holders (Finance, told of each closing by rule D3) see every employee (owner, 2026-10-22).
+2. **Closing** (`hr.approve`) needs the month to have ended and no pending request or item dated in it (`MONTH_HAS_PENDING`, with the list). Closed months reject new punches, corrections, requests, decisions and recomputation dated in them (`MONTH_CLOSED`). Settled in D1: closing first recomputes the month's days (an item it raises holds the month); passkey replacement requests are not dated attendance and neither hold nor are held by a month; an `out` after midnight (rule C15) is refused when its day is in a closed month; a sheet of a closed month shows the frozen summaries, of an open one the live totals.
 3. Closing writes `attendance_month_summaries` for every user with a day in the month, in the same transaction, and notifies Finance (`attendance_month_closed`).
-4. **Reopening** needs a reason and deletes nothing: the summaries are rewritten at the next close. F19 will block reopening a month whose payroll is approved.
+4. **Reopening** needs a reason and deletes nothing: the summaries are rewritten at the next close. A summary whose user has no day at the next close is archived. F19 will block reopening a month whose payroll is approved.
 5. **Excel**: the month sheet (one row per employee, totals) and an employee's month (one row per day, with punches and items), with exceljs as F15.
 
 ### Changes to earlier features
@@ -464,9 +464,9 @@ All under `/api/hr` unless stated. Lists follow ADR 0013 (pagination, filters).
 | `GET/POST /kiosks`, `POST /kiosks/:id/archive`, `POST /kiosks/:id/pairing-code` | `hr.manage` | `{ name }` | `kioskSchema` (+ the pairing code once) | — |
 | `POST /api/kiosk/pair` | none (rate-limited) | `{ code }` | sets `vh_kiosk` | `INVALID_PAIRING_CODE` |
 | `GET /api/kiosk/stream` | `vh_kiosk` cookie | — | SSE: QR window values, greetings, heartbeat | 401 |
-| `GET /months/:month` | `hr.read` | `{ department? }` | `monthSheetSchema` | — |
+| `GET /months/:month` | `hr.read` (in scope) or `salaries.read` | `{ department? }` | `monthSheetSchema` | — |
 | `POST /months/:month/close` · `/reopen` | `hr.approve` | — / `{ reason }` | `attendanceMonthSchema` | `MONTH_NOT_ENDED`, `MONTH_HAS_PENDING`, `NOT_CLOSED` |
-| `GET /months/:month/export` · `/employees/:userId/months/:month/export` | `hr.read` / self | — | `.xlsx` | — |
+| `GET /months/:month/export` · `/employees/:userId/months/:month/export` | `hr.read` or `salaries.read` / self or `hr.read` | — | `.xlsx` | — |
 
 Changed: task create, assign and update (`acceptLeave`, `ASSIGNEE_ON_LEAVE`); shoot and meeting conflicts (`leave` kind); `GET /api/calendar` (leave items, holiday key dates).
 

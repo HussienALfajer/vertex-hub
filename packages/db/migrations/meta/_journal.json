@@ -582,6 +582,13 @@
       "when": 1792636973719,
       "tag": "0082_public_maginty",
       "breakpoints": true
+    },
+    {
+      "idx": 83,
+      "version": "7",
+      "when": 1792657070509,
+      "tag": "0083_steady_machine_man",
+      "breakpoints": true
     }
   ]
 }
