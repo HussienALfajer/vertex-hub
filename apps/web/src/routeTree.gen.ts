@@ -83,6 +83,8 @@ import { Route as AppClientsClientIdIndexRouteImport } from './routes/_app/clien
 import { Route as AppClientsClientIdReportRouteImport } from './routes/_app/clients/$clientId/report'
 import { Route as AppContentPostsPostIdRouteImport } from './routes/_app/content/posts/$postId'
 import { Route as AppHrItemsItemIdRouteImport } from './routes/_app/hr/items/$itemId'
+import { Route as AppHrMonthsIndexRouteImport } from './routes/_app/hr/months/index'
+import { Route as AppHrMonthsMonthRouteImport } from './routes/_app/hr/months/$month'
 import { Route as AppHrPeopleIndexRouteImport } from './routes/_app/hr/people/index'
 import { Route as AppHrPeopleUserIdRouteImport } from './routes/_app/hr/people/$userId'
 import { Route as AppHrRequestsRequestIdRouteImport } from './routes/_app/hr/requests/$requestId'
@@ -469,6 +471,16 @@ const AppHrItemsItemIdRoute = AppHrItemsItemIdRouteImport.update({
   path: '/hr/items/$itemId',
   getParentRoute: () => AppRoute,
 } as any)
+const AppHrMonthsIndexRoute = AppHrMonthsIndexRouteImport.update({
+  id: '/hr/months/',
+  path: '/hr/months/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppHrMonthsMonthRoute = AppHrMonthsMonthRouteImport.update({
+  id: '/hr/months/$month',
+  path: '/hr/months/$month',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppHrPeopleIndexRoute = AppHrPeopleIndexRouteImport.update({
   id: '/hr/people/',
   path: '/hr/people/',
@@ -585,11 +597,13 @@ export interface FileRoutesByFullPath {
   '/clients/$clientId/report': typeof AppClientsClientIdReportRoute
   '/content/posts/$postId': typeof AppContentPostsPostIdRoute
   '/hr/items/$itemId': typeof AppHrItemsItemIdRoute
+  '/hr/months/$month': typeof AppHrMonthsMonthRoute
   '/hr/people/$userId': typeof AppHrPeopleUserIdRoute
   '/hr/requests/$requestId': typeof AppHrRequestsRequestIdRoute
   '/shoots/$shootId/edit': typeof AppShootsShootIdEditRoute
   '/announcements/$announcementId/': typeof AppAnnouncementsAnnouncementIdIndexRoute
   '/clients/$clientId/': typeof AppClientsClientIdIndexRoute
+  '/hr/months/': typeof AppHrMonthsIndexRoute
   '/hr/people/': typeof AppHrPeopleIndexRoute
   '/retainers/$retainerId/': typeof AppRetainersRetainerIdIndexRoute
   '/shoots/$shootId/': typeof AppShootsShootIdIndexRoute
@@ -668,11 +682,13 @@ export interface FileRoutesByTo {
   '/clients/$clientId/report': typeof AppClientsClientIdReportRoute
   '/content/posts/$postId': typeof AppContentPostsPostIdRoute
   '/hr/items/$itemId': typeof AppHrItemsItemIdRoute
+  '/hr/months/$month': typeof AppHrMonthsMonthRoute
   '/hr/people/$userId': typeof AppHrPeopleUserIdRoute
   '/hr/requests/$requestId': typeof AppHrRequestsRequestIdRoute
   '/shoots/$shootId/edit': typeof AppShootsShootIdEditRoute
   '/announcements/$announcementId': typeof AppAnnouncementsAnnouncementIdIndexRoute
   '/clients/$clientId': typeof AppClientsClientIdIndexRoute
+  '/hr/months': typeof AppHrMonthsIndexRoute
   '/hr/people': typeof AppHrPeopleIndexRoute
   '/retainers/$retainerId': typeof AppRetainersRetainerIdIndexRoute
   '/shoots/$shootId': typeof AppShootsShootIdIndexRoute
@@ -753,11 +769,13 @@ export interface FileRoutesById {
   '/_app/clients/$clientId/report': typeof AppClientsClientIdReportRoute
   '/_app/content/posts/$postId': typeof AppContentPostsPostIdRoute
   '/_app/hr/items/$itemId': typeof AppHrItemsItemIdRoute
+  '/_app/hr/months/$month': typeof AppHrMonthsMonthRoute
   '/_app/hr/people/$userId': typeof AppHrPeopleUserIdRoute
   '/_app/hr/requests/$requestId': typeof AppHrRequestsRequestIdRoute
   '/_app/shoots/$shootId/edit': typeof AppShootsShootIdEditRoute
   '/_app/announcements/$announcementId/': typeof AppAnnouncementsAnnouncementIdIndexRoute
   '/_app/clients/$clientId/': typeof AppClientsClientIdIndexRoute
+  '/_app/hr/months/': typeof AppHrMonthsIndexRoute
   '/_app/hr/people/': typeof AppHrPeopleIndexRoute
   '/_app/retainers/$retainerId/': typeof AppRetainersRetainerIdIndexRoute
   '/_app/shoots/$shootId/': typeof AppShootsShootIdIndexRoute
@@ -838,11 +856,13 @@ export interface FileRouteTypes {
     | '/clients/$clientId/report'
     | '/content/posts/$postId'
     | '/hr/items/$itemId'
+    | '/hr/months/$month'
     | '/hr/people/$userId'
     | '/hr/requests/$requestId'
     | '/shoots/$shootId/edit'
     | '/announcements/$announcementId/'
     | '/clients/$clientId/'
+    | '/hr/months/'
     | '/hr/people/'
     | '/retainers/$retainerId/'
     | '/shoots/$shootId/'
@@ -921,11 +941,13 @@ export interface FileRouteTypes {
     | '/clients/$clientId/report'
     | '/content/posts/$postId'
     | '/hr/items/$itemId'
+    | '/hr/months/$month'
     | '/hr/people/$userId'
     | '/hr/requests/$requestId'
     | '/shoots/$shootId/edit'
     | '/announcements/$announcementId'
     | '/clients/$clientId'
+    | '/hr/months'
     | '/hr/people'
     | '/retainers/$retainerId'
     | '/shoots/$shootId'
@@ -1005,11 +1027,13 @@ export interface FileRouteTypes {
     | '/_app/clients/$clientId/report'
     | '/_app/content/posts/$postId'
     | '/_app/hr/items/$itemId'
+    | '/_app/hr/months/$month'
     | '/_app/hr/people/$userId'
     | '/_app/hr/requests/$requestId'
     | '/_app/shoots/$shootId/edit'
     | '/_app/announcements/$announcementId/'
     | '/_app/clients/$clientId/'
+    | '/_app/hr/months/'
     | '/_app/hr/people/'
     | '/_app/retainers/$retainerId/'
     | '/_app/shoots/$shootId/'
@@ -1547,6 +1571,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppHrItemsItemIdRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/hr/months/': {
+      id: '/_app/hr/months/'
+      path: '/hr/months'
+      fullPath: '/hr/months/'
+      preLoaderRoute: typeof AppHrMonthsIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/hr/months/$month': {
+      id: '/_app/hr/months/$month'
+      path: '/hr/months/$month'
+      fullPath: '/hr/months/$month'
+      preLoaderRoute: typeof AppHrMonthsMonthRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/hr/people/': {
       id: '/_app/hr/people/'
       path: '/hr/people'
@@ -1672,11 +1710,13 @@ interface AppRouteChildren {
   AppClientsClientIdReportRoute: typeof AppClientsClientIdReportRoute
   AppContentPostsPostIdRoute: typeof AppContentPostsPostIdRoute
   AppHrItemsItemIdRoute: typeof AppHrItemsItemIdRoute
+  AppHrMonthsMonthRoute: typeof AppHrMonthsMonthRoute
   AppHrPeopleUserIdRoute: typeof AppHrPeopleUserIdRoute
   AppHrRequestsRequestIdRoute: typeof AppHrRequestsRequestIdRoute
   AppShootsShootIdEditRoute: typeof AppShootsShootIdEditRoute
   AppAnnouncementsAnnouncementIdIndexRoute: typeof AppAnnouncementsAnnouncementIdIndexRoute
   AppClientsClientIdIndexRoute: typeof AppClientsClientIdIndexRoute
+  AppHrMonthsIndexRoute: typeof AppHrMonthsIndexRoute
   AppHrPeopleIndexRoute: typeof AppHrPeopleIndexRoute
   AppRetainersRetainerIdIndexRoute: typeof AppRetainersRetainerIdIndexRoute
   AppShootsShootIdIndexRoute: typeof AppShootsShootIdIndexRoute
@@ -1751,12 +1791,14 @@ const AppRouteChildren: AppRouteChildren = {
   AppClientsClientIdReportRoute: AppClientsClientIdReportRoute,
   AppContentPostsPostIdRoute: AppContentPostsPostIdRoute,
   AppHrItemsItemIdRoute: AppHrItemsItemIdRoute,
+  AppHrMonthsMonthRoute: AppHrMonthsMonthRoute,
   AppHrPeopleUserIdRoute: AppHrPeopleUserIdRoute,
   AppHrRequestsRequestIdRoute: AppHrRequestsRequestIdRoute,
   AppShootsShootIdEditRoute: AppShootsShootIdEditRoute,
   AppAnnouncementsAnnouncementIdIndexRoute:
     AppAnnouncementsAnnouncementIdIndexRoute,
   AppClientsClientIdIndexRoute: AppClientsClientIdIndexRoute,
+  AppHrMonthsIndexRoute: AppHrMonthsIndexRoute,
   AppHrPeopleIndexRoute: AppHrPeopleIndexRoute,
   AppRetainersRetainerIdIndexRoute: AppRetainersRetainerIdIndexRoute,
   AppShootsShootIdIndexRoute: AppShootsShootIdIndexRoute,

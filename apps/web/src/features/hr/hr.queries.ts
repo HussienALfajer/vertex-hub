@@ -17,11 +17,13 @@ import type {
   HrRequestListQuery,
   HrSettings,
   JustifyItem,
+  MonthSheetQuery,
   Payout,
   PunchInput,
   PunchOptionsInput,
   RegisterPasskey,
   RejectPunch,
+  ReopenMonth,
   RevokePasskey,
   TodayBoardQuery,
   UpdateEmployeeFile,
@@ -58,6 +60,8 @@ export const hrKeys = {
   items: ['hr', 'items'] as const,
   itemList: (filters: AttendanceItemListFilters) => ['hr', 'items', 'list', filters] as const,
   item: (id: string) => ['hr', 'items', 'detail', id] as const,
+  months: ['hr', 'months'] as const,
+  month: (month: string, filters: MonthSheetQuery) => ['hr', 'months', month, filters] as const,
 };
 
 export type AttendanceItemListFilters = Partial<AttendanceItemListQuery>;
@@ -552,5 +556,56 @@ export function useArchiveKiosk() {
     mutationFn: (id: string) =>
       call(api.POST('/api/hr/kiosks/{id}/archive', { params: { path: { id } } })),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: hrKeys.kiosks }),
+  });
+}
+
+// Part D: attendance months.
+
+export const monthSheetQuery = (month: string, filters: MonthSheetQuery) =>
+  queryOptions({
+    queryKey: hrKeys.month(month, filters),
+    queryFn: () =>
+      call(api.GET('/api/hr/months/{month}', { params: { path: { month }, query: filters } })),
+    placeholderData: keepPreviousData,
+  });
+
+/** Rule D5: the workbooks, built by the API on request and served as downloads. */
+export const monthExportUrls = {
+  sheet: (month: string, { departmentId }: MonthSheetQuery) =>
+    `/api/hr/months/${month}/export${departmentId ? `?departmentId=${departmentId}` : ''}`,
+  employee: (userId: string, month: string) => `/api/hr/employees/${userId}/months/${month}/export`,
+};
+
+/**
+ * Closing and reopening lock or free the month's punches, requests and decisions (rule D2), so
+ * the days, items and requests refresh with the sheet.
+ */
+function useInvalidateMonths() {
+  const queryClient = useQueryClient();
+  return () =>
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: hrKeys.months }),
+      queryClient.invalidateQueries({ queryKey: hrKeys.attendance }),
+      queryClient.invalidateQueries({ queryKey: hrKeys.items }),
+      queryClient.invalidateQueries({ queryKey: hrKeys.requests }),
+    ]);
+}
+
+/** Refreshes also on failure: an item raised by the closing's recompute holds the month (D2). */
+export function useCloseMonth() {
+  const invalidate = useInvalidateMonths();
+  return useMutation({
+    mutationFn: (month: string) =>
+      call(api.POST('/api/hr/months/{month}/close', { params: { path: { month } } })),
+    onSettled: invalidate,
+  });
+}
+
+export function useReopenMonth() {
+  const invalidate = useInvalidateMonths();
+  return useMutation({
+    mutationFn: ({ month, ...input }: ReopenMonth & { month: string }) =>
+      call(api.POST('/api/hr/months/{month}/reopen', { params: { path: { month } }, body: input })),
+    onSuccess: invalidate,
   });
 }

@@ -13,7 +13,7 @@ import { formatNumber, formatTime } from '../../lib/format';
 
 type Tone = NonNullable<BadgeProps['tone']>;
 
-const dayTone = {
+export const dayTone = {
   upcoming: 'outline',
   in_progress: 'info',
   present: 'success',

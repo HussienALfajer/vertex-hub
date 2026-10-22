@@ -466,6 +466,29 @@ for (const colorScheme of ['light', 'dark'] as const) {
         await screenshot(page, testInfo, `hr-kiosk-pairing-code-${size}-${colorScheme}`);
       });
 
+      // F17 part D: the month sheet (open, with what is pending), a closed month, and reopening.
+      test(`attendance month (${size})`, async ({ page }, testInfo) => {
+        await page.setViewportSize({ width, height });
+        await page.clock.setFixedTime(new Date(HR_NOW));
+        await mockApi(page, { signedIn: true, me: manager, leave: true });
+        const m = ar.hr.months;
+        await page.goto('/hr/months/2026-10');
+        await expect(page.getByTestId('month-pending-counts')).toBeVisible();
+        await screenshot(page, testInfo, `hr-month-${size}-${colorScheme}`);
+        await page.goto('/hr/months/2026-09');
+        await page.getByRole('button', { name: m.close }).click();
+        await expect(page.getByRole('alertdialog')).toBeVisible();
+        await screenshot(page, testInfo, `hr-month-close-${size}-${colorScheme}`);
+        await page.getByRole('alertdialog').getByRole('button', { name: m.close }).click();
+        await expect(page.locator('[data-month-status="closed"]')).toBeVisible();
+        await screenshot(page, testInfo, `hr-month-closed-${size}-${colorScheme}`);
+        await page.getByRole('button', { name: m.reopen }).click();
+        await expect(
+          page.getByRole('dialog', { name: new RegExp(m.reopenTitle.split('{{')[0] ?? '') }),
+        ).toBeVisible();
+        await screenshot(page, testInfo, `hr-month-reopen-${size}-${colorScheme}`);
+      });
+
       test(`entrance screen (${size})`, async ({ page }, testInfo) => {
         await page.setViewportSize({ width, height });
         await page.clock.setFixedTime(new Date(HR_NOW));
