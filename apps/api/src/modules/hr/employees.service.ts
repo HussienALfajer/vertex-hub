@@ -16,13 +16,14 @@ import {
   type UpdateEmployeeFile,
 } from '@vertex-hub/contracts';
 import {
+  attendancePasskeys,
   type Database,
   employeeFiles,
   salaryChanges,
   type Transaction,
   workSchedules,
 } from '@vertex-hub/db';
-import { asc, eq, inArray } from 'drizzle-orm';
+import { and, asc, eq, inArray } from 'drizzle-orm';
 import { DATABASE } from '../../core/database/database.module.js';
 import { CodedException } from '../../core/errors/index.js';
 import { type AuditActor, changedFields, recordAudit } from '../audit/index.js';
@@ -337,6 +338,7 @@ export class EmployeesService {
         files: new Map<string, EmployeeFileRow>(),
         schedules: new Map<string, string>(),
         salaries: [] as SalaryRow[],
+        passkeys: [] as { userId: string; status: string }[],
       };
     }
     const files = await executor
@@ -344,7 +346,7 @@ export class EmployeesService {
       .from(employeeFiles)
       .where(inArray(employeeFiles.userId, userIds));
     const scheduleIds = [...new Set(files.map((file) => file.scheduleId))];
-    const [schedules, salaries] = await Promise.all([
+    const [schedules, salaries, passkeys] = await Promise.all([
       executor
         .select({ id: workSchedules.id, name: workSchedules.name })
         .from(workSchedules)
@@ -360,11 +362,21 @@ export class EmployeesService {
         .from(salaryChanges)
         .where(inArray(salaryChanges.userId, userIds))
         .orderBy(asc(salaryChanges.effectiveOn)),
+      executor
+        .select({ userId: attendancePasskeys.userId, status: attendancePasskeys.status })
+        .from(attendancePasskeys)
+        .where(
+          and(
+            inArray(attendancePasskeys.userId, userIds),
+            inArray(attendancePasskeys.status, ['active', 'pending']),
+          ),
+        ),
     ]);
     return {
       files: new Map(files.map((file) => [file.userId, file])),
       schedules: new Map(schedules.map((schedule) => [schedule.id, schedule.name])),
       salaries: salaries as SalaryRow[],
+      passkeys: passkeys as { userId: string; status: string }[],
     };
   }
 
@@ -403,6 +415,10 @@ export class EmployeesService {
         schedule: { id: file.scheduleId, name: loaded.schedules.get(file.scheduleId) ?? '' },
         attendanceExempt: file.attendanceExempt,
         remoteWeekdays: file.remoteWeekdays,
+        passkey: {
+          active: loaded.passkeys.some((p) => p.userId === profile.id && p.status === 'active'),
+          pending: loaded.passkeys.some((p) => p.userId === profile.id && p.status === 'pending'),
+        },
         annualLeaveDays: file.annualLeaveDays,
         endedOn: file.endedOn,
         endReason: file.endReason,

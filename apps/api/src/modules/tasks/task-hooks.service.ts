@@ -6,7 +6,7 @@ import type { PgColumn } from 'drizzle-orm/pg-core';
 import { DATABASE } from '../../core/database/database.module.js';
 import { type AuditActor, recordAudit } from '../audit/index.js';
 import { ResponsibilityRegistry } from '../auth/index.js';
-import { LeaveWorkSources } from '../hr/index.js';
+import { AttendanceFieldWork, LeaveWorkSources } from '../hr/index.js';
 import { EngagementDirectory, WorkProgress } from '../projects/index.js';
 import { ClientReviewHooks } from './client-review-hooks.js';
 import { PostTaskHooks, unlinkRemovedTask } from './post-task-hooks.js';
@@ -45,6 +45,7 @@ export class TaskHooksService implements OnModuleInit {
     private readonly postHooks: PostTaskHooks,
     private readonly guards: TaskGuards,
     private readonly leaveWork: LeaveWorkSources,
+    private readonly fieldWork: AttendanceFieldWork,
   ) {}
 
   onModuleInit(): void {
@@ -72,6 +73,14 @@ export class TaskHooksService implements OnModuleInit {
           .orderBy(asc(tasks.dueDate), asc(tasks.title));
         return assigned.map((task) => ({ type: 'assignee_of_open_tasks' as const, ...task }));
       },
+    });
+    // F17 rule C11: a field punch names a task by its title.
+    this.fieldWork.register('task', async (executor, ids) => {
+      const rows = await executor
+        .select({ id: tasks.id, title: tasks.title })
+        .from(tasks)
+        .where(inArray(tasks.id, [...ids]));
+      return new Map(rows.map((row) => [row.id, row.title]));
     });
     // F17 rule B14: the open tasks assigned to an employee and due in a leave's days.
     this.leaveWork.register(async (executor, userId, range) => {

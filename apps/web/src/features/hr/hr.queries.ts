@@ -1,7 +1,9 @@
 import { keepPreviousData, queryOptions, useMutation, useQueryClient } from '@tanstack/react-query';
 import type {
   ArchiveSalaryChange,
+  AttendanceItemListQuery,
   CancelHrRequest,
+  CreateAttendanceKiosk,
   CreateHoliday,
   CreateHrOpinion,
   CreateHrRequest,
@@ -9,11 +11,19 @@ import type {
   CreateSalaryChange,
   CreateWorkSchedule,
   DecideHrRequest,
+  DecideItemInput,
   EmployeeListQuery,
   EndService,
   HrRequestListQuery,
   HrSettings,
+  JustifyItem,
   Payout,
+  PunchInput,
+  PunchOptionsInput,
+  RegisterPasskey,
+  RejectPunch,
+  RevokePasskey,
+  TodayBoardQuery,
   UpdateEmployeeFile,
   UpdateHoliday,
   UpdateWorkScheduleInput,
@@ -38,7 +48,19 @@ export const hrKeys = {
   requests: ['hr', 'requests'] as const,
   requestList: (filters: HrRequestListFilters) => ['hr', 'requests', 'list', filters] as const,
   request: (id: string) => ['hr', 'requests', 'detail', id] as const,
+  attendance: ['hr', 'attendance'] as const,
+  myToday: ['hr', 'attendance', 'me', 'today'] as const,
+  days: (userId: string, month: string) => ['hr', 'attendance', 'days', userId, month] as const,
+  board: (filters: TodayBoardQuery) => ['hr', 'attendance', 'board', filters] as const,
+  passkeys: ['hr', 'passkeys'] as const,
+  passkeysOf: (userId: string) => ['hr', 'passkeys', userId] as const,
+  kiosks: ['hr', 'kiosks'] as const,
+  items: ['hr', 'items'] as const,
+  itemList: (filters: AttendanceItemListFilters) => ['hr', 'items', 'list', filters] as const,
+  item: (id: string) => ['hr', 'items', 'detail', id] as const,
 };
+
+export type AttendanceItemListFilters = Partial<AttendanceItemListQuery>;
 
 export type HrRequestListFilters = Partial<HrRequestListQuery>;
 
@@ -335,7 +357,9 @@ export function useAddHrOpinion() {
     onSettled: (_opinion, _error, input) =>
       input.requestId
         ? queryClient.invalidateQueries({ queryKey: hrKeys.request(input.requestId) })
-        : undefined,
+        : input.itemId
+          ? queryClient.invalidateQueries({ queryKey: hrKeys.item(input.itemId) })
+          : undefined,
   });
 }
 
@@ -350,5 +374,183 @@ export function useAdjustLeaveBalance(userId: string) {
         }),
       ),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: hrKeys.balances }),
+  });
+}
+
+// Part C: attendance passkeys, entrance screens, punches, days and items.
+
+export const myAttendanceTodayQuery = queryOptions({
+  queryKey: hrKeys.myToday,
+  queryFn: () => call(api.GET('/api/hr/attendance/me/today')),
+  // The methods change with the time of day (a shoot opens, the day ends).
+  refetchInterval: 60_000,
+});
+
+export const attendanceDaysQuery = (userId: string, month: string) =>
+  queryOptions({
+    queryKey: hrKeys.days(userId, month),
+    queryFn: () =>
+      call(api.GET('/api/hr/attendance/days', { params: { query: { userId, month } } })),
+    placeholderData: keepPreviousData,
+  });
+
+export const todayBoardQuery = (filters: TodayBoardQuery) =>
+  queryOptions({
+    queryKey: hrKeys.board(filters),
+    queryFn: () => call(api.GET('/api/hr/attendance/today', { params: { query: filters } })),
+    placeholderData: keepPreviousData,
+    refetchInterval: 60_000,
+  });
+
+export const myPasskeysQuery = queryOptions({
+  queryKey: hrKeys.passkeysOf('me'),
+  queryFn: () => call(api.GET('/api/hr/passkeys/me')),
+});
+
+export const passkeysQuery = (userId: string) =>
+  queryOptions({
+    queryKey: hrKeys.passkeysOf(userId),
+    queryFn: () => call(api.GET('/api/hr/passkeys', { params: { query: { userId } } })),
+  });
+
+export const kiosksQuery = queryOptions({
+  queryKey: hrKeys.kiosks,
+  queryFn: () => call(api.GET('/api/hr/kiosks')),
+  // "Last seen" moves while the page is open.
+  refetchInterval: 30_000,
+});
+
+export const attendanceItemListQuery = (filters: AttendanceItemListFilters) =>
+  queryOptions({
+    queryKey: hrKeys.itemList(filters),
+    queryFn: () => call(api.GET('/api/hr/items', { params: { query: filters } })),
+    placeholderData: keepPreviousData,
+  });
+
+export const attendanceItemQuery = (id: string) =>
+  queryOptions({
+    queryKey: hrKeys.item(id),
+    queryFn: () => call(api.GET('/api/hr/items/{id}', { params: { path: { id } } })),
+  });
+
+/** A punch, a rejection or a decision moves the days, the items and the Today board. */
+function useInvalidateAttendance() {
+  const queryClient = useQueryClient();
+  return () =>
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: hrKeys.attendance }),
+      queryClient.invalidateQueries({ queryKey: hrKeys.items }),
+    ]);
+}
+
+/** A passkey change shows on My attendance, the file, People and the requests (rule C9). */
+function useInvalidatePasskeys() {
+  const queryClient = useQueryClient();
+  return () =>
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: hrKeys.passkeys }),
+      queryClient.invalidateQueries({ queryKey: hrKeys.myToday }),
+      queryClient.invalidateQueries({ queryKey: hrKeys.employees }),
+      queryClient.invalidateQueries({ queryKey: hrKeys.requests }),
+    ]);
+}
+
+export function usePasskeyOptions() {
+  return useMutation({ mutationFn: () => call(api.POST('/api/hr/passkeys/options')) });
+}
+
+export function useRegisterPasskey() {
+  const invalidate = useInvalidatePasskeys();
+  return useMutation({
+    mutationFn: (input: RegisterPasskey) => call(api.POST('/api/hr/passkeys', { body: input })),
+    onSuccess: invalidate,
+  });
+}
+
+export function useRevokePasskey() {
+  const invalidate = useInvalidatePasskeys();
+  return useMutation({
+    mutationFn: ({ id, ...input }: RevokePasskey & { id: string }) =>
+      call(api.POST('/api/hr/passkeys/{id}/revoke', { params: { path: { id } }, body: input })),
+    onSuccess: invalidate,
+  });
+}
+
+export function usePunchOptions() {
+  return useMutation({
+    mutationFn: (input: PunchOptionsInput) =>
+      call(api.POST('/api/hr/attendance/punch/options', { body: input })),
+  });
+}
+
+export function usePunch() {
+  const invalidate = useInvalidateAttendance();
+  return useMutation({
+    mutationFn: (input: PunchInput) => call(api.POST('/api/hr/attendance/punch', { body: input })),
+    onSuccess: invalidate,
+  });
+}
+
+export function useRejectPunch() {
+  const invalidate = useInvalidateAttendance();
+  return useMutation({
+    mutationFn: ({ id, ...input }: RejectPunch & { id: string }) =>
+      call(
+        api.POST('/api/hr/attendance/punches/{id}/reject', {
+          params: { path: { id } },
+          body: input,
+        }),
+      ),
+    onSuccess: invalidate,
+  });
+}
+
+export function useJustifyItem(id: string) {
+  const invalidate = useInvalidateAttendance();
+  return useMutation({
+    mutationFn: (input: JustifyItem) =>
+      call(api.POST('/api/hr/items/{id}/justification', { params: { path: { id } }, body: input })),
+    onSettled: invalidate,
+  });
+}
+
+/**
+ * Refreshes also on failure: the item may have been decided or voided meanwhile. A time-off
+ * decision moves the annual balance (rule C18).
+ */
+export function useDecideItem() {
+  const invalidate = useInvalidateAttendance();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...input }: DecideItemInput & { id: string }) =>
+      call(api.POST('/api/hr/items/{id}/decision', { params: { path: { id } }, body: input })),
+    onSettled: () =>
+      Promise.all([invalidate(), queryClient.invalidateQueries({ queryKey: hrKeys.balances })]),
+  });
+}
+
+export function useCreateKiosk() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: CreateAttendanceKiosk) => call(api.POST('/api/hr/kiosks', { body: input })),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: hrKeys.kiosks }),
+  });
+}
+
+export function useKioskPairingCode() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      call(api.POST('/api/hr/kiosks/{id}/pairing-code', { params: { path: { id } } })),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: hrKeys.kiosks }),
+  });
+}
+
+export function useArchiveKiosk() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      call(api.POST('/api/hr/kiosks/{id}/archive', { params: { path: { id } } })),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: hrKeys.kiosks }),
   });
 }

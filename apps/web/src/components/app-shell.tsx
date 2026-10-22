@@ -113,6 +113,7 @@ interface NavChild {
     | 'nav.taskBoard'
     | 'nav.workload'
     | 'nav.people'
+    | 'nav.hrToday'
     | 'nav.hrApprovals'
     | 'nav.hrSettings';
   /** Lists the page only for these users; others still reach it. */
@@ -167,6 +168,7 @@ const navItems: NavItem[] = [
     show: (me) => hasPeopleAccess(me) || readsHr(me) || managesHr(me),
     children: [
       { to: '/hr/people', label: 'nav.people', show: hasPeopleAccess },
+      { to: '/hr/today', label: 'nav.hrToday', show: readsHr },
       { to: '/hr/approvals', label: 'nav.hrApprovals', show: readsHr },
       { to: '/hr/settings', label: 'nav.hrSettings', show: managesHr },
     ],

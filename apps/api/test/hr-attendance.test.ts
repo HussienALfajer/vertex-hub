@@ -8,6 +8,7 @@ import {
   attendancePasskeyListSchema,
   attendancePasskeySchema,
   businessDate,
+  employeeFileSchema,
   holidaySchema,
   hrRequestPageSchema,
   hrSettingsSchema,
@@ -369,6 +370,13 @@ describe('HR attendance: passkeys, entrance screens and punches (F17 part C)', (
           ),
         );
       expect(submitted.map((row) => row.recipientId)).toContain(gm.id);
+      const file = employeeFileSchema.parse(
+        await ok(await call('GET', `/api/hr/employees/${colleague.id}`, ops)),
+      );
+      expect(file.employment?.passkey, 'People and the file show both').toEqual({
+        active: true,
+        pending: true,
+      });
       // The old phone still punches until the GM decides.
       const page = hrRequestPageSchema.parse(
         await ok(await call('GET', '/api/hr/requests?kind=passkey_replacement&status=pending', gm)),
@@ -573,15 +581,48 @@ describe('HR attendance: passkeys, entrance screens and punches (F17 part C)', (
       expect(noNote.status, 'a field punch needs its note').toBe(400);
     });
 
-    it('records a field punch as accepted (rule C11)', async () => {
+    it('records a field punch as accepted, with the task it names (rule C11)', async () => {
+      const due = taskDetailSchema.parse(
+        await ok(
+          await call('POST', '/api/tasks', gm, {
+            title: `${marker} زيارة`,
+            department: 'photography',
+            assigneeId: colleague.id,
+            dueDate: today,
+          }),
+          201,
+        ),
+      );
+      const later = taskDetailSchema.parse(
+        await ok(
+          await call('POST', '/api/tasks', gm, {
+            title: `${marker} لاحقاً`,
+            department: 'photography',
+            assigneeId: colleague.id,
+            dueDate: addDays(today, 5),
+          }),
+          201,
+        ),
+      );
+      taskIds.push(due.id, later.id);
+      const mine = myAttendanceTodaySchema.parse(
+        await ok(await call('GET', '/api/hr/attendance/me/today', colleague)),
+      );
+      expect(mine.fieldWork, 'only the work of today').toEqual([
+        { kind: 'task', id: due.id, title: due.title, startsAt: null },
+      ]);
+      const field = { method: 'field', latitude: 33.5, longitude: 36.3, accuracyM: 12 };
+      const notToday = await punch(colleague, colleaguePhone, field, {
+        fieldNote: 'زيارة عميل',
+        fieldWork: { kind: 'task', id: later.id },
+      });
+      expect(notToday.status, 'a task not due today').toBe(400);
       const result = punchResultSchema.parse(
         await ok(
-          await punch(
-            colleague,
-            colleaguePhone,
-            { method: 'field', latitude: 33.5, longitude: 36.3, accuracyM: 12 },
-            { fieldNote: 'زيارة عميل' },
-          ),
+          await punch(colleague, colleaguePhone, field, {
+            fieldNote: 'زيارة عميل',
+            fieldWork: { kind: 'task', id: due.id },
+          }),
           201,
         ),
       );
@@ -589,6 +630,7 @@ describe('HR attendance: passkeys, entrance screens and punches (F17 part C)', (
         method: 'field',
         fieldReview: 'accepted',
         fieldNote: 'زيارة عميل',
+        fieldWork: { kind: 'task', id: due.id, title: due.title },
         accuracyM: 12,
       });
     });

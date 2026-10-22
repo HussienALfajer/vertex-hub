@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { punchDirectionSchema } from './attendance.js';
+import { passkeyStateSchema, punchDirectionSchema } from './attendance.js';
 import {
   addDays,
   type CalendarDate,
@@ -117,6 +117,8 @@ export const employeeEmploymentSchema = z
     schedule: z.object({ id: z.uuid(), name: z.string() }),
     attendanceExempt: z.boolean(),
     remoteWeekdays: z.array(weekdaySchema),
+    /** Rules C3, C9 and C10: People and the file show it. */
+    passkey: passkeyStateSchema,
     annualLeaveDays: z.number(),
     endedOn: calendarDateSchema.nullable(),
     endReason: endReasonSchema.nullable(),

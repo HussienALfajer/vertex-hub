@@ -475,6 +475,7 @@ export async function removeMeetings(db: Database, ids: string[]): Promise<void>
   await db.delete(notificationReminders).where(inArray(notificationReminders.subjectId, unique));
   await db.delete(meetingAttendees).where(inArray(meetingAttendees.meetingId, unique));
   await db.delete(meetingContacts).where(inArray(meetingContacts.meetingId, unique));
+  await db.delete(attendancePunches).where(inArray(attendancePunches.fieldMeetingId, unique));
   await db.delete(meetings).where(inArray(meetings.id, unique));
 }
 
@@ -674,6 +675,7 @@ export async function removeTasks(db: Database, ids: string[]): Promise<void> {
   await db.delete(taskReviews).where(inArray(taskReviews.taskId, ids));
   await db.delete(taskRevisions).where(inArray(taskRevisions.taskId, ids));
   await db.delete(notificationReminders).where(inArray(notificationReminders.subjectId, ids));
+  await db.delete(attendancePunches).where(inArray(attendancePunches.fieldTaskId, ids));
   await db.delete(tasks).where(inArray(tasks.id, ids));
 }
 

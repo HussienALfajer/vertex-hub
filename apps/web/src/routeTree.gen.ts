@@ -12,10 +12,12 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as ActivateRouteImport } from './routes/activate'
 import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
+import { Route as KioskRouteImport } from './routes/kiosk'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as SetupTwoFactorRouteImport } from './routes/setup-two-factor'
 import { Route as AppIndexRouteImport } from './routes/_app/index'
 import { Route as AppAccountRouteImport } from './routes/_app/account'
+import { Route as AppAttendRouteImport } from './routes/_app/attend'
 import { Route as AppAuditRouteImport } from './routes/_app/audit'
 import { Route as AppDesignSystemRouteImport } from './routes/_app/design-system'
 import { Route as AppEmailsRouteImport } from './routes/_app/emails'
@@ -38,6 +40,7 @@ import { Route as AppDepartmentsDepartmentIdRouteImport } from './routes/_app/de
 import { Route as AppHrIndexRouteImport } from './routes/_app/hr/index'
 import { Route as AppHrApprovalsRouteImport } from './routes/_app/hr/approvals'
 import { Route as AppHrSettingsRouteImport } from './routes/_app/hr/settings'
+import { Route as AppHrTodayRouteImport } from './routes/_app/hr/today'
 import { Route as AppInvoicesIndexRouteImport } from './routes/_app/invoices/index'
 import { Route as AppInvoicesInvoiceIdRouteImport } from './routes/_app/invoices/$invoiceId'
 import { Route as AppInvoicesSettingsRouteImport } from './routes/_app/invoices/settings'
@@ -79,6 +82,7 @@ import { Route as AppApprovalsRequestsRequestIdRouteImport } from './routes/_app
 import { Route as AppClientsClientIdIndexRouteImport } from './routes/_app/clients/$clientId/index'
 import { Route as AppClientsClientIdReportRouteImport } from './routes/_app/clients/$clientId/report'
 import { Route as AppContentPostsPostIdRouteImport } from './routes/_app/content/posts/$postId'
+import { Route as AppHrItemsItemIdRouteImport } from './routes/_app/hr/items/$itemId'
 import { Route as AppHrPeopleIndexRouteImport } from './routes/_app/hr/people/index'
 import { Route as AppHrPeopleUserIdRouteImport } from './routes/_app/hr/people/$userId'
 import { Route as AppHrRequestsRequestIdRouteImport } from './routes/_app/hr/requests/$requestId'
@@ -102,6 +106,11 @@ const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
   path: '/forgot-password',
   getParentRoute: () => rootRouteImport,
 } as any)
+const KioskRoute = KioskRouteImport.update({
+  id: '/kiosk',
+  path: '/kiosk',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
@@ -120,6 +129,11 @@ const AppIndexRoute = AppIndexRouteImport.update({
 const AppAccountRoute = AppAccountRouteImport.update({
   id: '/account',
   path: '/account',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppAttendRoute = AppAttendRouteImport.update({
+  id: '/attend',
+  path: '/attend',
   getParentRoute: () => AppRoute,
 } as any)
 const AppAuditRoute = AppAuditRouteImport.update({
@@ -232,6 +246,11 @@ const AppHrApprovalsRoute = AppHrApprovalsRouteImport.update({
 const AppHrSettingsRoute = AppHrSettingsRouteImport.update({
   id: '/hr/settings',
   path: '/hr/settings',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppHrTodayRoute = AppHrTodayRouteImport.update({
+  id: '/hr/today',
+  path: '/hr/today',
   getParentRoute: () => AppRoute,
 } as any)
 const AppInvoicesIndexRoute = AppInvoicesIndexRouteImport.update({
@@ -445,6 +464,11 @@ const AppContentPostsPostIdRoute = AppContentPostsPostIdRouteImport.update({
   path: '/content/posts/$postId',
   getParentRoute: () => AppRoute,
 } as any)
+const AppHrItemsItemIdRoute = AppHrItemsItemIdRouteImport.update({
+  id: '/hr/items/$itemId',
+  path: '/hr/items/$itemId',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppHrPeopleIndexRoute = AppHrPeopleIndexRouteImport.update({
   id: '/hr/people/',
   path: '/hr/people/',
@@ -493,9 +517,11 @@ export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
   '/activate': typeof ActivateRoute
   '/forgot-password': typeof ForgotPasswordRoute
+  '/kiosk': typeof KioskRoute
   '/login': typeof LoginRoute
   '/setup-two-factor': typeof SetupTwoFactorRoute
   '/account': typeof AppAccountRoute
+  '/attend': typeof AppAttendRoute
   '/audit': typeof AppAuditRoute
   '/design-system': typeof AppDesignSystemRoute
   '/emails': typeof AppEmailsRoute
@@ -509,6 +535,7 @@ export interface FileRoutesByFullPath {
   '/departments/$departmentId': typeof AppDepartmentsDepartmentIdRoute
   '/hr/approvals': typeof AppHrApprovalsRoute
   '/hr/settings': typeof AppHrSettingsRoute
+  '/hr/today': typeof AppHrTodayRoute
   '/invoices/$invoiceId': typeof AppInvoicesInvoiceIdRoute
   '/invoices/settings': typeof AppInvoicesSettingsRoute
   '/leads/$leadId': typeof AppLeadsLeadIdRoute
@@ -557,6 +584,7 @@ export interface FileRoutesByFullPath {
   '/approvals/requests/$requestId': typeof AppApprovalsRequestsRequestIdRoute
   '/clients/$clientId/report': typeof AppClientsClientIdReportRoute
   '/content/posts/$postId': typeof AppContentPostsPostIdRoute
+  '/hr/items/$itemId': typeof AppHrItemsItemIdRoute
   '/hr/people/$userId': typeof AppHrPeopleUserIdRoute
   '/hr/requests/$requestId': typeof AppHrRequestsRequestIdRoute
   '/shoots/$shootId/edit': typeof AppShootsShootIdEditRoute
@@ -571,9 +599,11 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/activate': typeof ActivateRoute
   '/forgot-password': typeof ForgotPasswordRoute
+  '/kiosk': typeof KioskRoute
   '/login': typeof LoginRoute
   '/setup-two-factor': typeof SetupTwoFactorRoute
   '/account': typeof AppAccountRoute
+  '/attend': typeof AppAttendRoute
   '/audit': typeof AppAuditRoute
   '/design-system': typeof AppDesignSystemRoute
   '/emails': typeof AppEmailsRoute
@@ -588,6 +618,7 @@ export interface FileRoutesByTo {
   '/departments/$departmentId': typeof AppDepartmentsDepartmentIdRoute
   '/hr/approvals': typeof AppHrApprovalsRoute
   '/hr/settings': typeof AppHrSettingsRoute
+  '/hr/today': typeof AppHrTodayRoute
   '/invoices/$invoiceId': typeof AppInvoicesInvoiceIdRoute
   '/invoices/settings': typeof AppInvoicesSettingsRoute
   '/leads/$leadId': typeof AppLeadsLeadIdRoute
@@ -636,6 +667,7 @@ export interface FileRoutesByTo {
   '/approvals/requests/$requestId': typeof AppApprovalsRequestsRequestIdRoute
   '/clients/$clientId/report': typeof AppClientsClientIdReportRoute
   '/content/posts/$postId': typeof AppContentPostsPostIdRoute
+  '/hr/items/$itemId': typeof AppHrItemsItemIdRoute
   '/hr/people/$userId': typeof AppHrPeopleUserIdRoute
   '/hr/requests/$requestId': typeof AppHrRequestsRequestIdRoute
   '/shoots/$shootId/edit': typeof AppShootsShootIdEditRoute
@@ -652,9 +684,11 @@ export interface FileRoutesById {
   '/_app': typeof AppRouteWithChildren
   '/activate': typeof ActivateRoute
   '/forgot-password': typeof ForgotPasswordRoute
+  '/kiosk': typeof KioskRoute
   '/login': typeof LoginRoute
   '/setup-two-factor': typeof SetupTwoFactorRoute
   '/_app/account': typeof AppAccountRoute
+  '/_app/attend': typeof AppAttendRoute
   '/_app/audit': typeof AppAuditRoute
   '/_app/design-system': typeof AppDesignSystemRoute
   '/_app/emails': typeof AppEmailsRoute
@@ -669,6 +703,7 @@ export interface FileRoutesById {
   '/_app/departments/$departmentId': typeof AppDepartmentsDepartmentIdRoute
   '/_app/hr/approvals': typeof AppHrApprovalsRoute
   '/_app/hr/settings': typeof AppHrSettingsRoute
+  '/_app/hr/today': typeof AppHrTodayRoute
   '/_app/invoices/$invoiceId': typeof AppInvoicesInvoiceIdRoute
   '/_app/invoices/settings': typeof AppInvoicesSettingsRoute
   '/_app/leads/$leadId': typeof AppLeadsLeadIdRoute
@@ -717,6 +752,7 @@ export interface FileRoutesById {
   '/_app/approvals/requests/$requestId': typeof AppApprovalsRequestsRequestIdRoute
   '/_app/clients/$clientId/report': typeof AppClientsClientIdReportRoute
   '/_app/content/posts/$postId': typeof AppContentPostsPostIdRoute
+  '/_app/hr/items/$itemId': typeof AppHrItemsItemIdRoute
   '/_app/hr/people/$userId': typeof AppHrPeopleUserIdRoute
   '/_app/hr/requests/$requestId': typeof AppHrRequestsRequestIdRoute
   '/_app/shoots/$shootId/edit': typeof AppShootsShootIdEditRoute
@@ -734,9 +770,11 @@ export interface FileRouteTypes {
     | '/'
     | '/activate'
     | '/forgot-password'
+    | '/kiosk'
     | '/login'
     | '/setup-two-factor'
     | '/account'
+    | '/attend'
     | '/audit'
     | '/design-system'
     | '/emails'
@@ -750,6 +788,7 @@ export interface FileRouteTypes {
     | '/departments/$departmentId'
     | '/hr/approvals'
     | '/hr/settings'
+    | '/hr/today'
     | '/invoices/$invoiceId'
     | '/invoices/settings'
     | '/leads/$leadId'
@@ -798,6 +837,7 @@ export interface FileRouteTypes {
     | '/approvals/requests/$requestId'
     | '/clients/$clientId/report'
     | '/content/posts/$postId'
+    | '/hr/items/$itemId'
     | '/hr/people/$userId'
     | '/hr/requests/$requestId'
     | '/shoots/$shootId/edit'
@@ -812,9 +852,11 @@ export interface FileRouteTypes {
   to:
     | '/activate'
     | '/forgot-password'
+    | '/kiosk'
     | '/login'
     | '/setup-two-factor'
     | '/account'
+    | '/attend'
     | '/audit'
     | '/design-system'
     | '/emails'
@@ -829,6 +871,7 @@ export interface FileRouteTypes {
     | '/departments/$departmentId'
     | '/hr/approvals'
     | '/hr/settings'
+    | '/hr/today'
     | '/invoices/$invoiceId'
     | '/invoices/settings'
     | '/leads/$leadId'
@@ -877,6 +920,7 @@ export interface FileRouteTypes {
     | '/approvals/requests/$requestId'
     | '/clients/$clientId/report'
     | '/content/posts/$postId'
+    | '/hr/items/$itemId'
     | '/hr/people/$userId'
     | '/hr/requests/$requestId'
     | '/shoots/$shootId/edit'
@@ -892,9 +936,11 @@ export interface FileRouteTypes {
     | '/_app'
     | '/activate'
     | '/forgot-password'
+    | '/kiosk'
     | '/login'
     | '/setup-two-factor'
     | '/_app/account'
+    | '/_app/attend'
     | '/_app/audit'
     | '/_app/design-system'
     | '/_app/emails'
@@ -909,6 +955,7 @@ export interface FileRouteTypes {
     | '/_app/departments/$departmentId'
     | '/_app/hr/approvals'
     | '/_app/hr/settings'
+    | '/_app/hr/today'
     | '/_app/invoices/$invoiceId'
     | '/_app/invoices/settings'
     | '/_app/leads/$leadId'
@@ -957,6 +1004,7 @@ export interface FileRouteTypes {
     | '/_app/approvals/requests/$requestId'
     | '/_app/clients/$clientId/report'
     | '/_app/content/posts/$postId'
+    | '/_app/hr/items/$itemId'
     | '/_app/hr/people/$userId'
     | '/_app/hr/requests/$requestId'
     | '/_app/shoots/$shootId/edit'
@@ -973,6 +1021,7 @@ export interface RootRouteChildren {
   AppRoute: typeof AppRouteWithChildren
   ActivateRoute: typeof ActivateRoute
   ForgotPasswordRoute: typeof ForgotPasswordRoute
+  KioskRoute: typeof KioskRoute
   LoginRoute: typeof LoginRoute
   SetupTwoFactorRoute: typeof SetupTwoFactorRoute
   ATokenRoute: typeof ATokenRoute
@@ -1001,6 +1050,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ForgotPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/kiosk': {
+      id: '/kiosk'
+      path: '/kiosk'
+      fullPath: '/kiosk'
+      preLoaderRoute: typeof KioskRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/login': {
       id: '/login'
       path: '/login'
@@ -1027,6 +1083,13 @@ declare module '@tanstack/react-router' {
       path: '/account'
       fullPath: '/account'
       preLoaderRoute: typeof AppAccountRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/attend': {
+      id: '/_app/attend'
+      path: '/attend'
+      fullPath: '/attend'
+      preLoaderRoute: typeof AppAttendRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/audit': {
@@ -1181,6 +1244,13 @@ declare module '@tanstack/react-router' {
       path: '/hr/settings'
       fullPath: '/hr/settings'
       preLoaderRoute: typeof AppHrSettingsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/hr/today': {
+      id: '/_app/hr/today'
+      path: '/hr/today'
+      fullPath: '/hr/today'
+      preLoaderRoute: typeof AppHrTodayRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/invoices/': {
@@ -1470,6 +1540,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppContentPostsPostIdRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/hr/items/$itemId': {
+      id: '/_app/hr/items/$itemId'
+      path: '/hr/items/$itemId'
+      fullPath: '/hr/items/$itemId'
+      preLoaderRoute: typeof AppHrItemsItemIdRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/hr/people/': {
       id: '/_app/hr/people/'
       path: '/hr/people'
@@ -1531,6 +1608,7 @@ declare module '@tanstack/react-router' {
 
 interface AppRouteChildren {
   AppAccountRoute: typeof AppAccountRoute
+  AppAttendRoute: typeof AppAttendRoute
   AppAuditRoute: typeof AppAuditRoute
   AppDesignSystemRoute: typeof AppDesignSystemRoute
   AppEmailsRoute: typeof AppEmailsRoute
@@ -1544,6 +1622,7 @@ interface AppRouteChildren {
   AppDepartmentsDepartmentIdRoute: typeof AppDepartmentsDepartmentIdRoute
   AppHrApprovalsRoute: typeof AppHrApprovalsRoute
   AppHrSettingsRoute: typeof AppHrSettingsRoute
+  AppHrTodayRoute: typeof AppHrTodayRoute
   AppInvoicesInvoiceIdRoute: typeof AppInvoicesInvoiceIdRoute
   AppInvoicesSettingsRoute: typeof AppInvoicesSettingsRoute
   AppLeadsLeadIdRoute: typeof AppLeadsLeadIdRoute
@@ -1592,6 +1671,7 @@ interface AppRouteChildren {
   AppApprovalsRequestsRequestIdRoute: typeof AppApprovalsRequestsRequestIdRoute
   AppClientsClientIdReportRoute: typeof AppClientsClientIdReportRoute
   AppContentPostsPostIdRoute: typeof AppContentPostsPostIdRoute
+  AppHrItemsItemIdRoute: typeof AppHrItemsItemIdRoute
   AppHrPeopleUserIdRoute: typeof AppHrPeopleUserIdRoute
   AppHrRequestsRequestIdRoute: typeof AppHrRequestsRequestIdRoute
   AppShootsShootIdEditRoute: typeof AppShootsShootIdEditRoute
@@ -1606,6 +1686,7 @@ interface AppRouteChildren {
 
 const AppRouteChildren: AppRouteChildren = {
   AppAccountRoute: AppAccountRoute,
+  AppAttendRoute: AppAttendRoute,
   AppAuditRoute: AppAuditRoute,
   AppDesignSystemRoute: AppDesignSystemRoute,
   AppEmailsRoute: AppEmailsRoute,
@@ -1619,6 +1700,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppDepartmentsDepartmentIdRoute: AppDepartmentsDepartmentIdRoute,
   AppHrApprovalsRoute: AppHrApprovalsRoute,
   AppHrSettingsRoute: AppHrSettingsRoute,
+  AppHrTodayRoute: AppHrTodayRoute,
   AppInvoicesInvoiceIdRoute: AppInvoicesInvoiceIdRoute,
   AppInvoicesSettingsRoute: AppInvoicesSettingsRoute,
   AppLeadsLeadIdRoute: AppLeadsLeadIdRoute,
@@ -1668,6 +1750,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppApprovalsRequestsRequestIdRoute: AppApprovalsRequestsRequestIdRoute,
   AppClientsClientIdReportRoute: AppClientsClientIdReportRoute,
   AppContentPostsPostIdRoute: AppContentPostsPostIdRoute,
+  AppHrItemsItemIdRoute: AppHrItemsItemIdRoute,
   AppHrPeopleUserIdRoute: AppHrPeopleUserIdRoute,
   AppHrRequestsRequestIdRoute: AppHrRequestsRequestIdRoute,
   AppShootsShootIdEditRoute: AppShootsShootIdEditRoute,
@@ -1689,6 +1772,7 @@ const rootRouteChildren: RootRouteChildren = {
   AppRoute: AppRouteWithChildren,
   ActivateRoute: ActivateRoute,
   ForgotPasswordRoute: ForgotPasswordRoute,
+  KioskRoute: KioskRoute,
   LoginRoute: LoginRoute,
   SetupTwoFactorRoute: SetupTwoFactorRoute,
   ATokenRoute: ATokenRoute,

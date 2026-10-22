@@ -7,15 +7,14 @@ import {
   type CreateHrRequest,
   createHrRequestSchema,
   createLeaveAdjustmentSchema,
-  HR_REQUEST_KINDS,
   HR_REQUEST_LIMITS,
   type HrRequestDetail,
-  type HrRequestKind,
   type HrRequestPreview,
   LEAVE_HALVES,
   LEAVE_TYPES,
   type LeaveHalf,
   type LeaveType,
+  type PunchDirection,
 } from '@vertex-hub/contracts';
 import {
   Callout,
@@ -55,11 +54,16 @@ type FinalFocus = ComponentProps<typeof FormDialog>['finalFocus'];
 
 const WHOLE = 'whole';
 
+/** What a person asks for; a passkey replacement comes from registering a new phone (rule C9). */
+const REQUEST_KINDS = ['leave', 'permission', 'remote_day', 'correction'] as const;
+
+type RequestKind = (typeof REQUEST_KINDS)[number];
+
 /** Stands in for a reason not typed yet, in the request the preview sends. */
 const PREVIEW_REASON = '…';
 
 interface RequestValues {
-  kind: HrRequestKind;
+  kind: RequestKind;
   leaveType: LeaveType;
   startsOn: string;
   endsOn: string;
@@ -67,6 +71,9 @@ interface RequestValues {
   date: string;
   fromTime: string;
   toTime: string;
+  /** Correction only. */
+  direction: PunchDirection;
+  time: string;
   reason: string;
 }
 
@@ -81,6 +88,8 @@ function requestDefaults(): RequestValues {
     date: today,
     fromTime: '',
     toTime: '',
+    direction: 'in',
+    time: '',
     reason: '',
   };
 }
@@ -88,16 +97,35 @@ function requestDefaults(): RequestValues {
 /** The request the values describe, in the shape the API takes. */
 function requestInput(values: RequestValues, userId: string | undefined) {
   const reason = values.reason.trim() || null;
-  return values.kind === 'permission'
-    ? {
+  switch (values.kind) {
+    case 'permission':
+      return {
         kind: 'permission' as const,
         userId,
         date: values.date,
         fromTime: values.fromTime,
         toTime: values.toTime,
         reason,
-      }
-    : {
+      };
+    case 'remote_day':
+      return {
+        kind: 'remote_day' as const,
+        userId,
+        startsOn: values.startsOn,
+        endsOn: values.endsOn,
+        reason,
+      };
+    case 'correction':
+      return {
+        kind: 'correction' as const,
+        userId,
+        date: values.date,
+        direction: values.direction,
+        time: values.time,
+        reason,
+      };
+    default:
+      return {
         kind: 'leave' as const,
         userId,
         leaveType: values.leaveType,
@@ -106,11 +134,12 @@ function requestInput(values: RequestValues, userId: string | undefined) {
         half: values.startsOn === values.endsOn && values.half !== WHOLE ? values.half : null,
         reason,
       };
+  }
 }
 
 /**
- * A new leave or permission (spec screen "My attendance", Requests): its preview (days, the paid
- * and unpaid split, short notice, the certificate) before it is submitted. With `forUser`,
+ * A new leave, permission, remote day or correction (spec screen "My attendance", Requests): its
+ * preview (days, the paid and unpaid split, short notice, the certificate) before it is submitted. With `forUser`,
  * `hr.approve` records it for that employee, approved at once (rule B8). A sick leave that needs
  * a certificate opens its page after submitting, where the certificate is attached (rule B13).
  */
@@ -126,7 +155,7 @@ export function NewRequestDialog({
   forUser?: { id: string; name: string };
 }) {
   const { t } = useTranslation();
-  const ids = { kind: useId(), half: useId() };
+  const ids = { kind: useId(), half: useId(), direction: useId() };
   const navigate = useNavigate();
   const create = useCreateHrRequest();
   const form = useForm<RequestValues>({ defaultValues: requestDefaults() });
@@ -143,6 +172,7 @@ export function NewRequestDialog({
     hrRequestPreviewQuery(settled ? (JSON.parse(settled) as CreateHrRequest) : null),
   );
   const leave = values.kind === 'leave';
+  const ranged = leave || values.kind === 'remote_day';
   const singleDay = values.startsOn === values.endsOn;
   const reasonRequired = !leave || values.leaveType !== 'annual';
 
@@ -177,7 +207,7 @@ export function NewRequestDialog({
     }
   });
 
-  const kindItems = HR_REQUEST_KINDS.map((kind) => ({
+  const kindItems = REQUEST_KINDS.map((kind) => ({
     value: kind,
     label: t(`hr.requests.kinds.${kind}`),
   }));
@@ -218,7 +248,8 @@ export function NewRequestDialog({
             <ToggleGroup
               aria-labelledby={ids.kind}
               value={[field.value]}
-              onValueChange={(next: HrRequestKind[]) => next[0] && field.onChange(next[0])}
+              onValueChange={(next: RequestKind[]) => next[0] && field.onChange(next[0])}
+              className="flex-wrap"
             >
               {kindItems.map((item) => (
                 <ToggleGroupItem key={item.value} value={item.value}>
@@ -230,24 +261,26 @@ export function NewRequestDialog({
         )}
       />
 
-      {leave ? (
+      {ranged ? (
         <>
-          <Controller
-            control={form.control}
-            name="leaveType"
-            render={({ field }) => (
-              <Field>
-                <FieldLabel>{t('hr.requests.fields.leaveType')}</FieldLabel>
-                <ChoiceSelect
-                  label={t('hr.requests.fields.leaveType')}
-                  items={typeItems}
-                  value={field.value}
-                  onChange={(next) => field.onChange(next as LeaveType)}
-                />
-                <FieldDescription>{t(`hr.requests.typeHints.${field.value}`)}</FieldDescription>
-              </Field>
-            )}
-          />
+          {leave && (
+            <Controller
+              control={form.control}
+              name="leaveType"
+              render={({ field }) => (
+                <Field>
+                  <FieldLabel>{t('hr.requests.fields.leaveType')}</FieldLabel>
+                  <ChoiceSelect
+                    label={t('hr.requests.fields.leaveType')}
+                    items={typeItems}
+                    value={field.value}
+                    onChange={(next) => field.onChange(next as LeaveType)}
+                  />
+                  <FieldDescription>{t(`hr.requests.typeHints.${field.value}`)}</FieldDescription>
+                </Field>
+              )}
+            />
+          )}
           <div className="grid gap-5 sm:grid-cols-2">
             <Field invalid={!!errors.startsOn}>
               <FieldLabel>{t('hr.requests.fields.startsOn')}</FieldLabel>
@@ -271,7 +304,7 @@ export function NewRequestDialog({
               <FieldError match={!!errors.endsOn}>{t('hr.requests.errors.endsOn')}</FieldError>
             </Field>
           </div>
-          {singleDay && (
+          {leave && singleDay && (
             <Controller
               control={form.control}
               name="half"
@@ -299,6 +332,40 @@ export function NewRequestDialog({
             />
           )}
         </>
+      ) : values.kind === 'correction' ? (
+        <>
+          <Controller
+            control={form.control}
+            name="direction"
+            render={({ field }) => (
+              <Field>
+                <FieldLabel id={ids.direction} render={<span />}>
+                  {t('hr.requests.fields.direction')}
+                </FieldLabel>
+                <ToggleGroup
+                  aria-labelledby={ids.direction}
+                  value={[field.value]}
+                  onValueChange={(next: PunchDirection[]) => next[0] && field.onChange(next[0])}
+                >
+                  <ToggleGroupItem value="in">{t('hr.attendance.directions.in')}</ToggleGroupItem>
+                  <ToggleGroupItem value="out">{t('hr.attendance.directions.out')}</ToggleGroupItem>
+                </ToggleGroup>
+              </Field>
+            )}
+          />
+          <div className="grid gap-5 sm:grid-cols-2">
+            <Field invalid={!!errors.date}>
+              <FieldLabel>{t('hr.requests.fields.date')}</FieldLabel>
+              <Input type="date" dir="ltr" {...form.register('date')} />
+              <FieldError match={!!errors.date}>{t('hr.requests.errors.date')}</FieldError>
+            </Field>
+            <Field invalid={!!errors.time}>
+              <FieldLabel>{t('hr.requests.fields.time')}</FieldLabel>
+              <Input type="time" dir="ltr" {...form.register('time')} />
+              <FieldError match={!!errors.time}>{t('hr.requests.errors.time')}</FieldError>
+            </Field>
+          </div>
+        </>
       ) : (
         <div className="grid gap-5 sm:grid-cols-3">
           <Field invalid={!!errors.date}>
@@ -324,7 +391,11 @@ export function NewRequestDialog({
           {reasonRequired ? t('hr.requests.fields.reason') : t('hr.requests.fields.reasonOptional')}
         </FieldLabel>
         <Textarea rows={2} maxLength={HR_REQUEST_LIMITS.reason} {...form.register('reason')} />
-        {!leave && <FieldDescription>{t('hr.requests.permissionHint')}</FieldDescription>}
+        {!leave && (
+          <FieldDescription>
+            {t(`hr.requests.kindHints.${values.kind as Exclude<RequestKind, 'leave'>}`)}
+          </FieldDescription>
+        )}
         <FieldError match={!!errors.reason}>{t('hr.requests.errors.reason')}</FieldError>
       </Field>
 
@@ -333,7 +404,7 @@ export function NewRequestDialog({
           loading={preview.isPending || preview.isFetching}
           error={preview.isError ? preview.error : null}
           data={preview.data}
-          leave={leave}
+          kind={values.kind}
         />
       )}
     </FormDialog>
@@ -345,14 +416,15 @@ function RequestPreview({
   loading,
   error,
   data,
-  leave,
+  kind,
 }: {
   loading: boolean;
   error: unknown;
   data: HrRequestPreview | undefined;
-  leave: boolean;
+  kind: RequestKind;
 }) {
   const { t } = useTranslation();
+  const leave = kind === 'leave' || kind === 'remote_day';
   if (error) {
     return (
       <Callout
@@ -396,7 +468,7 @@ function RequestPreview({
         />
       ))}
       {data.warnings.length === 0 && !leave && (
-        <p className="text-sm text-muted-foreground">{t('hr.requests.preview.permissionOk')}</p>
+        <p className="text-sm text-muted-foreground">{t(`hr.requests.preview.ok.${kind}`)}</p>
       )}
     </div>
   );

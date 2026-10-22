@@ -57,21 +57,34 @@ export function RequestStatusBadge({ status }: { status: HrRequestStatus }) {
   );
 }
 
-/** "Annual leave", "Sick leave" or "Permission to leave". */
+/** "Annual leave", "Sick leave", or the kind: "Permission to leave", "Remote work"… */
 export function useRequestTitle() {
   const { t } = useTranslation();
   return (request: Pick<HrRequest, 'kind' | 'leaveType'>) =>
-    request.kind === 'permission'
-      ? t('hr.requests.kinds.permission')
-      : t(`hr.leaveTypes.${request.leaveType ?? 'annual'}`);
+    request.kind === 'leave'
+      ? t(`hr.leaveTypes.${request.leaveType ?? 'annual'}`)
+      : t(`hr.requests.kinds.${request.kind}`);
 }
 
-/** When a request is: its days (a half day named), or a permission's day and window. */
+/**
+ * When a request is: its days (a half day named), a permission's day and window, or a
+ * correction's day, direction and time (rule C19).
+ */
 export function useRequestWhen() {
   const { t } = useTranslation();
   return (
-    request: Pick<HrRequest, 'kind' | 'startsOn' | 'endsOn' | 'half' | 'fromTime' | 'toTime'>,
+    request: Pick<
+      HrRequest,
+      'kind' | 'startsOn' | 'endsOn' | 'half' | 'fromTime' | 'toTime' | 'correctionDirection'
+    >,
   ) => {
+    if (request.kind === 'correction') {
+      return t('hr.requests.correctionWhen', {
+        date: formatCalendarDate(request.startsOn),
+        direction: t(`hr.attendance.directions.${request.correctionDirection ?? 'in'}`),
+        time: formatTimeOfDay(request.fromTime ?? ''),
+      });
+    }
     if (request.kind === 'permission') {
       return t('hr.requests.permissionWhen', {
         date: formatCalendarDate(request.startsOn),

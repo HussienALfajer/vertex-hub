@@ -1,8 +1,22 @@
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
-import { HR_REQUEST_KINDS, type HrRequestKind, type MeResponse } from '@vertex-hub/contracts';
-import { EmptyState, PageHeader, Pagination } from '@vertex-hub/ui';
-import { StampIcon } from 'lucide-react';
+import {
+  ATTENDANCE_ITEM_KINDS,
+  type AttendanceItemKind,
+  HR_REQUEST_KINDS,
+  type HrRequestKind,
+  type MeResponse,
+} from '@vertex-hub/contracts';
+import {
+  EmptyState,
+  PageHeader,
+  Pagination,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from '@vertex-hub/ui';
+import { ClipboardListIcon, StampIcon, TimerIcon } from 'lucide-react';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LoadError } from '../../components/load-error';
@@ -13,20 +27,30 @@ import { usePageInRange } from '../../lib/use-page-in-range';
 import { departmentListQuery } from '../departments/departments.queries';
 import { ChoiceSelect } from '../quotes/choice-select';
 import { hrRequestListQuery } from './hr.queries';
+import { ItemApprovals } from './item-approvals';
 import { RequestRows, RequestRowsSkeleton } from './leave-parts';
 
 /** Approvals reach `hr.read` holders: the GM decides, managers and Ops give opinions (B14). */
 export const readsHr = (me: MeResponse) => can(me, 'hr.read');
 
+const APPROVAL_VIEWS = ['requests', 'items'] as const;
+
+type ApprovalView = (typeof APPROVAL_VIEWS)[number];
+
 export interface HrApprovalsSearch {
+  /** Unset means the requests. */
+  view?: ApprovalView;
   kind?: HrRequestKind;
+  itemKind?: AttendanceItemKind;
   departmentId?: string;
   page?: number;
 }
 
 export function parseHrApprovalsSearch(search: Record<string, unknown>): HrApprovalsSearch {
   return {
+    view: oneOfParam(APPROVAL_VIEWS, search.view),
     kind: oneOfParam(HR_REQUEST_KINDS, search.kind),
+    itemKind: oneOfParam(ATTENDANCE_ITEM_KINDS, search.itemKind),
     departmentId: idParam(search.departmentId),
     page: pageParam(search.page),
   };
@@ -35,16 +59,17 @@ export function parseHrApprovalsSearch(search: Record<string, unknown>): HrAppro
 const PAGE_SIZE = 25;
 
 /**
- * Approvals `/hr/approvals` (spec F17): the pending requests in the viewer's scope, oldest first,
- * filtered by kind and department. Attendance items join them in part C.
+ * Approvals `/hr/approvals` (spec F17): the pending requests and attendance items in the
+ * viewer's scope, oldest first, filtered by kind and department.
  */
 export function HrApprovalsPage({ search }: { search: HrApprovalsSearch }) {
   const { t } = useTranslation();
   const navigate = useNavigate({ from: '/hr/approvals' });
   const page = search.page ?? 1;
+  const view = search.view ?? 'requests';
   const departments = useQuery(departmentListQuery);
-  const requests = useQuery(
-    hrRequestListQuery({
+  const requests = useQuery({
+    ...hrRequestListQuery({
       status: ['pending'],
       kind: search.kind,
       departmentId: search.departmentId,
@@ -52,7 +77,8 @@ export function HrApprovalsPage({ search }: { search: HrApprovalsSearch }) {
       page,
       pageSize: PAGE_SIZE,
     }),
-  );
+    enabled: view === 'requests',
+  });
   usePageInRange(
     page,
     requests.data?.total,
@@ -68,7 +94,9 @@ export function HrApprovalsPage({ search }: { search: HrApprovalsSearch }) {
 
   const kindItems = [
     { value: ALL, label: t('hr.approvals.allKinds') },
-    ...HR_REQUEST_KINDS.map((kind) => ({ value: kind, label: t(`hr.requests.kinds.${kind}`) })),
+    ...(view === 'items'
+      ? ATTENDANCE_ITEM_KINDS.map((kind) => ({ value: kind, label: t(`hr.items.kinds.${kind}`) }))
+      : HR_REQUEST_KINDS.map((kind) => ({ value: kind, label: t(`hr.requests.kinds.${kind}`) }))),
   ];
   const departmentItems = [
     { value: ALL, label: t('users.allDepartments') },
@@ -78,13 +106,42 @@ export function HrApprovalsPage({ search }: { search: HrApprovalsSearch }) {
   return (
     <>
       <PageHeader title={t('hr.approvals.title')} description={t('hr.approvals.subtitle')} />
+      <Tabs
+        value={view}
+        onValueChange={(next: ApprovalView) =>
+          navigate({
+            search: (previous) => ({
+              departmentId: previous.departmentId,
+              view: next === 'requests' ? undefined : next,
+            }),
+            replace: true,
+          })
+        }
+      >
+        <TabsList aria-label={t('hr.approvals.title')}>
+          <TabsTrigger value="requests">
+            <ClipboardListIcon />
+            {t('hr.approvals.views.requests')}
+          </TabsTrigger>
+          <TabsTrigger value="items">
+            <TimerIcon />
+            {t('hr.approvals.views.items')}
+          </TabsTrigger>
+        </TabsList>
+        <TabsContent value="requests" />
+        <TabsContent value="items" />
+      </Tabs>
       <div className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-3 md:flex-row md:items-center">
         <ChoiceSelect
           label={t('hr.approvals.kind')}
           items={kindItems}
-          value={search.kind ?? ALL}
+          value={(view === 'items' ? search.itemKind : search.kind) ?? ALL}
           onChange={(value) =>
-            setFilter({ kind: value === ALL ? undefined : (value as HrRequestKind) })
+            setFilter(
+              view === 'items'
+                ? { itemKind: value === ALL ? undefined : (value as AttendanceItemKind) }
+                : { kind: value === ALL ? undefined : (value as HrRequestKind) },
+            )
           }
           className="md:w-48"
         />
@@ -96,7 +153,14 @@ export function HrApprovalsPage({ search }: { search: HrApprovalsSearch }) {
           className="md:w-48"
         />
       </div>
-      {requests.isPending ? (
+      {view === 'items' ? (
+        <ItemApprovals
+          kind={search.itemKind}
+          departmentId={search.departmentId}
+          page={page}
+          onPageChange={(next) => navigate({ search: (previous) => ({ ...previous, page: next }) })}
+        />
+      ) : requests.isPending ? (
         <RequestRowsSkeleton />
       ) : requests.isError ? (
         <LoadError message={t('hr.requests.listError')} onRetry={() => requests.refetch()} />

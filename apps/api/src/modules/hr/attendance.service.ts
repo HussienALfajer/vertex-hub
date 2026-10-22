@@ -13,6 +13,7 @@ import {
   businessTimeOfDay,
   type CalendarDate,
   DUPLICATE_PUNCH_SECONDS,
+  type FieldWork,
   type MyAttendanceToday,
   nextPunchDirection,
   PUNCH_REFUSALS,
@@ -45,6 +46,7 @@ import { AuditService, recordAudit } from '../audit/index.js';
 import { type CurrentUserInfo, UserDirectory } from '../auth/index.js';
 import { NotificationCenter } from '../notifications/index.js';
 import { AttendanceDays, type DayRow } from './attendance-days.js';
+import { AttendanceFieldWork } from './attendance-field-work.js';
 import { AttendanceKiosksService, OfficeRefused } from './attendance-kiosks.service.js';
 import { AttendancePasskeys, type PasskeyRow } from './attendance-passkeys.js';
 import { AttendanceShoots } from './attendance-shoots.js';
@@ -119,6 +121,7 @@ export class AttendanceService {
     private readonly settings: HrSettingsService,
     private readonly stream: KioskStream,
     private readonly work: LeaveWorkSources,
+    private readonly fieldWork: AttendanceFieldWork,
     private readonly users: UserDirectory,
     private readonly center: NotificationCenter,
     private readonly audit: AuditService,
@@ -137,6 +140,7 @@ export class AttendanceService {
     let day: AttendanceDay | null = null;
     let methods: SelfPunchMethod[] = [];
     let shoots: MyAttendanceToday['shoots'] = [];
+    let fieldWork: FieldWork[] = [];
     if (!exemption) {
       const row = await this.db.transaction(async (tx) => {
         await lockLeave(tx, actor.id);
@@ -144,6 +148,7 @@ export class AttendanceService {
       });
       day = row ? ((await this.presentDays(this.db, actor.id, [row]))[0] ?? null) : null;
       shoots = await this.shoots.punchable(this.db, actor.id, now);
+      fieldWork = await this.fieldWorkOf(this.db, actor.id, today);
       methods = [
         'office',
         // Rules C8 and C19: a standing remote weekday or an approved remote day.
@@ -161,7 +166,22 @@ export class AttendanceService {
       nextDirection: nextPunchDirection(await this.lastPunch(this.db, actor.id), now),
       methods,
       shoots,
+      fieldWork,
     };
+  }
+
+  /** Rule C11: what a field punch may name: the open tasks due today and today's meetings. */
+  private async fieldWorkOf(
+    executor: Executor,
+    userId: string,
+    date: CalendarDate,
+  ): Promise<FieldWork[]> {
+    const work = await this.work.find(executor, userId, { from: date, to: date });
+    return work.flatMap((item) =>
+      item.kind === 'task' || item.kind === 'meeting'
+        ? [{ kind: item.kind, id: item.id, title: item.title, startsAt: item.startsAt }]
+        : [],
+    );
   }
 
   /** `POST /attendance/punch/options`: the place is checked, then the passkey is asked for. */
@@ -220,6 +240,16 @@ export class AttendanceService {
     if (ticket.method === 'field' && !input.fieldNote) {
       throw new BadRequestException('A field punch needs a note');
     }
+    const named = input.fieldWork;
+    if (
+      named &&
+      (ticket.method !== 'field' ||
+        !(await this.fieldWorkOf(this.db, actor.id, businessDate(now))).some(
+          (work) => work.kind === named.kind && work.id === named.id,
+        ))
+    ) {
+      throw new BadRequestException('Not a task due today or a meeting today');
+    }
     let kiosk: typeof attendanceKiosks.$inferSelect | null = null;
     if (ticket.method === 'office') {
       // Rule C6, checked again: the phone may have left the office network since the options.
@@ -265,6 +295,8 @@ export class AttendanceService {
           longitude: ticket.longitude,
           accuracyM: ticket.accuracyM,
           fieldNote: ticket.method === 'field' ? (input.fieldNote ?? null) : null,
+          fieldTaskId: named?.kind === 'task' ? named.id : null,
+          fieldMeetingId: named?.kind === 'meeting' ? named.id : null,
           shootId: ticket.shootId,
           fieldReview: field ? 'accepted' : null,
         })
@@ -653,7 +685,10 @@ export class AttendanceService {
     rows: readonly PunchRow[],
   ): Promise<AttendancePunch[]> {
     const kioskIds = [...new Set(rows.flatMap((row) => (row.kioskId ? [row.kioskId] : [])))];
-    const [kiosks, places] = await Promise.all([
+    const idsOf = (pick: (row: PunchRow) => string | null) => [
+      ...new Set(rows.flatMap((row) => (pick(row) ? [pick(row) as string] : []))),
+    ];
+    const [kiosks, places, taskTitles, meetingTitles] = await Promise.all([
       kioskIds.length === 0
         ? Promise.resolve([])
         : executor
@@ -663,7 +698,28 @@ export class AttendanceService {
       this.shoots.places(executor, [
         ...new Set(rows.flatMap((row) => (row.shootId ? [row.shootId] : []))),
       ]),
+      this.fieldWork.titles(
+        executor,
+        'task',
+        idsOf((row) => row.fieldTaskId),
+      ),
+      this.fieldWork.titles(
+        executor,
+        'meeting',
+        idsOf((row) => row.fieldMeetingId),
+      ),
     ]);
+    const fieldWorkOf = (row: PunchRow): AttendancePunch['fieldWork'] => {
+      const task = row.fieldTaskId ? taskTitles.get(row.fieldTaskId) : undefined;
+      if (row.fieldTaskId && task !== undefined) {
+        return { kind: 'task', id: row.fieldTaskId, title: task };
+      }
+      const meeting = row.fieldMeetingId ? meetingTitles.get(row.fieldMeetingId) : undefined;
+      if (row.fieldMeetingId && meeting !== undefined) {
+        return { kind: 'meeting', id: row.fieldMeetingId, title: meeting };
+      }
+      return null;
+    };
     const kioskNames = new Map(kiosks.map((kiosk) => [kiosk.id, kiosk.name]));
     return rows.map((row) => ({
       id: row.id,
@@ -675,6 +731,7 @@ export class AttendanceService {
       longitude: row.longitude,
       accuracyM: row.accuracyM,
       fieldNote: row.fieldNote,
+      fieldWork: fieldWorkOf(row),
       shoot: row.shootId ? (places.get(row.shootId) ?? null) : null,
       fieldReview: row.fieldReview,
       archivedAt: row.archivedAt?.toISOString() ?? null,

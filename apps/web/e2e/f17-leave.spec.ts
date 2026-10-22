@@ -49,6 +49,8 @@ test('an employee sees their balances and asks for annual leave with its preview
   await expect(page.getByRole('heading', { level: 1, name: h.attendance.title })).toBeVisible();
   // No HR section for an employee without HR access.
   await expect(nav.getByRole('link', { name: ar.nav.hr })).toHaveCount(0);
+  // The page opens on Today; the balances have their own tab.
+  await page.getByRole('tab', { name: h.attendance.tabs.balances }).click();
 
   // Annual: 9 accrued, 2 taken, 2 pending: 5 available.
   const annual = page.locator('[data-leave-type="annual"]');
@@ -111,7 +113,7 @@ test('a permission takes its window and a reason', async ({ page }) => {
   await dialog.getByLabel(r.fields.fromTime).fill('10:00');
   await dialog.getByLabel(r.fields.toTime).fill('11:30');
   await dialog.getByLabel(r.fields.reason).fill('موعد طبيب');
-  await expect(dialog.getByText(r.preview.permissionOk)).toBeVisible();
+  await expect(dialog.getByText(r.preview.ok.permission)).toBeVisible();
   await dialog.getByRole('button', { name: r.new.submit }).click();
   await expect(page.getByText(r.new.submitted)).toBeVisible();
 });

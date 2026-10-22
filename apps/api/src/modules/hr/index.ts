@@ -1,5 +1,6 @@
 // Public surface of the hr module. Code outside this folder imports from here only.
 
+export { AttendanceFieldWork, type FieldWorkTitles } from './attendance-field-work.js';
 export {
   type AttendanceShootSource,
   AttendanceShoots,

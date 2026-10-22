@@ -9,43 +9,58 @@ import {
   TabsList,
   TabsTrigger,
 } from '@vertex-hub/ui';
-import { CalendarCheckIcon, ClipboardListIcon, WalletCardsIcon } from 'lucide-react';
+import {
+  CalendarCheckIcon,
+  CalendarDaysIcon,
+  ClipboardListIcon,
+  SunIcon,
+  WalletCardsIcon,
+} from 'lucide-react';
 import { useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LoadError } from '../../components/load-error';
 import { useMe } from '../../lib/auth';
 import { formatNumber } from '../../lib/format';
-import { oneOfParam, pageParam } from '../../lib/search-params';
+import { monthParam, oneOfParam, pageParam } from '../../lib/search-params';
 import { usePageInRange } from '../../lib/use-page-in-range';
+import { AttendanceMonth, monthOrCurrent } from './attendance-month';
+import { PasskeyCard, TodayCard } from './attendance-today';
 import { hrRequestListQuery } from './hr.queries';
 import { NewRequestDialog } from './leave-dialogs';
 import { LeaveBalances, NewRequestButton, RequestRows, RequestRowsSkeleton } from './leave-parts';
 
-const ATTENDANCE_TABS = ['balances', 'requests'] as const;
+const ATTENDANCE_TABS = ['today', 'month', 'balances', 'requests'] as const;
 
 type AttendanceTab = (typeof ATTENDANCE_TABS)[number];
 
 export interface MyAttendanceSearch {
-  /** Unset means Balances. The Today card and the month arrive with part C. */
+  /** Unset means Today. */
   tab?: AttendanceTab;
   page?: number;
+  /** This month's tab: `YYYY-MM`; unset means the current month. */
+  month?: string;
 }
 
 export function parseMyAttendanceSearch(search: Record<string, unknown>): MyAttendanceSearch {
-  return { tab: oneOfParam(ATTENDANCE_TABS, search.tab), page: pageParam(search.page) };
+  return {
+    tab: oneOfParam(ATTENDANCE_TABS, search.tab),
+    page: pageParam(search.page),
+    month: monthParam(search.month),
+  };
 }
 
 const PAGE_SIZE = 20;
 
 /**
- * My attendance `/me/attendance` (spec F17): for now the leave balances and the employee's own
- * requests, with "New request" (rules B8–B13). Every user has it; exempt users have leave only.
+ * My attendance `/me/attendance` (spec F17): Today (the punch buttons and the passkey), This
+ * month, the leave balances and the employee's own requests, with "New request" (rules B8–B13,
+ * C19). Every user has it; exempt users are told they need not punch.
  */
 export function MyAttendancePage({ search }: { search: MyAttendanceSearch }) {
   const { t } = useTranslation();
   const me = useMe();
   const navigate = useNavigate({ from: '/me/attendance' });
-  const tab = search.tab ?? 'balances';
+  const tab = search.tab ?? 'today';
   const [requesting, setRequesting] = useState(false);
   const newButton = useRef<HTMLButtonElement>(null);
   const newRequest = (
@@ -67,12 +82,20 @@ export function MyAttendancePage({ search }: { search: MyAttendanceSearch }) {
         value={tab}
         onValueChange={(next: AttendanceTab) =>
           navigate({
-            search: { tab: next === 'balances' ? undefined : next },
+            search: { tab: next === 'today' ? undefined : next },
             replace: true,
           })
         }
       >
         <TabsList aria-label={t('hr.attendance.title')}>
+          <TabsTrigger value="today">
+            <SunIcon />
+            {t('hr.attendance.tabs.today')}
+          </TabsTrigger>
+          <TabsTrigger value="month">
+            <CalendarDaysIcon />
+            {t('hr.attendance.tabs.month')}
+          </TabsTrigger>
           <TabsTrigger value="balances">
             <WalletCardsIcon />
             {t('hr.attendance.tabs.balances')}
@@ -82,6 +105,22 @@ export function MyAttendancePage({ search }: { search: MyAttendanceSearch }) {
             {t('hr.attendance.tabs.requests')}
           </TabsTrigger>
         </TabsList>
+        <TabsContent value="today">
+          <div className="grid gap-6 lg:grid-cols-[2fr_1fr] lg:items-start">
+            <TodayCard />
+            <PasskeyCard />
+          </div>
+        </TabsContent>
+        <TabsContent value="month">
+          <AttendanceMonth
+            userId="me"
+            month={monthOrCurrent(search.month)}
+            onMonthChange={(month) =>
+              navigate({ search: (previous) => ({ ...previous, month }), replace: true })
+            }
+            self
+          />
+        </TabsContent>
         <TabsContent value="balances">
           <LeaveBalances userId={me.user.id} />
         </TabsContent>

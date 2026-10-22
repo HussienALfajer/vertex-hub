@@ -376,6 +376,14 @@ Settled in implementation (PR C2, 2026-10-22):
 - `GET /items/:id` returns an item with its day's timeline, the opinions and what the caller may do, for Approvals; opinions take `itemId` as well as `requestId`.
 - Notifications: `attendance_items_pending` and `field_punch_recorded` merge per date through a fixed subject id per date; `attendance_items_pending` pushes (F16 rule B3 pushes every type above informational). Reminders and the screen check run in the F16 minute job; the check-in and check-out reminders are keyed once per attendance day, the shoot check-in per crew member and start, the offline screen per last sighting.
 
+Settled in implementation (PR C3, 2026-10-22):
+- Rule C7: a punch takes two taps. The first reads the location and has the API check the place (the code, the network, the remote day, the shoot); the second opens the passkey prompt. Browsers, Safari above all, open the prompt only right after a tap, and the location and the check can take seconds. A phone camera that opens `/attend#<code>` lands on the same two taps.
+- Rule C11: the optional task or meeting of a field punch is one of the user's open tasks due today or today's meetings (`fieldWork` on My attendance today, the same work `LeaveWorkSources` gives rule B14); the punch shows its title.
+- Screens "Today" and the day's timeline: each punch's point is an "Open in maps" link. The hub's CSP allows no map tiles from another host, so no small map is drawn on the page.
+- Rule C6a in production: the hub's nginx headers allow `camera=(self)` and `geolocation=(self)`; the server's standard `Permissions-Policy` turns both off.
+- The entrance screen keeps its code while the stream reconnects (every 15 minutes by design); the "offline" banner shows after two failed connections in a row.
+- People and the file show the passkey's state (`employment.passkey`: active, a replacement pending).
+
 ### Part D: months
 1. **The month sheet** shows each employee's days and totals, with pending requests and items counted. `hr.read` holders see it in scope.
 2. **Closing** (`hr.approve`) needs the month to have ended and no pending request or item dated in it (`MONTH_HAS_PENDING`, with the list). Closed months reject new punches, corrections, requests, decisions and recomputation dated in them (`MONTH_CLOSED`).
@@ -447,7 +455,7 @@ All under `/api/hr` unless stated. Lists follow ADR 0013 (pagination, filters).
 | `GET /attendance/me/today` | session | — | `myTodaySchema` (day, next action, allowed methods, greeting) | — |
 | `GET /attendance/days` | self / `hr.read` | `{ userId, month }` | `attendanceDayListSchema` (with punches) | — |
 | `POST /attendance/punch/options` | session | `{ method, code?, shootId?, latitude?, longitude?, accuracyM? }` | WebAuthn assertion options + a punch ticket (60 s) | `EXEMPT`, `NO_PASSKEY`, `INVALID_CODE`, `OFF_OFFICE_NETWORK`, `NOT_REMOTE_DAY`, `NOT_ON_SHOOT` (not crew, or outside the shoot's window), `LOCATION_REQUIRED`, `MONTH_CLOSED` |
-| `POST /attendance/punch` | session | `{ ticket, assertion, fieldNote?, fieldTaskId?, fieldMeetingId? }` | `{ punch, day, greeting }` | `PASSKEY_FAILED`, `TICKET_EXPIRED`, `OFF_OFFICE_NETWORK` (checked again) |
+| `POST /attendance/punch` | session | `{ ticket, assertion, fieldNote?, fieldWork?: { kind, id } }` | `{ punch, day, greeting }` | `PASSKEY_FAILED`, `TICKET_EXPIRED`, `OFF_OFFICE_NETWORK` (checked again) |
 | `POST /attendance/punches/:id/reject` | `hr.approve` | `{ note }` | `attendanceDaySchema` | `NOT_FIELD`, `MONTH_CLOSED` |
 | `GET /attendance/today` | `hr.read` | `{ department? }` | `todayBoardSchema` | — |
 | `POST /passkeys/options` · `POST /passkeys` | session | — / attestation | `passkeySchema` | `PENDING_EXISTS` |

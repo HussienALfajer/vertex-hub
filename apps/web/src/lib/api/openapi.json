@@ -55207,6 +55207,9 @@
               "$ref": "#/components/schemas/Weekday"
             }
           },
+          "passkey": {
+            "$ref": "#/components/schemas/PasskeyState"
+          },
           "annualLeaveDays": {
             "type": "number"
           },
@@ -55237,6 +55240,7 @@
           "schedule",
           "attendanceExempt",
           "remoteWeekdays",
+          "passkey",
           "annualLeaveDays",
           "endedOn",
           "endReason",
@@ -55263,6 +55267,22 @@
           "thursday",
           "friday"
         ]
+      },
+      "PasskeyState": {
+        "type": "object",
+        "properties": {
+          "active": {
+            "type": "boolean"
+          },
+          "pending": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "active",
+          "pending"
+        ],
+        "additionalProperties": false
       },
       "EndReason": {
         "type": "string",
@@ -57215,20 +57235,7 @@
             "type": "boolean"
           },
           "passkey": {
-            "type": "object",
-            "properties": {
-              "active": {
-                "type": "boolean"
-              },
-              "pending": {
-                "type": "boolean"
-              }
-            },
-            "required": [
-              "active",
-              "pending"
-            ],
-            "additionalProperties": false
+            "$ref": "#/components/schemas/PasskeyState"
           },
           "day": {
             "nullable": true,
@@ -57252,6 +57259,12 @@
             "items": {
               "$ref": "#/components/schemas/PunchableShoot"
             }
+          },
+          "fieldWork": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FieldWork"
+            }
           }
         },
         "required": [
@@ -57262,7 +57275,8 @@
           "day",
           "nextDirection",
           "methods",
-          "shoots"
+          "shoots",
+          "fieldWork"
         ],
         "additionalProperties": false
       },
@@ -57473,6 +57487,29 @@
             "nullable": true,
             "type": "string"
           },
+          "fieldWork": {
+            "nullable": true,
+            "type": "object",
+            "properties": {
+              "kind": {
+                "$ref": "#/components/schemas/FieldWorkKind"
+              },
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "title": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "id",
+              "title"
+            ],
+            "additionalProperties": false
+          },
           "shoot": {
             "nullable": true,
             "type": "object",
@@ -57526,6 +57563,7 @@
           "longitude",
           "accuracyM",
           "fieldNote",
+          "fieldWork",
           "shoot",
           "fieldReview",
           "archivedAt"
@@ -57540,6 +57578,13 @@
           "field",
           "shoot",
           "correction"
+        ]
+      },
+      "FieldWorkKind": {
+        "type": "string",
+        "enum": [
+          "task",
+          "meeting"
         ]
       },
       "FieldReview": {
@@ -57589,6 +57634,35 @@
           "startsAt",
           "endsAt",
           "location"
+        ],
+        "additionalProperties": false
+      },
+      "FieldWork": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/FieldWorkKind"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "title": {
+            "type": "string"
+          },
+          "startsAt": {
+            "nullable": true,
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          }
+        },
+        "required": [
+          "kind",
+          "id",
+          "title",
+          "startsAt"
         ],
         "additionalProperties": false
       },
@@ -57675,11 +57749,35 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 500
+          },
+          "fieldWork": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/FieldWorkRef"
+              }
+            ]
           }
         },
         "required": [
           "ticket",
           "assertion"
+        ]
+      },
+      "FieldWorkRef": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/FieldWorkKind"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": [
+          "kind",
+          "id"
         ]
       },
       "PunchResult": {

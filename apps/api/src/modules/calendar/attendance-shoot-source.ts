@@ -1,18 +1,30 @@
 import { Injectable, type OnModuleInit } from '@nestjs/common';
 import { SHOOT_CHECK_IN_MINUTES_BEFORE } from '@vertex-hub/contracts';
-import { shootCrew, shoots } from '@vertex-hub/db';
+import { meetings, shootCrew, shoots } from '@vertex-hub/db';
 import { and, asc, eq, gt, inArray, isNull, lte } from 'drizzle-orm';
-import { AttendanceShoots, type CrewShoot } from '../hr/index.js';
+import { AttendanceFieldWork, AttendanceShoots, type CrewShoot } from '../hr/index.js';
 
 /**
  * F17 rule C13: the shoots a crew member checks in and out of, given to `hr`'s attendance. A shoot
- * opens for punches 30 minutes before its start and closes at its end.
+ * opens for punches 30 minutes before its start and closes at its end. Rule C11: the titles of
+ * the meetings that field punches name.
  */
 @Injectable()
 export class AttendanceShootSource implements OnModuleInit {
-  constructor(private readonly attendance: AttendanceShoots) {}
+  constructor(
+    private readonly attendance: AttendanceShoots,
+    private readonly fieldWork: AttendanceFieldWork,
+  ) {}
 
   onModuleInit(): void {
+    // Rule C11: a field punch names a meeting by its title.
+    this.fieldWork.register('meeting', async (executor, ids) => {
+      const rows = await executor
+        .select({ id: meetings.id, title: meetings.title })
+        .from(meetings)
+        .where(inArray(meetings.id, [...ids]));
+      return new Map(rows.map((row) => [row.id, row.title]));
+    });
     this.attendance.register({
       punchable: (executor, userId, at) =>
         executor

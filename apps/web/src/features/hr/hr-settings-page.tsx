@@ -28,6 +28,7 @@ import {
 import {
   CalendarOffIcon,
   ClockIcon,
+  MonitorSmartphoneIcon,
   PlusIcon,
   SlidersHorizontalIcon,
   TrashIcon,
@@ -46,12 +47,13 @@ import { ChoiceSelect } from '../quotes/choice-select';
 import { checked } from './employee-dialogs';
 import { HolidaysTab } from './holidays-tab';
 import { hrSettingsQuery, useUpdateHrSettings } from './hr.queries';
+import { KiosksTab } from './kiosks-tab';
 import { SchedulesTab } from './schedules-tab';
 
 /** HR settings are kept by `hr.manage` (spec F17, screen "HR settings"). */
 export const managesHr = (me: MeResponse) => can(me, 'hr.manage');
 
-const SETTINGS_TABS = ['rules', 'schedules', 'holidays'] as const;
+const SETTINGS_TABS = ['rules', 'schedules', 'holidays', 'screens'] as const;
 
 type SettingsTab = (typeof SETTINGS_TABS)[number];
 
@@ -71,8 +73,8 @@ export function parseHrSettingsSearch(search: Record<string, unknown>): HrSettin
 }
 
 /**
- * HR settings `/hr/settings` (spec F17): the attendance and leave rules, the work schedules and
- * the public holidays. The attendance start date and the entrance screens arrive with Part C.
+ * HR settings `/hr/settings` (spec F17): the attendance and leave rules with the attendance start
+ * date, the work schedules, the public holidays and the entrance screens.
  */
 export function HrSettingsPage({ search }: { search: HrSettingsSearch }) {
   const { t } = useTranslation();
@@ -104,6 +106,10 @@ export function HrSettingsPage({ search }: { search: HrSettingsSearch }) {
             <CalendarOffIcon />
             {t('hr.settings.tabs.holidays')}
           </TabsTrigger>
+          <TabsTrigger value="screens">
+            <MonitorSmartphoneIcon />
+            {t('hr.settings.tabs.screens')}
+          </TabsTrigger>
         </TabsList>
         <TabsContent value="rules">
           <RulesTab />
@@ -118,6 +124,9 @@ export function HrSettingsPage({ search }: { search: HrSettingsSearch }) {
               navigate({ search: (previous) => ({ ...previous, year }), replace: true })
             }
           />
+        </TabsContent>
+        <TabsContent value="screens">
+          <KiosksTab />
         </TabsContent>
       </Tabs>
     </>
@@ -162,6 +171,8 @@ const NUMBER_FIELDS = [
 type NumberField = (typeof NUMBER_FIELDS)[number];
 
 type RulesValues = Record<NumberField, string> & {
+  /** Rule C1: empty keeps attendance in trial. */
+  attendanceStartsOn: string;
   firstLatenessWarning: boolean;
   /** The last tier's limit is ignored: it is "more" (null). */
   latenessTiers: { upToMinutes: string; fraction: string }[];
@@ -172,6 +183,7 @@ const valuesOf = (settings: HrSettings): RulesValues => ({
     NumberField,
     string
   >),
+  attendanceStartsOn: settings.attendanceStartsOn ?? '',
   firstLatenessWarning: settings.firstLatenessWarning,
   latenessTiers: settings.latenessTiers.map((tier) => ({
     upToMinutes: tier.upToMinutes === null ? '' : String(tier.upToMinutes),
@@ -209,8 +221,7 @@ function RulesForm({ settings }: { settings: HrSettings }) {
     const input = checked(
       form,
       hrSettingsSchema.safeParse({
-        // Rule C1: the start date is kept as stored; its field arrives with the attendance screens.
-        attendanceStartsOn: settings.attendanceStartsOn,
+        attendanceStartsOn: values.attendanceStartsOn || null,
         ...Object.fromEntries(NUMBER_FIELDS.map((field) => [field, typedNumber(values[field])])),
         firstLatenessWarning: values.firstLatenessWarning,
         latenessTiers: values.latenessTiers.map((tier, index) => ({
@@ -255,6 +266,24 @@ function RulesForm({ settings }: { settings: HrSettings }) {
       noValidate
     >
       <FormSection title={t('hr.settings.attendance')} hint={t('hr.settings.attendanceHint')}>
+        <Field invalid={!!errors.attendanceStartsOn}>
+          <FieldLabel>{t('hr.settings.fields.attendanceStartsOn')}</FieldLabel>
+          <Input
+            type="date"
+            dir="ltr"
+            className="sm:w-56"
+            min={settings.attendanceStartsOn === null ? businessDate() : undefined}
+            {...form.register('attendanceStartsOn')}
+          />
+          <FieldDescription>
+            {settings.attendanceStartsOn && settings.attendanceStartsOn <= businessDate()
+              ? t('hr.settings.hints.attendanceStarted')
+              : t('hr.settings.hints.attendanceStartsOn')}
+          </FieldDescription>
+          <FieldError match={!!errors.attendanceStartsOn}>
+            {t('hr.settings.errors.attendanceStartsOn')}
+          </FieldError>
+        </Field>
         <div className="grid gap-5 sm:grid-cols-2">
           {field('graceMinutes')}
           {field('checkInReminderMinutes')}
