@@ -367,6 +367,15 @@ Settled in implementation (PR B4, 2026-10-22):
 21. **Reminders** (F16 minute job). `attendance_check_in_missing` at the latest allowed start + `check_in_reminder_minutes` when the user has no presence, no leave and is not exempt; `attendance_check_out_missing` 60 minutes after the expected end while an `in` is open. Once per day each.
 22. **Screen offline.** `kiosk_offline` to Ops and GMs when a paired screen is not seen for 10 minutes during working hours of the default schedule; resolved when it returns.
 
+Settled in implementation (PR C2, 2026-10-22):
+- Rule C14: a pending item follows its day's minutes; a decided item whose minutes change is voided and raised again as a pending one, so no decision stands on figures it did not see. A voided `time_off` gives its credit back.
+- Rule C17: missing out proposes 0 (the decision is usually "waived"); an absence beside a half-day leave proposes 0.5. The first lateness of the month is the first live one dated in that month.
+- Rule C18: a `time_off` credit is an `overtime_credit` ledger row on the annual balance of the day's year; changing the decision writes the opposite row (ledger rows are never edited). `attendance_item_decided` names the kind and the decision, never the fraction or the minutes.
+- Rule C19: a correction is for a moment that has passed (today included, for a lost phone, edge case 6), on a day attendance applies to; its punch is written at approval (or at once when `hr.approve` records it) and archived if the request is cancelled. A remote day covers 1–31 days, counts their work days, is short notice under `remote_notice_work_days`, and meets only another remote day (rule B8).
+- "Roles and access": a holder of `hr.approve` decides their own items like anyone else's (no automatic decision); the audit marks it.
+- `GET /items/:id` returns an item with its day's timeline, the opinions and what the caller may do, for Approvals; opinions take `itemId` as well as `requestId`.
+- Notifications: `attendance_items_pending` and `field_punch_recorded` merge per date through a fixed subject id per date; `attendance_items_pending` pushes (F16 rule B3 pushes every type above informational). Reminders and the screen check run in the F16 minute job; the check-in and check-out reminders are keyed once per attendance day, the shoot check-in per crew member and start, the offline screen per last sighting.
+
 ### Part D: months
 1. **The month sheet** shows each employee's days and totals, with pending requests and items counted. `hr.read` holders see it in scope.
 2. **Closing** (`hr.approve`) needs the month to have ended and no pending request or item dated in it (`MONTH_HAS_PENDING`, with the list). Closed months reject new punches, corrections, requests, decisions and recomputation dated in them (`MONTH_CLOSED`).

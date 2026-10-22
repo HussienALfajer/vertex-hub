@@ -1,8 +1,9 @@
 import {
   ATTENDANCE_DAY_KINDS,
   ATTENDANCE_DAY_STATUSES,
+  ATTENDANCE_ITEM_KINDS,
+  ATTENDANCE_ITEM_STATUSES,
   ATTENDANCE_PLACES,
-  ATTENDANCE_PUNCH_DIRECTIONS,
   DAY_LEAVES,
   FIELD_REVIEWS,
   PASSKEY_STATUSES,
@@ -27,7 +28,13 @@ import {
 import { users } from './auth.js';
 import { meetings, shoots } from './calendar.js';
 import { archivedAt, id, timestamps } from './columns.js';
-import { hrRequests } from './hr.js';
+import {
+  balanceLeaveTypeEnum,
+  hrRequests,
+  leaveDays,
+  ledgerEntryEnum,
+  punchDirectionEnum,
+} from './hr.js';
 import { tasks } from './tasks.js';
 
 /*
@@ -112,8 +119,6 @@ export const attendanceKiosks = pgTable(
     index('attendance_kiosks_created_by_id_idx').on(table.createdById),
   ],
 );
-
-export const punchDirectionEnum = pgEnum('punch_direction', ATTENDANCE_PUNCH_DIRECTIONS);
 
 export const punchMethodEnum = pgEnum('punch_method', PUNCH_METHODS);
 
@@ -208,4 +213,141 @@ export const attendanceDays = pgTable(
     archivedAt: archivedAt(),
   },
   (table) => [uniqueIndex('attendance_days_user_id_date_key').on(table.userId, table.date)],
+);
+
+export const attendanceItemKindEnum = pgEnum('attendance_item_kind', ATTENDANCE_ITEM_KINDS);
+
+export const attendanceItemStatusEnum = pgEnum('attendance_item_status', ATTENDANCE_ITEM_STATUSES);
+
+/**
+ * Rules C14, C17 and C18: what the General Manager decides about a day. At most one live item per
+ * day and kind; one that no longer applies is `void`. `credited_days` is the time off a
+ * `time_off` decision added to the annual balance, reversed if the decision changes.
+ */
+export const attendanceItems = pgTable(
+  'attendance_items',
+  {
+    id: id(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id),
+    dayId: uuid('day_id')
+      .notNull()
+      .references(() => attendanceDays.id),
+    kind: attendanceItemKindEnum('kind').notNull(),
+    minutes: integer('minutes').notNull(),
+    proposedFraction: numeric('proposed_fraction', {
+      precision: 4,
+      scale: 2,
+      mode: 'number',
+    }).notNull(),
+    justification: text('justification'),
+    justifiedAt: timestamp('justified_at', { withTimezone: true }),
+    status: attendanceItemStatusEnum('status').notNull().default('pending'),
+    decidedFraction: numeric('decided_fraction', { precision: 4, scale: 2, mode: 'number' }),
+    decidedMinutes: integer('decided_minutes'),
+    creditedDays: numeric('credited_days', { precision: 5, scale: 1, mode: 'number' }),
+    decidedById: uuid('decided_by_id').references(() => users.id),
+    decidedAt: timestamp('decided_at', { withTimezone: true }),
+    decisionNote: text('decision_note'),
+    ...timestamps(),
+    archivedAt: archivedAt(),
+  },
+  (table) => [
+    index('attendance_items_user_id_idx').on(table.userId),
+    index('attendance_items_day_id_idx').on(table.dayId),
+    index('attendance_items_decided_by_id_idx').on(table.decidedById),
+    index('attendance_items_status_idx').on(table.status, table.createdAt),
+    uniqueIndex('attendance_items_day_kind_key')
+      .on(table.dayId, table.kind)
+      .where(sql`${table.status} <> 'void'`),
+    check('attendance_items_minutes_check', sql`${table.minutes} >= 0`),
+    check(
+      'attendance_items_decision_check',
+      sql`(${table.status} = 'deducted') = (${table.decidedFraction} is not null)
+        and (${table.status} in ('paid', 'time_off')) = (${table.decidedMinutes} is not null)
+        and (${table.decidedMinutes} is null or ${table.decidedMinutes} <= ${table.minutes})
+        and (${table.creditedDays} is null or ${table.status} = 'time_off')`,
+    ),
+  ],
+);
+
+/**
+ * Rules B4–B7: the signed leave balance ledger; a balance is the sum of its non-archived rows.
+ * The unique keys keep the daily job idempotent. Declared here, beside `attendance_items`, since an
+ * `overtime_credit` row points at its item (rule C18).
+ */
+export const leaveLedger = pgTable(
+  'leave_ledger',
+  {
+    id: id(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id),
+    leaveType: balanceLeaveTypeEnum('leave_type').notNull(),
+    year: integer('year').notNull(),
+    days: leaveDays('days').notNull(),
+    entry: ledgerEntryEnum('entry').notNull(),
+    /** `YYYY-MM`: the month an accrual is for. */
+    period: text('period'),
+    requestId: uuid('request_id').references(() => hrRequests.id),
+    /** `overtime_credit` only: the overtime item it credits or gives back (rule C18). */
+    itemId: uuid('item_id').references(() => attendanceItems.id),
+    note: text('note'),
+    createdById: uuid('created_by_id').references(() => users.id),
+    ...timestamps(),
+    archivedAt: archivedAt(),
+  },
+  (table) => [
+    index('leave_ledger_user_id_idx').on(table.userId, table.leaveType, table.year),
+    index('leave_ledger_request_id_idx').on(table.requestId),
+    index('leave_ledger_item_id_idx').on(table.itemId),
+    index('leave_ledger_created_by_id_idx').on(table.createdById),
+    uniqueIndex('leave_ledger_accrual_key')
+      .on(table.userId, table.period)
+      .where(sql`${table.entry} = 'accrual' and ${table.archivedAt} is null`),
+    uniqueIndex('leave_ledger_yearly_key')
+      .on(table.userId, table.leaveType, table.year, table.entry)
+      .where(
+        sql`${table.entry} in ('grant', 'carry_over', 'expiry') and ${table.archivedAt} is null`,
+      ),
+    check(
+      'leave_ledger_period_check',
+      sql`(${table.entry} = 'accrual') = (${table.period} is not null)`,
+    ),
+    check(
+      'leave_ledger_note_check',
+      sql`${table.entry} not in ('adjustment', 'opening') or ${table.note} is not null`,
+    ),
+    check(
+      'leave_ledger_item_check',
+      sql`(${table.entry}::text = 'overtime_credit') = (${table.itemId} is not null)`,
+    ),
+  ],
+);
+
+/** Rules B14 and C17: a department manager's or Ops' comment on a pending request or item. */
+export const hrOpinions = pgTable(
+  'hr_opinions',
+  {
+    id: id(),
+    requestId: uuid('request_id').references(() => hrRequests.id),
+    itemId: uuid('item_id').references(() => attendanceItems.id),
+    authorId: uuid('author_id')
+      .notNull()
+      .references(() => users.id),
+    body: text('body').notNull(),
+    ...timestamps(),
+    archivedAt: archivedAt(),
+  },
+  (table) => [
+    index('hr_opinions_request_id_idx').on(table.requestId),
+    index('hr_opinions_item_id_idx').on(table.itemId),
+    index('hr_opinions_author_id_idx').on(table.authorId),
+    check('hr_opinions_body_check', sql`char_length(${table.body}) between 1 and 1000`),
+    check(
+      'hr_opinions_subject_check',
+      sql`(${table.requestId} is null) <> (${table.itemId} is null)`,
+    ),
+  ],
 );

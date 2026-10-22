@@ -138,6 +138,13 @@ export class ShootWorkflowService {
             outcome: 'done',
             actorId: actor.id,
           },
+          // F17 rule C13: a closed shoot no longer waits for a check-in.
+          {
+            subject: { type: 'shoot', id },
+            types: ['shoot_check_in_missing'],
+            outcome: 'void',
+            actorId: actor.id,
+          },
         ],
       );
     });
@@ -189,7 +196,7 @@ export class ShootWorkflowService {
         [
           {
             subject: { type: 'shoot', id },
-            types: ['shoot_not_closed'],
+            types: ['shoot_not_closed', 'shoot_check_in_missing'],
             outcome: 'void',
             actorId: actor.id,
           },

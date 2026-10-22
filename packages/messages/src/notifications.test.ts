@@ -259,6 +259,15 @@ const SAMPLES: Record<NotificationType, unknown> = {
   },
   colleague_on_leave: { employee: 'سامر', startsOn: '2026-11-08', endsOn: '2026-11-12' },
   leave_balance_adjusted: { leaveType: 'annual', year: 2026, days: 2.5 },
+  attendance_item_raised: { kind: 'lateness', date: '2026-10-21', minutes: 25 },
+  attendance_items_pending: { employee: 'سامر', kind: 'absence', date: '2026-10-21' },
+  attendance_item_decided: { kind: 'overtime', date: '2026-10-21', decision: 'time_off' },
+  attendance_check_in_missing: { date: '2026-10-22' },
+  attendance_check_out_missing: { date: '2026-10-22' },
+  field_punch_recorded: { employee: 'سامر', direction: 'in', at: '2026-10-22T07:30:00.000Z' },
+  field_punch_rejected: { method: 'shoot', direction: 'out', at: '2026-10-22T14:00:00.000Z' },
+  shoot_check_in_missing: { shoot },
+  kiosk_offline: { name: 'المدخل', lastSeenAt: '2026-10-22T06:00:00.000Z' },
   action_reminder: {
     originalType: 'task_review_requested',
     originalData: { task },
@@ -728,5 +737,45 @@ describe('HR leave (F17 part B)', () => {
     expect(linkPath(notificationLink(sample('colleague_on_leave')))).toBe(
       '/calendar?date=2026-11-08',
     );
+  });
+});
+
+describe('HR attendance (F17 part C)', () => {
+  const render = (type: NotificationType, overrides?: Partial<Notification>) =>
+    notificationText(sample(type, overrides), departmentName);
+
+  it('names an item by its minutes, never a deduction (rules C17 and C18)', () => {
+    expect(render('attendance_item_raised').text).toBe(
+      'سُجّل عليك تأخير 25 دقيقة يوم 21 تشرين الأول 2026',
+    );
+    expect(render('attendance_item_decided').text).toBe(
+      'أضافت الإدارة العمل الإضافي يوم 21 تشرين الأول 2026 إلى رصيد إجازتك',
+    );
+    expect(linkPath(notificationLink(sample('attendance_item_raised')))).toBe('/me/attendance');
+    expect(render('attendance_items_pending').text).toBe(
+      'الغياب لـسامر يوم 21 تشرين الأول 2026 بانتظار قرارك',
+    );
+    expect(render('attendance_items_pending', { count: 5 }).text).toBe('5 بنود حضور بانتظار قرارك');
+    expect(linkPath(notificationLink(sample('attendance_items_pending')))).toBe('/hr/approvals');
+  });
+
+  it('reminds of missing punches and opens My attendance (rules C13 and C21)', () => {
+    expect(render('attendance_check_in_missing').text).toBe(
+      'لم تسجّل حضورك بعد يوم 22 تشرين الأول 2026',
+    );
+    expect(linkPath(notificationLink(sample('attendance_check_out_missing')))).toBe(
+      '/me/attendance',
+    );
+    expect(render('shoot_check_in_missing').text).toContain('تصوير المنيو');
+    expect(linkPath(notificationLink(sample('shoot_check_in_missing')))).toBe('/me/attendance');
+  });
+
+  it('tells the GMs of field punches and offline screens (rules C11, C12 and C22)', () => {
+    expect(render('field_punch_recorded', { count: 3 }).text).toBe('3 تسجيلات ميدانية');
+    expect(linkPath(notificationLink(sample('field_punch_recorded')))).toBe('/hr/today');
+    expect(render('field_punch_rejected').text).toContain('رُفض تسجيل الانصراف في جلسة التصوير');
+    expect(linkPath(notificationLink(sample('field_punch_rejected')))).toBe('/me/attendance');
+    expect(render('kiosk_offline').text).toContain('شاشة الدخول «المدخل» غير متصلة منذ');
+    expect(linkPath(notificationLink(sample('kiosk_offline')))).toBe('/hr/settings?tab=screens');
   });
 });

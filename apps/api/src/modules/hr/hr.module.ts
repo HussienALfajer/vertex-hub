@@ -1,12 +1,16 @@
 import { Module } from '@nestjs/common';
+import { AuditModule } from '../audit/index.js';
 import { AuthModule } from '../auth/index.js';
 import { FilesModule } from '../files/index.js';
 import { NotificationsModule } from '../notifications/index.js';
 import { AttendanceService } from './attendance.service.js';
 import { AttendanceDays } from './attendance-days.js';
+import { AttendanceItems } from './attendance-items.js';
+import { AttendanceItemsService } from './attendance-items.service.js';
 import { AttendanceKiosksService } from './attendance-kiosks.service.js';
 import { AttendancePasskeys } from './attendance-passkeys.js';
 import { AttendancePasskeysService } from './attendance-passkeys.service.js';
+import { AttendanceReminders } from './attendance-reminders.js';
 import { AttendanceShoots } from './attendance-shoots.js';
 import { AttendanceWebAuthn } from './attendance-webauthn.js';
 import { EmployeeFileOwner } from './employee-file-owner.js';
@@ -17,6 +21,7 @@ import { HolidaysService } from './holidays.service.js';
 import { HrController } from './hr.controller.js';
 import { HrAttendanceController } from './hr-attendance.controller.js';
 import { HrDailyService } from './hr-daily.service.js';
+import { HrItemsController } from './hr-items.controller.js';
 import { HrLeaveController } from './hr-leave.controller.js';
 import { HrRequestFileOwner } from './hr-request-file-owner.js';
 import { HrRequestsService } from './hr-requests.service.js';
@@ -46,15 +51,18 @@ import { WorkSchedulesService } from './work-schedules.service.js';
  * fill with an employee's work (rule B14), so `hr` imports neither. Registers the `hr_request`
  * owner policy in `files` (rule B13). Part C: attendance passkeys (WebAuthn, ADR 0039), entrance
  * screens and their stream, punches and the days computed from them (rules C1–C16, C20); exports
- * the `AttendanceShoots` registry `calendar` fills for shoot check-ins (rule C13).
+ * the `AttendanceShoots` registry `calendar` fills for shoot check-ins (rule C13). Attendance
+ * items, their justification and decision, remote days and corrections, field punch review, the
+ * Today board and the minute job's attendance reminders (rules C12, C13, C17–C19, C21, C22).
  */
 @Module({
-  imports: [AuthModule, FilesModule, NotificationsModule],
+  imports: [AuditModule, AuthModule, FilesModule, NotificationsModule],
   controllers: [
     HrController,
     HrRulesController,
     HrLeaveController,
     HrAttendanceController,
+    HrItemsController,
     KioskController,
   ],
   providers: [
@@ -83,6 +91,9 @@ import { WorkSchedulesService } from './work-schedules.service.js';
     AttendanceKiosksService,
     AttendanceShoots,
     AttendanceService,
+    AttendanceItems,
+    AttendanceItemsService,
+    AttendanceReminders,
     KioskStream,
   ],
   exports: [HolidayCalendar, LeaveDirectory, LeaveWorkSources, AttendanceShoots],

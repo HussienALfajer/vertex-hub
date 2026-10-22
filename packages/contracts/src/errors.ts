@@ -253,6 +253,9 @@ export const ERROR_CODES = [
   'DUPLICATE_PUNCH',
   'PENDING_EXISTS',
   'INVALID_PAIRING_CODE',
+  'INVALID_DECISION',
+  'NOT_FIELD',
+  'NOT_YET',
 ] as const;
 
 export const errorCodeSchema = z.enum(ERROR_CODES).meta({ id: 'ErrorCode' });

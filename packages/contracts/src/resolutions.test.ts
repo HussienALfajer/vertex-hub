@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  LEAD_REMINDER_KINDS,
   NOTIFICATION_CATALOG,
   NOTIFICATION_TYPES,
-  TIMED_REMINDER_KINDS,
   timedReminderWindow,
 } from './notifications.js';
 import {
@@ -177,7 +177,7 @@ describe('timed reminders (F16 rule B13)', () => {
       from: new Date('2026-10-20T08:10:00Z'),
       to: new Date('2026-10-20T08:15:00Z'),
     });
-    for (const kind of TIMED_REMINDER_KINDS.filter((kind) => kind !== 'meeting_starting')) {
+    for (const kind of LEAD_REMINDER_KINDS.filter((kind) => kind !== 'meeting_starting')) {
       expect(timedReminderWindow(kind, now)).toEqual({
         from: new Date('2026-10-20T09:55:00Z'),
         to: new Date('2026-10-20T10:00:00Z'),

@@ -1,4 +1,5 @@
 import {
+  ATTENDANCE_PUNCH_DIRECTIONS,
   BALANCE_LEAVE_TYPES,
   EMPLOYMENT_TYPES,
   END_REASONS,
@@ -44,7 +45,8 @@ import { currencyEnum } from './projects.js';
 export const weekdayEnum = pgEnum('weekday', WEEKDAYS);
 
 /** Leave days in half days (spec, Data). */
-const leaveDays = (name: string) => numeric(name, { precision: 5, scale: 1, mode: 'number' });
+export const leaveDays = (name: string) =>
+  numeric(name, { precision: 5, scale: 1, mode: 'number' });
 
 export const workScheduleKindEnum = pgEnum('work_schedule_kind', WORK_SCHEDULE_KINDS);
 
@@ -255,10 +257,15 @@ export const hrRequestStatusEnum = pgEnum('hr_request_status', HR_REQUEST_STATUS
 
 export const ledgerEntryEnum = pgEnum('ledger_entry', LEDGER_ENTRIES);
 
+/** A punch's direction; declared here for `hr_requests` and reused by `attendance_punches`. */
+export const punchDirectionEnum = pgEnum('punch_direction', ATTENDANCE_PUNCH_DIRECTIONS);
+
 /**
- * Rules B8–B15: leave and permission requests. A permission's day is both `starts_on` and
- * `ends_on`; `days` and the split are a leave's only. A `passkey_replacement` (rule C9) is dated the
- * day it was asked. A cancelled request keeps the canceller in `decided_by_id`.
+ * Rules B8–B15 and C19: leave, permission, remote-day and correction requests. A permission's or
+ * a correction's day is both `starts_on` and `ends_on`; `days` and the split are a leave's only
+ * (remote days have `days`). A correction's punch time is `from_time`. A `passkey_replacement`
+ * (rule C9) is dated the day it was asked. A cancelled request keeps the canceller in
+ * `decided_by_id`.
  */
 export const hrRequests = pgTable(
   'hr_requests',
@@ -274,6 +281,7 @@ export const hrRequests = pgTable(
     half: leaveHalfEnum('half'),
     fromTime: time('from_time'),
     toTime: time('to_time'),
+    correctionDirection: punchDirectionEnum('correction_direction'),
     days: leaveDays('days'),
     paidDays: leaveDays('paid_days'),
     unpaidDays: leaveDays('unpaid_days'),
@@ -299,79 +307,17 @@ export const hrRequests = pgTable(
       'hr_requests_kind_check',
       sql`(${table.kind} = 'leave' and ${table.leaveType} is not null and ${table.fromTime} is null and ${table.toTime} is null and ${table.days} is not null)
         or (${table.kind} = 'permission' and ${table.leaveType} is null and ${table.half} is null and ${table.startsOn} = ${table.endsOn} and ${table.fromTime} < ${table.toTime})
-        or (${table.kind}::text = 'passkey_replacement' and ${table.leaveType} is null and ${table.half} is null and ${table.fromTime} is null and ${table.toTime} is null and ${table.days} is null and ${table.startsOn} = ${table.endsOn})`,
+        or (${table.kind}::text = 'passkey_replacement' and ${table.leaveType} is null and ${table.half} is null and ${table.fromTime} is null and ${table.toTime} is null and ${table.days} is null and ${table.startsOn} = ${table.endsOn})
+        or (${table.kind}::text = 'remote_day' and ${table.leaveType} is null and ${table.half} is null and ${table.fromTime} is null and ${table.toTime} is null and ${table.days} is not null)
+        or (${table.kind}::text = 'correction' and ${table.leaveType} is null and ${table.half} is null and ${table.fromTime} is not null and ${table.toTime} is null and ${table.days} is null and ${table.startsOn} = ${table.endsOn})`,
+    ),
+    check(
+      'hr_requests_correction_check',
+      sql`(${table.kind}::text = 'correction') = (${table.correctionDirection} is not null)`,
     ),
     check(
       'hr_requests_half_check',
       sql`${table.half} is null or ${table.startsOn} = ${table.endsOn}`,
     ),
-  ],
-);
-
-/**
- * Rules B4–B7: the signed leave balance ledger; a balance is the sum of its non-archived rows.
- * The unique keys keep the daily job idempotent.
- */
-export const leaveLedger = pgTable(
-  'leave_ledger',
-  {
-    id: id(),
-    userId: uuid('user_id')
-      .notNull()
-      .references(() => users.id),
-    leaveType: balanceLeaveTypeEnum('leave_type').notNull(),
-    year: integer('year').notNull(),
-    days: leaveDays('days').notNull(),
-    entry: ledgerEntryEnum('entry').notNull(),
-    /** `YYYY-MM`: the month an accrual is for. */
-    period: text('period'),
-    requestId: uuid('request_id').references(() => hrRequests.id),
-    note: text('note'),
-    createdById: uuid('created_by_id').references(() => users.id),
-    ...timestamps(),
-    archivedAt: archivedAt(),
-  },
-  (table) => [
-    index('leave_ledger_user_id_idx').on(table.userId, table.leaveType, table.year),
-    index('leave_ledger_request_id_idx').on(table.requestId),
-    index('leave_ledger_created_by_id_idx').on(table.createdById),
-    uniqueIndex('leave_ledger_accrual_key')
-      .on(table.userId, table.period)
-      .where(sql`${table.entry} = 'accrual' and ${table.archivedAt} is null`),
-    uniqueIndex('leave_ledger_yearly_key')
-      .on(table.userId, table.leaveType, table.year, table.entry)
-      .where(
-        sql`${table.entry} in ('grant', 'carry_over', 'expiry') and ${table.archivedAt} is null`,
-      ),
-    check(
-      'leave_ledger_period_check',
-      sql`(${table.entry} = 'accrual') = (${table.period} is not null)`,
-    ),
-    check(
-      'leave_ledger_note_check',
-      sql`${table.entry} not in ('adjustment', 'opening') or ${table.note} is not null`,
-    ),
-  ],
-);
-
-/** Rule B14: a department manager's or Ops' comment on a pending request. */
-export const hrOpinions = pgTable(
-  'hr_opinions',
-  {
-    id: id(),
-    requestId: uuid('request_id')
-      .notNull()
-      .references(() => hrRequests.id),
-    authorId: uuid('author_id')
-      .notNull()
-      .references(() => users.id),
-    body: text('body').notNull(),
-    ...timestamps(),
-    archivedAt: archivedAt(),
-  },
-  (table) => [
-    index('hr_opinions_request_id_idx').on(table.requestId),
-    index('hr_opinions_author_id_idx').on(table.authorId),
-    check('hr_opinions_body_check', sql`char_length(${table.body}) between 1 and 1000`),
   ],
 );

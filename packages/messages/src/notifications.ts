@@ -2,6 +2,8 @@ import type {
   AdCampaignStatus,
   DeliverableKind,
   DepartmentCode,
+  HrRequestKind,
+  LeaveType,
   Notification,
   PostStatus,
   ProjectStatus,
@@ -336,6 +338,8 @@ export const NOTIFICATION_TEXT = {
   approval_completed: 'ردّ {{contact}} على كل أعمال رابط «{{client}}»',
   shoot_starting: 'تبدأ جلسة التصوير «{{shoot}}» خلال ساعتين، في {{when}}',
   shoot_completed: 'أُغلقت جلسة التصوير «{{shoot}}» بواسطة {{actor}}',
+  /** F17 rule C13. */
+  shoot_check_in_missing: 'لم تسجّل حضورك في جلسة التصوير «{{shoot}}» التي بدأت {{when}}',
   meeting_starting: 'يبدأ الاجتماع «{{meeting}}» خلال 15 دقيقة، في {{when}}',
   client_status_changed: {
     active: 'أصبح {{client}} عميلًا نشطًا بواسطة {{actor}}',
@@ -428,6 +432,8 @@ export const NOTIFICATION_TEXT = {
     leave: 'طلب {{employee}} {{what}} {{dates}}',
     permission: 'طلب {{employee}} إذن مغادرة يوم {{dates}}',
     passkey_replacement: 'طلب {{employee}} اعتماد مفتاح حضور على جهاز جديد',
+    remote_day: 'طلب {{employee}} العمل عن بُعد {{dates}}',
+    correction: 'طلب {{employee}} تصحيح تسجيل يوم {{dates}}',
   },
   hr_request_decided: {
     approved: 'وافقت الإدارة على طلبك: {{what}} {{dates}}',
@@ -444,6 +450,60 @@ export const NOTIFICATION_TEXT = {
   },
   permission: 'إذن مغادرة',
   passkey: 'مفتاح الحضور الجديد',
+  remoteDay: 'العمل عن بُعد',
+  correction: 'تصحيح التسجيل',
+  /** F17 part C: an item names its minutes, never a deduction (rule C17). */
+  attendance_item_raised: {
+    lateness: 'سُجّل عليك تأخير {{minutes}} دقيقة يوم {{date}}',
+    early_leave: 'سُجّلت عليك مغادرة مبكرة قبل الموعد بـ{{minutes}} دقيقة يوم {{date}}',
+    absence: 'سُجّل عليك غياب يوم {{date}}',
+    missing_out: 'لم يُسجَّل انصرافك يوم {{date}}',
+    overtime: 'سُجّل لك عمل إضافي {{minutes}} دقيقة يوم {{date}}',
+  },
+  attendance_items_pending: '{{what}} لـ{{employee}} يوم {{date}} بانتظار قرارك',
+  attendance_items_pending_merged: {
+    zero: 'لا بنود حضور بانتظار قرارك',
+    one: 'بند حضور واحد بانتظار قرارك',
+    two: 'بندا حضور بانتظار قرارك',
+    few: '{{n}} بنود حضور بانتظار قرارك',
+    many: '{{n}} بندًا للحضور بانتظار قرارك',
+    other: '{{n}} بند حضور بانتظار قرارك',
+  },
+  attendance_item_decided: {
+    deducted: 'قررت الإدارة خصمًا على {{what}} يوم {{date}}',
+    waived: 'أعفتك الإدارة من {{what}} يوم {{date}}',
+    warned: 'وجّهت إليك الإدارة تنبيهًا على {{what}} يوم {{date}}',
+    paid: 'اعتمدت الإدارة {{what}} يوم {{date}} مدفوعًا',
+    time_off: 'أضافت الإدارة {{what}} يوم {{date}} إلى رصيد إجازتك',
+    rejected: 'لم تعتمد الإدارة {{what}} يوم {{date}}',
+  },
+  itemKinds: {
+    lateness: 'التأخير',
+    early_leave: 'المغادرة المبكرة',
+    absence: 'الغياب',
+    missing_out: 'الانصراف غير المسجّل',
+    overtime: 'العمل الإضافي',
+  },
+  attendance_check_in_missing: 'لم تسجّل حضورك بعد يوم {{date}}',
+  attendance_check_out_missing: 'لم تسجّل انصرافك يوم {{date}}',
+  field_punch_recorded: {
+    in: 'سجّل {{employee}} حضورًا ميدانيًا {{when}}',
+    out: 'سجّل {{employee}} انصرافًا ميدانيًا {{when}}',
+  },
+  field_punch_recorded_merged: {
+    zero: 'لا تسجيلات ميدانية',
+    one: 'تسجيل ميداني واحد',
+    two: 'تسجيلان ميدانيان',
+    few: '{{n}} تسجيلات ميدانية',
+    many: '{{n}} تسجيلًا ميدانيًا',
+    other: '{{n}} تسجيل ميداني',
+  },
+  field_punch_rejected: {
+    field: 'رُفض تسجيل {{direction}} الميداني {{when}}',
+    shoot: 'رُفض تسجيل {{direction}} في جلسة التصوير {{when}}',
+  },
+  directions: { in: 'الحضور', out: 'الانصراف' },
+  kiosk_offline: 'شاشة الدخول «{{name}}» غير متصلة منذ {{when}}',
   /** F16 rule B11: each escalation step wraps the original's text. */
   action_reminder: 'تذكير: {{text}}',
   action_escalated: 'تصعيد: {{text}}',
@@ -502,6 +562,10 @@ export function notificationLink(notification: Notification): NotificationLink {
     }
     const tab = kind === 'client_statement' ? 'invoices' : 'ads';
     return { to: '/clients/$clientId', params: { clientId: subject.id }, search: { tab } };
+  }
+  if (notification.type === 'shoot_check_in_missing') {
+    // F17 rule C13: the shoot check-in is on My attendance.
+    return { to: '/me/attendance' };
   }
   if (notification.type === 'retainer_cycle_report_ready') {
     // F05C screen 9: the cycle's report.
@@ -572,7 +636,12 @@ export function notificationLink(notification: Notification): NotificationLink {
         return { to: '/team/$userId', params: { userId: subject.id } };
       }
       // F17 rules B7 and B18: the balances on My attendance; a colleague's leave on the calendar.
-      if (notification.type === 'leave_balance_adjusted') return { to: '/me/attendance' };
+      if (
+        notification.type === 'leave_balance_adjusted' ||
+        notification.type === 'field_punch_rejected'
+      ) {
+        return { to: '/me/attendance' };
+      }
       if (notification.type === 'colleague_on_leave') {
         return { to: '/calendar', search: { date: notification.data.startsOn } };
       }
@@ -596,6 +665,18 @@ export function notificationLink(notification: Notification): NotificationLink {
       return notification.type === 'holiday_changed'
         ? { to: '/calendar', search: { date: notification.data.startsOn } }
         : { to: '/calendar' };
+    case 'attendance_day':
+    case 'attendance_item':
+      // F17 rules C17–C21: the employee's own day and items.
+      return { to: '/me/attendance' };
+    case 'attendance_date':
+      // The General Managers' notices of a date: the items to decide, or the field punches.
+      return notification.type === 'field_punch_recorded'
+        ? { to: '/hr/today' }
+        : { to: '/hr/approvals' };
+    case 'kiosk':
+      // Rule C22: the entrance screens in HR settings.
+      return { to: '/hr/settings', search: { tab: 'screens' } };
     default:
       return { to: '/tasks/$taskId', params: { taskId: subject.id } };
   }
@@ -637,6 +718,21 @@ export function escalatedOriginal(notification: Notification): Notification | nu
 function formatDue(due: { dueDate: string; dueTime: string | null }): string {
   const date = formatCalendarDate(due.dueDate);
   return due.dueTime ? fill(text.dueAt, { date, time: formatTimeOfDay(due.dueTime) }) : date;
+}
+
+/** What an HR request asks for, as its notices name it. */
+function requestWhat(kind: HrRequestKind, leaveType: LeaveType | null): string {
+  if (leaveType) return text.leaveTypes[leaveType];
+  switch (kind) {
+    case 'passkey_replacement':
+      return text.passkey;
+    case 'remote_day':
+      return text.remoteDay;
+    case 'correction':
+      return text.correction;
+    default:
+      return text.permission;
+  }
 }
 
 /** One day, or a period of days. */
@@ -956,7 +1052,8 @@ export function notificationText(
     case 'shoot_dropped':
     case 'shoot_changed':
     case 'shoot_starting':
-    case 'shoot_completed': {
+    case 'shoot_completed':
+    case 'shoot_check_in_missing': {
       const { shoot } = notification.data;
       const values = { actor, shoot: shoot.title, when: formatDateTime(shoot.startsAt) };
       return {
@@ -1236,7 +1333,7 @@ export function notificationText(
       return {
         text: fill(text.hr_request_submitted[kind], {
           employee,
-          what: leaveType ? text.leaveTypes[leaveType] : text.permission,
+          what: requestWhat(kind, leaveType),
           dates: kind === 'passkey_replacement' ? '' : formatDays(startsOn, endsOn),
         }),
         context: null,
@@ -1244,15 +1341,84 @@ export function notificationText(
     }
     case 'hr_request_decided': {
       const { decision, kind, leaveType, startsOn, endsOn } = notification.data;
-      const passkey = kind === 'passkey_replacement';
       return {
         text: fill(text.hr_request_decided[decision], {
-          what: leaveType ? text.leaveTypes[leaveType] : passkey ? text.passkey : text.permission,
-          dates: passkey ? '' : formatDays(startsOn, endsOn),
+          what: requestWhat(kind, leaveType),
+          dates: kind === 'passkey_replacement' ? '' : formatDays(startsOn, endsOn),
         }).trim(),
         context: null,
       };
     }
+    case 'attendance_item_raised': {
+      const { kind, date, minutes } = notification.data;
+      return {
+        text: fill(text.attendance_item_raised[kind], {
+          minutes: formatNumber(minutes),
+          date: formatCalendarDate(date),
+        }),
+        context: null,
+      };
+    }
+    case 'attendance_items_pending': {
+      const { employee, kind, date } = notification.data;
+      return {
+        text:
+          notification.count > 1
+            ? counted(text.attendance_items_pending_merged, notification.count, {})
+            : fill(text.attendance_items_pending, {
+                what: text.itemKinds[kind],
+                employee,
+                date: formatCalendarDate(date),
+              }),
+        context: null,
+      };
+    }
+    case 'attendance_item_decided': {
+      const { kind, date, decision } = notification.data;
+      return {
+        text: fill(text.attendance_item_decided[decision], {
+          what: text.itemKinds[kind],
+          date: formatCalendarDate(date),
+        }),
+        context: null,
+      };
+    }
+    case 'attendance_check_in_missing':
+    case 'attendance_check_out_missing':
+      return {
+        text: fill(text[notification.type], {
+          date: formatCalendarDate(notification.data.date),
+        }),
+        context: null,
+      };
+    case 'field_punch_recorded': {
+      const { employee, direction, at } = notification.data;
+      return {
+        text:
+          notification.count > 1
+            ? counted(text.field_punch_recorded_merged, notification.count, {})
+            : fill(text.field_punch_recorded[direction], { employee, when: formatDateTime(at) }),
+        context: null,
+      };
+    }
+    case 'field_punch_rejected': {
+      const { method, direction, at } = notification.data;
+      return {
+        text: fill(text.field_punch_rejected[method], {
+          direction: text.directions[direction],
+          when: formatDateTime(at),
+        }),
+        context: null,
+      };
+    }
+    case 'kiosk_offline':
+      return {
+        text: fill(text.kiosk_offline, {
+          name: notification.data.name,
+          when: formatDateTime(notification.data.lastSeenAt),
+        }),
+        context: null,
+      };
     case 'colleague_on_leave':
       return {
         text: fill(text.colleague_on_leave, {
@@ -1394,6 +1560,9 @@ type TaskNotification = Exclude<
       | `hr_request_${string}`
       | 'colleague_on_leave'
       | 'leave_balance_adjusted'
+      | `attendance_${string}`
+      | `field_punch_${string}`
+      | 'kiosk_offline'
       | CalendarNotification['type'];
   }
 >;

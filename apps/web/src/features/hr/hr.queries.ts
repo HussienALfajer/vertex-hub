@@ -333,7 +333,9 @@ export function useAddHrOpinion() {
   return useMutation({
     mutationFn: (input: CreateHrOpinion) => call(api.POST('/api/hr/opinions', { body: input })),
     onSettled: (_opinion, _error, input) =>
-      queryClient.invalidateQueries({ queryKey: hrKeys.request(input.requestId) }),
+      input.requestId
+        ? queryClient.invalidateQueries({ queryKey: hrKeys.request(input.requestId) })
+        : undefined,
   });
 }
 

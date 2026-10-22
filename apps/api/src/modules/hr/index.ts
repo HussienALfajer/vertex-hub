@@ -3,6 +3,7 @@
 export {
   type AttendanceShootSource,
   AttendanceShoots,
+  type CrewShoot,
   type ShootPlace,
 } from './attendance-shoots.js';
 export { HolidayCalendar } from './holiday-calendar.js';

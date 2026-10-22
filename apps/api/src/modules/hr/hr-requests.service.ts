@@ -2,6 +2,7 @@ import { Inject, Injectable, NotFoundException, type OnModuleInit } from '@nestj
 import {
   addDays,
   businessDate,
+  businessInstant,
   type CalendarDate,
   type CancelHrRequest,
   type CreateHrOpinion,
@@ -21,6 +22,7 @@ import {
   lastOfMonth,
   leaveSplit,
   leaveUnits,
+  type PunchDirection,
   paidDaysByYear,
   permissionMinutes,
   type RequestSpan,
@@ -29,7 +31,13 @@ import {
   type TimeOfDay,
   unitDays,
 } from '@vertex-hub/contracts';
-import { type Database, hrOpinions, hrRequests, type Transaction } from '@vertex-hub/db';
+import {
+  attendancePunches,
+  type Database,
+  hrOpinions,
+  hrRequests,
+  type Transaction,
+} from '@vertex-hub/db';
 import {
   and,
   asc,
@@ -75,6 +83,7 @@ interface Evaluated {
   half: LeaveHalf | null;
   fromTime: TimeOfDay | null;
   toTime: TimeOfDay | null;
+  correctionDirection: PunchDirection | null;
   days: number | null;
   paidDays: number | null;
   unpaidDays: number | null;
@@ -109,6 +118,7 @@ const auditFields = (row: Evaluated | RequestRow) => ({
   half: row.half,
   fromTime: toTime(row.fromTime),
   toTime: toTime(row.toTime),
+  correctionDirection: row.correctionDirection,
   days: row.days,
   paidDays: row.paidDays,
   unpaidDays: row.unpaidDays,
@@ -117,10 +127,11 @@ const auditFields = (row: Evaluated | RequestRow) => ({
 const yearOf = (date: CalendarDate) => Number(date.slice(0, 4));
 
 /**
- * Leave and permission requests (rules B8–B15, B18 and edge cases 11, 13, 22): submitted by the
- * employee, or recorded by `hr.approve` and approved at once; decided by `hr.approve`, with the
- * opinions of `hr.read` holders. Approving writes the ledger rows of the paid days, and a holiday
- * change recounts the days of open leaves.
+ * Leave, permission, remote-day and correction requests (rules B8–B15, B18, C19 and edge cases
+ * 11, 13, 22): submitted by the employee, or recorded by `hr.approve` and approved at once;
+ * decided by `hr.approve`, with the opinions of `hr.read` holders. Approving writes the ledger
+ * rows of the paid days or a correction's punch, and a holiday change recounts the days of open
+ * leaves.
  */
 @Injectable()
 export class HrRequestsService implements OnModuleInit {
@@ -199,6 +210,7 @@ export class HrRequestsService implements OnModuleInit {
           half: evaluated.half,
           fromTime: evaluated.fromTime,
           toTime: evaluated.toTime,
+          correctionDirection: evaluated.correctionDirection,
           days: evaluated.days,
           paidDays: evaluated.paidDays,
           unpaidDays: evaluated.unpaidDays,
@@ -229,6 +241,7 @@ export class HrRequestsService implements OnModuleInit {
           after: { status: 'approved', recordedByApprover: true },
         });
         if (row.userId !== actor.id) await this.notifyDecided(tx, row, 'approved', actor.id);
+        await this.writeCorrection(tx, row);
         await this.refreshDays(tx, row);
       } else {
         await this.notifySubmitted(tx, row);
@@ -471,6 +484,7 @@ export class HrRequestsService implements OnModuleInit {
       if (approved.kind === 'passkey_replacement') {
         await this.passkeys.activatePending(tx, approved.userId, actorOf(actor));
       }
+      await this.writeCorrection(tx, approved);
       await this.refreshDays(tx, approved);
       await recordAudit(tx, {
         actor: actorOf(actor),
@@ -522,6 +536,11 @@ export class HrRequestsService implements OnModuleInit {
       if (current.status === 'approved') {
         // The days before today were taken; the rest return to the balance.
         await this.syncTaken(tx, cancelled, actor.id, today);
+        // Rule C19: a cancelled correction's punch no longer counts.
+        await tx
+          .update(attendancePunches)
+          .set({ archivedAt: new Date() })
+          .where(eq(attendancePunches.requestId, id));
         await this.refreshDays(tx, cancelled);
       }
       if (current.kind === 'passkey_replacement') {
@@ -547,7 +566,7 @@ export class HrRequestsService implements OnModuleInit {
   /** `POST /opinions` (rule B14): `hr.read` covering the employee, on a pending request. */
   async opine(actor: CurrentUserInfo, input: CreateHrOpinion): Promise<HrOpinion> {
     const row = await this.db.transaction(async (tx) => {
-      const request = await this.locked(tx, input.requestId);
+      const request = await this.locked(tx, input.requestId ?? '');
       if (request.userId === actor.id || !(await this.scope.covers(actor, request.userId, tx))) {
         throw new NotFoundException();
       }
@@ -718,22 +737,7 @@ export class HrRequestsService implements OnModuleInit {
     // Recorded by an approver for someone else: the notice and the deadlines are theirs to
     // waive (rule B8: a leave recorded after the fact).
     const deadlines = !(approver && userId !== actor.id);
-    const span =
-      input.kind === 'leave'
-        ? {
-            startsOn: input.startsOn,
-            endsOn: input.endsOn,
-            half: input.half,
-            fromTime: null,
-            toTime: null,
-          }
-        : {
-            startsOn: input.date,
-            endsOn: input.date,
-            half: null,
-            fromTime: input.fromTime,
-            toTime: input.toTime,
-          };
+    const span = spanOfInput(input);
     const holidays = await this.context.holidaysFrom(
       span.startsOn < today ? span.startsOn : today,
       executor,
@@ -742,12 +746,43 @@ export class HrRequestsService implements OnModuleInit {
       userId,
       kind: input.kind,
       ...span,
+      correctionDirection: input.kind === 'correction' ? input.direction : null,
       reason: input.reason,
       approvedAtOnce: approver,
     };
+    const plain = {
+      leaveType: null,
+      days: null,
+      paidDays: null,
+      unpaidDays: null,
+      shortNotice: false,
+      certificateRequired: false,
+    };
 
     let evaluated: Evaluated;
-    if (input.kind === 'permission') {
+    if (input.kind === 'remote_day') {
+      // Rules B9 and C19: the work days it covers, from today on, short notice under the setting.
+      const days = countWorkDays(addDays(input.startsOn, -1), input.endsOn, subject, holidays);
+      if (days === 0) throw notWorkDay();
+      if (deadlines && input.startsOn < today) throw tooLate();
+      evaluated = {
+        ...base,
+        ...plain,
+        days,
+        shortNotice:
+          deadlines &&
+          countWorkDays(today, input.startsOn, subject, holidays) < settings.remoteNoticeWorkDays,
+      };
+    } else if (input.kind === 'correction') {
+      // Rule C19: a moment that has passed, on a day attendance applies to the employee.
+      if (businessInstant(input.date, input.time) > new Date()) {
+        throw new CodedException(400, 'NOT_YET', 'A correction is for a moment that has passed');
+      }
+      if (!(await this.days.appliesOn(executor, userId, input.date))) {
+        throw new CodedException(403, 'EXEMPT', 'Attendance does not apply to this day');
+      }
+      evaluated = { ...base, ...plain };
+    } else if (input.kind === 'permission') {
       if (!isScheduleWorkDay(input.date, subject.workWeekdays, holidays)) throw notWorkDay();
       if (deadlines && input.date < today) throw tooLate();
       if (permissionMinutes(input) > settings.permissionMaxMinutes) {
@@ -770,15 +805,7 @@ export class HrRequestsService implements OnModuleInit {
       if ((used?.count ?? 0) >= settings.permissionsPerMonth) {
         throw permissionLimit('No permissions left this month');
       }
-      evaluated = {
-        ...base,
-        leaveType: null,
-        days: null,
-        paidDays: null,
-        unpaidDays: null,
-        shortNotice: false,
-        certificateRequired: false,
-      };
+      evaluated = { ...base, ...plain };
     } else {
       const counted = await this.countLeave(executor, userId, input, { subject, holidays });
       if (counted.days === 0) throw notWorkDay();
@@ -821,7 +848,9 @@ export class HrRequestsService implements OnModuleInit {
           input.leaveType === 'sick' && counted.days > settings.sickCertificateAfterDays,
       };
     }
-    await this.checkOverlap(executor, userId, { kind: input.kind, ...span });
+    if (input.kind !== 'correction') {
+      await this.checkOverlap(executor, userId, { kind: input.kind, ...span });
+    }
     return evaluated;
   }
 
@@ -882,8 +911,8 @@ export class HrRequestsService implements OnModuleInit {
       .where(
         and(
           eq(hrRequests.userId, userId),
-          // A passkey replacement is dated, but takes no time off.
-          inArray(hrRequests.kind, ['leave', 'permission']),
+          // A passkey replacement and a correction are dated, but take no time.
+          inArray(hrRequests.kind, ['leave', 'permission', 'remote_day']),
           inArray(hrRequests.status, [...LIVE_STATUSES]),
           isNull(hrRequests.archivedAt),
           lte(hrRequests.startsOn, span.endsOn),
@@ -927,12 +956,28 @@ export class HrRequestsService implements OnModuleInit {
     );
   }
 
-  /** Rule C14: the attendance days a leave or permission covers are recomputed. */
+  /**
+   * Rule C14: the attendance days a leave, permission or remote day covers are recomputed; for a
+   * correction, its day and the one before (rule C15: an early `out` may close it).
+   */
   private async refreshDays(tx: Transaction, row: RequestRow): Promise<void> {
-    if (row.kind !== 'leave' && row.kind !== 'permission') return;
-    const dates: CalendarDate[] = [];
+    if (row.kind === 'passkey_replacement') return;
+    const dates: CalendarDate[] = row.kind === 'correction' ? [addDays(row.startsOn, -1)] : [];
     for (let date = row.startsOn; date <= row.endsOn; date = addDays(date, 1)) dates.push(date);
-    await this.days.refresh(tx, row.userId, dates);
+    // A correction's punch needs its day, even one the daily job has not created yet.
+    await this.days.refresh(tx, row.userId, dates, { create: row.kind === 'correction' });
+  }
+
+  /** Rule C19: an approved correction writes its punch at the time asked for. */
+  private async writeCorrection(tx: Transaction, row: RequestRow): Promise<void> {
+    if (row.kind !== 'correction' || !row.correctionDirection || !row.fromTime) return;
+    await tx.insert(attendancePunches).values({
+      userId: row.userId,
+      direction: row.correctionDirection,
+      at: businessInstant(row.startsOn, toTime(row.fromTime) ?? '00:00'),
+      method: 'correction',
+      requestId: row.id,
+    });
   }
 
   /** The employee of a request, read before taking their lock; 404 when there is none. */
@@ -1011,6 +1056,7 @@ export class HrRequestsService implements OnModuleInit {
       half: row.half,
       fromTime: toTime(row.fromTime),
       toTime: toTime(row.toTime),
+      correctionDirection: row.correctionDirection,
       days: row.days,
       paidDays: row.paidDays,
       unpaidDays: row.unpaidDays,
@@ -1167,10 +1213,49 @@ const empty = (query: HrRequestListQuery): HrRequestPage => ({
   pageSize: query.pageSize,
 });
 
-function toOpinion(row: typeof hrOpinions.$inferSelect, authorName: string): HrOpinion {
+/** The span a new request covers (rule B8): a correction is its day and its punch's time. */
+function spanOfInput(input: CreateHrRequest): Omit<RequestSpan, 'kind'> {
+  switch (input.kind) {
+    case 'leave':
+      return {
+        startsOn: input.startsOn,
+        endsOn: input.endsOn,
+        half: input.half,
+        fromTime: null,
+        toTime: null,
+      };
+    case 'remote_day':
+      return {
+        startsOn: input.startsOn,
+        endsOn: input.endsOn,
+        half: null,
+        fromTime: null,
+        toTime: null,
+      };
+    case 'correction':
+      return {
+        startsOn: input.date,
+        endsOn: input.date,
+        half: null,
+        fromTime: input.time,
+        toTime: null,
+      };
+    default:
+      return {
+        startsOn: input.date,
+        endsOn: input.date,
+        half: null,
+        fromTime: input.fromTime,
+        toTime: input.toTime,
+      };
+  }
+}
+
+export function toOpinion(row: typeof hrOpinions.$inferSelect, authorName: string): HrOpinion {
   return {
     id: row.id,
     requestId: row.requestId,
+    itemId: row.itemId,
     author: { id: row.authorId, name: authorName },
     body: row.body,
     createdAt: row.createdAt.toISOString(),

@@ -568,6 +568,20 @@
       "when": 1792620891146,
       "tag": "0080_lethal_scorpion",
       "breakpoints": true
+    },
+    {
+      "idx": 81,
+      "version": "7",
+      "when": 1792634349218,
+      "tag": "0081_dashing_whizzer",
+      "breakpoints": true
+    },
+    {
+      "idx": 82,
+      "version": "7",
+      "when": 1792636973719,
+      "tag": "0082_public_maginty",
+      "breakpoints": true
     }
   ]
 }

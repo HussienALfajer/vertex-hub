@@ -12,12 +12,26 @@ export interface ShootPlace {
   mapUrl: string | null;
 }
 
+/** A scheduled shoot and its team crew, for the check-in reminder (rule C13). */
+export interface CrewShoot {
+  id: string;
+  title: string;
+  startsAt: Date;
+  endsAt: Date;
+  location: string;
+  crewIds: string[];
+}
+
 /** What the `calendar` module tells attendance about shoots. */
 export interface AttendanceShootSource {
   /** Rule C13: the scheduled shoots the user is team crew of, open for a punch at `at`. */
   punchable(executor: Executor, userId: string, at: Date): Promise<PunchableShoot[]>;
   /** The shoots of punches, by id. */
   places(executor: Executor, ids: readonly string[]): Promise<Map<string, ShootPlace>>;
+  /** The scheduled shoots starting in `(from, to]`, with their team crew. */
+  startingBetween(executor: Executor, from: Date, to: Date): Promise<CrewShoot[]>;
+  /** The ids of the scheduled shoots ending in `(from, to]`. */
+  endingBetween(executor: Executor, from: Date, to: Date): Promise<string[]>;
 }
 
 /**
@@ -39,5 +53,13 @@ export class AttendanceShoots {
   places(executor: Executor, ids: readonly string[]): Promise<Map<string, ShootPlace>> {
     if (ids.length === 0 || !this.source) return Promise.resolve(new Map());
     return this.source.places(executor, ids);
+  }
+
+  startingBetween(executor: Executor, from: Date, to: Date): Promise<CrewShoot[]> {
+    return this.source?.startingBetween(executor, from, to) ?? Promise.resolve([]);
+  }
+
+  endingBetween(executor: Executor, from: Date, to: Date): Promise<string[]> {
+    return this.source?.endingBetween(executor, from, to) ?? Promise.resolve([]);
   }
 }

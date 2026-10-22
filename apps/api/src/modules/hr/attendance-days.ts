@@ -25,6 +25,7 @@ import {
   workSchedules,
 } from '@vertex-hub/db';
 import { and, asc, eq, gte, inArray, isNull, lt, lte } from 'drizzle-orm';
+import { AttendanceItems } from './attendance-items.js';
 import { HolidayCalendar } from './holiday-calendar.js';
 import { lockLeave } from './leave-ledger.js';
 
@@ -61,11 +62,15 @@ export function attendanceApplies(
  * job, a punch or the user's own screen. Its expectations are frozen from the schedule when it is
  * created (edge case 10: a schedule change reaches only days without punches from today on); its
  * figures are recomputed from punches, approved leave and permissions, holidays and the HR
- * settings whenever one of them changes. Callers hold the user's HR lock (`lockLeave`).
+ * settings whenever one of them changes, and its items follow (`AttendanceItems`, rules C14 and
+ * C17). Callers hold the user's HR lock (`lockLeave`).
  */
 @Injectable()
 export class AttendanceDays {
-  constructor(private readonly holidays: HolidayCalendar) {}
+  constructor(
+    private readonly holidays: HolidayCalendar,
+    private readonly items: AttendanceItems,
+  ) {}
 
   /**
    * Recomputes the user's days on `dates`. `create` adds the missing rows where attendance
@@ -73,7 +78,7 @@ export class AttendanceDays {
    * Returns the rows that exist afterwards, archived ones (attendance no longer applies) left out.
    */
   async refresh(
-    executor: Executor,
+    executor: Transaction,
     userId: string,
     dates: readonly CalendarDate[],
     options: { create?: boolean; refreeze?: boolean; now?: Date } = {},
@@ -123,6 +128,7 @@ export class AttendanceDays {
             .update(attendanceDays)
             .set({ archivedAt: now })
             .where(eq(attendanceDays.id, row.id));
+          await this.items.dropDay(executor, row.id, now);
         }
         continue;
       }
@@ -149,7 +155,7 @@ export class AttendanceDays {
       } else if (row.archivedAt || (options.refreeze && date >= today && dayPunches.length === 0)) {
         row = { ...row, ...frozen };
       }
-      const updated = await this.compute(executor, row, {
+      const updated = await this.compute(executor, row, now, {
         file,
         holidays,
         requests,
@@ -255,9 +261,33 @@ export class AttendanceDays {
     return rows.map((row) => row.userId);
   }
 
-  private async compute(
+  /** Rule C2: whether attendance applies to the user on `date` (a correction's day, rule C19). */
+  async appliesOn(executor: Executor, userId: string, date: CalendarDate): Promise<boolean> {
+    const [file] = await executor
+      .select()
+      .from(employeeFiles)
+      .where(eq(employeeFiles.userId, userId));
+    return attendanceApplies(file, date, businessDate());
+  }
+
+  /**
+   * Rule C8: whether the user works remotely on `date`: a standing remote weekday of the file, or
+   * an approved remote day (rule C19).
+   */
+  async remoteOn(
     executor: Executor,
+    file: Pick<FileRow, 'userId' | 'remoteWeekdays'>,
+    date: CalendarDate,
+  ): Promise<boolean> {
+    if (file.remoteWeekdays.includes(weekdayOf(date))) return true;
+    const requests = await this.approvedRequests(executor, file.userId, date, date);
+    return requests.some((request) => request.kind === 'remote_day');
+  }
+
+  private async compute(
+    executor: Transaction,
     row: DayRow,
+    now: Date,
     context: {
       file: FileRow;
       holidays: readonly HolidayRange[];
@@ -300,7 +330,9 @@ export class AttendanceDays {
       phase: context.phase,
       trial,
     });
-    const place = context.file.remoteWeekdays.includes(weekdayOf(date)) ? 'remote' : 'office';
+    const remote =
+      context.file.remoteWeekdays.includes(weekdayOf(date)) ||
+      covering.some((r) => r.kind === 'remote_day');
     const [updated] = await executor
       .update(attendanceDays)
       .set({
@@ -309,7 +341,7 @@ export class AttendanceDays {
         latestStart: row.latestStart,
         expectedEnd: row.expectedEnd,
         requiredMinutes: row.requiredMinutes,
-        place: kind === 'work' ? place : null,
+        place: kind === 'work' ? (remote ? 'remote' : 'office') : null,
         leave,
         firstInAt: computed.firstInAt,
         lastOutAt: computed.lastOutAt,
@@ -322,7 +354,13 @@ export class AttendanceDays {
       })
       .where(eq(attendanceDays.id, row.id))
       .returning();
-    return updated ?? row;
+    if (!updated) return row;
+    await this.items.reconcile(
+      executor,
+      { row: updated, computed, phase: context.phase, trial, settings: context.settings },
+      now,
+    );
+    return updated;
   }
 
   private async scheduleDays(executor: Executor, scheduleId: string) {
@@ -359,7 +397,7 @@ export class AttendanceDays {
         and(
           eq(hrRequests.userId, userId),
           eq(hrRequests.status, 'approved'),
-          inArray(hrRequests.kind, ['leave', 'permission']),
+          inArray(hrRequests.kind, ['leave', 'permission', 'remote_day']),
           isNull(hrRequests.archivedAt),
           lte(hrRequests.startsOn, to),
           gte(hrRequests.endsOn, from),
