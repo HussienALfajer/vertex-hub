@@ -377,7 +377,7 @@ describe('images (F01C)', () => {
     it('marks an undecodable image failed after three attempts and stops serving it (edge case 4)', async () => {
       const me = await cast.signedIn();
       // PNG magic bytes and a header, then garbage: accepted on upload, never decodable.
-      const broken = Buffer.concat([square.subarray(0, 33), randomBytes(2000)]);
+      const broken = Buffer.concat([square.subarray(0, 33), Buffer.alloc(2000, 0x41)]);
       const image = await setOk(`/api/users/${me.id}`, me.cookie, broken);
       const content = app.get(FileContentService);
       while ((await content.renderPendingImages()).left) {
