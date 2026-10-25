@@ -89,7 +89,10 @@ describe('images (F01C)', () => {
         ),
       );
 
-  const currentImages = (column: typeof images.userId, id: string) =>
+  const currentImages = (
+    column: typeof images.userId | typeof images.retainerId,
+    id: string,
+  ) =>
     db
       .select()
       .from(images)
