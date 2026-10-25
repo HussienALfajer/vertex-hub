@@ -352,7 +352,7 @@ describe('signed-in devices (F01B)', () => {
       const [mine] = await list(now);
       expect(mine?.sharedWith).toEqual([
         {
-          user: { id: first.id, name: first.name, image: null },
+          user: { id: first.id, name: first.name, imageId: null },
           department: { code: 'content_management', name: expect.any(String) },
           match: 'same_browser',
           lastActiveAt: expect.any(String),

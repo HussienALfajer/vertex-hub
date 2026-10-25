@@ -179,10 +179,11 @@ describe('clients', () => {
         {
           id: created.id,
           tradeName: created.tradeName,
+          imageId: null,
           sector: null,
           status: 'active',
           isHealthcare: false,
-          accountManager: { id: cast.am.id, name: cast.am.name, archived: false },
+          accountManager: { id: cast.am.id, name: cast.am.name, imageId: null, archived: false },
           hasApprovalContact: false,
         },
       ]);

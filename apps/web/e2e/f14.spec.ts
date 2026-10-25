@@ -66,7 +66,7 @@ test('a pushed notification shows a toast that opens its subject', async ({ page
     streamed: [
       notificationFor(employeeMe, 5900, {
         type: 'task_assigned',
-        actor: { id: manager.user.id, name: manager.user.name },
+        actor: { id: manager.user.id, name: manager.user.name, imageId: null },
         subject: { type: 'task', id: seedIds.dishShoot },
         data: {
           task: {

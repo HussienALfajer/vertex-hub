@@ -201,7 +201,7 @@ describe('meetings (F11 rule 14)', () => {
       const body = (await expectError(refused, 409, 'SCHEDULE_CONFLICT')) as ErrorResponse;
       expect(body.details).toEqual([
         expect.objectContaining({
-          user: { id: cast.videographer.id, name: cast.videographer.name },
+          user: { id: cast.videographer.id, name: cast.videographer.name, imageId: null },
           kind: 'shoot',
           id: shoot.id,
         }),

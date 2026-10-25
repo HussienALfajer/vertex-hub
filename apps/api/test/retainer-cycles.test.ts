@@ -139,7 +139,7 @@ describe('retainer cycles', () => {
         expect.objectContaining({
           delta: 3,
           reason: 'Posted from the client’s account',
-          author: { id: cast.am.id, name: expect.any(String) },
+          author: { id: cast.am.id, name: expect.any(String), imageId: null },
         }),
       ]);
       // R11 on known dates, whatever day the suite runs: three days left with 5 of 12 is behind.

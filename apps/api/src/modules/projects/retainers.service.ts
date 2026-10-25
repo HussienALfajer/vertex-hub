@@ -431,7 +431,7 @@ export class RetainersService {
       entityId: created.id,
       after: {
         ...values,
-        client: { id: client.id, name: client.name, imageId: client.imageId },
+        client: { id: client.id, name: client.name },
         deliverables: lines,
       },
     });

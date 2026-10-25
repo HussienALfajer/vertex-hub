@@ -126,7 +126,7 @@ describe('task views: board, workload, My tasks', () => {
     expect(after.departments).toEqual(['design']);
     const row = after.people.find((p) => p.user.id === person.id);
     expect(row).toEqual({
-      user: { id: person.id, name: person.name },
+      user: { id: person.id, name: person.name, imageId: null },
       departments: ['design'],
       overdue: 1,
       // The overdue task is due before this week only when today is not the week's first day.

@@ -342,7 +342,7 @@ describe('client balances, statements, retainer billing and invoice due dates (F
       date: mine.dueOn,
       title: mine.displayNumber,
       targetId: mine.id,
-      client: { id: clientId, name: mine.client.name, archived: false },
+      client: { id: clientId, name: mine.client.name, imageId: null, archived: false },
       invoiceStatus: 'sent',
     });
     expect(await dueIds(finance.cookie)).toEqual(expect.arrayContaining([mine.id, theirs.id]));

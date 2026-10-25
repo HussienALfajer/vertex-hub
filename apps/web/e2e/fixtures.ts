@@ -779,7 +779,8 @@ export const auditSeed: AuditEntry[] = [
     entityType: 'department',
     entityId: design.id,
     before: { manager: null },
-    after: { manager: { id: id(3), name: 'ليان الأحمد' } },
+    after: { manager: { id: id(3), name: 'ليان الأحمد', imageId: null } },
+    actorImageId: null,
   },
   {
     id: id(502),
@@ -791,6 +792,7 @@ export const auditSeed: AuditEntry[] = [
     entityId: id(3),
     before: { roles: [] },
     after: { roles: ['account_manager'] },
+    actorImageId: null,
   },
   {
     id: id(503),
@@ -802,6 +804,7 @@ export const auditSeed: AuditEntry[] = [
     entityId: id(5),
     before: null,
     after: { name: 'نور السيد', email: 'nour@vertex.example', roles: [] },
+    actorImageId: null,
   },
   {
     id: id(504),
@@ -813,6 +816,7 @@ export const auditSeed: AuditEntry[] = [
     entityId: id(1),
     before: { twoFactorEnabled: true },
     after: { twoFactorEnabled: false },
+    actorImageId: null,
   },
   {
     id: id(505),
@@ -822,8 +826,9 @@ export const auditSeed: AuditEntry[] = [
     action: 'client.account_manager_changed',
     entityType: 'client',
     entityId: id(601),
-    before: { accountManager: { id: id(1), name: 'سارة الخطيب' } },
-    after: { accountManager: { id: id(3), name: 'ليان الأحمد' } },
+    before: { accountManager: { id: id(1), name: 'سارة الخطيب', imageId: null } },
+    after: { accountManager: { id: id(3), name: 'ليان الأحمد', imageId: null } },
+    actorImageId: null,
   },
   {
     id: id(506),
@@ -835,6 +840,7 @@ export const auditSeed: AuditEntry[] = [
     entityId: id(611),
     before: null,
     after: { clientId: id(601), name: 'هالة الشامي', hasFinalApproval: true },
+    actorImageId: null,
   },
   {
     id: id(507),
@@ -846,6 +852,7 @@ export const auditSeed: AuditEntry[] = [
     entityId: id(801),
     before: { status: 'planned' },
     after: { status: 'active' },
+    actorImageId: null,
   },
   {
     id: id(508),
@@ -857,6 +864,7 @@ export const auditSeed: AuditEntry[] = [
     entityId: id(813),
     before: { projectId: id(801), name: 'التنفيذ', installmentMinor: 100_000 },
     after: { projectId: id(801), name: 'التنفيذ', installmentMinor: 120_000 },
+    actorImageId: null,
   },
   {
     id: id(509),
@@ -868,6 +876,7 @@ export const auditSeed: AuditEntry[] = [
     entityId: id(901),
     before: { status: 'paused' },
     after: { status: 'active' },
+    actorImageId: null,
   },
   {
     id: id(510),
@@ -884,6 +893,7 @@ export const auditSeed: AuditEntry[] = [
         { kind: 'reel', label: null, monthlyQuantity: 4 },
       ],
     },
+    actorImageId: null,
   },
   {
     id: id(511),
@@ -904,6 +914,7 @@ export const auditSeed: AuditEntry[] = [
       sizeBytes: 2_726_297,
       note: 'ألوان الهوية الجديدة وصورة الطبق الموسمي.',
     },
+    actorImageId: null,
   },
   {
     id: id(512),
@@ -925,6 +936,7 @@ export const auditSeed: AuditEntry[] = [
       kind: 'upload',
       sizeBytes: 298_000,
     },
+    actorImageId: null,
   },
   {
     id: id(513),
@@ -941,6 +953,7 @@ export const auditSeed: AuditEntry[] = [
       versions: [{ name: 'منشور التوعية', number: 1 }],
       hasText: true,
     },
+    actorImageId: null,
   },
   {
     id: id(514),
@@ -958,6 +971,7 @@ export const auditSeed: AuditEntry[] = [
       note: 'غيّروا صورة الغلاف.',
       versions: [{ name: 'منشور التوعية', number: 1 }],
     },
+    actorImageId: null,
   },
 ];
 
@@ -1327,7 +1341,7 @@ function signedInDevices(
         if (known && MATCH_STRENGTH[known.match] >= MATCH_STRENGTH[match]) continue;
         const primary = user.departments.find((d) => d.isPrimary);
         shared.set(user.id, {
-          user: { id: user.id, name: user.name, image: null },
+          user: { id: user.id, name: user.name, imageId: null },
           department: primary ? { code: primary.code, name: primary.name } : null,
           match,
           lastActiveAt: other.lastActiveAt,
@@ -1618,7 +1632,7 @@ export async function mockApi(page: Page, options: MockOptions): Promise<MockedA
     const head = users.find((u) => u.id === managers.get(d.id));
     return {
       ...d,
-      manager: head ? { id: head.id, name: head.name } : null,
+      manager: head ? { id: head.id, name: head.name, imageId: null } : null,
       memberCount: membersOf(d).length,
     };
   };
@@ -1628,6 +1642,7 @@ export async function mockApi(page: Page, options: MockOptions): Promise<MockedA
       .map((u) => ({
         id: u.id,
         name: u.name,
+        imageId: null,
         title: u.title,
         isPrimary: u.departments.find((x) => x.id === d.id)?.isPrimary ?? false,
         status: u.status === 'invited' ? ('invited' as const) : ('active' as const),
@@ -2047,9 +2062,11 @@ function clientRoutes({ users, clients, me }: ClientState) {
       accountManager: {
         id: c.accountManagerId,
         name: manager?.name ?? '',
+        imageId: null,
         archived: manager?.status === 'archived',
       },
       hasApprovalContact: c.contacts.some((x) => !x.archived && x.hasFinalApproval),
+      imageId: null,
     };
   };
   const strip = <T extends { archived: boolean }>({ archived: _, ...rest }: T) => rest;
@@ -2074,7 +2091,7 @@ function clientRoutes({ users, clients, me }: ClientState) {
       occurredAt: n.occurredAt,
       channel: n.channel,
       summary: n.summary,
-      author: { id: n.authorId, name: nameOf(n.authorId) },
+      author: { id: n.authorId, name: nameOf(n.authorId), imageId: null },
       contact: who ? { id: who.id, name: who.name, archived: who.archived } : null,
       canEdit: own && !c.archived,
       canArchive: (own || holds('clients.manage', 'all')) && !c.archived,
@@ -2497,7 +2514,9 @@ function projectRoutes({ users, clients, projects, me }: ProjectState) {
     status: m.status,
     overdue: m.status === 'pending' && !!m.dueDate && m.dueDate < PROJECTS_TODAY,
     doneAt: m.doneAt,
-    doneBy: m.doneById ? { id: m.doneById, name: user(m.doneById)?.name ?? '' } : null,
+    doneBy: m.doneById
+      ? { id: m.doneById, name: user(m.doneById)?.name ?? '', imageId: null }
+      : null,
     tasks: noTasks,
     ...(seesMoney(p) && { money: { installmentMinor: m.installmentMinor } }),
   });
@@ -2507,10 +2526,12 @@ function projectRoutes({ users, clients, projects, me }: ProjectState) {
     return {
       id: p.id,
       name: p.name,
-      client: { id: p.clientId, name: clientOf(p)?.tradeName ?? '' },
+      imageId: null,
+      client: { id: p.clientId, name: clientOf(p)?.tradeName ?? '', imageId: null },
       projectManager: {
         id: p.projectManagerId,
         name: manager?.name ?? '',
+        imageId: null,
         archived: manager?.status === 'archived',
       },
       departments: p.departments,
@@ -2541,6 +2562,7 @@ function projectRoutes({ users, clients, projects, me }: ProjectState) {
       },
     }),
     permissions: permissions(p),
+    ownImageId: null,
   });
   const extraWorkOf = (p: ProjectRecord, item: ExtraWorkRecord): ExtraWork => {
     const who = clientOf(p)?.contacts.find((x) => x.id === item.contactId);
@@ -2552,7 +2574,7 @@ function projectRoutes({ users, clients, projects, me }: ProjectState) {
       description: item.description,
       requestedOn: item.requestedOn,
       contact: who ? { id: who.id, name: who.name, archived: who.archived } : null,
-      loggedBy: { id: item.loggedById, name: user(item.loggedById)?.name ?? '' },
+      loggedBy: { id: item.loggedById, name: user(item.loggedById)?.name ?? '', imageId: null },
       billingStatus: item.billingStatus,
       billingNote: item.billingNote,
       createdAt: item.createdAt,
@@ -2968,7 +2990,7 @@ interface ContractRecord {
   signed: RetainerContract['signed'];
   voided: RetainerContract['voided'];
   issuedAt: string | null;
-  issuedBy: { id: string; name: string } | null;
+  issuedBy: { id: string; name: string; imageId: string | null } | null;
   draftPdf: RetainerContractDetail['draftPdf'];
   annexes: ContractAnnex[];
   archived: boolean;
@@ -3173,7 +3195,7 @@ export function retainersSeed(): RetainerRecord[] {
               position: 1,
             },
           ],
-          createdBy: { id: id(3), name: '' },
+          createdBy: { id: id(3), name: '', imageId: null },
           createdAt: '2026-10-03T09:00:00.000Z',
           decision: null,
           appliedAt: null,
@@ -3208,7 +3230,7 @@ export function retainersSeed(): RetainerRecord[] {
           status: 'pending_approval',
           reason: 'الحملة متوقفة نصف الشهر',
           lines: [],
-          createdBy: { id: id(3), name: '' },
+          createdBy: { id: id(3), name: '', imageId: null },
           createdAt: '2026-10-08T11:30:00.000Z',
           decision: null,
           appliedAt: null,
@@ -3309,7 +3331,7 @@ function contractSettingsSeed() {
     slogan: 'نبدأ بفكرة، ونبني كياناً، ونصنع أثراً.',
     numberPrefix: 'VM-CCS',
     updatedAt: '2026-10-01T08:00:00.000Z',
-    updatedBy: null as { id: string; name: string } | null,
+    updatedBy: null as { id: string; name: string; imageId: string | null } | null,
   };
   const articles = [
     {
@@ -3454,7 +3476,7 @@ function retainerRoutes({ users, clients, retainers, me, contractSettings }: Ret
         id: a.id,
         delta: a.delta,
         reason: a.reason,
-        author: { id: a.authorId, name: user(a.authorId)?.name ?? '' },
+        author: { id: a.authorId, name: user(a.authorId)?.name ?? '', imageId: null },
         createdAt: a.createdAt,
       })),
     })),
@@ -3490,10 +3512,12 @@ function retainerRoutes({ users, clients, retainers, me, contractSettings }: Ret
     return {
       id: r.id,
       name: r.name,
-      client: { id: r.clientId, name: client?.tradeName ?? '' },
+      imageId: null,
+      client: { id: r.clientId, name: client?.tradeName ?? '', imageId: null },
       accountManager: {
         id: client?.accountManagerId ?? '',
         name: user(client?.accountManagerId ?? '')?.name ?? '',
+        imageId: null,
       },
       departments: r.departments,
       status: r.status,
@@ -3536,6 +3560,7 @@ function retainerRoutes({ users, clients, retainers, me, contractSettings }: Ret
       },
     }),
     permissions: permissions(r),
+    ownImageId: null,
   });
   const extraWorkOf = (r: RetainerRecord, item: ExtraWorkRecord): ExtraWork => {
     const who = clientOf(r)?.contacts.find((x) => x.id === item.contactId);
@@ -3547,7 +3572,7 @@ function retainerRoutes({ users, clients, retainers, me, contractSettings }: Ret
       description: item.description,
       requestedOn: item.requestedOn,
       contact: who ? { id: who.id, name: who.name, archived: who.archived } : null,
-      loggedBy: { id: item.loggedById, name: user(item.loggedById)?.name ?? '' },
+      loggedBy: { id: item.loggedById, name: user(item.loggedById)?.name ?? '', imageId: null },
       billingStatus: item.billingStatus,
       billingNote: item.billingNote,
       createdAt: item.createdAt,
@@ -3745,7 +3770,7 @@ function retainerRoutes({ users, clients, retainers, me, contractSettings }: Ret
         pdf: { state: 'ready' },
         signed: null,
         voided: null,
-        issuedBy: { id: me().user.id, name: me().user.name },
+        issuedBy: { id: me().user.id, name: me().user.name, imageId: null },
         createdAt: stamp(),
       };
       contract.annexes.push(annex);
@@ -3870,7 +3895,7 @@ function retainerRoutes({ users, clients, retainers, me, contractSettings }: Ret
       );
       contract.status = 'issued';
       contract.issuedAt = stamp();
-      contract.issuedBy = { id: me().user.id, name: me().user.name };
+      contract.issuedBy = { id: me().user.id, name: me().user.name, imageId: null };
       contract.snapshot = contractContent(r, contract);
       return json(route, contractDetail(r, contract));
     }
@@ -4156,7 +4181,7 @@ function retainerRoutes({ users, clients, retainers, me, contractSettings }: Ret
             revisionLimit: null,
             position: index + 1,
           })),
-          createdBy: { id: me().user.id, name: '' },
+          createdBy: { id: me().user.id, name: '', imageId: null },
           createdAt: new Date().toISOString(),
           decision: null,
           appliedAt: !needsApproval && applied ? new Date().toISOString() : null,
@@ -4184,7 +4209,7 @@ function retainerRoutes({ users, clients, retainers, me, contractSettings }: Ret
           : 'rejected',
         decision: {
           approved,
-          by: { id: me().user.id, name: me().user.name },
+          by: { id: me().user.id, name: me().user.name, imageId: null },
           at: new Date().toISOString(),
           note: note ?? null,
         },
@@ -4220,7 +4245,7 @@ function retainerRoutes({ users, clients, retainers, me, contractSettings }: Ret
         status: 'applied',
         reason: input.reason,
         lines: [],
-        createdBy: { id: me().user.id, name: me().user.name },
+        createdBy: { id: me().user.id, name: me().user.name, imageId: null },
         createdAt: new Date().toISOString(),
         decision: null,
         appliedAt: new Date().toISOString(),
@@ -4741,7 +4766,7 @@ export function tasksSeed(): TaskRecord[] {
           stage: 'internal',
           outcome: 'returned',
           note: 'اختصر النص في سطرين.',
-          reviewer: { id: id(1), name: 'سارة الخطيب' },
+          reviewer: { id: id(1), name: 'سارة الخطيب', imageId: null },
           versions: [],
           clientText: null,
           createdAt: '2026-10-07T10:00:00.000Z',
@@ -4751,7 +4776,7 @@ export function tasksSeed(): TaskRecord[] {
           stage: 'internal',
           outcome: 'passed',
           note: null,
-          reviewer: { id: id(1), name: 'سارة الخطيب' },
+          reviewer: { id: id(1), name: 'سارة الخطيب', imageId: null },
           versions: [{ id: id(1381), fileItemId: id(1330), name: 'منشور التوعية', number: 1 }],
           clientText:
             'ابتسامتك تبدأ بدقيقتين: نظّف أسنانك مرتين يوميًا.\nاحجز فحصك الدوري في عيادة الشفاء.',
@@ -4787,7 +4812,7 @@ export function tasksSeed(): TaskRecord[] {
           stage: 'internal',
           outcome: 'passed',
           note: null,
-          reviewer: { id: id(1), name: 'سارة الخطيب' },
+          reviewer: { id: id(1), name: 'سارة الخطيب', imageId: null },
           versions: [],
           clientText: 'التبييض الآمن يبدأ بفحص عند طبيبك.',
           createdAt: '2026-10-08T12:00:00.000Z',
@@ -4848,9 +4873,9 @@ export function approvalsSeed(): {
   requests: ApprovalRequestRecord[];
 } {
   const jasmine = id(601);
-  const layan = { id: id(3), name: 'ليان الأحمد' };
-  const sara = { id: id(1), name: 'سارة الخطيب' };
-  const hala = { id: id(611), name: 'هالة الشامي', archived: false };
+  const layan = { id: id(3), name: 'ليان الأحمد', imageId: null };
+  const sara = { id: id(1), name: 'سارة الخطيب', imageId: null };
+  const hala = { id: id(611), name: 'هالة الشامي', archived: false, imageId: null };
   const pass = (
     n: number,
     versions: TaskReview['versions'],
@@ -4861,7 +4886,7 @@ export function approvalsSeed(): {
     stage,
     outcome: 'passed',
     note: null,
-    reviewer: stage === 'medical' ? { id: id(8), name: 'د. هبة النجار' } : sara,
+    reviewer: stage === 'medical' ? { id: id(8), name: 'د. هبة النجار', imageId: null } : sara,
     versions,
     clientText,
     createdAt: '2026-10-07T08:00:00.000Z',
@@ -5145,7 +5170,11 @@ function taskRoutes({
       .departments.filter((d) => d.isManager)
       .map((d) => d.code);
   const user = (userId: string) => users.find((u) => u.id === userId);
-  const person = (userId: string) => ({ id: userId, name: user(userId)?.name ?? '' });
+  const person = (userId: string) => ({
+    id: userId,
+    name: user(userId)?.name ?? '',
+    imageId: null,
+  });
   const clientOf = (task: TaskRecord) => clients.find((c) => c.id === task.clientId);
   const projectOf = (task: TaskRecord) => projects.find((p) => p.id === task.projectId);
   const retainerOf = (task: TaskRecord) => retainers.find((r) => r.id === task.retainerId);
@@ -5277,6 +5306,7 @@ function taskRoutes({
         ? {
             id: assignee.id,
             name: assignee.name,
+            imageId: null,
             archived: assignee.status === 'archived',
             inDepartment: assignee.departments.some((d) => d.code === task.department),
           }
@@ -5289,11 +5319,11 @@ function taskRoutes({
       overdue: overdue(task),
       blocked: blocked(task),
       client: clientOf(task)
-        ? { id: task.clientId as string, name: clientOf(task)?.tradeName ?? '' }
+        ? { id: task.clientId as string, name: clientOf(task)?.tradeName ?? '', imageId: null }
         : null,
-      project: project ? { id: project.id, name: project.name } : null,
+      project: project ? { id: project.id, name: project.name, imageId: null } : null,
       milestone: milestoneRecord ? { id: milestoneRecord.id, name: milestoneRecord.name } : null,
-      retainer: retainer ? { id: retainer.id, name: retainer.name } : null,
+      retainer: retainer ? { id: retainer.id, name: retainer.name, imageId: null } : null,
       cycle: cycle
         ? { id: cycle.id, periodStart: cycle.periodStart, periodEnd: cycle.periodEnd }
         : null,
@@ -5389,7 +5419,11 @@ function taskRoutes({
     const mine = comment.authorId === me().user.id && !task.archived;
     return {
       id: comment.id,
-      author: { ...person(comment.authorId), archived: author?.status === 'archived' },
+      author: {
+        ...person(comment.authorId),
+        archived: author?.status === 'archived',
+        imageId: null,
+      },
       body: comment.archived ? null : comment.body,
       mentions: mentionedUserIds(comment.body).map((userId) => ({
         ...person(userId),
@@ -5592,7 +5626,7 @@ function taskRoutes({
     const contact = requestContact(request);
     return {
       id: request.id,
-      client: { id: request.clientId, name: requestClient(request).tradeName },
+      client: { id: request.clientId, name: requestClient(request).tradeName, imageId: null },
       contact: { id: contact.id, name: contact.name, archived: contact.archived },
       state: stateOf(request),
       items: countsOf(request),
@@ -5932,7 +5966,7 @@ function taskRoutes({
           )
           .sort((a, b) => a.tradeName.localeCompare(b.tradeName, 'ar'))
           .map((c) => ({
-            client: { id: c.id, name: c.tradeName },
+            client: { id: c.id, name: c.tradeName, imageId: null },
             isHealthcare: c.isHealthcare,
             contacts: c.contacts
               .filter((contact) => !contact.archived && contact.hasFinalApproval)
@@ -6290,7 +6324,7 @@ function taskRoutes({
           .map((u) => {
             const theirs = open.filter((t) => t.assigneeId === u.id);
             return {
-              user: { id: u.id, name: u.name },
+              user: { id: u.id, name: u.name, imageId: null },
               departments: u.departments
                 .map((d) => d.code)
                 .filter((code) => departments.includes(code)),
@@ -6669,8 +6703,8 @@ export function contentSeed(): {
   requests: ApprovalRequestRecord[];
 } {
   const jasmine = id(601);
-  const layan = { id: id(3), name: 'ليان الأحمد' };
-  const sara = { id: id(1), name: 'سارة الخطيب' };
+  const layan = { id: id(3), name: 'ليان الأحمد', imageId: null };
+  const sara = { id: id(1), name: 'سارة الخطيب', imageId: null };
   const png = (name: string) => ({ name, mimeType: 'image/png', sizeBytes: 2_400_000 });
   const final = {
     isFinal: true,
@@ -7001,6 +7035,7 @@ function contentRoutes({
   const person = (userId: string) => ({
     id: userId,
     name: users.find((u) => u.id === userId)?.name ?? '',
+    imageId: null,
   });
   const archivable = (userId: string) => ({
     ...person(userId),
@@ -7037,7 +7072,7 @@ function contentRoutes({
 
   const summary = (post: PostRecord): Post => ({
     id: post.id,
-    client: { id: post.clientId, name: clientOf(post)?.tradeName ?? '' },
+    client: { id: post.clientId, name: clientOf(post)?.tradeName ?? '', imageId: null },
     title: post.title,
     type: post.type,
     platforms: post.platforms,
@@ -7071,9 +7106,10 @@ function contentRoutes({
       client: {
         id: post.clientId,
         name: clientOf(post)?.tradeName ?? '',
+        imageId: null,
         healthcare: clientOf(post)?.isHealthcare ?? false,
       },
-      responsible: { ...archivable(post.responsibleId), inScope: true },
+      responsible: { ...archivable(post.responsibleId), inScope: true, imageId: null },
       caption: post.caption,
       hashtags: post.hashtags,
       notes: post.notes,
@@ -7549,7 +7585,7 @@ interface FileRecord {
   versions: FileVersionRecord[];
 }
 
-type Uploader = { id: string; name: string };
+type Uploader = { id: string; name: string; imageId: string | null };
 
 const uploadVersion = (
   n: number,
@@ -7605,8 +7641,8 @@ const linkVersion = (
  * Jasmine's brand files and documents (one confidential), with a project and a retainer document.
  */
 export function filesSeed(): FileRecord[] {
-  const layan = { id: id(3), name: 'ليان الأحمد' };
-  const sara = { id: id(1), name: 'سارة الخطيب' };
+  const layan = { id: id(3), name: 'ليان الأحمد', imageId: null };
+  const sara = { id: id(1), name: 'سارة الخطيب', imageId: null };
   const png = (name: string, sizeBytes: number) => ({ name, mimeType: 'image/png', sizeBytes });
   const pdf = (name: string, sizeBytes: number) => ({
     name,
@@ -7716,7 +7752,7 @@ export function filesSeed(): FileRecord[] {
         1382,
         2,
         png('dental-post-v2.png', 1_310_720),
-        { id: id(5), name: 'نور السيد' },
+        { id: id(5), name: 'نور السيد', imageId: null },
         '2026-10-09T08:00:00.000Z',
         { note: 'صورة أوضح للفرشاة.' },
       ),
@@ -7724,7 +7760,7 @@ export function filesSeed(): FileRecord[] {
         1381,
         1,
         png('dental-post.png', 1_258_291),
-        { id: id(5), name: 'نور السيد' },
+        { id: id(5), name: 'نور السيد', imageId: null },
         '2026-10-07T12:00:00.000Z',
       ),
     ]),
@@ -7843,6 +7879,7 @@ function fileRoutes({
   const person = (userId: string) => ({
     id: userId,
     name: users.find((u) => u.id === userId)?.name ?? '',
+    imageId: null,
   });
   const holds = (permission: string, scope: string) =>
     me().permissions.some((g) => g.permission === permission && g.scopes.includes(scope as never));
@@ -8642,7 +8679,12 @@ function templateRoutes({ users, clients, retainers, templates, me }: TemplateSt
       const user = users.find((u) => u.id === userId);
       return {
         department,
-        user: { id: userId, name: user?.name ?? '', archived: user?.status === 'archived' },
+        user: {
+          id: userId,
+          name: user?.name ?? '',
+          archived: user?.status === 'archived',
+          imageId: null,
+        },
         valid: isMember(userId, department),
       };
     });
@@ -8662,9 +8704,11 @@ function templateRoutes({ users, clients, retainers, templates, me }: TemplateSt
         .map((r) => ({
           id: r.id,
           name: r.name,
+          imageId: null,
           client: {
             id: r.clientId,
             name: clients.find((c) => c.id === r.clientId)?.tradeName ?? '',
+            imageId: null,
           },
         })),
       createdAt: '2026-09-01T08:00:00.000Z',
@@ -8841,7 +8885,11 @@ function templateRunRoutes({
   const holds = (permission: string, scope: string) =>
     me().permissions.some((g) => g.permission === permission && g.scopes.includes(scope as never));
   const user = (userId: string) => users.find((u) => u.id === userId);
-  const person = (userId: string) => ({ id: userId, name: user(userId)?.name ?? '' });
+  const person = (userId: string) => ({
+    id: userId,
+    name: user(userId)?.name ?? '',
+    imageId: null,
+  });
   const clientScope = (clientId: string) =>
     holds('projects.manage', 'all') ||
     (holds('projects.manage', 'own_clients') &&
@@ -9215,7 +9263,7 @@ export function notificationFor(
 
 /** Sara's and Karim's notifications. */
 export function notificationsSeed(): NotificationRecord[] {
-  const layan = { id: id(3), name: 'ليان الأحمد' };
+  const layan = { id: id(3), name: 'ليان الأحمد', imageId: null };
   return [
     notificationFor(manager, 5001, {
       type: 'task_review_requested',
@@ -9307,7 +9355,7 @@ export function notificationsSeed(): NotificationRecord[] {
     }),
     notificationFor(manager, 5006, {
       type: 'client_account_manager_assigned',
-      actor: { id: id(2), name: 'عمر حداد' },
+      actor: { id: id(2), name: 'عمر حداد', imageId: null },
       subject: { type: 'client', id: id(602) },
       data: { client: 'عيادة الشفاء' },
       read: true,
@@ -9330,7 +9378,7 @@ export function notificationsSeed(): NotificationRecord[] {
       inbox: 'fyi',
       resolution: {
         outcome: 'done',
-        by: { id: id(2), name: 'عمر حداد' },
+        by: { id: id(2), name: 'عمر حداد', imageId: null },
         at: '2026-09-29T15:00:00.000Z',
       },
       updatedAt: '2026-09-29T14:00:00.000Z',
@@ -9351,7 +9399,7 @@ export function notificationsSeed(): NotificationRecord[] {
       inbox: 'done',
       resolution: {
         outcome: 'done',
-        by: { id: manager.user.id, name: manager.user.name },
+        by: { id: manager.user.id, name: manager.user.name, imageId: null },
         at: '2026-09-28T12:00:00.000Z',
       },
       updatedAt: '2026-09-28T10:00:00.000Z',
@@ -9367,7 +9415,7 @@ export function notificationsSeed(): NotificationRecord[] {
     }),
     notificationFor(employeeMe, 5010, {
       type: 'task_assigned',
-      actor: { id: id(1), name: 'سارة الخطيب' },
+      actor: { id: id(1), name: 'سارة الخطيب', imageId: null },
       subject: { type: 'task', id: id(1002) },
       data: {
         task: {
@@ -9387,7 +9435,7 @@ export function notificationsSeed(): NotificationRecord[] {
  * (acceptance step C7), and a meeting about to start with its link.
  */
 export function catalogNotificationsSeed(): NotificationRecord[] {
-  const omar = { id: id(2), name: 'عمر حداد' };
+  const omar = { id: id(2), name: 'عمر حداد', imageId: null };
   const client = 'مطعم الياسمين';
   return [
     notificationFor(manager, 5801, {
@@ -9479,7 +9527,7 @@ export function catalogNotificationsSeed(): NotificationRecord[] {
 /** F16 rule A15: a delivered and opened push, one to a device that is gone, and a test. */
 function pushDeliveriesSeed(notifications: NotificationRecord[]): PushDelivery[] {
   const strip = ({ recipientId: _, ...rest }: NotificationRecord) => rest as Notification;
-  const sara = { id: manager.user.id, name: manager.user.name };
+  const sara = { id: manager.user.id, name: manager.user.name, imageId: null };
   const found = (n: number) => {
     const record = notifications.find((item) => item.id === id(n));
     return record ? strip(record) : null;
@@ -9499,7 +9547,7 @@ function pushDeliveriesSeed(notifications: NotificationRecord[]): PushDelivery[]
     },
     {
       id: id(9702),
-      user: { id: employeeMe.user.id, name: employeeMe.user.name },
+      user: { id: employeeMe.user.id, name: employeeMe.user.name, imageId: null },
       device: 'Safari على iPhone',
       kind: 'notification',
       notification: found(5010),
@@ -9691,7 +9739,7 @@ function notificationRoutes({
         policies.set(type, {
           push: input.push,
           email: input.email,
-          updatedBy: { id: me().user.id, name: me().user.name },
+          updatedBy: { id: me().user.id, name: me().user.name, imageId: null },
           updatedAt: new Date().toISOString(),
         });
       return json(route, policyOf(type));
@@ -10049,6 +10097,7 @@ function announcementRoutes({
   const person = (userId: string) => ({
     id: userId,
     name: users.find((u) => u.id === userId)?.name ?? '',
+    imageId: null,
   });
   const scopes = () =>
     me().permissions.find((granted) => granted.permission === 'announcements.manage')?.scopes ?? [];
@@ -10254,6 +10303,7 @@ function announcementRoutes({
         users: resolved.slice(0, AUDIENCE_PREVIEW_MAX).map((u) => ({
           id: u.id,
           name: u.name,
+          imageId: null,
           image: null,
           department: u.departments.find((d) => d.isPrimary)?.code ?? null,
         })),
@@ -10554,7 +10604,7 @@ const address = (name: string, email: string, userId?: string) => ({
 /** The outbox: client emails of the seeded documents, and staff emails of each state. */
 export function emailsSeed(): EmailRecord[] {
   const hala = address('هالة الشامي', 'hala@jasmine.example');
-  const layan = { id: id(3), name: 'ليان الأحمد' };
+  const layan = { id: id(3), name: 'ليان الأحمد', imageId: null };
   const client = {
     audience: 'client' as const,
     cc: [address(layan.name, 'layan@vertex.example', layan.id)],
@@ -11108,6 +11158,7 @@ function calendarRoutes({
   const person = (userId: string) => ({
     id: userId,
     name: users.find((u) => u.id === userId)?.name ?? '',
+    imageId: null,
   });
   const archivable = (userId: string) => ({
     ...person(userId),
@@ -11115,7 +11166,9 @@ function calendarRoutes({
   });
   const clientOf = (clientId: string | null) => {
     const client = clients.find((c) => c.id === clientId);
-    return client ? { id: client.id, name: client.tradeName, archived: client.archived } : null;
+    return client
+      ? { id: client.id, name: client.tradeName, archived: client.archived, imageId: null }
+      : null;
   };
   const inPhotography = (userId: string) =>
     !!users.find((u) => u.id === userId)?.departments.some((d) => d.code === 'photography');
@@ -11316,7 +11369,7 @@ function calendarRoutes({
   const keyDates = (from: string, to: string): KeyDate[] => {
     const inRange = (date: string | null): date is string => !!date && date >= from && date <= to;
     const client = (clientId: string) =>
-      clientOf(clientId) ?? { id: clientId, name: '', archived: false };
+      clientOf(clientId) ?? { id: clientId, name: '', archived: false, imageId: null };
     const open = projects.filter((p) => !p.archived && OPEN_STATUSES.includes(p.status));
     return [
       ...open
@@ -12210,7 +12263,7 @@ export function quotesSeed(): QuoteRecords {
       defaultValidityDays: 14,
       discountThresholdPercent: 10,
       updatedAt: '2026-09-20T08:00:00.000Z',
-      updatedBy: { id: id(1), name: 'سارة الخطيب' },
+      updatedBy: { id: id(1), name: 'سارة الخطيب', imageId: null },
     },
     quotes: [
       quote(9201, {
@@ -12326,7 +12379,7 @@ function quoteRoutes({
   };
   const person = (userId: string) => {
     const user = users.find((u) => u.id === userId);
-    return { id: userId, name: user?.name ?? '' };
+    return { id: userId, name: user?.name ?? '', imageId: null };
   };
   const catalogPriceOf = (
     item: { priceUsdMinor: number; priceSypMinor: number | null },
@@ -12370,7 +12423,7 @@ function quoteRoutes({
     return {
       ...q,
       displayNumber: quoteDisplayNumber(q),
-      client: client ? { id: client.id, name: client.tradeName } : null,
+      client: client ? { id: client.id, name: client.tradeName, imageId: null } : null,
       recipient: client
         ? { kind: 'client', id: client.id, name: client.tradeName }
         : { kind: 'lead', id: lead?.id ?? '', name: lead ? leadDisplayName(lead) : '' },
@@ -12574,6 +12627,7 @@ function quoteRoutes({
             return {
               id: r.id,
               name: r.name,
+              imageId: null,
               status: r.status,
               startDate: r.startDate,
               renewsFromCycle,
@@ -13312,6 +13366,7 @@ function leadRules({ leads, quotes, clients, users, me }: LeadState) {
   const person = (userId: string) => ({
     id: userId,
     name: users.find((u) => u.id === userId)?.name ?? '',
+    imageId: null,
   });
   /** `leads.*` covering the lead (scope `assigned`: its owner), or the quote scopes (F03). */
   const covers = (permission: Permission, lead: LeadRecord) => {
@@ -13486,7 +13541,12 @@ function leadRoutes(state: LeadState & { rules: LeadRuleSet }) {
   const manageAll = () => scopes('leads.manage').includes('all');
   const owner = (userId: string) => {
     const user = users.find((u) => u.id === userId);
-    return { id: userId, name: user?.name ?? '', archived: user?.status === 'archived' };
+    return {
+      id: userId,
+      name: user?.name ?? '',
+      archived: user?.status === 'archived',
+      imageId: null,
+    };
   };
   const eligibleOwners = () =>
     users.filter(
@@ -13549,7 +13609,7 @@ function leadRoutes(state: LeadState & { rules: LeadRuleSet }) {
       budgetCurrency: lead.budgetCurrency,
       interests: lead.interests.map((interest) => interestName(interest)?.name ?? ''),
       quoteCount: latestQuotes(lead).length,
-      client: client ? { id: client.id, name: client.tradeName } : null,
+      client: client ? { id: client.id, name: client.tradeName, imageId: null } : null,
       closedAt: lead.closedAt,
       createdAt: lead.createdAt,
       updatedAt: lead.updatedAt,
@@ -13731,6 +13791,7 @@ function leadRoutes(state: LeadState & { rules: LeadRuleSet }) {
         items: eligibleOwners().map((u) => ({
           id: u.id,
           name: u.name,
+          imageId: null,
           departments: u.departments.map((d) => d.code),
         })),
       });
@@ -14273,9 +14334,10 @@ function invoiceRoutes({
   const person = (userId: string) => ({
     id: userId,
     name: users.find((u) => u.id === userId)?.name ?? '',
+    imageId: null,
   });
   const named = (record: { id: string; name: string } | undefined) =>
-    record ? { id: record.id, name: record.name } : null;
+    record ? { id: record.id, name: record.name, imageId: null } : null;
   const live = (i: InvoiceRecord) => !i.archivedAt && i.status !== 'void';
   const chargesOf = (r: RetainerRecord) =>
     [
@@ -14361,7 +14423,7 @@ function invoiceRoutes({
       id: i.id,
       displayNumber:
         i.year && i.number ? invoiceDisplayNumber({ year: i.year, number: i.number }) : null,
-      client: { id: i.clientId, name: client?.tradeName ?? '' },
+      client: { id: i.clientId, name: client?.tradeName ?? '', imageId: null },
       accountManager: person(client?.accountManagerId ?? id(1)),
       engagement: project
         ? { type: 'project', id: project.id, name: project.name }
@@ -14555,7 +14617,7 @@ function invoiceRoutes({
       to,
     });
     return {
-      client: { id: client.id, name: client.tradeName },
+      client: { id: client.id, name: client.tradeName, imageId: null },
       billingName: client.billingName ?? client.tradeName,
       billingAddress: client.billingAddress ?? null,
       currency,
@@ -14846,7 +14908,7 @@ function invoiceRoutes({
             .filter((m) => !m.archived && (m.installmentMinor ?? 0) > 0 && !heldBy(m.id))
             .map((m) => ({
               id: m.id,
-              project: { id: p.id, name: p.name },
+              project: { id: p.id, name: p.name, imageId: null },
               name: m.name,
               status: m.status,
               installmentMinor: m.installmentMinor ?? 0,
@@ -14857,7 +14919,7 @@ function invoiceRoutes({
             .filter((c) => !heldBy(c.id))
             .map((c) => ({
               id: c.id,
-              retainer: { id: r.id, name: r.name },
+              retainer: { id: r.id, name: r.name, imageId: null },
               cycle: c.cycle,
               periodStart: c.periodStart,
               periodEnd: c.periodEnd,
@@ -14871,7 +14933,7 @@ function invoiceRoutes({
             .map((w) => ({
               id: w.id,
               project: 'milestones' in e ? { id: e.id, name: e.name } : null,
-              retainer: 'cycles' in e ? { id: e.id, name: e.name } : null,
+              retainer: 'cycles' in e ? { id: e.id, name: e.name, imageId: null } : null,
               title: w.title,
               estimateMinor: w.estimateMinor,
             })),
@@ -15337,6 +15399,7 @@ function campaignRoutes({
   const person = (userId: string) => ({
     id: userId,
     name: users.find((u) => u.id === userId)?.name ?? '',
+    imageId: null,
   });
   const clientName = (clientId: string) => clients.find((c) => c.id === clientId)?.tradeName ?? '';
 
@@ -15391,14 +15454,19 @@ function campaignRoutes({
     return {
       id: c.id,
       name: c.name,
-      client: { id: c.clientId, name: clientName(c.clientId) },
+      client: { id: c.clientId, name: clientName(c.clientId), imageId: null },
       platform: c.platform,
       objective: c.objective,
       funding: c.funding,
       status: c.status,
       startsOn: c.startsOn,
       endsOn: c.endsOn,
-      owner: { id: c.ownerId, name: owner?.name ?? '', archived: owner?.status === 'archived' },
+      owner: {
+        id: c.ownerId,
+        name: owner?.name ?? '',
+        archived: owner?.status === 'archived',
+        imageId: null,
+      },
       budgetMinor: c.budgetMinor,
       spendMinor: totals.spendMinor,
       budgetUsed: budgetUsed(totals.spendMinor, c.budgetMinor),
@@ -15566,7 +15634,12 @@ function campaignRoutes({
     const canFund = scopes('campaigns.fund').length > 0;
     return {
       ...totalsOf(clientId),
-      client: { id: clientId, name: client?.tradeName ?? '', archived: client?.archived ?? false },
+      client: {
+        id: clientId,
+        name: client?.tradeName ?? '',
+        archived: client?.archived ?? false,
+        imageId: null,
+      },
       usesWallet: usesWallet(clientId),
       from: null,
       to: null,
@@ -15752,7 +15825,7 @@ function campaignRoutes({
         )
         .map((client) => ({
           ...totalsOf(client.id),
-          client: { id: client.id, name: client.tradeName },
+          client: { id: client.id, name: client.tradeName, imageId: null },
           accountManager: person(client.accountManagerId),
           lastDepositOn:
             entries
@@ -15858,14 +15931,20 @@ function reportRoutes({ users, clients, projects, retainers, tasks, tasksApi, me
   const scopes = (permission: string) =>
     me().permissions.find((g) => g.permission === permission)?.scopes ?? [];
   const holds = (permission: string) => scopes(permission).length > 0;
-  const named = (record: { id: string; name: string }) => ({ id: record.id, name: record.name });
+  const named = (record: { id: string; name: string }) => ({
+    id: record.id,
+    name: record.name,
+    imageId: null,
+  });
   const clientNamed = (clientId: string) => ({
     id: clientId,
     name: clients.find((c) => c.id === clientId)?.tradeName ?? '',
+    imageId: null,
   });
   const userNamed = (userId: string) => ({
     id: userId,
     name: users.find((u) => u.id === userId)?.name ?? '',
+    imageId: null,
   });
   const open = () => tasks.filter((t) => !t.archived && isTaskOpen(t.status));
   const week = weekOf(PROJECTS_TODAY);
@@ -16715,7 +16794,7 @@ export function employeesSeed(users: UserResponse[]): {
     amountMinor,
     currency: 'USD',
     reason,
-    createdBy: { id: id(1), name: 'سارة الخطيب' },
+    createdBy: { id: id(1), name: 'سارة الخطيب', imageId: null },
     createdAt: `${effectiveOn}T09:00:00.000Z`,
     archivedAt: archived ? `${effectiveOn}T10:00:00.000Z` : null,
     archiveReason: archived ?? null,
@@ -16786,6 +16865,7 @@ function hrRoutes({
           ),
         },
       }),
+      imageId: null,
     };
   };
 
@@ -17092,7 +17172,7 @@ function hrRoutes({
         id: id(next++),
         userId: file.userId,
         ...body,
-        createdBy: { id: me().user.id, name: me().user.name },
+        createdBy: { id: me().user.id, name: me().user.name, imageId: null },
         createdAt: new Date().toISOString(),
         archivedAt: null,
         archiveReason: null,
@@ -17132,6 +17212,7 @@ export function leaveSeed(users: UserResponse[]): LeaveState {
   const person = (userId: string) => ({
     id: userId,
     name: users.find((u) => u.id === userId)?.name ?? '',
+    imageId: null,
   });
   const request = (
     n: number,
@@ -17293,6 +17374,7 @@ function leaveRoutes({
   const person = (userId: string) => ({
     id: userId,
     name: users.find((u) => u.id === userId)?.name ?? '',
+    imageId: null,
   });
   const scopesOf = (permission: Permission) =>
     me().permissions.find((g) => g.permission === permission)?.scopes ?? [];
@@ -17828,6 +17910,7 @@ function attendanceRoutes({
   const person = (userId: string) => ({
     id: userId,
     name: users.find((u) => u.id === userId)?.name ?? '',
+    imageId: null,
   });
   const fileOf = (userId: string) => files.find((f) => f.userId === userId);
 
@@ -18262,6 +18345,7 @@ function attendanceRoutes({
               tasksDueToday: 2,
               firstEventAt: FIELD_WORK[1]?.startsAt ?? null,
               workedMinutes: null,
+              photo: null,
             }
           : {
               direction,
@@ -18270,6 +18354,7 @@ function attendanceRoutes({
               tasksDueToday: null,
               firstEventAt: null,
               workedMinutes: day.workedMinutes,
+              photo: null,
             };
       const { userId: _userId, ...shown } = punch;
       return json(route, { punch: shown, day, greeting } satisfies PunchResult, 201);

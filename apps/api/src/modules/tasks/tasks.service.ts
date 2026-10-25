@@ -791,7 +791,9 @@ export class TasksService {
           [task.assigneeId, assigneeId].filter((userId): userId is string => !!userId),
           tx,
         );
-        const who = (userId: string | null) => (userId ? personRef(people, userId) : null);
+        // The audit names the people; their photos are not part of the change.
+        const who = (userId: string | null) =>
+          userId ? { id: userId, name: people.get(userId)?.name ?? '' } : null;
         await audit('task.assigned', {
           before: { assignee: who(task.assigneeId) },
           after: { assignee: who(assigneeId) },
@@ -875,7 +877,7 @@ export class TasksService {
           entityType: 'task',
           entityId: id,
           before: {
-            assignee: personRef(people, task.assigneeId),
+            assignee: { id: task.assigneeId, name: people.get(task.assigneeId)?.name ?? '' },
           },
           after: { assignee: null },
         });

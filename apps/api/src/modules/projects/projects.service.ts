@@ -135,7 +135,7 @@ export class ProjectsService implements OnModuleInit {
     this.responsibilities.register({
       find: async (tx, userId) => {
         const managed = await tx
-          .select({ id: projects.id, name: projects.name, imageId: projects.imageId })
+          .select({ id: projects.id, name: projects.name })
           .from(projects)
           .where(
             and(
@@ -333,8 +333,8 @@ export class ProjectsService implements OnModuleInit {
       entityId: created.id,
       after: {
         ...values,
-        client: { id: client.id, name: client.name, imageId: client.imageId },
-        projectManager: { id: manager.id, name: manager.name, imageId: manager.imageId },
+        client: { id: client.id, name: client.name },
+        projectManager: { id: manager.id, name: manager.name },
         milestones,
       },
     });
@@ -406,7 +406,7 @@ export class ProjectsService implements OnModuleInit {
         managerChange = {
           before: { projectManager: { id: current.projectManagerId, name: previous?.name ?? '' } },
           after: {
-            projectManager: { id: manager.id, name: manager.name, imageId: manager.imageId },
+            projectManager: { id: manager.id, name: manager.name },
           },
         };
       }
@@ -530,7 +530,7 @@ export class ProjectsService implements OnModuleInit {
           entityId: id,
           before: { projectManager: { id: project.projectManagerId, name: previous?.name ?? '' } },
           after: {
-            projectManager: { id: manager.id, name: manager.name, imageId: manager.imageId },
+            projectManager: { id: manager.id, name: manager.name },
           },
         });
         await this.notices.managerAssigned(

@@ -325,7 +325,7 @@ describe('shoots (F11 rules 1–9)', () => {
       const body = (await expectError(refused, 409, 'SCHEDULE_CONFLICT')) as ErrorResponse;
       expect(body.details).toEqual([
         expect.objectContaining({
-          user: { id: cast.photographer.id, name: cast.photographer.name },
+          user: { id: cast.photographer.id, name: cast.photographer.name, imageId: null },
           kind: 'shoot',
           id: first.id,
           title: first.title,

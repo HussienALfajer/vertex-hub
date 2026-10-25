@@ -81,7 +81,7 @@ test('closing lists what still holds the month', async ({ page }) => {
     {
       kind: 'item',
       id: '00000000-0000-4000-8000-000000009931',
-      user: { id: seedIds.karim, name: 'كريم' },
+      user: { id: seedIds.karim, name: 'كريم', imageId: null },
       date: '2026-09-14',
     },
   ];

@@ -87,6 +87,7 @@ describe('departments', () => {
     expect(items.find((d) => d.code === 'internal_operations')?.manager).toEqual({
       id: operations.id,
       name: operations.name,
+      imageId: null,
     });
     expect(items.find((d) => d.code === 'photography')?.memberCount).toBeGreaterThanOrEqual(1);
   });

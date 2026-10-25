@@ -246,14 +246,14 @@ describe('dashboard (F15 rules 1–7)', () => {
     it('lists retainers behind and low wallets with their client', async () => {
       const after = await company();
       expect(after.retainersBehind).toContainEqual({
-        client: { id: clientId, name: expect.any(String) },
+        client: { id: clientId, name: expect.any(String), imageId: null },
         retainer: { id: expect.any(String), name: retainerName },
         cycleId,
         linesBehind: 2,
         completion: 0,
       });
       expect(after.lowWallets).toContainEqual({
-        client: { id: clientId, name: expect.any(String) },
+        client: { id: clientId, name: expect.any(String), imageId: null },
         balanceUsdMinor: 0,
       });
     });

@@ -446,7 +446,7 @@ describe('leads (F03 rules 1–3, 5–9, 12)', () => {
         {
           id: theirs.id,
           displayName: theirs.displayName,
-          owner: { id: cast.otherAm.id, name: cast.otherAm.name },
+          owner: { id: cast.otherAm.id, name: cast.otherAm.name, imageId: null },
           stage: 'new',
           readable: false,
         },
@@ -456,7 +456,7 @@ describe('leads (F03 rules 1–3, 5–9, 12)', () => {
           id: existing.id,
           tradeName: existing.tradeName,
           status: 'active',
-          accountManager: { id: cast.am.id, name: cast.am.name },
+          accountManager: { id: cast.am.id, name: cast.am.name, imageId: null },
         },
       ]);
       const excluded = await ok(

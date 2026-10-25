@@ -133,7 +133,9 @@ describe('task comments (rule 16)', () => {
 
     await db.update(users).set({ archivedAt: new Date() }).where(eq(users.id, colleague.id));
     const shown = (await list(task.id, cast.writer.cookie)).items[0];
-    expect(shown?.mentions).toEqual([{ id: colleague.id, name: colleague.name, archived: true }]);
+    expect(shown?.mentions).toEqual([
+      { id: colleague.id, name: colleague.name, imageId: null, archived: true },
+    ]);
 
     const response = await edit(
       task.id,
