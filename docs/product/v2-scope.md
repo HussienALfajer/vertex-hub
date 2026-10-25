@@ -102,6 +102,7 @@ Approved by the owner in full (2026-10-25).
 - **Everywhere a person, client, project or retainer is shown** (headers, lists, pickers, cards, the client page header), the image replaces the initial; the initial stays the fallback.
 - **Technically:** a square crop on upload; the worker renders small and medium thumbnails; images are served only to signed-in users.
 - **Notifications:** none needed beyond the audit (a photo changed by someone else notifies its owner).
+- **Decided in the spec interview (owner, 2026-10-25):** a change by someone else notifies the person responsible for the record (the user; the client's account manager for a client or retainer; the project manager for a project), informational and in-app; no logo is taken from the brand files automatically; the crop can zoom out so a whole logo fits, on a white square; the photo shows on the entrance screen greeting, and the client's logo beside the client's name on every client-facing PDF (not in emails); an "Add your photo" card on My account and a "Without photo" filter on the team list, with no notification. Spec: `docs/specs/F01C-profile-photos-logos.md`.
 
 ### F06B — Tasks 2.0
 Approved by the owner in full (2026-10-25).
