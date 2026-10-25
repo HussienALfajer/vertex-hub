@@ -205,6 +205,16 @@ describe('images (F01C)', () => {
       expect(rows).toHaveLength(1);
       expect(rows[0]?.data).toEqual({ changes: ['photo', 'title'] });
       expect(rows[0]?.count).toBe(2);
+
+      // A change on a later day starts a new notice: the unread one is from yesterday.
+      await db
+        .update(notifications)
+        .set({ createdAt: new Date(Date.now() - 36 * 3600 * 1000) })
+        .where(eq(notifications.id, rows[0]?.id ?? ''));
+      expect((await remove(`/api/users/${target.id}`, cast.gm.cookie)).status).toBe(204);
+      const later = await noticesOf(target.id, 'profile_changed', target.id);
+      expect(later).toHaveLength(2);
+      expect(later.find((row) => row.id !== rows[0]?.id)?.data).toEqual({ changes: ['photo'] });
     });
 
     it('takes an upload once and only from its uploader (rule 1)', async () => {
@@ -482,6 +492,12 @@ describe('images (F01C)', () => {
       expect(
         (await put(path, cast.otherAm.cookie, { source: { uploadId: outsider } })).status,
       ).toBe(403);
+      expect((await remove(path, cast.otherAm.cookie)).status).toBe(403);
+      const unknown = `/api/projects/${randomUUID()}`;
+      expect((await put(unknown, cast.gm.cookie, { source: { uploadId: outsider } })).status).toBe(
+        404,
+      );
+      expect((await remove(unknown, cast.gm.cookie)).status).toBe(404);
       // The employee manages the project (the `assigned` scope).
       await setOk(path, cast.employee.cookie);
       expect(await noticesOf(cast.employee.id, 'project_image_changed', project.id)).toHaveLength(
@@ -545,6 +561,25 @@ describe('images (F01C)', () => {
         .from(retainers)
         .where(eq(retainers.id, retainer.id));
       expect(row?.imageId).toBe(image.id);
+      const [audit] = await auditOf(retainer.id, 'retainer.image_set').then((rows) =>
+        rows.slice(-1),
+      );
+      expect(audit?.after).toEqual({ imageId: image.id, source: 'upload' });
+      expect(audit?.before).toEqual({ imageId: expect.any(String) });
+
+      expect((await remove(path, cast.employee.cookie)).status).toBe(403);
+      expect((await remove(path, cast.gm.cookie)).status).toBe(204);
+      const [cleared] = await db
+        .select({ imageId: retainers.imageId })
+        .from(retainers)
+        .where(eq(retainers.id, retainer.id));
+      expect(cleared?.imageId).toBeNull();
+      expect(await currentImages(images.retainerId, retainer.id)).toHaveLength(0);
+      const [removed] = await auditOf(retainer.id, 'retainer.image_removed');
+      expect(removed?.before).toEqual({ imageId: image.id });
+      const merged = await noticesOf(cast.am.id, 'retainer_image_changed', retainer.id);
+      expect(merged).toHaveLength(1);
+      expect(merged[0]?.data).toMatchObject({ removed: true });
       expect((await remove(`/api/retainers/${randomUUID()}`, cast.gm.cookie)).status).toBe(404);
     });
 
