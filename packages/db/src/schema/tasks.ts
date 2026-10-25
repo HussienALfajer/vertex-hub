@@ -24,10 +24,11 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 import { approvalItems } from './approvals.js';
-import { departmentCodeEnum, users } from './auth.js';
+import { users } from './auth.js';
 import { clientContacts, clients } from './clients.js';
 import { archivedAt, id, timestamps } from './columns.js';
 import { contentPosts, postClientResponses } from './content.js';
+import { departmentCodeEnum } from './department-codes.js';
 import { projectMilestones, projects } from './projects.js';
 import { extraWorkItems, retainerCycleLines, retainerCycles } from './retainers.js';
 import {

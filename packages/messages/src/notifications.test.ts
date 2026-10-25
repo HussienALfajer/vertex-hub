@@ -290,6 +290,10 @@ const SAMPLES: Record<NotificationType, unknown> = {
     waitingOn: ['رنا'],
     waitingOnMore: 3,
   },
+  profile_changed: { changes: ['photo', 'title'] },
+  client_logo_changed: { client: 'مطعم الشام', removed: false },
+  project_image_changed: { project: 'إطلاق المنيو', client: 'مطعم الشام', removed: true },
+  retainer_image_changed: { retainer: 'عقد شهري', client: 'مطعم الشام', removed: false },
 };
 
 const SUBJECT_ID = '0192a5a0-0000-7000-8000-000000000001';
@@ -781,6 +785,23 @@ describe('HR attendance (F17 part C)', () => {
     expect(render('attendance_month_closed').text).toContain('أُغلق حضور شهر');
     expect(linkPath(notificationLink(sample('attendance_month_closed')))).toBe(
       '/hr/months/2026-10',
+    );
+  });
+
+  it('names the actor and the changed parts, and opens My account (F01C rules 18–19)', () => {
+    expect(render('profile_changed').text).toBe('عدّل رنا ملفك الشخصي: الصورة، المسمّى الوظيفي');
+    expect(linkPath(notificationLink(sample('profile_changed')))).toBe('/account');
+  });
+
+  it('names a changed or removed image and opens its record (F01C rule 18)', () => {
+    expect(render('client_logo_changed').text).toBe('غيّر رنا شعار العميل «مطعم الشام»');
+    expect(render('project_image_changed')).toEqual({
+      text: 'أزال رنا صورة المشروع «إطلاق المنيو»',
+      context: 'مطعم الشام',
+    });
+    expect(render('retainer_image_changed').text).toBe('غيّر رنا صورة العقد الشهري «عقد شهري»');
+    expect(linkPath(notificationLink(sample('client_logo_changed')))).toBe(
+      `/clients/${SUBJECT_ID}`,
     );
   });
 });

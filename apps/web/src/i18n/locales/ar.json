@@ -384,6 +384,10 @@
     "STORAGE_FULL": "مساحة التخزين ممتلئة. أبلغ مدير العمليات.",
     "UPLOAD_NOT_FOUND": "انتهت صلاحية الملف المرفوع. ارفعه من جديد.",
     "FILE_TYPE_NOT_ACCEPTED": "هذا النوع من الملفات غير مقبول هنا: ارفع ملف PDF أو صورة.",
+    "IMAGE_TYPE_NOT_ALLOWED": "هذا النوع من الصور غير مقبول: اختر صورة PNG أو JPEG أو WebP.",
+    "IMAGE_TOO_LARGE": "الصورة أكبر من 10 ميغابايت.",
+    "IMAGE_TOO_SMALL": "الصورة صغيرة جدًا: يجب ألا يقل كل ضلع عن 128 بكسل.",
+    "BRAND_FILE_NOT_FOUND": "لم يُعثر على هذا الشعار في ملفات هوية العميل.",
     "LINK_NOT_ALLOWED": "المراجع ملفات مرفوعة فقط. أضف الرابط في روابط المهمة.",
     "NOT_VERSIONED": "المراجع ليس لها إصدارات.",
     "NOT_DELIVERABLE": "العلامة النهائية للمخرجات فقط.",
@@ -980,7 +984,9 @@
         "backup_codes_regenerated": "أنشأ رموزًا احتياطية جديدة",
         "profile_updated": "عدّل هاتفه أو مهاراته",
         "session_signed_out": "سجّل الخروج من جهاز",
-        "sessions_signed_out": "سجّل الخروج من كل الأجهزة"
+        "sessions_signed_out": "سجّل الخروج من كل الأجهزة",
+        "image_set": "غيّر الصورة",
+        "image_removed": "أزال الصورة"
       },
       "department": {
         "updated": "عدّل قسمًا"
@@ -994,7 +1000,9 @@
         "archived": "أرشف عميلًا",
         "restored": "استعاد عميلًا",
         "brand_kit_updated": "عدّل الهوية البصرية",
-        "emailed": "أرسل بريدًا إلى العميل"
+        "emailed": "أرسل بريدًا إلى العميل",
+        "image_set": "غيّر شعار العميل",
+        "image_removed": "أزال شعار العميل"
       },
       "client_contact": {
         "created": "أضاف جهة اتصال",
@@ -1018,7 +1026,9 @@
         "status_changed": "غيّر حالة المشروع",
         "money_updated": "عدّل عملة المشروع",
         "archived": "أرشف المشروع",
-        "restored": "استعاد المشروع"
+        "restored": "استعاد المشروع",
+        "image_set": "غيّر صورة المشروع",
+        "image_removed": "أزال صورة المشروع"
       },
       "project_milestone": {
         "created": "أضاف مرحلة",
@@ -1037,7 +1047,9 @@
         "money_updated": "عدّل عملة العقد الشهري أو رسومه",
         "archived": "أرشف العقد الشهري",
         "restored": "استعاد العقد الشهري",
-        "template_changed": "غيّر القالب الشهري"
+        "template_changed": "غيّر القالب الشهري",
+        "image_set": "غيّر صورة العقد الشهري",
+        "image_removed": "أزال صورة العقد الشهري"
       },
       "retainer_cycle": {
         "created": "أنشأ دورة عقد شهري",
@@ -4726,7 +4738,11 @@
       "field_punch_rejected": "رفض تسجيلي الميداني",
       "shoot_check_in_missing": "تذكير بتسجيل الحضور في جلسة تصوير",
       "kiosk_offline": "انقطاع شاشة مدخل",
-      "attendance_month_closed": "إغلاق شهر حضور"
+      "attendance_month_closed": "إغلاق شهر حضور",
+      "profile_changed": "تعديل ملفي الشخصي",
+      "client_logo_changed": "تغيير شعار عميل",
+      "project_image_changed": "تغيير صورة مشروع",
+      "retainer_image_changed": "تغيير صورة عقد شهري"
     },
     "priorities": {
       "critical": "حرج",

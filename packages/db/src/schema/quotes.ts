@@ -21,11 +21,12 @@ import {
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
-import { departmentCodeEnum, users } from './auth.js';
+import { users } from './auth.js';
 import { catalogPackages, catalogServices } from './catalog.js';
 import { clientContacts, clients } from './clients.js';
 import { archivedAt, id, minorAmount, timestamps } from './columns.js';
 import { deliverableKindEnum } from './deliverables.js';
+import { departmentCodeEnum } from './department-codes.js';
 import { fileItems } from './files.js';
 import { leads } from './leads.js';
 import { currencyEnum, projects } from './projects.js';

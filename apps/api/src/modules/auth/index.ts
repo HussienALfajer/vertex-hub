@@ -26,5 +26,11 @@ export {
   type UserProfile,
   type UserSummary,
 } from './user-directory.js';
+export {
+  type ImageStore,
+  type ImageSubject,
+  type StoredImage,
+  UserImages,
+} from './user-images.js';
 export { UserLifecycle, type UserLifecycleHook } from './user-lifecycle.js';
 export { lockAccessChanges } from './user-status.js';

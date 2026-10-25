@@ -1,20 +1,36 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   Param,
   ParseUUIDPipe,
   Patch,
   Post,
+  Put,
   Query,
   SerializeOptions,
 } from '@nestjs/common';
-import { ApiCreatedResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBadRequestResponse,
+  ApiConflictResponse,
+  ApiCreatedResponse,
+  ApiForbiddenResponse,
+  ApiNoContentResponse,
+  ApiNotFoundResponse,
+  ApiOkResponse,
+  ApiPayloadTooLargeResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import {
   type CreateUser,
   createUserSchema,
+  type Image,
+  imageSchema,
+  type SetImage,
   type SkillListResponse,
+  setImageSchema,
   skillListResponseSchema,
   type UpdateUser,
   type UserLink,
@@ -29,7 +45,7 @@ import {
   userResponseSchema,
   userWithLinkResponseSchema,
 } from '@vertex-hub/contracts';
-import { RequirePermissions } from '../../core/access/index.js';
+import { RequirePermissions, RequireSession } from '../../core/access/index.js';
 import { CurrentUser, type CurrentUserInfo } from './current-user.decorator.js';
 import { UsersService } from './users.service.js';
 
@@ -134,6 +150,47 @@ export class UsersController {
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<UserWithLinkResponse> {
     return this.users.restore(actor, id);
+  }
+
+  @Put(':id/image')
+  @RequireSession()
+  @SerializeOptions({ schema: imageSchema })
+  @ApiOkResponse({
+    description: 'The new photo, pending until rendered',
+    standardSchema: imageSchema,
+  })
+  @ApiBadRequestResponse({
+    description:
+      '`UPLOAD_NOT_FOUND`, `IMAGE_TYPE_NOT_ALLOWED`, `IMAGE_TOO_SMALL`, `BRAND_FILE_NOT_FOUND` (users take no brand file)',
+  })
+  @ApiPayloadTooLargeResponse({ description: '`IMAGE_TOO_LARGE`: above 10 MB' })
+  @ApiForbiddenResponse({
+    description: "Another user's photo without `users.manage`; `GENERAL_MANAGER_ONLY`",
+  })
+  @ApiNotFoundResponse({ description: 'No such user' })
+  @ApiConflictResponse({ description: '`USER_ARCHIVED`' })
+  setImage(
+    @CurrentUser() actor: CurrentUserInfo,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body({ schema: setImageSchema }) input: SetImage,
+  ): Promise<Image> {
+    return this.users.setImage(actor, id, input);
+  }
+
+  @Delete(':id/image')
+  @HttpCode(204)
+  @RequireSession()
+  @ApiNoContentResponse({ description: 'The photo is removed (also when there was none)' })
+  @ApiForbiddenResponse({
+    description: "Another user's photo without `users.manage`; `GENERAL_MANAGER_ONLY`",
+  })
+  @ApiNotFoundResponse({ description: 'No such user' })
+  @ApiConflictResponse({ description: '`USER_ARCHIVED`' })
+  removeImage(
+    @CurrentUser() actor: CurrentUserInfo,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<void> {
+    return this.users.removeImage(actor, id);
   }
 
   @Post(':id/two-factor/reset')

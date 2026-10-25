@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { newPasswordSchema } from './auth.js';
 import { userDepartmentSchema } from './departments.js';
-import { pageQuerySchema, pageSchema } from './lists.js';
+import { pageQuerySchema, pageSchema, queryBooleanSchema } from './lists.js';
 import { assignableRoleSchema, roleSchema } from './roles.js';
 import { optionalText, uniqueTexts } from './text.js';
 
@@ -90,6 +90,8 @@ export const userResponseSchema = z
   .object({
     id: z.uuid(),
     name: z.string(),
+    /** The current photo (F01C); null shows the initial. */
+    imageId: z.uuid().nullable(),
     email: z.email().nullable(),
     title: z.string().nullable(),
     phone: z.string().nullable(),
@@ -113,6 +115,8 @@ export const userListQuerySchema = pageQuerySchema.extend({
   skill: skillSchema.optional(),
   /** Anything but `active` needs `users.manage`. */
   status: userStatusSchema.default('active'),
+  /** F01C rule 17: with or without a photo; needs `users.manage`. */
+  hasImage: queryBooleanSchema.optional(),
 });
 
 export type UserListQuery = z.infer<typeof userListQuerySchema>;

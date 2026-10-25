@@ -73,6 +73,44 @@ export class EngagementNotices {
   }
 
   /**
+   * F01C rule 18: someone else set or removed the image of a project (its project manager hears
+   * of it) or of a retainer (the client's primary account manager).
+   */
+  imageChanged(
+    tx: Transaction,
+    engagement:
+      | {
+          kind: 'project';
+          id: string;
+          name: string;
+          projectManagerId: string;
+          client: ClientSummary;
+        }
+      | { kind: 'retainer'; id: string; name: string; client: ClientSummary },
+    removed: boolean,
+    actorId: string,
+  ): Promise<number> {
+    return this.center.notify(
+      tx,
+      engagement.kind === 'project'
+        ? {
+            type: 'project_image_changed',
+            recipients: [engagement.projectManagerId],
+            actorId,
+            subjectId: engagement.id,
+            data: { project: engagement.name, client: engagement.client.name, removed },
+          }
+        : {
+            type: 'retainer_image_changed',
+            recipients: [engagement.client.accountManagerId],
+            actorId,
+            subjectId: engagement.id,
+            data: { retainer: engagement.name, client: engagement.client.name, removed },
+          },
+    );
+  }
+
+  /**
    * The account manager, the project manager and the managers of the project's departments;
    * Finance too when it completes or is cancelled. `assignedId`: a new project manager told of
    * the project by the same change, who is not told twice (F14 rule 2).

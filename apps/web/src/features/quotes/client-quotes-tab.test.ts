@@ -16,7 +16,7 @@ const OTHER = '0190a3c2-0000-7000-8000-000000000002';
 function me(assigned: AssignableRole[]): MeResponse {
   const roles = effectiveRoles(assigned, []);
   return {
-    user: { id: ME, name: 'مستخدم', email: 'user@vertexhub.test', image: null },
+    user: { id: ME, name: 'مستخدم', email: 'user@vertexhub.test', imageId: null },
     roles,
     departments: [],
     permissions: grantedPermissions({ roles, departments: [] }),

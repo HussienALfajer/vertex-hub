@@ -313,9 +313,12 @@ describe('module boundaries', () => {
     content: 'content',
     // The deliverable kind enum only, shared by catalog, quotes, retainers and templates.
     deliverables: 'projects',
+    // The department code enum only, shared by auth, catalog, projects, quotes, tasks and templates.
+    'department-codes': 'auth',
     email: 'email',
     files: 'files',
     hr: 'hr',
+    images: 'files',
     invoices: 'invoices',
     leads: 'leads',
     notifications: 'notifications',

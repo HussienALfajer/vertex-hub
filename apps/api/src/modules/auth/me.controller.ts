@@ -26,10 +26,13 @@ export class MeController {
   @SerializeOptions({ schema: meResponseSchema })
   @ApiOkResponse({ description: 'The signed-in user', standardSchema: meResponseSchema })
   @ApiUnauthorizedResponse({ description: 'No valid session' })
-  me(@Session() session: UserSession, @CurrentUser() current: CurrentUserInfo): MeResponse {
-    const { id, name, email, image } = session.user;
+  async me(
+    @Session() session: UserSession,
+    @CurrentUser() current: CurrentUserInfo,
+  ): Promise<MeResponse> {
+    const { id, name, email } = session.user;
     return {
-      user: { id, name, email, image: image ?? null },
+      user: { id, name, email, imageId: await this.users.imageIdOf(id) },
       roles: [...current.access.roles],
       departments: current.departments,
       permissions: grantedPermissions(current.access),

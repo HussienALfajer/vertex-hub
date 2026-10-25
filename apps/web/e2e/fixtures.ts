@@ -578,7 +578,7 @@ const content = seeded('content_management');
 const medical = seeded('medical_consultation');
 
 export const manager: MeResponse = {
-  user: { id: id(1), name: 'سارة الخطيب', email: 'sara@vertex.example', image: null },
+  user: { id: id(1), name: 'سارة الخطيب', email: 'sara@vertex.example', imageId: null },
   roles: ['general_manager', 'employee', 'account_manager'],
   departments: [{ ...general, isPrimary: true, isManager: false }],
   permissions: grantedPermissions({
@@ -614,7 +614,7 @@ export const financeMe: MeResponse = {
 
 /** Layan: a department manager who is also an Account Manager (F02 own_clients scope). */
 export const accountManagerMe: MeResponse = {
-  user: { id: id(3), name: 'ليان الأحمد', email: 'layan@vertex.example', image: null },
+  user: { id: id(3), name: 'ليان الأحمد', email: 'layan@vertex.example', imageId: null },
   roles: ['account_manager', 'department_manager', 'employee'],
   departments: [
     { ...design, isPrimary: true, isManager: true },
@@ -632,7 +632,7 @@ export const accountManagerMe: MeResponse = {
 
 /** Basel as a plain department manager of Design, with no other role (F15 home page). */
 export const departmentManagerMe: MeResponse = {
-  user: { id: id(6), name: 'باسل يوسف', email: 'basel@vertex.example', image: null },
+  user: { id: id(6), name: 'باسل يوسف', email: 'basel@vertex.example', imageId: null },
   roles: ['department_manager', 'employee'],
   departments: [{ ...design, isPrimary: true, isManager: true }],
   permissions: grantedPermissions({
@@ -655,7 +655,7 @@ export const plainAccountManagerMe: MeResponse = {
 
 /** Omar: the Internal Operations manager, who reads leads and quotes them (F03, F04). */
 export const operationsManagerMe: MeResponse = {
-  user: { id: id(2), name: 'عمر حداد', email: 'omar@vertex.example', image: null },
+  user: { id: id(2), name: 'عمر حداد', email: 'omar@vertex.example', imageId: null },
   roles: ['department_manager', 'employee'],
   departments: [{ ...operations, isPrimary: true, isManager: true }],
   permissions: grantedPermissions({
@@ -667,7 +667,7 @@ export const operationsManagerMe: MeResponse = {
 
 /** Karim: an employee with no role beyond the default one. */
 export const employeeMe: MeResponse = {
-  user: { id: id(4), name: 'كريم الزين', email: 'karim@vertex.example', image: null },
+  user: { id: id(4), name: 'كريم الزين', email: 'karim@vertex.example', imageId: null },
   roles: ['employee'],
   departments: [{ ...photography, isPrimary: true, isManager: false }],
   permissions: grantedPermissions({
@@ -679,7 +679,7 @@ export const employeeMe: MeResponse = {
 
 /** Dr. Hiba: a member of Medical Consultation, who reviews healthcare clients' content (F09). */
 export const medicalReviewerMe: MeResponse = {
-  user: { id: id(8), name: 'د. هبة النجار', email: 'hiba@vertex.example', image: null },
+  user: { id: id(8), name: 'د. هبة النجار', email: 'hiba@vertex.example', imageId: null },
   roles: ['employee'],
   departments: [{ ...medical, isPrimary: true, isManager: false }],
   permissions: grantedPermissions({
@@ -699,6 +699,7 @@ function member(
   return {
     id: id(n),
     name,
+    imageId: null,
     email,
     title: null,
     phone: null,

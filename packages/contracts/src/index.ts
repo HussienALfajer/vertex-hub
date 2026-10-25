@@ -23,6 +23,7 @@ export * from './extra-work.js';
 export * from './files.js';
 export * from './health.js';
 export * from './hr.js';
+export * from './images.js';
 export * from './invoices.js';
 export * from './jobs.js';
 export * from './leads.js';

@@ -1,6 +1,7 @@
-import { DEPARTMENT_CODES, ROLES } from '@vertex-hub/contracts';
+import { ROLES } from '@vertex-hub/contracts';
 import { sql } from 'drizzle-orm';
 import {
+  type AnyPgColumn,
   boolean,
   index,
   integer,
@@ -13,6 +14,8 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 import { archivedAt, id, timestamps } from './columns.js';
+import { departmentCodeEnum } from './department-codes.js';
+import { images } from './images.js';
 
 /*
  * Identity and access, owned by the api `auth` module: the Better Auth tables (ADR 0002) plus
@@ -20,21 +23,27 @@ import { archivedAt, id, timestamps } from './columns.js';
  * expects; column names are snake_case. Better Auth generates ids through `newId` (UUIDv7).
  */
 
-export const users = pgTable('users', {
-  id: id(),
-  name: text('name').notNull(),
-  email: text('email').notNull().unique(),
-  emailVerified: boolean('email_verified').notNull().default(false),
-  image: text('image'),
-  /** Set by the Better Auth two-factor plugin once TOTP is verified. */
-  twoFactorEnabled: boolean('two_factor_enabled').notNull().default(false),
-  title: text('title'),
-  /** `+` and 8–15 digits. */
-  phone: text('phone'),
-  skills: text('skills').array().notNull().default(sql`'{}'::text[]`),
-  ...timestamps(),
-  archivedAt: archivedAt(),
-});
+export const users = pgTable(
+  'users',
+  {
+    id: id(),
+    name: text('name').notNull(),
+    email: text('email').notNull().unique(),
+    emailVerified: boolean('email_verified').notNull().default(false),
+    image: text('image'),
+    /** Set by the Better Auth two-factor plugin once TOTP is verified. */
+    twoFactorEnabled: boolean('two_factor_enabled').notNull().default(false),
+    title: text('title'),
+    /** `+` and 8–15 digits. */
+    phone: text('phone'),
+    skills: text('skills').array().notNull().default(sql`'{}'::text[]`),
+    /** F01C: the current photo; Better Auth's `image` stays unused. */
+    imageId: uuid('image_id').references((): AnyPgColumn => images.id),
+    ...timestamps(),
+    archivedAt: archivedAt(),
+  },
+  (table) => [index('users_image_id_idx').on(table.imageId)],
+);
 
 export const sessions = pgTable(
   'sessions',
@@ -130,8 +139,6 @@ export const twoFactors = pgTable(
   },
   (table) => [index('two_factors_user_id_idx').on(table.userId)],
 );
-
-export const departmentCodeEnum = pgEnum('department_code', DEPARTMENT_CODES);
 
 /** The ten fixed departments (ADR 0014), seeded by migration; never archived in V1. */
 export const departments = pgTable(

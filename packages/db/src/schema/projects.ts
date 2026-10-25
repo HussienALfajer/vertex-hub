@@ -1,6 +1,7 @@
 import { CURRENCIES, MILESTONE_STATUSES, PROJECT_STATUSES } from '@vertex-hub/contracts';
 import { sql } from 'drizzle-orm';
 import {
+  type AnyPgColumn,
   check,
   date,
   index,
@@ -12,9 +13,11 @@ import {
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
-import { departmentCodeEnum, users } from './auth.js';
+import { users } from './auth.js';
 import { clients } from './clients.js';
 import { archivedAt, id, minorAmount, timestamps } from './columns.js';
+import { departmentCodeEnum } from './department-codes.js';
+import { images } from './images.js';
 
 /*
  * Projects and retainers of clients (F05), owned by the api `projects` module. Dates without a
@@ -48,6 +51,8 @@ export const projects = pgTable(
     completedAt: timestamp('completed_at', { withTimezone: true }),
     cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
     cancelReason: text('cancel_reason'),
+    /** F01C: its own image; the client's logo shows without one. */
+    imageId: uuid('image_id').references((): AnyPgColumn => images.id),
     ...timestamps(),
     archivedAt: archivedAt(),
   },
@@ -60,6 +65,7 @@ export const projects = pgTable(
     index('projects_status_idx').on(table.status),
     index('projects_due_date_idx').on(table.dueDate),
     index('projects_departments_idx').using('gin', table.departments),
+    index('projects_image_id_idx').on(table.imageId),
     check('projects_dates_check', sql`${table.dueDate} >= ${table.startDate}`),
   ],
 );

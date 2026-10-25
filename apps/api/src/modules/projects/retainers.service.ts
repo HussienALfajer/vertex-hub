@@ -25,6 +25,7 @@ import {
   type DeliverableLineList,
   deliverableKey,
   duplicateDeliverables,
+  type Image,
   permissionScopes,
   RENEWAL_NOTICE_DAYS,
   RETAINER_LIMITS,
@@ -37,6 +38,7 @@ import {
   type RetainerStatusChange,
   type RetainerTermSummary,
   renewalState,
+  type SetImage,
   type UpdateRetainer,
 } from '@vertex-hub/contracts';
 import {
@@ -75,6 +77,7 @@ import {
   type UserSummary,
 } from '../auth/index.js';
 import { ClientDirectory, type ClientSummary } from '../clients/index.js';
+import { ImagesService } from '../files/index.js';
 import { BillingLocks } from './billing-locks.js';
 import { changedDepartments } from './engagement-departments.js';
 import { EngagementNotices } from './engagement-notices.js';
@@ -147,6 +150,7 @@ export class RetainersService {
     private readonly terms: RetainerTermsService,
     private readonly amendments: RetainerAmendmentsService,
     private readonly notices: EngagementNotices,
+    private readonly images: ImagesService,
   ) {}
 
   async list(actor: CurrentUserInfo, query: RetainerListQuery): Promise<RetainerPage> {
@@ -752,6 +756,58 @@ export class RetainersService {
     return change.startNow
       ? { opensNow: true, cyclesFrom: null }
       : { opensNow: false, cyclesFrom: nextStart };
+  }
+
+  /** F01C rules 1, 3, 5 and 18: the retainer's own image, shown instead of its client's logo. */
+  async setImage(actor: CurrentUserInfo, id: string, input: SetImage): Promise<Image> {
+    const image = await this.db.transaction(async (tx) => {
+      const { retainer, imageId } = await this.lockForImage(tx, actor, id);
+      const stored = await this.images.set(tx, actor, { type: 'retainer', id }, input);
+      await tx.update(retainers).set({ imageId: stored.image.id }).where(eq(retainers.id, id));
+      await recordAudit(tx, {
+        actor: actorOf(actor),
+        action: 'retainer.image_set',
+        entityType: 'retainer',
+        entityId: id,
+        ...(imageId && { before: { imageId } }),
+        after: { imageId: stored.image.id, source: stored.source },
+      });
+      await this.notices.imageChanged(tx, { kind: 'retainer', ...retainer }, false, actor.id);
+      return stored.image;
+    });
+    await this.images.queueRenders();
+    return image;
+  }
+
+  /** F01C rules 3 and 4: back to the client's logo; nothing changes without an image. */
+  async removeImage(actor: CurrentUserInfo, id: string): Promise<void> {
+    await this.db.transaction(async (tx) => {
+      const { retainer, imageId } = await this.lockForImage(tx, actor, id);
+      if (!imageId) return;
+      await this.images.remove(tx, actor, { type: 'retainer', id });
+      await tx.update(retainers).set({ imageId: null }).where(eq(retainers.id, id));
+      await recordAudit(tx, {
+        actor: actorOf(actor),
+        action: 'retainer.image_removed',
+        entityType: 'retainer',
+        entityId: id,
+        before: { imageId },
+        after: { imageId: null },
+      });
+      await this.notices.imageChanged(tx, { kind: 'retainer', ...retainer }, true, actor.id);
+    });
+  }
+
+  /** Client scope, on a retainer that is not archived (ended ones too). */
+  private async lockForImage(tx: Transaction, actor: CurrentUserInfo, id: string) {
+    const retainer = await readableRetainer(tx, this.clients, actor, id, { forUpdate: true });
+    if (!coversClient(actor, retainer.client)) throw new ForbiddenException();
+    assertRetainerNotArchived(retainer);
+    const [row] = await tx
+      .select({ imageId: retainers.imageId })
+      .from(retainers)
+      .where(eq(retainers.id, id));
+    return { retainer, imageId: row?.imageId ?? null };
   }
 
   async archive(actor: CurrentUserInfo, id: string): Promise<RetainerDetail> {

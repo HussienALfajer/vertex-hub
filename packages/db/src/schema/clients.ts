@@ -7,6 +7,7 @@ import {
 } from '@vertex-hub/contracts';
 import { sql } from 'drizzle-orm';
 import {
+  type AnyPgColumn,
   boolean,
   index,
   jsonb,
@@ -19,6 +20,7 @@ import {
 } from 'drizzle-orm/pg-core';
 import { users } from './auth.js';
 import { archivedAt, id, timestamps } from './columns.js';
+import { images } from './images.js';
 
 /*
  * Clients and what the team knows about them (F02), owned by the api `clients` module.
@@ -59,6 +61,8 @@ export const clients = pgTable(
     billingAddress: text('billing_address'),
     /** Commercial registration or licence, printed in contracts (F05C). */
     registrationNumber: text('registration_number'),
+    /** F01C: the current logo. */
+    imageId: uuid('image_id').references((): AnyPgColumn => images.id),
     ...timestamps(),
     archivedAt: archivedAt(),
   },
@@ -69,6 +73,7 @@ export const clients = pgTable(
     index('clients_sector_idx').on(sql`lower(${table.sector})`),
     index('clients_account_manager_id_idx').on(table.accountManagerId),
     index('clients_status_idx').on(table.status),
+    index('clients_image_id_idx').on(table.imageId),
   ],
 );
 

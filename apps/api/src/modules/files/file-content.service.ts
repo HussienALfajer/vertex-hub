@@ -5,10 +5,13 @@ import {
   FILES_PREVIEW_JOB,
   FILES_PURGE_UPLOADS_JOB,
   fileExtension,
+  IMAGE_MAX_ATTEMPTS,
+  IMAGE_SIZES,
+  type ImageSize,
   isInlineMimeType,
 } from '@vertex-hub/contracts';
-import { type Database, fileItems, fileVersions } from '@vertex-hub/db';
-import { eq } from 'drizzle-orm';
+import { type Database, fileItems, fileVersions, images } from '@vertex-hub/db';
+import { and, eq, isNull, sql } from 'drizzle-orm';
 import sharp from 'sharp';
 import { ENV, type Env } from '../../core/config/env.js';
 import { DATABASE } from '../../core/database/database.module.js';
@@ -44,6 +47,9 @@ export type PreviewSize = 'thumbnail' | 'preview';
 const previewKey = (key: string, size: PreviewSize) =>
   `${key}.${size === 'thumbnail' ? 'thumb' : 'preview'}.webp`;
 
+/** F01C: a profile image's rendition beside its square. */
+export const imageRenditionKey = (key: string, size: ImageSize) => `${key}.${size}.webp`;
+
 /**
  * Serving content (spec F10 rules 16–18) and the `files.preview` and `files.purge-uploads` jobs,
  * which `apps/worker` schedules and this process works (ADR 0008).
@@ -64,8 +70,9 @@ export class FileContentService implements OnModuleInit {
 
   onModuleInit(): void {
     this.jobs.work(FILES_PREVIEW_JOB.queue, async () => {
-      const result = await this.renderPendingPreviews();
-      if (result.left) await this.jobs.send(FILES_PREVIEW_JOB.queue);
+      const previews = await this.renderPendingPreviews();
+      const images = await this.renderPendingImages();
+      if (previews.left || images.left) await this.jobs.send(FILES_PREVIEW_JOB.queue);
     });
     this.jobs.work(FILES_PURGE_UPLOADS_JOB.queue, async () => {
       const purged = await this.uploads.purgeUploads();
@@ -113,6 +120,37 @@ export class FileContentService implements OnModuleInit {
     response.setHeader('Content-Disposition', 'inline');
     response.setHeader('Cache-Control', cacheControl(confidential));
     await this.send(previewKey(version.storageKey, size), request, response);
+  }
+
+  /**
+   * F01C rule 11: a current image to any signed-in user. A ready one is served from its rendition
+   * and cached for good (a new image has a new id); a pending one from the uploaded square, never
+   * cached; a failed, archived or unknown one is 404.
+   */
+  async image(
+    id: string,
+    size: ImageSize,
+    request: IncomingMessage,
+    response: ServerResponse,
+  ): Promise<void> {
+    const [image] = await this.db
+      .select({ storageKey: images.storageKey, mimeType: images.mimeType, status: images.status })
+      .from(images)
+      .where(and(eq(images.id, id), isNull(images.archivedAt)));
+    if (!image || image.status === 'failed') throw new NotFoundException();
+    const ready = image.status === 'ready';
+    response.setHeader('X-Content-Type-Options', 'nosniff');
+    response.setHeader('Content-Type', ready ? 'image/webp' : image.mimeType);
+    response.setHeader('Content-Disposition', 'inline');
+    response.setHeader(
+      'Cache-Control',
+      ready ? 'private, max-age=31536000, immutable' : 'no-store',
+    );
+    await this.send(
+      ready ? imageRenditionKey(image.storageKey, size) : image.storageKey,
+      request,
+      response,
+    );
   }
 
   /**
@@ -206,6 +244,61 @@ export class FileContentService implements OnModuleInit {
       else failed += 1;
     }
     return { ready, failed, left: pending.length > PREVIEW_BATCH };
+  }
+
+  /**
+   * F01C rule 10: renders the `sm` and `md` WebP renditions of pending images, centre-cropped to
+   * a square with transparency kept, trying each up to three times before marking it `failed`.
+   */
+  async renderPendingImages(): Promise<{ ready: number; failed: number; left: boolean }> {
+    const pending = await this.db
+      .select({ id: images.id, key: images.storageKey })
+      .from(images)
+      .where(eq(images.status, 'pending'))
+      .orderBy(images.createdAt, images.id)
+      .limit(PREVIEW_BATCH + 1);
+    let ready = 0;
+    let failed = 0;
+    for (const { id, key } of pending.slice(0, PREVIEW_BATCH)) {
+      const { rendered, attempts } = await this.renderImage(key);
+      await this.db
+        .update(images)
+        .set({
+          ...(rendered
+            ? { status: 'ready' as const, width: rendered.width, height: rendered.height }
+            : { status: 'failed' as const }),
+          attempts: sql`${images.attempts} + ${attempts}`,
+          updatedAt: new Date(),
+        })
+        .where(eq(images.id, id));
+      if (rendered) ready += 1;
+      else failed += 1;
+    }
+    return { ready, failed, left: pending.length > PREVIEW_BATCH };
+  }
+
+  private async renderImage(
+    key: string,
+  ): Promise<{ rendered: { width: number; height: number } | null; attempts: number }> {
+    for (let attempt = 1; attempt <= IMAGE_MAX_ATTEMPTS; attempt += 1) {
+      try {
+        const source = await this.readAll(key);
+        const { width, height } = await sharp(source, { failOn: 'error' }).metadata();
+        for (const size of ['sm', 'md'] as const) {
+          const target = imageRenditionKey(key, size);
+          await this.storage.remove(target);
+          const output = sharp(source, { failOn: 'error' })
+            .rotate()
+            .resize(IMAGE_SIZES[size], IMAGE_SIZES[size], { fit: 'cover', position: 'centre' })
+            .webp({ quality: 85 });
+          await pipeline(output, await this.storage.writable(target));
+        }
+        return { rendered: { width: width ?? 0, height: height ?? 0 }, attempts: attempt };
+      } catch (error) {
+        this.logger.warn(`Image ${key} failed to render (attempt ${attempt}): ${String(error)}`);
+      }
+    }
+    return { rendered: null, attempts: IMAGE_MAX_ATTEMPTS };
   }
 
   /** Renders both sizes from one read of the image; returns its dimensions, or null on failure. */

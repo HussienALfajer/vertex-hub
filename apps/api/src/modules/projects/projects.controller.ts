@@ -1,19 +1,33 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   Param,
   ParseUUIDPipe,
   Patch,
   Post,
+  Put,
   Query,
   SerializeOptions,
 } from '@nestjs/common';
-import { ApiCreatedResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBadRequestResponse,
+  ApiConflictResponse,
+  ApiCreatedResponse,
+  ApiForbiddenResponse,
+  ApiNoContentResponse,
+  ApiNotFoundResponse,
+  ApiOkResponse,
+  ApiPayloadTooLargeResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import {
   type CreateProject,
   createProjectSchema,
+  type Image,
+  imageSchema,
   type ProjectDetail,
   type ProjectListQuery,
   type ProjectPage,
@@ -22,6 +36,8 @@ import {
   projectListQuerySchema,
   projectPageSchema,
   projectStatusChangeSchema,
+  type SetImage,
+  setImageSchema,
   type UpdateProject,
   updateProjectSchema,
 } from '@vertex-hub/contracts';
@@ -133,5 +149,44 @@ export class ProjectsController {
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<ProjectDetail> {
     return this.projects.restore(actor, id);
+  }
+
+  @Put(':id/image')
+  @RequirePermissions('projects.manage')
+  @SerializeOptions({ schema: imageSchema })
+  @ApiOkResponse({
+    description: 'The new project image, pending until rendered',
+    standardSchema: imageSchema,
+  })
+  @ApiBadRequestResponse({
+    description:
+      '`UPLOAD_NOT_FOUND`, `IMAGE_TYPE_NOT_ALLOWED`, `IMAGE_TOO_SMALL`, `BRAND_FILE_NOT_FOUND` (only client logos come from brand files)',
+  })
+  @ApiPayloadTooLargeResponse({ description: '`IMAGE_TOO_LARGE`: above 10 MB' })
+  @ApiForbiddenResponse({ description: 'A project outside the `projects.manage` scope' })
+  @ApiNotFoundResponse({ description: 'No such readable project' })
+  @ApiConflictResponse({ description: '`PROJECT_ARCHIVED`, `CLIENT_ARCHIVED`' })
+  setImage(
+    @CurrentUser() actor: CurrentUserInfo,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body({ schema: setImageSchema }) input: SetImage,
+  ): Promise<Image> {
+    return this.projects.setImage(actor, id, input);
+  }
+
+  @Delete(':id/image')
+  @HttpCode(204)
+  @RequirePermissions('projects.manage')
+  @ApiNoContentResponse({
+    description: "The project's own image is removed: it shows its client's logo again",
+  })
+  @ApiForbiddenResponse({ description: 'A project outside the `projects.manage` scope' })
+  @ApiNotFoundResponse({ description: 'No such readable project' })
+  @ApiConflictResponse({ description: '`PROJECT_ARCHIVED`, `CLIENT_ARCHIVED`' })
+  removeImage(
+    @CurrentUser() actor: CurrentUserInfo,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<void> {
+    return this.projects.removeImage(actor, id);
   }
 }

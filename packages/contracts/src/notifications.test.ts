@@ -9,6 +9,7 @@ import {
   firstMatchPerRecipient,
   isEscalationType,
   isMutableNotificationType,
+  mergedNotificationData,
   NOTIFICATION_CATALOG,
   NOTIFICATION_DATA_SCHEMAS,
   NOTIFICATION_RESOLUTIONS,
@@ -81,6 +82,11 @@ describe('notification catalog', () => {
         // F17 part A: the information notices.
         'employee_leaving',
         'salary_changed',
+        // F01C.
+        'profile_changed',
+        'client_logo_changed',
+        'project_image_changed',
+        'retainer_image_changed',
         // F17 part B.
         'holiday_changed',
         'hr_request_decided',
@@ -756,5 +762,54 @@ describe('channel policy (F16 rule B2)', () => {
     expect(
       updateNotificationPolicySchema.safeParse({ reset: true, push: 'on', email: 'on' }).success,
     ).toBe(false);
+  });
+});
+
+describe('image and profile notices (spec F01C)', () => {
+  it('merges each per subject and day, informational, without push', () => {
+    for (const type of [
+      'profile_changed',
+      'client_logo_changed',
+      'project_image_changed',
+      'retainer_image_changed',
+    ] as const) {
+      expect(NOTIFICATION_CATALOG[type]).toMatchObject({
+        box: 'info',
+        priority: 'informational',
+        push: 'off',
+        merges: true,
+        mergesDaily: true,
+        mutable: true,
+      });
+    }
+    expect(NOTIFICATION_CATALOG.profile_changed).toMatchObject({
+      category: 'account',
+      subject: 'user',
+    });
+    expect(NOTIFICATION_CATALOG.task_commented.mergesDaily).toBe(false);
+  });
+
+  it('names every part changed that day in display order (rule 19)', () => {
+    expect(
+      mergedNotificationData(
+        { type: 'profile_changed', data: { changes: ['title', 'photo'] } },
+        { changes: ['skills', 'photo'] },
+      ),
+    ).toEqual({ changes: ['photo', 'title', 'skills'] });
+    expect(
+      mergedNotificationData({ type: 'profile_changed', data: { changes: ['name'] } }, null),
+    ).toEqual({ changes: ['name'] });
+    expect(
+      mergedNotificationData(
+        { type: 'client_logo_changed', data: { client: 'C', removed: true } },
+        { client: 'C', removed: false },
+      ),
+    ).toEqual({ client: 'C', removed: true });
+  });
+
+  it('needs at least one change', () => {
+    expect(NOTIFICATION_DATA_SCHEMAS.profile_changed.safeParse({ changes: [] }).success).toBe(
+      false,
+    );
   });
 });

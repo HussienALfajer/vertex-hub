@@ -1,10 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import {
+  businessDate,
+  businessInstant,
   type ChannelOverrides,
   type ChannelPolicies,
   channelModeOf,
   effectiveChannel,
   firstMatchPerRecipient,
+  mergedNotificationData,
   NOTIFICATION_CATALOG,
   NOTIFICATION_DATA_SCHEMAS,
   NOTIFICATION_EMAIL,
@@ -19,7 +22,7 @@ import {
   resolutionTypeOf,
 } from '@vertex-hub/contracts';
 import { newId, notificationSettings, notifications, type Transaction } from '@vertex-hub/db';
-import { and, eq, inArray, isNotNull, isNull, or, type SQL, sql } from 'drizzle-orm';
+import { and, eq, gte, inArray, isNotNull, isNull, or, type SQL, sql } from 'drizzle-orm';
 import { UserDirectory } from '../auth/index.js';
 import { NOTIFICATIONS_CHANNEL, pushPayloads } from './notification-channel.js';
 import { NotificationPolicies } from './notification-policies.service.js';
@@ -374,7 +377,7 @@ export class NotificationCenter {
       sql`select pg_advisory_xact_lock(hashtextextended(${`${notice.type}:${recipientId}:${notice.subjectId}`}, 0))`,
     );
     const [open] = await tx
-      .select({ id: notifications.id })
+      .select({ id: notifications.id, data: notifications.data })
       .from(notifications)
       .where(
         and(
@@ -384,6 +387,10 @@ export class NotificationCenter {
           isNull(notifications.readAt),
           isNull(notifications.resolvedAt),
           isNull(notifications.snoozedUntil),
+          // F01C: "merges per … and day" types merge only into today's row.
+          NOTIFICATION_CATALOG[notice.type].mergesDaily
+            ? gte(notifications.createdAt, businessInstant(businessDate(), '00:00'))
+            : undefined,
         ),
       )
       .limit(1)
@@ -394,7 +401,7 @@ export class NotificationCenter {
       .set({
         count: sql`${notifications.count} + 1`,
         actorId: notice.actorId,
-        data,
+        data: mergedNotificationData({ type: notice.type, data } as NotificationContent, open.data),
         updatedAt: new Date(),
         // F14 email rule 8: a later batch carries the new items once.
         ...(email.emailState === 'pending' && email),
