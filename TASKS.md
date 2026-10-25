@@ -7,7 +7,7 @@ Three PRs, each accepted by the owner before the next starts. One session per PR
 - [x] contracts: `images.ts` (`IMAGE_SUBJECT_TYPES`, `IMAGE_SIZES`, `IMAGE_MAX_BYTES`, `IMAGE_MIN_SIDE`, `IMAGE_UPLOAD_SIDE`, accepted types, `setImageSchema`, `imageSchema`, `imagePath`); error codes `IMAGE_TYPE_NOT_ALLOWED`, `IMAGE_TOO_LARGE`, `IMAGE_TOO_SMALL`, `BRAND_FILE_NOT_FOUND` (and any missing `*_ARCHIVED`); audit actions `<user|client|project|retainer>.image_set` / `.image_removed`; notification types `profile_changed`, `client_logo_changed`, `project_image_changed`, `retainer_image_changed` (texts in `messages`); `userListQuerySchema.hasImage`, user list items and the session user gain `imageId`; unit tests; `ar.json` keys
 - [x] db (`/db-migration`): `images` (enums, checks, partial unique indexes, pending index); `image_id` on `users`, `clients`, `projects`, `retainers`; `TABLE_OWNERS`
 - [x] api: `files` `ImagesService` (set, remove, brand version check) and `GET /api/images/:id/:size` (pending `no-store`, ready `immutable`, 404 otherwise, `X-Accel-Redirect`); `files.preview` renders pending images (rule 10); `PUT`/`DELETE …/:id/image` on users, clients, projects, retainers with scopes, archived refusals, audit, notifications (rule 18); `profile_changed` on profile edits by another person (rule 19); `hasImage` filter; `test/images.test.ts`
-- [ ] bridge: `openapi:export`, `api:generate`; web typecheck
+- [x] bridge: `openapi:export`, `api:generate`; web typecheck
 - [ ] checks, reviewer, acceptance (API at `/api/docs`), PR with auto-merge
 
 ## PR A2 — references, greeting and PDFs: contracts, api, worker
